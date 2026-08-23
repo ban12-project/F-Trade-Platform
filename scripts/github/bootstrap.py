@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import fcntl
 import subprocess
 import sys
 from pathlib import Path
@@ -11,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP = ROOT / ".github" / "bootstrap"
+LOCK_PATH = Path("/tmp/f-trade-github-bootstrap.lock")
 
 
 def run_gh(args: list[str], *, input_text: str | None = None) -> str:
@@ -33,6 +35,15 @@ def load(name: str):
 
 
 def main() -> int:
+    with LOCK_PATH.open("w", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError("Another GitHub bootstrap is already running") from error
+        return bootstrap()
+
+
+def bootstrap() -> int:
     repo_info = json.loads(run_gh(["repo", "view", "--json", "nameWithOwner,isPrivate,hasIssuesEnabled"]))
     repo = repo_info["nameWithOwner"]
     if not repo_info["isPrivate"]:
