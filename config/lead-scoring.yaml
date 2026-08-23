@@ -1,0 +1,42 @@
+version: 1
+status: proposed
+score_cap: 100
+thresholds:
+  cold_max: 30
+  warm_max: 60
+rules:
+  - id: active_inquiry
+    description: 主动询盘
+    points: 20
+  - id: provides_oe_number
+    description: 提供 OE Number
+    points: 15
+  - id: explicit_quantity
+    description: 明确数量
+    points: 15
+  - id: target_quantity_range
+    description: 数量达到目标范围
+    points: 10
+  - id: asks_sample
+    description: 询问 Sample
+    points: 10
+  - id: asks_lead_time
+    description: 询问 Lead Time
+    points: 10
+  - id: asks_payment_terms
+    description: 询问 Payment Terms
+    points: 15
+  - id: replies_again
+    description: 二次主动回复
+    points: 15
+normalization: "min(100, sum(triggered_rule.points))"
+statuses:
+  - name: COLD
+    min_score: 0
+    max_score: 30
+  - name: WARM
+    min_score: 31
+    max_score: 60
+  - name: HOT
+    min_score: 61
+    max_score: 100

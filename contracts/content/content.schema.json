@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/content.schema.json",
+  "title": "Content",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["content_id", "product_id", "content_type", "objective", "target_customer", "platform", "hook", "body", "product_facts", "call_to_action", "hashtags", "visual_instruction", "status"],
+  "properties": {
+    "content_id": {"type": "string", "minLength": 1},
+    "product_id": {"type": "string", "minLength": 1},
+    "content_type": {"enum": ["product", "factory_capability", "industry_knowledge"]},
+    "objective": {"type": "string", "minLength": 1},
+    "target_customer": {"type": "string", "minLength": 1},
+    "platform": {"type": "string", "minLength": 1},
+    "hook": {"type": "string", "minLength": 1},
+    "body": {"type": "string", "minLength": 1},
+    "product_facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "value", "evidence_ref"],
+        "properties": {
+          "field": {"type": "string", "minLength": 1},
+          "value": {"type": "string", "minLength": 1},
+          "evidence_ref": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "call_to_action": {"type": "string", "minLength": 1},
+    "hashtags": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "visual_instruction": {"type": "string", "minLength": 1},
+    "status": {"enum": ["draft", "approved"]},
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "approved_by": {"type": "string", "minLength": 1},
+        "approved_at": {"type": "string", "format": "date-time"},
+        "evidence_ref": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "approved"}}},
+      "then": {"required": ["review"], "properties": {"review": {"required": ["approved_by", "approved_at", "evidence_ref"]}}}
+    }
+  ]
+}

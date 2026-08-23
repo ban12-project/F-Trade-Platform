@@ -1,0 +1,35 @@
+{
+  "record_id": "synthetic-product-ready-001",
+  "source_ref": "synthetic_factory_sheet_row_001",
+  "evidence_refs": ["synthetic_factory_sheet_row_001", "human_review_001"],
+  "verification_status": "verified",
+  "missing_fields": [],
+  "product": {
+    "product_name": "Synthetic Clutch Kit",
+    "product_type": "clutch_kit",
+    "internal_sku": "SYN-CK-001",
+    "oe_numbers": ["SYN-OE-001"],
+    "application": "Synthetic test application",
+    "vehicle_brand": "Synthetic",
+    "vehicle_model": "Demo Model"
+  },
+  "specifications": {
+    "clutch_diameter_mm": 240,
+    "spline_count": 23,
+    "spline_size": "synthetic-size",
+    "friction_material": "synthetic-material",
+    "kit_contents": ["clutch_disc", "pressure_plate", "release_bearing"]
+  },
+  "commercial": {
+    "moq": 10,
+    "estimated_lead_time_days": 30,
+    "packaging": "synthetic-neutral-box",
+    "supported_customization": "synthetic-label",
+    "sample_available": true
+  },
+  "review": {
+    "approved_by": "synthetic-reviewer",
+    "approved_at": "2026-08-23T12:00:00Z",
+    "evidence_ref": "human_review_001"
+  }
+}

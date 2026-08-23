@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/workflow-event.schema.json",
+  "title": "WorkflowEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "entity_type", "entity_id", "from_state", "to_state", "actor_type", "occurred_at", "evidence_refs"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "entity_type": {"enum": ["product", "content", "lead", "rfq", "quotation", "opportunity"]},
+    "entity_id": {"type": "string", "minLength": 1},
+    "from_state": {
+      "enum": ["PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "PRODUCT_READY", "CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED", "CONTENT_APPROVED", "PUBLISHED", "LEAD_RECEIVED", "RFQ_COLLECTING", "RFQ_READY", "QUOTE_REVIEW_REQUIRED", "QUOTED", "FOLLOW_UP", "OPPORTUNITY", "WON", "LOST"]
+    },
+    "to_state": {
+      "enum": ["PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "PRODUCT_READY", "CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED", "CONTENT_APPROVED", "PUBLISHED", "LEAD_RECEIVED", "RFQ_COLLECTING", "RFQ_READY", "QUOTE_REVIEW_REQUIRED", "QUOTED", "FOLLOW_UP", "OPPORTUNITY", "WON", "LOST"]
+    },
+    "actor_type": {"enum": ["agent", "human", "system"]},
+    "actor_id": {"type": "string", "minLength": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "evidence_refs": {"type": "array", "items": {"type": "string"}},
+    "gate": {"enum": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"]}
+  }
+}

@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.md text diff
+*.json text diff
+*.yaml text diff
+*.yml text diff
+*.csv text diff
+*.pdf binary

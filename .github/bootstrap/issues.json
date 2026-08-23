@@ -1,0 +1,164 @@
+[
+  {
+    "title": "[EPIC] Repository baseline and governance",
+    "milestone": "M0 基线与治理",
+    "labels": ["type:epic", "area:platform", "priority:P0"],
+    "body": "## 目标\n建立私有研发仓库、数据分级、Issue/PR 流程和自动校验。\n\n## 验收\n- [ ] 文档、参考资料和安全规则已归档\n- [ ] Schema、fixture 和 CSV 模板通过 CI\n- [ ] 标签、Milestone、Issue Forms 和 PR 模板可用\n- [ ] main 具备 PR、CI 和线性历史约束"
+  },
+  {
+    "title": "Archive source material and define data classification",
+    "milestone": "M0 基线与治理",
+    "labels": ["type:task", "area:docs", "priority:P0"],
+    "body": "将 MVP 文档和目录 PDF 归档到 docs，并明确 PDF 仅为制动品类格式参考。完成原始资料授权、真实业务数据禁止入库和 synthetic fixture 规则。\n\n## 验收\n- [ ] 资料路径稳定且 README 可导航\n- [ ] PDF 用途和品类隔离说明存在\n- [ ] .DS_Store、密钥和真实业务数据不会进入 Git"
+  },
+  {
+    "title": "Establish contract validation CI",
+    "milestone": "M0 基线与治理",
+    "labels": ["type:task", "area:data", "area:platform", "priority:P0"],
+    "body": "维护 Product、Content、RFQ、Quotation、Workflow 和 Human Approval 契约，并让本地脚本与 GitHub Actions 使用同一套校验。\n\n## 验收\n- [ ] 正向 fixtures 通过\n- [ ] Agent 报价、无来源事实和非法状态转换的反例失败\n- [ ] Pull Request 必须通过 repository-validate"
+  },
+  {
+    "title": "Configure GitHub issue and pull request flow",
+    "milestone": "M0 基线与治理",
+    "labels": ["type:task", "area:platform", "priority:P0"],
+    "body": "启用私有仓库的 Issue、Actions、Issue Forms、Milestones、标签和 PR 约定；配置 main 的服务端保护，若套餐不支持则记录风险。\n\n## 验收\n- [ ] bootstrap 可重复运行且不复制项\n- [ ] main 禁止直接推送、强推和删除（服务端能力可用时）\n- [ ] squash merge、自动删分支和关联 Issue 关闭可验证"
+  },
+  {
+    "title": "[EPIC] Product data closed loop",
+    "milestone": "M1 产品数据闭环",
+    "labels": ["type:epic", "area:product", "priority:P0", "gate:01-truth"],
+    "body": "## 目标\n把工厂混乱资料转换为可追溯的 ProductDraft/ProductReady。\n\n## 依赖\n先完成 M0。\n\n## 验收\n- [ ] 20 个真实 SKU 的来源和授权已确认\n- [ ] 缺失字段可识别且不会被 AI 猜测\n- [ ] ProductReady 必须通过真实性门禁"
+  },
+  {
+    "title": "[DECISION] Select and authorize 20 real clutch SKUs",
+    "milestone": "M1 产品数据闭环",
+    "labels": ["type:decision", "area:product", "priority:P0", "status:needs-decision"],
+    "body": "确定第一阶段 10-30 个（目标约 20 个）真实离合器 SKU、来源文件、授权范围和四类完整度分组。不要把目录总表 PDF 的制动品类记录当作样本。\n\n## 关闭条件\n- [ ] 工厂提供来源和允许使用范围\n- [ ] 每个 SKU 的脱敏/保密等级明确\n- [ ] A/B/C/D 测试分组完成"
+  },
+  {
+    "title": "Implement ProductDraft to ProductReady verification contract",
+    "milestone": "M1 产品数据闭环",
+    "labels": ["type:feature", "area:product", "area:data", "priority:P0", "gate:01-truth"],
+    "body": "实现产品导入、缺失字段、来源证据、审核状态和 ProductReady 严格校验。\n\n## 验收\n- [ ] 必须字段缺失时停留在 review_required\n- [ ] OE、车型和工程参数没有来源时不能 Ready\n- [ ] 人工审核记录包含人、时间和证据引用"
+  },
+  {
+    "title": "Prepare A-D product data and image test cohort protocol",
+    "milestone": "M1 产品数据闭环",
+    "labels": ["type:task", "area:data", "area:product", "priority:P1"],
+    "body": "建立四类测试协议：数据完整/不完整 × 有图/无图。只提交 synthetic fixture 或经授权的脱敏资料。\n\n## 验收\n- [ ] 每类测试输入、期望缺失字段和人工动作明确\n- [ ] 无图路径不会允许 AI 图片充当结构证据"
+  },
+  {
+    "title": "Define Product Agent acceptance matrix",
+    "milestone": "M1 产品数据闭环",
+    "labels": ["type:task", "area:product", "priority:P1", "gate:01-truth"],
+    "body": "为 20 个测试产品定义字段识别正确率、OE/车型不变、缺失识别、审核耗时和一次人工修改后的 Ready 标准。\n\n## 验收\n- [ ] 接受标准可逐条执行\n- [ ] 失败样例会进入 Issue，而不是被覆盖"
+  },
+  {
+    "title": "[EPIC] Content publish loop",
+    "milestone": "M2 内容发布闭环",
+    "labels": ["type:epic", "area:content", "priority:P1", "gate:01-truth"],
+    "body": "## 目标\n从 ProductReady 生成三类内容，经过人工审核后进入单渠道发布。\n\n## 依赖\nM1 ProductReady 和 Gate 01。\n\n## 验收\n- [ ] 产品型、工厂能力型、行业知识型内容都有契约\n- [ ] 视觉说明不冒充真实结构\n- [ ] 未审批内容不能发布"
+  },
+  {
+    "title": "[DECISION] Select the first overseas social channel",
+    "milestone": "M2 内容发布闭环",
+    "labels": ["type:decision", "area:content", "priority:P0", "status:needs-decision"],
+    "body": "选择第一阶段唯一海外渠道，明确目标客户、API/半自动发布能力、账号权限、内容限制和询盘回流方式。\n\n## 关闭条件\n- [ ] 渠道和账号责任人明确\n- [ ] 发布与询盘回流路径可测试\n- [ ] 不因多渠道同时铺开而失去可归因性"
+  },
+  {
+    "title": "Define three content types and visual safety policy",
+    "milestone": "M2 内容发布闭环",
+    "labels": ["type:feature", "area:content", "priority:P1", "gate:01-truth"],
+    "body": "实现产品型、工厂能力型和行业知识型内容模板；记录产品事实证据和视觉素材限制。\n\n## 验收\n- [ ] 每种类型都有英文输出结构和 CTA\n- [ ] 图片生成不能改变花键、孔位、尺寸、材料或零件数量"
+  },
+  {
+    "title": "Implement Content Gate 01 approval path",
+    "milestone": "M2 内容发布闭环",
+    "labels": ["type:feature", "area:content", "priority:P1", "gate:01-truth"],
+    "body": "让工厂/运营人员在发布前检查型号、OE、车型、参数、图片一致性和营销措辞，并留下审批证据。\n\n## 验收\n- [ ] draft、approved 和 published 状态不可跳过审核\n- [ ] 审核拒绝会返回可修订状态"
+  },
+  {
+    "title": "[EPIC] Inquiry to quote loop",
+    "milestone": "M3 询盘报价闭环",
+    "labels": ["type:epic", "area:sales", "priority:P0", "gate:02-quote"],
+    "body": "## 目标\n把模糊询盘转为 RFQ Ready，再交给人工销售报价。\n\n## 依赖\nM1 ProductReady 和 M0 Workflow Event。\n\n## 验收\n- [ ] 信息不足时继续澄清\n- [ ] Agent 不直接报价\n- [ ] 人工报价可追溯到 RFQ"
+  },
+  {
+    "title": "Implement RFQ Draft/Ready and completeness rules",
+    "milestone": "M3 询盘报价闭环",
+    "labels": ["type:feature", "area:sales", "area:data", "priority:P0"],
+    "body": "实现客户、产品和商业信息的渐进补全；产品身份、数量和目的地不完整时不得进入 RFQ_READY。\n\n## 验收\n- [ ] 已有字段和缺失字段可见\n- [ ] OE 或准确车型可确认产品身份\n- [ ] completeness_score 是可解释的派生值"
+  },
+  {
+    "title": "Implement Sales Agent clarification behavior",
+    "milestone": "M3 询盘报价闭环",
+    "labels": ["type:feature", "area:sales", "priority:P1"],
+    "body": "对类似“500 pcs Toyota clutch kit, please quote”的输入识别已知字段并逐步询问 OE/车型、数量、目的地等缺失信息。\n\n## 验收\n- [ ] 不能在信息不足时输出价格\n- [ ] 多轮回复合并到同一个结构化 RFQ\n- [ ] 不确定的工程事实会回到人工确认"
+  },
+  {
+    "title": "Implement Gate 02 manual quotation handoff",
+    "milestone": "M3 询盘报价闭环",
+    "labels": ["type:feature", "area:sales", "priority:P0", "gate:02-quote"],
+    "body": "提供 RFQ Ready 到人工报价的交接界面/契约；单价、MOQ、交期、付款条款和有效期全部由人工输入。\n\n## 验收\n- [ ] Agent actor 无法发送正式报价\n- [ ] 报价审批包含人、时间和证据\n- [ ] 报价内容不进入公开 fixture 或 Issue"
+  },
+  {
+    "title": "Create inquiry and RFQ acceptance matrix",
+    "milestone": "M3 询盘报价闭环",
+    "labels": ["type:task", "area:sales", "area:data", "priority:P1"],
+    "body": "覆盖信息充分、不充分、车型歧义、无 OE、数量缺失、目的地缺失和客户拒绝补充等模拟场景。\n\n## 验收\n- [ ] 每个场景有期望状态、下一问题和禁止动作"
+  },
+  {
+    "title": "[EPIC] Follow-up to opportunity loop",
+    "milestone": "M4 跟单商机闭环",
+    "labels": ["type:epic", "area:follow-up", "priority:P1", "gate:03-delivery"],
+    "body": "## 目标\n报价后按上下文跟进，识别采购意向并在交期承诺前触发人工确认。\n\n## 依赖\nM3 Quotation Handoff。\n\n## 验收\n- [ ] 跟进不是固定重复 Any update?\n- [ ] 规则评分可解释且封顶 100\n- [ ] 交期确认不由 Agent 自动完成"
+  },
+  {
+    "title": "Define context-aware follow-up cadence",
+    "milestone": "M4 跟单商机闭环",
+    "labels": ["type:feature", "area:follow-up", "priority:P1"],
+    "body": "为报价已发送、客户未读/已读未回复、价格高、稍后采购、询问样品和询问交期等场景定义不同跟进内容和人工升级条件。"
+  },
+  {
+    "title": "Calibrate rule-based lead scoring with cap",
+    "milestone": "M4 跟单商机闭环",
+    "labels": ["type:task", "area:follow-up", "area:data", "priority:P1"],
+    "body": "使用 config/lead-scoring.yaml 的规则作为初始基线；权重合计 110，输出必须 min(100, sum)。用真实运行数据（不得提交到 GitHub）校准阈值。\n\n## 验收\n- [ ] 每条得分都有触发证据\n- [ ] COLD/WARM/HOT 边界无歧义\n- [ ] 规则版本可追溯"
+  },
+  {
+    "title": "Implement Gate 03 delivery confirmation",
+    "milestone": "M4 跟单商机闭环",
+    "labels": ["type:feature", "area:follow-up", "priority:P0", "gate:03-delivery"],
+    "body": "客户出现明确采购意向后，把生产能力和交期确认交给工厂人工；系统记录审批证据并阻止 Agent 自行承诺。"
+  },
+  {
+    "title": "Create five follow-up scenario tests",
+    "milestone": "M4 跟单商机闭环",
+    "labels": ["type:task", "area:follow-up", "priority:P1"],
+    "body": "建立客户未读、已读未回复、表示价格高、稍后采购、询问样品/交期五类 synthetic 场景，并定义下一步动作。"
+  },
+  {
+    "title": "[EPIC] Integrated demo acceptance",
+    "milestone": "M5 集成 Demo 验收",
+    "labels": ["type:epic", "area:orchestrator", "area:docs", "priority:P0"],
+    "body": "## 目标\n完成从产品 Excel/CSV 到有效商机的可重复演示。\n\n## 依赖\nM2、M4 和 Workflow Event 契约。\n\n## 验收\n- [ ] 上传资料并识别产品\n- [ ] 生成内容并人工批准\n- [ ] 模拟询盘并补全 RFQ\n- [ ] 人工报价、跟单并进入 OPPORTUNITY\n- [ ] 形成验收报告和 Go/No-Go 决策"
+  },
+  {
+    "title": "Define Orchestrator transitions and audit events",
+    "milestone": "M5 集成 Demo 验收",
+    "labels": ["type:feature", "area:orchestrator", "area:data", "priority:P0"],
+    "body": "把各 Agent 的结构化输入输出接到显式状态机；记录每次状态转换、actor、证据和 Human Gate。\n\n## 验收\n- [ ] 非法跳转被拒绝\n- [ ] Agent 不能绕过三个门禁\n- [ ] 事件可以重放和审计"
+  },
+  {
+    "title": "Build end-to-end demo script with synthetic data",
+    "milestone": "M5 集成 Demo 验收",
+    "labels": ["type:task", "area:orchestrator", "area:docs", "priority:P0"],
+    "body": "使用仓库内 synthetic fixtures 编排产品导入、内容审核、模拟询盘、RFQ、人工报价、跟单和 OPPORTUNITY。不得使用真实客户或真实价格。"
+  },
+  {
+    "title": "Run acceptance and Go/No-Go review",
+    "milestone": "M5 集成 Demo 验收",
+    "labels": ["type:decision", "area:docs", "priority:P0", "status:needs-decision"],
+    "body": "按照 MVP 验收标准执行完整演示，记录失败项、人工修改次数、事实错误、RFQ 完整度和门禁绕过情况，最终决定是否进入下一阶段。"
+  }
+]

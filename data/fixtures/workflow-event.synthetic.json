@@ -1,0 +1,11 @@
+{
+  "event_id": "synthetic-event-001",
+  "entity_type": "rfq",
+  "entity_id": "synthetic-rfq-ready-001",
+  "from_state": "RFQ_COLLECTING",
+  "to_state": "RFQ_READY",
+  "actor_type": "agent",
+  "actor_id": "sales-agent-synthetic",
+  "occurred_at": "2026-08-23T12:00:00Z",
+  "evidence_refs": ["synthetic-chat-001"]
+}

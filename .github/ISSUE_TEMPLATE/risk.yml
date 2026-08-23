@@ -1,0 +1,25 @@
+name: Risk / 风险记录
+description: 记录数据、授权、合规、依赖或验收风险
+title: "[RISK] "
+labels:
+  - "type:risk"
+  - "status:blocked"
+body:
+  - type: textarea
+    id: risk
+    attributes:
+      label: 风险描述与证据
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影响范围
+    validations:
+      required: true
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: 缓解、负责人和解除条件
+    validations:
+      required: true

@@ -1,0 +1,33 @@
+# macOS / editor
+.DS_Store
+.AppleDouble
+.LSOverride
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node / build output (future application code)
+node_modules/
+dist/
+build/
+.next/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Temporary artifacts
+tmp/
+output/
+coverage/

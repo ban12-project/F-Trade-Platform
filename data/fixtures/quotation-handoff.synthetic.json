@@ -1,0 +1,19 @@
+{
+  "handoff_id": "synthetic-handoff-001",
+  "rfq_id": "synthetic-rfq-ready-001",
+  "actor_type": "human",
+  "status": "approved",
+  "quote": {
+    "unit_price": 12.5,
+    "currency": "USD",
+    "moq": 100,
+    "lead_time_days": 30,
+    "payment_terms": "Synthetic terms",
+    "validity_days": 30
+  },
+  "approval": {
+    "approved_by": "synthetic-sales-reviewer",
+    "approved_at": "2026-08-23T12:00:00Z",
+    "evidence_ref": "synthetic_quote_review_001"
+  }
+}

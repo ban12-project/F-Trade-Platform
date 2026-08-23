@@ -1,0 +1,46 @@
+name: Feature / 能力需求
+description: 描述一个可验收的产品或研发能力
+title: "[FEATURE] "
+labels:
+  - "type:feature"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        只描述可交付能力，不要填写真实客户、真实价格或生产秘密。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题与目标
+      description: 谁遇到什么问题，完成后应得到什么结果？
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围与非目标
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 使用可观察、可验证的 Given/When/Then 或清单。
+    validations:
+      required: true
+  - type: dropdown
+    id: gate
+    attributes:
+      label: 影响的 Human Gate
+      options:
+        - 不涉及
+        - gate:01-truth
+        - gate:02-quote
+        - gate:03-delivery
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖与风险
+      description: 链接阻塞 Issue；说明是否需要工厂资料或外部授权。

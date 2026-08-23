@@ -1,0 +1,37 @@
+name: Bug / 缺陷
+description: 记录已验证的行为偏差或回归
+title: "[BUG] "
+labels:
+  - "type:bug"
+body:
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重现步骤与输入
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 日志、fixture 或截图
+      description: 必须脱敏；不要粘贴真实客户或秘密。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 影响领域
+      options:
+        - area:product
+        - area:content
+        - area:sales
+        - area:follow-up
+        - area:orchestrator
+        - area:data
+        - area:platform
+    validations:
+      required: true

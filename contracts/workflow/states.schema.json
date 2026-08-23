@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/states.schema.json",
+  "title": "WorkflowStates",
+  "definitions": {
+    "state": {
+      "enum": [
+        "PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "PRODUCT_READY",
+        "CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED", "CONTENT_APPROVED",
+        "PUBLISHED", "LEAD_RECEIVED", "RFQ_COLLECTING", "RFQ_READY",
+        "QUOTE_REVIEW_REQUIRED", "QUOTED", "FOLLOW_UP", "OPPORTUNITY",
+        "WON", "LOST"
+      ]
+    }
+  }
+}

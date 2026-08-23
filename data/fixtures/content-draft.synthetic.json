@@ -1,0 +1,17 @@
+{
+  "content_id": "synthetic-content-001",
+  "product_id": "synthetic-product-ready-001",
+  "content_type": "product",
+  "objective": "Generate a synthetic B2B product post",
+  "target_customer": "Synthetic distributor",
+  "platform": "pending-channel-decision",
+  "hook": "Synthetic clutch kit for demonstration",
+  "body": "Synthetic content only. Confirm OE number and vehicle model before quotation.",
+  "product_facts": [
+    {"field": "product_type", "value": "clutch_kit", "evidence_ref": "synthetic_factory_sheet_row_001"}
+  ],
+  "call_to_action": "Send OE number, vehicle model and quantity for a quotation.",
+  "hashtags": ["#SyntheticDemo", "#ClutchKit"],
+  "visual_instruction": "Use a clearly labeled synthetic product mockup; do not imply real structure.",
+  "status": "draft"
+}

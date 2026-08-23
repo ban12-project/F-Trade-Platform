@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/human-approval.schema.json",
+  "title": "HumanApproval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approval_id", "gate", "entity_id", "status", "actor_type", "approved_by", "approved_at", "evidence_ref"],
+  "properties": {
+    "approval_id": {"type": "string", "minLength": 1},
+    "gate": {"enum": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"]},
+    "entity_id": {"type": "string", "minLength": 1},
+    "status": {"enum": ["approved", "rejected"]},
+    "actor_type": {"const": "human"},
+    "approved_by": {"type": "string", "minLength": 1},
+    "approved_at": {"type": "string", "format": "date-time"},
+    "evidence_ref": {"type": "string", "minLength": 1},
+    "notes": {"type": "string"}
+  }
+}

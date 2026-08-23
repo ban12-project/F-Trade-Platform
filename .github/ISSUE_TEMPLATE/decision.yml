@@ -1,0 +1,31 @@
+name: Decision / 决策记录
+description: 记录会改变范围、接口、渠道或合规边界的选择
+title: "[DECISION] "
+labels:
+  - "type:decision"
+  - "status:needs-decision"
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: 背景与待决问题
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: 候选方案与权衡
+    validations:
+      required: true
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: 推荐方案
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 对范围、数据契约和验收的影响
+    validations:
+      required: true

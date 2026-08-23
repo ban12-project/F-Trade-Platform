@@ -1,0 +1,27 @@
+name: Task / 执行任务
+description: 将已确定的工作拆成可独立完成的任务
+title: "[TASK] "
+labels:
+  - "type:task"
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: 任务内容
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 完成定义
+    validations:
+      required: true
+  - type: input
+    id: parent
+    attributes:
+      label: 父 Epic 或相关 Issue
+      placeholder: "#123"
+  - type: textarea
+    id: validation
+    attributes:
+      label: 验证方式

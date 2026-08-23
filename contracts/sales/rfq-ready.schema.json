@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/rfq-ready.schema.json",
+  "title": "RFQReady",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rfq_id", "customer", "product", "commercial", "status", "completeness_score", "missing_fields"],
+  "properties": {
+    "rfq_id": {"type": "string", "minLength": 1},
+    "customer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"name": {"type": "string"}, "company": {"type": "string"}, "country": {"type": "string"}}
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["product_type"],
+      "properties": {
+        "product_type": {"enum": ["clutch_disc", "clutch_cover", "release_bearing", "clutch_kit"]},
+        "oe_number": {"type": "string", "minLength": 1},
+        "vehicle_brand": {"type": "string", "minLength": 1},
+        "vehicle_model": {"type": "string", "minLength": 1},
+        "vehicle_year": {"type": "string"},
+        "engine": {"type": "string"},
+        "required_specification": {"type": "string"}
+      },
+      "anyOf": [
+        {"required": ["oe_number"]},
+        {"required": ["vehicle_brand", "vehicle_model"]}
+      ]
+    },
+    "commercial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quantity", "destination"],
+      "properties": {
+        "quantity": {"type": "integer", "minimum": 1},
+        "destination": {"type": "string", "minLength": 1},
+        "packaging_requirement": {"type": "string"},
+        "expected_delivery": {"type": "string"},
+        "customization": {"type": "string"}
+      }
+    },
+    "status": {"const": "ready"},
+    "completeness_score": {"type": "number", "minimum": 90, "maximum": 100},
+    "missing_fields": {"type": "array", "maxItems": 0}
+  }
+}
