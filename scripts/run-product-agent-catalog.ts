@@ -18,6 +18,14 @@ export interface CatalogPreflightReport {
   };
   candidate_count: number;
   candidate_identifiers: string[];
+  manual_review: {
+    status: "review_required";
+    reasons: Array<
+      | "catalog_candidates_require_source_field_review"
+      | "no_supported_catalog_candidates"
+      | "ocr_text_requires_visual_verification"
+    >;
+  };
 }
 
 function option(name: string, fallback: string) {
@@ -47,6 +55,11 @@ export function createCatalogPreflightReport(
   document: Awaited<ReturnType<typeof preprocessProductAgentDocument>>,
   candidates: ReturnType<typeof discoverCatalogCandidates>,
 ): CatalogPreflightReport {
+  const reviewReasons: CatalogPreflightReport["manual_review"]["reasons"] = [
+    "catalog_candidates_require_source_field_review",
+  ];
+  if (candidates.length === 0) reviewReasons.push("no_supported_catalog_candidates");
+  if (document.ocr_enabled) reviewReasons.push("ocr_text_requires_visual_verification");
   return {
     classification: "local_preflight",
     document: {
@@ -57,6 +70,10 @@ export function createCatalogPreflightReport(
     },
     candidate_count: candidates.length,
     candidate_identifiers: candidates.map((candidate) => candidate.identifier),
+    manual_review: {
+      status: "review_required",
+      reasons: reviewReasons,
+    },
   };
 }
 

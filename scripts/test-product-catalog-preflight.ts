@@ -35,8 +35,25 @@ assert.deepEqual(report, {
   },
   candidate_count: 1,
   candidate_identifiers: ["RYC251"],
+  manual_review: {
+    status: "review_required",
+    reasons: ["catalog_candidates_require_source_field_review"],
+  },
 });
 assert.equal(JSON.stringify(report).includes("Synthetic Kit"), false);
 assert.equal(JSON.stringify(report).includes("source_text"), false);
+
+const imageOnlyReport = createCatalogPreflightReport(
+  { ...document, ocr_enabled: true },
+  [],
+);
+assert.deepEqual(imageOnlyReport.manual_review, {
+  status: "review_required",
+  reasons: [
+    "catalog_candidates_require_source_field_review",
+    "no_supported_catalog_candidates",
+    "ocr_text_requires_visual_verification",
+  ],
+});
 
 console.log("PASS product catalog preflight");
