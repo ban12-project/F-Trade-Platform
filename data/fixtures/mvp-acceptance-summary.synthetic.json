@@ -1,0 +1,27 @@
+{
+  "classification": "synthetic",
+  "run_id": "synthetic-mvp-acceptance-001",
+  "executed_at": "2026-08-24T12:00:00Z",
+  "criteria": [
+    {"criterion_id": "product_import", "status": "passed", "evidence_refs": ["synthetic-product-import-001"]},
+    {"criterion_id": "content_gate", "status": "passed", "evidence_refs": ["synthetic-content-gate-001"]},
+    {"criterion_id": "rfq_completion", "status": "passed", "evidence_refs": ["synthetic-rfq-001"]},
+    {"criterion_id": "quotation_handoff", "status": "passed", "evidence_refs": ["synthetic-quotation-001"]},
+    {"criterion_id": "follow_up_opportunity", "status": "passed", "evidence_refs": ["synthetic-opportunity-001"]},
+    {"criterion_id": "gate_bypass", "status": "passed", "evidence_refs": ["synthetic-workflow-001"]}
+  ],
+  "metrics": {
+    "manual_revision_count": 0,
+    "factual_error_count": 0,
+    "rfq_total": 1,
+    "rfq_ready": 1,
+    "gate_bypass_count": 0,
+    "blocked_external_dependency_count": 0
+  },
+  "decision": {
+    "status": "go",
+    "decided_by_type": "human",
+    "decided_at": "2026-08-24T12:01:00Z",
+    "decision_ref": "synthetic-decision-001"
+  }
+}

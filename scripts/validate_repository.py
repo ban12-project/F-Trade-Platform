@@ -65,6 +65,7 @@ def check_schemas() -> None:
             "product-acceptance-passed.synthetic.json",
             "product-acceptance-failed.synthetic.json",
         ],
+        "mvp-acceptance-summary.schema.json": ["mvp-acceptance-summary.synthetic.json"],
         "product-ready.schema.json": [
             "product-ready.synthetic.json",
             "product-ready-application.synthetic.json",
@@ -206,6 +207,29 @@ def check_product_acceptance_config() -> None:
         raise AssertionError("Failed acceptance runs must require a new GitHub issue")
     if criteria["failure_record"]["overwrite_previous_run"]:
         raise AssertionError("Failed acceptance runs must remain immutable")
+
+
+def check_mvp_acceptance_summary() -> None:
+    summary = load_json(FIXTURE_DIR / "mvp-acceptance-summary.synthetic.json")
+    expected = {
+        "product_import", "content_gate", "rfq_completion", "quotation_handoff",
+        "follow_up_opportunity", "gate_bypass",
+    }
+    criteria = summary["criteria"]
+    if {item["criterion_id"] for item in criteria} != expected or len(criteria) != len(expected):
+        raise AssertionError("MVP acceptance summary must contain each required criterion exactly once")
+    metrics = summary["metrics"]
+    if metrics["rfq_ready"] > metrics["rfq_total"]:
+        raise AssertionError("RFQ Ready count cannot exceed RFQ total")
+    if summary["decision"]["status"] == "go":
+        if any(item["status"] != "passed" for item in criteria):
+            raise AssertionError("Go decision requires every acceptance criterion to pass")
+        if metrics["factual_error_count"] or metrics["gate_bypass_count"]:
+            raise AssertionError("Go decision requires zero factual errors and gate bypasses")
+        if metrics["rfq_ready"] != metrics["rfq_total"]:
+            raise AssertionError("Go decision requires every RFQ to be ready")
+        if metrics["blocked_external_dependency_count"]:
+            raise AssertionError("Go decision requires no blocked external dependencies")
 
 
 def check_database_baseline() -> None:
@@ -425,6 +449,7 @@ def main() -> int:
         ("CSV template", check_csv_template),
         ("lead scoring", check_scoring_config),
         ("product acceptance", check_product_acceptance_config),
+        ("MVP acceptance summary", check_mvp_acceptance_summary),
         ("database baseline", check_database_baseline),
         ("service adapters", check_service_adapters),
         ("workflow orchestrator", check_workflow_orchestrator),
