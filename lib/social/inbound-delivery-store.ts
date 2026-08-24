@@ -21,6 +21,12 @@ export interface InboundDeliveryReceiptStore {
   claim(receipt: InboundDeliveryReceipt): Promise<"accepted" | "duplicate">;
 }
 
+export interface InboundDeliveryTransactionRunner<Context> {
+  transaction<T>(callback: (context: Context) => Promise<T>): Promise<T>;
+}
+
+export type DatabaseTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
 export function createInboundDeliveryReceipt(
   policy: ChannelInboundPolicy,
   webhook: OfficialInboundWebhook,
@@ -49,9 +55,41 @@ export async function claimOfficialInboundDelivery(
   };
 }
 
+/**
+ * Claims a delivery and runs the accepted action inside the caller's database
+ * transaction. A duplicate never reaches the action. If the action throws,
+ * the transaction runner must roll the claim back with the action.
+ */
+export async function processOfficialInboundDelivery<Context, Result>(
+  policy: ChannelInboundPolicy,
+  webhook: OfficialInboundWebhook,
+  runner: InboundDeliveryTransactionRunner<Context>,
+  storeForContext: (context: Context) => InboundDeliveryReceiptStore,
+  onAccepted: (context: Context, receipt: InboundDeliveryReceipt) => Promise<Result>,
+) {
+  const receipt = createInboundDeliveryReceipt(policy, webhook);
+  return runner.transaction(async (context) => {
+    const status = await storeForContext(context).claim(receipt);
+    if (status === "duplicate") {
+      return {
+        deliveryKey: receipt.deliveryKey,
+        status,
+        nextAction: "ignore_duplicate" as const,
+      };
+    }
+    const result = await onAccepted(context, receipt);
+    return {
+      deliveryKey: receipt.deliveryKey,
+      status,
+      nextAction: "create_or_update_lead" as const,
+      result,
+    };
+  });
+}
+
 /** Uses a unique database index as the concurrency-safe delivery claim. */
 export function databaseInboundDeliveryReceiptStore(
-  database: Database = getDatabase(),
+  database: Pick<Database, "insert"> = getDatabase(),
 ): InboundDeliveryReceiptStore {
   return {
     async claim(receipt) {
@@ -75,6 +113,21 @@ export function databaseInboundDeliveryReceiptStore(
       return inserted.length === 1 ? "accepted" : "duplicate";
     },
   };
+}
+
+export async function processDatabaseOfficialInboundDelivery<Result>(
+  policy: ChannelInboundPolicy,
+  webhook: OfficialInboundWebhook,
+  onAccepted: (transaction: DatabaseTransaction, receipt: InboundDeliveryReceipt) => Promise<Result>,
+  database: Database = getDatabase(),
+) {
+  return processOfficialInboundDelivery(
+    policy,
+    webhook,
+    database,
+    (transaction) => databaseInboundDeliveryReceiptStore(transaction),
+    onAccepted,
+  );
 }
 
 export async function hasInboundDeliveryReceipt(
