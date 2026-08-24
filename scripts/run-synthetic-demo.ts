@@ -4,7 +4,7 @@ import path from "node:path";
 import { compileContract } from "../lib/contracts/validator";
 import { decideContent } from "../lib/content/gate";
 import { publishThroughOfficialChannel } from "../lib/content/publication-policy";
-import { assessInboundDelivery, assessReplyWindow } from "../lib/social/inbound-policy";
+import { acceptOfficialInboundWebhook, assessInboundDelivery, assessReplyWindow } from "../lib/social/inbound-policy";
 import {
   replayTransitions,
   type ApprovalDecision,
@@ -132,7 +132,12 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     direction: "inbound" as const,
     receivedAt: "2026-08-24T08:59:00Z",
   };
-  const inboundDelivery = assessInboundDelivery(socialPolicy, inboundMessage, new Set());
+  const inboundDelivery = acceptOfficialInboundWebhook(socialPolicy, {
+    transport: "official_webhook",
+    channelRef: socialPolicy.channelRef,
+    accountRef: socialPolicy.accountRef,
+    ...inboundMessage,
+  }, new Set());
   if (inboundDelivery.status !== "accepted") throw new Error("Synthetic inbound message was not accepted");
   const duplicateDelivery = assessInboundDelivery(
     socialPolicy,

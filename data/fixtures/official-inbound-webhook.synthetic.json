@@ -1,0 +1,8 @@
+{
+  "transport": "official_webhook",
+  "channel_ref": "synthetic-instagram-channel",
+  "account_ref": "synthetic-factory-account",
+  "message_id": "synthetic-platform-message-001",
+  "direction": "inbound",
+  "received_at": "2026-08-24T09:00:00Z"
+}

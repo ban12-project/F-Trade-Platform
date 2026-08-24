@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/official-inbound-webhook.schema.json",
+  "title": "OfficialInboundWebhook",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["transport", "channel_ref", "account_ref", "message_id", "direction", "received_at"],
+  "properties": {
+    "transport": {"const": "official_webhook"},
+    "channel_ref": {"type": "string", "pattern": "^(synthetic|sanitized)-[a-z0-9-]+$"},
+    "account_ref": {"type": "string", "pattern": "^(synthetic|sanitized)-[a-z0-9-]+$"},
+    "message_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "direction": {"const": "inbound"},
+    "received_at": {"type": "string", "format": "date-time"}
+  }
+}

@@ -67,6 +67,7 @@ def check_schemas() -> None:
         ],
         "mvp-acceptance-summary.schema.json": ["mvp-acceptance-summary.synthetic.json"],
         "channel-inbound-policy.schema.json": ["channel-inbound-policy.synthetic.json"],
+        "official-inbound-webhook.schema.json": ["official-inbound-webhook.synthetic.json"],
         "product-pilot-authorization.schema.json": ["product-pilot-authorization.synthetic.json"],
         "publication-policy.schema.json": ["publication-policy.synthetic.json"],
         "product-ready.schema.json": [
