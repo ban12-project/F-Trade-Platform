@@ -16,9 +16,11 @@ venv/
 
 # Node / build output (future application code)
 node_modules/
+.pnpm-store/
 dist/
 build/
 .next/
+*.tsbuildinfo
 
 # Secrets and local configuration
 .env
@@ -31,3 +33,6 @@ build/
 tmp/
 output/
 coverage/
+playwright-report/
+test-results/
+blob-report/

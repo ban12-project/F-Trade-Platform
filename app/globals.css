@@ -1,0 +1,15 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 3rem;
+}
+
+main {
+  display: grid;
+  gap: 1rem;
+  max-width: 48rem;
+}
