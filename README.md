@@ -32,6 +32,7 @@ AI 外贸工作流平台第一阶段 MVP，试点品类为汽车离合器。
 - [安全与数据分级](SECURITY.md)
 - [项目状态](docs/PROJECT_STATUS.md)
 - [Product Agent A–D 测试协议](docs/testing/product-cohort-protocol.md)
+- [Product Agent 验收矩阵](docs/testing/product-agent-acceptance.md)
 - [参考资料说明](docs/reference/README.md)
 
 ## 研发流

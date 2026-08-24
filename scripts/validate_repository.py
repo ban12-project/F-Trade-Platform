@@ -61,6 +61,10 @@ def check_schemas() -> None:
     checks = {
         "product-draft.schema.json": ["product-draft.synthetic.json"],
         "product-cohort.schema.json": ["product-cohort.synthetic.json"],
+        "product-acceptance-result.schema.json": [
+            "product-acceptance-passed.synthetic.json",
+            "product-acceptance-failed.synthetic.json",
+        ],
         "product-ready.schema.json": [
             "product-ready.synthetic.json",
             "product-ready-application.synthetic.json",
@@ -132,6 +136,10 @@ def check_schemas() -> None:
         SCHEMA_DIR / "workflow" / "workflow-event.schema.json",
         FIXTURE_DIR / "workflow-event-cross-aggregate-invalid.json",
     )
+    assert_invalid(
+        SCHEMA_DIR / "testing" / "product-acceptance-result.schema.json",
+        FIXTURE_DIR / "product-acceptance-false-pass-invalid.json",
+    )
     validate_each(
         SCHEMA_DIR / "workflow" / "workflow-event.schema.json",
         FIXTURE_DIR / "workflow-events-matrix.synthetic.json",
@@ -164,6 +172,40 @@ def check_scoring_config() -> None:
         raise AssertionError("Lead scoring normalization must cap at 100")
     if config["thresholds"] != {"cold_max": 30, "warm_max": 60}:
         raise AssertionError("Lead scoring thresholds changed unexpectedly")
+
+
+def check_product_acceptance_config() -> None:
+    with (ROOT / "config/product-acceptance.yaml").open(encoding="utf-8") as stream:
+        config = yaml.safe_load(stream)
+    cases = config["cases"]
+    if config["cohort_size"] != 20 or len(cases) != 20:
+        raise AssertionError("Product acceptance plan must contain exactly 20 slots")
+    expected_ids = {f"pilot-slot-{index:02d}" for index in range(1, 21)}
+    if {case["slot_id"] for case in cases} != expected_ids:
+        raise AssertionError("Product acceptance slot IDs must cover 01 through 20")
+    cohort_counts = {
+        cohort: sum(case["cohort"] == cohort for case in cases)
+        for cohort in ("A", "B", "C", "D")
+    }
+    if cohort_counts != {"A": 5, "B": 5, "C": 5, "D": 5}:
+        raise AssertionError(f"Product acceptance cohorts must be balanced: {cohort_counts}")
+    if any(case["status"] != "planned" for case in cases):
+        raise AssertionError("Unexecuted acceptance slots must remain planned")
+    criteria = config["criteria"]
+    for name in (
+        "sourced_field_recognition",
+        "oe_preservation",
+        "vehicle_fidelity",
+        "blocking_missing_detection",
+    ):
+        if criteria[name]["pass_threshold"] != 1.0:
+            raise AssertionError(f"{name} must require 100%")
+    if criteria["review_elapsed_seconds"]["pass_threshold"] is not None:
+        raise AssertionError("Review time must remain baseline-only before the real cohort")
+    if not criteria["failure_record"]["requires_new_github_issue"]:
+        raise AssertionError("Failed acceptance runs must require a new GitHub issue")
+    if criteria["failure_record"]["overwrite_previous_run"]:
+        raise AssertionError("Failed acceptance runs must remain immutable")
 
 
 def check_database_baseline() -> None:
@@ -264,6 +306,7 @@ def main() -> int:
         ("schemas and fixtures", check_schemas),
         ("CSV template", check_csv_template),
         ("lead scoring", check_scoring_config),
+        ("product acceptance", check_product_acceptance_config),
         ("database baseline", check_database_baseline),
         ("service adapters", check_service_adapters),
         ("repository hygiene", check_repository_hygiene),

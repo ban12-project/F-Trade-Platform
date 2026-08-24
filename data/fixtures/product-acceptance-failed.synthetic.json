@@ -1,0 +1,19 @@
+{
+  "run_id": "synthetic-acceptance-fail-001",
+  "slot_id": "pilot-slot-16",
+  "cohort": "D",
+  "status": "failed",
+  "started_at": "2026-08-24T11:00:00Z",
+  "completed_at": "2026-08-24T11:08:00Z",
+  "metrics": {
+    "sourced_field_recognition": 1,
+    "oe_preservation": 1,
+    "vehicle_fidelity": 1,
+    "blocking_missing_detection": 0,
+    "review_elapsed_seconds": 480
+  },
+  "revision_rounds": 1,
+  "ready": false,
+  "failure_issue_url": "https://github.com/example/synthetic/issues/999",
+  "notes": "Synthetic failure example; the run record must not be overwritten."
+}

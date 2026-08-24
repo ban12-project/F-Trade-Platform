@@ -1,0 +1,88 @@
+version: 1.0.0
+cohort_size: 20
+criteria:
+  sourced_field_recognition:
+    formula: exact_source_backed_fields / expected_source_fields
+    pass_threshold: 1.0
+  oe_preservation:
+    formula: exact_set_match_after_whitespace_normalization
+    pass_threshold: 1.0
+  vehicle_fidelity:
+    formula: no_added_or_changed_brand_model_application_values
+    pass_threshold: 1.0
+  blocking_missing_detection:
+    formula: detected_blocking_missing_fields / expected_blocking_missing_fields
+    pass_threshold: 1.0
+  review_elapsed_seconds:
+    formula: gate_01_decided_at - review_started_at
+    pass_threshold: null
+    note: baseline_only_until_real_cohort_is_run
+  ready_after_one_revision:
+    max_human_revision_rounds: 1
+    requires_zero_blocking_fields: true
+    requires_human_gate_01_approval: true
+    requires_field_evidence_for_every_supplied_fact: true
+  failure_record:
+    requires_new_github_issue: true
+    overwrite_previous_run: false
+cases:
+  - slot_id: pilot-slot-01
+    cohort: A
+    status: planned
+  - slot_id: pilot-slot-02
+    cohort: A
+    status: planned
+  - slot_id: pilot-slot-03
+    cohort: A
+    status: planned
+  - slot_id: pilot-slot-04
+    cohort: A
+    status: planned
+  - slot_id: pilot-slot-05
+    cohort: A
+    status: planned
+  - slot_id: pilot-slot-06
+    cohort: B
+    status: planned
+  - slot_id: pilot-slot-07
+    cohort: B
+    status: planned
+  - slot_id: pilot-slot-08
+    cohort: B
+    status: planned
+  - slot_id: pilot-slot-09
+    cohort: B
+    status: planned
+  - slot_id: pilot-slot-10
+    cohort: B
+    status: planned
+  - slot_id: pilot-slot-11
+    cohort: C
+    status: planned
+  - slot_id: pilot-slot-12
+    cohort: C
+    status: planned
+  - slot_id: pilot-slot-13
+    cohort: C
+    status: planned
+  - slot_id: pilot-slot-14
+    cohort: C
+    status: planned
+  - slot_id: pilot-slot-15
+    cohort: C
+    status: planned
+  - slot_id: pilot-slot-16
+    cohort: D
+    status: planned
+  - slot_id: pilot-slot-17
+    cohort: D
+    status: planned
+  - slot_id: pilot-slot-18
+    cohort: D
+    status: planned
+  - slot_id: pilot-slot-19
+    cohort: D
+    status: planned
+  - slot_id: pilot-slot-20
+    cohort: D
+    status: planned

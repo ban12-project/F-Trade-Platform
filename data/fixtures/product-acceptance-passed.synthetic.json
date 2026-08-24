@@ -1,0 +1,18 @@
+{
+  "run_id": "synthetic-acceptance-pass-001",
+  "slot_id": "pilot-slot-01",
+  "cohort": "A",
+  "status": "passed",
+  "started_at": "2026-08-24T10:00:00Z",
+  "completed_at": "2026-08-24T10:03:00Z",
+  "metrics": {
+    "sourced_field_recognition": 1,
+    "oe_preservation": 1,
+    "vehicle_fidelity": 1,
+    "blocking_missing_detection": 1,
+    "review_elapsed_seconds": 180
+  },
+  "revision_rounds": 0,
+  "ready": true,
+  "notes": "Synthetic schema example only."
+}
