@@ -43,6 +43,8 @@ DeliveryConfirmation: DELIVERY_CONFIRMATION_PENDING
 
 Sales Agent 只收集和整理 RFQ。报价草稿由人工销售创建，价格、MOQ、Lead Time、付款条款和有效期经另一条可审计的人工决策批准后才允许发送。待审批报价不提前携带审批结果。
 
+`lib/quotation/handoff.ts` 是报价交接的领域边界：只接受 human 创建人，Gate 02 决定必须带 human actor、决定时间和证据引用；只有已批准报价才能由 human 标记为 sent。它不使用公开 fixture 保存真实报价内容。
+
 ### Gate 03 - 交期确认
 
 客户出现明确采购意向后，工厂人工确认生产能力和交期。Agent 可以发起确认请求和传递结果，不能作为决策人自行承诺。
