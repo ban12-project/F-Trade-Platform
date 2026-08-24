@@ -288,6 +288,14 @@ def check_synthetic_demo() -> None:
         raise AssertionError(f"Synthetic demo tests failed: {result.stderr or result.stdout}")
 
 
+def check_product_catalog_preflight() -> None:
+    result = subprocess.run(
+        ["pnpm", "test:catalog-preflight"], cwd=ROOT, capture_output=True, text=True
+    )
+    if result.returncode:
+        raise AssertionError(f"Product catalog preflight tests failed: {result.stderr or result.stdout}")
+
+
 def check_quotation_gate() -> None:
     result = subprocess.run(["pnpm", "test:quotation"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -399,6 +407,7 @@ def main() -> int:
         ("service adapters", check_service_adapters),
         ("workflow orchestrator", check_workflow_orchestrator),
         ("synthetic end-to-end demo", check_synthetic_demo),
+        ("product catalog preflight", check_product_catalog_preflight),
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),
