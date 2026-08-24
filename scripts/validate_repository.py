@@ -262,6 +262,12 @@ def check_product_pilot_authorization() -> None:
 
 
 def check_database_baseline() -> None:
+    database_client = (ROOT / "lib/db/client.ts").read_text(encoding="utf-8")
+    for required in ("drizzle-orm/neon-serverless", "new Pool", "closeDatabase"):
+        if required not in database_client:
+            raise AssertionError(f"Database client must support transactions: {required}")
+    if "drizzle-orm/neon-http" in database_client:
+        raise AssertionError("Database client must not use the transactionless neon-http driver")
     auth_source = (ROOT / "lib/auth.ts").read_text(encoding="utf-8")
     if "disableSignUp: true" not in auth_source:
         raise AssertionError("Public Better Auth sign-up must remain disabled")
@@ -403,6 +409,12 @@ def check_inbound_delivery_receipts() -> None:
     result = subprocess.run(["pnpm", "test:inbound-delivery"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
         raise AssertionError(f"Inbound delivery receipt tests failed: {result.stderr or result.stdout}")
+
+
+def check_database_driver() -> None:
+    result = subprocess.run(["pnpm", "test:database-driver"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Database transaction driver tests failed: {result.stderr or result.stdout}")
 
 
 def check_main_push_guard() -> None:
@@ -551,6 +563,7 @@ def main() -> int:
         ("local OCR guards", check_local_ocr),
         ("social inbound policy", check_social_inbound_policy),
         ("inbound delivery receipts", check_inbound_delivery_receipts),
+        ("database transaction driver", check_database_driver),
         ("local main push guard", check_main_push_guard),
         ("content publication policy", check_content_publication_policy),
         ("quotation Gate 02", check_quotation_gate),
