@@ -168,6 +168,38 @@ def check_database_baseline() -> None:
         raise AssertionError("Approval decisions must be constrained to a human actor")
 
 
+def check_service_adapters() -> None:
+    package = load_json(ROOT / "package.json")
+    expected = {
+        "workflow": "4.8.4",
+        "@vercel/blob": "2.8.0",
+        "ai": "7.0.77",
+    }
+    for name, version in expected.items():
+        if package["dependencies"].get(name) != version:
+            raise AssertionError(f"{name} must remain pinned to {version}")
+
+    next_config = (ROOT / "next.config.ts").read_text(encoding="utf-8")
+    if "withWorkflow(nextConfig)" not in next_config:
+        raise AssertionError("Next.js config must register Workflow SDK")
+
+    workflow = (ROOT / "workflows/human-gate.ts").read_text(encoding="utf-8")
+    for required in ('"use workflow"', "approvalId", 'actorType: "human"'):
+        if required not in workflow:
+            raise AssertionError(f"Human Gate workflow is missing: {required}")
+
+    blob = (ROOT / "lib/evidence/vercel-private-blob.ts").read_text(encoding="utf-8")
+    if blob.count('access: "private"') < 2 or 'access: "public"' in blob:
+        raise AssertionError("Evidence Blob adapter must enforce private read and write access")
+    if "result.url" in blob or "result.downloadUrl" in blob:
+        raise AssertionError("Evidence adapter must not expose private Blob URLs")
+
+    generator = (ROOT / "lib/ai/structured-generator.ts").read_text(encoding="utf-8")
+    for required in ("model: LanguageModel", "assertSchemaValidates", "verifiedFacts"):
+        if required not in generator:
+            raise AssertionError(f"Structured generator is missing: {required}")
+
+
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
     tracked = subprocess.run(
@@ -207,6 +239,7 @@ def main() -> int:
         ("CSV template", check_csv_template),
         ("lead scoring", check_scoring_config),
         ("database baseline", check_database_baseline),
+        ("service adapters", check_service_adapters),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]

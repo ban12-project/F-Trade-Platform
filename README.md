@@ -80,3 +80,11 @@ pnpm db:migrate
 
 `db:migrate` 会连接并修改目标数据库，执行前必须核对环境和连接 URL；前两个
 命令只生成或检查迁移结构。
+
+### 托管服务适配层
+
+- Workflow SDK 使用稳定版 4.x，Human Gate 只传递 approval/aggregate 标识和人工决策；业务状态仍写入 PostgreSQL。
+- 工程资料通过 Vercel Private Blob 适配器保存，应用只持久化内部 pathname 和证据元数据，不暴露私有 URL。
+- AI SDK 适配器不绑定模型供应商，只接受调用方注入的 `LanguageModel` 和带运行时校验的 Schema。
+
+模型的安全提示不能证明事实正确。生成内容中的产品事实还必须逐项匹配已提供的 `field/value/evidenceRef`，并继续经过 Gate 01 人工审核。

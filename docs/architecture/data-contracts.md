@@ -36,3 +36,11 @@ Workflow Event 只允许同一聚合内的合法转换。门禁转换必须同�
 Drizzle Schema 将业务对象保存为带 `type`、`state`、版本与结构化 payload 的聚合记录；边界层仍必须先使用对应 JSON Schema 校验 payload。Approval、Workflow Event、Evidence 和 Audit Event 使用独立表与外键关联。
 
 Workflow Event 和 Audit Event 只追加，不允许在应用层更新；首个 SQL migration 还通过数据库触发器拒绝 UPDATE/DELETE。认证表由 Better Auth 使用，公开注册关闭，邀请只保存不可逆 token hash。
+
+## 服务适配边界
+
+Workflow SDK 只持久化运行、step 和 hook 进度；Human Gate hook 使用由 `approvalId` 派生的确定性 token，开始前必须确认 PostgreSQL 中存在对应 Pending Approval。收到决策后仍要先原子写入 Approval、聚合状态和审计事件，再恢复 workflow。
+
+Vercel Blob 适配器强制 private read/write，并使用不可变随机 pathname。数据库保存 pathname、hash、内容类型、大小和来源，不把私有 Blob URL 当作公开业务字段。
+
+AI SDK 由调用方注入模型和运行时可验证 Schema。结构化生成器只能使用传入的 verified facts；产品事实必须精确匹配证据三元组。提示词和 Schema 都不能替代 Gate 01 人工真实性审核。

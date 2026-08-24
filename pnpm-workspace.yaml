@@ -1,3 +1,5 @@
 allowBuilds:
-  # Drizzle Kit can use the platform package without running dependency scripts.
+  # Platform-specific packages are already resolved; dependency scripts stay blocked.
+  '@swc/core': false
+  cbor-extract: false
   esbuild: false
