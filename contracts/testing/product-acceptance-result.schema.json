@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/product-acceptance-result.schema.json",
+  "title": "ProductAcceptanceResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "slot_id", "cohort", "status", "started_at", "completed_at", "metrics", "revision_rounds", "ready", "notes"],
+  "properties": {
+    "run_id": {"type": "string", "minLength": 1},
+    "slot_id": {"type": "string", "pattern": "^pilot-slot-(0[1-9]|1[0-9]|20)$"},
+    "cohort": {"enum": ["A", "B", "C", "D"]},
+    "status": {"enum": ["passed", "failed"]},
+    "started_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": "string", "format": "date-time"},
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourced_field_recognition", "oe_preservation", "vehicle_fidelity", "blocking_missing_detection", "review_elapsed_seconds"],
+      "properties": {
+        "sourced_field_recognition": {"type": "number", "minimum": 0, "maximum": 1},
+        "oe_preservation": {"type": "number", "minimum": 0, "maximum": 1},
+        "vehicle_fidelity": {"type": "number", "minimum": 0, "maximum": 1},
+        "blocking_missing_detection": {"type": "number", "minimum": 0, "maximum": 1},
+        "review_elapsed_seconds": {"type": "integer", "minimum": 0}
+      }
+    },
+    "revision_rounds": {"type": "integer", "minimum": 0},
+    "ready": {"type": "boolean"},
+    "failure_issue_url": {"type": "string", "format": "uri", "pattern": "^https://github\\.com/[^/]+/[^/]+/issues/[0-9]+$"},
+    "notes": {"type": "string"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "failed"}}, "required": ["status"]},
+      "then": {"required": ["failure_issue_url"]},
+      "else": {"not": {"required": ["failure_issue_url"]}}
+    },
+    {
+      "if": {"properties": {"status": {"const": "passed"}}, "required": ["status"]},
+      "then": {
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "sourced_field_recognition": {"const": 1},
+              "oe_preservation": {"const": 1},
+              "vehicle_fidelity": {"const": 1},
+              "blocking_missing_detection": {"const": 1}
+            },
+            "required": ["sourced_field_recognition", "oe_preservation", "vehicle_fidelity", "blocking_missing_detection"]
+          },
+          "revision_rounds": {"type": "integer", "maximum": 1},
+          "ready": {"const": true}
+        }
+      }
+    }
+  ]
+}
