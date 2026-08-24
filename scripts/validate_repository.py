@@ -68,6 +68,7 @@ def check_schemas() -> None:
         "mvp-acceptance-summary.schema.json": ["mvp-acceptance-summary.synthetic.json"],
         "channel-inbound-policy.schema.json": ["channel-inbound-policy.synthetic.json"],
         "product-pilot-authorization.schema.json": ["product-pilot-authorization.synthetic.json"],
+        "publication-policy.schema.json": ["publication-policy.synthetic.json"],
         "product-ready.schema.json": [
             "product-ready.synthetic.json",
             "product-ready-application.synthetic.json",
@@ -387,6 +388,12 @@ def check_main_push_guard() -> None:
         raise AssertionError(f"Local main push guard tests failed: {result.stderr or result.stdout}")
 
 
+def check_content_publication_policy() -> None:
+    result = subprocess.run(["pnpm", "test:content-publication"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Content publication policy tests failed: {result.stderr or result.stdout}")
+
+
 def check_quotation_gate() -> None:
     result = subprocess.run(["pnpm", "test:quotation"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -521,6 +528,7 @@ def main() -> int:
         ("local OCR guards", check_local_ocr),
         ("social inbound policy", check_social_inbound_policy),
         ("local main push guard", check_main_push_guard),
+        ("content publication policy", check_content_publication_policy),
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),
