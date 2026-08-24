@@ -294,6 +294,12 @@ def check_quotation_gate() -> None:
         raise AssertionError(f"Quotation Gate 02 tests failed: {result.stderr or result.stdout}")
 
 
+def check_delivery_gate() -> None:
+    result = subprocess.run(["pnpm", "test:delivery"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Delivery Gate 03 tests failed: {result.stderr or result.stdout}")
+
+
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
     tracked = subprocess.run(
@@ -338,6 +344,7 @@ def main() -> int:
         ("workflow orchestrator", check_workflow_orchestrator),
         ("synthetic end-to-end demo", check_synthetic_demo),
         ("quotation Gate 02", check_quotation_gate),
+        ("delivery Gate 03", check_delivery_gate),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
