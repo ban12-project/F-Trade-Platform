@@ -279,4 +279,33 @@ export const auditEvent = pgTable(
   ],
 );
 
+/**
+ * Metadata-only receipt for an official inbound social message. The composite
+ * uniqueness constraint is the durable exactly-once claim boundary; message
+ * bodies, browser state, and credentials must never be stored here.
+ */
+export const socialInboundDelivery = pgTable(
+  "social_inbound_delivery",
+  {
+    deliveryKey: text("delivery_key").primaryKey(),
+    channelRef: text("channel_ref").notNull(),
+    accountRef: text("account_ref").notNull(),
+    messageId: text("message_id").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    claimedAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("social_inbound_delivery_external_uidx").on(
+      table.channelRef,
+      table.accountRef,
+      table.messageId,
+    ),
+    index("social_inbound_delivery_received_at_idx").on(table.receivedAt),
+    check("social_inbound_delivery_key_nonempty", sql`length(btrim(${table.deliveryKey})) > 0`),
+    check("social_inbound_delivery_channel_nonempty", sql`length(btrim(${table.channelRef})) > 0`),
+    check("social_inbound_delivery_account_nonempty", sql`length(btrim(${table.accountRef})) > 0`),
+    check("social_inbound_delivery_message_nonempty", sql`length(btrim(${table.messageId})) > 0`),
+  ],
+);
+
 export const authSchema = { user, session, account, verification };

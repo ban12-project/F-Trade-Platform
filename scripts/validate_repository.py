@@ -287,6 +287,17 @@ def check_database_baseline() -> None:
             raise AssertionError(f"Database migration is missing trigger: {trigger}")
     if "decided_by_type\" = 'human'" not in migration:
         raise AssertionError("Approval decisions must be constrained to a human actor")
+    for required in (
+        'CREATE TABLE "social_inbound_delivery"',
+        'CREATE UNIQUE INDEX "social_inbound_delivery_external_uidx"',
+        '"channel_ref","account_ref","message_id"',
+    ):
+        if required not in migration:
+            raise AssertionError(f"Database migration is missing durable inbound delivery control: {required}")
+    inbound_store = (ROOT / "lib/social/inbound-delivery-store.ts").read_text(encoding="utf-8")
+    for required in ("onConflictDoNothing", "socialInboundDelivery.messageId", "ignore_duplicate"):
+        if required not in inbound_store:
+            raise AssertionError(f"Inbound delivery store is missing atomic deduplication behavior: {required}")
 
 
 def check_service_adapters() -> None:
@@ -386,6 +397,12 @@ def check_social_inbound_policy() -> None:
     result = subprocess.run(["pnpm", "test:social-inbound"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
         raise AssertionError(f"Social inbound policy tests failed: {result.stderr or result.stdout}")
+
+
+def check_inbound_delivery_receipts() -> None:
+    result = subprocess.run(["pnpm", "test:inbound-delivery"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Inbound delivery receipt tests failed: {result.stderr or result.stdout}")
 
 
 def check_main_push_guard() -> None:
@@ -533,6 +550,7 @@ def main() -> int:
         ("product catalog preflight", check_product_catalog_preflight),
         ("local OCR guards", check_local_ocr),
         ("social inbound policy", check_social_inbound_policy),
+        ("inbound delivery receipts", check_inbound_delivery_receipts),
         ("local main push guard", check_main_push_guard),
         ("content publication policy", check_content_publication_policy),
         ("quotation Gate 02", check_quotation_gate),

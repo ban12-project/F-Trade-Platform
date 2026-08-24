@@ -69,6 +69,13 @@ export function acceptOfficialInboundWebhook(
   webhook: OfficialInboundWebhook,
   processedDeliveryKeys: ReadonlySet<string>,
 ) {
+  return assessInboundDelivery(policy, validateOfficialInboundWebhook(policy, webhook), processedDeliveryKeys);
+}
+
+export function validateOfficialInboundWebhook(
+  policy: ChannelInboundPolicy,
+  webhook: OfficialInboundWebhook,
+): InboundMessageReference {
   validateChannelInboundPolicy(policy);
   if (webhook.transport !== "official_webhook") {
     throw new Error("Inbound workflow accepts only official webhook transport");
@@ -76,7 +83,8 @@ export function acceptOfficialInboundWebhook(
   if (webhook.channelRef !== policy.channelRef || webhook.accountRef !== policy.accountRef) {
     throw new Error("Official webhook channel and account must match the inbound policy");
   }
-  return assessInboundDelivery(policy, webhook, processedDeliveryKeys);
+  inboundDeliveryKey(policy, webhook);
+  return webhook;
 }
 
 export function assessReplyWindow(
