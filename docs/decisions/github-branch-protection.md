@@ -17,7 +17,10 @@
 
 - 所有工作仍必须通过 Issue → 分支 → PR → `repository-validate` → squash merge。
 - `CONTRIBUTING.md`、PR 模板和 CI 作为团队约定与自动检查。
+- 开发者可运行 `sh scripts/git/install-main-push-guard.sh` 安装本地 pre-push hook，拒绝直接推送或删除 `main`；安装器不会覆盖已有 hook。
 - 任何绕过流程的情况记录为 `type:risk` 或 `type:bug`，不把它当作服务端已保护。
+
+本地 hook 可被 `--no-verify` 绕过，只是降低误操作概率，不能作为服务器端保护的等价物。
 
 ## 解除条件
 
