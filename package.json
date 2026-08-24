@@ -14,11 +14,18 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate",
     "start": "next start",
+    "product-agent": "tsx scripts/run-product-agent.ts",
+    "product-agent:catalog": "tsx scripts/run-product-agent-catalog.ts",
+    "eval:harbor:prepare": "tsx scripts/prepare-harbor-product-agent-dataset.ts",
+    "eval:harbor:podman": "sh scripts/run-harbor-product-agent-podman.sh",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.41",
+    "@ai-sdk/google": "4.0.50",
+    "@ai-sdk/openai": "4.0.46",
     "@neondatabase/serverless": "1.1.0",
     "@vercel/blob": "2.8.0",
     "ai": "7.0.77",
@@ -38,6 +45,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "drizzle-kit": "0.31.10",
+    "tsx": "4.23.12",
     "typescript": "5.9.3"
   }
 }
