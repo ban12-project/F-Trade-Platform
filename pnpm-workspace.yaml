@@ -1,0 +1,3 @@
+allowBuilds:
+  # Drizzle Kit can use the platform package without running dependency scripts.
+  esbuild: false

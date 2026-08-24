@@ -65,3 +65,18 @@ pnpm test:e2e
 
 Playwright 会构建并启动受控测试服务器。测试构建会启用 Next.js 的
 `instant()` 测试 API，普通生产构建不会暴露该 API。
+
+### 数据库与内部认证
+
+复制 `.env.example` 中的变量到本地未跟踪的 `.env.local`，并使用 Neon
+提供的 PostgreSQL 连接 URL。公开注册在 Better Auth 配置中关闭；首个管理员
+通过受控运维流程创建，后续账号只允许管理员配置。
+
+```bash
+pnpm db:generate
+pnpm db:check
+pnpm db:migrate
+```
+
+`db:migrate` 会连接并修改目标数据库，执行前必须核对环境和连接 URL；前两个
+命令只生成或检查迁移结构。

@@ -30,3 +30,9 @@ Quotation 不包含自动决定价格的能力。正式金额和交期字段由�
 Human Approval 区分请求和决策：请求可以由 agent、human 或 system 发起，批准或拒绝的 `decision.actor_type` 必须是 `human`。Pending 不得包含伪造的决策结果。
 
 Workflow Event 只允许同一聚合内的合法转换。门禁转换必须同时提供 `gate` 和 `approval_ref`；跨聚合动作通过创建新对象与引用关联，不伪装成状态转换。
+
+## 运行时持久化
+
+Drizzle Schema 将业务对象保存为带 `type`、`state`、版本与结构化 payload 的聚合记录；边界层仍必须先使用对应 JSON Schema 校验 payload。Approval、Workflow Event、Evidence 和 Audit Event 使用独立表与外键关联。
+
+Workflow Event 和 Audit Event 只追加，不允许在应用层更新；首个 SQL migration 还通过数据库触发器拒绝 UPDATE/DELETE。认证表由 Better Auth 使用，公开注册关闭，邀请只保存不可逆 token hash。
