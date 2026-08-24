@@ -19,6 +19,7 @@
     "eval:harbor:prepare": "tsx scripts/prepare-harbor-product-agent-dataset.ts",
     "eval:harbor:podman": "sh scripts/run-harbor-product-agent-podman.sh",
     "typecheck": "tsc --noEmit",
+    "test:workflow": "tsx scripts/test-workflow-transitions.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

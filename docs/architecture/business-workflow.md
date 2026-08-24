@@ -31,6 +31,8 @@ DeliveryConfirmation: DELIVERY_CONFIRMATION_PENDING
 
 任何状态转换都要写入结构化 Workflow Event，包含实体、前后状态、actor、时间和证据。需要门禁的转换还必须引用独立的 Human Approval。Agent 不能绕过状态机直接发布、报价或承诺交期。
 
+运行时转换规则在 `lib/workflow/transitions.ts` 中集中执行：它会拒绝非法跳转、错误 actor、缺失或不匹配的审批，并可通过不可变事件流重放任一聚合状态。`lib/workflow/orchestrator.ts` 在一个数据库事务内锁定聚合、写入新状态、追加 Workflow Event 和 Audit Event；调用该服务前仍须完成 actor 的认证和授权。`pnpm test:workflow` 覆盖正常转换、三类门禁绕过和重放完整性；该校验也被 `scripts/validate_repository.py` 调用。
+
 ## 三类 Human Gate
 
 ### Gate 01 - 产品与内容真实性
