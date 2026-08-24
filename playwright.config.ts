@@ -23,6 +23,7 @@ export default defineConfig({
   webServer: {
     command: "pnpm build:test && pnpm start",
     env: {
+      NEXT_ENABLE_TESTING_API: "1",
       BETTER_AUTH_SECRET: "synthetic-playwright-secret-1234567890",
       BETTER_AUTH_URL: baseURL,
       DATABASE_URL: "postgresql://synthetic:synthetic@127.0.0.1:9/f_trade",

@@ -66,3 +66,8 @@ python3 scripts/validate_repository.py
 - #32：基于真实资料和人工操作记录的最终 Go/No-Go。
 
 因此，Issue #26 只能视为“合成技术链路通过”，不能据此关闭真实业务上线或人工验收事项。
+# Mock official channel browser acceptance
+
+When an external social API remains unavailable, a test-only mock channel is available in builds made with `NEXT_ENABLE_TESTING_API=1` at `/testing/mock-channel`.
+
+It accepts synthetic webhook metadata only. The browser scenario proves one delivery is accepted, a repeated delivery is ignored, and a failed downstream action is rolled back so the same webhook can be retried. It never accepts a message body, credentials, customer data, or a real API request.
