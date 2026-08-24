@@ -2,6 +2,16 @@
   "record_id": "synthetic-product-001",
   "source_ref": "synthetic_factory_sheet_row_001",
   "evidence_refs": ["synthetic_factory_sheet_row_001"],
+  "field_evidence": {
+    "product.product_name": "synthetic_factory_sheet_row_001",
+    "product.product_type": "synthetic_factory_sheet_row_001",
+    "product.internal_sku": "synthetic_factory_sheet_row_001",
+    "product.application": "synthetic_factory_sheet_row_001",
+    "product.vehicle_brand": "synthetic_factory_sheet_row_001",
+    "product.vehicle_model": "synthetic_factory_sheet_row_001",
+    "specifications.kit_contents": "synthetic_factory_sheet_row_001",
+    "commercial.sample_available": "synthetic_factory_sheet_row_001"
+  },
   "verification_status": "review_required",
   "blocking_missing_fields": ["oe_numbers_or_verified_application"],
   "optional_missing_fields": ["spline_count", "packaging"],

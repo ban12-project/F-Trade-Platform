@@ -4,9 +4,11 @@ Agent 和服务之间通过 JSON/YAML 结构化对象交互，不依赖自然语
 
 ## Product
 
-- `ProductDraft`：允许资料不完整，必须保留来源、阻断缺失字段、可选缺失字段和审核状态。
+- `ProductDraft`：允许资料不完整，必须保留来源、阻断缺失字段、可选缺失字段、审核状态，以及每个已提供事实对应的 `field_evidence`。
 - `ProductReady`：阻断缺失字段必须为空，并通过 Gate 01；产品身份需要 OE，或同时具备已确认的应用、品牌和车型。
 - 产品名称、类型和内部 SKU 是 Ready 的最低核心字段。规格与商业字段可以作为可选缺失项；模型不能把缺失值填成猜测值。
+- `evidence_refs` 只是对象可使用的证据集合；`field_evidence` 必须把每个已填写的产品、规格和商业字段映射到其中一个证据引用。仅有对象级来源不能证明具体 OE、车型或工程参数。
+- 没有 OE 时，应用、品牌和车型即使都有来源也必须经 Gate 01 人工确认后才能成为 Ready；自动审核阶段保持 `review_required`。
 - Ready 对象只保存 `approval_ref`，完整的人类决策保存在 Human Approval 中。
 
 ## Content
