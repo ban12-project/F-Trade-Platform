@@ -23,6 +23,7 @@
     "test:social-inbound": "tsx scripts/test-social-inbound-policy.ts",
     "test:inbound-delivery": "tsx scripts/test-inbound-delivery-store.ts",
     "test:database-driver": "tsx scripts/test-database-transaction-driver.ts",
+    "test:github-governance": "python3 scripts/test-github-governance.py",
     "test:main-push-guard": "sh scripts/test-main-push-guard.sh",
     "test:content-publication": "tsx scripts/test-content-publication-policy.ts",
     "eval:harbor:prepare": "tsx scripts/prepare-harbor-product-agent-dataset.ts",
