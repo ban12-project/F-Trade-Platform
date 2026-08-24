@@ -26,6 +26,7 @@
     "test:delivery": "tsx scripts/test-delivery-confirmation.ts",
     "test:rfq": "tsx scripts/test-rfq-completeness.ts",
     "test:sales": "tsx scripts/test-sales-clarification.ts",
+    "test:scoring": "tsx scripts/test-lead-scoring.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
