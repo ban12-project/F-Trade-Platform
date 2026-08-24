@@ -57,6 +57,13 @@ Sales Agent 只收集和整理 RFQ。报价草稿由人工销售创建，价格�
 - 审批和业务对象分别存储；业务对象只引用 `approval_ref`，避免伪造内嵌审批。
 - 第一阶段 Demo 以 `OPPORTUNITY` 为成功终点；不把模拟询盘冒充真实成交。
 
+## 官方渠道入站边界
+
+社媒渠道必须在人工完成官方 API 资格核验后，才可配置为 `ChannelInboundPolicy`。策略只允许 inbound
+消息、以渠道/账号/message ID 组合键去重，并且要求显式设置由人工确认的回复窗口；平台窗口不能由
+Agent 猜测。窗口外自动回复一律禁止，策略只能要求人工升级或经人工批准的模板。该模块只处理外部引用
+和时间，不存储平台凭据、Cookie 或消息正文。
+
 ## Synthetic 端到端演示
 
 执行 `pnpm demo:synthetic` 可验证产品导入、内容审核和发布、RFQ 完整、人工报价审批和发送、跟单到 `OPPORTUNITY` 的演示闭环。该脚本只读取带 `synthetic` 标识的 fixture，并在开始前按各自 JSON Schema 验证输入；它不会连接渠道、读取客户数据或生成真实报价。
