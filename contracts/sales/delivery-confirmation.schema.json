@@ -31,15 +31,15 @@
   "allOf": [
     {
       "if": {"properties": {"status": {"const": "pending"}}, "required": ["status"]},
-      "then": {"not": {"anyOf": [{"required": ["result"]}, {"required": ["approval_ref"]}]}}
+      "then": {"not": {"anyOf": [{"properties": {"result": {}}, "required": ["result"]}, {"properties": {"approval_ref": {}}, "required": ["approval_ref"]}]}}
     },
     {
       "if": {"properties": {"status": {"enum": ["confirmed", "rejected"]}}, "required": ["status"]},
-      "then": {"required": ["result", "approval_ref"]}
+      "then": {"properties": {"result": {}, "approval_ref": {}}, "required": ["result", "approval_ref"]}
     },
     {
       "if": {"properties": {"status": {"const": "confirmed"}}, "required": ["status"]},
-      "then": {"properties": {"result": {"required": ["confirmed_lead_time_days"]}}}
+      "then": {"properties": {"result": {"type": "object", "properties": {"confirmed_lead_time_days": {}}, "required": ["confirmed_lead_time_days"]}}}
     }
   ]
 }
