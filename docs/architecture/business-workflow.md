@@ -61,8 +61,10 @@ Sales Agent 只收集和整理 RFQ。报价草稿由人工销售创建，价格�
 
 社媒渠道必须在人工完成官方 API 资格核验后，才可配置为 `ChannelInboundPolicy`。策略只允许 inbound
 消息、以渠道/账号/message ID 组合键去重，并且要求显式设置由人工确认的回复窗口；平台窗口不能由
-Agent 猜测。窗口外自动回复一律禁止，策略只能要求人工升级或经人工批准的模板。该模块只处理外部引用
-和时间，不存储平台凭据、Cookie 或消息正文。
+Agent 猜测。入站处理先校验不含消息正文的 `OfficialInboundWebhook` 元数据契约：传输必须标为
+`official_webhook`，渠道和账号引用必须与已启用策略一致；DOM 观察或浏览器会话输入会被拒绝。窗口外自动
+回复一律禁止，策略只能要求人工升级或经人工批准的模板。该模块只处理外部引用和时间，不存储平台凭据、Cookie
+或消息正文。
 
 内容发布也必须通过 `ContentPublicationPolicy`：只有人工启用的官方 API 渠道、已完成 Gate 01 的内容和
 system/human 发布 actor 才能进入发布传输。该策略只保存脱敏渠道/账号引用和外部发布引用，不保存 OAuth

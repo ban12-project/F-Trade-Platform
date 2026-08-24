@@ -13,6 +13,15 @@ export interface InboundMessageReference {
   receivedAt: string;
 }
 
+export interface OfficialInboundWebhook {
+  transport: "official_webhook";
+  channelRef: string;
+  accountRef: string;
+  messageId: string;
+  direction: "inbound";
+  receivedAt: string;
+}
+
 function requireReference(value: string, label: string) {
   if (!value.trim()) throw new Error(`${label} is required`);
 }
@@ -53,6 +62,21 @@ export function assessInboundDelivery(
     status: processedDeliveryKeys.has(deliveryKey) ? "duplicate" as const : "accepted" as const,
     nextAction: processedDeliveryKeys.has(deliveryKey) ? "ignore_duplicate" as const : "create_or_update_lead" as const,
   };
+}
+
+export function acceptOfficialInboundWebhook(
+  policy: ChannelInboundPolicy,
+  webhook: OfficialInboundWebhook,
+  processedDeliveryKeys: ReadonlySet<string>,
+) {
+  validateChannelInboundPolicy(policy);
+  if (webhook.transport !== "official_webhook") {
+    throw new Error("Inbound workflow accepts only official webhook transport");
+  }
+  if (webhook.channelRef !== policy.channelRef || webhook.accountRef !== policy.accountRef) {
+    throw new Error("Official webhook channel and account must match the inbound policy");
+  }
+  return assessInboundDelivery(policy, webhook, processedDeliveryKeys);
 }
 
 export function assessReplyWindow(
