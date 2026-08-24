@@ -15,6 +15,7 @@ export interface CatalogPreflightReport {
     filename: string;
     media_type: string;
     ocr_enabled: boolean;
+    conversion_status: "converted" | "no_text";
   };
   candidate_count: number;
   candidate_identifiers: string[];
@@ -24,6 +25,7 @@ export interface CatalogPreflightReport {
       | "catalog_candidates_require_source_field_review"
       | "no_supported_catalog_candidates"
       | "ocr_text_requires_visual_verification"
+      | "document_conversion_requires_approved_ocr"
     >;
   };
 }
@@ -60,6 +62,9 @@ export function createCatalogPreflightReport(
   ];
   if (candidates.length === 0) reviewReasons.push("no_supported_catalog_candidates");
   if (document.ocr_enabled) reviewReasons.push("ocr_text_requires_visual_verification");
+  if (document.conversion_status === "no_text") {
+    reviewReasons.push("document_conversion_requires_approved_ocr");
+  }
   return {
     classification: "local_preflight",
     document: {
@@ -67,6 +72,7 @@ export function createCatalogPreflightReport(
       filename: document.filename,
       media_type: document.media_type,
       ocr_enabled: document.ocr_enabled,
+      conversion_status: document.conversion_status,
     },
     candidate_count: candidates.length,
     candidate_identifiers: candidates.map((candidate) => candidate.identifier),
@@ -101,6 +107,7 @@ async function main() {
     recordId,
     imageAvailability: "none",
     imageRefs: [],
+    allowEmptySource: preflight,
   });
   const discoveredCandidates = discoverCatalogCandidates(document.source);
   const candidates = (onlyIdentifiers.size === 0

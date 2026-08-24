@@ -4,7 +4,12 @@
 from __future__ import annotations
 
 import importlib.util
+import io
+import json
 import os
+import sys
+import tempfile
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -38,4 +43,21 @@ with patch.object(MODULE.shutil, "which", return_value=None):
         raise AssertionError("Missing local OCR executable should fail closed")
 
 assert MODULE.MAX_LOCAL_OCR_PAGES == 64
+
+with tempfile.TemporaryDirectory() as directory:
+    image_only_pdf = Path(directory) / "synthetic-image-only.pdf"
+    image_only_pdf.write_bytes(b"%PDF-synthetic")
+    output = io.StringIO()
+    with (
+        patch.object(MODULE, "convert_with_markitdown", return_value=""),
+        patch.object(sys, "argv", ["markitdown_preprocess.py", str(image_only_pdf)]),
+        patch.dict(os.environ, {"F_TRADE_METADATA_PREFLIGHT": "1"}, clear=False),
+        redirect_stdout(output),
+    ):
+        MODULE.main()
+    result = json.loads(output.getvalue())
+    assert result["source_text"] == ""
+    assert result["conversion_status"] == "no_text"
+    assert result["filename"] == image_only_pdf.name
+
 print("PASS local OCR preprocessing guards")
