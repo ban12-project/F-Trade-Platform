@@ -20,6 +20,10 @@ async function main() {
     replyWindowStatus: "within_window",
     outsideWindowAction: "require_human_approved_template",
   });
+  assert.deepEqual(report.publicationTransport, {
+    status: "published",
+    officialApi: true,
+  });
   console.log("PASS synthetic end-to-end demo");
 }
 
