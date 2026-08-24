@@ -14,6 +14,12 @@ async function main() {
   });
   assert.equal(report.transitionCount, 11);
   assert.deepEqual(report.approvedGates, ["gate_01_truth", "gate_02_quote"]);
+  assert.deepEqual(report.inboundMessaging, {
+    deliveryStatus: "accepted",
+    duplicateStatus: "duplicate",
+    replyWindowStatus: "within_window",
+    outsideWindowAction: "require_human_approved_template",
+  });
   console.log("PASS synthetic end-to-end demo");
 }
 

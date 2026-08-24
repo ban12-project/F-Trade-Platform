@@ -27,7 +27,13 @@ python3 scripts/validate_repository.py
     "lead": "OPPORTUNITY"
   },
   "transitionCount": 11,
-  "approvedGates": ["gate_01_truth", "gate_02_quote"]
+  "approvedGates": ["gate_01_truth", "gate_02_quote"],
+  "inboundMessaging": {
+    "deliveryStatus": "accepted",
+    "duplicateStatus": "duplicate",
+    "replyWindowStatus": "within_window",
+    "outsideWindowAction": "require_human_approved_template"
+  }
 }
 ```
 
@@ -37,7 +43,7 @@ python3 scripts/validate_repository.py
 | --- | --- | --- |
 | 识别产品 | `product-ready.synthetic.json` 经 ProductReady 契约校验，并从 `PRODUCT_IMPORTED` 通过人工 Gate 01 到 `PRODUCT_READY` | 仅合成 fixture 已验证 |
 | 生成内容并人工批准 | 内容契约校验；`CONTENT_GENERATING → CONTENT_REVIEW_REQUIRED → CONTENT_APPROVED → CONTENT_PUBLISHED`，批准记录为 human | 已验证 |
-| 模拟询盘并补全 RFQ | RFQ Ready 契约校验，并以 `RFQ_COLLECTING → RFQ_READY` 回放 | 已验证 |
+| 模拟询盘并补全 RFQ | synthetic 官方 API/inbound-only 策略接受首条消息、去重重复投递、执行显式回复窗口；随后 RFQ Ready 契约校验并以 `RFQ_COLLECTING → RFQ_READY` 回放 | 已验证 |
 | 人工报价、跟单并进入 Opportunity | Quote Gate 02 的 human 批准后才发送；跟单从 `LEAD_RECEIVED` 到 `FOLLOW_UP` 再到 `OPPORTUNITY` | 已验证 |
 | 形成验收报告和 Go/No-Go 决策 | 本文提供技术报告；Go/No-Go 是业务负责人决策 | 报告完成；决策待人工 |
 
