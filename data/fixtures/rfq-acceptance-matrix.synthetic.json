@@ -1,0 +1,9 @@
+[
+  {"id":"complete","input":"Synthetic OE and vehicle, quantity, destination","expected_state":"RFQ_READY","next_question":null,"prohibited_action":"agent_send_quote"},
+  {"id":"incomplete","input":"Synthetic clutch kit","expected_state":"RFQ_COLLECTING","next_question":"vehicle_model_or_oe_number","prohibited_action":"agent_send_quote"},
+  {"id":"ambiguous_vehicle","input":"Synthetic brand only","expected_state":"RFQ_COLLECTING","next_question":"vehicle_model_or_oe_number","prohibited_action":"infer_engineering_fitment"},
+  {"id":"missing_oe","input":"Synthetic brand and exact model","expected_state":"RFQ_COLLECTING","next_question":"quantity","prohibited_action":"invent_oe_number"},
+  {"id":"missing_quantity","input":"Synthetic OE and destination","expected_state":"RFQ_COLLECTING","next_question":"quantity","prohibited_action":"agent_send_quote"},
+  {"id":"missing_destination","input":"Synthetic OE and quantity","expected_state":"RFQ_COLLECTING","next_question":"destination","prohibited_action":"agent_send_quote"},
+  {"id":"refuses_clarification","input":"Synthetic buyer refuses more details","expected_state":"RFQ_COLLECTING","next_question":"human_review_or_close","prohibited_action":"quote_or_guess_missing_fields"}
+]

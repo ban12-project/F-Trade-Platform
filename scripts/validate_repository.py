@@ -305,6 +305,19 @@ def check_rfq_completeness() -> None:
     if result.returncode:
         raise AssertionError(f"RFQ completeness tests failed: {result.stderr or result.stdout}")
 
+def check_rfq_acceptance_matrix() -> None:
+    cases = load_json(FIXTURE_DIR / "rfq-acceptance-matrix.synthetic.json")
+    expected = {"complete", "incomplete", "ambiguous_vehicle", "missing_oe", "missing_quantity", "missing_destination", "refuses_clarification"}
+    if {case["id"] for case in cases} != expected:
+        raise AssertionError("RFQ acceptance matrix must cover all required scenarios")
+    for case in cases:
+        if set(case) != {"id", "input", "expected_state", "next_question", "prohibited_action"}:
+            raise AssertionError(f"RFQ acceptance matrix has invalid fields: {case['id']}")
+        if case["expected_state"] == "RFQ_READY" and case["next_question"] is not None:
+            raise AssertionError("Ready RFQ scenarios cannot have a next question")
+        if case["expected_state"] != "RFQ_READY" and not case["next_question"]:
+            raise AssertionError("Collecting RFQ scenarios require a next question")
+
 def check_sales_clarification() -> None:
     result = subprocess.run(["pnpm", "test:sales"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -357,6 +370,7 @@ def main() -> int:
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),
+        ("RFQ acceptance matrix", check_rfq_acceptance_matrix),
         ("sales clarification", check_sales_clarification),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
