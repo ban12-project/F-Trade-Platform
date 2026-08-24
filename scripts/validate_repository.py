@@ -296,6 +296,12 @@ def check_product_catalog_preflight() -> None:
         raise AssertionError(f"Product catalog preflight tests failed: {result.stderr or result.stdout}")
 
 
+def check_local_ocr() -> None:
+    result = subprocess.run(["pnpm", "test:local-ocr"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Local OCR guard tests failed: {result.stderr or result.stdout}")
+
+
 def check_quotation_gate() -> None:
     result = subprocess.run(["pnpm", "test:quotation"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -424,6 +430,7 @@ def main() -> int:
         ("workflow orchestrator", check_workflow_orchestrator),
         ("synthetic end-to-end demo", check_synthetic_demo),
         ("product catalog preflight", check_product_catalog_preflight),
+        ("local OCR guards", check_local_ocr),
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),

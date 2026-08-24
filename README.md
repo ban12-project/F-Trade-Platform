@@ -119,3 +119,13 @@ Markdown，再把该 Markdown 作为不可信来源文本交给模型；生产�
 ```bash
 MARKITDOWN_PYTHON=/path/to/python3 pnpm product-agent:catalog -- --preflight --document /authorized/catalog.pdf
 ```
+
+图像型 PDF 的本地 OCR 默认关闭。若资料获授权、机器上已安装 Poppler 与 Tesseract，才可显式启用；
+该路径只在本机渲染与识别，最多处理 64 页，绝不上传图册。OCR 文本仍是不可信来源，不能跳过字段级
+证据和 Gate 01 人工核验：
+
+```bash
+F_TRADE_LOCAL_OCR_ENABLED=1 \
+MARKITDOWN_PYTHON=/path/to/python3 \
+pnpm product-agent:catalog -- --preflight --document /authorized/catalog.pdf
+```
