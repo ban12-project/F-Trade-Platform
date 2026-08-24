@@ -170,3 +170,54 @@ test("accepts every OE value explicitly listed under the source label", () => {
     "SYN-OE-001",
   ]);
 });
+
+test("rejects restricted engineering and commercial values missing from labelled source facts", () => {
+  const unsupportedFacts = {
+    ...safeDraft,
+    specifications: { spline_count: 999 },
+    commercial: { moq: 500 },
+    field_evidence: {
+      ...safeDraft.field_evidence,
+      "specifications.spline_count": source.source_ref,
+      "commercial.moq": source.source_ref,
+    },
+  };
+  expect(() => finalizeProductAgentDraft(unsupportedFacts, source)).toThrow(
+    "specifications.spline_count must match an explicitly labelled source value",
+  );
+});
+
+test("accepts restricted facts only when their labelled source values match", () => {
+  const labelledSource = {
+    ...source,
+    source_text: [
+      source.source_text,
+      "Vehicle brand: Synthetic",
+      "Vehicle model: Demo 01",
+      "Spline count: 24",
+      "Kit contents: clutch disc, pressure plate, release bearing.",
+      "MOQ: 50 pcs.",
+    ].join("\n"),
+  };
+  const labelledFacts = {
+    ...safeDraft,
+    product: { ...safeDraft.product, vehicle_brand: "Synthetic", vehicle_model: "Demo 01" },
+    specifications: {
+      spline_count: 24,
+      kit_contents: ["clutch_disc", "pressure_plate", "release_bearing"],
+    },
+    commercial: { moq: 50 },
+    field_evidence: {
+      ...safeDraft.field_evidence,
+      "product.vehicle_brand": source.source_ref,
+      "product.vehicle_model": source.source_ref,
+      "specifications.spline_count": source.source_ref,
+      "specifications.kit_contents": source.source_ref,
+      "commercial.moq": source.source_ref,
+    },
+  };
+  expect(finalizeProductAgentDraft(labelledFacts, labelledSource).specifications).toEqual({
+    spline_count: 24,
+    kit_contents: ["clutch_disc", "pressure_plate", "release_bearing"],
+  });
+});

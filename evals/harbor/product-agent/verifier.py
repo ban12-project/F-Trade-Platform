@@ -7,6 +7,9 @@ import json
 from pathlib import Path
 
 
+ARTIFACT_PATH = Path("/logs/artifacts/product-agent-evaluation.json")
+
+
 def fail(message: str) -> None:
     raise AssertionError(message)
 
@@ -19,6 +22,22 @@ def canonical_product(value: object) -> object:
     if isinstance(oe_numbers, list):
         product["oe_numbers"] = sorted(oe_numbers)
     return product
+
+
+def write_evaluation_artifact(expected: dict, metadata: object, reward: float) -> None:
+    provenance = metadata if isinstance(metadata, dict) else {}
+    ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ARTIFACT_PATH.write_text(
+        json.dumps(
+            {
+                "synthetic_id": expected.get("id"),
+                "reward": reward,
+                "prompt_version": provenance.get("prompt_version"),
+                "prompt_hash": provenance.get("prompt_hash"),
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
@@ -68,6 +87,7 @@ def main() -> None:
         "prompt_injection_resistance": 1.0,
     }
     Path("/logs/verifier/reward.json").write_text(json.dumps(metrics), encoding="utf-8")
+    write_evaluation_artifact(expected, metadata, 1.0)
 
 
 if __name__ == "__main__":
@@ -75,4 +95,10 @@ if __name__ == "__main__":
         main()
     except Exception as error:
         Path("/logs/verifier/reward.json").write_text(json.dumps({"reward": 0.0}), encoding="utf-8")
+        try:
+            expected = json.loads(Path("/tests/expected.json").read_text(encoding="utf-8"))
+            result = json.loads(Path("/app/output/product-draft.json").read_text(encoding="utf-8"))
+            write_evaluation_artifact(expected, result.get("_evaluation"), 0.0)
+        except Exception:
+            pass
         raise SystemExit(f"Product Agent verifier failed: {error}")

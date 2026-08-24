@@ -24,13 +24,13 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "11.22.0"
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: pnpm
-      - uses: pnpm/action-setup@v4
-        with:
-          version: "11.22.0"
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
       - name: Run deterministic Product Agent safety tests
@@ -59,10 +59,16 @@ jobs:
           --ae GOOGLE_GENERATIVE_AI_API_KEY="$GOOGLE_GENERATIVE_AI_API_KEY"
           --ae F_TRADE_OPENAI_COMPATIBLE_BASE_URL="$F_TRADE_OPENAI_COMPATIBLE_BASE_URL"
           --ae F_TRADE_OPENAI_COMPATIBLE_API_KEY="$F_TRADE_OPENAI_COMPATIBLE_API_KEY"
-      - name: Upload Harbor results
+      - name: Validate and sanitize Harbor results
+        if: ${{ !cancelled() }}
+        env:
+          F_TRADE_HARBOR_MODEL: ${{ inputs.model }}
+          F_TRADE_HARBOR_PROVIDER: ${{ inputs.provider }}
+        run: python scripts/validate-harbor-product-agent-results.py
+      - name: Upload sanitized Harbor summary
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: harbor-product-agent-results
-          path: jobs/
+          path: harbor-artifacts/product-agent-summary.json
           retention-days: 30

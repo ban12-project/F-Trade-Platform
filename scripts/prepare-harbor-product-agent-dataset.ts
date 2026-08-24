@@ -1,10 +1,15 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { basename, dirname, parse, resolve } from "node:path";
 
 import { productAgentEvalCases } from "../evals/harbor/product-agent/cases";
 
-const root = resolve(process.env.HARBOR_DATASET_DIR ?? "/tmp/f-trade-harbor-product-agent");
+const datasetDirectoryName = "f-trade-harbor-product-agent";
+const defaultRoot = resolve("/tmp", datasetDirectoryName);
+const root = resolve(process.env.HARBOR_DATASET_DIR ?? defaultRoot);
 const templateRoot = resolve("evals/harbor/product-agent");
+const markerPath = resolve(root, ".f-trade-harbor-dataset");
+const markerContents = "synthetic Harbor Product Agent dataset\n";
 
 async function write(path: string, value: string) {
   await mkdir(dirname(path), { recursive: true });
@@ -12,7 +17,31 @@ async function write(path: string, value: string) {
 }
 
 async function main() {
+  if (
+    basename(root) !== datasetDirectoryName ||
+    root === parse(root).root ||
+    root === resolve(".") ||
+    root === resolve(homedir())
+  ) {
+    throw new Error(`Refusing to replace unsafe Harbor dataset directory: ${root}`);
+  }
+  if (root !== defaultRoot) {
+    try {
+      if ((await readFile(markerPath, "utf8")) !== markerContents) {
+        throw new Error(`Refusing to replace unmarked Harbor dataset directory: ${root}`);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      try {
+        await stat(root);
+        throw new Error(`Refusing to replace unmarked Harbor dataset directory: ${root}`);
+      } catch (rootError) {
+        if ((rootError as NodeJS.ErrnoException).code !== "ENOENT") throw rootError;
+      }
+    }
+  }
   await rm(root, { recursive: true, force: true });
+  await write(markerPath, markerContents);
   for (const item of productAgentEvalCases) {
     const taskRoot = resolve(root, item.id);
     await write(

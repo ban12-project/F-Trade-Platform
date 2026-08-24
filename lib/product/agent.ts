@@ -72,6 +72,152 @@ function normalizeOeNumber(value: string) {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+function normalizeSourceValue(value: string) {
+  return value.trim().replace(/[.|]+$/g, "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function extractLabelledValues(sourceText: string, labels: string[]) {
+  const values: string[] = [];
+  for (const label of labels) {
+    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(
+      `(?:^|\\n)\\s*(?:[-*]\\s*)?(?:\\|\\s*)?${escapedLabel}\\s*(?:[:：]|\\|)\\s*([^\\r\\n|]+)`,
+      "gi",
+    );
+    for (const match of sourceText.matchAll(pattern)) {
+      const value = match[1]?.trim();
+      if (value) values.push(value);
+    }
+  }
+  return values;
+}
+
+function assertLabelledTextFact(
+  field: string,
+  value: unknown,
+  labels: string[],
+  sourceText: string,
+) {
+  if (value === undefined) return;
+  if (
+    typeof value !== "string" ||
+    !extractLabelledValues(sourceText, labels).some(
+      (sourceValue) => normalizeSourceValue(sourceValue) === normalizeSourceValue(value),
+    )
+  ) {
+    throw new Error(`Product Agent field ${field} must match an explicitly labelled source value`);
+  }
+}
+
+function assertLabelledNumberFact(
+  field: string,
+  value: unknown,
+  labels: string[],
+  sourceText: string,
+) {
+  if (value === undefined) return;
+  const sourceNumbers = extractLabelledValues(sourceText, labels).flatMap((sourceValue) => {
+    const match = /-?(?:\d+(?:\.\d+)?|\.\d+)/.exec(sourceValue.replace(/,/g, ""));
+    return match ? [Number(match[0])] : [];
+  });
+  if (typeof value !== "number" || !sourceNumbers.includes(value)) {
+    throw new Error(`Product Agent field ${field} must match an explicitly labelled source value`);
+  }
+}
+
+function assertLabelledKitContents(value: unknown, sourceText: string) {
+  if (value === undefined) return;
+  const supportedContents = new Set<string>();
+  for (const sourceValue of extractLabelledValues(sourceText, ["Kit contents"])) {
+    const normalized = normalizeSourceValue(sourceValue);
+    if (/\bclutch disc\b/.test(normalized)) supportedContents.add("clutch_disc");
+    if (/\b(?:pressure plate|clutch cover)\b/.test(normalized)) {
+      supportedContents.add("pressure_plate");
+    }
+    if (/\brelease bearing\b/.test(normalized)) supportedContents.add("release_bearing");
+  }
+  if (
+    !Array.isArray(value) ||
+    value.length !== supportedContents.size ||
+    value.some((item) => typeof item !== "string" || !supportedContents.has(item))
+  ) {
+    throw new Error(
+      "Product Agent field specifications.kit_contents must match an explicitly labelled source value",
+    );
+  }
+}
+
+function assertRestrictedFacts(draft: ProductDraft, sourceText: string) {
+  assertLabelledTextFact(
+    "product.application",
+    draft.product.application,
+    ["Application"],
+    sourceText,
+  );
+  assertLabelledTextFact(
+    "product.vehicle_brand",
+    draft.product.vehicle_brand,
+    ["Vehicle brand"],
+    sourceText,
+  );
+  assertLabelledTextFact(
+    "product.vehicle_model",
+    draft.product.vehicle_model,
+    ["Vehicle model"],
+    sourceText,
+  );
+  assertLabelledNumberFact(
+    "specifications.clutch_diameter_mm",
+    draft.specifications?.clutch_diameter_mm,
+    ["Clutch diameter"],
+    sourceText,
+  );
+  assertLabelledNumberFact(
+    "specifications.spline_count",
+    draft.specifications?.spline_count,
+    ["Spline count"],
+    sourceText,
+  );
+  assertLabelledTextFact(
+    "specifications.spline_size",
+    draft.specifications?.spline_size,
+    ["Spline size"],
+    sourceText,
+  );
+  assertLabelledTextFact(
+    "specifications.friction_material",
+    draft.specifications?.friction_material,
+    ["Friction material"],
+    sourceText,
+  );
+  assertLabelledKitContents(draft.specifications?.kit_contents, sourceText);
+  assertLabelledNumberFact(
+    "specifications.gross_weight_kg",
+    draft.specifications?.gross_weight_kg,
+    ["Gross weight"],
+    sourceText,
+  );
+  assertLabelledNumberFact(
+    "specifications.net_weight_kg",
+    draft.specifications?.net_weight_kg,
+    ["Net weight"],
+    sourceText,
+  );
+  assertLabelledTextFact(
+    "specifications.package_size",
+    draft.specifications?.package_size,
+    ["Package size"],
+    sourceText,
+  );
+  assertLabelledNumberFact("commercial.moq", draft.commercial?.moq, ["MOQ"], sourceText);
+  assertLabelledNumberFact(
+    "commercial.estimated_lead_time_days",
+    draft.commercial?.estimated_lead_time_days,
+    ["Estimated lead time", "Lead time"],
+    sourceText,
+  );
+}
+
 function extractExplicitOeNumbers(sourceText: string) {
   const values = new Set<string>();
   const labelledOeLine =
@@ -101,6 +247,7 @@ function assertSafeDraft(draft: ProductDraft, source: ProductAgentSource) {
       );
     }
   }
+  assertRestrictedFacts(draft, source.source_text);
   const internalSku = draft.product.internal_sku;
   if (
     source.candidate_identifier &&
