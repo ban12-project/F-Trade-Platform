@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { compileContract } from "../lib/contracts/validator";
+import { assessInboundDelivery, assessReplyWindow } from "../lib/social/inbound-policy";
 import {
   replayTransitions,
   type ApprovalDecision,
@@ -15,6 +16,12 @@ export interface SyntheticDemoReport {
   finalStates: Record<string, string>;
   transitionCount: number;
   approvedGates: string[];
+  inboundMessaging: {
+    deliveryStatus: "accepted";
+    duplicateStatus: "duplicate";
+    replyWindowStatus: "within_window";
+    outsideWindowAction: "require_human_approved_template";
+  };
 }
 
 async function loadJson(relativePath: string): Promise<JsonObject> {
@@ -100,6 +107,32 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
   const rfqId = rfq.rfq_id;
   const quotationId = quotation.handoff_id;
   const leadId = "synthetic-lead-demo-001";
+  const socialPolicy = {
+    channelRef: "synthetic-instagram-channel",
+    accountRef: "synthetic-factory-account",
+    officialApi: true,
+    inboundOnly: true,
+    replyWindowMinutes: 60,
+    outsideWindowAction: "require_approved_template" as const,
+  };
+  const inboundMessage = {
+    messageId: "synthetic-platform-message-001",
+    direction: "inbound" as const,
+    receivedAt: "2026-08-24T08:59:00Z",
+  };
+  const inboundDelivery = assessInboundDelivery(socialPolicy, inboundMessage, new Set());
+  if (inboundDelivery.status !== "accepted") throw new Error("Synthetic inbound message was not accepted");
+  const duplicateDelivery = assessInboundDelivery(
+    socialPolicy,
+    inboundMessage,
+    new Set([inboundDelivery.deliveryKey]),
+  );
+  if (duplicateDelivery.status !== "duplicate") throw new Error("Synthetic duplicate message was not rejected");
+  const replyWindow = assessReplyWindow(socialPolicy, inboundMessage, "2026-08-24T09:00:00Z");
+  const outsideWindow = assessReplyWindow(socialPolicy, inboundMessage, "2026-08-24T10:00:00Z");
+  if (replyWindow.status !== "within_window" || outsideWindow.nextAction !== "require_human_approved_template") {
+    throw new Error("Synthetic inbound reply-window policy was not enforced");
+  }
   const productApproval = approval("synthetic-approval-001", productId, "gate_01_truth", "approved", "synthetic-reviewer");
   const contentApproval = approval("synthetic-content-approval-001", contentId, "gate_01_truth", "approved", "synthetic-reviewer");
   const quoteApproval = approval("synthetic-quote-approval-001", quotationId, "gate_02_quote", "approved", "synthetic-sales-reviewer");
@@ -141,6 +174,12 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     finalStates,
     transitionCount,
     approvedGates: ["gate_01_truth", "gate_02_quote"],
+    inboundMessaging: {
+      deliveryStatus: inboundDelivery.status,
+      duplicateStatus: duplicateDelivery.status,
+      replyWindowStatus: replyWindow.status,
+      outsideWindowAction: outsideWindow.nextAction,
+    },
   };
 }
 
