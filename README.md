@@ -97,3 +97,18 @@ pnpm db:migrate
 `evidence_refs` 中的来源。自动审核会列出核心缺失项、未绑定证据的字段，以及
 尚未由人工核验的车型身份。只有具备有效人员、时间和证据记录的 Gate 01
 人工批准，才能把草稿提升为 `ProductReady`；agent 形式的批准会在运行时被拒绝。
+
+### Harbor Product Agent 评测
+
+`pnpm eval:harbor:prepare` 会在临时目录生成 20 个仅含 synthetic 数据的 Harbor 任务。
+本机使用 Podman 时，先启动 Podman machine，并把其 Docker 兼容 API socket 设置为
+`DOCKER_HOST`；再在当前 shell 设置 OpenAI-compatible endpoint 和 key，执行：
+
+```bash
+pnpm eval:harbor:podman openai-compatible/gpt-5.6-luna
+```
+
+Issue #48 的 PDF 只能作为本机授权测试输入，不能提交、镜像复制或上传到 Harbor artifact。
+Product Agent 会先使用 MarkItDown 的本地 `convert_local()` 将允许的 PDF、Office 和文本格式转为
+Markdown，再把该 Markdown 作为不可信来源文本交给模型；生产服务必须继续限制上传路径、文件类型和
+大小。[MarkItDown security guidance](https://github.com/microsoft/markitdown#security-considerations)

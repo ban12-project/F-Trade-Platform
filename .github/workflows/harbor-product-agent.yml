@@ -1,0 +1,68 @@
+name: harbor-product-agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Model identifier in provider/model format
+        required: true
+        type: string
+      provider:
+        description: Provider whose protected environment supplies the API key
+        required: true
+        type: choice
+        options: [openai, anthropic, google, openai-compatible]
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: harbor-product-agent
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.provider }}-product-agent-eval
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "11.22.0"
+      - name: Install application dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run deterministic Product Agent safety tests
+        run: pnpm exec playwright test tests/e2e/product-agent.spec.ts
+      - name: Set up Harbor
+        uses: astral-sh/setup-uv@v6
+      - name: Install Harbor
+        run: uv tool install harbor
+      - name: Build Product Agent evaluation image
+        run: docker build -f evals/harbor/product-agent/Dockerfile -t f-trade-product-agent-eval:latest .
+      - name: Prepare synthetic Harbor tasks
+        run: pnpm eval:harbor:prepare
+      - name: Run Product Agent evaluation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          F_TRADE_OPENAI_COMPATIBLE_BASE_URL: ${{ vars.F_TRADE_OPENAI_COMPATIBLE_BASE_URL }}
+          F_TRADE_OPENAI_COMPATIBLE_API_KEY: ${{ secrets.F_TRADE_OPENAI_COMPATIBLE_API_KEY }}
+        run: >-
+          harbor run -p /tmp/f-trade-harbor-product-agent
+          -a evals.harbor.product_agent.f_trade_product_agent:FTradeProductAgent
+          -m "${{ inputs.model }}" -k 3 --yes
+          --ae OPENAI_API_KEY="$OPENAI_API_KEY"
+          --ae ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+          --ae GOOGLE_GENERATIVE_AI_API_KEY="$GOOGLE_GENERATIVE_AI_API_KEY"
+          --ae F_TRADE_OPENAI_COMPATIBLE_BASE_URL="$F_TRADE_OPENAI_COMPATIBLE_BASE_URL"
+          --ae F_TRADE_OPENAI_COMPATIBLE_API_KEY="$F_TRADE_OPENAI_COMPATIBLE_API_KEY"
+      - name: Upload Harbor results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: harbor-product-agent-results
+          path: jobs/
+          retention-days: 30
