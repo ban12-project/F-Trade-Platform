@@ -18,6 +18,7 @@
     "product-agent:catalog": "tsx scripts/run-product-agent-catalog.ts",
     "test:catalog-preflight": "tsx scripts/test-product-catalog-preflight.ts",
     "test:local-ocr": "python3 scripts/test-local-ocr-preprocess.py",
+    "test:social-inbound": "tsx scripts/test-social-inbound-policy.ts",
     "eval:harbor:prepare": "tsx scripts/prepare-harbor-product-agent-dataset.ts",
     "eval:harbor:podman": "sh scripts/run-harbor-product-agent-podman.sh",
     "typecheck": "tsc --noEmit",

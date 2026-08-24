@@ -66,6 +66,7 @@ def check_schemas() -> None:
             "product-acceptance-failed.synthetic.json",
         ],
         "mvp-acceptance-summary.schema.json": ["mvp-acceptance-summary.synthetic.json"],
+        "channel-inbound-policy.schema.json": ["channel-inbound-policy.synthetic.json"],
         "product-ready.schema.json": [
             "product-ready.synthetic.json",
             "product-ready-application.synthetic.json",
@@ -326,6 +327,12 @@ def check_local_ocr() -> None:
         raise AssertionError(f"Local OCR guard tests failed: {result.stderr or result.stdout}")
 
 
+def check_social_inbound_policy() -> None:
+    result = subprocess.run(["pnpm", "test:social-inbound"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Social inbound policy tests failed: {result.stderr or result.stdout}")
+
+
 def check_quotation_gate() -> None:
     result = subprocess.run(["pnpm", "test:quotation"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -456,6 +463,7 @@ def main() -> int:
         ("synthetic end-to-end demo", check_synthetic_demo),
         ("product catalog preflight", check_product_catalog_preflight),
         ("local OCR guards", check_local_ocr),
+        ("social inbound policy", check_social_inbound_policy),
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),
