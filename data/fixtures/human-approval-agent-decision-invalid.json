@@ -1,0 +1,16 @@
+{
+  "approval_id": "invalid-agent-approval-001",
+  "gate": "gate_02_quote",
+  "entity_type": "quotation",
+  "entity_id": "synthetic-handoff-001",
+  "status": "approved",
+  "requested_by_type": "agent",
+  "requested_by_id": "synthetic-sales-agent",
+  "requested_at": "2026-08-23T11:00:00Z",
+  "decision": {
+    "actor_type": "agent",
+    "decided_by": "synthetic-sales-agent",
+    "decided_at": "2026-08-23T12:00:00Z",
+    "evidence_ref": "invalid-agent-decision"
+  }
+}

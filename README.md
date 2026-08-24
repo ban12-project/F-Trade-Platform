@@ -19,13 +19,15 @@ AI 外贸工作流平台第一阶段 MVP，试点品类为汽车离合器。
 - AI 不生成或决定最终价格、生产交期和正式报价。
 - GitHub 只跟踪研发交付，不保存真实客户、RFQ、报价、目的港或其他业务流水。
 - `docs/reference/目录总表.pdf` 是制动盘/刹车片目录，仅作为跨品类表格格式参考，不是离合器数据源。
-- 当前未选择首个社媒渠道和应用技术栈；这两个决定通过 GitHub Decision Issue 完成，不在初始化阶段擅自确定。
+- 当前未选择首个社媒渠道；该决定通过 GitHub Decision Issue 完成，不在实现阶段擅自确定。
+- MVP 应用技术栈已经通过 ADR 0001 确定；试点部署前仍必须完成 Next.js 安全更新风险项。
 
 ## 导航
 
 - [MVP 技术方案](docs/background/AI外贸工作流平台_第一阶段MVP_离合器.md)
 - [业务工作流与 Human Gate](docs/architecture/business-workflow.md)
 - [数据契约总览](docs/architecture/data-contracts.md)
+- [ADR 0001：MVP 应用技术栈](docs/decisions/0001-mvp-application-stack.md)
 - [研发工作约定](CONTRIBUTING.md)
 - [安全与数据分级](SECURITY.md)
 - [项目状态](docs/PROJECT_STATUS.md)

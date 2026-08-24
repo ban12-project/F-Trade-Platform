@@ -1,0 +1,17 @@
+{
+  "approval_id": "synthetic-approval-rejected-001",
+  "gate": "gate_01_truth",
+  "entity_type": "content",
+  "entity_id": "synthetic-content-001",
+  "status": "rejected",
+  "requested_by_type": "agent",
+  "requested_by_id": "synthetic-content-agent",
+  "requested_at": "2026-08-23T11:00:00Z",
+  "decision": {
+    "actor_type": "human",
+    "decided_by": "synthetic-reviewer",
+    "decided_at": "2026-08-23T12:00:00Z",
+    "evidence_ref": "synthetic-content-review-001",
+    "notes": "Revise unsupported engineering wording."
+  }
+}

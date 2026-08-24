@@ -1,0 +1,10 @@
+{
+  "approval_id": "synthetic-approval-pending-001",
+  "gate": "gate_02_quote",
+  "entity_type": "quotation",
+  "entity_id": "synthetic-handoff-review-001",
+  "status": "pending",
+  "requested_by_type": "human",
+  "requested_by_id": "synthetic-sales-user",
+  "requested_at": "2026-08-23T11:00:00Z"
+}

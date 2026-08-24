@@ -1,44 +1,54 @@
 # 业务工作流与 Human Gate
 
-## 状态流
+## 聚合状态机
+
+产品到商机是一条业务旅程，但不是同一个实体的一条全局状态链。每个聚合只改变自己的状态，聚合之间通过引用和事件关联。
 
 ```text
-PRODUCT_IMPORTED
-  → PRODUCT_REVIEW_REQUIRED
-  → PRODUCT_READY
-  → CONTENT_GENERATING
-  → CONTENT_REVIEW_REQUIRED
-  → CONTENT_APPROVED
-  → PUBLISHED
-  → LEAD_RECEIVED
-  → RFQ_COLLECTING
-  → RFQ_READY
-  → QUOTE_REVIEW_REQUIRED
-  → QUOTED
-  → FOLLOW_UP
-  → OPPORTUNITY
-  → WON / LOST
+Product: PRODUCT_IMPORTED → PRODUCT_REVIEW_REQUIRED
+           ↑                    ├→ PRODUCT_READY
+           └ PRODUCT_REVISION_REQUIRED ←┘
+
+Content: CONTENT_GENERATING → CONTENT_REVIEW_REQUIRED
+             ↑                    ├→ CONTENT_APPROVED → CONTENT_PUBLISHED
+             └ CONTENT_REVISION_REQUIRED ←┘
+
+RFQ: RFQ_COLLECTING → RFQ_READY
+
+Quotation: QUOTE_DRAFT → QUOTE_REVIEW_REQUIRED
+               ↑                    ├→ QUOTE_APPROVED → QUOTE_SENT
+               └ QUOTE_REVISION_REQUIRED ←┘
+
+Lead: LEAD_RECEIVED → FOLLOW_UP → OPPORTUNITY → WON / LOST
+
+DeliveryConfirmation: DELIVERY_CONFIRMATION_PENDING
+                        ├→ DELIVERY_CONFIRMATION_CONFIRMED
+                        ├→ DELIVERY_CONFIRMATION_REJECTED
+                        └→ DELIVERY_CONFIRMATION_EXPIRED
 ```
 
-任何状态转换都要写入结构化 Workflow Event，包含实体、前后状态、actor、时间、证据和审批信息。Agent 不能绕过状态机直接发布、报价或承诺交期。
+例如 `PRODUCT_READY` 不直接转换成 `CONTENT_GENERATING`。内容生成会创建新的 Content 聚合，并引用已就绪的 Product。这样可以让一个产品产生多份内容，也避免把不同实体的生命周期混为一谈。
+
+任何状态转换都要写入结构化 Workflow Event，包含实体、前后状态、actor、时间和证据。需要门禁的转换还必须引用独立的 Human Approval。Agent 不能绕过状态机直接发布、报价或承诺交期。
 
 ## 三类 Human Gate
 
 ### Gate 01 - 产品与内容真实性
 
-产品导入后先检查来源、OE、车型、参数和缺失字段；内容发布前再检查产品事实、图片一致性和营销措辞。两次检查属于同一真实性门禁类型，分别对应 `PRODUCT_REVIEW_REQUIRED` 和 `CONTENT_REVIEW_REQUIRED`。
+产品导入后检查来源、产品身份、参数和阻断缺失字段；内容发布前检查产品事实、图片一致性和营销措辞。批准进入 Ready/Approved，拒绝进入对应 Revision Required，修订后可以重新送审。
 
 ### Gate 02 - 正式报价
 
-Sales Agent 只收集和整理 RFQ。价格、MOQ、Lead Time、付款条款和报价有效期由人工销售输入并批准后才允许发送。
+Sales Agent 只收集和整理 RFQ。报价草稿由人工销售创建，价格、MOQ、Lead Time、付款条款和有效期经另一条可审计的人工决策批准后才允许发送。待审批报价不提前携带审批结果。
 
 ### Gate 03 - 交期确认
 
-客户出现明确采购意向后，工厂人工确认生产能力和交期；Agent 只能传递确认结果，不能自行承诺。
+客户出现明确采购意向后，工厂人工确认生产能力和交期。Agent 可以发起确认请求和传递结果，不能作为决策人自行承诺。
 
 ## 关键安全规则
 
 - 营销语言可以生成，工程事实不能生成。
 - AI 图片不能证明花键、孔位、尺寸、摩擦材料、零件数量或真实产品结构。
 - RFQ 不完整时持续提问，不直接报价。
+- 审批和业务对象分别存储；业务对象只引用 `approval_ref`，避免伪造内嵌审批。
 - 第一阶段 Demo 以 `OPPORTUNITY` 为成功终点；不把模拟询盘冒充真实成交。

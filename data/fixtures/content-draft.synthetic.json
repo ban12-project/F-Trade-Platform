@@ -13,5 +13,5 @@
   "call_to_action": "Send OE number, vehicle model and quantity for a quotation.",
   "hashtags": ["#SyntheticDemo", "#ClutchKit"],
   "visual_instruction": "Use a clearly labeled synthetic product mockup; do not imply real structure.",
-  "status": "draft"
+  "status": "review_required"
 }

@@ -4,21 +4,40 @@
   "title": "WorkflowEvent",
   "type": "object",
   "additionalProperties": false,
-  "required": ["event_id", "entity_type", "entity_id", "from_state", "to_state", "actor_type", "occurred_at", "evidence_refs"],
+  "required": ["event_id", "entity_type", "entity_id", "from_state", "to_state", "actor_type", "actor_id", "occurred_at", "evidence_refs"],
   "properties": {
     "event_id": {"type": "string", "minLength": 1},
-    "entity_type": {"enum": ["product", "content", "lead", "rfq", "quotation", "opportunity"]},
+    "entity_type": {"enum": ["product", "content", "lead", "rfq", "quotation", "delivery_confirmation"]},
     "entity_id": {"type": "string", "minLength": 1},
-    "from_state": {
-      "enum": ["PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "PRODUCT_READY", "CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED", "CONTENT_APPROVED", "PUBLISHED", "LEAD_RECEIVED", "RFQ_COLLECTING", "RFQ_READY", "QUOTE_REVIEW_REQUIRED", "QUOTED", "FOLLOW_UP", "OPPORTUNITY", "WON", "LOST"]
-    },
-    "to_state": {
-      "enum": ["PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "PRODUCT_READY", "CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED", "CONTENT_APPROVED", "PUBLISHED", "LEAD_RECEIVED", "RFQ_COLLECTING", "RFQ_READY", "QUOTE_REVIEW_REQUIRED", "QUOTED", "FOLLOW_UP", "OPPORTUNITY", "WON", "LOST"]
-    },
+    "from_state": {"enum": ["PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "PRODUCT_REVISION_REQUIRED", "PRODUCT_READY", "CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED", "CONTENT_REVISION_REQUIRED", "CONTENT_APPROVED", "CONTENT_PUBLISHED", "RFQ_COLLECTING", "RFQ_READY", "QUOTE_DRAFT", "QUOTE_REVIEW_REQUIRED", "QUOTE_REVISION_REQUIRED", "QUOTE_APPROVED", "QUOTE_SENT", "LEAD_RECEIVED", "FOLLOW_UP", "OPPORTUNITY", "WON", "LOST", "DELIVERY_CONFIRMATION_PENDING", "DELIVERY_CONFIRMATION_CONFIRMED", "DELIVERY_CONFIRMATION_REJECTED", "DELIVERY_CONFIRMATION_EXPIRED"]},
+    "to_state": {"enum": ["PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "PRODUCT_REVISION_REQUIRED", "PRODUCT_READY", "CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED", "CONTENT_REVISION_REQUIRED", "CONTENT_APPROVED", "CONTENT_PUBLISHED", "RFQ_COLLECTING", "RFQ_READY", "QUOTE_DRAFT", "QUOTE_REVIEW_REQUIRED", "QUOTE_REVISION_REQUIRED", "QUOTE_APPROVED", "QUOTE_SENT", "LEAD_RECEIVED", "FOLLOW_UP", "OPPORTUNITY", "WON", "LOST", "DELIVERY_CONFIRMATION_PENDING", "DELIVERY_CONFIRMATION_CONFIRMED", "DELIVERY_CONFIRMATION_REJECTED", "DELIVERY_CONFIRMATION_EXPIRED"]},
     "actor_type": {"enum": ["agent", "human", "system"]},
     "actor_id": {"type": "string", "minLength": 1},
     "occurred_at": {"type": "string", "format": "date-time"},
-    "evidence_refs": {"type": "array", "items": {"type": "string"}},
-    "gate": {"enum": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"]}
-  }
+    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "gate": {"enum": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"]},
+    "approval_ref": {"type": "string", "minLength": 1}
+  },
+  "oneOf": [
+    {"properties": {"entity_type": {"const": "product"}, "from_state": {"const": "PRODUCT_IMPORTED"}, "to_state": {"const": "PRODUCT_REVIEW_REQUIRED"}, "actor_type": {"enum": ["agent", "human", "system"]}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "product"}, "from_state": {"const": "PRODUCT_REVIEW_REQUIRED"}, "to_state": {"const": "PRODUCT_READY"}, "actor_type": {"const": "human"}, "gate": {"const": "gate_01_truth"}}, "required": ["gate", "approval_ref"]},
+    {"properties": {"entity_type": {"const": "product"}, "from_state": {"const": "PRODUCT_REVIEW_REQUIRED"}, "to_state": {"const": "PRODUCT_REVISION_REQUIRED"}, "actor_type": {"const": "human"}, "gate": {"const": "gate_01_truth"}}, "required": ["gate", "approval_ref"]},
+    {"properties": {"entity_type": {"const": "product"}, "from_state": {"const": "PRODUCT_REVISION_REQUIRED"}, "to_state": {"const": "PRODUCT_REVIEW_REQUIRED"}, "actor_type": {"enum": ["agent", "human", "system"]}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "content"}, "from_state": {"const": "CONTENT_GENERATING"}, "to_state": {"const": "CONTENT_REVIEW_REQUIRED"}, "actor_type": {"const": "agent"}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "content"}, "from_state": {"const": "CONTENT_REVIEW_REQUIRED"}, "to_state": {"const": "CONTENT_APPROVED"}, "actor_type": {"const": "human"}, "gate": {"const": "gate_01_truth"}}, "required": ["gate", "approval_ref"]},
+    {"properties": {"entity_type": {"const": "content"}, "from_state": {"const": "CONTENT_REVIEW_REQUIRED"}, "to_state": {"const": "CONTENT_REVISION_REQUIRED"}, "actor_type": {"const": "human"}, "gate": {"const": "gate_01_truth"}}, "required": ["gate", "approval_ref"]},
+    {"properties": {"entity_type": {"const": "content"}, "from_state": {"const": "CONTENT_REVISION_REQUIRED"}, "to_state": {"const": "CONTENT_REVIEW_REQUIRED"}, "actor_type": {"enum": ["agent", "human"]}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "content"}, "from_state": {"const": "CONTENT_APPROVED"}, "to_state": {"const": "CONTENT_PUBLISHED"}, "actor_type": {"enum": ["human", "system"]}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "rfq"}, "from_state": {"const": "RFQ_COLLECTING"}, "to_state": {"const": "RFQ_READY"}, "actor_type": {"enum": ["agent", "human"]}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "quotation"}, "from_state": {"const": "QUOTE_DRAFT"}, "to_state": {"const": "QUOTE_REVIEW_REQUIRED"}, "actor_type": {"const": "human"}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "quotation"}, "from_state": {"const": "QUOTE_REVIEW_REQUIRED"}, "to_state": {"const": "QUOTE_APPROVED"}, "actor_type": {"const": "human"}, "gate": {"const": "gate_02_quote"}}, "required": ["gate", "approval_ref"]},
+    {"properties": {"entity_type": {"const": "quotation"}, "from_state": {"const": "QUOTE_REVIEW_REQUIRED"}, "to_state": {"const": "QUOTE_REVISION_REQUIRED"}, "actor_type": {"const": "human"}, "gate": {"const": "gate_02_quote"}}, "required": ["gate", "approval_ref"]},
+    {"properties": {"entity_type": {"const": "quotation"}, "from_state": {"const": "QUOTE_REVISION_REQUIRED"}, "to_state": {"const": "QUOTE_REVIEW_REQUIRED"}, "actor_type": {"const": "human"}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "quotation"}, "from_state": {"const": "QUOTE_APPROVED"}, "to_state": {"const": "QUOTE_SENT"}, "actor_type": {"enum": ["human", "system"]}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "lead"}, "from_state": {"const": "LEAD_RECEIVED"}, "to_state": {"const": "FOLLOW_UP"}, "actor_type": {"enum": ["agent", "human", "system"]}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "lead"}, "from_state": {"const": "FOLLOW_UP"}, "to_state": {"const": "OPPORTUNITY"}, "actor_type": {"enum": ["agent", "human"]}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "lead"}, "from_state": {"const": "OPPORTUNITY"}, "to_state": {"enum": ["WON", "LOST"]}, "actor_type": {"const": "human"}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}},
+    {"properties": {"entity_type": {"const": "delivery_confirmation"}, "from_state": {"const": "DELIVERY_CONFIRMATION_PENDING"}, "to_state": {"enum": ["DELIVERY_CONFIRMATION_CONFIRMED", "DELIVERY_CONFIRMATION_REJECTED"]}, "actor_type": {"const": "human"}, "gate": {"const": "gate_03_delivery"}}, "required": ["gate", "approval_ref"]},
+    {"properties": {"entity_type": {"const": "delivery_confirmation"}, "from_state": {"const": "DELIVERY_CONFIRMATION_PENDING"}, "to_state": {"const": "DELIVERY_CONFIRMATION_EXPIRED"}, "actor_type": {"const": "system"}}, "not": {"anyOf": [{"required": ["gate"]}, {"required": ["approval_ref"]}]}}
+  ]
 }

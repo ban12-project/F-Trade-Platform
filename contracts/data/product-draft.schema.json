@@ -4,13 +4,14 @@
   "title": "ProductDraft",
   "type": "object",
   "additionalProperties": false,
-  "required": ["record_id", "source_ref", "verification_status", "missing_fields", "product"],
+  "required": ["record_id", "source_ref", "verification_status", "blocking_missing_fields", "optional_missing_fields", "product"],
   "properties": {
     "record_id": {"type": "string", "minLength": 1},
     "source_ref": {"type": "string", "minLength": 1},
-    "evidence_refs": {"type": "array", "items": {"type": "string"}},
-    "verification_status": {"enum": ["unverified", "review_required", "verified"]},
-    "missing_fields": {"type": "array", "items": {"type": "string"}},
+    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "verification_status": {"enum": ["unverified", "review_required", "revision_required"]},
+    "blocking_missing_fields": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "optional_missing_fields": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "product": {
       "type": "object",
       "additionalProperties": false,
@@ -18,7 +19,7 @@
         "product_name": {"type": "string", "minLength": 1},
         "product_type": {"enum": ["clutch_disc", "clutch_cover", "release_bearing", "clutch_kit"]},
         "internal_sku": {"type": "string", "minLength": 1},
-        "oe_numbers": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "oe_numbers": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
         "application": {"type": "string", "minLength": 1},
         "vehicle_brand": {"type": "string", "minLength": 1},
         "vehicle_model": {"type": "string", "minLength": 1}
@@ -32,7 +33,7 @@
         "spline_count": {"type": "integer", "minimum": 1},
         "spline_size": {"type": "string", "minLength": 1},
         "friction_material": {"type": "string", "minLength": 1},
-        "kit_contents": {"type": "array", "items": {"enum": ["clutch_disc", "pressure_plate", "release_bearing"]}},
+        "kit_contents": {"type": "array", "items": {"enum": ["clutch_disc", "pressure_plate", "release_bearing"]}, "uniqueItems": true},
         "gross_weight_kg": {"type": "number", "exclusiveMinimum": 0},
         "net_weight_kg": {"type": "number", "exclusiveMinimum": 0},
         "package_size": {"type": "string", "minLength": 1}
@@ -47,15 +48,6 @@
         "packaging": {"type": "string", "minLength": 1},
         "supported_customization": {"type": "string", "minLength": 1},
         "sample_available": {"type": "boolean"}
-      }
-    },
-    "review": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "approved_by": {"type": "string", "minLength": 1},
-        "approved_at": {"type": "string", "format": "date-time"},
-        "evidence_ref": {"type": "string", "minLength": 1}
       }
     }
   }

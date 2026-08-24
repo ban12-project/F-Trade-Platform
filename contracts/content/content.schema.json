@@ -30,21 +30,18 @@
     "call_to_action": {"type": "string", "minLength": 1},
     "hashtags": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "visual_instruction": {"type": "string", "minLength": 1},
-    "status": {"enum": ["draft", "approved"]},
-    "review": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "approved_by": {"type": "string", "minLength": 1},
-        "approved_at": {"type": "string", "format": "date-time"},
-        "evidence_ref": {"type": "string", "minLength": 1}
-      }
-    }
+    "status": {"enum": ["review_required", "revision_required", "approved", "published"]},
+    "approval_ref": {"type": "string", "minLength": 1},
+    "published_ref": {"type": "string", "minLength": 1}
   },
   "allOf": [
     {
-      "if": {"properties": {"status": {"const": "approved"}}},
-      "then": {"required": ["review"], "properties": {"review": {"required": ["approved_by", "approved_at", "evidence_ref"]}}}
+      "if": {"properties": {"status": {"enum": ["approved", "published"]}}, "required": ["status"]},
+      "then": {"required": ["approval_ref"]}
+    },
+    {
+      "if": {"properties": {"status": {"const": "published"}}, "required": ["status"]},
+      "then": {"required": ["published_ref"]}
     }
   ]
 }

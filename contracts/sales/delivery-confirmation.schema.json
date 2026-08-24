@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/delivery-confirmation.schema.json",
+  "title": "DeliveryConfirmation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["confirmation_id", "related_entity_type", "related_entity_id", "status", "requested_by_type", "requested_by_id", "requested_at"],
+  "properties": {
+    "confirmation_id": {"type": "string", "minLength": 1},
+    "related_entity_type": {"enum": ["rfq", "opportunity"]},
+    "related_entity_id": {"type": "string", "minLength": 1},
+    "status": {"enum": ["pending", "confirmed", "rejected", "expired"]},
+    "requested_by_type": {"enum": ["agent", "human", "system"]},
+    "requested_by_id": {"type": "string", "minLength": 1},
+    "requested_at": {"type": "string", "format": "date-time"},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor_type", "decided_by", "decided_at", "evidence_ref"],
+      "properties": {
+        "actor_type": {"const": "human"},
+        "decided_by": {"type": "string", "minLength": 1},
+        "decided_at": {"type": "string", "format": "date-time"},
+        "evidence_ref": {"type": "string", "minLength": 1},
+        "confirmed_lead_time_days": {"type": "integer", "minimum": 0},
+        "notes": {"type": "string"}
+      }
+    },
+    "approval_ref": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "pending"}}, "required": ["status"]},
+      "then": {"not": {"anyOf": [{"required": ["result"]}, {"required": ["approval_ref"]}]}}
+    },
+    {
+      "if": {"properties": {"status": {"enum": ["confirmed", "rejected"]}}, "required": ["status"]},
+      "then": {"required": ["result", "approval_ref"]}
+    },
+    {
+      "if": {"properties": {"status": {"const": "confirmed"}}, "required": ["status"]},
+      "then": {"properties": {"result": {"required": ["confirmed_lead_time_days"]}}}
+    }
+  ]
+}

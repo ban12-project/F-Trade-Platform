@@ -1,0 +1,11 @@
+{
+  "event_id": "invalid-cross-aggregate-event-001",
+  "entity_type": "product",
+  "entity_id": "synthetic-product-ready-001",
+  "from_state": "PRODUCT_READY",
+  "to_state": "CONTENT_GENERATING",
+  "actor_type": "agent",
+  "actor_id": "synthetic-content-agent",
+  "occurred_at": "2026-08-23T12:00:00Z",
+  "evidence_refs": ["invalid-cross-aggregate-transition"]
+}
