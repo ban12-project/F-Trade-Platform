@@ -372,6 +372,22 @@ def check_repository_hygiene() -> None:
     bad = [path for path in tracked if Path(path).name in forbidden]
     if bad:
         raise AssertionError(f"Forbidden files are tracked: {bad}")
+    browser_state_names = {
+        "auth.json", "cookie.json", "cookies.json", "storage-state.json", "storageState.json",
+    }
+    browser_state_prefixes = ("storage-state", "storageState", "session-state")
+    browser_state_directories = {".agent-browser", ".auth", ".browser-profiles", "browser-profiles"}
+    browser_state = [
+        path for path in tracked
+        if (
+            Path(path).suffix == ".har"
+            or Path(path).name in browser_state_names
+            or Path(path).name.startswith(browser_state_prefixes)
+            or browser_state_directories.intersection(Path(path).parts)
+        )
+    ]
+    if browser_state:
+        raise AssertionError(f"Browser session artifacts must not be tracked: {browser_state}")
     pdf = ROOT / "docs/reference/目录总表.pdf"
     if not pdf.exists() or pdf.stat().st_size < 1000:
         raise AssertionError("Reference PDF is missing or unexpectedly small")

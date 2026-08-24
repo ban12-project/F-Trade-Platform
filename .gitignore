@@ -29,6 +29,18 @@ build/
 *.pem
 *.key
 
+# Browser automation state can contain bearer sessions, Cookies and customer messages.
+.agent-browser/
+.browser-profiles/
+.auth/
+browser-profiles/
+storage-state*.json
+storageState*.json
+cookies.json
+cookie.json
+session-state*.json
+*.har
+
 # Temporary artifacts
 tmp/
 output/
