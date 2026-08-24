@@ -35,7 +35,7 @@ Workflow Event 只允许同一聚合内的合法转换。门禁转换必须同�
 
 ## 运行时持久化
 
-Drizzle Schema 将业务对象保存为带 `type`、`state`、版本与结构化 payload 的聚合记录；边界层仍必须先使用对应 JSON Schema 校验 payload。Approval、Workflow Event、Evidence 和 Audit Event 使用独立表与外键关联。
+Drizzle 使用支持事务的 Neon serverless `Pool` 驱动，将业务对象保存为带 `type`、`state`、版本与结构化 payload 的聚合记录；边界层仍必须先使用对应 JSON Schema 校验 payload。Approval、Workflow Event、Evidence 和 Audit Event 使用独立表与外键关联。不得改用 transaction 会直接失败的 Neon HTTP 驱动。
 
 Workflow Event 和 Audit Event 只追加，不允许在应用层更新；首个 SQL migration 还通过数据库触发器拒绝 UPDATE/DELETE。认证表由 Better Auth 使用，公开注册关闭，邀请只保存不可逆 token hash。
 
