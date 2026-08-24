@@ -233,6 +233,11 @@ def check_mvp_acceptance_summary() -> None:
             raise AssertionError("Go decision requires every RFQ to be ready")
         if metrics["blocked_external_dependency_count"]:
             raise AssertionError("Go decision requires no blocked external dependencies")
+    result = subprocess.run(
+        ["pnpm", "test:mvp-acceptance"], cwd=ROOT, capture_output=True, text=True
+    )
+    if result.returncode:
+        raise AssertionError(f"MVP acceptance decision tests failed: {result.stderr or result.stdout}")
 
 
 def check_product_pilot_authorization() -> None:
