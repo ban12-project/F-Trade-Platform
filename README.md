@@ -50,3 +50,16 @@ python3 scripts/validate_repository.py
 ```
 
 GitHub Actions 会在 Pull Request 和 `main` 推送时运行同一套核心校验。
+
+### Next.js 与端到端测试
+
+应用基线使用 Next.js 16.3 和 Playwright。需要 Node.js 24 与 pnpm：
+
+```bash
+pnpm install
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+Playwright 会构建并启动受控测试服务器。测试构建会启用 Next.js 的
+`instant()` 测试 API，普通生产构建不会暴露该 API。

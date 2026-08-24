@@ -135,9 +135,10 @@ def check_repository_hygiene() -> None:
 
 def check_local_markdown_links() -> None:
     pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+    ignored_directories = {".git", ".next", "node_modules", "playwright-report"}
     missing: list[str] = []
     for markdown in ROOT.rglob("*.md"):
-        if ".git" in markdown.parts:
+        if ignored_directories.intersection(markdown.parts):
             continue
         for target in pattern.findall(markdown.read_text(encoding="utf-8")):
             if target.startswith(("http://", "https://", "mailto:", "#")):
