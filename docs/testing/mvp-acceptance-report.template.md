@@ -44,3 +44,9 @@
 - 决策证据引用：`<internal-evidence-reference>`
 
 `go` 的前提是六项验收均为 `passed`、事实错误为零、门禁绕过为零、`RFQ Ready` 数等于 RFQ 总数，且不存在未处理的外部依赖阻塞。否则应选择 `pending` 或 `no_go` 并由人工制定后续动作。
+
+在受控内部系统生成仅含 `synthetic` 或 `sanitized_aggregate` 的摘要后，可在本机运行以下命令复核 JSON Schema 和 Go 判定；命令不上传或输出摘要内容：
+
+```bash
+pnpm validate:mvp-acceptance -- /approved/internal/mvp-acceptance-summary.json
+```

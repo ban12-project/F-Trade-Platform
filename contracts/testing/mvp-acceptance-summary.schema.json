@@ -34,8 +34,8 @@
         "allOf": [
           {
             "if": {"properties": {"status": {"const": "failed"}}, "required": ["status"]},
-            "then": {"required": ["failure_code"]},
-            "else": {"not": {"required": ["failure_code"]}}
+            "then": {"properties": {"failure_code": true}, "required": ["failure_code"]},
+            "else": {"not": {"properties": {"failure_code": true}, "required": ["failure_code"]}}
           }
         ]
       }
@@ -66,13 +66,16 @@
       "allOf": [
         {
           "if": {"properties": {"status": {"enum": ["go", "no_go"]}}, "required": ["status"]},
-          "then": {"required": ["decided_by_type", "decided_at", "decision_ref"]},
+          "then": {
+            "properties": {"decided_by_type": true, "decided_at": true, "decision_ref": true},
+            "required": ["decided_by_type", "decided_at", "decision_ref"]
+          },
           "else": {
             "not": {
               "anyOf": [
-                {"required": ["decided_by_type"]},
-                {"required": ["decided_at"]},
-                {"required": ["decision_ref"]}
+                {"properties": {"decided_by_type": true}, "required": ["decided_by_type"]},
+                {"properties": {"decided_at": true}, "required": ["decided_at"]},
+                {"properties": {"decision_ref": true}, "required": ["decision_ref"]}
               ]
             }
           }
