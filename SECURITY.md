@@ -23,8 +23,10 @@
 
 ## 认证与数据库
 
-- `DATABASE_URL`、`BETTER_AUTH_SECRET` 和生产 URL 只通过部署环境的 Secret 管理提供。
+- `DATABASE_URL`、`BETTER_AUTH_SECRET`、`BLOB_READ_WRITE_TOKEN` 和生产 URL 只通过部署环境的 Secret 管理提供；Vercel 上优先使用平台 OIDC 短期凭据。
 - 公开注册必须保持关闭；内部账号由已授权管理员创建，不在仓库保存初始密码。
 - 邀请表只保存 token hash，不保存可直接使用的邀请 token。
 - `audit_event` 与 `workflow_event` 是 append-only 表；数据库迁移通过触发器拒绝更新和删除。
 - 数据库迁移属于外部状态变更，执行前必须确认目标环境，不对未知 URL 自动运行。
+- 工程资料只写入 Private Blob；应用接口不得直接返回 private Blob URL 或读写 token。
+- 模型输出即使通过结构校验也不等于事实已验证，发布前必须完成 Gate 01。
