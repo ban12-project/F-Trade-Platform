@@ -335,6 +335,11 @@ def check_follow_up_scenarios() -> None:
     if any(not case["next_action"] or not case["prohibited_action"] for case in cases):
         raise AssertionError("Every follow-up scenario requires an action and prohibited action")
 
+def check_follow_up_cadence() -> None:
+    result = subprocess.run(["pnpm", "test:cadence"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Follow-up cadence tests failed: {result.stderr or result.stdout}")
+
 
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
@@ -386,6 +391,7 @@ def main() -> int:
         ("sales clarification", check_sales_clarification),
         ("lead scoring", check_lead_scoring),
         ("follow-up scenarios", check_follow_up_scenarios),
+        ("follow-up cadence", check_follow_up_cadence),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
