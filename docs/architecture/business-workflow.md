@@ -68,8 +68,9 @@ Agent 猜测。入站处理先校验不含消息正文的 `OfficialInboundWebhoo
 
 每个通过该边界的消息还必须在数据库 `social_inbound_delivery` 中原子领取：唯一索引使用
 `channel_ref + account_ref + message_id`，只保存这些引用和接收时间。重复投递返回 `duplicate`，不能再次
-创建或更新 Lead；表中不保存消息正文、Cookie 或凭据。真实 webhook handler 必须把领取与下游 Lead 操作
-放在同一数据库事务中，才可对该完整处理链路主张 exactly-once。
+创建或更新 Lead；表中不保存消息正文、Cookie 或凭据。`processDatabaseOfficialInboundDelivery` 会将领取与
+下游 Lead 操作封装在同一数据库事务中：下游失败时收据回滚，重复投递不会进入动作。真实 webhook handler
+必须使用这个入口，才可对该完整处理链路主张 exactly-once。
 
 内容发布也必须通过 `ContentPublicationPolicy`：只有人工启用的官方 API 渠道、已完成 Gate 01 的内容和
 system/human 发布 actor 才能进入发布传输。该策略只保存脱敏渠道/账号引用和外部发布引用，不保存 OAuth
