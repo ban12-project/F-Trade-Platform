@@ -24,6 +24,7 @@
     "test:demo": "tsx scripts/test-synthetic-demo.ts",
     "test:quotation": "tsx scripts/test-quotation-handoff.ts",
     "test:delivery": "tsx scripts/test-delivery-confirmation.ts",
+    "test:rfq": "tsx scripts/test-rfq-completeness.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
