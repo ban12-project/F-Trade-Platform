@@ -113,8 +113,9 @@ Product Agent 会先使用 MarkItDown 的本地 `convert_local()` 将允许的 P
 Markdown，再把该 Markdown 作为不可信来源文本交给模型；生产服务必须继续限制上传路径、文件类型和
 大小。[MarkItDown security guidance](https://github.com/microsoft/markitdown#security-considerations)
 
-在配置模型前，可先运行本地预检；它只输出文档哈希、媒体类型、OCR 状态和候选标识符/数量，不输出
-转换后的原文，也不会调用模型。真实资料的输出不得保存到 Git 或 Issue：
+在配置模型前，可先运行本地预检；它只输出文档哈希、媒体类型、OCR 状态、候选标识符/数量和
+`manual_review` 原因，不输出转换后的原文，也不会调用模型。预检始终要求人工复核：零候选必须调查
+目录版式/提取失败，OCR 文本还必须逐页视觉核验。真实资料的输出不得保存到 Git 或 Issue：
 
 ```bash
 MARKITDOWN_PYTHON=/path/to/python3 pnpm product-agent:catalog -- --preflight --document /authorized/catalog.pdf
