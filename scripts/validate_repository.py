@@ -67,6 +67,7 @@ def check_schemas() -> None:
         ],
         "mvp-acceptance-summary.schema.json": ["mvp-acceptance-summary.synthetic.json"],
         "channel-inbound-policy.schema.json": ["channel-inbound-policy.synthetic.json"],
+        "product-pilot-authorization.schema.json": ["product-pilot-authorization.synthetic.json"],
         "product-ready.schema.json": [
             "product-ready.synthetic.json",
             "product-ready-application.synthetic.json",
@@ -231,6 +232,26 @@ def check_mvp_acceptance_summary() -> None:
             raise AssertionError("Go decision requires every RFQ to be ready")
         if metrics["blocked_external_dependency_count"]:
             raise AssertionError("Go decision requires no blocked external dependencies")
+
+
+def check_product_pilot_authorization() -> None:
+    manifest = load_json(FIXTURE_DIR / "product-pilot-authorization.synthetic.json")
+    slots = manifest["slots"]
+    expected_slot_ids = {f"pilot-slot-{index:02d}" for index in range(1, 21)}
+    if {item["slot_id"] for item in slots} != expected_slot_ids or len(slots) != 20:
+        raise AssertionError("Product pilot authorization must cover each of 20 slots exactly once")
+    matrix = {
+        "A": ("complete", "real_product_image"),
+        "B": ("complete", "none"),
+        "C": ("incomplete", "real_product_image"),
+        "D": ("incomplete", "none"),
+    }
+    for cohort, expected in matrix.items():
+        matching = [item for item in slots if item["cohort"] == cohort]
+        if len(matching) != 5 or any((item["data_completeness"], item["image_availability"]) != expected for item in matching):
+            raise AssertionError(f"Product pilot authorization has an invalid {cohort} cohort matrix")
+    if manifest["manifest_status"] == "authorized" and any(item["authorization_status"] != "authorized" for item in slots):
+        raise AssertionError("Authorized product pilot manifest requires all slots to be authorized")
 
 
 def check_database_baseline() -> None:
@@ -490,6 +511,7 @@ def main() -> int:
         ("lead scoring", check_scoring_config),
         ("product acceptance", check_product_acceptance_config),
         ("MVP acceptance summary", check_mvp_acceptance_summary),
+        ("product pilot authorization", check_product_pilot_authorization),
         ("database baseline", check_database_baseline),
         ("service adapters", check_service_adapters),
         ("Next.js security release readiness", check_next_security_release_readiness),

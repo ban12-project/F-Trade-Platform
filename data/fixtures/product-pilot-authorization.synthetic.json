@@ -1,0 +1,27 @@
+{
+  "classification": "synthetic",
+  "manifest_status": "authorized",
+  "authorization_ref": "synthetic-factory-authorization-001",
+  "slots": [
+    {"slot_id":"pilot-slot-01","cohort":"A","data_completeness":"complete","image_availability":"real_product_image","source_ref":"synthetic-source-01","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-02","cohort":"A","data_completeness":"complete","image_availability":"real_product_image","source_ref":"synthetic-source-02","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-03","cohort":"A","data_completeness":"complete","image_availability":"real_product_image","source_ref":"synthetic-source-03","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-04","cohort":"A","data_completeness":"complete","image_availability":"real_product_image","source_ref":"synthetic-source-04","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-05","cohort":"A","data_completeness":"complete","image_availability":"real_product_image","source_ref":"synthetic-source-05","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-06","cohort":"B","data_completeness":"complete","image_availability":"none","source_ref":"synthetic-source-06","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-07","cohort":"B","data_completeness":"complete","image_availability":"none","source_ref":"synthetic-source-07","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-08","cohort":"B","data_completeness":"complete","image_availability":"none","source_ref":"synthetic-source-08","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-09","cohort":"B","data_completeness":"complete","image_availability":"none","source_ref":"synthetic-source-09","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-10","cohort":"B","data_completeness":"complete","image_availability":"none","source_ref":"synthetic-source-10","confidentiality":"confidential","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-11","cohort":"C","data_completeness":"incomplete","image_availability":"real_product_image","source_ref":"synthetic-source-11","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-12","cohort":"C","data_completeness":"incomplete","image_availability":"real_product_image","source_ref":"synthetic-source-12","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-13","cohort":"C","data_completeness":"incomplete","image_availability":"real_product_image","source_ref":"synthetic-source-13","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-14","cohort":"C","data_completeness":"incomplete","image_availability":"real_product_image","source_ref":"synthetic-source-14","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-15","cohort":"C","data_completeness":"incomplete","image_availability":"real_product_image","source_ref":"synthetic-source-15","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-16","cohort":"D","data_completeness":"incomplete","image_availability":"none","source_ref":"synthetic-source-16","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-17","cohort":"D","data_completeness":"incomplete","image_availability":"none","source_ref":"synthetic-source-17","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-18","cohort":"D","data_completeness":"incomplete","image_availability":"none","source_ref":"synthetic-source-18","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-19","cohort":"D","data_completeness":"incomplete","image_availability":"none","source_ref":"synthetic-source-19","confidentiality":"restricted","authorization_status":"authorized"},
+    {"slot_id":"pilot-slot-20","cohort":"D","data_completeness":"incomplete","image_availability":"none","source_ref":"synthetic-source-20","confidentiality":"restricted","authorization_status":"authorized"}
+  ]
+}
