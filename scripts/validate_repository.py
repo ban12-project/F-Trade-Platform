@@ -305,6 +305,11 @@ def check_rfq_completeness() -> None:
     if result.returncode:
         raise AssertionError(f"RFQ completeness tests failed: {result.stderr or result.stdout}")
 
+def check_sales_clarification() -> None:
+    result = subprocess.run(["pnpm", "test:sales"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Sales clarification tests failed: {result.stderr or result.stdout}")
+
 
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
@@ -352,6 +357,7 @@ def main() -> int:
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),
+        ("sales clarification", check_sales_clarification),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]

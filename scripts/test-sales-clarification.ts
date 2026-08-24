@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { applyInquiryMessage, assertNoAgentQuotation, nextClarification } from "../lib/sales/clarification";
+const draft = { rfq_id: "synthetic-rfq", customer: {}, product: { product_type: "clutch_kit" }, commercial: {}, status: "collecting", completeness_score: 0, missing_fields: [] };
+const partial = applyInquiryMessage(draft, "500 pcs Toyota Corolla clutch kit, please quote");
+assert.equal(partial.commercial.quantity, 500);
+assert.equal(nextClarification(partial).field, "destination");
+const complete = applyInquiryMessage(partial, "Destination: Synthetic Port");
+assert.equal(nextClarification(complete).status, "ready");
+assert.throws(() => assertNoAgentQuotation(complete), /cannot send/);
+console.log("PASS Sales clarification behavior");
