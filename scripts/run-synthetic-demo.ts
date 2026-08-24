@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { compileContract } from "../lib/contracts/validator";
+import { decideContent } from "../lib/content/gate";
+import { publishThroughOfficialChannel } from "../lib/content/publication-policy";
 import { assessInboundDelivery, assessReplyWindow } from "../lib/social/inbound-policy";
 import {
   replayTransitions,
@@ -21,6 +23,10 @@ export interface SyntheticDemoReport {
     duplicateStatus: "duplicate";
     replyWindowStatus: "within_window";
     outsideWindowAction: "require_human_approved_template";
+  };
+  publicationTransport: {
+    status: "published";
+    officialApi: true;
   };
 }
 
@@ -110,10 +116,16 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
   const socialPolicy = {
     channelRef: "synthetic-instagram-channel",
     accountRef: "synthetic-factory-account",
-    officialApi: true,
+    officialApi: true as const,
     inboundOnly: true,
     replyWindowMinutes: 60,
     outsideWindowAction: "require_approved_template" as const,
+  };
+  const publicationPolicy = {
+    channelRef: "synthetic-instagram-channel",
+    accountRef: "synthetic-factory-account",
+    officialApi: true as const,
+    publishingEnabled: true,
   };
   const inboundMessage = {
     messageId: "synthetic-platform-message-001",
@@ -136,6 +148,19 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
   const productApproval = approval("synthetic-approval-001", productId, "gate_01_truth", "approved", "synthetic-reviewer");
   const contentApproval = approval("synthetic-content-approval-001", contentId, "gate_01_truth", "approved", "synthetic-reviewer");
   const quoteApproval = approval("synthetic-quote-approval-001", quotationId, "gate_02_quote", "approved", "synthetic-sales-reviewer");
+  const approvedContent = decideContent(content, {
+    actorType: "human",
+    approved: true,
+    approvalRef: contentApproval.id,
+    evidenceRef: contentApproval.evidenceRef,
+  });
+  const publishedContent = publishThroughOfficialChannel(
+    approvedContent,
+    publicationPolicy,
+    "system",
+    "synthetic-publication-001",
+  );
+  if (publishedContent.status !== "published") throw new Error("Synthetic official publication policy was not enforced");
 
   const productEvents = [
     { event: event("synthetic-product-submit-001", "product", productId, "PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "agent", "synthetic-product-agent", "2026-08-24T09:00:00Z") },
@@ -179,6 +204,10 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
       duplicateStatus: duplicateDelivery.status,
       replyWindowStatus: replyWindow.status,
       outsideWindowAction: outsideWindow.nextAction,
+    },
+    publicationTransport: {
+      status: publishedContent.status,
+      officialApi: publicationPolicy.officialApi,
     },
   };
 }
