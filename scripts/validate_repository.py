@@ -300,6 +300,12 @@ def check_delivery_gate() -> None:
         raise AssertionError(f"Delivery Gate 03 tests failed: {result.stderr or result.stdout}")
 
 
+def check_rfq_completeness() -> None:
+    result = subprocess.run(["pnpm", "test:rfq"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"RFQ completeness tests failed: {result.stderr or result.stdout}")
+
+
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
     tracked = subprocess.run(
@@ -345,6 +351,7 @@ def main() -> int:
         ("synthetic end-to-end demo", check_synthetic_demo),
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
+        ("RFQ completeness", check_rfq_completeness),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
