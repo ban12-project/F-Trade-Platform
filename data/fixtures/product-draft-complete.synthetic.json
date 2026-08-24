@@ -1,0 +1,24 @@
+{
+  "record_id": "synthetic-product-complete-001",
+  "source_ref": "synthetic_factory_sheet_row_complete_001",
+  "evidence_refs": ["synthetic_factory_sheet_row_complete_001"],
+  "field_evidence": {
+    "product.product_name": "synthetic_factory_sheet_row_complete_001",
+    "product.product_type": "synthetic_factory_sheet_row_complete_001",
+    "product.internal_sku": "synthetic_factory_sheet_row_complete_001",
+    "product.oe_numbers": "synthetic_factory_sheet_row_complete_001",
+    "specifications.clutch_diameter_mm": "synthetic_factory_sheet_row_complete_001"
+  },
+  "verification_status": "unverified",
+  "blocking_missing_fields": [],
+  "optional_missing_fields": ["spline_count", "packaging"],
+  "product": {
+    "product_name": "Synthetic Complete Clutch Kit",
+    "product_type": "clutch_kit",
+    "internal_sku": "SYN-CK-COMPLETE-001",
+    "oe_numbers": ["SYN-OE-COMPLETE-001"]
+  },
+  "specifications": {
+    "clutch_diameter_mm": 240
+  }
+}

@@ -60,6 +60,7 @@ def check_schemas() -> None:
 
     checks = {
         "product-draft.schema.json": ["product-draft.synthetic.json"],
+        "product-cohort.schema.json": ["product-cohort.synthetic.json"],
         "product-ready.schema.json": [
             "product-ready.synthetic.json",
             "product-ready-application.synthetic.json",
@@ -89,6 +90,31 @@ def check_schemas() -> None:
         schema_path = next(SCHEMA_DIR.rglob(schema_name))
         for fixture_name in fixtures:
             validate(schema_path, FIXTURE_DIR / fixture_name)
+
+    validate(
+        SCHEMA_DIR / "data" / "product-draft.schema.json",
+        FIXTURE_DIR / "product-draft-complete.synthetic.json",
+    )
+
+    cohort = load_json(FIXTURE_DIR / "product-cohort.synthetic.json")
+    expected_combinations = {
+        "A": ("complete", "real_product_image"),
+        "B": ("complete", "none"),
+        "C": ("incomplete", "real_product_image"),
+        "D": ("incomplete", "none"),
+    }
+    actual_combinations = {
+        item["cohort_id"]: (item["data_completeness"], item["image_availability"])
+        for item in cohort["cohorts"]
+    }
+    if actual_combinations != expected_combinations:
+        raise AssertionError(f"Unexpected Product A-D cohort matrix: {actual_combinations}")
+    for item in cohort["cohorts"]:
+        product_fixture = ROOT / item["product_fixture"]
+        if not product_fixture.is_file():
+            raise AssertionError(f"Missing cohort product fixture: {product_fixture}")
+        if item["image_availability"] == "none" and item["image_refs"]:
+            raise AssertionError(f"No-image cohort {item['cohort_id']} has image refs")
 
     assert_invalid(
         SCHEMA_DIR / "sales" / "quotation-handoff.schema.json",

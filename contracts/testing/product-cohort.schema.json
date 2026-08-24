@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/product-cohort.schema.json",
+  "title": "ProductCohortProtocol",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "data_classification", "cohorts"],
+  "properties": {
+    "protocol_version": {"type": "string", "minLength": 1},
+    "data_classification": {"const": "synthetic"},
+    "cohorts": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cohort_id", "data_completeness", "image_availability", "product_fixture", "image_refs", "expected_blocking_fields", "required_human_actions", "visual_policy"],
+        "properties": {
+          "cohort_id": {"enum": ["A", "B", "C", "D"]},
+          "data_completeness": {"enum": ["complete", "incomplete"]},
+          "image_availability": {"enum": ["real_product_image", "none"]},
+          "product_fixture": {"type": "string", "minLength": 1},
+          "image_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "expected_blocking_fields": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "required_human_actions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "visual_policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["generated_image_is_structural_evidence", "allowed_uses", "protected_attributes"],
+            "properties": {
+              "generated_image_is_structural_evidence": {"const": false},
+              "allowed_uses": {"type": "array", "items": {"enum": ["background", "layout", "clearly_labeled_illustration"]}, "uniqueItems": true},
+              "protected_attributes": {
+                "type": "array",
+                "minItems": 5,
+                "items": {"enum": ["spline", "hole_pattern", "dimensions", "material", "part_count"]},
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
