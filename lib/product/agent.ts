@@ -1,4 +1,4 @@
-import { generateText, Output, type LanguageModel } from "ai";
+import { generateText, Output, type LanguageModel, type UserModelMessage } from "ai";
 
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import { compileContract } from "../contracts/validator";
@@ -16,8 +16,15 @@ export interface ProductAgentSource {
   source_text: string;
   image_availability: "real_product_image" | "none";
   image_refs: string[];
+  image_inputs?: ProductAgentImageInput[];
   /** Trusted caller-supplied selection key; never evidence for a product fact. */
   candidate_identifier?: string;
+}
+
+export interface ProductAgentImageInput {
+  ref: string;
+  media_type: "image/png" | "image/jpeg";
+  data_base64: string;
 }
 
 export interface ProductAgentRequest {
@@ -76,8 +83,57 @@ function normalizeSourceValue(value: string) {
   return value.trim().replace(/[.|]+$/g, "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+interface MarkdownTable {
+  headers: string[];
+  rows: string[][];
+}
+
+function parseMarkdownRow(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return undefined;
+  return trimmed.slice(1, -1).split("|").map((cell) => cell.trim());
+}
+
+export function parseMarkdownTables(sourceText: string): MarkdownTable[] {
+  const lines = sourceText.split(/\r?\n/);
+  const tables: MarkdownTable[] = [];
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const headers = parseMarkdownRow(lines[index]!);
+    const separator = parseMarkdownRow(lines[index + 1]!);
+    if (
+      !headers ||
+      !separator ||
+      headers.length !== separator.length ||
+      !separator.every((cell) => /^:?-{3,}:?$/.test(cell))
+    ) {
+      continue;
+    }
+    const rows: string[][] = [];
+    index += 2;
+    while (index < lines.length) {
+      const row = parseMarkdownRow(lines[index]!);
+      if (!row || row.length !== headers.length) break;
+      rows.push(row);
+      index += 1;
+    }
+    index -= 1;
+    tables.push({ headers, rows });
+  }
+  return tables;
+}
+
 function extractLabelledValues(sourceText: string, labels: string[]) {
   const values: string[] = [];
+  const normalizedLabels = new Set(labels.map(normalizeSourceValue));
+  for (const table of parseMarkdownTables(sourceText)) {
+    table.headers.forEach((header, column) => {
+      if (!normalizedLabels.has(normalizeSourceValue(header))) return;
+      for (const row of table.rows) {
+        const value = row[column]?.trim();
+        if (value) values.push(value);
+      }
+    });
+  }
   for (const label of labels) {
     const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(
@@ -90,6 +146,24 @@ function extractLabelledValues(sourceText: string, labels: string[]) {
     }
   }
   return values;
+}
+
+function assertLabelledBooleanFact(
+  field: string,
+  value: unknown,
+  labels: string[],
+  sourceText: string,
+) {
+  if (value === undefined) return;
+  const sourceValues = extractLabelledValues(sourceText, labels).flatMap((sourceValue) => {
+    const normalized = normalizeSourceValue(sourceValue);
+    if (["yes", "true", "available"].includes(normalized)) return [true];
+    if (["no", "false", "unavailable", "not available"].includes(normalized)) return [false];
+    return [];
+  });
+  if (typeof value !== "boolean" || !sourceValues.includes(value)) {
+    throw new Error(`Product Agent field ${field} must match an explicitly labelled source value`);
+  }
 }
 
 function assertLabelledTextFact(
@@ -147,7 +221,25 @@ function assertLabelledKitContents(value: unknown, sourceText: string) {
   }
 }
 
-function assertRestrictedFacts(draft: ProductDraft, sourceText: string) {
+function assertSourceBackedFacts(draft: ProductDraft, sourceText: string) {
+  assertLabelledTextFact(
+    "product.product_name",
+    draft.product.product_name,
+    ["Product name"],
+    sourceText,
+  );
+  assertLabelledTextFact(
+    "product.product_type",
+    draft.product.product_type,
+    ["Product type"],
+    sourceText,
+  );
+  assertLabelledTextFact(
+    "product.internal_sku",
+    draft.product.internal_sku,
+    ["Internal SKU", "Kit No.", "Part No.", "Type No."],
+    sourceText,
+  );
   assertLabelledTextFact(
     "product.application",
     draft.product.application,
@@ -216,13 +308,39 @@ function assertRestrictedFacts(draft: ProductDraft, sourceText: string) {
     ["Estimated lead time", "Lead time"],
     sourceText,
   );
+  assertLabelledTextFact(
+    "commercial.packaging",
+    draft.commercial?.packaging,
+    ["Packaging"],
+    sourceText,
+  );
+  assertLabelledTextFact(
+    "commercial.supported_customization",
+    draft.commercial?.supported_customization,
+    ["Supported customization", "Customization"],
+    sourceText,
+  );
+  assertLabelledBooleanFact(
+    "commercial.sample_available",
+    draft.commercial?.sample_available,
+    ["Sample available"],
+    sourceText,
+  );
 }
 
 function extractExplicitOeNumbers(sourceText: string) {
   const values = new Set<string>();
+  for (const sourceValue of extractLabelledValues(sourceText, ["OE", "OE No.", "OEM", "OEM No."])) {
+    for (const value of sourceValue.split(/[,;，、]|\t|\s{2,}/)) {
+      const normalized = normalizeOeNumber(value.replace(/^[\s([{"']+|[\s)\]}"'.]+$/g, ""));
+      if (normalized) values.add(normalized);
+    }
+  }
   const labelledOeLine =
     /\b(?:(?:OEM|OE)\s*NO\.?\s*(?:[:：]\s*|\s+)|(?:OEM|OE)\s*[:：]\s*)([^\r\n]+)/gi;
   for (const match of sourceText.matchAll(labelledOeLine)) {
+    const lineStart = sourceText.lastIndexOf("\n", match.index ?? 0) + 1;
+    if (sourceText.slice(lineStart, match.index).trimStart().startsWith("|")) continue;
     for (const value of match[1]!.split(/[,;|，、]|\t|\s{2,}/)) {
       const normalized = normalizeOeNumber(value.replace(/^[\s([{"']+|[\s)\]}"'.]+$/g, ""));
       if (normalized) values.add(normalized);
@@ -247,7 +365,7 @@ function assertSafeDraft(draft: ProductDraft, source: ProductAgentSource) {
       );
     }
   }
-  assertRestrictedFacts(draft, source.source_text);
+  assertSourceBackedFacts(draft, source.source_text);
   const internalSku = draft.product.internal_sku;
   if (
     source.candidate_identifier &&
@@ -289,18 +407,31 @@ export function finalizeProductAgentDraft(value: unknown, source: ProductAgentSo
 
 export class AiSdkProductAgent implements ProductAgent {
   async run({ model, source, timeout_ms }: ProductAgentRequest): Promise<ProductAgentResult> {
+    validateProductAgentSource(source);
+    const promptText = JSON.stringify({
+      record_id: source.record_id,
+      source_ref: source.source_ref,
+      evidence_refs: source.evidence_refs,
+      image_availability: source.image_availability,
+      image_refs: source.image_refs,
+      candidate_identifier: source.candidate_identifier,
+      source_text: `<untrusted-source-text>\n${source.source_text}\n</untrusted-source-text>`,
+    });
+    const messages: UserModelMessage[] = [{
+      role: "user",
+      content: [
+        { type: "text", text: promptText },
+        ...(source.image_inputs ?? []).map((input) => ({
+          type: "image" as const,
+          image: Buffer.from(input.data_base64, "base64"),
+          mediaType: input.media_type,
+        })),
+      ],
+    }];
     const result = await generateText({
       model,
       instructions: PRODUCT_AGENT_SYSTEM_PROMPT,
-      prompt: JSON.stringify({
-        record_id: source.record_id,
-        source_ref: source.source_ref,
-        evidence_refs: source.evidence_refs,
-        image_availability: source.image_availability,
-        image_refs: source.image_refs,
-        candidate_identifier: source.candidate_identifier,
-        source_text: `<untrusted-source-text>\n${source.source_text}\n</untrusted-source-text>`,
-      }),
+      messages,
       // Some OpenAI-compatible routers reject standard JSON Schema keywords that the
       // ProductDraft contract needs. We request JSON text and validate it locally with AJV.
       output: Output.text(),
@@ -337,6 +468,28 @@ export function validateProductAgentSource(value: unknown): ProductAgentSource {
   }
   if (source.image_availability === "real_product_image" && source.image_refs.length === 0) {
     throw new Error("Image-backed Product Agent source must include a real image reference");
+  }
+  const imageInputs = source.image_inputs ?? [];
+  if (!Array.isArray(imageInputs)) throw new Error("Product Agent image inputs must be an array");
+  if (source.image_availability === "none" && imageInputs.length > 0) {
+    throw new Error("No-image Product Agent source cannot include image inputs");
+  }
+  if (source.image_availability === "real_product_image") {
+    const refs = new Set(source.image_refs);
+    if (
+      imageInputs.length !== refs.size ||
+      imageInputs.some((input) =>
+        !input ||
+        typeof input !== "object" ||
+        !refs.has(input.ref) ||
+        (input.media_type !== "image/png" && input.media_type !== "image/jpeg") ||
+        typeof input.data_base64 !== "string" ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input.data_base64) ||
+        Buffer.from(input.data_base64, "base64").length === 0
+      )
+    ) {
+      throw new Error("Image-backed Product Agent source must include bytes for every image reference");
+    }
   }
   if (
     source.candidate_identifier !== undefined &&

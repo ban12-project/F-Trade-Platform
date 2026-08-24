@@ -50,6 +50,14 @@ def main() -> None:
 
     source = expected["source"]
     truth = expected["expected"]
+    image_inputs = source.get("image_inputs", [])
+    if source["image_availability"] == "real_product_image":
+        if len(image_inputs) != len(source["image_refs"]) or not image_inputs:
+            fail("Image-backed task did not provide actual synthetic image bytes")
+        if {item.get("ref") for item in image_inputs} != set(source["image_refs"]):
+            fail("Synthetic image bytes do not match supplied image references")
+    elif image_inputs:
+        fail("No-image task unexpectedly provided image bytes")
     if draft.get("record_id") != source["record_id"] or draft.get("source_ref") != source["source_ref"]:
         fail("record_id and source_ref must be preserved")
     if draft.get("verification_status") != "review_required":

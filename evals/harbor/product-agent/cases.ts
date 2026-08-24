@@ -8,6 +8,11 @@ export interface ProductAgentEvalCase {
     source_text: string;
     image_availability: "real_product_image" | "none";
     image_refs: string[];
+    image_inputs?: Array<{
+      ref: string;
+      media_type: "image/png";
+      data_base64: string;
+    }>;
   };
   expected: {
     product: Record<string, unknown>;
@@ -32,6 +37,11 @@ const variants: Variant[] = [
   { suffix: "05", detail: "MOQ: 50 pcs.", commercial: { moq: 50 } },
 ];
 
+// A generated 1x1 PNG containing no product information. It proves that image bytes traverse
+// the multimodal request path without turning pixels into structural product evidence.
+const SYNTHETIC_IMAGE_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
 function sourceText(cohort: "A" | "B" | "C" | "D", suffix: string, detail: string) {
   const core = [
     `Product name: Synthetic Clutch Kit ${cohort}${suffix}`,
@@ -54,6 +64,8 @@ export const productAgentEvalCases: ProductAgentEvalCase[] = (["A", "B", "C", "D
     variants.map((variant) => {
       const sourceRef = `synthetic_factory_${cohort.toLowerCase()}_${variant.suffix}`;
       const isComplete = cohort === "A" || cohort === "B";
+      const hasImage = cohort === "A" || cohort === "C";
+      const imageRef = `synthetic-private-evidence/${cohort.toLowerCase()}-${variant.suffix}/front.png`;
       return {
         id: `${cohort.toLowerCase()}-${variant.suffix}`,
         cohort,
@@ -62,11 +74,15 @@ export const productAgentEvalCases: ProductAgentEvalCase[] = (["A", "B", "C", "D
           source_ref: sourceRef,
           evidence_refs: [sourceRef],
           source_text: sourceText(cohort, variant.suffix, variant.detail),
-          image_availability: cohort === "A" || cohort === "C" ? "real_product_image" : "none",
-          image_refs:
-            cohort === "A" || cohort === "C"
-              ? [`synthetic-private-evidence/${cohort.toLowerCase()}-${variant.suffix}/front.png`]
-              : [],
+          image_availability: hasImage ? "real_product_image" : "none",
+          image_refs: hasImage ? [imageRef] : [],
+          ...(hasImage ? {
+            image_inputs: [{
+              ref: imageRef,
+              media_type: "image/png" as const,
+              data_base64: SYNTHETIC_IMAGE_BASE64,
+            }],
+          } : {}),
         },
         expected: {
           product: {
