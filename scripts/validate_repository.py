@@ -417,6 +417,12 @@ def check_database_driver() -> None:
         raise AssertionError(f"Database transaction driver tests failed: {result.stderr or result.stdout}")
 
 
+def check_github_governance() -> None:
+    result = subprocess.run(["pnpm", "test:github-governance"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"GitHub governance artifact tests failed: {result.stderr or result.stdout}")
+
+
 def check_main_push_guard() -> None:
     result = subprocess.run(["pnpm", "test:main-push-guard"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -564,6 +570,7 @@ def main() -> int:
         ("social inbound policy", check_social_inbound_policy),
         ("inbound delivery receipts", check_inbound_delivery_receipts),
         ("database transaction driver", check_database_driver),
+        ("GitHub governance artifacts", check_github_governance),
         ("local main push guard", check_main_push_guard),
         ("content publication policy", check_content_publication_policy),
         ("quotation Gate 02", check_quotation_gate),
