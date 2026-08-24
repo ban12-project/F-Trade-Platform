@@ -340,6 +340,11 @@ def check_follow_up_cadence() -> None:
     if result.returncode:
         raise AssertionError(f"Follow-up cadence tests failed: {result.stderr or result.stdout}")
 
+def check_content_gate() -> None:
+    result = subprocess.run(["pnpm", "test:content-gate"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Content Gate 01 tests failed: {result.stderr or result.stdout}")
+
 
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
@@ -392,6 +397,7 @@ def main() -> int:
         ("lead scoring", check_lead_scoring),
         ("follow-up scenarios", check_follow_up_scenarios),
         ("follow-up cadence", check_follow_up_cadence),
+        ("content Gate 01", check_content_gate),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
