@@ -345,6 +345,16 @@ def check_content_gate() -> None:
     if result.returncode:
         raise AssertionError(f"Content Gate 01 tests failed: {result.stderr or result.stdout}")
 
+def check_content_policy() -> None:
+    policy = load_json(ROOT / "config/content-policy.json")
+    if {item["id"] for item in policy["types"]} != {"product", "factory_capability", "industry_knowledge"}:
+        raise AssertionError("Content policy must include three content types")
+    if any(not item["cta"] or not item["english_structure"] for item in policy["types"]):
+        raise AssertionError("Every content type requires English structure and CTA")
+    forbidden = {"spline_count", "spline_geometry", "bolt_hole_pattern", "dimensions", "friction_material", "part_count"}
+    if set(policy["visual_prohibitions"]) != forbidden:
+        raise AssertionError("Visual policy must prohibit engineering-fact alteration")
+
 
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
@@ -398,6 +408,7 @@ def main() -> int:
         ("follow-up scenarios", check_follow_up_scenarios),
         ("follow-up cadence", check_follow_up_cadence),
         ("content Gate 01", check_content_gate),
+        ("content safety policy", check_content_policy),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
