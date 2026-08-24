@@ -21,6 +21,7 @@ const document: ProductAgentDocumentSource = {
   filename: "synthetic-catalog.md",
   media_type: "md",
   ocr_enabled: false,
+  conversion_status: "converted",
 };
 
 const report = createCatalogPreflightReport(document, discoverCatalogCandidates(document.source));
@@ -32,6 +33,7 @@ assert.deepEqual(report, {
     filename: "synthetic-catalog.md",
     media_type: "md",
     ocr_enabled: false,
+    conversion_status: "converted",
   },
   candidate_count: 1,
   candidate_identifiers: ["RYC251"],
@@ -44,7 +46,7 @@ assert.equal(JSON.stringify(report).includes("Synthetic Kit"), false);
 assert.equal(JSON.stringify(report).includes("source_text"), false);
 
 const imageOnlyReport = createCatalogPreflightReport(
-  { ...document, ocr_enabled: true },
+  { ...document, ocr_enabled: true, conversion_status: "no_text" },
   [],
 );
 assert.deepEqual(imageOnlyReport.manual_review, {
@@ -53,6 +55,7 @@ assert.deepEqual(imageOnlyReport.manual_review, {
     "catalog_candidates_require_source_field_review",
     "no_supported_catalog_candidates",
     "ocr_text_requires_visual_verification",
+    "document_conversion_requires_approved_ocr",
   ],
 });
 

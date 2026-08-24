@@ -133,6 +133,20 @@ def main() -> None:
     except (OSError, RuntimeError, subprocess.CalledProcessError, ValueError) as error:
         fail(str(error))
     if not source_text:
+        if enabled("F_TRADE_METADATA_PREFLIGHT"):
+            json.dump(
+                {
+                    "source_text": "",
+                    "document_sha256": digest,
+                    "filename": path.name,
+                    "media_type": path.suffix.lower().removeprefix("."),
+                    "ocr_enabled": remote_ocr or local_ocr,
+                    "conversion_status": "no_text",
+                },
+                sys.stdout,
+                ensure_ascii=False,
+            )
+            return
         if path.suffix.lower() == ".pdf" and not remote_ocr and not local_ocr:
             fail(
                 "conversion produced no text; this PDF may be image-only. "
@@ -147,6 +161,7 @@ def main() -> None:
             "filename": path.name,
             "media_type": path.suffix.lower().removeprefix("."),
             "ocr_enabled": remote_ocr or local_ocr,
+            "conversion_status": "converted",
         },
         sys.stdout,
         ensure_ascii=False,

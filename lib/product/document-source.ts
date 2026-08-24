@@ -13,6 +13,7 @@ interface MarkItDownResult {
   filename: string;
   media_type: string;
   ocr_enabled?: boolean;
+  conversion_status?: "converted" | "no_text";
 }
 
 export interface ProductAgentDocumentRequest {
@@ -20,6 +21,7 @@ export interface ProductAgentDocumentRequest {
   recordId: string;
   imageAvailability: ProductAgentSource["image_availability"];
   imageRefs: string[];
+  allowEmptySource?: boolean;
 }
 
 export interface ProductAgentDocumentSource {
@@ -28,6 +30,7 @@ export interface ProductAgentDocumentSource {
   filename: string;
   media_type: string;
   ocr_enabled: boolean;
+  conversion_status: "converted" | "no_text";
 }
 
 function markItDownPython() {
@@ -56,9 +59,20 @@ export async function preprocessProductAgentDocument(
   const { stdout } = await execFileAsync(markItDownPython(), [
     resolve("scripts/markitdown_preprocess.py"),
     documentPath,
-  ], { maxBuffer: 32 * 1024 * 1024 });
+  ], {
+    maxBuffer: 32 * 1024 * 1024,
+    env: {
+      ...process.env,
+      F_TRADE_METADATA_PREFLIGHT: request.allowEmptySource ? "1" : "0",
+    },
+  });
   const converted = JSON.parse(stdout) as MarkItDownResult;
-  if (!converted.source_text || !/^[a-f0-9]{64}$/.test(converted.document_sha256)) {
+  const conversionStatus = converted.conversion_status ?? "converted";
+  if (
+    !/^[a-f0-9]{64}$/.test(converted.document_sha256)
+    || (conversionStatus !== "converted" && conversionStatus !== "no_text")
+    || (!converted.source_text && (!request.allowEmptySource || conversionStatus !== "no_text"))
+  ) {
     throw new Error("MarkItDown preprocessing returned an invalid conversion result");
   }
 
@@ -76,5 +90,6 @@ export async function preprocessProductAgentDocument(
     filename: converted.filename || basename(documentPath),
     media_type: converted.media_type,
     ocr_enabled: converted.ocr_enabled === true,
+    conversion_status: conversionStatus,
   };
 }
