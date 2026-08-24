@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# f-trade-main-push-guard
+# Git invokes this hook with: <local ref> <local sha> <remote ref> <remote sha> per line.
+set -eu
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "Refusing to push directly to main. Create a branch and merge through a green pull request." >&2
+    exit 1
+  fi
+done

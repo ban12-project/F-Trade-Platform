@@ -360,6 +360,12 @@ def check_social_inbound_policy() -> None:
         raise AssertionError(f"Social inbound policy tests failed: {result.stderr or result.stdout}")
 
 
+def check_main_push_guard() -> None:
+    result = subprocess.run(["pnpm", "test:main-push-guard"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Local main push guard tests failed: {result.stderr or result.stdout}")
+
+
 def check_quotation_gate() -> None:
     result = subprocess.run(["pnpm", "test:quotation"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -492,6 +498,7 @@ def main() -> int:
         ("product catalog preflight", check_product_catalog_preflight),
         ("local OCR guards", check_local_ocr),
         ("social inbound policy", check_social_inbound_policy),
+        ("local main push guard", check_main_push_guard),
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),

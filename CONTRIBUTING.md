@@ -7,6 +7,14 @@
 3. Pull Request 必须关联 Issue，并说明范围、证据、验证结果和是否影响 Human Gate。
 4. CI 通过后使用 squash merge；合并后删除分支。
 
+在本地安装 `main` 误推防护（不会覆盖已有 pre-push hook）：
+
+```bash
+sh scripts/git/install-main-push-guard.sh
+```
+
+该 hook 只是一道本地补偿控制；`--no-verify` 可以绕过它，不能替代 GitHub 的服务端分支保护。
+
 ## 事实与数据规则
 
 - 不把推测写成产品事实；未知字段保持缺失并进入人工审核。
