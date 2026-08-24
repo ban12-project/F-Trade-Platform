@@ -293,6 +293,33 @@ def check_service_adapters() -> None:
             raise AssertionError(f"Structured generator is missing: {required}")
 
 
+def check_next_security_release_readiness() -> None:
+    package = load_json(ROOT / "package.json")
+    next_version = package["dependencies"].get("next")
+    playwright_version = package["devDependencies"].get("@next/playwright")
+    if not isinstance(next_version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", next_version):
+        raise AssertionError("Next.js must use an exact semantic version")
+    if next_version != playwright_version:
+        raise AssertionError("next and @next/playwright must be upgraded to the same exact version")
+    lockfile = (ROOT / "pnpm-lock.yaml").read_text(encoding="utf-8")
+    next_lock = re.search(
+        r"^      next:\n        specifier: ([^\n]+)\n        version: ([^\n]+)$",
+        lockfile,
+        re.MULTILINE,
+    )
+    playwright_lock = re.search(
+        r"^      '@next/playwright':\n        specifier: ([^\n]+)\n        version: ([^\n]+)$",
+        lockfile,
+        re.MULTILINE,
+    )
+    if not next_lock or not playwright_lock:
+        raise AssertionError("pnpm lockfile is missing Next.js importer entries")
+    if next_lock.group(1) != next_version or not next_lock.group(2).startswith(next_version):
+        raise AssertionError("pnpm lockfile Next.js version does not match package.json")
+    if playwright_lock.group(1) != next_version or not playwright_lock.group(2).startswith(next_version):
+        raise AssertionError("pnpm lockfile @next/playwright version does not match package.json")
+
+
 def check_workflow_orchestrator() -> None:
     orchestrator = (ROOT / "lib/workflow/orchestrator.ts").read_text(encoding="utf-8")
     for required in ("database.transaction", "workflowEvent", "auditEvent", "for(\"update\")"):
@@ -459,6 +486,7 @@ def main() -> int:
         ("MVP acceptance summary", check_mvp_acceptance_summary),
         ("database baseline", check_database_baseline),
         ("service adapters", check_service_adapters),
+        ("Next.js security release readiness", check_next_security_release_readiness),
         ("workflow orchestrator", check_workflow_orchestrator),
         ("synthetic end-to-end demo", check_synthetic_demo),
         ("product catalog preflight", check_product_catalog_preflight),
