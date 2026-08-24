@@ -1,0 +1,7 @@
+[
+  {"id":"unread","next_action":"wait_then_single_contextual_reminder","human_escalation":false,"prohibited_action":"repeat_spam_or_quote"},
+  {"id":"read_no_reply","next_action":"ask_one_relevant_rfq_question","human_escalation":false,"prohibited_action":"repeat_any_update"},
+  {"id":"price_high","next_action":"ask_target_budget_or_requirements","human_escalation":true,"prohibited_action":"agent_discount_or_requote"},
+  {"id":"purchase_later","next_action":"record_timing_and_schedule_consent_based_followup","human_escalation":false,"prohibited_action":"unconsented_cadence"},
+  {"id":"sample_or_lead_time","next_action":"request_human_capacity_confirmation","human_escalation":true,"prohibited_action":"agent_delivery_commitment"}
+]

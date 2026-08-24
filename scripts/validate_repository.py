@@ -328,6 +328,13 @@ def check_lead_scoring() -> None:
     if result.returncode:
         raise AssertionError(f"Lead scoring tests failed: {result.stderr or result.stdout}")
 
+def check_follow_up_scenarios() -> None:
+    cases = load_json(FIXTURE_DIR / "follow-up-scenarios.synthetic.json")
+    if {case["id"] for case in cases} != {"unread", "read_no_reply", "price_high", "purchase_later", "sample_or_lead_time"}:
+        raise AssertionError("Follow-up scenarios must cover the five required cases")
+    if any(not case["next_action"] or not case["prohibited_action"] for case in cases):
+        raise AssertionError("Every follow-up scenario requires an action and prohibited action")
+
 
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
@@ -378,6 +385,7 @@ def main() -> int:
         ("RFQ acceptance matrix", check_rfq_acceptance_matrix),
         ("sales clarification", check_sales_clarification),
         ("lead scoring", check_lead_scoring),
+        ("follow-up scenarios", check_follow_up_scenarios),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
