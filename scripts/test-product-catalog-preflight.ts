@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+
+import { discoverCatalogCandidates } from "../lib/product/catalog-candidates";
+import type { ProductAgentDocumentSource } from "../lib/product/document-source";
+import { createCatalogPreflightReport } from "./run-product-agent-catalog";
+
+const document: ProductAgentDocumentSource = {
+  source: {
+    record_id: "synthetic-catalog",
+    source_ref: "document:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    evidence_refs: ["document:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"],
+    source_text: [
+      "| Kit No. | Product name |",
+      "| --- | --- |",
+      "| RYC251 | Synthetic Kit |",
+    ].join("\n"),
+    image_availability: "none",
+    image_refs: [],
+  },
+  document_sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  filename: "synthetic-catalog.md",
+  media_type: "md",
+  ocr_enabled: false,
+};
+
+const report = createCatalogPreflightReport(document, discoverCatalogCandidates(document.source));
+
+assert.deepEqual(report, {
+  classification: "local_preflight",
+  document: {
+    document_sha256: document.document_sha256,
+    filename: "synthetic-catalog.md",
+    media_type: "md",
+    ocr_enabled: false,
+  },
+  candidate_count: 1,
+  candidate_identifiers: ["RYC251"],
+});
+assert.equal(JSON.stringify(report).includes("Synthetic Kit"), false);
+assert.equal(JSON.stringify(report).includes("source_text"), false);
+
+console.log("PASS product catalog preflight");

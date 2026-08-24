@@ -8,6 +8,18 @@ import { preprocessProductAgentDocument } from "../lib/product/document-source";
 import { PRODUCT_AGENT_PROMPT_VERSION } from "../lib/product/product-agent-prompt";
 import { PRODUCT_AGENT_PROMPT_HASH } from "../lib/product/product-agent-prompt";
 
+export interface CatalogPreflightReport {
+  classification: "local_preflight";
+  document: {
+    document_sha256: string;
+    filename: string;
+    media_type: string;
+    ocr_enabled: boolean;
+  };
+  candidate_count: number;
+  candidate_identifiers: string[];
+}
+
 function option(name: string, fallback: string) {
   const index = process.argv.indexOf(name);
   return index === -1 ? fallback : (process.argv[index + 1] ?? fallback);
@@ -20,6 +32,10 @@ function positiveInteger(name: string, value: string, fallback: number) {
   return parsed;
 }
 
+function hasFlag(name: string) {
+  return process.argv.includes(name);
+}
+
 type CatalogResult = {
   identifier: string;
   status: "pending" | "succeeded" | "failed";
@@ -27,11 +43,27 @@ type CatalogResult = {
   error?: string;
 };
 
+export function createCatalogPreflightReport(
+  document: Awaited<ReturnType<typeof preprocessProductAgentDocument>>,
+  candidates: ReturnType<typeof discoverCatalogCandidates>,
+): CatalogPreflightReport {
+  return {
+    classification: "local_preflight",
+    document: {
+      document_sha256: document.document_sha256,
+      filename: document.filename,
+      media_type: document.media_type,
+      ocr_enabled: document.ocr_enabled,
+    },
+    candidate_count: candidates.length,
+    candidate_identifiers: candidates.map((candidate) => candidate.identifier),
+  };
+}
+
 async function main() {
   const documentPath = option("--document", "");
   if (!documentPath) throw new Error("Pass --document <catalog-file>");
-  const modelId = option("--model", process.env.F_TRADE_MODEL ?? "");
-  if (!modelId) throw new Error("Pass --model provider/model or set F_TRADE_MODEL");
+  const preflight = hasFlag("--preflight");
   const outputPath = resolve(option("--output", "output/catalog-review.json"));
   const recordId = option("--record-id", "catalog-review");
   const limit = positiveInteger("--limit", option("--limit", ""), Number.POSITIVE_INFINITY);
@@ -61,7 +93,14 @@ async function main() {
   if (onlyIdentifiers.size > 0 && candidates.length !== onlyIdentifiers.size) {
     throw new Error("One or more requested catalog candidate identifiers were not found");
   }
+  if (preflight) {
+    console.log(JSON.stringify(createCatalogPreflightReport(document, candidates), null, 2));
+    return;
+  }
   if (candidates.length === 0) throw new Error("No supported catalog product identifiers found");
+
+  const modelId = option("--model", process.env.F_TRADE_MODEL ?? "");
+  if (!modelId) throw new Error("Pass --model provider/model or set F_TRADE_MODEL");
 
   const agent = new AiSdkProductAgent();
   const model = createProductAgentModel(modelId);
@@ -118,7 +157,9 @@ async function main() {
   await writeReport();
 }
 
-main().catch((error: unknown) => {
-  console.error(`Catalog Product Agent failed: ${error instanceof Error ? error.message : "unknown error"}`);
-  process.exitCode = 1;
-});
+if (process.argv[1]?.endsWith("run-product-agent-catalog.ts")) {
+  main().catch((error: unknown) => {
+    console.error(`Catalog Product Agent failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    process.exitCode = 1;
+  });
+}

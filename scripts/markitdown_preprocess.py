@@ -57,6 +57,11 @@ def main() -> None:
     result = converter.convert_local(path)
     source_text = result.text_content.strip()
     if not source_text:
+        if path.suffix.lower() == ".pdf" and not enable_ocr:
+            fail(
+                "conversion produced no text; this PDF may be image-only. "
+                "OCR is disabled and requires an approved local or configured OCR path"
+            )
         fail("conversion produced no text")
 
     json.dump(

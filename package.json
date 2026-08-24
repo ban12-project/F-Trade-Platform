@@ -16,6 +16,7 @@
     "start": "next start",
     "product-agent": "tsx scripts/run-product-agent.ts",
     "product-agent:catalog": "tsx scripts/run-product-agent-catalog.ts",
+    "test:catalog-preflight": "tsx scripts/test-product-catalog-preflight.ts",
     "eval:harbor:prepare": "tsx scripts/prepare-harbor-product-agent-dataset.ts",
     "eval:harbor:podman": "sh scripts/run-harbor-product-agent-podman.sh",
     "typecheck": "tsc --noEmit",
