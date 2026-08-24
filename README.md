@@ -46,7 +46,7 @@ Milestone 依赖关系：`M0 → M1 → {M2, M3} → M4 → M5`。
 
 ## 本地验证
 
-需要 Python 3.11+、`jsonschema` 和 `PyYAML`：
+需要 Python 3.11+、`jsonschema`、`PyYAML` 和用于本地 Product Agent 文档预处理的 `markitdown[pdf]`：
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
