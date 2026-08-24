@@ -1,0 +1,9 @@
+{
+  "confirmation_id": "synthetic-delivery-confirmation-pending-001",
+  "related_entity_type": "rfq",
+  "related_entity_id": "synthetic-rfq-ready-001",
+  "status": "pending",
+  "requested_by_type": "agent",
+  "requested_by_id": "synthetic-sales-agent",
+  "requested_at": "2026-08-23T11:00:00Z"
+}

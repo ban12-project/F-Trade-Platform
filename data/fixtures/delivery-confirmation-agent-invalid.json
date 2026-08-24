@@ -1,0 +1,17 @@
+{
+  "confirmation_id": "invalid-delivery-confirmation-001",
+  "related_entity_type": "opportunity",
+  "related_entity_id": "synthetic-opportunity-001",
+  "status": "confirmed",
+  "requested_by_type": "agent",
+  "requested_by_id": "synthetic-sales-agent",
+  "requested_at": "2026-08-23T11:00:00Z",
+  "result": {
+    "actor_type": "agent",
+    "decided_by": "synthetic-sales-agent",
+    "decided_at": "2026-08-23T12:00:00Z",
+    "evidence_ref": "invalid-agent-capacity-check",
+    "confirmed_lead_time_days": 30
+  },
+  "approval_ref": "invalid-delivery-approval"
+}

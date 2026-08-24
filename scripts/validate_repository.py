@@ -42,6 +42,17 @@ def assert_invalid(schema_path: Path, fixture_path: Path) -> None:
         raise AssertionError(f"Expected invalid fixture to fail: {fixture_path}")
 
 
+def validate_each(schema_path: Path, fixture_path: Path) -> None:
+    schema = load_json(schema_path)
+    instances = load_json(fixture_path)
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    for index, instance in enumerate(instances):
+        errors = sorted(validator.iter_errors(instance), key=lambda error: list(error.path))
+        if errors:
+            details = "; ".join(error.message for error in errors)
+            raise AssertionError(f"{fixture_path}[{index}]: {details}")
+
+
 def check_schemas() -> None:
     for path in sorted(SCHEMA_DIR.rglob("*.schema.json")):
         schema = load_json(path)
@@ -49,13 +60,30 @@ def check_schemas() -> None:
 
     checks = {
         "product-draft.schema.json": ["product-draft.synthetic.json"],
-        "product-ready.schema.json": ["product-ready.synthetic.json"],
+        "product-ready.schema.json": [
+            "product-ready.synthetic.json",
+            "product-ready-application.synthetic.json",
+        ],
         "content.schema.json": ["content-draft.synthetic.json"],
         "rfq-draft.schema.json": ["rfq-draft.synthetic.json"],
         "rfq-ready.schema.json": ["rfq-ready.synthetic.json"],
-        "quotation-handoff.schema.json": ["quotation-handoff.synthetic.json"],
-        "workflow-event.schema.json": ["workflow-event.synthetic.json"],
-        "human-approval.schema.json": ["human-approval.synthetic.json"],
+        "quotation-handoff.schema.json": [
+            "quotation-handoff.synthetic.json",
+            "quotation-review-required.synthetic.json",
+        ],
+        "delivery-confirmation.schema.json": [
+            "delivery-confirmation.synthetic.json",
+            "delivery-confirmation-pending.synthetic.json",
+        ],
+        "workflow-event.schema.json": [
+            "workflow-event.synthetic.json",
+            "workflow-event-revision.synthetic.json",
+        ],
+        "human-approval.schema.json": [
+            "human-approval.synthetic.json",
+            "human-approval-pending.synthetic.json",
+            "human-approval-rejected.synthetic.json",
+        ],
     }
     for schema_name, fixtures in checks.items():
         schema_path = next(SCHEMA_DIR.rglob(schema_name))
@@ -65,6 +93,22 @@ def check_schemas() -> None:
     assert_invalid(
         SCHEMA_DIR / "sales" / "quotation-handoff.schema.json",
         FIXTURE_DIR / "quotation-agent-invalid.json",
+    )
+    assert_invalid(
+        SCHEMA_DIR / "workflow" / "human-approval.schema.json",
+        FIXTURE_DIR / "human-approval-agent-decision-invalid.json",
+    )
+    assert_invalid(
+        SCHEMA_DIR / "sales" / "delivery-confirmation.schema.json",
+        FIXTURE_DIR / "delivery-confirmation-agent-invalid.json",
+    )
+    assert_invalid(
+        SCHEMA_DIR / "workflow" / "workflow-event.schema.json",
+        FIXTURE_DIR / "workflow-event-cross-aggregate-invalid.json",
+    )
+    validate_each(
+        SCHEMA_DIR / "workflow" / "workflow-event.schema.json",
+        FIXTURE_DIR / "workflow-events-matrix.synthetic.json",
     )
 
 
@@ -94,30 +138,6 @@ def check_scoring_config() -> None:
         raise AssertionError("Lead scoring normalization must cap at 100")
     if config["thresholds"] != {"cold_max": 30, "warm_max": 60}:
         raise AssertionError("Lead scoring thresholds changed unexpectedly")
-
-
-def check_workflow_transition() -> None:
-    allowed = {
-        ("PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED"),
-        ("PRODUCT_REVIEW_REQUIRED", "PRODUCT_READY"),
-        ("PRODUCT_READY", "CONTENT_GENERATING"),
-        ("CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED"),
-        ("CONTENT_REVIEW_REQUIRED", "CONTENT_APPROVED"),
-        ("CONTENT_APPROVED", "PUBLISHED"),
-        ("PUBLISHED", "LEAD_RECEIVED"),
-        ("LEAD_RECEIVED", "RFQ_COLLECTING"),
-        ("RFQ_COLLECTING", "RFQ_READY"),
-        ("RFQ_READY", "QUOTE_REVIEW_REQUIRED"),
-        ("QUOTE_REVIEW_REQUIRED", "QUOTED"),
-        ("QUOTED", "FOLLOW_UP"),
-        ("FOLLOW_UP", "OPPORTUNITY"),
-        ("OPPORTUNITY", "WON"),
-        ("OPPORTUNITY", "LOST"),
-    }
-    event = load_json(FIXTURE_DIR / "workflow-event.synthetic.json")
-    transition = (event["from_state"], event["to_state"])
-    if transition not in allowed:
-        raise AssertionError(f"Fixture uses a forbidden workflow transition: {transition}")
 
 
 def check_repository_hygiene() -> None:
@@ -158,7 +178,6 @@ def main() -> int:
         ("schemas and fixtures", check_schemas),
         ("CSV template", check_csv_template),
         ("lead scoring", check_scoring_config),
-        ("workflow transition", check_workflow_transition),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]

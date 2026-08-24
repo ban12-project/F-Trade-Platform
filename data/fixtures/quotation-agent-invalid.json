@@ -1,7 +1,8 @@
 {
   "handoff_id": "invalid-agent-handoff",
   "rfq_id": "synthetic-rfq-ready-001",
-  "actor_type": "agent",
+  "created_by_actor_type": "agent",
+  "created_by_actor_id": "synthetic-sales-agent",
   "status": "approved",
   "quote": {
     "unit_price": 12.5,
@@ -11,9 +12,5 @@
     "payment_terms": "Invalid",
     "validity_days": 30
   },
-  "approval": {
-    "approved_by": "synthetic-agent",
-    "approved_at": "2026-08-23T12:00:00Z",
-    "evidence_ref": "invalid"
-  }
+  "approval_ref": "invalid-agent-approval"
 }

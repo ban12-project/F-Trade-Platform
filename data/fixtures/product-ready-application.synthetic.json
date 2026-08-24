@@ -1,0 +1,17 @@
+{
+  "record_id": "synthetic-product-ready-application-001",
+  "source_ref": "synthetic_factory_sheet_row_002",
+  "evidence_refs": ["synthetic_factory_sheet_row_002", "human_review_002"],
+  "verification_status": "verified",
+  "blocking_missing_fields": [],
+  "optional_missing_fields": ["oe_numbers"],
+  "product": {
+    "product_name": "Synthetic Clutch Kit Without OE",
+    "product_type": "clutch_kit",
+    "internal_sku": "SYN-CK-002",
+    "application": "Synthetic verified vehicle application",
+    "vehicle_brand": "Synthetic",
+    "vehicle_model": "Demo Model 2"
+  },
+  "approval_ref": "synthetic-approval-002"
+}

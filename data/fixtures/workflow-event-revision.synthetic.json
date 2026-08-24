@@ -1,0 +1,13 @@
+{
+  "event_id": "synthetic-event-revision-001",
+  "entity_type": "content",
+  "entity_id": "synthetic-content-001",
+  "from_state": "CONTENT_REVIEW_REQUIRED",
+  "to_state": "CONTENT_REVISION_REQUIRED",
+  "actor_type": "human",
+  "actor_id": "synthetic-reviewer",
+  "occurred_at": "2026-08-23T12:00:00Z",
+  "evidence_refs": ["synthetic-content-review-001"],
+  "gate": "gate_01_truth",
+  "approval_ref": "synthetic-approval-rejected-001"
+}

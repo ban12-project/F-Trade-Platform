@@ -1,10 +1,16 @@
 {
   "approval_id": "synthetic-approval-001",
   "gate": "gate_01_truth",
+  "entity_type": "product",
   "entity_id": "synthetic-product-ready-001",
   "status": "approved",
-  "actor_type": "human",
-  "approved_by": "synthetic-reviewer",
-  "approved_at": "2026-08-23T12:00:00Z",
-  "evidence_ref": "human_review_001"
+  "requested_by_type": "agent",
+  "requested_by_id": "synthetic-product-agent",
+  "requested_at": "2026-08-23T11:00:00Z",
+  "decision": {
+    "actor_type": "human",
+    "decided_by": "synthetic-reviewer",
+    "decided_at": "2026-08-23T12:00:00Z",
+    "evidence_ref": "human_review_001"
+  }
 }

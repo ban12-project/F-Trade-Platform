@@ -1,9 +1,9 @@
 {
-  "handoff_id": "synthetic-handoff-001",
+  "handoff_id": "synthetic-handoff-review-001",
   "rfq_id": "synthetic-rfq-ready-001",
   "created_by_actor_type": "human",
   "created_by_actor_id": "synthetic-sales-user",
-  "status": "approved",
+  "status": "review_required",
   "quote": {
     "unit_price": 12.5,
     "currency": "USD",
@@ -11,6 +11,5 @@
     "lead_time_days": 30,
     "payment_terms": "Synthetic terms",
     "validity_days": 30
-  },
-  "approval_ref": "synthetic-quote-approval-001"
+  }
 }
