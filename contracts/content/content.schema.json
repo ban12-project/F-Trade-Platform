@@ -37,11 +37,11 @@
   "allOf": [
     {
       "if": {"properties": {"status": {"enum": ["approved", "published"]}}, "required": ["status"]},
-      "then": {"required": ["approval_ref"]}
+      "then": {"properties": {"approval_ref": {}}, "required": ["approval_ref"]}
     },
     {
       "if": {"properties": {"status": {"const": "published"}}, "required": ["status"]},
-      "then": {"required": ["published_ref"]}
+      "then": {"properties": {"published_ref": {}}, "required": ["published_ref"]}
     }
   ]
 }

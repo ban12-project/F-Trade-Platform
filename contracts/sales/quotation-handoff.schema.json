@@ -30,11 +30,11 @@
   "allOf": [
     {
       "if": {"properties": {"status": {"enum": ["approved", "sent"]}}, "required": ["status"]},
-      "then": {"required": ["approval_ref"]}
+      "then": {"properties": {"approval_ref": {}}, "required": ["approval_ref"]}
     },
     {
       "if": {"properties": {"status": {"const": "sent"}}, "required": ["status"]},
-      "then": {"required": ["sent_at"]}
+      "then": {"properties": {"sent_at": {}}, "required": ["sent_at"]}
     }
   ]
 }

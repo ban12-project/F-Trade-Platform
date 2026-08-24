@@ -26,8 +26,8 @@
         "required_specification": {"type": "string"}
       },
       "anyOf": [
-        {"required": ["oe_number"]},
-        {"required": ["vehicle_brand", "vehicle_model"]}
+        {"properties": {"oe_number": {}}, "required": ["oe_number"]},
+        {"properties": {"vehicle_brand": {}, "vehicle_model": {}}, "required": ["vehicle_brand", "vehicle_model"]}
       ]
     },
     "commercial": {

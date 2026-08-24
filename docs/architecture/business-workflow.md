@@ -54,3 +54,7 @@ Sales Agent 只收集和整理 RFQ。报价草稿由人工销售创建，价格�
 - RFQ 不完整时持续提问，不直接报价。
 - 审批和业务对象分别存储；业务对象只引用 `approval_ref`，避免伪造内嵌审批。
 - 第一阶段 Demo 以 `OPPORTUNITY` 为成功终点；不把模拟询盘冒充真实成交。
+
+## Synthetic 端到端演示
+
+执行 `pnpm demo:synthetic` 可验证产品导入、内容审核和发布、RFQ 完整、人工报价审批和发送、跟单到 `OPPORTUNITY` 的演示闭环。该脚本只读取带 `synthetic` 标识的 fixture，并在开始前按各自 JSON Schema 验证输入；它不会连接渠道、读取客户数据或生成真实报价。

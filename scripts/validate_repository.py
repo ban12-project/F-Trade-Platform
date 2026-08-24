@@ -280,6 +280,14 @@ def check_workflow_orchestrator() -> None:
         raise AssertionError(f"Workflow transition tests failed: {result.stderr or result.stdout}")
 
 
+def check_synthetic_demo() -> None:
+    result = subprocess.run(
+        ["pnpm", "test:demo"], cwd=ROOT, capture_output=True, text=True
+    )
+    if result.returncode:
+        raise AssertionError(f"Synthetic demo tests failed: {result.stderr or result.stdout}")
+
+
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
     tracked = subprocess.run(
@@ -322,6 +330,7 @@ def main() -> int:
         ("database baseline", check_database_baseline),
         ("service adapters", check_service_adapters),
         ("workflow orchestrator", check_workflow_orchestrator),
+        ("synthetic end-to-end demo", check_synthetic_demo),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]

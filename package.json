@@ -20,6 +20,8 @@
     "eval:harbor:podman": "sh scripts/run-harbor-product-agent-podman.sh",
     "typecheck": "tsc --noEmit",
     "test:workflow": "tsx scripts/test-workflow-transitions.ts",
+    "demo:synthetic": "tsx scripts/run-synthetic-demo.ts",
+    "test:demo": "tsx scripts/test-synthetic-demo.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
