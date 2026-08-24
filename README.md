@@ -88,3 +88,10 @@ pnpm db:migrate
 - AI SDK 适配器不绑定模型供应商，只接受调用方注入的 `LanguageModel` 和带运行时校验的 Schema。
 
 模型的安全提示不能证明事实正确。生成内容中的产品事实还必须逐项匹配已提供的 `field/value/evidenceRef`，并继续经过 Gate 01 人工审核。
+
+### 产品真实性验证
+
+产品草稿中的每个已填写事实都必须通过 `field_evidence` 指向
+`evidence_refs` 中的来源。自动审核会列出核心缺失项、未绑定证据的字段，以及
+尚未由人工核验的车型身份。只有具备有效人员、时间和证据记录的 Gate 01
+人工批准，才能把草稿提升为 `ProductReady`；agent 形式的批准会在运行时被拒绝。

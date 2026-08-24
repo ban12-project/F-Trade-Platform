@@ -2,6 +2,14 @@
   "record_id": "synthetic-product-ready-application-001",
   "source_ref": "synthetic_factory_sheet_row_002",
   "evidence_refs": ["synthetic_factory_sheet_row_002", "human_review_002"],
+  "field_evidence": {
+    "product.product_name": "synthetic_factory_sheet_row_002",
+    "product.product_type": "synthetic_factory_sheet_row_002",
+    "product.internal_sku": "synthetic_factory_sheet_row_002",
+    "product.application": "synthetic_factory_sheet_row_002",
+    "product.vehicle_brand": "synthetic_factory_sheet_row_002",
+    "product.vehicle_model": "synthetic_factory_sheet_row_002"
+  },
   "verification_status": "verified",
   "blocking_missing_fields": [],
   "optional_missing_fields": ["oe_numbers"],
