@@ -38,6 +38,9 @@ jobs:
       - name: Run type checks
         run: pnpm typecheck
 
+      - name: Check database migrations
+        run: pnpm db:check
+
       - name: Run Playwright tests
         run: pnpm test:e2e
 

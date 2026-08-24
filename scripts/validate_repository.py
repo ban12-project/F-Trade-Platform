@@ -140,6 +140,34 @@ def check_scoring_config() -> None:
         raise AssertionError("Lead scoring thresholds changed unexpectedly")
 
 
+def check_database_baseline() -> None:
+    auth_source = (ROOT / "lib/auth.ts").read_text(encoding="utf-8")
+    if "disableSignUp: true" not in auth_source:
+        raise AssertionError("Public Better Auth sign-up must remain disabled")
+    if "minPasswordLength: 12" not in auth_source:
+        raise AssertionError("Internal passwords must require at least 12 characters")
+
+    migrations = sorted((ROOT / "drizzle").glob("*.sql"))
+    if not migrations:
+        raise AssertionError("At least one Drizzle SQL migration is required")
+    migration = "\n".join(path.read_text(encoding="utf-8") for path in migrations)
+    required_tables = {
+        "user", "session", "account", "verification", "invitation",
+        "aggregate_record", "approval", "evidence", "workflow_event", "audit_event",
+    }
+    missing_tables = [
+        table for table in sorted(required_tables)
+        if f'CREATE TABLE "{table}"' not in migration
+    ]
+    if missing_tables:
+        raise AssertionError(f"Database migration is missing tables: {missing_tables}")
+    for trigger in ("audit_event_append_only", "workflow_event_append_only"):
+        if f'CREATE TRIGGER "{trigger}"' not in migration:
+            raise AssertionError(f"Database migration is missing trigger: {trigger}")
+    if "decided_by_type\" = 'human'" not in migration:
+        raise AssertionError("Approval decisions must be constrained to a human actor")
+
+
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
     tracked = subprocess.run(
@@ -178,6 +206,7 @@ def main() -> int:
         ("schemas and fixtures", check_schemas),
         ("CSV template", check_csv_template),
         ("lead scoring", check_scoring_config),
+        ("database baseline", check_database_baseline),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
