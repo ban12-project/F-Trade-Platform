@@ -323,6 +323,11 @@ def check_sales_clarification() -> None:
     if result.returncode:
         raise AssertionError(f"Sales clarification tests failed: {result.stderr or result.stdout}")
 
+def check_lead_scoring() -> None:
+    result = subprocess.run(["pnpm", "test:scoring"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Lead scoring tests failed: {result.stderr or result.stdout}")
+
 
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
@@ -372,6 +377,7 @@ def main() -> int:
         ("RFQ completeness", check_rfq_completeness),
         ("RFQ acceptance matrix", check_rfq_acceptance_matrix),
         ("sales clarification", check_sales_clarification),
+        ("lead scoring", check_lead_scoring),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
