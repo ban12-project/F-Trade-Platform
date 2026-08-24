@@ -14,7 +14,7 @@
     "actor_type": {"enum": ["agent", "human", "system"]},
     "actor_id": {"type": "string", "minLength": 1},
     "occurred_at": {"type": "string", "format": "date-time"},
-    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
     "gate": {"enum": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"]},
     "approval_ref": {"type": "string", "minLength": 1}
   },

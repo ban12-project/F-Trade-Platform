@@ -268,6 +268,18 @@ def check_service_adapters() -> None:
             raise AssertionError(f"Structured generator is missing: {required}")
 
 
+def check_workflow_orchestrator() -> None:
+    orchestrator = (ROOT / "lib/workflow/orchestrator.ts").read_text(encoding="utf-8")
+    for required in ("database.transaction", "workflowEvent", "auditEvent", "for(\"update\")"):
+        if required not in orchestrator:
+            raise AssertionError(f"Workflow orchestrator is missing: {required}")
+    result = subprocess.run(
+        ["pnpm", "test:workflow"], cwd=ROOT, capture_output=True, text=True
+    )
+    if result.returncode:
+        raise AssertionError(f"Workflow transition tests failed: {result.stderr or result.stdout}")
+
+
 def check_repository_hygiene() -> None:
     forbidden = {".DS_Store", ".env", ".env.local", "id_rsa"}
     tracked = subprocess.run(
@@ -309,6 +321,7 @@ def main() -> int:
         ("product acceptance", check_product_acceptance_config),
         ("database baseline", check_database_baseline),
         ("service adapters", check_service_adapters),
+        ("workflow orchestrator", check_workflow_orchestrator),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]
