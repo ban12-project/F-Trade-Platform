@@ -64,6 +64,10 @@ Sales Agent 只收集和整理 RFQ。报价草稿由人工销售创建，价格�
 Agent 猜测。窗口外自动回复一律禁止，策略只能要求人工升级或经人工批准的模板。该模块只处理外部引用
 和时间，不存储平台凭据、Cookie 或消息正文。
 
+内容发布也必须通过 `ContentPublicationPolicy`：只有人工启用的官方 API 渠道、已完成 Gate 01 的内容和
+system/human 发布 actor 才能进入发布传输。该策略只保存脱敏渠道/账号引用和外部发布引用，不保存 OAuth
+凭据，也不允许 Agent 或浏览器会话直接发布。
+
 ## Synthetic 端到端演示
 
 执行 `pnpm demo:synthetic` 可验证产品导入、内容审核和发布、RFQ 完整、人工报价审批和发送、跟单到 `OPPORTUNITY` 的演示闭环。该脚本只读取带 `synthetic` 标识的 fixture，并在开始前按各自 JSON Schema 验证输入；它不会连接渠道、读取客户数据或生成真实报价。

@@ -1,0 +1,6 @@
+{
+  "channel_ref": "synthetic-content-channel",
+  "account_ref": "synthetic-factory-account",
+  "official_api": true,
+  "publishing_enabled": true
+}
