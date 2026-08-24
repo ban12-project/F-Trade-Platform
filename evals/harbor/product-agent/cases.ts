@@ -39,7 +39,7 @@ function sourceText(cohort: "A" | "B" | "C" | "D", suffix: string, detail: strin
     `Internal SKU: SYN-${cohort}-${suffix}`,
   ];
   if (cohort === "A" || cohort === "B") {
-    core.push(`OE numbers: SYN-OE-${cohort}-${suffix}, SYN-OE-${cohort}-${suffix}-ALT`);
+    core.push(`OEM No.: SYN-OE-${cohort}-${suffix}, SYN-OE-${cohort}-${suffix}-ALT`);
   } else {
     core.push("Application: Synthetic demo application", "Vehicle brand: Synthetic", `Vehicle model: Demo ${cohort}${suffix}`);
   }

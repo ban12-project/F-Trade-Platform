@@ -132,5 +132,41 @@ test("removes null optional facts without creating a sourced value", () => {
 test("rejects OE numbers when the source has no OE or OEM label", () => {
   expect(() =>
     finalizeProductAgentDraft(safeDraft, { ...source, source_text: "Part No. SYN-OE-001" }),
-  ).toThrow("explicit OE or OEM No. source label");
+  ).toThrow("explicitly listed under an OE or OEM No. source label");
+});
+
+test("rejects an OE value that is not listed under the source label", () => {
+  expect(() =>
+    finalizeProductAgentDraft(
+      {
+        ...safeDraft,
+        product: { ...safeDraft.product, oe_numbers: ["SYN-OE-HALLUCINATED"] },
+      },
+      source,
+    ),
+  ).toThrow("explicitly listed under an OE or OEM No. source label");
+});
+
+test("does not treat an incidental OEM word as an OE source label", () => {
+  expect(() =>
+    finalizeProductAgentDraft(safeDraft, {
+      ...source,
+      source_text: "This OEM replacement is identified only by Part No. SYN-OE-001",
+    }),
+  ).toThrow("explicitly listed under an OE or OEM No. source label");
+});
+
+test("accepts every OE value explicitly listed under the source label", () => {
+  const labelledSource = {
+    ...source,
+    source_text: "OEM No.: SYN-OE-001, SYN-OE-002",
+  };
+  const draft = {
+    ...safeDraft,
+    product: { ...safeDraft.product, oe_numbers: ["SYN-OE-002", "SYN-OE-001"] },
+  };
+  expect(finalizeProductAgentDraft(draft, labelledSource).product.oe_numbers).toEqual([
+    "SYN-OE-002",
+    "SYN-OE-001",
+  ]);
 });

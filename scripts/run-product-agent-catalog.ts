@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { createProductAgentModel } from "../lib/ai/model-provider";
@@ -69,25 +69,31 @@ async function main() {
     identifier: candidate.identifier,
     status: "pending",
   }));
+  let reportWrite = Promise.resolve();
   async function writeReport() {
-    const successCount = results.filter((result) => result.status === "succeeded").length;
-    const failureCount = results.filter((result) => result.status === "failed").length;
-    await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, `${JSON.stringify({
-      model: modelId,
-      prompt: { version: PRODUCT_AGENT_PROMPT_VERSION, hash: PRODUCT_AGENT_PROMPT_HASH },
-      document: {
-        document_sha256: document.document_sha256,
-        filename: document.filename,
-        media_type: document.media_type,
-        ocr_enabled: document.ocr_enabled,
-      },
-      candidate_count: candidates.length,
-      success_count: successCount,
-      failure_count: failureCount,
-      pending_count: candidates.length - successCount - failureCount,
-      results,
-    }, null, 2)}\n`);
+    reportWrite = reportWrite.then(async () => {
+      const successCount = results.filter((result) => result.status === "succeeded").length;
+      const failureCount = results.filter((result) => result.status === "failed").length;
+      const temporaryPath = `${outputPath}.tmp`;
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(temporaryPath, `${JSON.stringify({
+        model: modelId,
+        prompt: { version: PRODUCT_AGENT_PROMPT_VERSION, hash: PRODUCT_AGENT_PROMPT_HASH },
+        document: {
+          document_sha256: document.document_sha256,
+          filename: document.filename,
+          media_type: document.media_type,
+          ocr_enabled: document.ocr_enabled,
+        },
+        candidate_count: candidates.length,
+        success_count: successCount,
+        failure_count: failureCount,
+        pending_count: candidates.length - successCount - failureCount,
+        results,
+      }, null, 2)}\n`);
+      await rename(temporaryPath, outputPath);
+    });
+    await reportWrite;
   }
   await writeReport();
   let nextIndex = 0;

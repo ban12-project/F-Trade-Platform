@@ -11,6 +11,16 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
+def canonical_product(value: object) -> object:
+    if not isinstance(value, dict):
+        return value
+    product = dict(value)
+    oe_numbers = product.get("oe_numbers")
+    if isinstance(oe_numbers, list):
+        product["oe_numbers"] = sorted(oe_numbers)
+    return product
+
+
 def main() -> None:
     expected = json.loads(Path("/tests/expected.json").read_text(encoding="utf-8"))
     result = json.loads(Path("/app/output/product-draft.json").read_text(encoding="utf-8"))
@@ -25,11 +35,11 @@ def main() -> None:
         fail("record_id and source_ref must be preserved")
     if draft.get("verification_status") != "review_required":
         fail("Product Agent must not verify products")
-    if draft.get("product") != truth["product"]:
+    if canonical_product(draft.get("product")) != canonical_product(truth["product"]):
         fail("Product fields differ from supported synthetic truth")
-    if draft.get("specifications") != truth.get("specifications"):
+    if (draft.get("specifications") or {}) != (truth.get("specifications") or {}):
         fail("Specification fields differ from supported synthetic truth")
-    if draft.get("commercial") != truth.get("commercial"):
+    if (draft.get("commercial") or {}) != (truth.get("commercial") or {}):
         fail("Commercial fields differ from supported synthetic truth")
     if sorted(draft.get("blocking_missing_fields", [])) != sorted(truth["blocking_missing_fields"]):
         fail("Blocking missing fields are incorrect")

@@ -68,6 +68,23 @@ function parseModelJson(text: string): unknown {
   }
 }
 
+function normalizeOeNumber(value: string) {
+  return value.trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+function extractExplicitOeNumbers(sourceText: string) {
+  const values = new Set<string>();
+  const labelledOeLine =
+    /\b(?:(?:OEM|OE)\s*NO\.?\s*(?:[:：]\s*|\s+)|(?:OEM|OE)\s*[:：]\s*)([^\r\n]+)/gi;
+  for (const match of sourceText.matchAll(labelledOeLine)) {
+    for (const value of match[1]!.split(/[,;|，、]|\t|\s{2,}/)) {
+      const normalized = normalizeOeNumber(value.replace(/^[\s([{"']+|[\s)\]}"'.]+$/g, ""));
+      if (normalized) values.add(normalized);
+    }
+  }
+  return values;
+}
+
 function assertSafeDraft(draft: ProductDraft, source: ProductAgentSource) {
   if (draft.record_id !== source.record_id || draft.source_ref !== source.source_ref) {
     throw new Error("Product Agent output must preserve the supplied record and source references");
@@ -76,12 +93,13 @@ function assertSafeDraft(draft: ProductDraft, source: ProductAgentSource) {
     throw new Error("Product Agent may only create review_required product drafts");
   }
   const oeNumbers = draft.product.oe_numbers;
-  if (
-    Array.isArray(oeNumbers) &&
-    oeNumbers.length > 0 &&
-    !/(?:\bOEM\s*NO\.?|\bOEM\s*[:：]|\bOE\s*(?:NO\.?)?\s*[:：])/i.test(source.source_text)
-  ) {
-    throw new Error("Product Agent may populate oe_numbers only from an explicit OE or OEM No. source label");
+  if (Array.isArray(oeNumbers) && oeNumbers.length > 0) {
+    const sourcedOeNumbers = extractExplicitOeNumbers(source.source_text);
+    if (oeNumbers.some((oeNumber) => !sourcedOeNumbers.has(normalizeOeNumber(oeNumber)))) {
+      throw new Error(
+        "Product Agent may populate only OE numbers explicitly listed under an OE or OEM No. source label",
+      );
+    }
   }
   const internalSku = draft.product.internal_sku;
   if (
