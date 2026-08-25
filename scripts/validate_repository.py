@@ -67,6 +67,7 @@ def check_schemas() -> None:
         ],
         "mvp-acceptance-summary.schema.json": ["mvp-acceptance-summary.synthetic.json"],
         "channel-inbound-policy.schema.json": ["channel-inbound-policy.synthetic.json"],
+        "channel-onboarding.schema.json": ["channel-onboarding.synthetic.json"],
         "official-inbound-webhook.schema.json": ["official-inbound-webhook.synthetic.json"],
         "product-pilot-authorization.schema.json": ["product-pilot-authorization.synthetic.json"],
         "product-catalog-intake.schema.json": ["product-catalog-intake.synthetic.json"],
@@ -149,6 +150,10 @@ def check_schemas() -> None:
     assert_invalid(
         SCHEMA_DIR / "testing" / "product-catalog-intake.schema.json",
         FIXTURE_DIR / "product-catalog-intake-fact-leak-invalid.json",
+    )
+    assert_invalid(
+        SCHEMA_DIR / "social" / "channel-onboarding.schema.json",
+        FIXTURE_DIR / "channel-onboarding-secret-invalid.json",
     )
     validate_each(
         SCHEMA_DIR / "workflow" / "workflow-event.schema.json",
@@ -294,6 +299,25 @@ def check_product_catalog_intake() -> None:
                 raise AssertionError("Ready catalog intake must use an approved conversion")
             if slot["blocker_codes"]:
                 raise AssertionError("Ready catalog intake cannot retain blockers")
+
+
+def check_channel_onboarding() -> None:
+    manifest = load_json(FIXTURE_DIR / "channel-onboarding.synthetic.json")
+    if manifest["production_readiness"] in {"test_ready", "approved"}:
+        required = {
+            "ownership_status": "verified",
+            "official_oauth_status": "tested",
+            "publishing_path": "postiz_official_api",
+            "inbound_path": "chatwoot_official_webhook",
+            "reply_window_status": "confirmed",
+        }
+        for field, expected in required.items():
+            if manifest[field] != expected:
+                raise AssertionError(f"Channel readiness requires {field}={expected}")
+    if manifest["browser_automation_production"]:
+        raise AssertionError("Browser automation must remain prohibited for production channels")
+    if not manifest["inbound_only"] or not manifest["external_effects_require_human_approval"]:
+        raise AssertionError("Channel onboarding must preserve inbound-only human-approved operation")
 
 
 def check_database_baseline() -> None:
@@ -596,6 +620,7 @@ def main() -> int:
         ("MVP acceptance summary", check_mvp_acceptance_summary),
         ("product pilot authorization", check_product_pilot_authorization),
         ("product catalog intake", check_product_catalog_intake),
+        ("channel onboarding", check_channel_onboarding),
         ("database baseline", check_database_baseline),
         ("service adapters", check_service_adapters),
         ("Next.js security release readiness", check_next_security_release_readiness),
