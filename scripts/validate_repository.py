@@ -69,6 +69,7 @@ def check_schemas() -> None:
         "channel-inbound-policy.schema.json": ["channel-inbound-policy.synthetic.json"],
         "official-inbound-webhook.schema.json": ["official-inbound-webhook.synthetic.json"],
         "product-pilot-authorization.schema.json": ["product-pilot-authorization.synthetic.json"],
+        "product-catalog-intake.schema.json": ["product-catalog-intake.synthetic.json"],
         "publication-policy.schema.json": ["publication-policy.synthetic.json"],
         "product-ready.schema.json": [
             "product-ready.synthetic.json",
@@ -144,6 +145,10 @@ def check_schemas() -> None:
     assert_invalid(
         SCHEMA_DIR / "testing" / "product-acceptance-result.schema.json",
         FIXTURE_DIR / "product-acceptance-false-pass-invalid.json",
+    )
+    assert_invalid(
+        SCHEMA_DIR / "testing" / "product-catalog-intake.schema.json",
+        FIXTURE_DIR / "product-catalog-intake-fact-leak-invalid.json",
     )
     validate_each(
         SCHEMA_DIR / "workflow" / "workflow-event.schema.json",
@@ -259,6 +264,36 @@ def check_product_pilot_authorization() -> None:
             raise AssertionError(f"Product pilot authorization has an invalid {cohort} cohort matrix")
     if manifest["manifest_status"] == "authorized" and any(item["authorization_status"] != "authorized" for item in slots):
         raise AssertionError("Authorized product pilot manifest requires all slots to be authorized")
+
+
+def check_product_catalog_intake() -> None:
+    manifest = load_json(FIXTURE_DIR / "product-catalog-intake.synthetic.json")
+    documents = {item["document_ref"]: item for item in manifest["source_documents"]}
+    slots = manifest["slots"]
+    expected_slot_ids = {f"pilot-slot-{index:02d}" for index in range(1, 21)}
+    if {item["slot_id"] for item in slots} != expected_slot_ids or len(slots) != 20:
+        raise AssertionError("Product catalog intake must cover each of 20 slots exactly once")
+    matrix = {
+        "A": ("complete", "real_product_image"),
+        "B": ("complete", "none"),
+        "C": ("incomplete", "real_product_image"),
+        "D": ("incomplete", "none"),
+    }
+    for cohort, expected in matrix.items():
+        matching = [item for item in slots if item["cohort"] == cohort]
+        if len(matching) != 5 or any((item["data_completeness"], item["image_availability"]) != expected for item in matching):
+            raise AssertionError(f"Product catalog intake has an invalid {cohort} cohort matrix")
+    for slot in slots:
+        document = documents.get(slot["source_document_ref"])
+        if document is None:
+            raise AssertionError(f"Catalog intake slot references an unknown document: {slot['slot_id']}")
+        if slot["intake_status"] == "ready_for_preflight":
+            if document["use_authorization"] != "approved":
+                raise AssertionError("Ready catalog intake must use an authorized source document")
+            if document["conversion_status"] != "approved_for_extraction":
+                raise AssertionError("Ready catalog intake must use an approved conversion")
+            if slot["blocker_codes"]:
+                raise AssertionError("Ready catalog intake cannot retain blockers")
 
 
 def check_database_baseline() -> None:
@@ -560,6 +595,7 @@ def main() -> int:
         ("product acceptance", check_product_acceptance_config),
         ("MVP acceptance summary", check_mvp_acceptance_summary),
         ("product pilot authorization", check_product_pilot_authorization),
+        ("product catalog intake", check_product_catalog_intake),
         ("database baseline", check_database_baseline),
         ("service adapters", check_service_adapters),
         ("Next.js security release readiness", check_next_security_release_readiness),

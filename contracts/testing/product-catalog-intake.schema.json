@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/product-catalog-intake.schema.json",
+  "title": "ProductCatalogIntakeManifest",
+  "description": "A sanitized intake manifest. It deliberately contains no product engineering facts or source file paths.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["classification", "manifest_status", "authorization_ref", "source_documents", "slots"],
+  "properties": {
+    "classification": {"enum": ["synthetic", "sanitized_aggregate"]},
+    "manifest_status": {"enum": ["draft", "authorized"]},
+    "authorization_ref": {"type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"},
+    "source_documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["document_ref", "media_type", "use_authorization", "conversion_status", "contains_real_product_images"],
+        "properties": {
+          "document_ref": {"type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"},
+          "media_type": {"enum": ["pdf", "docx", "xlsx", "csv", "other"]},
+          "use_authorization": {"enum": ["pending", "approved", "rejected"]},
+          "conversion_status": {"enum": ["not_run", "preflight_only", "approved_for_extraction"]},
+          "contains_real_product_images": {"type": "boolean"}
+        }
+      }
+    },
+    "slots": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slot_id", "cohort", "source_document_ref", "source_ref", "data_completeness", "image_availability", "intake_status", "blocker_codes"],
+        "properties": {
+          "slot_id": {"type": "string", "pattern": "^pilot-slot-(0[1-9]|1[0-9]|20)$"},
+          "cohort": {"enum": ["A", "B", "C", "D"]},
+          "source_document_ref": {"type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"},
+          "source_ref": {"type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"},
+          "data_completeness": {"enum": ["complete", "incomplete"]},
+          "image_availability": {"enum": ["real_product_image", "none"]},
+          "intake_status": {"enum": ["planned", "ready_for_preflight", "blocked"]},
+          "blocker_codes": {
+            "type": "array",
+            "items": {"enum": ["authorization_pending", "authorization_rejected", "source_conversion_required", "source_field_review_required", "image_review_required"]},
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}
