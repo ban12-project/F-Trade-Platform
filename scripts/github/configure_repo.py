@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply repository settings and main-branch protection after the first push."""
+"""Apply the M0 free-tier GitHub repository settings after the first push."""
 
 from __future__ import annotations
 
@@ -42,26 +42,7 @@ def main() -> int:
         "-F", "allow_rebase_merge=false", "-F", "allow_auto_merge=false",
         "-F", "delete_branch_on_merge=true",
     ])
-    protection = {
-        "required_status_checks": {"strict": True, "contexts": ["repository-validate"]},
-        "enforce_admins": True,
-        "required_pull_request_reviews": {
-            "dismiss_stale_reviews": False,
-            "require_code_owner_reviews": False,
-            "required_approving_review_count": 0,
-            "require_last_push_approval": False,
-        },
-        "restrictions": None,
-        "required_linear_history": True,
-        "allow_force_pushes": False,
-        "allow_deletions": False,
-        "block_creations": False,
-        "required_conversation_resolution": True,
-        "lock_branch": False,
-        "allow_fork_syncing": False,
-    }
-    gh(["api", "--method", "PUT", f"repos/{repo}/branches/main/protection", "--input", "-"], protection)
-    print(f"Repository settings and main protection configured for {repo}")
+    print(f"M0 free-tier repository settings configured for {repo}")
     return 0
 
 

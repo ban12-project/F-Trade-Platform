@@ -25,6 +25,11 @@ pr_template = (GITHUB / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
 for required in ("Closes #", "Gate 01", "Gate 02", "Gate 03", "真实客户"):
     assert required in pr_template, f"PR template is missing governance prompt: {required}"
 
+repo_configurer = (ROOT / "scripts" / "github" / "configure_repo.py").read_text(encoding="utf-8")
+assert "branches/main/protection" not in repo_configurer, "M0 configuration must not require paid branch protection"
+assert "allow_squash_merge=true" in repo_configurer, "M0 configuration must retain squash merge"
+assert "delete_branch_on_merge=true" in repo_configurer, "M0 configuration must retain branch cleanup"
+
 milestones = json.loads((GITHUB / "bootstrap" / "milestones.json").read_text(encoding="utf-8"))
 assert [item["title"] for item in milestones] == [f"M{index} {name}" for index, name in enumerate([
     "基线与治理", "产品数据闭环", "内容发布闭环", "询盘报价闭环", "跟单商机闭环", "集成 Demo 验收",

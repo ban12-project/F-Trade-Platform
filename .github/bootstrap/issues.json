@@ -3,7 +3,7 @@
     "title": "[EPIC] Repository baseline and governance",
     "milestone": "M0 基线与治理",
     "labels": ["type:epic", "area:platform", "priority:P0"],
-    "body": "## 目标\n建立私有研发仓库、数据分级、Issue/PR 流程和自动校验。\n\n## 验收\n- [ ] 文档、参考资料和安全规则已归档\n- [ ] Schema、fixture 和 CSV 模板通过 CI\n- [ ] 标签、Milestone、Issue Forms 和 PR 模板可用\n- [ ] main 具备 PR、CI 和线性历史约束"
+    "body": "## 目标\n建立私有研发仓库、数据分级、Issue/PR 流程和自动校验。\n\n## 验收\n- [ ] 文档、参考资料和安全规则已归档\n- [ ] Schema、fixture 和 CSV 模板通过 CI\n- [ ] 标签、Milestone、Issue Forms 和 PR 模板可用\n- [ ] 免费仓库设置（Issues、squash-only、自动删分支）及本地误推防护可验证\n\n## 范围外风险\n私有仓库的服务端分支保护需要付费套餐，不作为 M0 验收目标；详见 docs/decisions/github-branch-protection.md。"
   },
   {
     "title": "Archive source material and define data classification",
