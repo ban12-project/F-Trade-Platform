@@ -19,7 +19,7 @@ function ReviewShell() {
   return <main className="mx-auto min-h-svh w-full max-w-4xl p-6" aria-busy="true" />;
 }
 
-export default function ProductReviewPage({ params }: PageProps<"/console/products/[productId]">) {
+export default function ProductReviewPage({ params }: { params: Promise<{ productId: string }> }) {
   return (
     <Suspense fallback={<ReviewShell />}>
       {params.then(({ productId }) => <AuthorizedProductReview productId={productId} />)}
