@@ -20,7 +20,7 @@ M1 产品数据闭环
 
 | Milestone | 交付目标 | 当前状态 |
 |---|---|---|
-| M0 | 仓库、契约、校验、Issue/PR 流程 | 基线完成；私有仓库服务端分支保护受 #34 的套餐能力限制 |
+| M0 | 仓库、契约、校验、Issue/PR 流程 | 免费方案范围内的基线已完成；服务端分支保护明确不作为 M0 验收目标，残余风险见 GitHub 治理范围决策 |
 | M1 | 产品导入、缺失识别、真实性门禁 | 契约与 Gate 01 已实现；真实 SKU 验收待工厂授权资料 |
 | M2 | 三类内容、人工审核、单渠道发布适配 | 内容模板、人工审核 Gate 与合成发布链路已实现；首个渠道待 #11 决策 |
 | M3 | 询盘澄清、RFQ Ready、人工报价交接 | 契约、完整性判断、澄清和人工报价 Gate 已实现 |
@@ -33,3 +33,4 @@ GitHub Issues 和 Milestones 是状态的事实来源；本页只保留阶段说
 真实演示的脱敏记录格式与人工决策条件见[MVP 验收与 Go/No-Go 记录模板](testing/mvp-acceptance-report.template.md)。
 Next.js 安全补丁发布后的受控升级步骤见[Next.js 安全补丁升级运行手册](testing/next-security-release-runbook.md)。
 真实 SKU 的脱敏授权记录格式与 A–D 分组条件见[真实 SKU 试点授权清单模板](testing/product-pilot-authorization.template.md)。
+M0 的免费治理验收口径及未消除的直接推送风险见[GitHub 治理范围决策](decisions/github-branch-protection.md)。
