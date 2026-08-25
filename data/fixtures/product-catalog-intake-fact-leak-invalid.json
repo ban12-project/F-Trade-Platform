@@ -1,0 +1,11 @@
+{
+  "classification": "synthetic",
+  "manifest_status": "draft",
+  "authorization_ref": "synthetic-authorization-001",
+  "source_documents": [
+    {"document_ref":"synthetic-catalog-001","media_type":"pdf","use_authorization":"pending","conversion_status":"not_run","contains_real_product_images":false}
+  ],
+  "slots": [
+    {"slot_id":"pilot-slot-01","cohort":"A","source_document_ref":"synthetic-catalog-001","source_ref":"synthetic-source-01","data_completeness":"complete","image_availability":"real_product_image","intake_status":"planned","blocker_codes":["authorization_pending"],"product_name":"must-not-enter-git"}
+  ]
+}
