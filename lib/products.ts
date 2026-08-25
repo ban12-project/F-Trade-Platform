@@ -1,16 +1,17 @@
 import { randomUUID } from "node:crypto";
 
-import { desc, eq, type InferInsertModel } from "drizzle-orm";
+import { and, desc, eq, inArray, sql, type InferInsertModel } from "drizzle-orm";
 
-import type { ProductDraft } from "@/lib/product/verification";
-import { reviewProductDraft } from "@/lib/product/verification";
+import type { ProductApproval, ProductDraft } from "@/lib/product/verification";
+import { approveProductDraft, rejectProductDraft, reviewProductDraft } from "@/lib/product/verification";
 import { getDatabase } from "@/lib/db/client";
-import { aggregateRecord, auditEvent, workflowEvent } from "@/lib/db/schema";
-import type { productCatalogFormSchema } from "@/lib/form-schemas";
+import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
+import type { productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
 import { assertTransition } from "@/lib/workflow/transitions";
 import type { z } from "zod";
 
 export type ProductCatalogInput = z.infer<typeof productCatalogFormSchema>;
+export type ProductReviewInput = z.infer<typeof productReviewFormSchema>;
 
 export type ProductCatalogEntry = {
   id: string;
@@ -21,6 +22,12 @@ export type ProductCatalogEntry = {
   productType: string;
   verificationStatus: string;
   blockingFields: string[];
+  approvalStatus: "pending" | "approved" | "rejected" | null;
+};
+
+export type ProductCatalogDetail = ProductCatalogEntry & {
+  draft: ProductDraft;
+  approvalId: string | null;
 };
 
 function optionalText(value: string) {
@@ -89,6 +96,7 @@ export async function createProductCatalogDraft(input: ProductCatalogInput, acto
   const draft = buildProductCatalogDraft(input, id);
   const now = new Date();
   const workflowEventId = randomUUID();
+  const approvalId = randomUUID();
   assertTransition({
     eventId: workflowEventId,
     entityType: "product",
@@ -120,6 +128,15 @@ export async function createProductCatalogDraft(input: ProductCatalogInput, acto
     evidenceRefs: draft.evidence_refs,
     occurredAt: now,
   };
+  const approvalValues: InferInsertModel<typeof approval> = {
+    id: approvalId,
+    aggregateId: id,
+    gate: "gate_01_truth",
+    status: "pending",
+    requestedByType: "human",
+    requestedById: actorId,
+    requestedAt: now,
+  };
   const auditValues: InferInsertModel<typeof auditEvent> = {
     id: randomUUID(),
     action: "product_draft_created",
@@ -136,14 +153,18 @@ export async function createProductCatalogDraft(input: ProductCatalogInput, acto
   };
   await database.transaction(async (tx) => {
     await tx.insert(aggregateRecord).values(aggregateValues);
+    await tx.insert(approval).values(approvalValues);
     await tx.insert(workflowEvent).values(workflowValues);
     await tx.insert(auditEvent).values(auditValues);
   });
 
-  return { id, draft };
+  return { id, draft, approvalId };
 }
 
-function catalogEntry(row: typeof aggregateRecord.$inferSelect): ProductCatalogEntry | null {
+function catalogEntry(
+  row: typeof aggregateRecord.$inferSelect,
+  approvalRow?: Pick<typeof approval.$inferSelect, "id" | "status">,
+): ProductCatalogEntry | null {
   const payload = row.payload as Partial<ProductDraft>;
   const product = payload.product;
   if (!product || typeof product.product_name !== "string" || typeof product.internal_sku !== "string") {
@@ -160,18 +181,231 @@ function catalogEntry(row: typeof aggregateRecord.$inferSelect): ProductCatalogE
     blockingFields: Array.isArray(payload.blocking_missing_fields)
       ? payload.blocking_missing_fields.filter((value): value is string => typeof value === "string")
       : [],
+    approvalStatus: approvalRow?.status ?? null,
   };
 }
 
 export async function listProductCatalogEntries(limit = 50) {
-  const rows = await getDatabase()
+  const database = getDatabase();
+  const rows = await database
     .select()
     .from(aggregateRecord)
     .where(eq(aggregateRecord.type, "product"))
     .orderBy(desc(aggregateRecord.createdAt))
     .limit(limit);
+  const approvalRows = rows.length === 0
+    ? []
+    : await database
+      .select({ id: approval.id, aggregateId: approval.aggregateId, status: approval.status })
+      .from(approval)
+      .where(and(eq(approval.gate, "gate_01_truth"), inArray(approval.aggregateId, rows.map((row) => row.id))))
+      .orderBy(desc(approval.requestedAt), desc(approval.createdAt));
+  const approvalsByAggregate = new Map<string, (typeof approvalRows)[number]>();
+  for (const approvalRow of approvalRows) {
+    if (!approvalsByAggregate.has(approvalRow.aggregateId)) {
+      approvalsByAggregate.set(approvalRow.aggregateId, approvalRow);
+    }
+  }
   return rows.flatMap((row) => {
-    const entry = catalogEntry(row);
+    const entry = catalogEntry(row, approvalsByAggregate.get(row.id));
     return entry ? [entry] : [];
+  });
+}
+
+export async function getProductCatalogDetail(productId: string): Promise<ProductCatalogDetail | null> {
+  const database = getDatabase();
+  const [row] = await database
+    .select()
+    .from(aggregateRecord)
+    .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
+    .limit(1);
+  if (!row) return null;
+  const [approvalRow] = await database
+    .select({ id: approval.id, status: approval.status })
+    .from(approval)
+    .where(and(eq(approval.aggregateId, productId), eq(approval.gate, "gate_01_truth")))
+    .orderBy(desc(approval.requestedAt), desc(approval.createdAt))
+    .limit(1);
+  const entry = catalogEntry(row, approvalRow);
+  if (!entry) return null;
+  return { ...entry, draft: row.payload as unknown as ProductDraft, approvalId: approvalRow?.id ?? null };
+}
+
+export async function decideProductCatalogReview(
+  input: ProductReviewInput,
+  actorId: string,
+) {
+  const now = new Date();
+  const eventId = randomUUID();
+  return getDatabase().transaction(async (tx) => {
+    const [aggregate] = await tx
+      .select({ id: aggregateRecord.id, state: aggregateRecord.state, version: aggregateRecord.version, payload: aggregateRecord.payload })
+      .from(aggregateRecord)
+      .where(and(eq(aggregateRecord.id, input.productId), eq(aggregateRecord.type, "product")))
+      .for("update");
+    if (!aggregate) throw new Error("产品草稿不存在。");
+    if (aggregate.state !== "PRODUCT_REVIEW_REQUIRED") throw new Error("该产品当前不处于待审核状态。");
+
+    const [pendingApproval] = await tx
+      .select()
+      .from(approval)
+      .where(and(
+        eq(approval.aggregateId, aggregate.id),
+        eq(approval.gate, "gate_01_truth"),
+        eq(approval.status, "pending"),
+      ))
+      .for("update");
+    if (!pendingApproval) throw new Error("未找到待处理的 Gate 01 审核请求。");
+
+    const productApproval: ProductApproval = {
+      approval_id: pendingApproval.id,
+      gate: "gate_01_truth",
+      entity_type: "product",
+      entity_id: aggregate.id,
+      status: input.decision,
+      decision: {
+        actor_type: "human",
+        decided_by: actorId,
+        decided_at: now.toISOString(),
+        evidence_ref: input.evidenceRef,
+        ...(input.notes ? { notes: input.notes } : {}),
+      },
+    };
+    const draft = aggregate.payload as unknown as ProductDraft;
+    const payload = input.decision === "approved"
+      ? approveProductDraft(draft, productApproval)
+      : rejectProductDraft(draft, productApproval);
+    const nextState = input.decision === "approved" ? "PRODUCT_READY" : "PRODUCT_REVISION_REQUIRED";
+    assertTransition({
+      eventId,
+      entityType: "product",
+      entityId: aggregate.id,
+      fromState: "PRODUCT_REVIEW_REQUIRED",
+      toState: nextState,
+      actorType: "human",
+      actorId,
+      occurredAt: now.toISOString(),
+      evidenceRefs: [input.evidenceRef],
+      gate: "gate_01_truth",
+      approvalRef: pendingApproval.id,
+    }, {
+      id: pendingApproval.id,
+      aggregateId: aggregate.id,
+      gate: "gate_01_truth",
+      status: input.decision,
+      decidedByType: "human",
+      decidedById: actorId,
+      evidenceRef: input.evidenceRef,
+    });
+
+    await tx.update(approval).set({
+      status: input.decision,
+      decidedByType: "human",
+      decidedById: actorId,
+      decidedAt: now,
+      evidenceRef: input.evidenceRef,
+      ...(input.notes ? { notes: input.notes } : {}),
+    }).where(eq(approval.id, pendingApproval.id));
+    const [updated] = await tx.update(aggregateRecord).set({
+      state: nextState,
+      payload: payload as unknown as Record<string, unknown>,
+      version: sql`${aggregateRecord.version} + 1`,
+    }).where(and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version)))
+      .returning({ id: aggregateRecord.id });
+    if (!updated) throw new Error("产品审核与另一项操作冲突，请刷新后重试。");
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: aggregate.id,
+      fromState: "PRODUCT_REVIEW_REQUIRED",
+      toState: nextState,
+      actorType: "human",
+      actorId,
+      gate: "gate_01_truth",
+      approvalId: pendingApproval.id,
+      evidenceRefs: [input.evidenceRef],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "product_gate_01_decided",
+      actorType: "human",
+      actorId,
+      aggregateId: aggregate.id,
+      subjectType: "product",
+      subjectId: aggregate.id,
+      metadata: { decision: input.decision, approval_id: pendingApproval.id },
+      occurredAt: now,
+    });
+    return { state: nextState, approvalId: pendingApproval.id };
+  });
+}
+
+export async function reviseProductCatalogDraft(
+  productId: string,
+  input: ProductCatalogInput,
+  actorId: string,
+) {
+  const now = new Date();
+  const eventId = randomUUID();
+  const approvalId = randomUUID();
+  return getDatabase().transaction(async (tx) => {
+    const [aggregate] = await tx
+      .select({ id: aggregateRecord.id, state: aggregateRecord.state, version: aggregateRecord.version })
+      .from(aggregateRecord)
+      .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
+      .for("update");
+    if (!aggregate) throw new Error("产品草稿不存在。");
+    if (aggregate.state !== "PRODUCT_REVISION_REQUIRED") throw new Error("该产品当前不处于待修订状态。");
+
+    const draft = buildProductCatalogDraft(input, productId);
+    assertTransition({
+      eventId,
+      entityType: "product",
+      entityId: productId,
+      fromState: "PRODUCT_REVISION_REQUIRED",
+      toState: "PRODUCT_REVIEW_REQUIRED",
+      actorType: "human",
+      actorId,
+      occurredAt: now.toISOString(),
+      evidenceRefs: draft.evidence_refs,
+    });
+    const [updated] = await tx.update(aggregateRecord).set({
+      state: "PRODUCT_REVIEW_REQUIRED",
+      payload: draft as unknown as Record<string, unknown>,
+      version: sql`${aggregateRecord.version} + 1`,
+    }).where(and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version)))
+      .returning({ id: aggregateRecord.id });
+    if (!updated) throw new Error("产品修订与另一项操作冲突，请刷新后重试。");
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: productId,
+      gate: "gate_01_truth",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: productId,
+      fromState: "PRODUCT_REVISION_REQUIRED",
+      toState: "PRODUCT_REVIEW_REQUIRED",
+      actorType: "human",
+      actorId,
+      evidenceRefs: draft.evidence_refs,
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "product_draft_revised",
+      actorType: "human",
+      actorId,
+      aggregateId: productId,
+      subjectType: "product",
+      subjectId: productId,
+      metadata: { approval_id: approvalId, blocking_field_count: draft.blocking_missing_fields.length },
+      occurredAt: now,
+    });
+    return { approvalId, draft };
   });
 }

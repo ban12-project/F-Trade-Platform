@@ -372,7 +372,10 @@ def check_database_baseline() -> None:
         '"use server"',
         "auth.api.getSession",
         "productCatalogFormSchema.safeParse",
+        "productReviewFormSchema.safeParse",
         "createProductCatalogDraft",
+        "decideProductCatalogReview",
+        "reviseProductCatalogDraft",
         'revalidatePath("/console/products")',
     ):
         if required not in product_actions:
@@ -381,6 +384,14 @@ def check_database_baseline() -> None:
     for required in ("useForm", "zodResolver", "createProductCatalogDraftAction", "FieldError"):
         if required not in product_panel:
             raise AssertionError(f"Product catalog form contract is missing: {required}")
+    product_review_panel = (ROOT / "app/console/products/[productId]/product-review-panel.tsx").read_text(encoding="utf-8")
+    for required in ("useForm", "zodResolver", "decideProductCatalogReviewAction", "evidenceRef"):
+        if required not in product_review_panel:
+            raise AssertionError(f"Product Gate 01 review form contract is missing: {required}")
+    product_revision_panel = (ROOT / "app/console/products/[productId]/revise/product-revision-panel.tsx").read_text(encoding="utf-8")
+    for required in ("useForm", "zodResolver", "reviseProductCatalogDraftAction", "productId"):
+        if required not in product_revision_panel:
+            raise AssertionError(f"Product Gate 01 revision form contract is missing: {required}")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:
