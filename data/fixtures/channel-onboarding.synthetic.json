@@ -1,0 +1,19 @@
+{
+  "classification": "synthetic",
+  "channel_ref": "synthetic-instagram-channel",
+  "account_ref": "synthetic-factory-test-account",
+  "platform": "instagram",
+  "account_type": "business",
+  "ownership_status": "verified",
+  "official_oauth_status": "tested",
+  "publishing_path": "postiz_official_api",
+  "inbound_path": "chatwoot_official_webhook",
+  "inbound_only": true,
+  "reply_window_status": "confirmed",
+  "reply_window_minutes": 1440,
+  "browser_automation_production": false,
+  "external_effects_require_human_approval": true,
+  "credentials_managed_externally": true,
+  "production_readiness": "test_ready",
+  "evidence_refs": ["synthetic-account-eligibility-001", "synthetic-oauth-test-001"]
+}
