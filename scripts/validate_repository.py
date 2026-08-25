@@ -343,10 +343,14 @@ def check_database_baseline() -> None:
     for required in (
         "auth.api.getSession",
         'session.user.role !== "admin"',
-        'matcher: ["/admin/:path*"]',
+        'matcher: ["/console/:path*"]',
     ):
         if required not in proxy_source:
             raise AssertionError(f"Admin proxy protection is missing: {required}")
+    next_config = (ROOT / "next.config.ts").read_text(encoding="utf-8")
+    for required in ('source: "/admin/:path*"', 'destination: "/console/:path*"', "permanent: true"):
+        if required not in next_config:
+            raise AssertionError(f"Console route migration is missing: {required}")
     invitation_actions = (ROOT / "lib/actions/invitations.ts").read_text(encoding="utf-8")
     for required in (
         '"use server"',
@@ -357,7 +361,7 @@ def check_database_baseline() -> None:
     ):
         if required not in invitation_actions:
             raise AssertionError(f"Invitation Server Action contract is missing: {required}")
-    invitation_panel = (ROOT / "app/admin/invitations/panel.tsx").read_text(encoding="utf-8")
+    invitation_panel = (ROOT / "app/console/invitations/panel.tsx").read_text(encoding="utf-8")
     for required in ("useForm", "zodResolver", "createInvitationAction", "FieldError"):
         if required not in invitation_panel:
             raise AssertionError(f"Invitation form contract is missing: {required}")
