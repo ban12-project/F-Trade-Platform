@@ -339,6 +339,14 @@ def check_database_baseline() -> None:
     ):
         if required not in auth_source:
             raise AssertionError(f"Passwordless Better Auth configuration is missing: {required}")
+    proxy_source = (ROOT / "proxy.ts").read_text(encoding="utf-8")
+    for required in (
+        "auth.api.getSession",
+        'session.user.role !== "admin"',
+        'matcher: ["/admin/:path*"]',
+    ):
+        if required not in proxy_source:
+            raise AssertionError(f"Admin proxy protection is missing: {required}")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:
