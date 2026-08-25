@@ -367,6 +367,20 @@ def check_database_baseline() -> None:
             raise AssertionError(f"Invitation form contract is missing: {required}")
     if 'fetch("/api/invitations"' in invitation_panel:
         raise AssertionError("Invitation UI must use a Server Action instead of an internal API route")
+    product_actions = (ROOT / "lib/actions/products.ts").read_text(encoding="utf-8")
+    for required in (
+        '"use server"',
+        "auth.api.getSession",
+        "productCatalogFormSchema.safeParse",
+        "createProductCatalogDraft",
+        'revalidatePath("/console/products")',
+    ):
+        if required not in product_actions:
+            raise AssertionError(f"Product catalog Server Action contract is missing: {required}")
+    product_panel = (ROOT / "app/console/products/product-catalog-panel.tsx").read_text(encoding="utf-8")
+    for required in ("useForm", "zodResolver", "createProductCatalogDraftAction", "FieldError"):
+        if required not in product_panel:
+            raise AssertionError(f"Product catalog form contract is missing: {required}")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:
@@ -485,6 +499,12 @@ def check_product_catalog_preflight() -> None:
     )
     if result.returncode:
         raise AssertionError(f"Product catalog preflight tests failed: {result.stderr or result.stdout}")
+
+
+def check_product_catalog_entry() -> None:
+    result = subprocess.run(["pnpm", "test:product-catalog-entry"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Product catalog entry tests failed: {result.stderr or result.stdout}")
 
 
 def check_local_ocr() -> None:
@@ -670,6 +690,7 @@ def main() -> int:
         ("workflow orchestrator", check_workflow_orchestrator),
         ("synthetic end-to-end demo", check_synthetic_demo),
         ("product catalog preflight", check_product_catalog_preflight),
+        ("product catalog entry", check_product_catalog_entry),
         ("local OCR guards", check_local_ocr),
         ("social inbound policy", check_social_inbound_policy),
         ("inbound delivery receipts", check_inbound_delivery_receipts),
