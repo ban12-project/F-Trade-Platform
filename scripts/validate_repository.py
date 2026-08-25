@@ -586,6 +586,14 @@ def check_repository_hygiene() -> None:
     ]
     if browser_state:
         raise AssertionError(f"Browser session artifacts must not be tracked: {browser_state}")
+    allowed_reference_pdfs = {"docs/reference/目录总表.pdf"}
+    tracked_pdfs = {path for path in tracked if Path(path).suffix.lower() == ".pdf"}
+    unexpected_pdfs = sorted(tracked_pdfs - allowed_reference_pdfs)
+    if unexpected_pdfs:
+        raise AssertionError(
+            "Raw or unapproved catalog PDFs must not be tracked; use controlled local storage or Private Blob: "
+            f"{unexpected_pdfs}"
+        )
     pdf = ROOT / "docs/reference/目录总表.pdf"
     if not pdf.exists() or pdf.stat().st_size < 1000:
         raise AssertionError("Reference PDF is missing or unexpectedly small")
