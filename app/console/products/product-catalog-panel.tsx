@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileCheck2Icon, PlusIcon, ShieldCheckIcon } from "lucide-react";
+import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -30,6 +31,15 @@ type ProductCatalogFormValues = z.infer<typeof productCatalogFormSchema>;
 
 function ProductTypeLabel({ value }: { value: string }) {
   return productTypes.find((type) => type.value === value)?.label ?? value;
+}
+
+function ProductStateLabel({ value }: { value: string }) {
+  const labels: Record<string, string> = {
+    PRODUCT_REVIEW_REQUIRED: "待 Gate 01 审核",
+    PRODUCT_REVISION_REQUIRED: "待修订",
+    PRODUCT_READY: "已通过 Gate 01",
+  };
+  return <Badge variant="secondary">{labels[value] ?? value}</Badge>;
 }
 
 export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[] }) {
@@ -222,15 +232,22 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
             </Empty>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>内部编号</TableHead><TableHead>产品名称</TableHead><TableHead>类型</TableHead><TableHead>状态</TableHead><TableHead>阻塞项</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>内部编号</TableHead><TableHead>产品名称</TableHead><TableHead>类型</TableHead><TableHead>状态</TableHead><TableHead>阻塞项</TableHead><TableHead>操作</TableHead></TableRow></TableHeader>
               <TableBody>
                 {entries.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell className="font-medium">{entry.internalSku}</TableCell>
                     <TableCell>{entry.productName}</TableCell>
                     <TableCell><ProductTypeLabel value={entry.productType} /></TableCell>
-                    <TableCell><Badge variant="secondary">待复核</Badge></TableCell>
+                    <TableCell><ProductStateLabel value={entry.state} /></TableCell>
                     <TableCell>{entry.blockingFields.length === 0 ? "字段待 Gate 01 核验" : `${entry.blockingFields.length} 项待补齐/核验`}</TableCell>
+                    <TableCell>
+                      {entry.state === "PRODUCT_REVIEW_REQUIRED" && entry.approvalStatus === "pending" ? (
+                        <Button size="sm" variant="outline" render={<Link href={`/console/products/${entry.id}`} />}>审核</Button>
+                      ) : entry.state === "PRODUCT_REVISION_REQUIRED" ? (
+                        <Button size="sm" variant="outline" render={<Link href={`/console/products/${entry.id}/revise`} />}>修订</Button>
+                      ) : "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

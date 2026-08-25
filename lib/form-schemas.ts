@@ -37,3 +37,10 @@ export const productCatalogFormSchema = z.object({
   sourceRef: privateReference,
   evidenceRef: privateReference,
 });
+
+export const productReviewFormSchema = z.object({
+  productId: z.uuid("产品记录标识无效。"),
+  decision: z.enum(["approved", "rejected"]),
+  evidenceRef: privateReference,
+  notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
+});
