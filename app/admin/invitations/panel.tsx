@@ -1,31 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useTransition } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { createInvitationAction, initialInvitationActionState } from "@/lib/actions/invitations";
+import { invitationFormSchema } from "@/lib/form-schemas";
 
 export function InvitationPanel() {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [state, formAction, pending] = useActionState(createInvitationAction, initialInvitationActionState);
+  const [, startTransition] = useTransition();
+  const form = useForm<z.infer<typeof invitationFormSchema>>({
+    resolver: zodResolver(invitationFormSchema),
+    defaultValues: { email: "" },
+  });
 
-  async function createInvitation() {
-    setBusy(true);
-    try {
-      const response = await fetch("/api/invitations", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const result = (await response.json()) as { error?: string };
-      setMessage(result.error ?? "邀请已发送。链接在 7 天后过期。");
-    } catch {
-      setMessage("请求未完成，请检查网络后重试。");
-    } finally {
-      setBusy(false);
-    }
+  useEffect(() => {
+    if (state.status === "success") form.reset();
+  }, [form, state.status]);
+
+  function onSubmit(values: z.infer<typeof invitationFormSchema>) {
+    const formData = new FormData();
+    formData.set("email", values.email);
+    startTransition(() => formAction(formData));
   }
 
   return (
@@ -34,14 +35,17 @@ export function InvitationPanel() {
         <h1>邀请用户</h1>
         <p>仅管理员可发放单次、限时邀请。受邀人验证邮箱后账户才会激活。</p>
       </div>
-      <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor="invite-email">受邀邮箱</FieldLabel>
-          <Input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-        </Field>
-        <Button disabled={busy || !email} onClick={createInvitation}>发送邀请</Button>
-      </FieldGroup>
-      <p aria-live="polite">{message}</p>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FieldGroup>
+          <Field data-invalid={!!form.formState.errors.email}>
+            <FieldLabel htmlFor="invite-email">受邀邮箱</FieldLabel>
+            <Input id="invite-email" type="email" aria-invalid={!!form.formState.errors.email} {...form.register("email")} />
+            <FieldError errors={[form.formState.errors.email]} />
+          </Field>
+          <Button type="submit" disabled={pending}>发送邀请</Button>
+        </FieldGroup>
+      </form>
+      <p aria-live="polite">{state.message}</p>
     </main>
   );
 }
