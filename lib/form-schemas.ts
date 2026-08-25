@@ -44,3 +44,25 @@ export const productReviewFormSchema = z.object({
   evidenceRef: privateReference,
   notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
 });
+
+const contentText = z.string().trim().min(1, "此字段不能为空。").max(4_000, "此字段不能超过 4000 个字符。");
+
+export const contentDraftFormSchema = z.object({
+  productId: z.uuid("产品记录标识无效。"),
+  contentType: z.enum(["product", "factory_capability", "industry_knowledge"]),
+  factPath: z.string().trim().regex(/^(?:product|specifications|commercial)\.[a-z_]+$/, "请选择已核验的产品字段。"),
+  objective: contentText,
+  targetCustomer: z.string().trim().min(1, "请填写目标客户。").max(240, "目标客户不能超过 240 个字符。"),
+  hook: z.string().trim().min(1, "请填写开场句。").max(500, "开场句不能超过 500 个字符。"),
+  body: contentText,
+  callToAction: z.string().trim().min(1, "请填写行动号召。").max(500, "行动号召不能超过 500 个字符。"),
+  hashtags: z.string().trim().max(500, "标签不能超过 500 个字符。"),
+  visualInstruction: contentText,
+});
+
+export const contentReviewFormSchema = z.object({
+  contentId: z.uuid("内容记录标识无效。"),
+  decision: z.enum(["approved", "rejected"]),
+  evidenceRef: privateReference,
+  notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
+});

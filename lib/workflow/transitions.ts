@@ -47,7 +47,7 @@ const rules: readonly TransitionRule[] = [
   { entityType: "product", fromState: "PRODUCT_REVIEW_REQUIRED", toState: "PRODUCT_READY", actors: ["human"], gate: "gate_01_truth", approvalStatus: "approved" },
   { entityType: "product", fromState: "PRODUCT_REVIEW_REQUIRED", toState: "PRODUCT_REVISION_REQUIRED", actors: ["human"], gate: "gate_01_truth", approvalStatus: "rejected" },
   { entityType: "product", fromState: "PRODUCT_REVISION_REQUIRED", toState: "PRODUCT_REVIEW_REQUIRED", actors: ["agent", "human", "system"] },
-  { entityType: "content", fromState: "CONTENT_GENERATING", toState: "CONTENT_REVIEW_REQUIRED", actors: ["agent"] },
+  { entityType: "content", fromState: "CONTENT_GENERATING", toState: "CONTENT_REVIEW_REQUIRED", actors: ["agent", "human"] },
   { entityType: "content", fromState: "CONTENT_REVIEW_REQUIRED", toState: "CONTENT_APPROVED", actors: ["human"], gate: "gate_01_truth", approvalStatus: "approved" },
   { entityType: "content", fromState: "CONTENT_REVIEW_REQUIRED", toState: "CONTENT_REVISION_REQUIRED", actors: ["human"], gate: "gate_01_truth", approvalStatus: "rejected" },
   { entityType: "content", fromState: "CONTENT_REVISION_REQUIRED", toState: "CONTENT_REVIEW_REQUIRED", actors: ["agent", "human"] },

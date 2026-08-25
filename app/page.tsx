@@ -7,6 +7,7 @@ export default function HomePage() {
       <p>离合器外贸工作流 MVP。</p>
       <Link href="/auth">登录或注册</Link>
       <Link href="/console/products">产品目录</Link>
+      <Link href="/console/content">内容工作台</Link>
       <Link href="/testing">查看测试页面</Link>
     </main>
   );
