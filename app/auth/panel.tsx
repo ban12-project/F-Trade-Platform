@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -14,6 +14,12 @@ export function AuthPanel() {
   const [otp, setOtp] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [invitationProvisioned, setInvitationProvisioned] = useState(false);
+
+  useEffect(() => {
+    setInviteToken(new URLSearchParams(window.location.search).get("invite"));
+  }, []);
 
   async function run(action: () => Promise<{ error?: { message?: string } | null }>, success: string) {
     setBusy(true);
@@ -28,9 +34,31 @@ export function AuthPanel() {
   }
 
   async function sendOtp() {
+    if (inviteToken && !invitationProvisioned) {
+      setBusy(true);
+      try {
+        const response = await fetch("/api/invitations/activate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, token: inviteToken }),
+        });
+        const result = (await response.json()) as { error?: string };
+        if (result.error) {
+          setMessage(result.error);
+          return;
+        }
+        setInvitationProvisioned(true);
+        window.history.replaceState({}, "", "/auth");
+      } catch {
+        setMessage("邀请激活失败，请重试。");
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
     await run(
       () => authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" }),
-      "验证码已发送。首次验证会创建账号。",
+      "验证码已发送。验证后即可激活账户。",
     );
   }
 
@@ -51,8 +79,8 @@ export function AuthPanel() {
 
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-md flex-col justify-center gap-6 p-6">
-      <h1>登录或注册</h1>
-      <p>使用邮箱验证码或 Passkey，不使用密码。</p>
+      <h1>登录</h1>
+      <p>仅受邀用户可使用邮箱验证码或 Passkey 登录，不使用密码。</p>
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="email">邮箱</FieldLabel>
@@ -74,7 +102,7 @@ export function AuthPanel() {
           />
         </Field>
         <Button disabled={busy || !email || !otp} onClick={verifyOtp}>
-          验证并登录/注册
+          验证并登录
         </Button>
       </FieldGroup>
       <Separator />

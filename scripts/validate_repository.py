@@ -331,10 +331,11 @@ def check_database_baseline() -> None:
     for required in (
         'emailAndPassword: { enabled: false }',
         "emailOTP({",
-        "disableSignUp: false",
+        "disableSignUp: true",
         "sendVerificationOTP: sendEmailOtp",
         "passkey({",
         "rpID: process.env.BETTER_AUTH_PASSKEY_RP_ID",
+        "invitationActivationPlugin()",
     ):
         if required not in auth_source:
             raise AssertionError(f"Passwordless Better Auth configuration is missing: {required}")

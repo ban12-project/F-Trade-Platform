@@ -17,3 +17,14 @@ export async function sendEmailOtp(input: { email: string; otp: string; type: st
   });
   if (error) throw new Error(`Resend OTP delivery failed: ${error.message}`);
 }
+
+export async function sendInvitationEmail(input: { email: string; inviteUrl: string; expiresAt: Date }) {
+  const resend = new Resend(required("RESEND_API_KEY"));
+  const { error } = await resend.emails.send({
+    from: required("AUTH_EMAIL_FROM"),
+    to: [input.email],
+    subject: "You are invited to F-Trade Platform",
+    text: `Use this invitation link to activate your account: ${input.inviteUrl}\n\nIt expires at ${input.expiresAt.toISOString()}. After activation, we will send a sign-in code to this email address.`,
+  });
+  if (error) throw new Error(`Resend invitation delivery failed: ${error.message}`);
+}
