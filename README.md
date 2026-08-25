@@ -88,6 +88,12 @@ pnpm db:migrate
 `db:migrate` 会连接并修改目标数据库，执行前必须核对环境和连接 URL；前两个
 命令只生成或检查迁移结构。
 
+### 产品目录录入
+
+管理员可在 `/console/products` 将工厂资料按“产品编号、OE、适配与规格”的目录结构创建为
+`PRODUCT_REVIEW_REQUIRED` 草稿。每条已填写的字段必须带脱敏的私有证据引用；录入不会使
+产品成为 `ProductReady`，也不会生成正式报价或交期。真实目录、产品图片与本机路径都不能提交到 Git。
+
 ### 托管服务适配层
 
 - Workflow SDK 使用稳定版 4.x，Human Gate 只传递 approval/aggregate 标识和人工决策；业务状态仍写入 PostgreSQL。

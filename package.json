@@ -17,6 +17,7 @@
     "product-agent": "tsx scripts/run-product-agent.ts",
     "product-agent:catalog": "tsx scripts/run-product-agent-catalog.ts",
     "test:catalog-preflight": "tsx scripts/test-product-catalog-preflight.ts",
+    "test:product-catalog-entry": "tsx scripts/test-product-catalog-entry.ts",
     "validate:mvp-acceptance": "tsx scripts/validate-mvp-acceptance-summary.ts",
     "test:mvp-acceptance": "tsx scripts/test-mvp-acceptance-summary.ts",
     "test:local-ocr": "python3 scripts/test-local-ocr-preprocess.py",
