@@ -15,6 +15,13 @@
       "when": 1787590042985,
       "tag": "0001_fair_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787625667003,
+      "tag": "0002_early_starjammers",
+      "breakpoints": true
     }
   ]
 }

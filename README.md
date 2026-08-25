@@ -73,8 +73,9 @@ Playwright 会构建并启动受控测试服务器。测试构建会启用 Next.
 ### 数据库与内部认证
 
 复制 `.env.example` 中的变量到本地未跟踪的 `.env.local`，并使用 Neon
-提供的 PostgreSQL 连接 URL。公开注册在 Better Auth 配置中关闭；首个管理员
-通过受控运维流程创建，后续账号只允许管理员配置。
+提供的 PostgreSQL 连接 URL。认证统一使用 Better Auth 的邮箱 OTP 与 Passkey，
+不启用密码登录。邮箱 OTP 首次验证会创建账号；部署前必须配置 `RESEND_API_KEY`、
+已验证的 `AUTH_EMAIL_FROM` 和适用于域名的 `BETTER_AUTH_PASSKEY_RP_ID`。
 
 ```bash
 pnpm db:generate

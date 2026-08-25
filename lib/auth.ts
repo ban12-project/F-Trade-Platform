@@ -1,9 +1,11 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { admin } from "better-auth/plugins";
+import { admin, emailOTP } from "better-auth/plugins";
+import { passkey } from "@better-auth/passkey";
 
 import { getDatabase } from "./db/client";
 import { authSchema } from "./db/schema";
+import { sendEmailOtp } from "./auth-email";
 
 function requireAuthSecret() {
   const value = process.env.BETTER_AUTH_SECRET;
@@ -22,13 +24,22 @@ export function createAuth() {
       provider: "pg",
       schema: authSchema,
     }),
-    emailAndPassword: {
-      enabled: true,
-      disableSignUp: true,
-      minPasswordLength: 12,
-      revokeSessionsOnPasswordReset: true,
-    },
-    plugins: [admin()],
+    emailAndPassword: { enabled: false },
+    plugins: [
+      admin(),
+      emailOTP({
+        disableSignUp: false,
+        expiresIn: 600,
+        allowedAttempts: 5,
+        overrideDefaultEmailVerification: true,
+        sendVerificationOTP: sendEmailOtp,
+      }),
+      passkey({
+        rpID: process.env.BETTER_AUTH_PASSKEY_RP_ID,
+        rpName: "F-Trade Platform",
+        origin: process.env.BETTER_AUTH_URL,
+      }),
+    ],
   });
 }
 
