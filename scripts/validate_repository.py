@@ -328,10 +328,16 @@ def check_database_baseline() -> None:
     if "drizzle-orm/neon-http" in database_client:
         raise AssertionError("Database client must not use the transactionless neon-http driver")
     auth_source = (ROOT / "lib/auth.ts").read_text(encoding="utf-8")
-    if "disableSignUp: true" not in auth_source:
-        raise AssertionError("Public Better Auth sign-up must remain disabled")
-    if "minPasswordLength: 12" not in auth_source:
-        raise AssertionError("Internal passwords must require at least 12 characters")
+    for required in (
+        'emailAndPassword: { enabled: false }',
+        "emailOTP({",
+        "disableSignUp: false",
+        "sendVerificationOTP: sendEmailOtp",
+        "passkey({",
+        "rpID: process.env.BETTER_AUTH_PASSKEY_RP_ID",
+    ):
+        if required not in auth_source:
+            raise AssertionError(f"Passwordless Better Auth configuration is missing: {required}")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:
@@ -339,7 +345,7 @@ def check_database_baseline() -> None:
     migration = "\n".join(path.read_text(encoding="utf-8") for path in migrations)
     required_tables = {
         "user", "session", "account", "verification", "invitation",
-        "aggregate_record", "approval", "evidence", "workflow_event", "audit_event",
+        "aggregate_record", "approval", "evidence", "workflow_event", "audit_event", "passkey",
     }
     missing_tables = [
         table for table in sorted(required_tables)
