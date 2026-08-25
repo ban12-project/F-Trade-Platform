@@ -27,6 +27,14 @@
 - 必须启用 `reactCompiler: true` 与实验性的 `experimental.turbopackRustReactCompiler: true`。若升级或构建暴露 React Compiler 兼容性问题，须记录风险并在 PR 中提供可观察证据，不能静默关闭。
 - TypeScript 保持 7.x；Next.js 默认的项目本地 TypeScript CLI 校验必须保留，不能设 `experimental.useTypeScriptCli: false`。TypeScript 7 已移除 `baseUrl`，路径别名只使用 `compilerOptions.paths`。
 
+## 数据交互与表单约定
+
+- 由 UI 发起的数据交互优先使用 Server Action；Route Handler 只用于外部 webhook、第三方集成或无法通过 Action 表达的 HTTP 契约。
+- Server Action 统一置于 `lib/actions/*`。每个 Action 都必须在服务端重新进行身份认证、授权和输入校验；Proxy 和页面渲染保护都不是安全边界。
+- 数据库及领域写入逻辑置于 `lib/*`，Action 只负责请求边界、授权、校验和返回给 UI 的最小结果，不能把原始数据库记录返回给客户端。
+- Zod 是应用层输入校验的统一 schema 库。客户端与 Server Action 必须复用同一份 schema；客户端校验仅改善交互，Server Action 仍必须以 `safeParse`／`parse` 独立拒绝不可信输入。
+- 客户端表单统一使用 `react-hook-form`、Zod 与现有 shadcn/ui `Field` 组件显示校验状态。需要浏览器能力的 Better Auth Passkey／OTP 调用可保留在客户端，但其业务写入仍优先经 Server Action。
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

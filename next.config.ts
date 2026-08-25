@@ -4,6 +4,15 @@ import { withWorkflow } from "workflow/next";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   reactCompiler: true,
+  async redirects() {
+    return [
+      {
+        source: "/admin/:path*",
+        destination: "/console/:path*",
+        permanent: true,
+      },
+    ];
+  },
   experimental: {
     exposeTestingApiInProductionBuild:
       process.env.NEXT_ENABLE_TESTING_API === "1",

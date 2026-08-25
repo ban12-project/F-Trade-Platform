@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { start } from "workflow/api";
 
-import { getAuth } from "../../../../lib/auth";
+import { auth } from "../../../../lib/auth";
 import { getDatabase } from "../../../../lib/db/client";
 import { approval } from "../../../../lib/db/schema";
 import {
@@ -36,7 +36,7 @@ function parseInput(value: unknown): HumanGateWorkflowInput {
 }
 
 export async function POST(request: Request) {
-  const session = await getAuth().api.getSession({ headers: request.headers });
+  const session = await auth.api.getSession({ headers: request.headers });
   if (!session || session.user.role !== "admin") {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
