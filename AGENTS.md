@@ -19,6 +19,14 @@
 - 所有工作通过 Issue → 分支 → PR → CI → squash merge 完成。
 - 不提交密钥、真实客户数据、未经授权的原始资料或未标记的虚构产品事实。
 
+## UI 与 Next.js 约定
+
+- 新 UI 必须先采用 shadcn/ui 的组件与组合方式；仅在库中没有合适组件时才写自定义基础控件。
+- Tailwind CSS 与 shadcn/ui 必须按 shadcn 官方 Next.js CLI 流程初始化和添加组件：`pnpm dlx shadcn@latest init`、`pnpm dlx shadcn@latest add <component>`。添加前先检查已有组件，避免手写或重复复制组件源码。
+- Next.js 保持 `cacheComponents: true`，并使用默认 Turbopack 构建。新路由应按 Cache Components 模型设计，以静态壳、靠近动态数据的 `Suspense` 边界和即时导航为默认目标。
+- 必须启用 `reactCompiler: true` 与实验性的 `experimental.turbopackRustReactCompiler: true`。若升级或构建暴露 React Compiler 兼容性问题，须记录风险并在 PR 中提供可观察证据，不能静默关闭。
+- TypeScript 保持 7.x；Next.js 默认的项目本地 TypeScript CLI 校验必须保留，不能设 `experimental.useTypeScriptCli: false`。TypeScript 7 已移除 `baseUrl`，路径别名只使用 `compilerOptions.paths`。
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
