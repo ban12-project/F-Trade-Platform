@@ -1,5 +1,5 @@
+import { auth } from "@/lib/auth";
 import { issueInvitation } from "@/lib/invitations";
-import { getAuth } from "@/lib/auth";
 
 function parseEmail(value: unknown) {
   if (!value || typeof value !== "object" || typeof (value as Record<string, unknown>).email !== "string") {
@@ -9,7 +9,7 @@ function parseEmail(value: unknown) {
 }
 
 export async function POST(request: Request) {
-  const session = await getAuth().api.getSession({ headers: request.headers });
+  const session = await auth.api.getSession({ headers: request.headers });
   if (!session || session.user.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
 
   try {

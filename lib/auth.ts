@@ -37,8 +37,7 @@ function requireAuthSecret() {
   return value;
 }
 
-export function createAuth() {
-  return betterAuth({
+export const auth = betterAuth({
     appName: "F-Trade Platform",
     secret: requireAuthSecret(),
     baseURL: process.env.BETTER_AUTH_URL,
@@ -63,14 +62,4 @@ export function createAuth() {
         origin: process.env.BETTER_AUTH_URL,
       }),
     ],
-  });
-}
-
-export type Auth = ReturnType<typeof createAuth>;
-
-let auth: Auth | undefined;
-
-export function getAuth(): Auth {
-  auth ??= createAuth();
-  return auth;
-}
+});
