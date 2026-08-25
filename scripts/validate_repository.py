@@ -392,6 +392,22 @@ def check_database_baseline() -> None:
     for required in ("useForm", "zodResolver", "reviseProductCatalogDraftAction", "productId"):
         if required not in product_revision_panel:
             raise AssertionError(f"Product Gate 01 revision form contract is missing: {required}")
+    content_actions = (ROOT / "lib/actions/content.ts").read_text(encoding="utf-8")
+    for required in ("contentDraftFormSchema.safeParse", "contentReviewFormSchema.safeParse", "createContentDraft", "decideContentReview", "reviseContentDraft"):
+        if required not in content_actions:
+            raise AssertionError(f"Content Server Action contract is missing: {required}")
+    content_panel = (ROOT / "app/console/content/content-catalog-panel.tsx").read_text(encoding="utf-8")
+    for required in ("useForm", "zodResolver", "createContentDraftAction", "factPath"):
+        if required not in content_panel:
+            raise AssertionError(f"Content draft form contract is missing: {required}")
+    content_review_panel = (ROOT / "app/console/content/[contentId]/content-review-panel.tsx").read_text(encoding="utf-8")
+    for required in ("useForm", "zodResolver", "decideContentReviewAction", "evidenceRef"):
+        if required not in content_review_panel:
+            raise AssertionError(f"Content Gate 01 review form contract is missing: {required}")
+    content_revision_panel = (ROOT / "app/console/content/[contentId]/revise/content-revision-panel.tsx").read_text(encoding="utf-8")
+    for required in ("useForm", "zodResolver", "reviseContentDraftAction", "contentId"):
+        if required not in content_revision_panel:
+            raise AssertionError(f"Content Gate 01 revision form contract is missing: {required}")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:
@@ -516,6 +532,12 @@ def check_product_catalog_entry() -> None:
     result = subprocess.run(["pnpm", "test:product-catalog-entry"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
         raise AssertionError(f"Product catalog entry tests failed: {result.stderr or result.stdout}")
+
+
+def check_content_catalog_entry() -> None:
+    result = subprocess.run(["pnpm", "test:content-catalog-entry"], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"Content catalog entry tests failed: {result.stderr or result.stdout}")
 
 
 def check_local_ocr() -> None:
@@ -702,6 +724,7 @@ def main() -> int:
         ("synthetic end-to-end demo", check_synthetic_demo),
         ("product catalog preflight", check_product_catalog_preflight),
         ("product catalog entry", check_product_catalog_entry),
+        ("content catalog entry", check_content_catalog_entry),
         ("local OCR guards", check_local_ocr),
         ("social inbound policy", check_social_inbound_policy),
         ("inbound delivery receipts", check_inbound_delivery_receipts),

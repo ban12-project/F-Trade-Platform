@@ -1,0 +1,69 @@
+"use client";
+
+import { useActionState, useMemo, useTransition } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { FilePenLineIcon, ShieldCheckIcon } from "lucide-react";
+import Link from "next/link";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { createContentDraftAction, initialContentActionState } from "@/lib/actions/content";
+import { contentDraftFormSchema } from "@/lib/form-schemas";
+import type { ContentCatalogEntry, ReadyProductContentSource } from "@/lib/content/store";
+
+type ContentFormValues = z.infer<typeof contentDraftFormSchema>;
+
+const contentTypes = [
+  { value: "product", label: "产品型" },
+  { value: "factory_capability", label: "工厂能力型" },
+  { value: "industry_knowledge", label: "行业知识型" },
+] as const;
+
+function stateLabel(state: string) {
+  return ({ CONTENT_REVIEW_REQUIRED: "待 Gate 01 审核", CONTENT_REVISION_REQUIRED: "待修订", CONTENT_APPROVED: "已通过 Gate 01", CONTENT_PUBLISHED: "已发布" } as Record<string, string>)[state] ?? state;
+}
+
+export function ContentCatalogPanel({ entries, products }: { entries: ContentCatalogEntry[]; products: ReadyProductContentSource[] }) {
+  const [state, formAction, pending] = useActionState(createContentDraftAction, initialContentActionState);
+  const [, startTransition] = useTransition();
+  const form = useForm<ContentFormValues>({
+    resolver: zodResolver(contentDraftFormSchema),
+    defaultValues: { productId: "", contentType: "product", factPath: "", objective: "", targetCustomer: "", hook: "", body: "", callToAction: "", hashtags: "", visualInstruction: "" },
+  });
+  const productId = form.watch("productId");
+  const selectedProduct = useMemo(() => products.find((product) => product.id === productId), [products, productId]);
+
+  function onSubmit(values: ContentFormValues) {
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(values)) formData.set(key, value);
+    startTransition(() => formAction(formData));
+  }
+
+  return <main className="mx-auto flex min-h-svh w-full max-w-7xl flex-col gap-6 p-6">
+    <header className="flex flex-col gap-2"><div className="flex flex-wrap gap-2"><Badge variant="secondary">内容工作台</Badge><Badge variant="outline">渠道尚未启用</Badge></div><h1 className="text-2xl font-semibold tracking-tight">内容草稿与 Gate 01</h1><p className="max-w-3xl text-muted-foreground">只能引用已通过 Gate 01 的产品字段；发布仍等待 #11 的官方渠道决策，不能在此处发送内容。</p></header>
+    <Alert><ShieldCheckIcon /><AlertTitle>产品事实由服务端固定</AlertTitle><AlertDescription>提交时仅接收字段路径，产品值和证据引用会从已核验产品重新取得。视觉说明不能声称花键、尺寸、摩擦材料等工程结构。</AlertDescription></Alert>
+    {products.length === 0 ? <Empty><EmptyHeader><EmptyMedia variant="icon"><FilePenLineIcon /></EmptyMedia><EmptyTitle>暂无可用的 Product Ready</EmptyTitle><EmptyDescription>先在产品工作台完成 Gate 01；内容工作台不会以草稿或推测数据起草内容。</EmptyDescription></EmptyHeader><EmptyContent>这不是故障：当前环境尚未导入获授权的真实 SKU。</EmptyContent></Empty> : <Card><CardHeader><CardTitle>新建待审内容</CardTitle><CardDescription>渠道固定为“待渠道决策”，不会产生任何对外发布。</CardDescription></CardHeader><CardContent><form onSubmit={form.handleSubmit(onSubmit)}><FieldGroup>
+      <Field data-invalid={!!form.formState.errors.productId}><FieldLabel>已核验产品</FieldLabel><Controller control={form.control} name="productId" render={({ field }) => <Select value={field.value} onValueChange={(value) => { field.onChange(value); form.setValue("factPath", ""); }}><SelectTrigger className="w-full"><SelectValue placeholder="选择 Product Ready" /></SelectTrigger><SelectContent><SelectGroup>{products.map((product) => <SelectItem key={product.id} value={product.id}>{product.internalSku} · {product.productName}</SelectItem>)}</SelectGroup></SelectContent></Select>} /><FieldError errors={[form.formState.errors.productId]} /></Field>
+      <Field data-invalid={!!form.formState.errors.factPath}><FieldLabel>引用的已核验字段</FieldLabel><Controller control={form.control} name="factPath" render={({ field }) => <Select value={field.value} onValueChange={field.onChange} disabled={!selectedProduct}><SelectTrigger className="w-full"><SelectValue placeholder="先选择产品" /></SelectTrigger><SelectContent><SelectGroup>{selectedProduct?.factOptions.map((fact) => <SelectItem key={fact.path} value={fact.path}>{fact.label}：{fact.value}</SelectItem>)}</SelectGroup></SelectContent></Select>} /><FieldDescription>证据引用由服务端从该字段的 Gate 01 记录中取得。</FieldDescription><FieldError errors={[form.formState.errors.factPath]} /></Field>
+      <Field><FieldLabel>内容类型</FieldLabel><Controller control={form.control} name="contentType" render={({ field }) => <Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{contentTypes.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent></Select>} /></Field>
+      <FieldGroup className="grid gap-4 md:grid-cols-2"><Field data-invalid={!!form.formState.errors.objective}><FieldLabel htmlFor="objective">目标</FieldLabel><Input id="objective" {...form.register("objective")} /><FieldError errors={[form.formState.errors.objective]} /></Field><Field data-invalid={!!form.formState.errors.targetCustomer}><FieldLabel htmlFor="target-customer">目标客户</FieldLabel><Input id="target-customer" {...form.register("targetCustomer")} /><FieldError errors={[form.formState.errors.targetCustomer]} /></Field></FieldGroup>
+      <Field data-invalid={!!form.formState.errors.hook}><FieldLabel htmlFor="hook">开场句</FieldLabel><Input id="hook" {...form.register("hook")} /><FieldError errors={[form.formState.errors.hook]} /></Field>
+      <Field data-invalid={!!form.formState.errors.body}><FieldLabel htmlFor="body">正文</FieldLabel><Textarea id="body" rows={6} {...form.register("body")} /><FieldError errors={[form.formState.errors.body]} /></Field>
+      <FieldGroup className="grid gap-4 md:grid-cols-2"><Field data-invalid={!!form.formState.errors.callToAction}><FieldLabel htmlFor="cta">行动号召</FieldLabel><Input id="cta" {...form.register("callToAction")} /><FieldError errors={[form.formState.errors.callToAction]} /></Field><Field data-invalid={!!form.formState.errors.hashtags}><FieldLabel htmlFor="hashtags">标签</FieldLabel><Input id="hashtags" placeholder="#Clutch, #Aftermarket" {...form.register("hashtags")} /><FieldError errors={[form.formState.errors.hashtags]} /></Field></FieldGroup>
+      <Field data-invalid={!!form.formState.errors.visualInstruction}><FieldLabel htmlFor="visual-instruction">视觉说明</FieldLabel><Textarea id="visual-instruction" rows={3} {...form.register("visualInstruction")} /><FieldDescription>只能描述非工程化的示意视觉，不能把图像作为事实证明。</FieldDescription><FieldError errors={[form.formState.errors.visualInstruction]} /></Field>
+      <div className="flex justify-end"><Button type="submit" disabled={pending}>创建待审内容</Button></div>
+    </FieldGroup></form></CardContent><CardFooter>提交不会调用外部模型或发布渠道；每份内容仍须通过人工 Gate 01。</CardFooter></Card>}
+    <Card><CardHeader><CardTitle>最近内容</CardTitle><CardDescription>批准不等于发布；未选择官方渠道前，内容会保持批准状态。</CardDescription></CardHeader><CardContent>{entries.length === 0 ? <p className="text-sm text-muted-foreground">尚无内容草稿。</p> : <Table><TableHeader><TableRow><TableHead>产品</TableHead><TableHead>类型</TableHead><TableHead>开场句</TableHead><TableHead>状态</TableHead><TableHead>操作</TableHead></TableRow></TableHeader><TableBody>{entries.map((entry) => <TableRow key={entry.id}><TableCell>{entry.productName}</TableCell><TableCell>{contentTypes.find((item) => item.value === entry.contentType)?.label ?? entry.contentType}</TableCell><TableCell className="max-w-md truncate">{entry.hook}</TableCell><TableCell><Badge variant="secondary">{stateLabel(entry.state)}</Badge></TableCell><TableCell>{entry.state === "CONTENT_REVIEW_REQUIRED" && entry.approvalStatus === "pending" ? <Button size="sm" variant="outline" render={<Link href={`/console/content/${entry.id}`} />}>审核</Button> : entry.state === "CONTENT_REVISION_REQUIRED" ? <Button size="sm" variant="outline" render={<Link href={`/console/content/${entry.id}/revise`} />}>修订</Button> : "—"}</TableCell></TableRow>)}</TableBody></Table>}</CardContent></Card>
+    {state.status !== "idle" && <Alert variant={state.status === "error" ? "destructive" : "default"}><AlertTitle>{state.status === "success" ? "已保存" : "未能保存"}</AlertTitle><AlertDescription>{state.message}</AlertDescription></Alert>}
+  </main>;
+}
