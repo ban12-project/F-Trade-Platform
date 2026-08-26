@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { listContentCatalogEntries, listReadyProductContentSources } from "@/lib/content/store";
+import { ConsoleLoading } from "@/components/console-loading";
 
 import { ContentCatalogPanel } from "./content-catalog-panel";
 
@@ -15,7 +16,7 @@ async function AuthorizedContentCatalog() {
 }
 
 function ContentShell() {
-  return <main className="mx-auto min-h-svh w-full max-w-7xl p-6" aria-busy="true" />;
+  return <ConsoleLoading />;
 }
 
 export default function ContentPage() {

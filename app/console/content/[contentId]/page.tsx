@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { getContentCatalogDetail } from "@/lib/content/store";
+import { ConsoleLoading } from "@/components/console-loading";
 
 import { ContentReviewPanel } from "./content-review-panel";
 
@@ -16,7 +17,7 @@ async function AuthorizedContentReview({ contentId }: { contentId: string }) {
 }
 
 function ReviewShell() {
-  return <main className="mx-auto min-h-svh w-full max-w-4xl p-6" aria-busy="true" />;
+  return <ConsoleLoading />;
 }
 
 export default function ContentReviewPage({ params }: { params: Promise<{ contentId: string }> }) {

@@ -3,18 +3,18 @@
 import { useActionState, useEffect, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileCheck2Icon, PlusIcon, ShieldCheckIcon } from "lucide-react";
-import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { createProductCatalogDraftAction, initialProductActionState } from "@/lib/actions/products";
 import { productCatalogFormSchema } from "@/lib/form-schemas";
@@ -75,13 +75,13 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
   }
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-7xl flex-col gap-6 p-6">
+    <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-6 p-4 md:p-6 lg:p-8">
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">产品资料</Badge>
           <Badge variant="outline">人工 Gate 01 必需</Badge>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">离合器目录录入</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-balance">离合器目录录入</h1>
         <p className="max-w-3xl text-muted-foreground">
           以目录的“图片、编号、OE、适配、规格”结构录入。保存后只会创建待复核草稿；系统不会把目录内容自动认定为工程事实。
         </p>
@@ -96,13 +96,13 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
       </Alert>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.72fr)]">
-        <Card>
+        <Card id="new-product">
           <CardHeader>
             <CardTitle>新建产品草稿</CardTitle>
             <CardDescription>参考目录的字段组织；每个已填写字段将绑定同一条初始证据引用，待人工逐项复核。</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
+            <form autoComplete="off" onSubmit={form.handleSubmit(onSubmit)}>
               <FieldGroup>
                 <FieldGroup className="grid gap-4 md:grid-cols-2">
                   <Field data-invalid={!!form.formState.errors.productName}>
@@ -111,14 +111,14 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
                     <FieldError errors={[form.formState.errors.productName]} />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.productType}>
-                    <FieldLabel>产品类型</FieldLabel>
+                    <FieldLabel htmlFor="product-type">产品类型</FieldLabel>
                     <Controller
                       control={form.control}
                       name="productType"
                       render={({ field }) => (
                         <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger aria-invalid={!!form.formState.errors.productType} className="w-full">
-                            <SelectValue placeholder="选择类型" />
+                          <SelectTrigger id="product-type" aria-invalid={!!form.formState.errors.productType} className="w-full">
+                            <SelectValue placeholder="选择类型…" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
@@ -142,7 +142,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="oe-numbers">OE / OEM 编号</FieldLabel>
-                    <Input id="oe-numbers" placeholder="多个编号用逗号分隔" {...form.register("oeNumbers")} />
+                    <Input id="oe-numbers" placeholder="多个编号用逗号分隔…" {...form.register("oeNumbers")} />
                   </Field>
                 </FieldGroup>
 
@@ -193,7 +193,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
               </FieldGroup>
               <div className="mt-6 flex justify-end">
                 <Button type="submit" disabled={pending}>
-                  <PlusIcon data-icon="inline-start" />
+                  {pending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
                   创建待复核草稿
                 </Button>
               </div>
@@ -243,9 +243,9 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
                     <TableCell>{entry.blockingFields.length === 0 ? "字段待 Gate 01 核验" : `${entry.blockingFields.length} 项待补齐/核验`}</TableCell>
                     <TableCell>
                       {entry.state === "PRODUCT_REVIEW_REQUIRED" && entry.approvalStatus === "pending" ? (
-                        <Button size="sm" variant="outline" render={<Link href={`/console/products/${entry.id}`} />}>审核</Button>
+                        <LinkButton size="sm" variant="outline" href={`/console/products/${entry.id}`}>审核</LinkButton>
                       ) : entry.state === "PRODUCT_REVISION_REQUIRED" ? (
-                        <Button size="sm" variant="outline" render={<Link href={`/console/products/${entry.id}/revise`} />}>修订</Button>
+                        <LinkButton size="sm" variant="outline" href={`/console/products/${entry.id}/revise`}>修订</LinkButton>
                       ) : "—"}
                     </TableCell>
                   </TableRow>
@@ -262,6 +262,6 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       )}
-    </main>
+    </div>
   );
 }

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
+import { ConsoleLoading } from "@/components/console-loading";
 
 import { InvitationPanel } from "./panel";
 
@@ -13,7 +14,7 @@ async function AuthorizedInvitationPanel() {
 }
 
 function InvitationShell() {
-  return <main className="mx-auto flex min-h-svh w-full max-w-md p-6" aria-busy="true" />;
+  return <ConsoleLoading />;
 }
 
 export default function InvitationsPage() {

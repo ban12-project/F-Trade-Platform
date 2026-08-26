@@ -30,6 +30,13 @@ export type ProductCatalogDetail = ProductCatalogEntry & {
   approvalId: string | null;
 };
 
+export type ProductCatalogDashboard = {
+  total: number;
+  pendingReview: number;
+  ready: number;
+  queue: ProductCatalogEntry[];
+};
+
 function optionalText(value: string) {
   const normalized = value.trim();
   return normalized || undefined;
@@ -185,14 +192,8 @@ function catalogEntry(
   };
 }
 
-export async function listProductCatalogEntries(limit = 50) {
+async function catalogEntriesForRows(rows: Array<typeof aggregateRecord.$inferSelect>) {
   const database = getDatabase();
-  const rows = await database
-    .select()
-    .from(aggregateRecord)
-    .where(eq(aggregateRecord.type, "product"))
-    .orderBy(desc(aggregateRecord.createdAt))
-    .limit(limit);
   const approvalRows = rows.length === 0
     ? []
     : await database
@@ -210,6 +211,36 @@ export async function listProductCatalogEntries(limit = 50) {
     const entry = catalogEntry(row, approvalsByAggregate.get(row.id));
     return entry ? [entry] : [];
   });
+}
+
+export async function listProductCatalogEntries(limit = 50) {
+  const rows = await getDatabase()
+    .select()
+    .from(aggregateRecord)
+    .where(eq(aggregateRecord.type, "product"))
+    .orderBy(desc(aggregateRecord.createdAt))
+    .limit(limit);
+  return catalogEntriesForRows(rows);
+}
+
+export async function getProductCatalogDashboard(queueLimit = 6): Promise<ProductCatalogDashboard> {
+  const database = getDatabase();
+  const [totalRows, pendingReviewRows, readyRows, queueRows] = await Promise.all([
+    database.select({ count: sql<number>`count(*)` }).from(aggregateRecord).where(eq(aggregateRecord.type, "product")),
+    database.select({ count: sql<number>`count(*)` }).from(aggregateRecord).where(and(eq(aggregateRecord.type, "product"), eq(aggregateRecord.state, "PRODUCT_REVIEW_REQUIRED"))),
+    database.select({ count: sql<number>`count(*)` }).from(aggregateRecord).where(and(eq(aggregateRecord.type, "product"), eq(aggregateRecord.state, "PRODUCT_READY"))),
+    database.select().from(aggregateRecord)
+      .where(and(eq(aggregateRecord.type, "product"), inArray(aggregateRecord.state, ["PRODUCT_REVIEW_REQUIRED", "PRODUCT_REVISION_REQUIRED"])))
+      .orderBy(desc(aggregateRecord.createdAt))
+      .limit(queueLimit),
+  ]);
+
+  return {
+    total: Number(totalRows[0]?.count ?? 0),
+    pendingReview: Number(pendingReviewRows[0]?.count ?? 0),
+    ready: Number(readyRows[0]?.count ?? 0),
+    queue: await catalogEntriesForRows(queueRows),
+  };
 }
 
 export async function getProductCatalogDetail(productId: string): Promise<ProductCatalogDetail | null> {

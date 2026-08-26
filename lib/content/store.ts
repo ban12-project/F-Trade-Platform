@@ -56,6 +56,12 @@ export type ContentCatalogDetail = ContentCatalogEntry & {
   approvalId: string | null;
 };
 
+export type ContentCatalogDashboard = {
+  total: number;
+  pendingReview: number;
+  queue: ContentCatalogEntry[];
+};
+
 const parseContent = compileContract<ContentRecord>(contentSchema);
 const forbiddenVisualClaims = [
   "spline",
@@ -212,6 +218,28 @@ export async function listContentCatalogEntries(limit = 50) {
     const entry = contentEntry(row, approvals.get(row.id));
     return entry ? [entry] : [];
   });
+}
+
+export async function getContentCatalogDashboard(queueLimit = 6): Promise<ContentCatalogDashboard> {
+  const database = getDatabase();
+  const [totalRows, pendingReviewRows, queueRows] = await Promise.all([
+    database.select({ count: sql<number>`count(*)` }).from(aggregateRecord).where(eq(aggregateRecord.type, "content")),
+    database.select({ count: sql<number>`count(*)` }).from(aggregateRecord).where(and(eq(aggregateRecord.type, "content"), eq(aggregateRecord.state, "CONTENT_REVIEW_REQUIRED"))),
+    database.select().from(aggregateRecord)
+      .where(and(eq(aggregateRecord.type, "content"), inArray(aggregateRecord.state, ["CONTENT_REVIEW_REQUIRED", "CONTENT_REVISION_REQUIRED"])))
+      .orderBy(desc(aggregateRecord.createdAt))
+      .limit(queueLimit),
+  ]);
+  const approvals = await latestApprovals(queueRows);
+
+  return {
+    total: Number(totalRows[0]?.count ?? 0),
+    pendingReview: Number(pendingReviewRows[0]?.count ?? 0),
+    queue: queueRows.flatMap((row) => {
+      const entry = contentEntry(row, approvals.get(row.id));
+      return entry ? [entry] : [];
+    }),
+  };
 }
 
 export async function getContentCatalogDetail(contentId: string): Promise<ContentCatalogDetail | null> {

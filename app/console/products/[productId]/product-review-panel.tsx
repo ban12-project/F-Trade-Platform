@@ -3,17 +3,17 @@
 import { useActionState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeftIcon, CheckCircle2Icon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
-import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { decideProductCatalogReviewAction, initialProductActionState } from "@/lib/actions/products";
@@ -25,6 +25,10 @@ type ReviewValues = z.infer<typeof productReviewFormSchema>;
 function valueOf(value: unknown) {
   if (Array.isArray(value)) return value.join(", ");
   return typeof value === "string" || typeof value === "number" ? String(value) : "未提供";
+}
+
+function stateLabel(state: string) {
+  return ({ PRODUCT_REVIEW_REQUIRED: "待 Gate 01 审核", PRODUCT_REVISION_REQUIRED: "待修订", PRODUCT_READY: "已通过 Gate 01" } as Record<string, string>)[state] ?? state;
 }
 
 export function ProductReviewPanel({ product }: { product: ProductCatalogDetail }) {
@@ -48,16 +52,16 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
   }
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-4xl flex-col gap-6 p-6">
+    <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-6 p-4 md:p-6 lg:p-8">
       <header className="flex flex-col gap-3">
-        <Button className="w-fit" size="sm" variant="ghost" render={<Link href="/console/products" />}>
+        <LinkButton className="w-fit" size="sm" variant="ghost" href="/console/products">
           <ArrowLeftIcon data-icon="inline-start" />返回目录
-        </Button>
+        </LinkButton>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">Gate 01</Badge>
-          <Badge variant="outline">{product.state}</Badge>
+          <Badge variant="outline">{stateLabel(product.state)}</Badge>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">审核产品草稿</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-balance">审核产品草稿</h1>
         <p className="text-muted-foreground">批准只在每项产品事实都能由来源证据核对时可用；否则应退回修订。</p>
       </header>
 
@@ -69,7 +73,7 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
 
       <Card>
         <CardHeader>
-          <CardTitle>{product.productName}</CardTitle>
+          <CardTitle>产品事实与证据</CardTitle>
           <CardDescription>{product.internalSku} · {product.productType}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -78,7 +82,7 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
             <TableBody>
               {(["product", "specifications", "commercial"] as const).flatMap((section) => Object.entries(product.draft[section] ?? {}).map(([field, value]) => {
                 const path = `${section}.${field}`;
-                return <TableRow key={path}><TableCell>{path}</TableCell><TableCell>{valueOf(value)}</TableCell><TableCell>{product.draft.field_evidence[path] ?? "缺失"}</TableCell></TableRow>;
+                return <TableRow key={path}><TableCell className="max-w-48 whitespace-normal break-words font-mono text-xs">{path}</TableCell><TableCell className="max-w-64 whitespace-normal break-words">{valueOf(value)}</TableCell><TableCell className="max-w-64 whitespace-normal break-words font-mono text-xs">{product.draft.field_evidence[path] ?? "缺失"}</TableCell></TableRow>;
               }))}
             </TableBody>
           </Table>
@@ -95,13 +99,13 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
           {!canDecide ? (
             <Alert><AlertTitle>当前无待处理审核</AlertTitle><AlertDescription>此记录已经审核，或状态已不允许再次决定。</AlertDescription></Alert>
           ) : (
-            <form onSubmit={form.handleSubmit(onSubmit)}>
+            <form autoComplete="off" onSubmit={form.handleSubmit(onSubmit)}>
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.decision}>
-                  <FieldLabel>决定</FieldLabel>
+                  <FieldLabel htmlFor="review-decision">决定</FieldLabel>
                   <Controller control={form.control} name="decision" render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full" aria-invalid={!!form.formState.errors.decision}><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="review-decision" className="w-full" aria-invalid={!!form.formState.errors.decision}><SelectValue /></SelectTrigger>
                       <SelectContent><SelectGroup><SelectItem value="approved">批准：进入 Product Ready</SelectItem><SelectItem value="rejected">退回：要求修订</SelectItem></SelectGroup></SelectContent>
                     </Select>
                   )} />
@@ -120,7 +124,7 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
                 </Field>
                 <div className="flex justify-end">
                   <Button type="submit" disabled={pending} variant="outline">
-                    {form.watch("decision") === "approved" ? <CheckCircle2Icon data-icon="inline-start" /> : <XCircleIcon data-icon="inline-start" />}
+                    {pending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : form.watch("decision") === "approved" ? <CheckCircle2Icon data-icon="inline-start" /> : <XCircleIcon data-icon="inline-start" />}
                     提交人工决定
                   </Button>
                 </div>
@@ -131,6 +135,6 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
       </Card>
 
       {state.status !== "idle" && <Alert variant={state.status === "error" ? "destructive" : "default"}><AlertTitle>{state.status === "success" ? "已记录" : "未能记录"}</AlertTitle><AlertDescription>{state.message}</AlertDescription></Alert>}
-    </main>
+    </div>
   );
 }
