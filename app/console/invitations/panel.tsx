@@ -49,7 +49,7 @@ export function InvitationPanel() {
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.email}>
                 <FieldLabel htmlFor="invite-email">受邀邮箱</FieldLabel>
-                <Input id="invite-email" type="email" autoComplete="email" spellCheck={false} placeholder="name@example.com…" aria-invalid={!!form.formState.errors.email} {...form.register("email")} />
+                <Input id="invite-email" type="email" autoComplete="email" spellCheck={false} placeholder="name@example.com" aria-invalid={!!form.formState.errors.email} {...form.register("email")} />
                 <FieldError errors={[form.formState.errors.email]} />
               </Field>
               <Button type="submit" disabled={pending}>{pending && <Spinner aria-hidden="true" data-icon="inline-start" />}发送邀请</Button>

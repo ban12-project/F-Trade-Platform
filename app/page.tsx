@@ -21,11 +21,11 @@ export default function HomePage() {
           <div className="motion-landing-enter flex flex-col gap-7">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">离合器外贸工作流</Badge>
-              <Badge variant="outline">MVP 试点</Badge>
+              <Badge variant="outline">离合器试点版</Badge>
             </div>
             <div className="flex flex-col gap-5">
-              <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">让每一条产品事实，都有可追溯的下一步。</h1>
-              <p className="max-w-2xl text-base leading-7 text-muted-foreground text-pretty sm:text-lg">F-Trade 把工厂资料、产品结构化、内容草稿和人工门禁放进一条清晰的工作流，帮助团队在获客前先把证据边界立住。</p>
+              <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">核对产品事实，再推进下一步。</h1>
+              <p className="max-w-2xl text-base leading-7 text-muted-foreground text-pretty sm:text-lg">F-Trade 在同一工作流中整理工厂资料、产品字段和内容草稿。先核实每项产品事实，再将其用于获客内容。</p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <LinkButton href="/auth" size="lg">进入工作台 <ArrowRightIcon data-icon="inline-end" /></LinkButton>
@@ -43,12 +43,12 @@ export default function HomePage() {
                     <CardTitle className="text-base">工作流状态</CardTitle>
                     <p className="text-xs text-muted-foreground">每一步都有明确的人工边界</p>
                   </div>
-                  <Badge variant="outline">Gate 01</Badge>
+                  <Badge variant="outline">人工事实审核</Badge>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-5 p-6">
                 {[
-                  [BoxesIcon, "产品资料", "来源与字段已绑定", "PRODUCT_REVIEW_REQUIRED"],
+                  [BoxesIcon, "产品资料", "为每个字段保留来源", "PRODUCT_REVIEW_REQUIRED"],
                   [ShieldCheckIcon, "人工核验", "逐项确认工程事实", "HUMAN GATE"],
                   [FileCheck2Icon, "内容草稿", "只引用已核验字段", "REVIEW REQUIRED"],
                 ].map(([Icon, title, description, status]) => {

@@ -13,7 +13,7 @@ export default function TestingPage() {
             <FlaskConicalIcon aria-hidden="true" className="text-muted-foreground" />
           </div>
           <CardTitle><h1>Playwright 测试基线</h1></CardTitle>
-          <CardDescription>该静态路由用于验证常规导航和即时导航 shell。</CardDescription>
+          <CardDescription>该静态路由用于验证常规导航和即时导航的静态页面框架。</CardDescription>
         </CardHeader>
         <CardContent>
           <LinkButton href="/" variant="outline">

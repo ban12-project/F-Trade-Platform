@@ -69,7 +69,7 @@ export function ContentRevisionPanel({ content, product }: { content: ContentCat
       <div className="mx-auto min-h-full w-full max-w-4xl p-4 md:p-6 lg:p-8">
         <Alert variant="destructive">
           <AlertTitle>引用产品不可用</AlertTitle>
-          <AlertDescription>产品已不处于 Product Ready；不能在缺少已核验事实的情况下重新送审。</AlertDescription>
+          <AlertDescription>引用产品不再处于已审核状态，不能在缺少已核验事实的情况下重新送审。</AlertDescription>
         </Alert>
       </div>
     );
@@ -83,13 +83,13 @@ export function ContentRevisionPanel({ content, product }: { content: ContentCat
           返回审核
         </LinkButton>
         <h1 className="text-3xl font-semibold tracking-tight text-balance">修订内容草稿</h1>
-        <p className="text-muted-foreground">保留同一 Product Ready 引用；修订后会生成新的 Gate 01 待审请求。</p>
+        <p className="text-muted-foreground">保留同一已审核产品引用。修订后会生成新的事实审核请求。</p>
       </header>
 
       <Alert>
         <ShieldCheckIcon />
         <AlertTitle>不得改写产品事实</AlertTitle>
-        <AlertDescription>产品值和证据仍由服务端从现有 Product Ready 派生；视觉说明不能描绘工程结构。</AlertDescription>
+        <AlertDescription>系统继续从当前已审核产品取得产品值和证据。视觉说明不能描绘工程结构。</AlertDescription>
       </Alert>
 
       <Card>

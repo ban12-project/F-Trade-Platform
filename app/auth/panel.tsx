@@ -116,7 +116,7 @@ export function AuthPanel() {
             </div>
             <div className="flex flex-col gap-2">
               <h1 className="text-2xl font-semibold tracking-tight">登录工作台</h1>
-              <p className="text-sm leading-6 text-muted-foreground">使用受邀邮箱验证码或 Passkey 登录。平台不启用密码登录，也不开放公开注册。</p>
+              <p className="text-sm leading-6 text-muted-foreground">使用受邀邮箱验证码或设备密钥（Passkey）登录。平台不启用密码登录，也不开放公开注册。</p>
             </div>
           </header>
 
@@ -129,7 +129,7 @@ export function AuthPanel() {
                   type="email"
                   autoComplete="email"
                   spellCheck={false}
-                  placeholder="name@example.com…"
+                  placeholder="name@example.com"
                   aria-invalid={!!form.formState.errors.email}
                   {...form.register("email")}
                 />
