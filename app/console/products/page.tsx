@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { listProductCatalogEntries } from "@/lib/products";
+import { ConsoleLoading } from "@/components/console-loading";
 
 import { ProductCatalogPanel } from "./product-catalog-panel";
 
@@ -15,7 +16,7 @@ async function AuthorizedCatalog() {
 }
 
 function CatalogShell() {
-  return <main className="mx-auto min-h-svh w-full max-w-7xl p-6" aria-busy="true" />;
+  return <ConsoleLoading />;
 }
 
 export default function ProductsPage() {

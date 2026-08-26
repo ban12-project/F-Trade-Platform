@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { getProductCatalogDetail } from "@/lib/products";
+import { ConsoleLoading } from "@/components/console-loading";
 
 import { ProductRevisionPanel } from "./product-revision-panel";
 
@@ -16,7 +17,7 @@ async function AuthorizedProductRevision({ productId }: { productId: string }) {
 }
 
 function RevisionShell() {
-  return <main className="mx-auto min-h-svh w-full max-w-4xl p-6" aria-busy="true" />;
+  return <ConsoleLoading />;
 }
 
 export default function ProductRevisionPage({ params }: { params: Promise<{ productId: string }> }) {

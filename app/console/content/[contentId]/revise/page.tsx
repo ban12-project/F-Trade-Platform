@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { getContentCatalogDetail, listReadyProductContentSources } from "@/lib/content/store";
+import { ConsoleLoading } from "@/components/console-loading";
 
 import { ContentRevisionPanel } from "./content-revision-panel";
 
@@ -16,7 +17,7 @@ async function AuthorizedContentRevision({ contentId }: { contentId: string }) {
 }
 
 function RevisionShell() {
-  return <main className="mx-auto min-h-svh w-full max-w-4xl p-6" aria-busy="true" />;
+  return <ConsoleLoading />;
 }
 
 export default function ContentRevisionPage({ params }: { params: Promise<{ contentId: string }> }) {
