@@ -6,12 +6,12 @@ import { redirect } from "next/navigation";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button, LinkButton } from "@/components/ui/button";
+import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { auth } from "@/lib/auth";
-import { listContentCatalogEntries, type ContentCatalogEntry } from "@/lib/content/store";
-import { listProductCatalogEntries, type ProductCatalogEntry } from "@/lib/products";
+import { getContentCatalogDashboard, type ContentCatalogDashboard, type ContentCatalogEntry } from "@/lib/content/store";
+import { getProductCatalogDashboard, type ProductCatalogDashboard, type ProductCatalogEntry } from "@/lib/products";
 
 const numberFormatter = new Intl.NumberFormat("zh-CN");
 
@@ -30,29 +30,35 @@ function statusVariant(state: string): "secondary" | "outline" | "destructive" {
   return "outline";
 }
 
-function DashboardStats({ products, contents }: { products: ProductCatalogEntry[]; contents: ContentCatalogEntry[] }) {
+function DashboardStats({
+  products,
+  contents,
+}: {
+  products: ProductCatalogDashboard;
+  contents: ContentCatalogDashboard;
+}) {
   const stats = [
     {
       label: "产品草稿",
-      value: products.length,
+      value: products.total,
       description: "已进入目录接收流程",
       icon: BoxesIcon,
     },
     {
       label: "待处理审核",
-      value: products.filter((entry) => entry.state === "PRODUCT_REVIEW_REQUIRED").length + contents.filter((entry) => entry.state === "CONTENT_REVIEW_REQUIRED").length,
+      value: products.pendingReview + contents.pendingReview,
       description: "需要人工 Gate 01 决定",
       icon: ShieldCheckIcon,
     },
     {
       label: "已核验产品",
-      value: products.filter((entry) => entry.state === "PRODUCT_READY").length,
+      value: products.ready,
       description: "可作为内容事实来源",
       icon: BoxesIcon,
     },
     {
       label: "内容草稿",
-      value: contents.length,
+      value: contents.total,
       description: "批准不等于已发布",
       icon: FilePenLineIcon,
     },
@@ -88,11 +94,11 @@ function ReviewQueue({ products, contents }: { products: ProductCatalogEntry[]; 
   const queue = [
     ...products
       .filter((entry) => entry.state === "PRODUCT_REVIEW_REQUIRED" || entry.state === "PRODUCT_REVISION_REQUIRED")
-      .map((entry) => ({ id: entry.id, name: entry.productName, detail: entry.internalSku, state: entry.state, href: entry.state === "PRODUCT_REVISION_REQUIRED" ? `/console/products/${entry.id}/revise` : `/console/products/${entry.id}` })),
+      .map((entry) => ({ id: entry.id, name: entry.productName, detail: entry.internalSku, state: entry.state, createdAt: entry.createdAt, href: entry.state === "PRODUCT_REVISION_REQUIRED" ? `/console/products/${entry.id}/revise` : `/console/products/${entry.id}` })),
     ...contents
       .filter((entry) => entry.state === "CONTENT_REVIEW_REQUIRED" || entry.state === "CONTENT_REVISION_REQUIRED")
-      .map((entry) => ({ id: entry.id, name: entry.hook, detail: entry.productName, state: entry.state, href: entry.state === "CONTENT_REVISION_REQUIRED" ? `/console/content/${entry.id}/revise` : `/console/content/${entry.id}` })),
-  ].slice(0, 6);
+      .map((entry) => ({ id: entry.id, name: entry.hook, detail: entry.productName, state: entry.state, createdAt: entry.createdAt, href: entry.state === "CONTENT_REVISION_REQUIRED" ? `/console/content/${entry.id}/revise` : `/console/content/${entry.id}` })),
+  ].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime()).slice(0, 6);
 
   return (
     <Card className="min-w-0">
@@ -182,8 +188,8 @@ async function AuthorizedOverview() {
   if (!session || session.user.role !== "admin") redirect("/auth");
 
   const [products, contents] = await Promise.all([
-    listProductCatalogEntries(),
-    listContentCatalogEntries(),
+    getProductCatalogDashboard(),
+    getContentCatalogDashboard(),
   ]);
 
   return (
@@ -210,7 +216,7 @@ async function AuthorizedOverview() {
       <DashboardStats products={products} contents={contents} />
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
-        <ReviewQueue products={products} contents={contents} />
+        <ReviewQueue products={products.queue} contents={contents.queue} />
         <Card>
           <CardHeader>
             <CardTitle>下一步建议</CardTitle>

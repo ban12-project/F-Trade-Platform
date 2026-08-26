@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   BoxesIcon,
   ClipboardCheckIcon,
@@ -23,6 +24,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 const workspaceItems = [
@@ -76,6 +78,11 @@ function NavigationGroup({
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
+
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [pathname, setOpenMobile]);
 
   return (
     <Sidebar collapsible="icon" variant="inset">
