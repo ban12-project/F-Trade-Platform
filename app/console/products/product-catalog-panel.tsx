@@ -79,11 +79,11 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">产品资料</Badge>
-          <Badge variant="outline">人工 Gate 01 必需</Badge>
+          <Badge variant="outline">需要人工事实审核（Gate 01）</Badge>
         </div>
         <h1 className="text-3xl font-semibold tracking-tight text-balance">离合器目录录入</h1>
         <p className="max-w-3xl text-muted-foreground">
-          以目录的“图片、编号、OE、适配、规格”结构录入。保存后只会创建待复核草稿；系统不会把目录内容自动认定为工程事实。
+          按目录中的图片、编号、原厂件编号（OE）、适配和规格录入。保存后只会创建待复核草稿；系统不会把目录内容自动认定为工程事实。
         </p>
       </header>
 
@@ -142,7 +142,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="oe-numbers">OE / OEM 编号</FieldLabel>
-                    <Input id="oe-numbers" placeholder="多个编号用逗号分隔…" {...form.register("oeNumbers")} />
+                    <Input id="oe-numbers" placeholder="多个编号请用逗号分隔" {...form.register("oeNumbers")} />
                   </Field>
                 </FieldGroup>
 
@@ -157,7 +157,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
 
                 <FieldSet>
                   <FieldLegend>离合器规格</FieldLegend>
-                  <FieldDescription>留空即标记为待核验，不能由 AI 补齐。</FieldDescription>
+                  <FieldDescription>没有来源依据时，请留空。人工智能不能补齐字段。</FieldDescription>
                   <FieldGroup className="grid gap-4 md:grid-cols-2">
                     <Field data-invalid={!!form.formState.errors.clutchDiameterMm}>
                       <FieldLabel htmlFor="clutch-diameter">盘径（mm）</FieldLabel>
@@ -209,7 +209,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
           </CardHeader>
           <CardContent className="flex flex-col gap-4 text-sm">
             <div className="flex items-start gap-3"><FileCheck2Icon className="mt-0.5 shrink-0 text-muted-foreground" /><div><p className="font-medium">目录编号</p><p className="text-muted-foreground">映射为内部编号；必须通过来源证据确认。</p></div></div>
-            <div className="flex items-start gap-3"><FileCheck2Icon className="mt-0.5 shrink-0 text-muted-foreground" /><div><p className="font-medium">OE、适配与规格</p><p className="text-muted-foreground">映射为可选字段；缺失或无证据会留在 Gate 01 阻塞项中。</p></div></div>
+            <div className="flex items-start gap-3"><FileCheck2Icon className="mt-0.5 shrink-0 text-muted-foreground" /><div><p className="font-medium">原厂件编号、适配与规格</p><p className="text-muted-foreground">这些字段均可选填。缺失来源或证据时，系统会在人工事实审核中标记阻塞项。</p></div></div>
             <div className="flex items-start gap-3"><FileCheck2Icon className="mt-0.5 shrink-0 text-muted-foreground" /><div><p className="font-medium">产品图片</p><p className="text-muted-foreground">下一步接入受控 Private Blob evidence，不在表单中引用本机或公开文件。</p></div></div>
           </CardContent>
         </Card>
@@ -246,7 +246,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
                         <LinkButton size="sm" variant="outline" href={`/console/products/${entry.id}`}>审核</LinkButton>
                       ) : entry.state === "PRODUCT_REVISION_REQUIRED" ? (
                         <LinkButton size="sm" variant="outline" href={`/console/products/${entry.id}/revise`}>修订</LinkButton>
-                      ) : "—"}
+                      ) : "无操作"}
                     </TableCell>
                   </TableRow>
                 ))}

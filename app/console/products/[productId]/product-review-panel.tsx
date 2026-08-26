@@ -58,7 +58,7 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
           <ArrowLeftIcon data-icon="inline-start" />返回目录
         </LinkButton>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">Gate 01</Badge>
+          <Badge variant="secondary">人工事实审核</Badge>
           <Badge variant="outline">{stateLabel(product.state)}</Badge>
         </div>
         <h1 className="text-3xl font-semibold tracking-tight text-balance">审核产品草稿</h1>
@@ -68,7 +68,7 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
       <Alert>
         <ShieldCheckIcon />
         <AlertTitle>人工决定是事实边界</AlertTitle>
-        <AlertDescription>不要把目录视觉、AI 推断或缺失字段当作工程证据。审核证据必须是受控存储中的私有引用。</AlertDescription>
+        <AlertDescription>不要把目录视觉、人工智能推断或缺失字段当作工程证据。审核证据必须是受控存储中的私有引用。</AlertDescription>
       </Alert>
 
       <Card>
@@ -106,7 +106,7 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
                   <Controller control={form.control} name="decision" render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger id="review-decision" className="w-full" aria-invalid={!!form.formState.errors.decision}><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectGroup><SelectItem value="approved">批准：进入 Product Ready</SelectItem><SelectItem value="rejected">退回：要求修订</SelectItem></SelectGroup></SelectContent>
+                      <SelectContent><SelectGroup><SelectItem value="approved">批准：通过事实审核</SelectItem><SelectItem value="rejected">退回：要求修订</SelectItem></SelectGroup></SelectContent>
                     </Select>
                   )} />
                   <FieldError errors={[form.formState.errors.decision]} />

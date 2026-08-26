@@ -164,7 +164,7 @@ function WorkflowGuide() {
     <Card>
       <CardHeader>
         <CardTitle>受控工作流</CardTitle>
-        <CardDescription>平台把 AI 的营销语言能力限制在已经通过证据门禁的范围内。</CardDescription>
+        <CardDescription>人工智能只能为已核验字段编写营销文案。</CardDescription>
       </CardHeader>
       <CardContent>
         <ol className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -198,10 +198,10 @@ async function AuthorizedOverview() {
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">内部工作台</Badge>
-            <Badge variant="outline">MVP · 离合器试点</Badge>
+            <Badge variant="outline">离合器试点版</Badge>
           </div>
           <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-balance">把每一次审核都变成可追溯的下一步</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-balance">审核待处理项目并继续工作</h1>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground text-pretty">
               从工厂资料到内容草稿，所有关键字段都留在证据边界内。先处理队列，再推进产品与内容的下一步。
             </p>
@@ -233,7 +233,7 @@ async function AuthorizedOverview() {
             </LinkButton>
           </CardContent>
           <CardFooter className="text-xs leading-5 text-muted-foreground">
-            报价、交期与正式发布仍需各自的人工 Gate；这里不会生成承诺。
+            报价、交期与正式发布均需人工审核；平台不作出承诺。
           </CardFooter>
         </Card>
       </div>
@@ -243,7 +243,7 @@ async function AuthorizedOverview() {
       <Alert>
         <ShieldCheckIcon />
         <AlertTitle>证据优先</AlertTitle>
-        <AlertDescription>OE、车型、尺寸、花键、摩擦材料、认证、寿命和安全性能必须来自工厂来源或人工确认，AI 不能补齐缺失事实。</AlertDescription>
+        <AlertDescription>原厂件编号（OE）、车型、尺寸、花键、摩擦材料、认证、寿命和安全性能必须来自工厂来源或人工确认。人工智能不能补齐缺失事实。</AlertDescription>
       </Alert>
     </div>
   );
