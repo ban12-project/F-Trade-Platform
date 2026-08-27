@@ -1,14 +1,14 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireRole } from "@/lib/auth-guard";
 import { getProductCatalogDetail } from "@/lib/products";
 import { ConsoleLoading } from "@/components/console-loading";
 
 import { ProductReviewPanel } from "./product-review-panel";
 
 async function AuthorizedProductReview({ productId }: { productId: string }) {
-  await requireAdmin();
+  await requireRole("admin");
   const product = await getProductCatalogDetail(productId);
   if (!product) notFound();
   return <ProductReviewPanel product={product} />;

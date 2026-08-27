@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireRole } from "@/lib/auth-guard";
 import { listContentCatalogEntries, listReadyProductContentSources } from "@/lib/content/store";
 import { ConsoleLoading } from "@/components/console-loading";
 
 import { ContentCatalogPanel } from "./content-catalog-panel";
 
 async function AuthorizedContentCatalog() {
-  await requireAdmin();
+  await requireRole("admin");
   const [entries, products] = await Promise.all([listContentCatalogEntries(), listReadyProductContentSources()]);
   return <ContentCatalogPanel entries={entries} products={products} />;
 }

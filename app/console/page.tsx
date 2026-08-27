@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireRole } from "@/lib/auth-guard";
 import { getContentCatalogDashboard, type ContentCatalogDashboard, type ContentCatalogEntry } from "@/lib/content/store";
 import { getProductCatalogDashboard, type ProductCatalogDashboard, type ProductCatalogEntry } from "@/lib/products";
 
@@ -182,7 +182,7 @@ function WorkflowGuide() {
 }
 
 async function AuthorizedOverview() {
-  await requireAdmin();
+  await requireRole("admin");
 
   const [products, contents] = await Promise.all([
     getProductCatalogDashboard(),
