@@ -341,12 +341,17 @@ def check_database_baseline() -> None:
             raise AssertionError(f"Passwordless Better Auth configuration is missing: {required}")
     proxy_source = (ROOT / "proxy.ts").read_text(encoding="utf-8")
     for required in (
-        "auth.api.getSession",
-        'session.user.role !== "admin"',
+        "getSessionCookie",
         'matcher: ["/console/:path*"]',
     ):
         if required not in proxy_source:
-            raise AssertionError(f"Admin proxy protection is missing: {required}")
+            raise AssertionError(f"Optimistic console proxy protection is missing: {required}")
+    if "auth.api.getSession" in proxy_source:
+        raise AssertionError("Console Proxy must not query the session database")
+    role_guard_source = (ROOT / "lib/auth-guard.ts").read_text(encoding="utf-8")
+    for required in ("requireRole", "auth.api.getSession", "allowedRoles.includes"):
+        if required not in role_guard_source:
+            raise AssertionError(f"Strict server role guard is missing: {required}")
     next_config = (ROOT / "next.config.ts").read_text(encoding="utf-8")
     for required in ('source: "/admin/:path*"', 'destination: "/console/:path*"', "permanent: true"):
         if required not in next_config:

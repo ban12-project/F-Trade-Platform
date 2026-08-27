@@ -28,16 +28,32 @@ export function AuthPanel() {
   });
 
   useEffect(() => {
-    setInviteToken(new URLSearchParams(window.location.search).get("invite"));
+    const searchParams = new URLSearchParams(window.location.search);
+    setInviteToken(searchParams.get("invite"));
+    if (searchParams.get("error") === "access-denied") {
+      setMessage("登录成功，但当前账号没有工作台访问权限。请联系管理员为该账号授予管理员权限。");
+    }
   }, []);
+
+  function enterConsole() {
+    // Authentication changes the cookie set used by the proxy. A document
+    // navigation guarantees the next request evaluates that fresh session.
+    window.location.assign("/console");
+  }
 
   async function run(action: () => Promise<{ error?: { message?: string } | null }>, success: string) {
     setBusy(true);
     try {
       const { error } = await action();
-      setMessage(error?.message ?? success);
+      if (error) {
+        setMessage(error.message ?? "请求未完成，请检查认证信息后重试。");
+        return false;
+      }
+      setMessage(success);
+      return true;
     } catch {
       setMessage("请求未完成，请检查网络和认证配置后重试。");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -68,7 +84,7 @@ export function AuthPanel() {
   }
 
   async function verifyOtp(values: z.infer<typeof authFormSchema>) {
-    await run(
+    const signedIn = await run(
       () => authClient.signIn.emailOtp({
         email: values.email,
         otp: values.otp,
@@ -76,10 +92,12 @@ export function AuthPanel() {
       }),
       "登录成功。你现在可以注册 Passkey。",
     );
+    if (signedIn) enterConsole();
   }
 
   async function signInPasskey() {
-    await run(() => authClient.signIn.passkey(), "Passkey 登录成功。");
+    const signedIn = await run(() => authClient.signIn.passkey(), "Passkey 登录成功。");
+    if (signedIn) enterConsole();
   }
 
   async function addPasskey() {
