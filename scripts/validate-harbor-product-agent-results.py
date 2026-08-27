@@ -20,8 +20,8 @@ def load_json(path: Path) -> dict:
 
 
 def main() -> None:
-    model = os.environ.get("F_TRADE_HARBOR_MODEL", "")
-    selected_provider = os.environ.get("F_TRADE_HARBOR_PROVIDER", "")
+    model = os.environ.get("HARBOR_MODEL", "")
+    selected_provider = os.environ.get("HARBOR_PROVIDER", "")
     provider, separator, _ = model.partition("/")
     errors: list[str] = []
     if not separator or not provider:

@@ -125,10 +125,14 @@ pnpm seed:admins -- --emails admin1@example.com,admin2@example.com --confirm
 
 `pnpm eval:harbor:prepare` 会在临时目录生成 20 个仅含 synthetic 数据的 Harbor 任务。
 本机使用 Podman 时，先启动 Podman machine，并把其 Docker 兼容 API socket 设置为
-`DOCKER_HOST`；再在当前 shell 设置 OpenAI-compatible endpoint 和 key，执行：
+`DOCKER_HOST`；并为目标 provider 设置专用的 `HARBOR_*` 评测凭据。Harbor 使用专用 runner，
+不会读取应用数据库、已保存的模型配置或 `MODEL_CONFIG_ENCRYPTION_KEY`。例如：
 
 ```bash
-pnpm eval:harbor:podman openai-compatible/gpt-5.6-luna
+HARBOR_MODEL=openai-compatible/gpt-5.6-luna \
+HARBOR_OPENAI_COMPATIBLE_BASE_URL=https://gateway.example.test/v1 \
+HARBOR_OPENAI_COMPATIBLE_API_KEY=local-evaluation-key \
+pnpm eval:harbor:podman
 ```
 
 Issue #48 的 PDF 只能作为本机授权测试输入，不能提交、镜像复制或上传到 Harbor artifact。

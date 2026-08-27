@@ -45,25 +45,52 @@ jobs:
         run: pnpm eval:harbor:prepare
       - name: Run Product Agent evaluation
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
-          F_TRADE_OPENAI_COMPATIBLE_BASE_URL: ${{ vars.F_TRADE_OPENAI_COMPATIBLE_BASE_URL }}
-          F_TRADE_OPENAI_COMPATIBLE_API_KEY: ${{ secrets.F_TRADE_OPENAI_COMPATIBLE_API_KEY }}
-        run: >-
-          harbor run -p /tmp/f-trade-harbor-product-agent
-          -a evals.harbor.product_agent.f_trade_product_agent:FTradeProductAgent
-          -m "${{ inputs.model }}" -k 3 --yes
-          --ae OPENAI_API_KEY="$OPENAI_API_KEY"
-          --ae ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
-          --ae GOOGLE_GENERATIVE_AI_API_KEY="$GOOGLE_GENERATIVE_AI_API_KEY"
-          --ae F_TRADE_OPENAI_COMPATIBLE_BASE_URL="$F_TRADE_OPENAI_COMPATIBLE_BASE_URL"
-          --ae F_TRADE_OPENAI_COMPATIBLE_API_KEY="$F_TRADE_OPENAI_COMPATIBLE_API_KEY"
+          HARBOR_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          HARBOR_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HARBOR_GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          HARBOR_OPENAI_COMPATIBLE_BASE_URL: ${{ vars.F_TRADE_OPENAI_COMPATIBLE_BASE_URL }}
+          HARBOR_OPENAI_COMPATIBLE_API_KEY: ${{ secrets.F_TRADE_OPENAI_COMPATIBLE_API_KEY }}
+          HARBOR_MODEL_INPUT: ${{ inputs.model }}
+          HARBOR_PROVIDER_INPUT: ${{ inputs.provider }}
+        run: |
+          case "$HARBOR_MODEL_INPUT" in
+            "$HARBOR_PROVIDER_INPUT"/*) ;;
+            *)
+              echo "Model provider must match the protected evaluation environment." >&2
+              exit 1
+              ;;
+          esac
+          case "$HARBOR_PROVIDER_INPUT" in
+            openai)
+              : "${HARBOR_OPENAI_API_KEY:?Missing protected OpenAI evaluation credential}"
+              set -- --ae "HARBOR_OPENAI_API_KEY=$HARBOR_OPENAI_API_KEY"
+              ;;
+            anthropic)
+              : "${HARBOR_ANTHROPIC_API_KEY:?Missing protected Anthropic evaluation credential}"
+              set -- --ae "HARBOR_ANTHROPIC_API_KEY=$HARBOR_ANTHROPIC_API_KEY"
+              ;;
+            google)
+              : "${HARBOR_GOOGLE_GENERATIVE_AI_API_KEY:?Missing protected Google evaluation credential}"
+              set -- --ae "HARBOR_GOOGLE_GENERATIVE_AI_API_KEY=$HARBOR_GOOGLE_GENERATIVE_AI_API_KEY"
+              ;;
+            openai-compatible)
+              : "${HARBOR_OPENAI_COMPATIBLE_BASE_URL:?Missing protected compatible endpoint}"
+              : "${HARBOR_OPENAI_COMPATIBLE_API_KEY:?Missing protected compatible credential}"
+              set -- \
+                --ae "HARBOR_OPENAI_COMPATIBLE_BASE_URL=$HARBOR_OPENAI_COMPATIBLE_BASE_URL" \
+                --ae "HARBOR_OPENAI_COMPATIBLE_API_KEY=$HARBOR_OPENAI_COMPATIBLE_API_KEY"
+              ;;
+          esac
+          harbor run -p /tmp/f-trade-harbor-product-agent \
+            -a evals.harbor.product_agent.f_trade_product_agent:FTradeProductAgent \
+            -m "$HARBOR_MODEL_INPUT" -k 3 --yes \
+            --ae "HARBOR_MODEL=$HARBOR_MODEL_INPUT" \
+            "$@"
       - name: Validate and sanitize Harbor results
         if: ${{ !cancelled() }}
         env:
-          F_TRADE_HARBOR_MODEL: ${{ inputs.model }}
-          F_TRADE_HARBOR_PROVIDER: ${{ inputs.provider }}
+          HARBOR_MODEL: ${{ inputs.model }}
+          HARBOR_PROVIDER: ${{ inputs.provider }}
         run: python scripts/validate-harbor-product-agent-results.py
       - name: Upload sanitized Harbor summary
         if: ${{ !cancelled() }}
