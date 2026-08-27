@@ -1,16 +1,14 @@
 import { Suspense } from "react";
-import { headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth-guard";
 import { getProductCatalogDetail } from "@/lib/products";
 import { ConsoleLoading } from "@/components/console-loading";
 
 import { ProductReviewPanel } from "./product-review-panel";
 
 async function AuthorizedProductReview({ productId }: { productId: string }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") redirect("/auth");
+  await requireAdmin();
   const product = await getProductCatalogDetail(productId);
   if (!product) notFound();
   return <ProductReviewPanel product={product} />;

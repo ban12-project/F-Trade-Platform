@@ -1,15 +1,13 @@
 import { Suspense } from "react";
-import { headers } from "next/headers";
 import { ArrowRightIcon, BoxesIcon, FilePenLineIcon, PlusIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth-guard";
 import { getContentCatalogDashboard, type ContentCatalogDashboard, type ContentCatalogEntry } from "@/lib/content/store";
 import { getProductCatalogDashboard, type ProductCatalogDashboard, type ProductCatalogEntry } from "@/lib/products";
 
@@ -184,8 +182,7 @@ function WorkflowGuide() {
 }
 
 async function AuthorizedOverview() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") redirect("/auth");
+  await requireAdmin();
 
   const [products, contents] = await Promise.all([
     getProductCatalogDashboard(),

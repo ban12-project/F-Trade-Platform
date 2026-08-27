@@ -1,16 +1,14 @@
 import { Suspense } from "react";
-import { headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth-guard";
 import { getContentCatalogDetail } from "@/lib/content/store";
 import { ConsoleLoading } from "@/components/console-loading";
 
 import { ContentReviewPanel } from "./content-review-panel";
 
 async function AuthorizedContentReview({ contentId }: { contentId: string }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") redirect("/auth");
+  await requireAdmin();
   const content = await getContentCatalogDetail(contentId);
   if (!content) notFound();
   return <ContentReviewPanel content={content} />;

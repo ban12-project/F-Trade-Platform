@@ -15,6 +15,12 @@ test("rejects public email and password sign-up", async ({ request }) => {
   });
 });
 
+test("redirects an unauthenticated console request to sign-in", async ({ page }) => {
+  await page.goto("/console");
+
+  await expect(page).toHaveURL(/\/auth$/);
+});
+
 test("navigates to the console after email OTP sign-in succeeds", async ({ page }) => {
   await page.route("**/api/auth/sign-in/email-otp", async (route) => {
     await route.fulfill({

@@ -1,16 +1,13 @@
 import { Suspense } from "react";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth-guard";
 import { listProductCatalogEntries } from "@/lib/products";
 import { ConsoleLoading } from "@/components/console-loading";
 
 import { ProductCatalogPanel } from "./product-catalog-panel";
 
 async function AuthorizedCatalog() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") redirect("/auth");
+  await requireAdmin();
   const entries = await listProductCatalogEntries();
   return <ProductCatalogPanel entries={entries} />;
 }
