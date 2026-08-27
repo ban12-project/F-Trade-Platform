@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-import { createProductAgentModel, parseModelId } from "../../lib/ai/model-provider";
+import {
+  createProductAgentModel,
+  validateProductAgentModelConfig,
+} from "../../lib/ai/model-provider";
+import { productAgentModelSettingsSchema } from "../../lib/form-schemas";
 import {
   finalizeProductAgentDraft,
   validateProductAgentSource,
@@ -43,33 +47,54 @@ const safeDraft = {
   },
 };
 
-test("accepts only provider/model identifiers", () => {
-  expect(parseModelId("openai/gpt-test")).toEqual({ provider: "openai", model: "gpt-test" });
-  expect(parseModelId("openai-compatible/gpt-test")).toEqual({
+test("validates the persisted provider configuration without allowing plaintext credential headers", () => {
+  const input = {
+    provider: "openai-compatible",
+    model: "gateway-model",
+    baseUrl: "https://gateway.example.test/v1",
+    headersJson: '{"X-Tenant":"f-trade"}',
+    providerName: "gateway",
+    organization: "",
+    project: "",
+    apiKey: "",
+    authToken: "",
+    clearApiKey: false,
+    clearAuthToken: false,
+  };
+  expect(productAgentModelSettingsSchema.safeParse(input).success).toBe(true);
+  expect(productAgentModelSettingsSchema.safeParse({
+    ...input,
+    headersJson: '{"Authorization":"Bearer should-not-be-plaintext"}',
+  }).success).toBe(false);
+});
+
+test("fails closed when a saved provider has no key", () => {
+  expect(() => createProductAgentModel({
+    provider: "openai",
+    model: "gpt-test",
+    providerOptions: {},
+  })).toThrow("Saved openai provider requires an API key");
+});
+
+test("fails closed when a saved OpenAI-compatible provider has no endpoint", () => {
+  expect(() => createProductAgentModel({
     provider: "openai-compatible",
     model: "gpt-test",
-  });
-  expect(() => parseModelId("gpt-test")).toThrow("provider/model");
-  expect(() => parseModelId("unknown/model")).toThrow("provider/model");
+    providerOptions: { apiKey: "test-key" },
+  })).toThrow("Saved OpenAI-compatible provider requires a Base URL");
 });
 
-test("fails closed when a selected provider has no key", () => {
-  const original = process.env.OPENAI_API_KEY;
-  delete process.env.OPENAI_API_KEY;
-  expect(() => createProductAgentModel("openai/gpt-test")).toThrow("OPENAI_API_KEY");
-  if (original) process.env.OPENAI_API_KEY = original;
-});
-
-test("fails closed when an OpenAI-compatible endpoint is incomplete", () => {
-  const originalKey = process.env.F_TRADE_OPENAI_COMPATIBLE_API_KEY;
-  const originalBaseUrl = process.env.F_TRADE_OPENAI_COMPATIBLE_BASE_URL;
-  delete process.env.F_TRADE_OPENAI_COMPATIBLE_API_KEY;
-  delete process.env.F_TRADE_OPENAI_COMPATIBLE_BASE_URL;
-  expect(() => createProductAgentModel("openai-compatible/gpt-test")).toThrow(
-    "F_TRADE_OPENAI_COMPATIBLE_BASE_URL",
-  );
-  if (originalKey) process.env.F_TRADE_OPENAI_COMPATIBLE_API_KEY = originalKey;
-  if (originalBaseUrl) process.env.F_TRADE_OPENAI_COMPATIBLE_BASE_URL = originalBaseUrl;
+test("rejects saving a provider configuration without an authentication method", () => {
+  expect(() => validateProductAgentModelConfig({
+    provider: "openai-compatible",
+    model: "gateway-model",
+    providerOptions: { baseURL: "https://gateway.example.test/v1" },
+  })).toThrow("API key");
+  expect(() => validateProductAgentModelConfig({
+    provider: "anthropic",
+    model: "claude-test",
+    providerOptions: {},
+  })).toThrow("API key or Auth token");
 });
 
 test("finalizes only source-backed review drafts", () => {

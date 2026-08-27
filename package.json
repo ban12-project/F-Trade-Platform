@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate",
+    "seed:admins": "node --env-file=.env --import tsx scripts/seed-admins.ts",
     "start": "next start",
     "product-agent": "tsx scripts/run-product-agent.ts",
     "product-agent:catalog": "tsx scripts/run-product-agent-catalog.ts",
