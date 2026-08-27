@@ -4,6 +4,7 @@ import {
   createProductAgentModel,
   validateProductAgentModelConfig,
 } from "../../lib/ai/model-provider";
+import { getHarborEvaluationModelConfig } from "../../lib/ai/harbor-evaluation-model";
 import { productAgentModelSettingsSchema } from "../../lib/form-schemas";
 import {
   finalizeProductAgentDraft,
@@ -95,6 +96,29 @@ test("rejects saving a provider configuration without an authentication method",
     model: "claude-test",
     providerOptions: {},
   })).toThrow("API key or Auth token");
+});
+
+test("uses only the selected provider's injected Harbor credential", () => {
+  expect(getHarborEvaluationModelConfig({
+    HARBOR_MODEL: "openai-compatible/gateway-model",
+    HARBOR_OPENAI_COMPATIBLE_BASE_URL: "https://gateway.example.test/v1",
+    HARBOR_OPENAI_COMPATIBLE_API_KEY: "synthetic-evaluation-key",
+    DATABASE_URL: "must-not-be-read",
+    MODEL_CONFIG_ENCRYPTION_KEY: "must-not-be-read",
+  })).toEqual({
+    provider: "openai-compatible",
+    model: "gateway-model",
+    providerOptions: {
+      baseURL: "https://gateway.example.test/v1",
+      apiKey: "synthetic-evaluation-key",
+    },
+  });
+  expect(() => getHarborEvaluationModelConfig({ HARBOR_MODEL: "openai/gpt-test" })).toThrow(
+    "HARBOR_OPENAI_API_KEY",
+  );
+  expect(() => getHarborEvaluationModelConfig({ HARBOR_MODEL: "unknown/model" })).toThrow(
+    "HARBOR_MODEL",
+  );
 });
 
 test("finalizes only source-backed review drafts", () => {

@@ -30,6 +30,16 @@ assert "branches/main/protection" not in repo_configurer, "M0 configuration must
 assert "allow_squash_merge=true" in repo_configurer, "M0 configuration must retain squash merge"
 assert "delete_branch_on_merge=true" in repo_configurer, "M0 configuration must retain branch cleanup"
 
+harbor_workflow = (GITHUB / "workflows" / "harbor-product-agent.yml").read_text(encoding="utf-8")
+assert "HARBOR_MODEL" in harbor_workflow, "Harbor workflow must pass its evaluation model explicitly"
+assert "HARBOR_MODEL_INPUT: ${{ inputs.model }}" in harbor_workflow, "Harbor model input must be shell-safe"
+assert '-m "$HARBOR_MODEL_INPUT"' in harbor_workflow, "Harbor must not interpolate workflow model input into shell"
+assert "--ae \"DATABASE_URL=" not in harbor_workflow, "Harbor must not receive application database access"
+assert "--ae \"MODEL_CONFIG_ENCRYPTION_KEY=" not in harbor_workflow, "Harbor must not receive config decryption access"
+harbor_runner = (ROOT / "scripts" / "run-harbor-product-agent-podman.sh").read_text(encoding="utf-8")
+assert "DATABASE_URL" not in harbor_runner, "Local Harbor runner must not receive application database access"
+assert "MODEL_CONFIG_ENCRYPTION_KEY" not in harbor_runner, "Local Harbor runner must not receive config decryption access"
+
 milestones = json.loads((GITHUB / "bootstrap" / "milestones.json").read_text(encoding="utf-8"))
 assert [item["title"] for item in milestones] == [f"M{index} {name}" for index, name in enumerate([
     "基线与治理", "产品数据闭环", "内容发布闭环", "询盘报价闭环", "跟单商机闭环", "集成 Demo 验收",
