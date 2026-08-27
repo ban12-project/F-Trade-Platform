@@ -3,8 +3,10 @@
 import { useEffect } from "react";
 import {
   BoxesIcon,
+  BotIcon,
   ClipboardCheckIcon,
   FilePenLineIcon,
+  MessagesSquareIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   Settings2Icon,
@@ -33,6 +35,8 @@ const workspaceItems = [
   { href: "/console", label: "总览", icon: LayoutDashboardIcon },
   { href: "/console/products", label: "产品目录", icon: BoxesIcon },
   { href: "/console/content", label: "内容工作台", icon: FilePenLineIcon },
+  { href: "/console/product-agent", label: "Product Agent", icon: BotIcon },
+  { href: "/console/sales", label: "询盘与报价", icon: MessagesSquareIcon },
 ] as const;
 
 const managementItems = [

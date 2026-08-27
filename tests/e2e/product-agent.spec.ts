@@ -5,7 +5,7 @@ import {
   validateProductAgentModelConfig,
 } from "../../lib/ai/model-provider";
 import { getHarborEvaluationModelConfig } from "../../lib/ai/harbor-evaluation-model";
-import { productAgentModelSettingsSchema } from "../../lib/form-schemas";
+import { productAgentModelSettingsSchema, productAgentRunFormSchema } from "../../lib/form-schemas";
 import {
   finalizeProductAgentDraft,
   validateProductAgentSource,
@@ -66,6 +66,21 @@ test("validates the persisted provider configuration without allowing plaintext 
   expect(productAgentModelSettingsSchema.safeParse({
     ...input,
     headersJson: '{"Authorization":"Bearer should-not-be-plaintext"}',
+  }).success).toBe(false);
+});
+
+test("accepts only an authorized, bounded Product Agent text envelope", () => {
+  expect(productAgentRunFormSchema.safeParse({
+    sourceRef: "source-catalog-001",
+    evidenceRef: "evidence-catalog-001",
+    sourceText: "Product name: Synthetic Clutch Kit\nProduct type: clutch_kit",
+    hasUpload: false,
+  }).success).toBe(true);
+  expect(productAgentRunFormSchema.safeParse({
+    sourceRef: "/tmp/factory.xlsx",
+    evidenceRef: "evidence-catalog-001",
+    sourceText: "Product name: Synthetic Clutch Kit\nProduct type: clutch_kit",
+    hasUpload: false,
   }).success).toBe(false);
 });
 

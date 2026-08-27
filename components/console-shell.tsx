@@ -44,6 +44,12 @@ function getBreadcrumb(pathname: string) {
     }
     return { section: "工作区", current: "内容工作台", href: "/console/content" };
   }
+  if (pathname.startsWith("/console/product-agent")) {
+    return { section: "工作区", current: "Product Agent", href: "/console/product-agent" };
+  }
+  if (pathname.startsWith("/console/sales")) {
+    return { section: "工作区", current: "询盘与报价", href: "/console/sales" };
+  }
   if (pathname.startsWith("/console/invitations")) {
     return { section: "管理", current: "团队邀请", href: "/console/invitations" };
   }

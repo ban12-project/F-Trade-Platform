@@ -168,6 +168,23 @@ export async function createProductCatalogDraft(input: ProductCatalogInput, acto
   return { id, draft, approvalId };
 }
 
+/** Persists a Product Agent result as review-only work; callers must never promote it to Ready. */
+export async function createProductAgentDraft(draft: ProductDraft, actorId: string, metadata: Record<string, unknown>) {
+  if (draft.verification_status !== "review_required") throw new Error("Product Agent output must require Gate 01 review.");
+  const id = draft.record_id;
+  const now = new Date();
+  const approvalId = randomUUID();
+  const eventId = randomUUID();
+  assertTransition({ eventId, entityType: "product", entityId: id, fromState: "PRODUCT_IMPORTED", toState: "PRODUCT_REVIEW_REQUIRED", actorType: "agent", actorId: "product_agent", occurredAt: now.toISOString(), evidenceRefs: draft.evidence_refs });
+  await getDatabase().transaction(async (tx) => {
+    await tx.insert(aggregateRecord).values({ id, type: "product", state: "PRODUCT_REVIEW_REQUIRED", payload: draft as unknown as Record<string, unknown>, createdByType: "agent", createdById: "product_agent" });
+    await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_01_truth", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
+    await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "PRODUCT_IMPORTED", toState: "PRODUCT_REVIEW_REQUIRED", actorType: "agent", actorId: "product_agent", evidenceRefs: draft.evidence_refs, occurredAt: now });
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: "product_agent_draft_created", actorType: "agent", actorId: "product_agent", aggregateId: id, subjectType: "product", subjectId: id, metadata: { ...metadata, requested_by: actorId, blocking_field_count: draft.blocking_missing_fields.length }, occurredAt: now });
+  });
+  return { id, approvalId, draft };
+}
+
 function catalogEntry(
   row: typeof aggregateRecord.$inferSelect,
   approvalRow?: Pick<typeof approval.$inferSelect, "id" | "status">,

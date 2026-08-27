@@ -94,6 +94,11 @@ pnpm db:migrate
 `PRODUCT_REVIEW_REQUIRED` 草稿。每条已填写的字段必须带脱敏的私有证据引用；录入不会使
 产品成为 `ProductReady`，也不会生成正式报价或交期。真实目录、产品图片与本机路径都不能提交到 Git。
 
+已配置模型的管理员可在 `/console/product-agent` 上传已获授权的 PDF、CSV、XLS 或 XLSX（最大 25MB），
+或粘贴已脱敏的预处理文本。上传文件会以 `restricted` 分类写入 Vercel Private Blob 与 evidence 表，再在
+短生命周期的本地副本上预处理；Product Agent 只生成 `PRODUCT_REVIEW_REQUIRED` 草稿。该入口不支持把本机路径
+或公开 URL 作为来源，且每次运行均需 Gate 01 人工审核。
+
 ### 托管服务适配层
 
 - Workflow SDK 使用稳定版 4.x，Human Gate 只传递 approval/aggregate 标识和人工决策；业务状态仍写入 PostgreSQL。
