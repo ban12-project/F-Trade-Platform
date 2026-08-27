@@ -49,3 +49,6 @@ playwright-report/
 test-results/
 blob-report/
 /.swc
+
+# Authorized local catalog references must never be committed or uploaded.
+docs/reference/*.pdf
