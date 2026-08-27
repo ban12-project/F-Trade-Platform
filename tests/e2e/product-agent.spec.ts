@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-import { createProductAgentModel } from "../../lib/ai/model-provider";
+import {
+  createProductAgentModel,
+  validateProductAgentModelConfig,
+} from "../../lib/ai/model-provider";
 import { productAgentModelSettingsSchema } from "../../lib/form-schemas";
 import {
   finalizeProductAgentDraft,
@@ -79,6 +82,19 @@ test("fails closed when a saved OpenAI-compatible provider has no endpoint", () 
     model: "gpt-test",
     providerOptions: { apiKey: "test-key" },
   })).toThrow("Saved OpenAI-compatible provider requires a Base URL");
+});
+
+test("rejects saving a provider configuration without an authentication method", () => {
+  expect(() => validateProductAgentModelConfig({
+    provider: "openai-compatible",
+    model: "gateway-model",
+    providerOptions: { baseURL: "https://gateway.example.test/v1" },
+  })).toThrow("API key");
+  expect(() => validateProductAgentModelConfig({
+    provider: "anthropic",
+    model: "claude-test",
+    providerOptions: {},
+  })).toThrow("API key or Auth token");
 });
 
 test("finalizes only source-backed review drafts", () => {

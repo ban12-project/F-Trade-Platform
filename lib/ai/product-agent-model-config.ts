@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
-import type { ProductAgentModelConfig, SupportedModelProvider } from "./model-provider";
+import {
+  validateProductAgentModelConfig,
+  type ProductAgentModelConfig,
+  type SupportedModelProvider,
+} from "./model-provider";
 import { getDatabase } from "../db/client";
 import { auditEvent, productAgentModelConfig } from "../db/schema";
 
@@ -137,6 +141,21 @@ export async function saveProductAgentModelSettings(input: SaveProductAgentModel
     : input.authToken
       ? encrypt(input.authToken)
       : existing?.authTokenCiphertext ?? null;
+  validateProductAgentModelConfig({
+    provider: input.provider,
+    model: input.model,
+    providerOptions: {
+      baseURL: optional(input.baseUrl),
+      headers: input.headers,
+      name: optional(input.providerName),
+      organization: optional(input.organization),
+      project: optional(input.project),
+      // Configuration validation only needs to establish that a non-empty encrypted
+      // credential exists; it must not decrypt or return that credential while saving.
+      apiKey: apiKeyCiphertext ? "configured" : undefined,
+      authToken: authTokenCiphertext ? "configured" : undefined,
+    },
+  });
   const values = {
     id: CONFIG_ID,
     provider: input.provider,

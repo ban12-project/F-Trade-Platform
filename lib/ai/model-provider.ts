@@ -26,7 +26,7 @@ function hasAuthenticationHeader(headers: Record<string, string | undefined> | u
   );
 }
 
-function assertProviderConfiguration(config: ProductAgentModelConfig) {
+export function validateProductAgentModelConfig(config: ProductAgentModelConfig) {
   const options = config.providerOptions as {
     apiKey?: string;
     authToken?: string;
@@ -48,7 +48,7 @@ function assertProviderConfiguration(config: ProductAgentModelConfig) {
 }
 
 export function createProductAgentModel(config: ProductAgentModelConfig): LanguageModel {
-  assertProviderConfiguration(config);
+  validateProductAgentModelConfig(config);
   switch (config.provider) {
     case "openai":
     case "openai-compatible":
