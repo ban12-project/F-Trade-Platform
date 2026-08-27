@@ -5,6 +5,7 @@ import {
   BoxesIcon,
   ClipboardCheckIcon,
   FilePenLineIcon,
+  KeyRoundIcon,
   LayoutDashboardIcon,
   UserPlusIcon,
 } from "lucide-react";
@@ -116,6 +117,18 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarSeparator />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={isItemActive(pathname, "/console/security")}
+              render={<Link href="/console/security" />}
+              tooltip="账号安全与 Passkey"
+            >
+              <KeyRoundIcon aria-hidden="true" />
+              <span>账号安全与 Passkey</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <div className="flex items-start gap-2 px-2 py-2 text-xs text-sidebar-foreground/65 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <ClipboardCheckIcon aria-hidden="true" className="mt-0.5 shrink-0" />
           <span className="leading-5 group-data-[collapsible=icon]:hidden">
