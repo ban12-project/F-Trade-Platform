@@ -1,15 +1,13 @@
-import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { auth } from "@/lib/auth";
+import { getSessionCookie } from "better-auth/cookies";
 
 export async function proxy(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
+  // Proxy runs for navigations and prefetches. This is intentionally only an
+  // optimistic cookie check; every console page and mutation verifies the
+  // session and administrator role again before accessing protected data.
+  if (!getSessionCookie(request)) {
     return NextResponse.redirect(new URL("/auth", request.url));
-  }
-  if (session.user.role !== "admin") {
-    return NextResponse.redirect(new URL("/auth?error=access-denied", request.url));
   }
   return NextResponse.next();
 }
