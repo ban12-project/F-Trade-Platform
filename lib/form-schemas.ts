@@ -45,6 +45,19 @@ export const productReviewFormSchema = z.object({
   notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
 });
 
+/** Deliberately accepts pre-authorized, sanitized text only; raw factory files stay in private evidence storage. */
+export const productAgentRunFormSchema = z.object({
+  sourceRef: privateReference.optional().or(z.literal("")),
+  evidenceRef: privateReference.optional().or(z.literal("")),
+  sourceText: z.string().trim().max(120_000, "资料文本不能超过 120000 个字符。"),
+  hasUpload: z.boolean(),
+}).superRefine((value, context) => {
+  if (value.hasUpload) return;
+  if (!value.sourceRef) context.addIssue({ code: "custom", path: ["sourceRef"], message: "请填写来源引用。" });
+  if (!value.evidenceRef) context.addIssue({ code: "custom", path: ["evidenceRef"], message: "请填写字段证据引用。" });
+  if (value.sourceText.trim().length < 20) context.addIssue({ code: "custom", path: ["sourceText"], message: "请粘贴至少 20 个字符的已授权资料文本。" });
+});
+
 const contentText = z.string().trim().min(1, "此字段不能为空。").max(4_000, "此字段不能超过 4000 个字符。");
 
 export const contentDraftFormSchema = z.object({
@@ -58,6 +71,28 @@ export const contentDraftFormSchema = z.object({
   callToAction: z.string().trim().min(1, "请填写行动号召。").max(500, "行动号召不能超过 500 个字符。"),
   hashtags: z.string().trim().max(500, "标签不能超过 500 个字符。"),
   visualInstruction: contentText,
+});
+
+export const contentAgentRequestSchema = contentDraftFormSchema.pick({
+  productId: true,
+  contentType: true,
+  factPath: true,
+  objective: true,
+  targetCustomer: true,
+});
+
+const optionalRfqText = z.string().trim().max(240, "字段不能超过 240 个字符。");
+export const rfqFormSchema = z.object({
+  customerName: optionalRfqText,
+  customerCompany: optionalRfqText,
+  customerCountry: optionalRfqText,
+  productType: z.enum(["clutch_disc", "clutch_cover", "release_bearing", "clutch_kit"]),
+  oeNumber: optionalRfqText,
+  vehicleBrand: optionalRfqText,
+  vehicleModel: optionalRfqText,
+  quantity: z.string().trim().regex(/^$|^[1-9]\d*$/, "数量必须是正整数。"),
+  destination: optionalRfqText,
+  evidenceRef: privateReference,
 });
 
 export const contentReviewFormSchema = z.object({
