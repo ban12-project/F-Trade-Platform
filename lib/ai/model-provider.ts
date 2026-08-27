@@ -1,46 +1,63 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic, type AnthropicProviderSettings } from "@ai-sdk/anthropic";
+import {
+  createGoogleGenerativeAI,
+  type GoogleGenerativeAIProviderSettings,
+} from "@ai-sdk/google";
+import { createOpenAI, type OpenAIProviderSettings } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
 export type SupportedModelProvider = "openai" | "anthropic" | "google" | "openai-compatible";
 
-export interface ParsedModelId {
+type ConfigurableProviderSettings =
+  | OpenAIProviderSettings
+  | AnthropicProviderSettings
+  | GoogleGenerativeAIProviderSettings;
+
+/** A Product Agent model is always constructed from a saved provider configuration. */
+export interface ProductAgentModelConfig {
   provider: SupportedModelProvider;
   model: string;
+  providerOptions: ConfigurableProviderSettings;
 }
 
-export function parseModelId(modelId: string): ParsedModelId {
-  const match = /^(openai|anthropic|google|openai-compatible)\/([^/\s]+)$/.exec(modelId);
-  if (!match) {
-    throw new Error(
-      "Model must use provider/model format with openai, anthropic, google, or openai-compatible",
-    );
+function hasAuthenticationHeader(headers: Record<string, string | undefined> | undefined) {
+  return Object.keys(headers ?? {}).some((header) =>
+    /^(authorization|x-api-key|api-key|x-goog-api-key)$/i.test(header),
+  );
+}
+
+function assertProviderConfiguration(config: ProductAgentModelConfig) {
+  const options = config.providerOptions as {
+    apiKey?: string;
+    authToken?: string;
+    baseURL?: string;
+    headers?: Record<string, string | undefined>;
+  };
+  if (config.provider === "openai-compatible" && !options.baseURL) {
+    throw new Error("Saved OpenAI-compatible provider requires a Base URL");
   }
-  return { provider: match[1] as SupportedModelProvider, model: match[2] };
-}
-
-function requiredSecret(name: string) {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required ${name} for the selected model provider`);
-  return value;
-}
-
-export function createProductAgentModel(modelId: string): LanguageModel {
-  const { provider, model } = parseModelId(modelId);
-  switch (provider) {
-    case "openai":
-      return createOpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") })(model);
-    case "openai-compatible": {
-      const baseURL = requiredSecret("F_TRADE_OPENAI_COMPATIBLE_BASE_URL");
-      return createOpenAI({
-        apiKey: requiredSecret("F_TRADE_OPENAI_COMPATIBLE_API_KEY"),
-        baseURL,
-      })(model);
+  if (config.provider === "anthropic") {
+    if (!options.apiKey && !options.authToken && !hasAuthenticationHeader(options.headers)) {
+      throw new Error("Saved Anthropic provider requires an API key or Auth token");
     }
+    return;
+  }
+  if (!options.apiKey && !hasAuthenticationHeader(options.headers)) {
+    throw new Error(`Saved ${config.provider} provider requires an API key`);
+  }
+}
+
+export function createProductAgentModel(config: ProductAgentModelConfig): LanguageModel {
+  assertProviderConfiguration(config);
+  switch (config.provider) {
+    case "openai":
+    case "openai-compatible":
+      return createOpenAI(config.providerOptions as OpenAIProviderSettings)(config.model);
     case "anthropic":
-      return createAnthropic({ apiKey: requiredSecret("ANTHROPIC_API_KEY") })(model);
+      return createAnthropic(config.providerOptions as AnthropicProviderSettings)(config.model);
     case "google":
-      return createGoogleGenerativeAI({ apiKey: requiredSecret("GOOGLE_GENERATIVE_AI_API_KEY") })(model);
+      return createGoogleGenerativeAI(
+        config.providerOptions as GoogleGenerativeAIProviderSettings,
+      )(config.model);
   }
 }

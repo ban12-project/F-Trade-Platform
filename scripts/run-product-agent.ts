@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { createProductAgentModel } from "../lib/ai/model-provider";
+import { resolveProductAgentModelConfig } from "../lib/ai/product-agent-model-config";
 import { AiSdkProductAgent, validateProductAgentSource } from "../lib/product/agent";
 import { preprocessProductAgentDocument } from "../lib/product/document-source";
 
@@ -14,8 +15,6 @@ async function main() {
   const inputPath = resolve(option("--input", "input/source.json"));
   const outputPath = resolve(option("--output", "output/product-draft.json"));
   const documentPath = option("--document", "");
-  const modelId = option("--model", process.env.F_TRADE_MODEL ?? "");
-  if (!modelId) throw new Error("Pass --model provider/model or set F_TRADE_MODEL");
 
   const preparedDocument = documentPath
     ? await preprocessProductAgentDocument({
@@ -29,7 +28,7 @@ async function main() {
     ? preparedDocument.source
     : validateProductAgentSource(JSON.parse(await readFile(inputPath, "utf8")));
   const result = await new AiSdkProductAgent().run({
-    model: createProductAgentModel(modelId),
+    model: createProductAgentModel(await resolveProductAgentModelConfig()),
     source,
   });
   await mkdir(dirname(outputPath), { recursive: true });

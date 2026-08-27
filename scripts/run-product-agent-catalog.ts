@@ -2,6 +2,7 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { createProductAgentModel } from "../lib/ai/model-provider";
+import { resolveProductAgentModelConfig } from "../lib/ai/product-agent-model-config";
 import { AiSdkProductAgent } from "../lib/product/agent";
 import { discoverCatalogCandidates } from "../lib/product/catalog-candidates";
 import { preprocessProductAgentDocument } from "../lib/product/document-source";
@@ -123,11 +124,9 @@ async function main() {
   }
   if (candidates.length === 0) throw new Error("No supported catalog product identifiers found");
 
-  const modelId = option("--model", process.env.F_TRADE_MODEL ?? "");
-  if (!modelId) throw new Error("Pass --model provider/model or set F_TRADE_MODEL");
-
+  const modelConfig = await resolveProductAgentModelConfig();
   const agent = new AiSdkProductAgent();
-  const model = createProductAgentModel(modelId);
+  const model = createProductAgentModel(modelConfig);
   const results: CatalogResult[] = candidates.map((candidate) => ({
     identifier: candidate.identifier,
     status: "pending",
@@ -140,7 +139,7 @@ async function main() {
       const temporaryPath = `${outputPath}.tmp`;
       await mkdir(dirname(outputPath), { recursive: true });
       await writeFile(temporaryPath, `${JSON.stringify({
-        model: modelId,
+        model: `${modelConfig.provider}/${modelConfig.model}`,
         prompt: { version: PRODUCT_AGENT_PROMPT_VERSION, hash: PRODUCT_AGENT_PROMPT_HASH },
         document: {
           document_sha256: document.document_sha256,

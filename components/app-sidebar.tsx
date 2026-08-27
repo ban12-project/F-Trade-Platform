@@ -7,6 +7,7 @@ import {
   FilePenLineIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
+  Settings2Icon,
   UserPlusIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -36,6 +37,7 @@ const workspaceItems = [
 
 const managementItems = [
   { href: "/console/invitations", label: "团队邀请", icon: UserPlusIcon },
+  { href: "/console/agent-settings", label: "Agent 配置", icon: Settings2Icon },
 ] as const;
 
 function isItemActive(pathname: string, href: string) {

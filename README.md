@@ -102,6 +102,18 @@ pnpm db:migrate
 
 模型的安全提示不能证明事实正确。生成内容中的产品事实还必须逐项匹配已提供的 `field/value/evidenceRef`，并继续经过 Gate 01 人工审核。
 
+### Product Agent 模型配置
+
+Product Agent 只从工作台“Agent 配置”页面中保存的 provider 读取模型、端点和认证信息，不再读取模型环境变量或命令行 `--model` 覆盖。API key 和 Auth token 会使用 `MODEL_CONFIG_ENCRYPTION_KEY` 以 AES-256-GCM 加密后写入数据库；设置该变量为 `openssl rand -base64 32` 的结果。密钥永不回显。未保存可用 provider 时，Agent 会明确拒绝运行。
+
+### 初始化管理员
+
+迁移完成后，用受控 seed 脚本创建或提升多个指定管理员。脚本由 Node 自动加载项目根目录的 `.env`，因此无需另行导出 `DATABASE_URL`。它不会删除数据、重置账户或启用公开注册；必须显式加 `--confirm`，并为每项变更写入审计事件。管理员随后在 `/auth` 使用邮箱验证码首次登录。
+
+```bash
+pnpm seed:admins -- --emails admin1@example.com,admin2@example.com --confirm
+```
+
 ### 产品真实性验证
 
 产品草稿中的每个已填写事实都必须通过 `field_evidence` 指向

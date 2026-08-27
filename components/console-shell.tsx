@@ -47,6 +47,9 @@ function getBreadcrumb(pathname: string) {
   if (pathname.startsWith("/console/invitations")) {
     return { section: "管理", current: "团队邀请", href: "/console/invitations" };
   }
+  if (pathname.startsWith("/console/agent-settings")) {
+    return { section: "管理", current: "Agent 配置", href: "/console/agent-settings" };
+  }
   if (pathname.startsWith("/console/security")) {
     return { section: "账号", current: "安全与 Passkey", href: "/console/security" };
   }

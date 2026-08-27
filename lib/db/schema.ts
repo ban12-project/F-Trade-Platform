@@ -331,4 +331,31 @@ export const socialInboundDelivery = pgTable(
   ],
 );
 
+/** Singleton, encrypted-at-rest configuration for the Product Agent's model provider. */
+export const productAgentModelConfig = pgTable(
+  "product_agent_model_config",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    baseUrl: text("base_url"),
+    headers: jsonb("headers").$type<Record<string, string>>().default({}).notNull(),
+    providerName: text("provider_name"),
+    organization: text("organization"),
+    project: text("project"),
+    apiKeyCiphertext: text("api_key_ciphertext"),
+    authTokenCiphertext: text("auth_token_ciphertext"),
+    updatedBy: text("updated_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    check("product_agent_model_config_singleton", sql`${table.id} = 'product_agent'`),
+    check("product_agent_model_config_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
+    check("product_agent_model_config_model_nonempty", sql`length(btrim(${table.model})) > 0`),
+  ],
+);
+
 export const authSchema = { user, session, account, verification };
