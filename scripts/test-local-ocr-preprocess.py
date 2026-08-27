@@ -44,6 +44,29 @@ with patch.object(MODULE.shutil, "which", return_value=None):
 
 assert MODULE.MAX_LOCAL_OCR_PAGES == 64
 
+with patch.dict(
+    os.environ,
+    {
+        "F_TRADE_OCR_OPENAI_COMPATIBLE_BASE_URL": "https://ocr.example.test/v1",
+        "F_TRADE_OCR_OPENAI_COMPATIBLE_API_KEY": "synthetic-ocr-key",
+        "F_TRADE_OCR_MODEL": "synthetic-ocr-model",
+    },
+    clear=True,
+):
+    assert MODULE.remote_ocr_config() == (
+        "https://ocr.example.test/v1",
+        "synthetic-ocr-key",
+        "synthetic-ocr-model",
+    )
+
+with patch.dict(os.environ, {"F_TRADE_OPENAI_COMPATIBLE_BASE_URL": "wrong-boundary"}, clear=True):
+    try:
+        MODULE.remote_ocr_config()
+    except SystemExit as error:
+        assert "F_TRADE_OCR_OPENAI_COMPATIBLE_BASE_URL" in str(error)
+    else:
+        raise AssertionError("Product Agent provider configuration must not satisfy remote OCR")
+
 with tempfile.TemporaryDirectory() as directory:
     image_only_pdf = Path(directory) / "synthetic-image-only.pdf"
     image_only_pdf.write_bytes(b"%PDF-synthetic")

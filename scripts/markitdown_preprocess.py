@@ -37,6 +37,18 @@ def local_ocr_language() -> str:
     return language
 
 
+def remote_ocr_config() -> tuple[str, str, str]:
+    base_url = os.environ.get("F_TRADE_OCR_OPENAI_COMPATIBLE_BASE_URL")
+    api_key = os.environ.get("F_TRADE_OCR_OPENAI_COMPATIBLE_API_KEY")
+    model = os.environ.get("F_TRADE_OCR_MODEL")
+    if not base_url or not api_key or not model:
+        fail(
+            "remote OCR requires F_TRADE_OCR_OPENAI_COMPATIBLE_BASE_URL, "
+            "F_TRADE_OCR_OPENAI_COMPATIBLE_API_KEY, and F_TRADE_OCR_MODEL"
+        )
+    return base_url, api_key, model
+
+
 def executable(name: str) -> str:
     resolved = shutil.which(name)
     if not resolved:
@@ -93,11 +105,7 @@ def convert_with_markitdown(path: Path, remote_ocr: bool):
     if remote_ocr:
         from openai import OpenAI
 
-        base_url = os.environ.get("F_TRADE_OPENAI_COMPATIBLE_BASE_URL")
-        api_key = os.environ.get("F_TRADE_OPENAI_COMPATIBLE_API_KEY")
-        model = os.environ.get("F_TRADE_OCR_MODEL")
-        if not base_url or not api_key or not model:
-            fail("remote OCR requires F_TRADE_OPENAI_COMPATIBLE_BASE_URL, API_KEY, and F_TRADE_OCR_MODEL")
+        base_url, api_key, model = remote_ocr_config()
         converter = MarkItDown(
             enable_plugins=True,
             llm_client=OpenAI(base_url=base_url, api_key=api_key),
