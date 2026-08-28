@@ -5,16 +5,14 @@ import { z } from "zod";
 
 import { getDatabase, type Database } from "@/lib/db/client";
 import { aggregateRecord } from "@/lib/db/schema";
+import { videoJobSubmissionFormSchema } from "@/lib/form-schemas";
 
 import { videoProjectSchema } from "./contracts";
 import { enqueueVideoJob } from "./job-store";
 import { loadVideoExecutionConfiguration } from "./provider-config-store";
-import { selectVerifiedVideoModel, videoGenerationRequestSchema } from "./provider-capabilities";
+import { selectVerifiedVideoModel } from "./provider-capabilities";
 
-export const videoJobSubmissionSchema = videoGenerationRequestSchema.extend({
-  videoId: z.uuid(),
-  expectedCostCents: z.number().int().positive().max(100_000_000),
-}).strict();
+export const videoJobSubmissionSchema = videoJobSubmissionFormSchema;
 export type VideoJobSubmission = z.infer<typeof videoJobSubmissionSchema>;
 
 export type SubmittedVideoJob = { id: string; status: "queued" | "running" | "succeeded" | "failed" | "cancelled" };

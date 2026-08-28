@@ -213,3 +213,14 @@ export const videoProviderModelSettingsFormSchema = z.object({
     context.addIssue({ code: "custom", path: ["modelEnabled"], message: "启用模型前必须填写验证时间和证据引用。" });
   }
 });
+
+export const videoJobSubmissionFormSchema = z.object({
+  videoId: z.uuid("视频计划标识无效。"),
+  provider: videoProvider,
+  modelId: z.string().trim().min(1, "请选择已验证模型。").max(240),
+  requiredCapabilities: z.array(z.enum(["text-to-video", "image-to-video", "reference-to-video", "video-editing", "audio-generation"])).min(1),
+  aspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]),
+  durationSeconds: z.coerce.number().int().positive().max(30),
+  resolution: z.string().trim().regex(/^\d{3,5}x\d{3,5}$/),
+  expectedCostCents: z.coerce.number().int().positive().max(100_000_000),
+}).strict();
