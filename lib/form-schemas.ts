@@ -60,6 +60,21 @@ export const productAgentRunFormSchema = z.object({
 
 const contentText = z.string().trim().min(1, "此字段不能为空。").max(4_000, "此字段不能超过 4000 个字符。");
 
+const videoPrivateAssetReference = z.string().trim().regex(/^asset-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写脱敏的私有素材引用，例如 asset-product-001。");
+const videoPlatform = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
+
+export const videoProjectDraftFormSchema = z.object({
+  productId: z.uuid("产品记录标识无效。"),
+  factPath: z.string().trim().regex(/^(?:product|specifications|commercial)\.[a-z_]+$/, "请选择已核验的产品字段。"),
+  objective: contentText,
+  targetAudience: z.string().trim().min(1, "请填写目标受众。").max(240, "目标受众不能超过 240 个字符。"),
+  scenePrompt: contentText,
+  durationSeconds: z.coerce.number().int("镜头时长必须是整数。").min(1, "镜头时长至少 1 秒。").max(30, "单个镜头不能超过 30 秒。"),
+  platforms: z.array(videoPlatform).min(1, "至少选择一个目标平台。").max(5),
+  assetRef: videoPrivateAssetReference,
+  rightsEvidenceRef: privateReference,
+});
+
 export const contentDraftFormSchema = z.object({
   productId: z.uuid("产品记录标识无效。"),
   contentType: z.enum(["product", "factory_capability", "industry_knowledge"]),
