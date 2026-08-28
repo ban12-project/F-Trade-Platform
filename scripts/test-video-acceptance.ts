@@ -40,7 +40,8 @@ assert.throws(() => beginVideoJob(job, "synthetic-provider-job-203", 2), /quota/
 
 assert.equal(validateVideoExport({ platform: "youtube", container: "mp4", videoCodec: "h264", audioCodec: "aac", width: 1920, height: 1080, fps: 30, durationSeconds: 5 }).platform, "youtube");
 assert.equal(validateVideoExport({ platform: "tiktok", container: "mp4", videoCodec: "h264", audioCodec: "aac", width: 1080, height: 1920, fps: 30, durationSeconds: 5 }).platform, "tiktok");
-assert.throws(() => validateVideoExport({ platform: "facebook", container: "mp4", videoCodec: "h264", audioCodec: "aac", width: 1080, height: 1920, fps: 30, durationSeconds: 5 }), /尚未经官方规格核验/);
+assert.equal(validateVideoExport({ platform: "facebook", container: "mp4", videoCodec: "h264", audioCodec: "aac", width: 1080, height: 1920, fps: 30, durationSeconds: 5 }).surface, "reels");
+assert.throws(() => validateVideoExport({ platform: "x", container: "mp4", videoCodec: "h264", audioCodec: "aac", width: 1920, height: 1080, fps: 30, durationSeconds: 5 }), /不满足/);
 
 const approval: ApprovalDecision = { id: "approval-content-201", aggregateId: videoId, gate: "gate_01_truth", status: "approved", decidedByType: "human", decidedById: "synthetic-reviewer", evidenceRef: "evidence-review-201" };
 const reviewToApproved: WorkflowEventInput = { eventId: "event-video-201", entityType: "video", entityId: videoId, fromState: "VIDEO_REVIEW_REQUIRED", toState: "VIDEO_APPROVED", actorType: "human", actorId: "synthetic-reviewer", occurredAt: "2026-08-28T01:00:00Z", evidenceRefs: ["evidence-review-201"], gate: "gate_01_truth", approvalRef: approval.id };
