@@ -48,6 +48,7 @@
     "test:video-jobs": "tsx scripts/test-video-jobs.ts",
     "test:video-export-presets": "tsx scripts/test-video-export-presets.ts",
     "test:video-acceptance": "tsx scripts/test-video-acceptance.ts",
+    "test:video-execution": "tsx scripts/test-video-execution.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
