@@ -7,7 +7,9 @@ import { completeVideoJob, claimConfiguredVideoJob, failVideoJob, type VideoJobR
 import { submitVideoGeneration, type VideoGenerationAdapter } from "./execution";
 import { loadVideoExecutionConfiguration, resolveVideoProviderCredential } from "./provider-config-store";
 import { videoProjectSchema } from "./contracts";
-import { videoGenerationRequestSchema, videoProviderIdSchema, type VideoProviderId } from "./provider-capabilities";
+import { videoGenerationRequestSchema, videoProviderIdSchema, type VideoModelCapability, type VideoProviderId } from "./provider-capabilities";
+import type { VideoProviderExecutionPolicy } from "./execution";
+import type { VideoProject } from "./contracts";
 
 export type RunVideoJobResult =
   | { kind: "idle" }
@@ -21,16 +23,55 @@ export type VideoJobRunnerDependencies = {
   retryDelayMs?: number;
 };
 
-function failureCode(error: unknown) {
+export function classifyVideoJobFailure(error: unknown) {
   if (error instanceof Error && /^retryable:/i.test(error.message)) return "provider_retryable";
   if (error instanceof Error && /未启用|未配置|尚未通过验证|不满足|不支持|预算|并发/i.test(error.message)) return "configuration_rejected";
   return "provider_submission_failed";
 }
 
-function retryAt(error: unknown, delayMs: number) {
+export function retryVideoJobAt(error: unknown, delayMs: number) {
   return error instanceof Error && /^retryable:/i.test(error.message)
     ? new Date(Date.now() + delayMs)
     : undefined;
+}
+
+export type LeasedVideoExecutionDependencies = {
+  project: VideoProject;
+  catalog: readonly VideoModelCapability[];
+  policies: readonly VideoProviderExecutionPolicy[];
+  adapters: readonly VideoGenerationAdapter[];
+  resolveCredential: (reference: string) => Promise<string>;
+};
+
+/** Executes a pre-claimed lease without touching scheduling or publication. */
+export async function executeLeasedVideoJob(
+  job: VideoJobRecord,
+  provider: VideoProviderId,
+  dependencies: LeasedVideoExecutionDependencies,
+) {
+  const policies = dependencies.policies.map((policy) => policy.provider === provider
+    ? { ...policy, budgetCommittedCents: Math.max(0, policy.budgetCommittedCents - job.reservedCostCents) }
+    : policy);
+  const generation = videoGenerationRequestSchema.parse({
+    provider,
+    modelId: job.modelId,
+    requiredCapabilities: job.requiredCapabilities,
+    aspectRatio: job.aspectRatio,
+    durationSeconds: job.durationSeconds,
+    resolution: job.resolution,
+  });
+  const result = await submitVideoGeneration({
+    project: dependencies.project,
+    generation,
+    expectedCostCents: job.expectedCostCents,
+  }, {
+    catalog: dependencies.catalog,
+    policies,
+    adapters: dependencies.adapters,
+    activeJobsByProvider: {},
+    resolveCredential: dependencies.resolveCredential,
+  });
+  return { result, maximumAttempts: policies.find((policy) => policy.provider === provider)?.maximumAttempts ?? 1 };
 }
 
 async function videoProjectForJob(job: VideoJobRecord, database: Database) {
@@ -64,37 +105,19 @@ export async function runNextConfiguredVideoJob(
       loadVideoExecutionConfiguration(database),
       videoProjectForJob(job, database),
     ]);
-    // The job's reservation is already included in committed budget. Subtract
-    // just that reservation for the pure execution policy's pre-submit check.
-    const policies = configuration.policies.map((policy) => policy.provider === provider
-      ? { ...policy, budgetCommittedCents: Math.max(0, policy.budgetCommittedCents - job.reservedCostCents) }
-      : policy);
-    maximumAttempts = policies.find((policy) => policy.provider === provider)?.maximumAttempts ?? 1;
-    const generation = videoGenerationRequestSchema.parse({
-      provider,
-      modelId: job.modelId,
-      requiredCapabilities: job.requiredCapabilities,
-      aspectRatio: job.aspectRatio,
-      durationSeconds: job.durationSeconds,
-      resolution: job.resolution,
-    });
-    const result = await submitVideoGeneration({
+    const execution = await executeLeasedVideoJob(job, provider, {
       project,
-      generation,
-      expectedCostCents: job.expectedCostCents,
-    }, {
       catalog: configuration.catalog,
-      policies,
+      policies: configuration.policies,
       adapters: dependencies.adapters,
-      // claimConfiguredVideoJob holds the provider concurrency boundary.
-      activeJobsByProvider: {},
       resolveCredential: (reference) => resolveVideoProviderCredential(reference, database),
     });
-    const completed = await completeVideoJob(job.id, workerId, result.resultAssetRef, database);
-    return { kind: "succeeded", jobId: completed.id, resultAssetRef: result.resultAssetRef };
+    maximumAttempts = execution.maximumAttempts;
+    const completed = await completeVideoJob(job.id, workerId, execution.result.resultAssetRef, database);
+    return { kind: "succeeded", jobId: completed.id, resultAssetRef: execution.result.resultAssetRef };
   } catch (error) {
-    const code = failureCode(error);
-    const retry = retryAt(error, dependencies.retryDelayMs ?? 60_000);
+    const code = classifyVideoJobFailure(error);
+    const retry = retryVideoJobAt(error, dependencies.retryDelayMs ?? 60_000);
     const failed = await failVideoJob(job.id, workerId, code, retry, maximumAttempts, database);
     return { kind: "failed", jobId: failed.id, failureCode: code, retryScheduled: failed.status === "queued" };
   }
