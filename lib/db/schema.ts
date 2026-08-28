@@ -420,6 +420,30 @@ export const videoModelConfig = pgTable(
   ],
 );
 
+/** Opaque reference to a generated video held only in private object storage. */
+export const videoGeneratedAsset = pgTable(
+  "video_generated_asset",
+  {
+    assetRef: text("asset_ref").primaryKey(),
+    blobPath: text("blob_path").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    provider: text("provider").notNull(),
+    modelId: text("model_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("video_generated_asset_blob_path_uidx").on(table.blobPath),
+    index("video_generated_asset_provider_created_idx").on(table.provider, table.createdAt),
+    check("video_generated_asset_ref_nonempty", sql`length(btrim(${table.assetRef})) > 0`),
+    check("video_generated_asset_path_nonempty", sql`length(btrim(${table.blobPath})) > 0`),
+    check("video_generated_asset_content_type_video", sql`${table.contentType} LIKE 'video/%'`),
+    check("video_generated_asset_size_positive", sql`${table.sizeBytes} > 0`),
+    check("video_generated_asset_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
+    check("video_generated_asset_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
+  ],
+);
+
 /**
  * Metadata-only receipt for an official inbound social message. The composite
  * uniqueness constraint is the durable exactly-once claim boundary; message
