@@ -330,6 +330,9 @@ export const videoJob = pgTable(
     resultAssetRef: text("result_asset_ref"),
     failureCode: text("failure_code"),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    claimedBy: text("claimed_by"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -340,6 +343,10 @@ export const videoJob = pgTable(
     check("video_job_attempts_nonnegative", sql`${table.attempts} >= 0`),
     check("video_job_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
     check("video_job_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
+    check(
+      "video_job_lease_consistent",
+      sql`(${table.status} = 'running' AND ${table.claimedBy} IS NOT NULL AND ${table.claimedAt} IS NOT NULL AND ${table.leaseExpiresAt} IS NOT NULL) OR (${table.status} <> 'running' AND ${table.claimedBy} IS NULL AND ${table.claimedAt} IS NULL AND ${table.leaseExpiresAt} IS NULL)`,
+    ),
   ],
 );
 
