@@ -26,11 +26,14 @@ export const videoCapabilitySchema = z.enum([
 ]);
 export type VideoCapability = z.infer<typeof videoCapabilitySchema>;
 
+export const videoAspectRatioSchema = z.enum(["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]);
+export type VideoAspectRatio = z.infer<typeof videoAspectRatioSchema>;
+
 export const videoModelCapabilitySchema = z.object({
   provider: videoProviderIdSchema,
   modelId: z.string().trim().min(1).max(240),
   capabilities: z.array(videoCapabilitySchema).min(1).max(5),
-  aspectRatios: z.array(z.enum(["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"])).min(1).max(6),
+  aspectRatios: z.array(videoAspectRatioSchema).min(1).max(6),
   durationSeconds: z.object({ min: z.number().int().positive(), max: z.number().int().positive() }).refine((value) => value.min <= value.max),
   resolutions: z.array(z.string().trim().regex(/^\d{3,5}x\d{3,5}$/)).min(1).max(12),
   verifiedAt: z.coerce.date().nullable(),
@@ -50,7 +53,7 @@ export const videoGenerationRequestSchema = z.object({
   provider: videoProviderIdSchema,
   modelId: z.string().trim().min(1).max(240),
   requiredCapabilities: z.array(videoCapabilitySchema).min(1).max(5),
-  aspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]),
+  aspectRatio: videoAspectRatioSchema,
   durationSeconds: z.number().int().positive(),
   resolution: z.string().trim().regex(/^\d{3,5}x\d{3,5}$/),
 }).strict();

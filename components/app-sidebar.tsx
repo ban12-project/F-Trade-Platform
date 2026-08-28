@@ -42,6 +42,7 @@ const workspaceItems = [
 const managementItems = [
   { href: "/console/invitations", label: "团队邀请", icon: UserPlusIcon },
   { href: "/console/agent-settings", label: "Agent 配置", icon: Settings2Icon },
+  { href: "/console/video/settings", label: "视频模型配置", icon: KeyRoundIcon },
 ] as const;
 
 function isItemActive(pathname: string, href: string) {

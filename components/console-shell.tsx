@@ -56,6 +56,9 @@ function getBreadcrumb(pathname: string) {
   if (pathname.startsWith("/console/agent-settings")) {
     return { section: "管理", current: "Agent 配置", href: "/console/agent-settings" };
   }
+  if (pathname.startsWith("/console/video/settings")) {
+    return { section: "管理", current: "视频模型配置", href: "/console/video/settings" };
+  }
   if (pathname.startsWith("/console/security")) {
     return { section: "账号", current: "安全与 Passkey", href: "/console/security" };
   }
