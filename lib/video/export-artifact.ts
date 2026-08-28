@@ -15,7 +15,8 @@ export type ReviewVideoExport = {
   surface: "video" | "reels";
   presetVersion: string;
   presetSourceUrl: string;
-  status: "review_required";
+  status: "review_required" | "approved";
+  approvalRef?: string;
   measured: Pick<ProbedVideo, "width" | "height" | "fps" | "durationSeconds" | "subtitleStreamCount">;
   createdAt: string;
 };
@@ -61,4 +62,11 @@ export function createReviewVideoExport(input: z.input<typeof reviewVideoExportI
     },
     createdAt: new Date().toISOString(),
   };
+}
+
+/** A human evidence reference is required before an export can enter an API draft. */
+export function approveReviewVideoExport(exportArtifact: ReviewVideoExport, approvalRef: string): ReviewVideoExport {
+  if (exportArtifact.status !== "review_required") throw new Error("只有待审核导出物可以批准。 ");
+  if (!/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i.test(approvalRef)) throw new Error("导出批准必须关联脱敏证据引用。 ");
+  return { ...exportArtifact, status: "approved", approvalRef };
 }
