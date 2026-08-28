@@ -24,6 +24,7 @@ export const actorType = pgEnum("actor_type", ["agent", "human", "system"]);
 export const aggregateType = pgEnum("aggregate_type", [
   "product",
   "content",
+  "video",
   "rfq",
   "quotation",
   "lead",

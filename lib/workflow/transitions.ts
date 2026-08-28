@@ -1,6 +1,7 @@
 export type AggregateType =
   | "product"
   | "content"
+  | "video"
   | "rfq"
   | "quotation"
   | "lead"
@@ -52,6 +53,11 @@ const rules: readonly TransitionRule[] = [
   { entityType: "content", fromState: "CONTENT_REVIEW_REQUIRED", toState: "CONTENT_REVISION_REQUIRED", actors: ["human"], gate: "gate_01_truth", approvalStatus: "rejected" },
   { entityType: "content", fromState: "CONTENT_REVISION_REQUIRED", toState: "CONTENT_REVIEW_REQUIRED", actors: ["agent", "human"] },
   { entityType: "content", fromState: "CONTENT_APPROVED", toState: "CONTENT_PUBLISHED", actors: ["human", "system"] },
+  { entityType: "video", fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actors: ["agent", "human", "system"] },
+  { entityType: "video", fromState: "VIDEO_REVIEW_REQUIRED", toState: "VIDEO_APPROVED", actors: ["human"], gate: "gate_01_truth", approvalStatus: "approved" },
+  { entityType: "video", fromState: "VIDEO_REVIEW_REQUIRED", toState: "VIDEO_REVISION_REQUIRED", actors: ["human"], gate: "gate_01_truth", approvalStatus: "rejected" },
+  { entityType: "video", fromState: "VIDEO_REVISION_REQUIRED", toState: "VIDEO_REVIEW_REQUIRED", actors: ["agent", "human"] },
+  { entityType: "video", fromState: "VIDEO_APPROVED", toState: "VIDEO_EXPORT_READY", actors: ["human"], gate: "gate_01_truth", approvalStatus: "approved" },
   { entityType: "rfq", fromState: "RFQ_COLLECTING", toState: "RFQ_READY", actors: ["agent", "human"] },
   { entityType: "quotation", fromState: "QUOTE_DRAFT", toState: "QUOTE_REVIEW_REQUIRED", actors: ["human"] },
   { entityType: "quotation", fromState: "QUOTE_REVIEW_REQUIRED", toState: "QUOTE_APPROVED", actors: ["human"], gate: "gate_02_quote", approvalStatus: "approved" },
