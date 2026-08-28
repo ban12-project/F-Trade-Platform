@@ -39,7 +39,7 @@ export type VideoGenerationAdapterRequest = {
 };
 
 export type VideoGenerationAdapterResult = {
-  providerJobRef: string;
+  providerJobRef?: string;
   resultAssetRef: string;
 };
 
@@ -106,5 +106,5 @@ export async function submitVideoGeneration(
     resolution: request.generation.resolution,
     credential,
   });
-  return z.object({ providerJobRef: privateRef, resultAssetRef: privateRef }).parse(result);
+  return z.object({ providerJobRef: privateRef.optional(), resultAssetRef: privateRef }).parse(result);
 }
