@@ -46,6 +46,7 @@
     "test:video-provider-capabilities": "tsx scripts/test-video-provider-capabilities.ts",
     "test:video-creative": "tsx scripts/test-video-creative.ts",
     "test:video-jobs": "tsx scripts/test-video-jobs.ts",
+    "test:video-export-presets": "tsx scripts/test-video-export-presets.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
