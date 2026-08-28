@@ -71,8 +71,12 @@ export const videoProjectDraftFormSchema = z.object({
   scenePrompt: contentText,
   durationSeconds: z.coerce.number().int("镜头时长必须是整数。").min(1, "镜头时长至少 1 秒。").max(30, "单个镜头不能超过 30 秒。"),
   platforms: z.array(videoPlatform).min(1, "至少选择一个目标平台。").max(5),
-  assetRef: videoPrivateAssetReference,
-  rightsEvidenceRef: privateReference,
+  assetRef: videoPrivateAssetReference.optional().or(z.literal("")),
+  rightsEvidenceRef: privateReference.optional().or(z.literal("")),
+}).superRefine((value, context) => {
+  if (value.assetRef && !value.rightsEvidenceRef) {
+    context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "引用已有素材时必须提供其权利证据。" });
+  }
 });
 
 export const contentDraftFormSchema = z.object({
