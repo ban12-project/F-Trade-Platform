@@ -45,6 +45,7 @@
     "test:video-contracts": "tsx scripts/test-video-contracts.ts",
     "test:video-provider-capabilities": "tsx scripts/test-video-provider-capabilities.ts",
     "test:video-creative": "tsx scripts/test-video-creative.ts",
+    "test:video-jobs": "tsx scripts/test-video-jobs.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
