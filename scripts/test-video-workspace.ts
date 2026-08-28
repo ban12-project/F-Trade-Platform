@@ -15,7 +15,9 @@ const valid = {
 };
 
 assert.equal(videoProjectDraftFormSchema.parse(valid).durationSeconds, 5);
+assert.equal(videoProjectDraftFormSchema.parse({ ...valid, assetRef: "", rightsEvidenceRef: "" }).assetRef, "");
 assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, factPath: "engineering.oe_number" }), /已核验/);
 assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, platforms: [] }), /至少选择/);
 assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, assetRef: "https://example.com/image.png" }), /私有素材/);
+assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, rightsEvidenceRef: "" }), /权利证据/);
 console.log("PASS video workspace form accepts only bounded, private, evidence-oriented input");

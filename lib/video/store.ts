@@ -34,18 +34,19 @@ export async function listReadyVideoProductSources(): Promise<ReadyVideoProductS
   });
 }
 
-export async function createVideoProject(input: VideoProjectDraftInput, actorId: string) {
+export async function createVideoProject(input: VideoProjectDraftInput, actorId: string, uploadedAssets: VideoProject["sourceAssets"] = []) {
   const now = new Date(); const id = randomUUID(); const approvalId = randomUUID(); const eventId = randomUUID();
   return getDatabase().transaction(async (tx) => {
     const [product] = await tx.select({ id: aggregateRecord.id, state: aggregateRecord.state, payload: aggregateRecord.payload }).from(aggregateRecord).where(and(eq(aggregateRecord.id, input.productId), eq(aggregateRecord.type, "product"))).for("update");
     if (!product || product.state !== "PRODUCT_READY") throw new Error("只能从已通过 Gate 01 的产品创建视频项目。 ");
     const ready = product.payload as unknown as ProductReady;
     if (ready.record_id !== product.id || ready.verification_status !== "verified") throw new Error("产品就绪记录不完整，无法创建视频项目。 ");
-    const project = buildVideoCreative({ productId: product.id, objective: input.objective, targetAudience: input.targetAudience, factPaths: [input.factPath], sourceAssets: [{ assetRef: input.assetRef, mediaType: "image", rightsEvidenceRef: input.rightsEvidenceRef }], platforms: input.platforms, scenes: [{ prompt: input.scenePrompt, durationSeconds: input.durationSeconds, claimRefs: [input.factPath], assetRefs: [input.assetRef] }] }, ready, id);
-    assertTransition({ eventId, entityType: "video", entityId: id, fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actorType: "human", actorId, occurredAt: now.toISOString(), evidenceRefs: [...project.factualClaims.map((claim) => claim.evidenceRef), input.rightsEvidenceRef] });
+    const sourceAssets = [...uploadedAssets, ...(input.assetRef && input.rightsEvidenceRef ? [{ assetRef: input.assetRef, mediaType: "image" as const, rightsEvidenceRef: input.rightsEvidenceRef }] : [])];
+    const project = buildVideoCreative({ productId: product.id, objective: input.objective, targetAudience: input.targetAudience, factPaths: [input.factPath], sourceAssets, platforms: input.platforms, scenes: [{ prompt: input.scenePrompt, durationSeconds: input.durationSeconds, claimRefs: [input.factPath], assetRefs: sourceAssets.map((asset) => asset.assetRef) }] }, ready, id);
+    assertTransition({ eventId, entityType: "video", entityId: id, fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actorType: "human", actorId, occurredAt: now.toISOString(), evidenceRefs: [...project.factualClaims.map((claim) => claim.evidenceRef), ...sourceAssets.map((asset) => asset.rightsEvidenceRef)] });
     await tx.insert(aggregateRecord).values({ id, type: "video", state: "VIDEO_REVIEW_REQUIRED", payload: project, createdByType: "human", createdById: actorId });
     await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_01_truth", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
-    await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actorType: "human", actorId, evidenceRefs: [...project.factualClaims.map((claim) => claim.evidenceRef), input.rightsEvidenceRef], occurredAt: now });
+    await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actorType: "human", actorId, evidenceRefs: [...project.factualClaims.map((claim) => claim.evidenceRef), ...sourceAssets.map((asset) => asset.rightsEvidenceRef)], occurredAt: now });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "video_project.created", actorType: "human", actorId, aggregateId: id, subjectType: "video_project", subjectId: id, metadata: { product_id: product.id, platform_count: project.platforms.length, scene_count: project.scenes.length }, occurredAt: now });
     return { id, approvalId, project };
   });
