@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 
 import { getDatabase, type Database } from "@/lib/db/client";
-import { auditEvent, videoJob as videoJobTable } from "@/lib/db/schema";
-import type { VideoProviderId } from "./provider-capabilities";
+import { auditEvent, videoJob as videoJobTable, videoProviderConfig } from "@/lib/db/schema";
+import { videoGenerationRequestSchema, type VideoProviderId } from "./provider-capabilities";
 
 export type VideoJobRecord = typeof videoJobTable.$inferSelect;
 
@@ -13,6 +13,11 @@ export type EnqueueVideoJobInput = {
   videoProjectId: string;
   provider: VideoProviderId;
   modelId: string;
+  requiredCapabilities: string[];
+  aspectRatio: string;
+  durationSeconds: number;
+  resolution: string;
+  expectedCostCents: number;
   idempotencyKey: string;
   actorId: string;
 };
@@ -33,11 +38,22 @@ function auditValues(action: string, job: VideoJobRecord, actorId: string, now: 
 export async function enqueueVideoJob(input: EnqueueVideoJobInput, database: Database = getDatabase()): Promise<VideoJobRecord> {
   assertIdentifier(input.id, "video job ID"); assertIdentifier(input.videoProjectId, "video project ID");
   assertIdentifier(input.modelId, "video model ID"); assertIdentifier(input.idempotencyKey, "video idempotency key"); assertIdentifier(input.actorId, "actor ID");
+  const generation = videoGenerationRequestSchema.parse({
+    provider: input.provider,
+    modelId: input.modelId,
+    requiredCapabilities: input.requiredCapabilities,
+    aspectRatio: input.aspectRatio,
+    durationSeconds: input.durationSeconds,
+    resolution: input.resolution,
+  });
+  if (!Number.isSafeInteger(input.expectedCostCents) || input.expectedCostCents < 1) throw new Error("expected video cost must be a positive integer");
   const now = new Date();
   return database.transaction(async (tx) => {
     const [created] = await tx.insert(videoJobTable).values({
       id: input.id, videoProjectId: input.videoProjectId, provider: input.provider, modelId: input.modelId,
-      idempotencyKey: input.idempotencyKey, status: "queued", attempts: 0,
+      requiredCapabilities: generation.requiredCapabilities, aspectRatio: generation.aspectRatio,
+      durationSeconds: generation.durationSeconds, resolution: generation.resolution,
+      expectedCostCents: input.expectedCostCents, reservedCostCents: 0, idempotencyKey: input.idempotencyKey, status: "queued", attempts: 0,
     }).onConflictDoNothing({ target: videoJobTable.idempotencyKey }).returning();
     if (created) {
       await tx.insert(auditEvent).values(auditValues("video_job.queued", created, input.actorId, now));
@@ -45,10 +61,55 @@ export async function enqueueVideoJob(input: EnqueueVideoJobInput, database: Dat
     }
     const [existing] = await tx.select().from(videoJobTable).where(eq(videoJobTable.idempotencyKey, input.idempotencyKey)).for("update");
     if (!existing) throw new Error("Video job idempotency lookup failed");
-    if (existing.videoProjectId !== input.videoProjectId || existing.provider !== input.provider || existing.modelId !== input.modelId) {
+    if (existing.videoProjectId !== input.videoProjectId || existing.provider !== input.provider || existing.modelId !== input.modelId || existing.expectedCostCents !== input.expectedCostCents) {
       throw new Error("Video job idempotency key belongs to another request");
     }
     return existing;
+  });
+}
+
+export type ConfiguredVideoJobClaim =
+  | { kind: "claimed"; job: VideoJobRecord }
+  | { kind: "rejected"; job: VideoJobRecord; reason: "budget_limit" | "concurrency_limit" }
+  | undefined;
+
+/**
+ * Claims a job and reserves its budget under the provider row lock. The lock
+ * serializes provider concurrency and budget decisions; no provider call occurs
+ * until this function returns a claimed lease.
+ */
+export async function claimConfiguredVideoJob(
+  workerId: string,
+  provider: VideoProviderId,
+  leaseMs = 10 * 60_000,
+  database: Database = getDatabase(),
+): Promise<ConfiguredVideoJobClaim> {
+  assertIdentifier(workerId, "worker ID");
+  if (!Number.isSafeInteger(leaseMs) || leaseMs < 1_000) throw new Error("lease duration must be at least one second");
+  const now = new Date(); const expiresAt = new Date(now.getTime() + leaseMs);
+  return database.transaction(async (tx) => {
+    const [config] = await tx.select().from(videoProviderConfig).where(and(eq(videoProviderConfig.provider, provider), eq(videoProviderConfig.enabled, true))).for("update");
+    if (!config) return undefined;
+    const [active] = await tx.select({ count: sql<number>`count(*)` }).from(videoJobTable).where(and(eq(videoJobTable.provider, provider), eq(videoJobTable.status, "running"), gt(videoJobTable.leaseExpiresAt, now)));
+    if (Number(active?.count ?? 0) >= config.maximumConcurrentJobs) return undefined;
+    const [candidate] = await tx.select().from(videoJobTable).where(and(
+      eq(videoJobTable.provider, provider),
+      lte(videoJobTable.attempts, config.maximumAttempts - 1),
+      or(and(eq(videoJobTable.status, "queued"), or(isNull(videoJobTable.nextAttemptAt), lte(videoJobTable.nextAttemptAt, now))), and(eq(videoJobTable.status, "running"), lte(videoJobTable.leaseExpiresAt, now))),
+    )).orderBy(asc(videoJobTable.createdAt)).limit(1).for("update");
+    if (!candidate) return undefined;
+    const reserve = candidate.reservedCostCents === 0 ? candidate.expectedCostCents : 0;
+    if (config.budgetCommittedCents + reserve > config.budgetLimitCents) {
+      const [rejected] = await tx.update(videoJobTable).set({ status: "failed", failureCode: "budget_limit", claimedBy: null, claimedAt: null, leaseExpiresAt: null }).where(eq(videoJobTable.id, candidate.id)).returning();
+      if (!rejected) throw new Error("Video job budget rejection lost");
+      await tx.insert(auditEvent).values(auditValues("video_job.rejected", rejected, workerId, now, { failure_code: "budget_limit" }));
+      return { kind: "rejected", job: rejected, reason: "budget_limit" };
+    }
+    if (reserve > 0) await tx.update(videoProviderConfig).set({ budgetCommittedCents: sql`${videoProviderConfig.budgetCommittedCents} + ${reserve}` }).where(eq(videoProviderConfig.provider, provider));
+    const [claimed] = await tx.update(videoJobTable).set({ status: "running", attempts: sql`${videoJobTable.attempts} + 1`, reservedCostCents: candidate.reservedCostCents || candidate.expectedCostCents, claimedBy: workerId, claimedAt: now, leaseExpiresAt: expiresAt, nextAttemptAt: null, failureCode: null }).where(eq(videoJobTable.id, candidate.id)).returning();
+    if (!claimed) throw new Error("Video job claim lost");
+    await tx.insert(auditEvent).values(auditValues("video_job.claimed", claimed, workerId, now, { lease_expires_at: expiresAt.toISOString(), budget_reserved_cents: reserve }));
+    return { kind: "claimed", job: claimed };
   });
 }
 
