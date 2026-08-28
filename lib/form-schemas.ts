@@ -102,6 +102,25 @@ export const contentReviewFormSchema = z.object({
   notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
 });
 
+const videoText = z.string().trim().min(1, "此字段不能为空。").max(2_000, "此字段不能超过 2000 个字符。");
+const videoReference = z.string().trim().regex(/^(?:source|evidence|asset)-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写脱敏的私有来源引用。");
+
+export const videoProjectFormSchema = z.object({
+  productId: z.uuid("产品记录标识无效。"),
+  objective: videoText,
+  targetAudience: z.string().trim().min(1, "请填写目标受众。").max(240, "目标受众不能超过 240 个字符。"),
+  sourceFactRefs: z.array(privateReference).min(1, "至少选择一条已核验产品事实。").max(24, "最多选择 24 条产品事实。"),
+  sourceAssetRefs: z.array(videoReference).max(16, "最多选择 16 个已授权素材。").default([]),
+  platforms: z.array(z.enum(["facebook", "instagram", "x", "youtube", "tiktok"])).min(1, "至少选择一个导出平台。").max(5),
+});
+
+export const videoReviewFormSchema = z.object({
+  videoId: z.uuid("视频记录标识无效。"),
+  decision: z.enum(["approved", "rejected"]),
+  evidenceRef: privateReference,
+  notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
+});
+
 const modelProvider = z.enum(["openai", "anthropic", "google", "openai-compatible"]);
 const optionalProviderText = z.string().trim().max(2_000, "字段不能超过 2000 个字符。");
 
