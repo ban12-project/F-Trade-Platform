@@ -9,6 +9,8 @@ const measured = parseFfprobeOutput({ format: { format_name: "mov,mp4,m4a,3gp,3g
 ] });
 assert.equal(measured.subtitleStreamCount, 1);
 assert.equal(validateProbedVideoExport("tiktok", measured).platform, "tiktok");
+assert.equal(validateProbedVideoExport("instagram", measured).surface, "reels");
+assert.equal(validateProbedVideoExport("facebook", measured).surface, "reels");
 assert.throws(() => parseFfprobeOutput({ format: { format_name: "matroska", duration: "5" }, streams: [] }), /MP4/);
-assert.throws(() => validateProbedVideoExport("facebook", measured), /尚未经官方规格核验/);
+assert.throws(() => validateProbedVideoExport("facebook", { ...measured, durationSeconds: 2 }), /不满足/);
 console.log("PASS video export validation consumes measured ffprobe metadata");
