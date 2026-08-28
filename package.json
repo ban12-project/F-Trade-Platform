@@ -43,6 +43,7 @@
     "test:cadence": "tsx scripts/test-follow-up-cadence.ts",
     "test:content-gate": "tsx scripts/test-content-gate.ts",
     "test:video-contracts": "tsx scripts/test-video-contracts.ts",
+    "test:video-provider-capabilities": "tsx scripts/test-video-provider-capabilities.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
