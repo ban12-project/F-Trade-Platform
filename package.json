@@ -48,9 +48,11 @@
     "test:video-creative": "tsx scripts/test-video-creative.ts",
     "test:video-jobs": "tsx scripts/test-video-jobs.ts",
     "test:video-job-runner": "tsx scripts/test-video-job-runner.ts",
+    "test:video-job-submission": "tsx scripts/test-video-job-submission.ts",
     "test:video-export-presets": "tsx scripts/test-video-export-presets.ts",
     "test:video-acceptance": "tsx scripts/test-video-acceptance.ts",
     "test:video-execution": "tsx scripts/test-video-execution.ts",
+    "test:video-workspace": "tsx scripts/test-video-workspace.ts",
     "test:ai-sdk-video-adapters": "tsx scripts/test-ai-sdk-video-adapters.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
