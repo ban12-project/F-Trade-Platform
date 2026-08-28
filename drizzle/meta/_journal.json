@@ -57,6 +57,13 @@
       "when": 1787933600000,
       "tag": "0007_video_provider_config",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787937200000,
+      "tag": "0008_video_job_request",
+      "breakpoints": true
     }
   ]
 }
