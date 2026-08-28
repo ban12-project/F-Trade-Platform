@@ -51,6 +51,13 @@ export const evidenceClassification = pgEnum("evidence_classification", [
   "confidential",
   "restricted",
 ]);
+export const videoJobStatus = pgEnum("video_job_status", [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
 
 export const user = pgTable(
   "user",
@@ -300,6 +307,39 @@ export const auditEvent = pgTable(
     index("audit_subject_time_idx").on(table.subjectType, table.subjectId, table.occurredAt),
     index("audit_actor_time_idx").on(table.actorType, table.actorId, table.occurredAt),
     check("audit_actor_nonempty", sql`length(btrim(${table.actorId})) > 0`),
+  ],
+);
+
+/**
+ * Durable, metadata-only execution record for a video request. Generated
+ * files remain in private object storage and are referenced by opaque IDs.
+ */
+export const videoJob = pgTable(
+  "video_job",
+  {
+    id: text("id").primaryKey(),
+    videoProjectId: text("video_project_id")
+      .notNull()
+      .references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    provider: text("provider").notNull(),
+    modelId: text("model_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    status: videoJobStatus("status").default("queued").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    providerJobRef: text("provider_job_ref"),
+    resultAssetRef: text("result_asset_ref"),
+    failureCode: text("failure_code"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("video_job_idempotency_uidx").on(table.idempotencyKey),
+    index("video_job_status_next_attempt_idx").on(table.status, table.nextAttemptAt),
+    index("video_job_video_project_idx").on(table.videoProjectId),
+    check("video_job_attempts_nonnegative", sql`${table.attempts} >= 0`),
+    check("video_job_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
+    check("video_job_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
   ],
 );
 

@@ -36,6 +36,13 @@
       "when": 1787922800000,
       "tag": "0004_video_aggregate",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787926400000,
+      "tag": "0005_video_job",
+      "breakpoints": true
     }
   ]
 }
