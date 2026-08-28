@@ -40,7 +40,7 @@ export const videoModelCapabilitySchema = z.object({
   if (model.enabled && (!model.verifiedAt || !model.verificationRef)) {
     context.addIssue({ code: "custom", path: ["enabled"], message: "启用视频模型前必须记录可复核的验证时间和证据引用。" });
   }
-  if (model.enabled && model.verifiedAt && model.verifiedAt.getTime() > Date.now()) {
+  if (model.verifiedAt && model.verifiedAt.getTime() > Date.now()) {
     context.addIssue({ code: "custom", path: ["verifiedAt"], message: "验证时间不能在未来。" });
   }
 });

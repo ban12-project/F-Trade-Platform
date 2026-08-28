@@ -1,4 +1,3 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
@@ -10,9 +9,9 @@ import {
 } from "./model-provider";
 import { getDatabase } from "../db/client";
 import { auditEvent, productAgentModelConfig } from "../db/schema";
+import { decryptStoredSecret, encryptStoredSecret } from "../security/encrypted-secret";
 
 const CONFIG_ID = "product_agent";
-const CIPHER_PREFIX = "v1";
 
 export interface ProductAgentModelSettings {
   provider: SupportedModelProvider;
@@ -47,38 +46,6 @@ function optional(value: string) {
   return trimmed || undefined;
 }
 
-function encryptionKey() {
-  const encoded = process.env.MODEL_CONFIG_ENCRYPTION_KEY;
-  if (!encoded) {
-    throw new Error("MODEL_CONFIG_ENCRYPTION_KEY is required to store provider credentials");
-  }
-  const key = Buffer.from(encoded, "base64");
-  if (key.length !== 32) {
-    throw new Error("MODEL_CONFIG_ENCRYPTION_KEY must be a base64-encoded 32-byte key");
-  }
-  return key;
-}
-
-function encrypt(value: string) {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
-  const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-  return [CIPHER_PREFIX, iv.toString("base64"), cipher.getAuthTag().toString("base64"), ciphertext.toString("base64")].join(".");
-}
-
-function decrypt(value: string) {
-  const [version, encodedIv, encodedTag, encodedCiphertext] = value.split(".");
-  if (version !== CIPHER_PREFIX || !encodedIv || !encodedTag || !encodedCiphertext) {
-    throw new Error("Stored Product Agent credential is invalid");
-  }
-  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(encodedIv, "base64"));
-  decipher.setAuthTag(Buffer.from(encodedTag, "base64"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(encodedCiphertext, "base64")),
-    decipher.final(),
-  ]).toString("utf8");
-}
-
 export async function getStoredProductAgentModelSettings(): Promise<ProductAgentModelSettings | undefined> {
   const row = await getDatabase().query.productAgentModelConfig.findFirst({
     where: eq(productAgentModelConfig.id, CONFIG_ID),
@@ -103,8 +70,8 @@ export async function getSavedProductAgentModelConfig(): Promise<ProductAgentMod
     where: eq(productAgentModelConfig.id, CONFIG_ID),
   });
   if (!row) return undefined;
-  const apiKey = row.apiKeyCiphertext ? decrypt(row.apiKeyCiphertext) : undefined;
-  const authToken = row.authTokenCiphertext ? decrypt(row.authTokenCiphertext) : undefined;
+  const apiKey = row.apiKeyCiphertext ? decryptStoredSecret(row.apiKeyCiphertext, "Stored Product Agent credential is invalid") : undefined;
+  const authToken = row.authTokenCiphertext ? decryptStoredSecret(row.authTokenCiphertext, "Stored Product Agent credential is invalid") : undefined;
   return {
     provider: row.provider as SupportedModelProvider,
     model: row.model,
@@ -134,12 +101,12 @@ export async function saveProductAgentModelSettings(input: SaveProductAgentModel
   const apiKeyCiphertext = input.clearApiKey
     ? null
     : input.apiKey
-      ? encrypt(input.apiKey)
+      ? encryptStoredSecret(input.apiKey)
       : existing?.apiKeyCiphertext ?? null;
   const authTokenCiphertext = input.clearAuthToken
     ? null
     : input.authToken
-      ? encrypt(input.authToken)
+      ? encryptStoredSecret(input.authToken)
       : existing?.authTokenCiphertext ?? null;
   validateProductAgentModelConfig({
     provider: input.provider,

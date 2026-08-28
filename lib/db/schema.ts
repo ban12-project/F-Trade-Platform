@@ -350,6 +350,67 @@ export const videoJob = pgTable(
   ],
 );
 
+/** Per-provider execution limits and encrypted credentials. It is disabled by default. */
+export const videoProviderConfig = pgTable(
+  "video_provider_config",
+  {
+    provider: text("provider").primaryKey(),
+    enabled: boolean("enabled").default(false).notNull(),
+    credentialCiphertext: text("credential_ciphertext"),
+    maximumConcurrentJobs: integer("maximum_concurrent_jobs").default(1).notNull(),
+    maximumAttempts: integer("maximum_attempts").default(1).notNull(),
+    budgetLimitCents: integer("budget_limit_cents").default(1).notNull(),
+    budgetCommittedCents: integer("budget_committed_cents").default(0).notNull(),
+    runtimeSettings: jsonb("runtime_settings").$type<Record<string, string>>().default({}).notNull(),
+    updatedBy: text("updated_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    check("video_provider_config_name_nonempty", sql`length(btrim(${table.provider})) > 0`),
+    check("video_provider_config_concurrency_positive", sql`${table.maximumConcurrentJobs} > 0`),
+    check("video_provider_config_attempts_positive", sql`${table.maximumAttempts} > 0`),
+    check("video_provider_config_budget_positive", sql`${table.budgetLimitCents} > 0`),
+    check("video_provider_config_budget_consistent", sql`${table.budgetCommittedCents} >= 0 AND ${table.budgetCommittedCents} <= ${table.budgetLimitCents}`),
+    check("video_provider_config_enabled_has_credential", sql`NOT ${table.enabled} OR ${table.credentialCiphertext} IS NOT NULL`),
+  ],
+);
+
+/** Human-verified capability record. A package being installed never enables a model. */
+export const videoModelConfig = pgTable(
+  "video_model_config",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider")
+      .notNull()
+      .references(() => videoProviderConfig.provider, { onDelete: "restrict" }),
+    modelId: text("model_id").notNull(),
+    capabilities: jsonb("capabilities").$type<string[]>().default([]).notNull(),
+    aspectRatios: jsonb("aspect_ratios").$type<string[]>().default([]).notNull(),
+    durationMinimumSeconds: integer("duration_minimum_seconds").notNull(),
+    durationMaximumSeconds: integer("duration_maximum_seconds").notNull(),
+    resolutions: jsonb("resolutions").$type<string[]>().default([]).notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verificationRef: text("verification_ref"),
+    enabled: boolean("enabled").default(false).notNull(),
+    updatedBy: text("updated_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("video_model_config_provider_model_uidx").on(table.provider, table.modelId),
+    index("video_model_config_provider_enabled_idx").on(table.provider, table.enabled),
+    check("video_model_config_id_nonempty", sql`length(btrim(${table.id})) > 0`),
+    check("video_model_config_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
+    check("video_model_config_duration_consistent", sql`${table.durationMinimumSeconds} > 0 AND ${table.durationMaximumSeconds} >= ${table.durationMinimumSeconds}`),
+    check("video_model_config_enabled_verified", sql`NOT ${table.enabled} OR (${table.verifiedAt} IS NOT NULL AND ${table.verificationRef} IS NOT NULL AND length(btrim(${table.verificationRef})) > 0)`),
+  ],
+);
+
 /**
  * Metadata-only receipt for an official inbound social message. The composite
  * uniqueness constraint is the durable exactly-once claim boundary; message
