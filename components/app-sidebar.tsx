@@ -6,6 +6,7 @@ import {
   BotIcon,
   ClipboardCheckIcon,
   FilePenLineIcon,
+  ClapperboardIcon,
   MessagesSquareIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
@@ -35,6 +36,7 @@ const workspaceItems = [
   { href: "/console", label: "总览", icon: LayoutDashboardIcon },
   { href: "/console/products", label: "产品目录", icon: BoxesIcon },
   { href: "/console/content", label: "内容工作台", icon: FilePenLineIcon },
+  { href: "/console/video", label: "视频工作台", icon: ClapperboardIcon },
   { href: "/console/product-agent", label: "Product Agent", icon: BotIcon },
   { href: "/console/sales", label: "询盘与报价", icon: MessagesSquareIcon },
 ] as const;
@@ -42,6 +44,7 @@ const workspaceItems = [
 const managementItems = [
   { href: "/console/invitations", label: "团队邀请", icon: UserPlusIcon },
   { href: "/console/agent-settings", label: "Agent 配置", icon: Settings2Icon },
+  { href: "/console/video/settings", label: "视频模型配置", icon: KeyRoundIcon },
 ] as const;
 
 function isItemActive(pathname: string, href: string) {

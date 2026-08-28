@@ -323,6 +323,12 @@ export const videoJob = pgTable(
       .references(() => aggregateRecord.id, { onDelete: "restrict" }),
     provider: text("provider").notNull(),
     modelId: text("model_id").notNull(),
+    requiredCapabilities: jsonb("required_capabilities").$type<string[]>().default([]).notNull(),
+    aspectRatio: text("aspect_ratio").default("16:9").notNull(),
+    durationSeconds: integer("duration_seconds").default(1).notNull(),
+    resolution: text("resolution").default("1280x720").notNull(),
+    expectedCostCents: integer("expected_cost_cents").default(1).notNull(),
+    reservedCostCents: integer("reserved_cost_cents").default(0).notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     status: videoJobStatus("status").default("queued").notNull(),
     attempts: integer("attempts").default(0).notNull(),
@@ -330,6 +336,9 @@ export const videoJob = pgTable(
     resultAssetRef: text("result_asset_ref"),
     failureCode: text("failure_code"),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    claimedBy: text("claimed_by"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -340,6 +349,98 @@ export const videoJob = pgTable(
     check("video_job_attempts_nonnegative", sql`${table.attempts} >= 0`),
     check("video_job_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
     check("video_job_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
+    check("video_job_duration_positive", sql`${table.durationSeconds} > 0`),
+    check("video_job_expected_cost_positive", sql`${table.expectedCostCents} > 0`),
+    check("video_job_reserved_cost_consistent", sql`${table.reservedCostCents} >= 0 AND ${table.reservedCostCents} <= ${table.expectedCostCents}`),
+    check(
+      "video_job_lease_consistent",
+      sql`(${table.status} = 'running' AND ${table.claimedBy} IS NOT NULL AND ${table.claimedAt} IS NOT NULL AND ${table.leaseExpiresAt} IS NOT NULL) OR (${table.status} <> 'running' AND ${table.claimedBy} IS NULL AND ${table.claimedAt} IS NULL AND ${table.leaseExpiresAt} IS NULL)`,
+    ),
+  ],
+);
+
+/** Per-provider execution limits and encrypted credentials. It is disabled by default. */
+export const videoProviderConfig = pgTable(
+  "video_provider_config",
+  {
+    provider: text("provider").primaryKey(),
+    enabled: boolean("enabled").default(false).notNull(),
+    credentialCiphertext: text("credential_ciphertext"),
+    maximumConcurrentJobs: integer("maximum_concurrent_jobs").default(1).notNull(),
+    maximumAttempts: integer("maximum_attempts").default(1).notNull(),
+    budgetLimitCents: integer("budget_limit_cents").default(1).notNull(),
+    budgetCommittedCents: integer("budget_committed_cents").default(0).notNull(),
+    runtimeSettings: jsonb("runtime_settings").$type<Record<string, string>>().default({}).notNull(),
+    updatedBy: text("updated_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    check("video_provider_config_name_nonempty", sql`length(btrim(${table.provider})) > 0`),
+    check("video_provider_config_concurrency_positive", sql`${table.maximumConcurrentJobs} > 0`),
+    check("video_provider_config_attempts_positive", sql`${table.maximumAttempts} > 0`),
+    check("video_provider_config_budget_positive", sql`${table.budgetLimitCents} > 0`),
+    check("video_provider_config_budget_consistent", sql`${table.budgetCommittedCents} >= 0 AND ${table.budgetCommittedCents} <= ${table.budgetLimitCents}`),
+    check("video_provider_config_enabled_has_credential", sql`NOT ${table.enabled} OR ${table.credentialCiphertext} IS NOT NULL`),
+  ],
+);
+
+/** Human-verified capability record. A package being installed never enables a model. */
+export const videoModelConfig = pgTable(
+  "video_model_config",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider")
+      .notNull()
+      .references(() => videoProviderConfig.provider, { onDelete: "restrict" }),
+    modelId: text("model_id").notNull(),
+    capabilities: jsonb("capabilities").$type<string[]>().default([]).notNull(),
+    aspectRatios: jsonb("aspect_ratios").$type<string[]>().default([]).notNull(),
+    durationMinimumSeconds: integer("duration_minimum_seconds").notNull(),
+    durationMaximumSeconds: integer("duration_maximum_seconds").notNull(),
+    resolutions: jsonb("resolutions").$type<string[]>().default([]).notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verificationRef: text("verification_ref"),
+    enabled: boolean("enabled").default(false).notNull(),
+    updatedBy: text("updated_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("video_model_config_provider_model_uidx").on(table.provider, table.modelId),
+    index("video_model_config_provider_enabled_idx").on(table.provider, table.enabled),
+    check("video_model_config_id_nonempty", sql`length(btrim(${table.id})) > 0`),
+    check("video_model_config_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
+    check("video_model_config_duration_consistent", sql`${table.durationMinimumSeconds} > 0 AND ${table.durationMaximumSeconds} >= ${table.durationMinimumSeconds}`),
+    check("video_model_config_enabled_verified", sql`NOT ${table.enabled} OR (${table.verifiedAt} IS NOT NULL AND ${table.verificationRef} IS NOT NULL AND length(btrim(${table.verificationRef})) > 0)`),
+  ],
+);
+
+/** Opaque reference to a generated video held only in private object storage. */
+export const videoGeneratedAsset = pgTable(
+  "video_generated_asset",
+  {
+    assetRef: text("asset_ref").primaryKey(),
+    blobPath: text("blob_path").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    provider: text("provider").notNull(),
+    modelId: text("model_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("video_generated_asset_blob_path_uidx").on(table.blobPath),
+    index("video_generated_asset_provider_created_idx").on(table.provider, table.createdAt),
+    check("video_generated_asset_ref_nonempty", sql`length(btrim(${table.assetRef})) > 0`),
+    check("video_generated_asset_path_nonempty", sql`length(btrim(${table.blobPath})) > 0`),
+    check("video_generated_asset_content_type_video", sql`${table.contentType} LIKE 'video/%'`),
+    check("video_generated_asset_size_positive", sql`${table.sizeBytes} > 0`),
+    check("video_generated_asset_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
+    check("video_generated_asset_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
   ],
 );
 
