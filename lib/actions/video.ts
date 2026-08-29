@@ -21,6 +21,6 @@ export async function createVideoProjectAction(_previous: VideoActionState, form
     const uploadedAssets = await prepareUploadedVideoAssets(files, session.user.id, parsed.data.rightsEvidenceRef || "");
     const result = await createVideoProject(parsed.data, session.user.id, uploadedAssets);
     revalidatePath("/console/video");
-    return { status: "success", message: `视频项目已创建（${result.id.slice(0, 8)}），等待 Gate 01 人工审核。` };
+    return { status: "success", message: `视频项目已创建（${result.id.slice(0, 8)}），创意检查仅作建议。` };
   } catch (error) { return { status: "error", message: error instanceof Error ? error.message : "无法创建视频项目。" }; }
 }

@@ -76,8 +76,8 @@ export async function submitVideoGeneration(
   dependencies: VideoExecutionDependencies,
 ): Promise<VideoGenerationAdapterResult> {
   const project = videoProjectSchema.parse(request.project);
-  if (project.status !== "review_required" && project.status !== "approved") {
-    throw new Error("只有待审核或已批准的视频计划可以提交生成任务。");
+  if (project.status !== "ready_for_generation" && project.status !== "review_required" && project.status !== "approved") {
+    throw new Error("视频创意尚未准备好生成。");
   }
   if (!Number.isSafeInteger(request.expectedCostCents) || request.expectedCostCents < 1) {
     throw new Error("视频生成必须提供正整数的预估成本。 ");

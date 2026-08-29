@@ -58,6 +58,8 @@ export const videoJobStatus = pgEnum("video_job_status", [
   "failed",
   "cancelled",
 ]);
+export const videoReviewStage = pgEnum("video_review_stage", ["pre_generation", "post_generation"]);
+export const videoReviewOutcome = pgEnum("video_review_outcome", ["accepted", "changes_requested", "skipped"]);
 
 export const user = pgTable(
   "user",
@@ -417,6 +419,26 @@ export const videoModelConfig = pgTable(
     check("video_model_config_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
     check("video_model_config_duration_consistent", sql`${table.durationMinimumSeconds} > 0 AND ${table.durationMaximumSeconds} >= ${table.durationMinimumSeconds}`),
     check("video_model_config_enabled_verified", sql`NOT ${table.enabled} OR (${table.verifiedAt} IS NOT NULL AND ${table.verificationRef} IS NOT NULL AND length(btrim(${table.verificationRef})) > 0)`),
+  ],
+);
+
+/** Advisory creative review. It records guidance and never authorizes product facts or publication. */
+export const videoAdvisoryReview = pgTable(
+  "video_advisory_review",
+  {
+    id: text("id").primaryKey(),
+    videoProjectId: text("video_project_id").notNull().references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    stage: videoReviewStage("stage").notNull(),
+    outcome: videoReviewOutcome("outcome").notNull(),
+    reason: text("reason").notNull(),
+    riskSnapshot: jsonb("risk_snapshot").$type<Record<string, unknown>>().default({}).notNull(),
+    decidedBy: text("decided_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("video_advisory_review_project_stage_idx").on(table.videoProjectId, table.stage, table.decidedAt),
+    check("video_advisory_review_reason_nonempty", sql`length(btrim(${table.reason})) > 0`),
   ],
 );
 

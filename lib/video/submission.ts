@@ -17,7 +17,7 @@ export type VideoJobSubmission = z.infer<typeof videoJobSubmissionSchema>;
 
 export type SubmittedVideoJob = { id: string; status: "queued" | "running" | "succeeded" | "failed" | "cancelled" };
 
-/** Stable opaque identity for exactly-once submission of the same reviewed plan. */
+/** Stable opaque identity for exactly-once submission of the same prepared plan. */
 export function videoJobIdempotencyKey(submission: VideoJobSubmission) {
   const value = JSON.stringify({
     videoId: submission.videoId,
@@ -33,7 +33,7 @@ export function videoJobIdempotencyKey(submission: VideoJobSubmission) {
 }
 
 /**
- * Queues one job from an approved video aggregate. It deliberately reloads all
+ * Queues one job from a prepared video aggregate. It deliberately reloads all
  * policy/model facts on the server; browser input cannot enable a provider or
  * turn an unreviewed plan into a generation request.
  */
@@ -49,8 +49,8 @@ export async function submitApprovedVideoJob(
     .where(and(eq(aggregateRecord.id, submission.videoId), eq(aggregateRecord.type, "video")));
   if (!record) throw new Error("未找到视频计划。");
   const project = videoProjectSchema.parse(record.payload);
-  if (record.state !== "VIDEO_APPROVED" || project.status !== "approved") {
-    throw new Error("只有已通过人工审核的视频计划可以提交生成。 ");
+  if (record.state !== "VIDEO_READY_FOR_GENERATION" || project.status !== "ready_for_generation") {
+    throw new Error("视频创意尚未准备好生成。 ");
   }
   const configuration = await loadVideoExecutionConfiguration(database);
   selectVerifiedVideoModel(configuration.catalog, submission);

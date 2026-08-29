@@ -37,7 +37,7 @@ export function buildVideoCreative(input: VideoCreativeInput, product: ProductRe
   return videoProjectSchema.parse({
     id,
     productId: product.record_id,
-    status: "review_required",
+    status: "ready_for_generation",
     objective: input.objective,
     targetAudience: input.targetAudience,
     platforms: input.platforms,

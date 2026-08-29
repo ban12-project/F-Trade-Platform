@@ -28,14 +28,14 @@ export const videoSceneSchema = z.object({
 export const videoProjectSchema = z.object({
   id: z.uuid(),
   productId: z.uuid(),
-  status: z.enum(["draft", "review_required", "revision_required", "approved", "export_ready"]),
+  status: z.enum(["draft", "ready_for_generation", "review_required", "revision_required", "approved", "export_ready"]),
   objective: z.string().trim().min(1).max(2_000),
   targetAudience: z.string().trim().min(1).max(240),
   platforms: z.array(videoPlatformSchema).min(1).max(5),
   factualClaims: z.array(videoFactClaimSchema).min(1).max(24),
   sourceAssets: z.array(videoAssetSchema).max(16),
   scenes: z.array(videoSceneSchema).min(1).max(20),
-  approvalRefs: z.array(z.string().trim().min(1)).max(2),
+  approvalRefs: z.array(z.string().trim().min(1)).max(2).default([]),
 }).strict().superRefine((project, context) => {
   const claimFields = new Set(project.factualClaims.map((claim) => claim.field));
   const assetRefs = new Set(project.sourceAssets.map((asset) => asset.assetRef));
@@ -46,9 +46,6 @@ export const videoProjectSchema = z.object({
     for (const assetRef of scene.assetRefs) {
       if (!assetRefs.has(assetRef)) context.addIssue({ code: "custom", path: ["scenes", sceneIndex, "assetRefs"], message: `镜头引用了未授权素材：${assetRef}` });
     }
-  }
-  if (project.status === "export_ready" && project.approvalRefs.length < 2) {
-    context.addIssue({ code: "custom", path: ["approvalRefs"], message: "导出前必须同时具备内容审核与导出审核记录。" });
   }
 });
 
