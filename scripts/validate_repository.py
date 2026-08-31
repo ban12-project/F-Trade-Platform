@@ -370,6 +370,16 @@ def check_database_baseline() -> None:
     for required in ("useForm", "zodResolver", "createWorkspaceProjectAction", "FieldError"):
         if required not in workspace_hub:
             raise AssertionError(f"Workspace project form contract is missing: {required}")
+    workspace_loading = (ROOT / "components/workspace/workspace-canvas-skeleton.tsx").read_text(encoding="utf-8")
+    for required in ("WorkspaceCanvasSkeleton", 'className="fixed inset-0', "Skeleton", "100dvh", "projectNodePlaceholders"):
+        if required not in workspace_loading:
+            raise AssertionError(f"Workspace canvas loading shell is missing: {required}")
+    for route in (ROOT / "app/workspace/page.tsx", ROOT / "app/workspace/[projectId]/page.tsx"):
+        source = route.read_text(encoding="utf-8")
+        if "WorkspaceCanvasSkeleton" not in source or "ConsoleLoading" in source:
+            raise AssertionError(f"Workspace route still uses the legacy Console loading shell: {route}")
+    if (ROOT / "components/console-loading.tsx").exists():
+        raise AssertionError("Legacy Console loading component must be removed")
     product_actions = (ROOT / "lib/actions/products.ts").read_text(encoding="utf-8")
     for required in (
         '"use server"',
