@@ -7,6 +7,7 @@ import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { AiSdkStructuredGenerator } from "@/lib/ai/structured-generator";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { listReadyProductContentSources } from "@/lib/content/store";
 import { contentAgentRequestSchema } from "@/lib/form-schemas";
 
@@ -23,7 +24,7 @@ export const initialContentAgentActionState: ContentAgentActionState = { status:
 
 export async function generateContentDraftAction(_previous: ContentAgentActionState, formData: FormData): Promise<ContentAgentActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权生成内容初稿。" };
+  if (!session || !hasPermission(session.user.role, "content:write")) return { status: "error", message: "无权生成内容初稿。" };
   const parsed = contentAgentRequestSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "内容请求格式不正确。" };
   try {

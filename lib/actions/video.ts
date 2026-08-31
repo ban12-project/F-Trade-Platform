@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { videoProjectDraftFormSchema } from "@/lib/form-schemas";
 import { prepareUploadedVideoAssets } from "@/lib/video/uploaded-assets";
 import { saveVideoCanvasSchema, videoCanvasDocumentSchema, type VideoCanvasDocument } from "@/lib/video/canvas-contracts";
@@ -15,7 +16,7 @@ export const initialVideoActionState: VideoActionState = { status: "idle", messa
 
 export async function createVideoProjectAction(_previous: VideoActionState, formData: FormData): Promise<VideoActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权创建视频项目。" };
+  if (!session || !hasPermission(session.user.role, "video:write")) return { status: "error", message: "无权创建视频项目。" };
   const parsed = videoProjectDraftFormSchema.safeParse({ ...Object.fromEntries(formData), platforms: formData.getAll("platforms") });
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "视频项目资料格式不正确。" };
   try {
@@ -32,7 +33,7 @@ export type SaveVideoCanvasActionState = { status: "success" | "error" | "confli
 
 export async function saveVideoCanvasAction(input: { expectedRevision: number; document: VideoCanvasDocument }): Promise<SaveVideoCanvasActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权保存画布。" };
+  if (!session || !hasPermission(session.user.role, "video:write")) return { status: "error", message: "无权保存画布。" };
   const parsed = saveVideoCanvasSchema.safeParse(input);
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "画布数据格式不正确。" };
   try {
@@ -47,7 +48,7 @@ export async function saveVideoCanvasAction(input: { expectedRevision: number; d
 
 export async function createVideoProjectFromCanvasAction(document: VideoCanvasDocument): Promise<VideoActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权创建视频项目。" };
+  if (!session || !hasPermission(session.user.role, "video:write")) return { status: "error", message: "无权创建视频项目。" };
   const parsed = videoCanvasDocumentSchema.safeParse(document);
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "画布数据格式不正确。" };
   try {

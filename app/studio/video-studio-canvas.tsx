@@ -559,7 +559,7 @@ export function VideoStudioCanvas({ products, entries, initialCanvas }: {
         <CardHeader className="gap-3 p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2"><Badge variant="secondary">视频 Studio</Badge><Badge variant="outline">创意检查为建议</Badge><span aria-live="polite" className="contents"><Badge variant="outline">{storageState === "saved" ? "本地已保存" : storageState === "unavailable" ? "本地保存不可用" : "正在恢复画布"}</Badge><Badge variant={cloudState === "saved" ? "secondary" : "outline"}>{cloudState === "saved" ? `云端已保存 r${serverRevision}` : cloudState === "saving" ? "正在保存云端草稿" : cloudState === "conflict" ? "云端版本冲突" : cloudState === "error" ? "云端保存失败" : "尚未保存到云端"}</Badge>{snapshotState === "imported" ? <Badge variant="secondary">已导入快照</Badge> : null}{snapshotState === "invalid" ? <Badge variant="outline">快照格式无效</Badge> : null}</span></div>
-            <Button variant="ghost" size="icon" render={<Link href="/console" />} aria-label="退出 Studio"><XIcon /></Button>
+            <Button variant="ghost" size="icon" render={<Link href="/console/video" />} aria-label="返回分步视频工作台"><XIcon /></Button>
           </div>
           <div className="flex flex-col gap-1">
             <CardTitle>无限画布</CardTitle>

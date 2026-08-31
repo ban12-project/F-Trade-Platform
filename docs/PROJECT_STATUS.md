@@ -22,7 +22,7 @@ M1 产品数据闭环
 |---|---|---|
 | M0 | 仓库、契约、校验、Issue/PR 流程 | 免费方案范围内的基线已完成；服务端分支保护明确不作为 M0 验收目标，残余风险见 GitHub 治理范围决策 |
 | M1 | 产品导入、缺失识别、真实性门禁 | 契约与 Gate 01 已实现；真实 SKU 验收待工厂授权资料 |
-| M2 | 三类内容、人工审核、单渠道发布适配 | 内容模板、人工审核 Gate 与合成发布链路已实现；首个渠道待 #11 决策 |
+| M2 | 三类内容、人工审核、单渠道发布适配 | 图文与视频的受控草稿、人工确认和合成链路已实现；Facebook MVP1 传输实验已接受，但真实渠道资格、素材与生产发布仍待验证 |
 | M3 | 询盘澄清、RFQ Ready、人工报价交接 | 契约、完整性判断、澄清和人工报价 Gate 已实现 |
 | M4 | 跟单策略、规则评分、交期门禁 | 上下文跟进、可解释评分与交期人工 Gate 已实现 |
 | M5 | 端到端 Demo、验收报告和 Go/No-Go | 合成技术链路和报告已完成；真实资料演示与人工 Go/No-Go 待 #32 |
@@ -34,3 +34,4 @@ GitHub Issues 和 Milestones 是状态的事实来源；本页只保留阶段说
 Next.js 安全补丁发布后的受控升级步骤见[Next.js 安全补丁升级运行手册](testing/next-security-release-runbook.md)。
 真实 SKU 的脱敏授权记录格式与 A–D 分组条件见[真实 SKU 试点授权清单模板](testing/product-pilot-authorization.template.md)。
 M0 的免费治理验收口径及未消除的直接推送风险见[GitHub 治理范围决策](decisions/github-branch-protection.md)。
+控制台采用业务员执行、管理员确认的任务流；默认视频入口为分步故事板，高级画布不改变任何事实或发布门禁，详见[控制台任务流与角色边界](decisions/0003-console-task-flow.md)。

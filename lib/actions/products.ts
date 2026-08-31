@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
 import { createProductCatalogDraft, decideProductCatalogReview, reviseProductCatalogDraft } from "@/lib/products";
 
@@ -19,7 +20,7 @@ export async function createProductCatalogDraftAction(
   formData: FormData,
 ): Promise<ProductActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") {
+  if (!session || !hasPermission(session.user.role, "product:write")) {
     return { status: "error", message: "无权录入产品资料。" };
   }
 
@@ -48,7 +49,7 @@ export async function decideProductCatalogReviewAction(
   formData: FormData,
 ): Promise<ProductActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") {
+  if (!session || !hasPermission(session.user.role, "product:review")) {
     return { status: "error", message: "无权执行 Gate 01 审核。" };
   }
   const parsed = productReviewFormSchema.safeParse(Object.fromEntries(formData));
@@ -73,7 +74,7 @@ export async function reviseProductCatalogDraftAction(
   formData: FormData,
 ): Promise<ProductActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") {
+  if (!session || !hasPermission(session.user.role, "product:write")) {
     return { status: "error", message: "无权修订产品草稿。" };
   }
   const productId = formData.get("productId");

@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
 import { AiSdkProductAgent } from "@/lib/product/agent";
 import { createProductAgentDraft } from "@/lib/products";
@@ -17,7 +18,7 @@ export const initialProductAgentActionState: ProductAgentActionState = { status:
 
 export async function runProductAgentAction(_previous: ProductAgentActionState, formData: FormData): Promise<ProductAgentActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权运行 Product Agent。" };
+  if (!session || !hasPermission(session.user.role, "product:write")) return { status: "error", message: "无权运行 Product Agent。" };
   try {
     const uploaded = formData.get("document");
     const source = uploaded instanceof File && uploaded.size > 0

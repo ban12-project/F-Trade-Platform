@@ -25,15 +25,15 @@ PASS synthetic video acceptance: evidence, rights, provider, retry quota, export
 | 提供商能力 | 仅允许当前已验证且启用的模型满足请求 | 通过 |
 | 失败恢复 | 可重试任务受最大尝试次数限制，耗尽后拒绝再次启动 | 通过 |
 | 人工 Gate | agent 不能执行 VIDEO_REVIEW_REQUIRED 到 VIDEO_APPROVED | 通过 |
-| 已核验导出 | YouTube 与 TikTok 的合约预设接受匹配的合成元数据 | 通过 |
-| 未核验渠道 | Facebook、Instagram、X 的占位预设拒绝导出 | 通过 |
+| 已核验导出 | YouTube、TikTok 与 Facebook 的合约预设接受匹配的合成元数据 | 通过 |
+| 规格不匹配 | X 的媒体元数据不匹配其已登记预设时会被拒绝 | 通过 |
 
 ## 未通过本次验收声明的事项
 
 - 当前导出检查的是导出元数据合约，不是对真实视频文件的 ffprobe/媒体探测。文件生成与转码服务接入后必须新增文件级检测。
 - 没有配置任何真实视频提供商密钥、模型调用、任务持久化或费用预算；能力注册表只是选择前的安全门槛。
-- 没有 OAuth 授权、平台账号资格或直接发布适配器。发布前仍需要完成 #11、#49、#50 和 #122 的人工/业务决策。
-- Facebook、Instagram、X 尚未写入官方规格来源，不能以本报告为由开启这些渠道。
+- Facebook MVP1 已有受控 CamoFox 传输决策，但尚未证明 OAuth/账号资格、真实素材、生产发布或真实获客效果；其他平台仍不得擅自开启。
+- Facebook、Instagram、X 的导出规格来源已登记在代码中；这只证明导出元数据预检，不能以本报告为由开启真实渠道发布。
 
 ## 人工 Gate 检查点
 

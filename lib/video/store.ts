@@ -1,18 +1,19 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/db/client";
 import { aggregateRecord, approval, auditEvent, videoJob, workflowEvent } from "@/lib/db/schema";
-import type { VideoProject } from "./contracts";
+import { videoProjectSchema, type VideoProject } from "./contracts";
 import { buildVideoCreative } from "./creative";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
-import type { videoProjectDraftFormSchema } from "@/lib/form-schemas";
+import type { videoProjectDraftFormSchema, videoReviewFormSchema } from "@/lib/form-schemas";
 import type { z } from "zod";
 import { type VideoCanvasDocument } from "./canvas-contracts";
 
 export type VideoProjectDraftInput = z.infer<typeof videoProjectDraftFormSchema>;
+export type VideoReviewInput = z.infer<typeof videoReviewFormSchema>;
 export type ReadyVideoProductSource = { id: string; productName: string; internalSku: string; factOptions: Array<{ value: string; label: string }> };
 export type VideoWorkspaceEntry = { id: string; state: string; createdAt: Date; productId: string; productName: string; objective: string; platforms: VideoProject["platforms"]; approvalStatus: "pending" | "approved" | "rejected" | null; previewAssetRef: string | null };
 
@@ -100,6 +101,28 @@ export async function createVideoProjectFromCanvas(document: VideoCanvasDocument
     await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actorType: "human", actorId, evidenceRefs, occurredAt: now });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "video_project.created_from_canvas", actorType: "human", actorId, aggregateId: id, subjectType: "video_project", subjectId: id, metadata: { product_id: product.id, platform_count: project.platforms.length, scene_count: project.scenes.length, canvas_snapshot_sha256: canvasSnapshotSha256 }, occurredAt: now });
     return { id, approvalId, project };
+  });
+}
+
+/** Gate 01 decision for a video plan. Approval never starts generation or publication. */
+export async function decideVideoReview(input: VideoReviewInput, actorId: string) {
+  const now = new Date(); const eventId = randomUUID();
+  return getDatabase().transaction(async (tx) => {
+    const [aggregate] = await tx.select({ id: aggregateRecord.id, state: aggregateRecord.state, version: aggregateRecord.version, payload: aggregateRecord.payload })
+      .from(aggregateRecord).where(and(eq(aggregateRecord.id, input.videoId), eq(aggregateRecord.type, "video"))).for("update");
+    if (!aggregate || aggregate.state !== "VIDEO_REVIEW_REQUIRED") throw new Error("该视频计划当前不处于待确认状态。");
+    const [pendingApproval] = await tx.select().from(approval).where(and(eq(approval.aggregateId, aggregate.id), eq(approval.gate, "gate_01_truth"), eq(approval.status, "pending"))).for("update");
+    if (!pendingApproval) throw new Error("未找到待处理的视频事实确认请求。");
+    const nextState = input.decision === "approved" ? "VIDEO_APPROVED" : "VIDEO_REVISION_REQUIRED";
+    const current = videoProjectSchema.parse(aggregate.payload);
+    const project = videoProjectSchema.parse({ ...current, status: input.decision === "approved" ? "approved" : "revision_required", ...(input.decision === "approved" ? { approvalRefs: [...current.approvalRefs, pendingApproval.id] } : {}) });
+    assertTransition({ eventId, entityType: "video", entityId: aggregate.id, fromState: "VIDEO_REVIEW_REQUIRED", toState: nextState, actorType: "human", actorId, occurredAt: now.toISOString(), evidenceRefs: [input.evidenceRef], gate: "gate_01_truth", approvalRef: pendingApproval.id }, { id: pendingApproval.id, aggregateId: aggregate.id, gate: "gate_01_truth", status: input.decision, decidedByType: "human", decidedById: actorId, evidenceRef: input.evidenceRef });
+    await tx.update(approval).set({ status: input.decision, decidedByType: "human", decidedById: actorId, decidedAt: now, evidenceRef: input.evidenceRef, ...(input.notes ? { notes: input.notes } : {}) }).where(eq(approval.id, pendingApproval.id));
+    const [updated] = await tx.update(aggregateRecord).set({ state: nextState, payload: project, version: sql`${aggregateRecord.version} + 1` }).where(and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version))).returning({ id: aggregateRecord.id });
+    if (!updated) throw new Error("视频确认与另一项操作冲突，请刷新后重试。");
+    await tx.insert(workflowEvent).values({ id: eventId, aggregateId: aggregate.id, fromState: "VIDEO_REVIEW_REQUIRED", toState: nextState, actorType: "human", actorId, gate: "gate_01_truth", approvalId: pendingApproval.id, evidenceRefs: [input.evidenceRef], occurredAt: now });
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: "video_gate_01_decided", actorType: "human", actorId, aggregateId: aggregate.id, subjectType: "video", subjectId: aggregate.id, metadata: { decision: input.decision, approval_id: pendingApproval.id }, occurredAt: now });
+    return { state: nextState, approvalId: pendingApproval.id };
   });
 }
 

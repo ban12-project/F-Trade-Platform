@@ -3,6 +3,7 @@
 已接受的架构决策：
 
 - [ADR 0001：MVP 应用技术栈](0001-mvp-application-stack.md)
+- [ADR 0003：控制台任务流与角色边界](0003-console-task-flow.md)
 
 每个未确定但会影响实现的选择创建一个 `type:decision` Issue；决策关闭后再补充 ADR。
 

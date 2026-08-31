@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileCheck2Icon, PlusIcon, ShieldCheckIcon } from "lucide-react";
+import { BotIcon, FileCheck2Icon, PlusIcon, ShieldCheckIcon } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -42,7 +42,7 @@ function ProductStateLabel({ value }: { value: string }) {
   return <Badge variant="secondary">{labels[value] ?? value}</Badge>;
 }
 
-export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[] }) {
+export function ProductCatalogPanel({ entries, canReview }: { entries: ProductCatalogEntry[]; canReview: boolean }) {
   const [state, formAction, pending] = useActionState(createProductCatalogDraftAction, initialProductActionState);
   const [, startTransition] = useTransition();
   const form = useForm<ProductCatalogFormValues>({
@@ -76,8 +76,8 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-6 p-4 md:p-6 lg:p-8">
-      <header className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+      <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-2"><div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">产品资料</Badge>
           <Badge variant="outline">需要人工事实审核（Gate 01）</Badge>
         </div>
@@ -85,6 +85,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
         <p className="max-w-3xl text-muted-foreground">
           按目录中的图片、编号、原厂件编号（OE）、适配和规格录入。保存后只会创建待复核草稿；系统不会把目录内容自动认定为工程事实。
         </p>
+        </div><LinkButton variant="outline" href="/console/product-agent"><BotIcon data-icon="inline-start" />从获授权资料导入</LinkButton>
       </header>
 
       <Alert>
@@ -218,7 +219,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
       <Card>
         <CardHeader>
           <CardTitle>最近录入</CardTitle>
-          <CardDescription>仅管理员可查看。所有条目初始状态均为待人工核验。</CardDescription>
+            <CardDescription>所有条目初始状态均为待人工确认。</CardDescription>
         </CardHeader>
         <CardContent>
           {entries.length === 0 ? (
@@ -243,7 +244,7 @@ export function ProductCatalogPanel({ entries }: { entries: ProductCatalogEntry[
                     <TableCell>{entry.blockingFields.length === 0 ? "字段待 Gate 01 核验" : `${entry.blockingFields.length} 项待补齐/核验`}</TableCell>
                     <TableCell>
                       {entry.state === "PRODUCT_REVIEW_REQUIRED" && entry.approvalStatus === "pending" ? (
-                        <LinkButton size="sm" variant="outline" href={`/console/products/${entry.id}`}>审核</LinkButton>
+                        <LinkButton size="sm" variant="outline" href={`/console/products/${entry.id}`}>{canReview ? "确认" : "查看进度"}</LinkButton>
                       ) : entry.state === "PRODUCT_REVISION_REQUIRED" ? (
                         <LinkButton size="sm" variant="outline" href={`/console/products/${entry.id}/revise`}>修订</LinkButton>
                       ) : "无操作"}

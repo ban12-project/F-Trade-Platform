@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 
 import { ConsoleLoading } from "@/components/console-loading";
-import { requireRole } from "@/lib/auth-guard";
+import { requirePermission } from "@/lib/auth-guard";
 
 import { PasskeyPanel } from "./passkey-panel";
 
 async function AuthorizedPasskeySettings() {
-  await requireRole("admin");
+  await requirePermission("workspace:view");
   return <PasskeyPanel />;
 }
 

@@ -2,12 +2,12 @@ import { Suspense } from "react";
 
 import { ConsoleLoading } from "@/components/console-loading";
 import { getStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
-import { requireRole } from "@/lib/auth-guard";
+import { requirePermission } from "@/lib/auth-guard";
 
 import { AgentSettingsPanel } from "./panel";
 
 async function AuthorizedAgentSettings() {
-  await requireRole("admin");
+  await requirePermission("settings:manage");
   return <AgentSettingsPanel settings={await getStoredProductAgentModelSettings()} />;
 }
 

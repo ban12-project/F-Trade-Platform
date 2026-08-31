@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { submitApprovedVideoJob, videoJobSubmissionSchema } from "@/lib/video/submission";
 
 export type VideoJobSubmissionActionState = {
@@ -23,7 +24,7 @@ export async function submitApprovedVideoJobAction(
   formData: FormData,
 ): Promise<VideoJobSubmissionActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权提交视频生成任务。" };
+  if (!session || !hasPermission(session.user.role, "video:write")) return { status: "error", message: "无权提交视频生成任务。" };
   const parsed = videoJobSubmissionSchema.safeParse({
     videoId: value(formData, "videoId"),
     provider: value(formData, "provider"),
