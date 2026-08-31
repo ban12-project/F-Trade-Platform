@@ -6,6 +6,7 @@ test("empty project canvas has one creation entry and centers its dialog", async
   const canvas = page.getByRole("main", { name: "项目总画布" });
   await expect(canvas).toBeVisible();
   await expect(page.getByText("从一张项目画布开始")).toHaveCount(0);
+  await expect(page.getByText("Synthetic project", { exact: true })).toHaveCount(0);
 
   const createProject = page.getByRole("button", { name: "新建项目" });
   await expect(createProject).toHaveCount(1);
@@ -32,6 +33,7 @@ test("desktop project switcher renders only a sheet overlay", async ({ page }) =
   await page.goto("/testing/workspace-canvas");
   await page.getByRole("button", { name: "项目", exact: true }).click();
   await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible();
+  await expect(page.getByText("Synthetic project", { exact: true })).toBeVisible();
   await expect(page.locator('[data-slot="sheet-overlay"]')).toBeVisible();
   await expect(page.locator('[data-slot="drawer-overlay"]')).toHaveCount(0);
 });
