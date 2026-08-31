@@ -57,24 +57,21 @@ Sales Agent 只收集和整理 RFQ。报价草稿由人工销售创建，价格�
 - 审批和业务对象分别存储；业务对象只引用 `approval_ref`，避免伪造内嵌审批。
 - 第一阶段 Demo 以 `OPPORTUNITY` 为成功终点；不把模拟询盘冒充真实成交。
 
-## 官方渠道入站边界
+## MVP1 Facebook 受控浏览器入站边界
 
-社媒渠道必须在人工完成官方 API 资格核验后，才可配置为 `ChannelInboundPolicy`。策略只允许 inbound
-消息、以渠道/账号/message ID 组合键去重，并且要求显式设置由人工确认的回复窗口；平台窗口不能由
-Agent 猜测。入站处理先校验不含消息正文的 `OfficialInboundWebhook` 元数据契约：传输必须标为
-`official_webhook`，渠道和账号引用必须与已启用策略一致；DOM 观察或浏览器会话输入会被拒绝。窗口外自动
-回复一律禁止，策略只能要求人工升级或经人工批准的模板。该模块只处理外部引用和时间，不存储平台凭据、Cookie
-或消息正文。
+MVP1 可使用 `official_api` 或经 #155 明确批准的 `camofox_controlled_mvp1`。两种策略均只接收用户主动
+发起的 inbound 消息，并要求人工确认回复窗口。CamoFox 路径必须提交 `controlled_browser_observation`、脱敏
+`observation_ref` 与消息身份质量；只有可见 DOM ID 的观察才可主张平台 ID 去重，派生指纹仅是 best-effort
+去重。窗口外自动回复一律禁止。
 
 每个通过该边界的消息还必须在数据库 `social_inbound_delivery` 中原子领取：唯一索引使用
 `channel_ref + account_ref + message_id`，只保存这些引用和接收时间。重复投递返回 `duplicate`，不能再次
-创建或更新 Lead；表中不保存消息正文、Cookie 或凭据。`processDatabaseOfficialInboundDelivery` 会将领取与
-下游 Lead 操作封装在同一数据库事务中：下游失败时收据回滚，重复投递不会进入动作。真实 webhook handler
-必须使用这个入口，才可对该完整处理链路主张 exactly-once。
+创建或更新 Lead；表中不保存 Cookie 或凭据。官方 webhook 通过带平台 ID 的交付可主张 exactly-once；浏览器
+观察只能在身份质量为 `dom_id` 时作同等主张，派生指纹必须在审计记录中标记为 best-effort。
 
-内容发布也必须通过 `ContentPublicationPolicy`：只有人工启用的官方 API 渠道、已完成 Gate 01 的内容和
-system/human 发布 actor 才能进入发布传输。该策略只保存脱敏渠道/账号引用和外部发布引用，不保存 OAuth
-凭据，也不允许 Agent 或浏览器会话直接发布。
+内容发布也必须通过 `ContentPublicationPolicy`：只有人工启用的渠道、已完成 Gate 01 的内容和 system/human
+发布 actor 才能进入传输。CamoFox 发布还需逐帖人工确认。安全检查、登录失效、固定出口 IP 不符、页面结构不确定
+或外部结果不确定时必须熔断；不得自动换号、换代理、求解验证码或重试不确定的发布。
 
 ## Synthetic 端到端演示
 

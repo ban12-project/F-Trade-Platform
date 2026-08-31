@@ -3,8 +3,8 @@ import path from "node:path";
 
 import { compileContract } from "../lib/contracts/validator";
 import { decideContent } from "../lib/content/gate";
-import { publishThroughOfficialChannel } from "../lib/content/publication-policy";
-import { acceptOfficialInboundWebhook, assessInboundDelivery, assessReplyWindow } from "../lib/social/inbound-policy";
+import { publishThroughChannel } from "../lib/content/publication-policy";
+import { acceptInboundChannelEvent, assessInboundDelivery, assessReplyWindow } from "../lib/social/inbound-policy";
 import {
   replayTransitions,
   type ApprovalDecision,
@@ -26,7 +26,7 @@ export interface SyntheticDemoReport {
   };
   publicationTransport: {
     status: "published";
-    officialApi: true;
+    transport: "camofox_controlled_mvp1";
   };
 }
 
@@ -114,17 +114,17 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
   const quotationId = quotation.handoff_id;
   const leadId = "synthetic-lead-demo-001";
   const socialPolicy = {
-    channelRef: "synthetic-instagram-channel",
+    channelRef: "synthetic-facebook-channel",
     accountRef: "synthetic-factory-account",
-    officialApi: true as const,
+    transport: "camofox_controlled_mvp1" as const,
     inboundOnly: true,
     replyWindowMinutes: 60,
     outsideWindowAction: "require_approved_template" as const,
   };
   const publicationPolicy = {
-    channelRef: "synthetic-instagram-channel",
+    channelRef: "synthetic-facebook-channel",
     accountRef: "synthetic-factory-account",
-    officialApi: true as const,
+    transport: "camofox_controlled_mvp1" as const,
     publishingEnabled: true,
   };
   const inboundMessage = {
@@ -132,10 +132,12 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     direction: "inbound" as const,
     receivedAt: "2026-08-24T08:59:00Z",
   };
-  const inboundDelivery = acceptOfficialInboundWebhook(socialPolicy, {
-    transport: "official_webhook",
+  const inboundDelivery = acceptInboundChannelEvent(socialPolicy, {
+    transport: "controlled_browser_observation",
     channelRef: socialPolicy.channelRef,
     accountRef: socialPolicy.accountRef,
+    observationRef: "synthetic-observation-001",
+    messageIdentityQuality: "derived_fingerprint",
     ...inboundMessage,
   }, new Set());
   if (inboundDelivery.status !== "accepted") throw new Error("Synthetic inbound message was not accepted");
@@ -159,13 +161,13 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     approvalRef: contentApproval.id,
     evidenceRef: contentApproval.evidenceRef,
   });
-  const publishedContent = publishThroughOfficialChannel(
+  const publishedContent = publishThroughChannel(
     approvedContent,
     publicationPolicy,
     "system",
     "synthetic-publication-001",
   );
-  if (publishedContent.status !== "published") throw new Error("Synthetic official publication policy was not enforced");
+  if (publishedContent.status !== "published") throw new Error("Synthetic publication policy was not enforced");
 
   const productEvents = [
     { event: event("synthetic-product-submit-001", "product", productId, "PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "agent", "synthetic-product-agent", "2026-08-24T09:00:00Z") },
@@ -212,7 +214,7 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     },
     publicationTransport: {
       status: publishedContent.status,
-      officialApi: publicationPolicy.officialApi,
+      transport: publicationPolicy.transport,
     },
   };
 }

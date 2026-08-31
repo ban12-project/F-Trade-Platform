@@ -1,16 +1,23 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://f-trade.example/contracts/official-inbound-webhook.schema.json",
-  "title": "OfficialInboundWebhook",
+  "title": "InboundChannelEvent",
   "type": "object",
   "additionalProperties": false,
   "required": ["transport", "channel_ref", "account_ref", "message_id", "direction", "received_at"],
   "properties": {
-    "transport": {"const": "official_webhook"},
+    "transport": {"enum": ["official_webhook", "controlled_browser_observation"]},
     "channel_ref": {"type": "string", "pattern": "^(synthetic|sanitized)-[a-z0-9-]+$"},
     "account_ref": {"type": "string", "pattern": "^(synthetic|sanitized)-[a-z0-9-]+$"},
     "message_id": {"type": "string", "minLength": 1, "maxLength": 256},
     "direction": {"const": "inbound"},
-    "received_at": {"type": "string", "format": "date-time"}
-  }
+    "received_at": {"type": "string", "format": "date-time"},
+    "observation_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+    "message_identity_quality": {"enum": ["dom_id", "derived_fingerprint"]}
+  },
+  "allOf": [{
+    "if": {"properties": {"transport": {"const": "controlled_browser_observation"}}, "required": ["transport"]},
+    "then": {"required": ["observation_ref", "message_identity_quality"]},
+    "else": {"not": {"anyOf": [{"required": ["observation_ref"]}, {"required": ["message_identity_quality"]}]}}
+  }]
 }

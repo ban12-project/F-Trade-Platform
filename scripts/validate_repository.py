@@ -306,16 +306,16 @@ def check_channel_onboarding() -> None:
     if manifest["production_readiness"] in {"test_ready", "approved"}:
         required = {
             "ownership_status": "verified",
-            "official_oauth_status": "tested",
-            "publishing_path": "postiz_official_api",
-            "inbound_path": "chatwoot_official_webhook",
+            "official_oauth_status": "not_started",
+            "publishing_path": "camofox_controlled_mvp1",
+            "inbound_path": "camofox_controlled_mvp1",
             "reply_window_status": "confirmed",
         }
         for field, expected in required.items():
             if manifest[field] != expected:
                 raise AssertionError(f"Channel readiness requires {field}={expected}")
-    if manifest["browser_automation_production"]:
-        raise AssertionError("Browser automation must remain prohibited for production channels")
+    if manifest["browser_automation_mode"] != "camofox_controlled_mvp1":
+        raise AssertionError("MVP1 Facebook onboarding requires the approved CamoFox transport")
     if not manifest["inbound_only"] or not manifest["external_effects_require_human_approval"]:
         raise AssertionError("Channel onboarding must preserve inbound-only human-approved operation")
 

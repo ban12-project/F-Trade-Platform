@@ -36,7 +36,7 @@ python3 scripts/validate_repository.py
   },
   "publicationTransport": {
     "status": "published",
-    "officialApi": true
+    "transport": "camofox_controlled_mvp1"
   }
 }
 ```
@@ -54,7 +54,7 @@ python3 scripts/validate_repository.py
 ## Gate 与安全断言
 
 - 产品就绪需要 Gate 01 的人工批准；Agent 批准会被运行时拒绝。
-- 内容发布先执行 Gate 01 的 human 批准，再经 `officialApi: true` 的发布策略；Agent 不能调用发布传输层。
+- 内容发布先执行 Gate 01 的 human 批准，再经 `camofox_controlled_mvp1` 发布策略；Agent 不能调用发布传输层。
 - 报价必须先由人工通过 Gate 02；Agent 不生成正式价格或交期。
 - 演示会拒绝非 `synthetic-` 标识符，防止把真实业务记录带入版本库。
 - `repository-validate` 额外覆盖非法状态转换、无来源工程事实、RFQ 完整性、内容安全和跟进规则。

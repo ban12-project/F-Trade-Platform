@@ -23,10 +23,13 @@
 
 发现疑似泄露时，不要在 Issue 或 PR 中复制秘密；先停止传播、撤销凭据，并通知仓库管理员。
 
-## 浏览器自动化测试边界
+## CamoFox MVP1 浏览器自动化边界
 
-- 不使用浏览器会话自动化作为生产社媒发布或 DM 传输通道；生产集成只能使用渠道官方 OAuth/API。
-- 本地浏览器测试只能使用 synthetic 或专用测试账号，任何外部副作用都需要人工批准。
+- #155 仅授权一个隔离的 CamoFox Worker 为 Facebook Personal Profile MVP1 执行受控发布和被动 DM 观察；该例外不适用于其他平台、账号或环境。
+- 发布必须经过 Gate 01 和逐帖人工确认；DM 仅允许确定性 RFQ 澄清模板。报价、MOQ、交期、付款、认证、质保、安全、尺寸、材料和适配问题必须转人工。
+- 安全检查、验证码、2FA、登录失效、固定出口 IP 改变、页面结构不确定或不确定外部结果必须立即熔断。禁止自动换号、换代理、解决验证码或重试不确定副作用。
+- Browser Profile、Cookie、HAR、trace、截图和代理凭据只能留在获批准 VPS 的加密运行卷，且不能出现在 Git、数据库业务记录、日志、Issue、PR 或聊天中。
+- CamoFox telemetry 和 trace 默认关闭；VNC 仅通过 SSH 隧道用于账户本人手动登录，登录完成后关闭。
 - `.gitignore` 和 `repository-validate` 会拒绝常见的 session state、Cookie、HAR 和 profile 路径；即使文件被强制加入也不能绕过校验。
 - 发现浏览器状态泄露时，立即撤销会话并重置相关凭据；不要把泄露文件或其内容贴入 Issue、PR、日志或聊天。
 

@@ -7,20 +7,21 @@ const channelSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]
 
 export const socialVideoPublicationPolicySchema = z.object({
   channel: channelSchema,
-  officialApi: z.literal(true),
+  transport: z.enum(["official_api", "camofox_controlled_mvp1"]),
   draftEnabled: z.boolean(),
   publishingEnabled: z.boolean(),
   accountRef: opaqueRef("social-account"),
   credentialRef: opaqueRef("social-credential"),
 }).strict().superRefine((policy, context) => {
   if (policy.publishingEnabled && !policy.draftEnabled) {
-    context.addIssue({ code: "custom", path: ["publishingEnabled"], message: "启用正式发布前必须先启用官方 API 草稿路径。" });
+    context.addIssue({ code: "custom", path: ["publishingEnabled"], message: "启用正式发布前必须先启用所选传输的草稿路径。" });
   }
 });
 export type SocialVideoPublicationPolicy = z.infer<typeof socialVideoPublicationPolicySchema>;
 
 export type SocialVideoPublicationAdapter = {
   channel: z.infer<typeof channelSchema>;
+  transport: SocialVideoPublicationPolicy["transport"];
   createDraft(input: { accountRef: string; assetRef: string; credential: string; idempotencyKey: string }): Promise<{ publicationRef: string; status: "draft" }>;
   publishDraft(input: { accountRef: string; publicationRef: string; credential: string; humanConfirmationRef: string }): Promise<{ publicationRef: string; status: "published" }>;
 };
@@ -40,12 +41,12 @@ function requireApprovedExport(exportArtifact: ReviewVideoExport) {
 }
 
 function adapterFor(policy: SocialVideoPublicationPolicy, adapters: readonly SocialVideoPublicationAdapter[]) {
-  const adapter = adapters.find((candidate) => candidate.channel === policy.channel);
-  if (!adapter) throw new Error("此社交渠道未配置官方 API 适配器。 ");
+  const adapter = adapters.find((candidate) => candidate.channel === policy.channel && candidate.transport === policy.transport);
+  if (!adapter) throw new Error("此社交渠道未配置所选传输适配器。 ");
   return adapter;
 }
 
-/** Creates a reviewable draft through an official API only; it never publishes. */
+/** Creates a reviewable draft through the explicitly enabled transport; it never publishes. */
 export async function createSocialVideoDraft(
   exportArtifact: ReviewVideoExport,
   policyInput: SocialVideoPublicationPolicy,
@@ -54,7 +55,7 @@ export async function createSocialVideoDraft(
 ): Promise<SocialVideoDraft> {
   const policy = socialVideoPublicationPolicySchema.parse(policyInput);
   requireApprovedExport(exportArtifact);
-  if (!policy.draftEnabled) throw new Error("此渠道未启用官方 API 草稿路径。 ");
+  if (!policy.draftEnabled) throw new Error("此渠道未启用所选传输的草稿路径。 ");
   if (policy.channel !== exportArtifact.platform) throw new Error("社交渠道必须与导出物平台一致。 ");
   const credential = await resolveCredential(policy.credentialRef);
   if (!credential.trim()) throw new Error("社交渠道凭据不可用。 ");
@@ -64,7 +65,7 @@ export async function createSocialVideoDraft(
     credential,
     idempotencyKey: `video-export-${exportArtifact.id}`,
   });
-  if (!/^publication-[a-z0-9][a-z0-9_-]{2,120}$/i.test(result.publicationRef) || result.status !== "draft") throw new Error("官方 API 返回的草稿引用无效。 ");
+  if (!/^publication-[a-z0-9][a-z0-9_-]{2,120}$/i.test(result.publicationRef) || result.status !== "draft") throw new Error("渠道适配器返回的草稿引用无效。 ");
   return { channel: policy.channel, accountRef: policy.accountRef, assetRef: exportArtifact.sourceAssetRef, publicationRef: result.publicationRef, status: "draft" };
 }
 
@@ -83,6 +84,6 @@ export async function publishSocialVideoDraft(
   const credential = await resolveCredential(policy.credentialRef);
   if (!credential.trim()) throw new Error("社交渠道凭据不可用。 ");
   const result = await adapterFor(policy, adapters).publishDraft({ accountRef: policy.accountRef, publicationRef: draft.publicationRef, credential, humanConfirmationRef });
-  if (result.status !== "published" || result.publicationRef !== draft.publicationRef) throw new Error("官方 API 返回的发布状态无效。 ");
+  if (result.status !== "published" || result.publicationRef !== draft.publicationRef) throw new Error("渠道适配器返回的发布状态无效。 ");
   return result;
 }

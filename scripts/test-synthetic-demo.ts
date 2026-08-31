@@ -22,7 +22,7 @@ async function main() {
   });
   assert.deepEqual(report.publicationTransport, {
     status: "published",
-    officialApi: true,
+    transport: "camofox_controlled_mvp1",
   });
   console.log("PASS synthetic end-to-end demo");
 }

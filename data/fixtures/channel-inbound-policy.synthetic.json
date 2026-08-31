@@ -1,7 +1,7 @@
 {
   "channel_ref": "synthetic-instagram-channel",
   "account_ref": "synthetic-factory-account",
-  "official_api": true,
+  "transport": "camofox_controlled_mvp1",
   "inbound_only": true,
   "reply_window_minutes": 1440,
   "outside_window_action": "require_approved_template"

@@ -5,8 +5,8 @@ import { createSocialVideoDraft, publishSocialVideoDraft, type SocialVideoPublic
 
 const measured = { container: "mp4" as const, videoCodec: "h264", audioCodec: "aac", width: 1080, height: 1920, fps: 30, durationSeconds: 5, subtitleStreamCount: 0 };
 const review = createReviewVideoExport({ videoId: "00000000-0000-4000-8000-000000000701", sourceAssetRef: "asset-video-701", platform: "tiktok", media: measured });
-const policy = { channel: "tiktok" as const, officialApi: true as const, draftEnabled: true, publishingEnabled: true, accountRef: "social-account-701", credentialRef: "social-credential-701" };
-const adapter: SocialVideoPublicationAdapter = { channel: "tiktok", async createDraft(input) { assert.equal(input.credential, "synthetic-secret"); return { publicationRef: "publication-701", status: "draft" }; }, async publishDraft(input) { assert.equal(input.humanConfirmationRef, "evidence-publish-701"); return { publicationRef: input.publicationRef, status: "published" }; } };
+const policy = { channel: "tiktok" as const, transport: "official_api" as const, draftEnabled: true, publishingEnabled: true, accountRef: "social-account-701", credentialRef: "social-credential-701" };
+const adapter: SocialVideoPublicationAdapter = { channel: "tiktok", transport: "official_api", async createDraft(input) { assert.equal(input.credential, "synthetic-secret"); return { publicationRef: "publication-701", status: "draft" }; }, async publishDraft(input) { assert.equal(input.humanConfirmationRef, "evidence-publish-701"); return { publicationRef: input.publicationRef, status: "published" }; } };
 
 async function main() {
   await assert.rejects(() => createSocialVideoDraft(review, policy, [adapter], async () => "synthetic-secret"), /人工审核/);
