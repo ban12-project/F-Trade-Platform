@@ -473,6 +473,107 @@ export const socialInboundDelivery = pgTable(
   ],
 );
 
+/**
+ * A command issued to the isolated social worker. It holds only opaque
+ * references and lifecycle metadata: browser profiles, cookies, proxy values,
+ * screenshots and traces are deliberately excluded.
+ */
+export const socialBrowserJob = pgTable(
+  "social_browser_job",
+  {
+    id: text("id").primaryKey(),
+    channelRef: text("channel_ref").notNull(),
+    accountRef: text("account_ref").notNull(),
+    kind: text("kind").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    payloadRef: text("payload_ref").notNull(),
+    status: text("status").default("queued").notNull(),
+    resultRef: text("result_ref"),
+    failureCode: text("failure_code"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("social_browser_job_idempotency_uidx").on(table.idempotencyKey),
+    index("social_browser_job_status_created_idx").on(table.status, table.createdAt),
+    check("social_browser_job_kind_nonempty", sql`length(btrim(${table.kind})) > 0`),
+    check("social_browser_job_payload_nonempty", sql`length(btrim(${table.payloadRef})) > 0`),
+    check("social_browser_job_status_valid", sql`${table.status} IN ('queued', 'claimed', 'succeeded', 'failed', 'paused')`),
+  ],
+);
+
+/** Durable outcome of a human-confirmed social publication attempt. */
+export const socialPublication = pgTable(
+  "social_publication",
+  {
+    id: text("id").primaryKey(),
+    channelRef: text("channel_ref").notNull(),
+    accountRef: text("account_ref").notNull(),
+    contentRef: text("content_ref").notNull(),
+    format: text("format").notNull(),
+    confirmationRef: text("confirmation_ref").notNull(),
+    browserJobId: text("browser_job_id").references(() => socialBrowserJob.id, { onDelete: "restrict" }),
+    externalPublicationRef: text("external_publication_ref"),
+    status: text("status").default("confirmed").notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("social_publication_account_created_idx").on(table.accountRef, table.createdAt),
+    uniqueIndex("social_publication_external_uidx").on(table.channelRef, table.accountRef, table.externalPublicationRef),
+    check("social_publication_format_valid", sql`${table.format} IN ('text', 'image', 'video')`),
+    check("social_publication_status_valid", sql`${table.status} IN ('confirmed', 'submitted', 'published', 'unknown', 'failed', 'paused')`),
+  ],
+);
+
+/** A social conversation linked to a lead only after normal lead matching. */
+export const socialConversation = pgTable(
+  "social_conversation",
+  {
+    id: text("id").primaryKey(),
+    channelRef: text("channel_ref").notNull(),
+    accountRef: text("account_ref").notNull(),
+    externalConversationRef: text("external_conversation_ref").notNull(),
+    leadId: text("lead_id").references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("social_conversation_external_uidx").on(table.channelRef, table.accountRef, table.externalConversationRef),
+    index("social_conversation_lead_updated_idx").on(table.leadId, table.updatedAt),
+  ],
+);
+
+/**
+ * Encrypted social-message body retained for the MVP's fixed 30-day window.
+ * Metadata supports routing and deletion; neither plaintext nor browser state
+ * is stored in this table.
+ */
+export const socialMessage = pgTable(
+  "social_message",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id").notNull().references(() => socialConversation.id, { onDelete: "cascade" }),
+    externalMessageRef: text("external_message_ref").notNull(),
+    direction: text("direction").notNull(),
+    identityQuality: text("identity_quality").notNull(),
+    bodyCiphertext: text("body_ciphertext").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("social_message_external_uidx").on(table.conversationId, table.externalMessageRef),
+    index("social_message_expiry_idx").on(table.expiresAt),
+    check("social_message_direction_valid", sql`${table.direction} IN ('inbound', 'outbound')`),
+    check("social_message_identity_valid", sql`${table.identityQuality} IN ('dom_id', 'derived_fingerprint', 'manual')`),
+    check("social_message_expiry_after_received", sql`${table.expiresAt} > ${table.receivedAt}`),
+  ],
+);
+
 /** Singleton, encrypted-at-rest configuration for the Product Agent's model provider. */
 export const productAgentModelConfig = pgTable(
   "product_agent_model_config",
