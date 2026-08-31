@@ -60,6 +60,8 @@ export const videoJobStatus = pgEnum("video_job_status", [
 ]);
 export const videoReviewStage = pgEnum("video_review_stage", ["pre_generation", "post_generation"]);
 export const videoReviewOutcome = pgEnum("video_review_outcome", ["accepted", "changes_requested", "skipped"]);
+export const workspaceProjectKind = pgEnum("workspace_project_kind", ["marketing", "sales"]);
+export const workspaceProjectStatus = pgEnum("workspace_project_status", ["active", "archived"]);
 
 export const user = pgTable(
   "user",
@@ -457,6 +459,59 @@ export const videoCanvasDocument = pgTable(
     uniqueIndex("video_canvas_document_owner_uidx").on(table.ownerId),
     check("video_canvas_document_revision_positive", sql`${table.revision} > 0`),
     check("video_canvas_document_owner_nonempty", sql`length(btrim(${table.ownerId})) > 0`),
+  ],
+);
+
+/** A user-visible workspace project. Domain facts remain in aggregate_record. */
+export const workspaceProject = pgTable(
+  "workspace_project",
+  {
+    id: text("id").primaryKey(),
+    kind: workspaceProjectKind("kind").notNull(),
+    status: workspaceProjectStatus("status").default("active").notNull(),
+    title: text("title").notNull(),
+    createdById: text("created_by_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("workspace_project_kind_status_idx").on(table.kind, table.status),
+    index("workspace_project_creator_idx").on(table.createdById),
+    check("workspace_project_title_nonempty", sql`length(btrim(${table.title})) > 0`),
+  ],
+);
+
+/** Links an existing governed aggregate to a project without duplicating it. */
+export const workspaceProjectItem = pgTable(
+  "workspace_project_item",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
+    aggregateId: text("aggregate_id").notNull().references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    role: text("role").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("workspace_project_item_project_aggregate_uidx").on(table.projectId, table.aggregateId),
+    index("workspace_project_item_aggregate_idx").on(table.aggregateId),
+    check("workspace_project_item_role_nonempty", sql`length(btrim(${table.role})) > 0`),
+  ],
+);
+
+/** Per-project visual composition with optimistic revision control. */
+export const workspaceCanvasDocument = pgTable(
+  "workspace_canvas_document",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
+    document: jsonb("document").$type<Record<string, unknown>>().notNull(),
+    revision: integer("revision").default(1).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("workspace_canvas_document_project_uidx").on(table.projectId),
+    check("workspace_canvas_document_revision_positive", sql`${table.revision} > 0`),
   ],
 );
 

@@ -34,4 +34,4 @@ GitHub Issues 和 Milestones 是状态的事实来源；本页只保留阶段说
 Next.js 安全补丁发布后的受控升级步骤见[Next.js 安全补丁升级运行手册](testing/next-security-release-runbook.md)。
 真实 SKU 的脱敏授权记录格式与 A–D 分组条件见[真实 SKU 试点授权清单模板](testing/product-pilot-authorization.template.md)。
 M0 的免费治理验收口径及未消除的直接推送风险见[GitHub 治理范围决策](decisions/github-branch-protection.md)。
-控制台采用业务员执行、管理员确认的任务流；默认视频入口为分步故事板，高级画布不改变任何事实或发布门禁，详见[控制台任务流与角色边界](decisions/0003-console-task-flow.md)。
+应用采用项目画布：产品营销和销售机会分别在一张画布中组织受控记录，画布不改变任何事实或发布门禁，详见[项目画布与角色边界](decisions/0003-console-task-flow.md)。

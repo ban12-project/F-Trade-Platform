@@ -13,7 +13,7 @@ test("business users can execute work but cannot approve or manage the system", 
   expect(hasPermission("user", "team:manage")).toBe(false);
 });
 
-test("administrators retain every console capability", () => {
+test("administrators retain every workspace capability", () => {
   expect(hasPermission("admin", "workspace:view")).toBe(true);
   expect(hasPermission("admin", "product:review")).toBe(true);
   expect(hasPermission("admin", "content:review")).toBe(true);
