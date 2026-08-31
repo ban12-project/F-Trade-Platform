@@ -1,17 +1,18 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
-import { requireRole } from "@/lib/auth-guard";
+import { requirePermission } from "@/lib/auth-guard";
+import { hasPermission } from "@/lib/authz";
 import { getContentCatalogDetail } from "@/lib/content/store";
 import { ConsoleLoading } from "@/components/console-loading";
 
 import { ContentReviewPanel } from "./content-review-panel";
 
 async function AuthorizedContentReview({ contentId }: { contentId: string }) {
-  await requireRole("admin");
+  const session = await requirePermission("workspace:view");
   const content = await getContentCatalogDetail(contentId);
   if (!content) notFound();
-  return <ContentReviewPanel content={content} />;
+  return <ContentReviewPanel content={content} canReview={hasPermission(session.user.role, "content:review")} />;
 }
 
 function ReviewShell() {

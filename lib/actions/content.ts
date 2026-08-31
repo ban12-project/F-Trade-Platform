@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
 import { createContentDraft, decideContentReview, reviseContentDraft } from "@/lib/content/store";
 
@@ -19,7 +20,7 @@ export async function createContentDraftAction(
   formData: FormData,
 ): Promise<ContentActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权创建内容草稿。" };
+  if (!session || !hasPermission(session.user.role, "content:write")) return { status: "error", message: "无权创建内容草稿。" };
   const parsed = contentDraftFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "内容资料格式不正确。" };
   try {
@@ -36,7 +37,7 @@ export async function decideContentReviewAction(
   formData: FormData,
 ): Promise<ContentActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权执行 Gate 01 内容审核。" };
+  if (!session || !hasPermission(session.user.role, "content:review")) return { status: "error", message: "无权执行 Gate 01 内容审核。" };
   const parsed = contentReviewFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "审核资料格式不正确。" };
   try {
@@ -54,7 +55,7 @@ export async function reviseContentDraftAction(
   formData: FormData,
 ): Promise<ContentActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") return { status: "error", message: "无权修订内容草稿。" };
+  if (!session || !hasPermission(session.user.role, "content:write")) return { status: "error", message: "无权修订内容草稿。" };
   const contentId = formData.get("contentId");
   const parsedContentId = contentReviewFormSchema.pick({ contentId: true }).safeParse({ contentId });
   if (!parsedContentId.success) return { status: "error", message: parsedContentId.error.issues[0]?.message ?? "内容记录标识无效。" };

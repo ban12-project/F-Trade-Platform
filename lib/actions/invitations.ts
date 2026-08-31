@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { invitationFormSchema } from "@/lib/form-schemas";
 import { issueInvitation, provisionInvitedUser } from "@/lib/invitations";
 
@@ -28,7 +29,7 @@ export async function createInvitationAction(
   formData: FormData,
 ): Promise<InvitationActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") {
+  if (!session || !hasPermission(session.user.role, "team:manage")) {
     return { status: "error", message: "无权发送邀请。" };
   }
 

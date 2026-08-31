@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { videoProviderModelSettingsFormSchema } from "@/lib/form-schemas";
 import { saveVideoProviderModelSettings } from "@/lib/video/provider-config-store";
 import { videoAspectRatioSchema, videoCapabilitySchema } from "@/lib/video/provider-capabilities";
@@ -32,7 +33,7 @@ export async function saveVideoProviderModelSettingsAction(
   formData: FormData,
 ): Promise<VideoProviderSettingsActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") {
+  if (!session || !hasPermission(session.user.role, "settings:manage")) {
     return { status: "error", message: "无权修改视频提供商配置。" };
   }
   const parsed = videoProviderModelSettingsFormSchema.safeParse({

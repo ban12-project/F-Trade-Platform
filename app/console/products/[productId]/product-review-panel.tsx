@@ -31,7 +31,7 @@ function stateLabel(state: string) {
   return ({ PRODUCT_REVIEW_REQUIRED: "待 Gate 01 审核", PRODUCT_REVISION_REQUIRED: "待修订", PRODUCT_READY: "已通过 Gate 01" } as Record<string, string>)[state] ?? state;
 }
 
-export function ProductReviewPanel({ product }: { product: ProductCatalogDetail }) {
+export function ProductReviewPanel({ product, canReview }: { product: ProductCatalogDetail; canReview: boolean }) {
   const [state, formAction, pending] = useActionState(decideProductCatalogReviewAction, initialProductActionState);
   const [, startTransition] = useTransition();
   const form = useForm<ReviewValues>({
@@ -43,7 +43,7 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
       notes: "",
     },
   });
-  const canDecide = product.state === "PRODUCT_REVIEW_REQUIRED" && product.approvalStatus === "pending";
+  const canDecide = canReview && product.state === "PRODUCT_REVIEW_REQUIRED" && product.approvalStatus === "pending";
 
   function onSubmit(values: ReviewValues) {
     const formData = new FormData();
@@ -97,7 +97,7 @@ export function ProductReviewPanel({ product }: { product: ProductCatalogDetail 
         </CardHeader>
         <CardContent>
           {!canDecide ? (
-            <Alert><AlertTitle>当前无待处理审核</AlertTitle><AlertDescription>此记录已经审核，或状态已不允许再次决定。</AlertDescription></Alert>
+            <Alert><AlertTitle>{canReview ? "当前无待处理审核" : "已提交，等待管理员确认"}</AlertTitle><AlertDescription>{canReview ? "此记录已经审核，或状态已不允许再次决定。" : "业务员可以查看事实和证据，但不能替代管理员作出人工确认。"}</AlertDescription></Alert>
           ) : (
             <form autoComplete="off" onSubmit={form.handleSubmit(onSubmit)}>
               <FieldGroup>

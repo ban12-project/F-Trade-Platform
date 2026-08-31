@@ -3,10 +3,8 @@
 import { useEffect } from "react";
 import {
   BoxesIcon,
-  BotIcon,
   ClipboardCheckIcon,
   FilePenLineIcon,
-  ClapperboardIcon,
   MessagesSquareIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
@@ -33,21 +31,20 @@ import {
 } from "@/components/ui/sidebar";
 
 const workspaceItems = [
-  { href: "/console", label: "总览", icon: LayoutDashboardIcon },
-  { href: "/console/products", label: "产品目录", icon: BoxesIcon },
-  { href: "/console/content", label: "内容工作台", icon: FilePenLineIcon },
-  { href: "/studio", label: "视频 Studio", icon: ClapperboardIcon },
-  { href: "/console/product-agent", label: "Product Agent", icon: BotIcon },
-  { href: "/console/sales", label: "询盘与报价", icon: MessagesSquareIcon },
+  { href: "/console", label: "待办", icon: LayoutDashboardIcon },
+  { href: "/console/products", label: "产品资料", icon: BoxesIcon },
+  { href: "/console/content", label: "营销内容", icon: FilePenLineIcon, matches: ["/console/content", "/console/video"] },
+  { href: "/console/sales", label: "客户询盘", icon: MessagesSquareIcon },
 ] as const;
 
 const managementItems = [
-  { href: "/console/invitations", label: "团队邀请", icon: UserPlusIcon },
-  { href: "/console/agent-settings", label: "Agent 配置", icon: Settings2Icon },
-  { href: "/console/video/settings", label: "视频模型配置", icon: KeyRoundIcon },
+  { href: "/console/invitations", label: "团队", icon: UserPlusIcon },
+  { href: "/console/agent-settings", label: "系统设置", icon: Settings2Icon },
+  { href: "/console/video/settings", label: "视频模型", icon: KeyRoundIcon },
 ] as const;
 
-function isItemActive(pathname: string, href: string) {
+function isItemActive(pathname: string, href: string, matches?: readonly string[]) {
+  if (matches?.some((match) => pathname === match || pathname.startsWith(`${match}/`))) return true;
   return href === "/console" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -57,7 +54,7 @@ function NavigationGroup({
   pathname,
 }: {
   label: string;
-  items: readonly { href: string; label: string; icon: typeof LayoutDashboardIcon }[];
+  items: readonly { href: string; label: string; icon: typeof LayoutDashboardIcon; matches?: readonly string[] }[];
   pathname: string;
 }) {
   return (
@@ -70,7 +67,7 @@ function NavigationGroup({
             return (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
-                  isActive={isItemActive(pathname, item.href)}
+                  isActive={isItemActive(pathname, item.href, item.matches)}
                   render={<Link href={item.href} />}
                   tooltip={item.label}
                 >
@@ -86,7 +83,7 @@ function NavigationGroup({
   );
 }
 
-export function AppSidebar() {
+export function AppSidebar({ role }: { role: string | null | undefined }) {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
@@ -121,7 +118,7 @@ export function AppSidebar() {
 
       <SidebarContent>
         <NavigationGroup label="工作区" items={workspaceItems} pathname={pathname} />
-        <NavigationGroup label="管理" items={managementItems} pathname={pathname} />
+        {role === "admin" ? <NavigationGroup label="管理" items={managementItems} pathname={pathname} /> : null}
       </SidebarContent>
 
       <SidebarFooter>
@@ -141,12 +138,12 @@ export function AppSidebar() {
         <div className="flex items-start gap-2 px-2 py-2 text-xs text-sidebar-foreground/65 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <ClipboardCheckIcon aria-hidden="true" className="mt-0.5 shrink-0" />
           <span className="leading-5 group-data-[collapsible=icon]:hidden">
-            所有产品事实与内容发布都必须经过人工 Gate 01。
+            产品事实与发布都需要管理员人工确认。
           </span>
         </div>
         <div className="flex items-center gap-2 px-2 pb-1 text-xs text-sidebar-foreground/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <span className="size-1.5 rounded-full bg-sidebar-primary" aria-hidden="true" />
-          <span className="group-data-[collapsible=icon]:hidden">管理员空间 · 内部使用</span>
+          <span className="group-data-[collapsible=icon]:hidden">{role === "admin" ? "管理员空间" : "业务工作区"} · 内部使用</span>
         </div>
       </SidebarFooter>
       <SidebarRail />

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/authz";
 import { productAgentModelSettingsSchema } from "@/lib/form-schemas";
 import { saveProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 
@@ -27,7 +28,7 @@ export async function saveProductAgentModelSettingsAction(
   formData: FormData,
 ): Promise<AgentSettingsActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || session.user.role !== "admin") {
+  if (!session || !hasPermission(session.user.role, "settings:manage")) {
     return { status: "error", message: "无权修改 Agent 配置。" };
   }
   const parsed = productAgentModelSettingsSchema.safeParse({

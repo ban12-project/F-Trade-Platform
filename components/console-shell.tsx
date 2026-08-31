@@ -44,8 +44,11 @@ function getBreadcrumb(pathname: string) {
     }
     return { section: "工作区", current: "内容工作台", href: "/console/content" };
   }
+  if (pathname.startsWith("/console/video")) {
+    return { section: "营销内容", current: "视频项目", href: "/console/content" };
+  }
   if (pathname.startsWith("/console/product-agent")) {
-    return { section: "工作区", current: "Product Agent", href: "/console/product-agent" };
+    return { section: "产品资料", current: "导入资料", href: "/console/products" };
   }
   if (pathname.startsWith("/console/sales")) {
     return { section: "工作区", current: "询盘与报价", href: "/console/sales" };
@@ -110,11 +113,11 @@ function ConsoleHeaderFallback() {
   );
 }
 
-export function ConsoleShell({ children }: { children: React.ReactNode }) {
+export function ConsoleShell({ children, role }: { children: React.ReactNode; role: string | null | undefined }) {
   return (
     <SidebarProvider>
       <Suspense fallback={null}>
-        <AppSidebar />
+        <AppSidebar role={role} />
       </Suspense>
       <SidebarInset id="main-content">
         <Suspense fallback={<ConsoleHeaderFallback />}>

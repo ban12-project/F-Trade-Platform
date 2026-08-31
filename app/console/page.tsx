@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ArrowRightIcon, BoxesIcon, FilePenLineIcon, PlusIcon, ShieldCheckIcon } from "lucide-react";
+import { ArrowRightIcon, BoxesIcon, ClapperboardIcon, FilePenLineIcon, PlusIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { requireRole } from "@/lib/auth-guard";
+import { requirePermission } from "@/lib/auth-guard";
 import { getContentCatalogDashboard, type ContentCatalogDashboard, type ContentCatalogEntry } from "@/lib/content/store";
 import { getProductCatalogDashboard, type ProductCatalogDashboard, type ProductCatalogEntry } from "@/lib/products";
 
@@ -88,7 +88,7 @@ function DashboardStats({
   );
 }
 
-function ReviewQueue({ products, contents }: { products: ProductCatalogEntry[]; contents: ContentCatalogEntry[] }) {
+function ReviewQueue({ products, contents, canReview }: { products: ProductCatalogEntry[]; contents: ContentCatalogEntry[]; canReview: boolean }) {
   const queue = [
     ...products
       .filter((entry) => entry.state === "PRODUCT_REVIEW_REQUIRED" || entry.state === "PRODUCT_REVISION_REQUIRED")
@@ -103,10 +103,10 @@ function ReviewQueue({ products, contents }: { products: ProductCatalogEntry[]; 
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <CardTitle>审核队列</CardTitle>
-            <CardDescription>按当前状态优先显示需要人工动作的条目。</CardDescription>
+            <CardTitle>{canReview ? "待人工确认" : "需要继续处理"}</CardTitle>
+            <CardDescription>{canReview ? "优先显示需要管理员确认的产品和内容。" : "显示待修订和已提交条目；管理员会独立作出确认。"}</CardDescription>
           </div>
-          <Badge variant="outline" className="shrink-0">Gate 01</Badge>
+          <Badge variant="outline" className="shrink-0">{canReview ? "确认队列" : "共享进度"}</Badge>
         </div>
       </CardHeader>
       <CardContent>
@@ -142,7 +142,7 @@ function ReviewQueue({ products, contents }: { products: ProductCatalogEntry[]; 
       </CardContent>
       <CardFooter>
         <LinkButton variant="ghost" size="sm" className="px-0" href="/console/products">
-          查看产品目录
+          查看产品资料
           <ArrowRightIcon data-icon="inline-end" />
         </LinkButton>
       </CardFooter>
@@ -182,7 +182,7 @@ function WorkflowGuide() {
 }
 
 async function AuthorizedOverview() {
-  await requireRole("admin");
+  const session = await requirePermission("workspace:view");
 
   const [products, contents] = await Promise.all([
     getProductCatalogDashboard(),
@@ -194,26 +194,26 @@ async function AuthorizedOverview() {
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">内部工作台</Badge>
+            <Badge variant="secondary">{session.user.role === "admin" ? "管理员待办" : "业务员待办"}</Badge>
             <Badge variant="outline">离合器试点版</Badge>
           </div>
           <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-balance">审核待处理项目并继续工作</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-balance">{session.user.role === "admin" ? "处理待确认事项并继续工作" : "从下一项工作开始"}</h1>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground text-pretty">
-              从工厂资料到内容草稿，所有关键字段都留在证据边界内。先处理队列，再推进产品与内容的下一步。
+              {session.user.role === "admin" ? "优先处理人工确认、修订和系统准备事项；平台不会替代人工承诺。" : "按待办完成资料录入、修订和提交；管理员会独立确认产品事实与发布。"}
             </p>
           </div>
         </div>
         <LinkButton href="/console/products">
           <PlusIcon data-icon="inline-start" />
-          录入产品资料
+          开始录入产品资料
         </LinkButton>
       </header>
 
       <DashboardStats products={products} contents={contents} />
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
-        <ReviewQueue products={products.queue} contents={contents.queue} />
+        <ReviewQueue products={products.queue} contents={contents.queue} canReview={session.user.role === "admin"} />
         <Card>
           <CardHeader>
             <CardTitle>下一步建议</CardTitle>
@@ -226,6 +226,10 @@ async function AuthorizedOverview() {
             </LinkButton>
             <LinkButton variant="outline" className="justify-between" href="/console/content">
               <span className="flex items-center gap-2"><FilePenLineIcon data-icon="inline-start" />查看内容草稿</span>
+              <ArrowRightIcon data-icon="inline-end" />
+            </LinkButton>
+            <LinkButton variant="outline" className="justify-between" href="/console/video">
+              <span className="flex items-center gap-2"><ClapperboardIcon data-icon="inline-start" />创建视频计划</span>
               <ArrowRightIcon data-icon="inline-end" />
             </LinkButton>
           </CardContent>
