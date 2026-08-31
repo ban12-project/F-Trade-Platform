@@ -442,6 +442,24 @@ export const videoAdvisoryReview = pgTable(
   ],
 );
 
+/** Personal, editable canvas layout. It is not a video project and carries no product facts. */
+export const videoCanvasDocument = pgTable(
+  "video_canvas_document",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    document: jsonb("document").$type<Record<string, unknown>>().notNull(),
+    revision: integer("revision").default(1).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("video_canvas_document_owner_uidx").on(table.ownerId),
+    check("video_canvas_document_revision_positive", sql`${table.revision} > 0`),
+    check("video_canvas_document_owner_nonempty", sql`length(btrim(${table.ownerId})) > 0`),
+  ],
+);
+
 /** Opaque reference to a generated video held only in private object storage. */
 export const videoGeneratedAsset = pgTable(
   "video_generated_asset",
