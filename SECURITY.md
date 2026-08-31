@@ -29,6 +29,7 @@
 - 发布必须经过 Gate 01 和逐帖人工确认；DM 仅允许确定性 RFQ 澄清模板。报价、MOQ、交期、付款、认证、质保、安全、尺寸、材料和适配问题必须转人工。
 - 安全检查、验证码、2FA、登录失效、固定出口 IP 改变、页面结构不确定或不确定外部结果必须立即熔断。禁止自动换号、换代理、解决验证码或重试不确定副作用。
 - Browser Profile、Cookie、HAR、trace、截图和代理凭据只能留在获批准 VPS 的加密运行卷，且不能出现在 Git、数据库业务记录、日志、Issue、PR 或聊天中。
+- 社交消息正文使用独立的 `SOCIAL_MESSAGE_ENCRYPTION_KEY` 以 AES-256-GCM 加密，最多保存 30 天；密钥不得与模型或提供商凭据共用。
 - CamoFox telemetry 和 trace 默认关闭；VNC 仅通过 SSH 隧道用于账户本人手动登录，登录完成后关闭。
 - `.gitignore` 和 `repository-validate` 会拒绝常见的 session state、Cookie、HAR 和 profile 路径；即使文件被强制加入也不能绕过校验。
 - 发现浏览器状态泄露时，立即撤销会话并重置相关凭据；不要把泄露文件或其内容贴入 Issue、PR、日志或聊天。
