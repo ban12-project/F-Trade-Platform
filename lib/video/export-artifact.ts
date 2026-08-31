@@ -17,6 +17,7 @@ export type ReviewVideoExport = {
   presetSourceUrl: string;
   status: "review_required" | "approved";
   approvalRef?: string;
+  timelineDurationSeconds?: number;
   measured: Pick<ProbedVideo, "width" | "height" | "fps" | "durationSeconds" | "subtitleStreamCount">;
   createdAt: string;
 };
@@ -35,6 +36,7 @@ export const reviewVideoExportInputSchema = z.object({
     durationSeconds: z.number().positive(),
     subtitleStreamCount: z.number().int().min(0),
   }).strict(),
+  timeline: z.object({ durationSeconds: z.number().positive() }).strict().optional(),
 }).strict();
 
 /**
@@ -43,6 +45,9 @@ export const reviewVideoExportInputSchema = z.object({
  */
 export function createReviewVideoExport(input: z.input<typeof reviewVideoExportInputSchema>): ReviewVideoExport {
   const value = reviewVideoExportInputSchema.parse(input);
+  if (value.timeline && Math.abs(value.media.durationSeconds - value.timeline.durationSeconds) > 0.1) {
+    throw new Error("导出媒体时长与已审核剪辑时间线不一致。 ");
+  }
   const preset = validateProbedVideoExport(value.platform, value.media);
   return {
     id: randomUUID(),
@@ -53,6 +58,7 @@ export function createReviewVideoExport(input: z.input<typeof reviewVideoExportI
     presetVersion: preset.version,
     presetSourceUrl: preset.sourceUrl,
     status: "review_required",
+    ...(value.timeline ? { timelineDurationSeconds: value.timeline.durationSeconds } : {}),
     measured: {
       width: value.media.width,
       height: value.media.height,

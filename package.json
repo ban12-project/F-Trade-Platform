@@ -64,6 +64,9 @@
     "test:video-material-intake": "tsx scripts/test-video-material-intake.ts",
     "test:ai-sdk-video-adapters": "tsx scripts/test-ai-sdk-video-adapters.ts",
     "test:video-media-probe": "tsx scripts/test-video-media-probe.ts",
+    "test:video-timeline": "tsx scripts/test-video-timeline.ts",
+    "test:video-rendering": "tsx scripts/test-video-rendering.ts",
+    "test:ffmpeg-renderer": "tsx scripts/test-ffmpeg-renderer.ts",
     "test:video-social-publication": "tsx scripts/test-video-social-publication.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
