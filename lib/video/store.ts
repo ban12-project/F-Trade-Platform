@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { and, desc, eq, inArray } from "drizzle-orm";
 
@@ -10,6 +10,7 @@ import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
 import type { videoProjectDraftFormSchema } from "@/lib/form-schemas";
 import type { z } from "zod";
+import { type VideoCanvasDocument } from "./canvas-contracts";
 
 export type VideoProjectDraftInput = z.infer<typeof videoProjectDraftFormSchema>;
 export type ReadyVideoProductSource = { id: string; productName: string; internalSku: string; factOptions: Array<{ value: string; label: string }> };
@@ -48,6 +49,56 @@ export async function createVideoProject(input: VideoProjectDraftInput, actorId:
     await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_01_truth", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
     await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actorType: "human", actorId, evidenceRefs: [...project.factualClaims.map((claim) => claim.evidenceRef), ...sourceAssets.map((asset) => asset.rightsEvidenceRef)], occurredAt: now });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "video_project.created", actorType: "human", actorId, aggregateId: id, subjectType: "video_project", subjectId: id, metadata: { product_id: product.id, platform_count: project.platforms.length, scene_count: project.scenes.length }, occurredAt: now });
+    return { id, approvalId, project };
+  });
+}
+
+function sceneConnectsToGenerate(sceneId: string, edges: VideoCanvasDocument["edges"]) {
+  const visited = new Set<string>();
+  const pending = [sceneId];
+  while (pending.length) {
+    const current = pending.pop();
+    if (!current || visited.has(current)) continue;
+    if (current === "generate") return true;
+    visited.add(current);
+    for (const edge of edges) if (edge.source === current) pending.push(edge.target);
+  }
+  return false;
+}
+
+/** Converts a fully configured canvas into one reviewable project; all facts are reloaded from ProductReady. */
+export async function createVideoProjectFromCanvas(document: VideoCanvasDocument, actorId: string) {
+  if (!document.brief || !document.factBinding || !document.assetBinding || !document.platforms?.length) throw new Error("请完成简报、已验证事实、素材权利和目标平台后再创建项目。");
+  const sceneNodeIds = document.nodes.filter((node) => node.id.startsWith("scene-")).map((node) => node.id);
+  if (!sceneNodeIds.length || !document.scenes) throw new Error("请至少添加并填写一个镜头节点。");
+  const canvasSnapshotSha256 = createHash("sha256").update(JSON.stringify(document)).digest("hex");
+  const scenes = sceneNodeIds.map((sceneId) => {
+    const scene = document.scenes?.[sceneId];
+    if (!scene) throw new Error("每个镜头节点都必须填写镜头说明和时长。");
+    if (!sceneConnectsToGenerate(sceneId, document.edges)) throw new Error("每个镜头节点都必须连接到生成视频节点。");
+    return scene;
+  });
+  const now = new Date(); const id = randomUUID(); const approvalId = randomUUID(); const eventId = randomUUID();
+  return getDatabase().transaction(async (tx) => {
+    const [product] = await tx.select({ id: aggregateRecord.id, state: aggregateRecord.state, payload: aggregateRecord.payload }).from(aggregateRecord).where(and(eq(aggregateRecord.id, document.factBinding!.productId), eq(aggregateRecord.type, "product"))).for("update");
+    if (!product || product.state !== "PRODUCT_READY") throw new Error("所选产品不再是已核验产品。");
+    const ready = product.payload as unknown as ProductReady;
+    if (ready.record_id !== product.id || ready.verification_status !== "verified") throw new Error("产品就绪记录不完整，无法创建视频项目。");
+    const project = buildVideoCreative({
+      productId: product.id,
+      objective: document.brief!.objective,
+      targetAudience: document.brief!.targetAudience,
+      factPaths: [document.factBinding!.factPath],
+      sourceAssets: [{ assetRef: document.assetBinding!.assetRef, mediaType: "image", rightsEvidenceRef: document.assetBinding!.rightsEvidenceRef }],
+      platforms: document.platforms!,
+      scenes: scenes.map((scene) => ({ prompt: scene.prompt, durationSeconds: scene.durationSeconds, claimRefs: [document.factBinding!.factPath], assetRefs: [document.assetBinding!.assetRef] })),
+    }, ready, id);
+    const evidenceRefs = [...project.factualClaims.map((claim) => claim.evidenceRef), document.assetBinding!.rightsEvidenceRef];
+    assertTransition({ eventId, entityType: "video", entityId: id, fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actorType: "human", actorId, occurredAt: now.toISOString(), evidenceRefs });
+    await tx.insert(aggregateRecord).values({ id, type: "video", state: "VIDEO_REVIEW_REQUIRED", payload: project, createdByType: "human", createdById: actorId });
+    await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_01_truth", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
+    await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "VIDEO_DRAFT", toState: "VIDEO_REVIEW_REQUIRED", actorType: "human", actorId, evidenceRefs, occurredAt: now });
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: "video_project.created_from_canvas", actorType: "human", actorId, aggregateId: id, subjectType: "video_project", subjectId: id, metadata: { product_id: product.id, platform_count: project.platforms.length, scene_count: project.scenes.length, canvas_snapshot_sha256: canvasSnapshotSha256 }, occurredAt: now });
     return { id, approvalId, project };
   });
 }

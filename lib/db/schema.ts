@@ -58,6 +58,8 @@ export const videoJobStatus = pgEnum("video_job_status", [
   "failed",
   "cancelled",
 ]);
+export const videoReviewStage = pgEnum("video_review_stage", ["pre_generation", "post_generation"]);
+export const videoReviewOutcome = pgEnum("video_review_outcome", ["accepted", "changes_requested", "skipped"]);
 
 export const user = pgTable(
   "user",
@@ -417,6 +419,44 @@ export const videoModelConfig = pgTable(
     check("video_model_config_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
     check("video_model_config_duration_consistent", sql`${table.durationMinimumSeconds} > 0 AND ${table.durationMaximumSeconds} >= ${table.durationMinimumSeconds}`),
     check("video_model_config_enabled_verified", sql`NOT ${table.enabled} OR (${table.verifiedAt} IS NOT NULL AND ${table.verificationRef} IS NOT NULL AND length(btrim(${table.verificationRef})) > 0)`),
+  ],
+);
+
+/** Advisory creative review. It records guidance and never authorizes product facts or publication. */
+export const videoAdvisoryReview = pgTable(
+  "video_advisory_review",
+  {
+    id: text("id").primaryKey(),
+    videoProjectId: text("video_project_id").notNull().references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    stage: videoReviewStage("stage").notNull(),
+    outcome: videoReviewOutcome("outcome").notNull(),
+    reason: text("reason").notNull(),
+    riskSnapshot: jsonb("risk_snapshot").$type<Record<string, unknown>>().default({}).notNull(),
+    decidedBy: text("decided_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("video_advisory_review_project_stage_idx").on(table.videoProjectId, table.stage, table.decidedAt),
+    check("video_advisory_review_reason_nonempty", sql`length(btrim(${table.reason})) > 0`),
+  ],
+);
+
+/** Personal, editable canvas layout. It is not a video project and carries no product facts. */
+export const videoCanvasDocument = pgTable(
+  "video_canvas_document",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    document: jsonb("document").$type<Record<string, unknown>>().notNull(),
+    revision: integer("revision").default(1).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("video_canvas_document_owner_uidx").on(table.ownerId),
+    check("video_canvas_document_revision_positive", sql`${table.revision} > 0`),
+    check("video_canvas_document_owner_nonempty", sql`length(btrim(${table.ownerId})) > 0`),
   ],
 );
 

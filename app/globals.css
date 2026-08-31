@@ -145,6 +145,30 @@ html {
   }
 }
 
+/* React Flow may render this after its options are applied; keep the Studio canvas chrome-free. */
+.video-studio-canvas .react-flow__attribution {
+  display: none !important;
+}
+
+.video-studio-canvas .react-flow__controls,
+.video-studio-canvas .react-flow__minimap {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
+  border-radius: calc(var(--radius) * 1.4);
+  background: color-mix(in srgb, var(--background) 70%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--foreground) 10%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.video-studio-canvas .react-flow__controls-button {
+  border-bottom-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+  background: transparent;
+}
+
+.video-studio-canvas .react-flow__controls-button:hover {
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
 .motion-landing-enter {
   opacity: 1;
   transform: translateY(0);
