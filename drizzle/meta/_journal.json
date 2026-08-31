@@ -92,6 +92,13 @@
       "when": 1787967000000,
       "tag": "0012_video_canvas_document",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788220800000,
+      "tag": "0013_social_channel_control",
+      "breakpoints": true
     }
   ]
 }
