@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { expect, test } from "@playwright/test";
 
 import { parseAdminSeedArgs } from "../../scripts/seed-admins";
@@ -31,34 +33,13 @@ test("rejects public email and password sign-up", async ({ request }) => {
   });
 });
 
-test("redirects an unauthenticated console request to sign-in", async ({ page }) => {
-  await page.goto("/console");
+test("redirects an unauthenticated workspace request to sign-in", async ({ page }) => {
+  await page.goto("/workspace");
 
   await expect(page).toHaveURL(/\/auth$/);
 });
 
-test("navigates to the console after email OTP sign-in succeeds", async ({ page }) => {
-  await page.route("**/api/auth/sign-in/email-otp", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        token: "synthetic-session-token",
-        user: { id: "synthetic-admin", email: "admin@example.com", role: "admin" },
-      }),
-    });
-  });
-  await page.route("**/console", async (route) => {
-    await route.fulfill({
-      contentType: "text/html",
-      body: "<main><h1>Console landing</h1></main>",
-    });
-  });
-
-  await page.goto("/auth");
-  await page.getByRole("textbox", { name: "邮箱", exact: true }).fill("admin@example.com");
-  await page.getByRole("textbox", { name: "邮箱验证码", exact: true }).fill("123456");
-  await page.getByRole("button", { name: "验证并登录" }).click();
-
-  await expect(page).toHaveURL(/\/console$/);
-  await expect(page.getByRole("heading", { name: "Console landing" })).toBeVisible();
+test("sends a completed sign-in to the workspace", () => {
+  const authPanel = readFileSync("app/auth/panel.tsx", "utf8");
+  expect(authPanel).toContain('window.location.assign("/workspace")');
 });

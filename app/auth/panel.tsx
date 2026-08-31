@@ -38,7 +38,7 @@ export function AuthPanel() {
   function enterConsole() {
     // Authentication changes the cookie set used by the proxy. A document
     // navigation guarantees the next request evaluates that fresh session.
-    window.location.assign("/console");
+    window.location.assign("/workspace");
   }
 
   async function run(action: () => Promise<{ error?: { message?: string } | null }>, success: string) {

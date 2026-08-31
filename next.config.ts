@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/admin/:path*",
-        destination: "/console/:path*",
+        destination: "/workspace",
         permanent: true,
       },
     ];

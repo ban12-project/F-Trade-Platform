@@ -13,7 +13,7 @@ AI 外贸工作流平台第一阶段 MVP，试点品类为汽车离合器。
 
 第一阶段范围固定为：1 家工厂、约 20 个真实离合器 SKU、1 个海外渠道、4 个业务 Agent、1 个 Workflow Orchestrator 和 3 类 Human Gate。
 
-控制台以业务任务为默认入口：业务员录入、生成、修订和提交，管理员独立完成人工确认、团队与系统控制。视频默认使用分步故事板；无限画布只作为高级创意编排视图，二者复用同一份受控草稿。
+应用以项目画布为默认入口：产品营销项目和销售机会项目分别组织受控业务对象，列表、表单和设置在画布的面板中完成。画布只保存关系与布局；工程事实、报价、审核和发布仍由既有受控工作流与人工 Gate 决定。
 
 ## 重要边界
 
@@ -30,7 +30,7 @@ AI 外贸工作流平台第一阶段 MVP，试点品类为汽车离合器。
 - [业务工作流与 Human Gate](docs/architecture/business-workflow.md)
 - [数据契约总览](docs/architecture/data-contracts.md)
 - [ADR 0001：MVP 应用技术栈](docs/decisions/0001-mvp-application-stack.md)
-- [ADR 0003：控制台任务流与角色边界](docs/decisions/0003-console-task-flow.md)
+- [ADR 0003：项目画布与角色边界](docs/decisions/0003-console-task-flow.md)
 - [研发工作约定](CONTRIBUTING.md)
 - [安全与数据分级](SECURITY.md)
 - [项目状态](docs/PROJECT_STATUS.md)
@@ -93,7 +93,7 @@ pnpm db:migrate
 
 ### 产品目录录入
 
-业务员和管理员可在 `/console/products` 将工厂资料按“产品编号、OE、适配与规格”的目录结构创建为
+业务员和管理员可在项目画布的产品面板中，将工厂资料按“产品编号、OE、适配与规格”的目录结构创建为
 `PRODUCT_REVIEW_REQUIRED` 草稿。每条已填写的字段必须带脱敏的私有证据引用；录入不会使
 产品成为 `ProductReady`，也不会生成正式报价或交期。真实目录、产品图片与本机路径都不能提交到 Git。
 

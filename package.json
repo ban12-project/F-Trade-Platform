@@ -44,6 +44,7 @@
     "eval:harbor:podman": "sh scripts/run-harbor-product-agent-podman.sh",
     "typecheck": "tsc --noEmit",
     "test:workflow": "tsx scripts/test-workflow-transitions.ts",
+    "test:workspace": "tsx scripts/test-workspace-contracts.ts",
     "demo:synthetic": "tsx scripts/run-synthetic-demo.ts",
     "test:demo": "tsx scripts/test-synthetic-demo.ts",
     "test:quotation": "tsx scripts/test-quotation-handoff.ts",
