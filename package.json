@@ -25,6 +25,7 @@
     "test:local-ocr": "python3 scripts/test-local-ocr-preprocess.py",
     "test:social-inbound": "tsx scripts/test-social-inbound-policy.ts",
     "test:social-message-record": "tsx scripts/test-social-message-record.ts",
+    "test:social-worker-protocol": "tsx scripts/test-social-worker-protocol.ts",
     "test:inbound-delivery": "tsx scripts/test-inbound-delivery-store.ts",
     "test:database-driver": "tsx scripts/test-database-transaction-driver.ts",
     "test:github-governance": "python3 scripts/test-github-governance.py",
