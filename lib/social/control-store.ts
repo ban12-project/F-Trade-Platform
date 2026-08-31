@@ -24,7 +24,9 @@ export async function saveSocialChannelControl(
     const existing = await tx.query.socialChannelControl.findFirst({
       where: and(eq(socialChannelControl.channelRef, parsed.channelRef), eq(socialChannelControl.accountRef, parsed.accountRef)),
     });
-    const current: SocialControlRecord = existing ?? { enabled: false, circuitStatus: "paused", pauseReason: "not_enabled", pauseEvidenceRef: null };
+    const current: SocialControlRecord = existing
+      ? { enabled: existing.enabled, circuitStatus: existing.circuitStatus === "active" ? "active" : "paused", pauseReason: existing.pauseReason, pauseEvidenceRef: existing.pauseEvidenceRef }
+      : { enabled: false, circuitStatus: "paused", pauseReason: "not_enabled", pauseEvidenceRef: null };
     const next = applySocialControlChange(current, parsed);
     const now = new Date();
     const values = {
@@ -39,6 +41,6 @@ export async function saveSocialChannelControl(
       subjectType: "social_channel_control", subjectId: saved.id,
       metadata: { channel_ref: parsed.channelRef, account_ref: parsed.accountRef, evidence_ref: parsed.evidenceRef, enabled: next.enabled, circuit_status: next.circuitStatus }, occurredAt: now,
     });
-    return { id: saved.id, channelRef: saved.channelRef, accountRef: saved.accountRef, enabled: saved.enabled, circuitStatus: saved.circuitStatus, pauseReason: saved.pauseReason, pauseEvidenceRef: saved.pauseEvidenceRef, changedAt: saved.changedAt };
+    return { id: saved.id, channelRef: saved.channelRef, accountRef: saved.accountRef, enabled: saved.enabled, circuitStatus: saved.circuitStatus === "active" ? "active" : "paused", pauseReason: saved.pauseReason, pauseEvidenceRef: saved.pauseEvidenceRef, changedAt: saved.changedAt };
   });
 }
