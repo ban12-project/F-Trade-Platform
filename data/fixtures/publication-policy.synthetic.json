@@ -1,6 +1,6 @@
 {
   "channel_ref": "synthetic-content-channel",
   "account_ref": "synthetic-factory-account",
-  "official_api": true,
+  "transport": "camofox_controlled_mvp1",
   "publishing_enabled": true
 }

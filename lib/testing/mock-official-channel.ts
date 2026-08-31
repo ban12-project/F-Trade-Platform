@@ -9,7 +9,7 @@ import type { ChannelInboundPolicy, OfficialInboundWebhook } from "../social/inb
 const policy: ChannelInboundPolicy = {
   channelRef: "synthetic-official-channel",
   accountRef: "synthetic-account",
-  officialApi: true,
+  transport: "official_api",
   inboundOnly: true,
   replyWindowMinutes: 60,
   outsideWindowAction: "block",

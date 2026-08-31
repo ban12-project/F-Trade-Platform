@@ -42,9 +42,9 @@ class TransactionalInMemoryReceiptStore implements InboundDeliveryTransactionRun
 }
 
 const policy = {
-  channelRef: "synthetic-instagram-channel",
+  channelRef: "synthetic-facebook-channel",
   accountRef: "synthetic-factory-account",
-  officialApi: true,
+  transport: "official_api" as const,
   inboundOnly: true,
   replyWindowMinutes: 60,
   outsideWindowAction: "require_approved_template" as const,
@@ -62,7 +62,7 @@ async function main() {
   const store = new InMemoryAtomicReceiptStore();
   const receipt = createInboundDeliveryReceipt(policy, webhook);
   assert.deepEqual(receipt, {
-    deliveryKey: "synthetic-instagram-channel:synthetic-factory-account:synthetic-platform-message-001",
+    deliveryKey: "synthetic-facebook-channel:synthetic-factory-account:synthetic-platform-message-001",
     channelRef: policy.channelRef,
     accountRef: policy.accountRef,
     messageId: webhook.messageId,

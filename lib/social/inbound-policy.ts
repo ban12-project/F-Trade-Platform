@@ -1,7 +1,7 @@
 export interface ChannelInboundPolicy {
   channelRef: string;
   accountRef: string;
-  officialApi: boolean;
+  transport: "official_api" | "camofox_controlled_mvp1";
   inboundOnly: boolean;
   replyWindowMinutes: number;
   outsideWindowAction: "block" | "require_approved_template";
@@ -13,14 +13,23 @@ export interface InboundMessageReference {
   receivedAt: string;
 }
 
-export interface OfficialInboundWebhook {
-  transport: "official_webhook";
+export interface InboundChannelEvent {
+  transport: "official_webhook" | "controlled_browser_observation";
   channelRef: string;
   accountRef: string;
   messageId: string;
   direction: "inbound";
   receivedAt: string;
+  observationRef?: string;
+  messageIdentityQuality?: "dom_id" | "derived_fingerprint";
 }
+
+export type OfficialInboundWebhook = InboundChannelEvent & { transport: "official_webhook" };
+export type CamofoxBrowserObservation = InboundChannelEvent & {
+  transport: "controlled_browser_observation";
+  observationRef: string;
+  messageIdentityQuality: "dom_id" | "derived_fingerprint";
+};
 
 function requireReference(value: string, label: string) {
   if (!value.trim()) throw new Error(`${label} is required`);
@@ -35,7 +44,9 @@ function parseTime(value: string, label: string) {
 export function validateChannelInboundPolicy(policy: ChannelInboundPolicy) {
   requireReference(policy.channelRef, "Channel reference");
   requireReference(policy.accountRef, "Account reference");
-  if (policy.officialApi !== true) throw new Error("Inbound policy requires an official API channel");
+  if (!['official_api', 'camofox_controlled_mvp1'].includes(policy.transport)) {
+    throw new Error("Inbound policy requires an approved channel transport");
+  }
   if (policy.inboundOnly !== true) throw new Error("Inbound policy must remain inbound-only");
   if (!Number.isInteger(policy.replyWindowMinutes) || policy.replyWindowMinutes < 1) {
     throw new Error("Reply window must be a positive whole number of minutes");
@@ -72,19 +83,44 @@ export function acceptOfficialInboundWebhook(
   return assessInboundDelivery(policy, validateOfficialInboundWebhook(policy, webhook), processedDeliveryKeys);
 }
 
+export function acceptInboundChannelEvent(
+  policy: ChannelInboundPolicy,
+  event: InboundChannelEvent,
+  processedDeliveryKeys: ReadonlySet<string>,
+) {
+  return assessInboundDelivery(policy, validateInboundChannelEvent(policy, event), processedDeliveryKeys);
+}
+
 export function validateOfficialInboundWebhook(
   policy: ChannelInboundPolicy,
   webhook: OfficialInboundWebhook,
 ): InboundMessageReference {
+  if (policy.transport !== "official_api") {
+    throw new Error("Official webhook requires the official API policy transport");
+  }
+  return validateInboundChannelEvent(policy, webhook);
+}
+
+export function validateInboundChannelEvent(
+  policy: ChannelInboundPolicy,
+  event: InboundChannelEvent,
+): InboundMessageReference {
   validateChannelInboundPolicy(policy);
-  if (webhook.transport !== "official_webhook") {
-    throw new Error("Inbound workflow accepts only official webhook transport");
+  const expectedTransport = policy.transport === "official_api"
+    ? "official_webhook"
+    : "controlled_browser_observation";
+  if (event.transport !== expectedTransport) {
+    throw new Error(`Inbound event transport must match policy transport: ${expectedTransport}`);
   }
-  if (webhook.channelRef !== policy.channelRef || webhook.accountRef !== policy.accountRef) {
-    throw new Error("Official webhook channel and account must match the inbound policy");
+  if (event.transport === "controlled_browser_observation") {
+    requireReference(event.observationRef ?? "", "Browser observation reference");
+    if (!event.messageIdentityQuality) throw new Error("Browser observation identity quality is required");
   }
-  inboundDeliveryKey(policy, webhook);
-  return webhook;
+  if (event.channelRef !== policy.channelRef || event.accountRef !== policy.accountRef) {
+    throw new Error("Inbound event channel and account must match the inbound policy");
+  }
+  inboundDeliveryKey(policy, event);
+  return event;
 }
 
 export function assessReplyWindow(

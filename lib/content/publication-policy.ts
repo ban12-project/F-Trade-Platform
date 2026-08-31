@@ -3,7 +3,7 @@ import { publishContent } from "./gate";
 export interface ContentPublicationPolicy {
   channelRef: string;
   accountRef: string;
-  officialApi: boolean;
+  transport: "official_api" | "camofox_controlled_mvp1";
   publishingEnabled: boolean;
 }
 
@@ -11,12 +11,14 @@ export function validatePublicationPolicy(policy: ContentPublicationPolicy) {
   if (!policy.channelRef.trim() || !policy.accountRef.trim()) {
     throw new Error("Publication policy requires channel and account references");
   }
-  if (policy.officialApi !== true) throw new Error("Content publication requires an official API channel");
+  if (!['official_api', 'camofox_controlled_mvp1'].includes(policy.transport)) {
+    throw new Error("Content publication requires an approved channel transport");
+  }
   if (!policy.publishingEnabled) throw new Error("Content publication is not enabled for this channel");
   return policy;
 }
 
-export function publishThroughOfficialChannel(
+export function publishThroughChannel(
   content: Record<string, unknown>,
   policy: ContentPublicationPolicy,
   actorType: "human" | "agent" | "system",
@@ -24,6 +26,8 @@ export function publishThroughOfficialChannel(
 ) {
   validatePublicationPolicy(policy);
   if (actorType === "agent") throw new Error("An agent cannot use a publication transport");
-  if (!publicationRef.trim()) throw new Error("Official publication requires an external publication reference");
+  if (!publicationRef.trim()) throw new Error("Publication requires an external publication reference");
   return publishContent(content, actorType, publicationRef);
 }
+
+export const publishThroughOfficialChannel = publishThroughChannel;
