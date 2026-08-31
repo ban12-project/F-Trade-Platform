@@ -25,6 +25,16 @@ import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
 type Values = z.infer<typeof createWorkspaceProjectSchema>;
 const initialWorkspaceActionState: WorkspaceActionState = { status: "idle", message: "" };
 type ProjectNode = Node<{ label: string; kind: "marketing" | "sales"; status: string }>;
+function useDesktopViewport() {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 768px)");
+    const sync = () => setIsDesktop(query.matches);
+    sync(); query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+  return isDesktop;
+}
 function nodeForProject(project: WorkspaceProjectSummary, index: number): ProjectNode { return { id: project.id, position: { x: 80 + (index % 3) * 280, y: 100 + Math.floor(index / 3) * 180 }, data: { label: project.title, kind: project.kind, status: project.status }, style: { width: 220, borderColor: project.kind === "marketing" ? "var(--primary)" : "var(--border)" }, type: "default" }; }
 
 function ProjectList({ projects, onOpen }: { projects: WorkspaceProjectSummary[]; onOpen: (id: string) => void }) {
@@ -33,6 +43,7 @@ function ProjectList({ projects, onOpen }: { projects: WorkspaceProjectSummary[]
 
 export function WorkspaceHub({ projects }: { projects: WorkspaceProjectSummary[] }) {
   const router = useRouter(); const [createOpen, setCreateOpen] = useState(false); const [projectsOpen, setProjectsOpen] = useState(false);
+  const isDesktop = useDesktopViewport();
   const [state, action, pending] = useActionState(createWorkspaceProjectAction, initialWorkspaceActionState);
   const form = useForm<Values>({ resolver: zodResolver(createWorkspaceProjectSchema), defaultValues: { kind: "marketing", title: "" } });
   const nodes = useMemo(() => projects.map(nodeForProject), [projects]);
@@ -41,7 +52,7 @@ export function WorkspaceHub({ projects }: { projects: WorkspaceProjectSummary[]
   function openProject(id: string) { setProjectsOpen(false); router.push(`/workspace/${id}`); }
   return <main id="main-content" className="fixed inset-0 overflow-hidden bg-muted" aria-label="项目总画布"><ReactFlow className="bg-background" nodes={nodes} edges={[]} onNodeClick={(_, node) => openProject(node.id)} fitView><Background /><Controls position="top-right" /></ReactFlow>
     <header className="absolute left-3 top-3 z-10 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 rounded-lg border bg-background/90 p-2 shadow-sm backdrop-blur md:left-6 md:top-6"><Badge variant="secondary">项目画布</Badge><Badge variant="outline">人工审核受控</Badge><Button size="sm" variant="outline" onClick={() => setProjectsOpen(true)}><FolderOpenIcon data-icon="inline-start" />项目</Button><Button size="sm" onClick={() => setCreateOpen(true)}><PlusIcon data-icon="inline-start" />新建项目</Button></header>
-    <div className="hidden md:block"><Sheet open={projectsOpen} onOpenChange={setProjectsOpen}><SheetContent side="right" className="gap-0"><SheetHeader><SheetTitle>项目</SheetTitle><SheetDescription>从列表切换项目，不离开画布工作方式。</SheetDescription></SheetHeader><ProjectList projects={projects} onOpen={openProject} /></SheetContent></Sheet></div><Drawer open={projectsOpen} onOpenChange={setProjectsOpen} showSwipeHandle><DrawerContent className="md:hidden"><DrawerHeader><DrawerTitle>项目</DrawerTitle><DrawerDescription>选择要打开的项目。</DrawerDescription></DrawerHeader><ProjectList projects={projects} onOpen={openProject} /></DrawerContent></Drawer>
+    {isDesktop ? <Sheet open={projectsOpen} onOpenChange={setProjectsOpen}><SheetContent side="right" className="gap-0"><SheetHeader><SheetTitle>项目</SheetTitle><SheetDescription>从列表切换项目，不离开画布工作方式。</SheetDescription></SheetHeader><ProjectList projects={projects} onOpen={openProject} /></SheetContent></Sheet> : <Drawer open={projectsOpen} onOpenChange={setProjectsOpen} showSwipeHandle><DrawerContent><DrawerHeader><DrawerTitle>项目</DrawerTitle><DrawerDescription>选择要打开的项目。</DrawerDescription></DrawerHeader><ProjectList projects={projects} onOpen={openProject} /></DrawerContent></Drawer>}
     <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>新建项目</DialogTitle><DialogDescription>创建后立即进入项目画布。</DialogDescription></DialogHeader><form className="min-h-0 overflow-y-auto" onSubmit={form.handleSubmit(submit)}><FieldGroup><Field data-invalid={!!form.formState.errors.title}><FieldLabel htmlFor="workspace-title">项目名称</FieldLabel><Input id="workspace-title" placeholder="例如：离合器新品推广" aria-invalid={!!form.formState.errors.title} {...form.register("title")} /><FieldError>{form.formState.errors.title?.message}</FieldError></Field><Field><FieldLabel>项目类型</FieldLabel><Controller control={form.control} name="kind" render={({ field }) => <ToggleGroup value={[field.value]} onValueChange={(value) => value[0] && field.onChange(value[0])} variant="outline" spacing={2}><ToggleGroupItem value="marketing">产品营销</ToggleGroupItem><ToggleGroupItem value="sales">销售机会</ToggleGroupItem></ToggleGroup>} /></Field><Button type="submit" disabled={pending}><PlusIcon data-icon="inline-start" />{pending ? "正在创建…" : "创建并打开画布"}</Button></FieldGroup></form>{state.status === "error" ? <p className="text-sm text-destructive" aria-live="polite">{state.message}</p> : null}</DialogContent></Dialog>
   </main>;
 }

@@ -27,3 +27,20 @@ test("empty project canvas has one creation entry and centers its dialog", async
   await expect(page.getByText(/useActionState.*transition/)).toHaveCount(0);
   await expect(dialog.getByText("无权访问项目工作区。", { exact: true })).toBeVisible();
 });
+
+test("desktop project switcher renders only a sheet overlay", async ({ page }) => {
+  await page.goto("/testing/workspace-canvas");
+  await page.getByRole("button", { name: "项目", exact: true }).click();
+  await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible();
+  await expect(page.locator('[data-slot="sheet-overlay"]')).toBeVisible();
+  await expect(page.locator('[data-slot="drawer-overlay"]')).toHaveCount(0);
+});
+
+test("mobile project switcher renders only a drawer overlay", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/testing/workspace-canvas");
+  await page.getByRole("button", { name: "项目", exact: true }).click();
+  await expect(page.locator('[data-slot="drawer-popup"]')).toBeVisible();
+  await expect(page.locator('[data-slot="drawer-overlay"]')).toBeVisible();
+  await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCount(0);
+});
