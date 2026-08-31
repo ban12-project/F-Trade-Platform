@@ -31,6 +31,7 @@
 - Browser Profile、Cookie、HAR、trace、截图和代理凭据只能留在获批准 VPS 的加密运行卷，且不能出现在 Git、数据库业务记录、日志、Issue、PR 或聊天中。
 - 社交消息正文使用独立的 `SOCIAL_MESSAGE_ENCRYPTION_KEY` 以 AES-256-GCM 加密，最多保存 30 天；密钥不得与模型或提供商凭据共用。
 - 应用向 Worker 发出的命令以独立 `SOCIAL_WORKER_SIGNING_KEY` 签名，必须绑定 Worker、五分钟内过期并由一次性 nonce 防重放；命令只包含 opaque payload reference，不能携带 Cookie、代理凭据或消息明文。
+- Worker 遇到 security checkpoint、CAPTCHA、2FA、登录失效、出口 IP 不符、页面结构不确定或不确定外部结果时，必须将渠道置为暂停；暂停状态不可由 Agent 或系统恢复，且不能把该次操作自动重试。
 - CamoFox telemetry 和 trace 默认关闭；VNC 仅通过 SSH 隧道用于账户本人手动登录，登录完成后关闭。
 - `.gitignore` 和 `repository-validate` 会拒绝常见的 session state、Cookie、HAR 和 profile 路径；即使文件被强制加入也不能绕过校验。
 - 发现浏览器状态泄露时，立即撤销会话并重置相关凭据；不要把泄露文件或其内容贴入 Issue、PR、日志或聊天。

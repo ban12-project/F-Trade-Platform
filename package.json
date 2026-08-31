@@ -27,6 +27,7 @@
     "test:social-message-record": "tsx scripts/test-social-message-record.ts",
     "test:social-worker-protocol": "tsx scripts/test-social-worker-protocol.ts",
     "test:social-worker-deployment": "tsx scripts/test-social-worker-deployment.ts",
+    "test:social-circuit-breaker": "tsx scripts/test-social-circuit-breaker.ts",
     "test:inbound-delivery": "tsx scripts/test-inbound-delivery-store.ts",
     "test:database-driver": "tsx scripts/test-database-transaction-driver.ts",
     "test:github-governance": "python3 scripts/test-github-governance.py",
