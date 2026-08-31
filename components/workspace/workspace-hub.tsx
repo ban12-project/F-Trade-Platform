@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
 import { Background, Controls, ReactFlow, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { FolderOpenIcon, PlusIcon } from "lucide-react";
@@ -9,7 +9,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-import { createWorkspaceProjectAction, initialWorkspaceActionState } from "@/lib/actions/workspace";
+import { createWorkspaceProjectAction, type WorkspaceActionState } from "@/lib/actions/workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
@@ -23,6 +23,7 @@ import { createWorkspaceProjectSchema } from "@/lib/workspace/contracts";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
 
 type Values = z.infer<typeof createWorkspaceProjectSchema>;
+const initialWorkspaceActionState: WorkspaceActionState = { status: "idle", message: "" };
 type ProjectNode = Node<{ label: string; kind: "marketing" | "sales"; status: string }>;
 function nodeForProject(project: WorkspaceProjectSummary, index: number): ProjectNode { return { id: project.id, position: { x: 80 + (index % 3) * 280, y: 100 + Math.floor(index / 3) * 180 }, data: { label: project.title, kind: project.kind, status: project.status }, style: { width: 220, borderColor: project.kind === "marketing" ? "var(--primary)" : "var(--border)" }, type: "default" }; }
 
@@ -36,7 +37,7 @@ export function WorkspaceHub({ projects }: { projects: WorkspaceProjectSummary[]
   const form = useForm<Values>({ resolver: zodResolver(createWorkspaceProjectSchema), defaultValues: { kind: "marketing", title: "" } });
   const nodes = useMemo(() => projects.map(nodeForProject), [projects]);
   useEffect(() => { if (state.status === "success" && state.projectId) { setCreateOpen(false); router.push(`/workspace/${state.projectId}`); } }, [router, state.projectId, state.status]);
-  function submit(values: Values) { const data = new FormData(); data.set("kind", values.kind); data.set("title", values.title); action(data); }
+  function submit(values: Values) { const data = new FormData(); data.set("kind", values.kind); data.set("title", values.title); startTransition(() => action(data)); }
   function openProject(id: string) { setProjectsOpen(false); router.push(`/workspace/${id}`); }
   return <main id="main-content" className="fixed inset-0 overflow-hidden bg-muted" aria-label="项目总画布"><ReactFlow className="bg-background" nodes={nodes} edges={[]} onNodeClick={(_, node) => openProject(node.id)} fitView><Background /><Controls position="top-right" /></ReactFlow>
     <header className="absolute left-3 top-3 z-10 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 rounded-lg border bg-background/90 p-2 shadow-sm backdrop-blur md:left-6 md:top-6"><Badge variant="secondary">项目画布</Badge><Badge variant="outline">人工审核受控</Badge><Button size="sm" variant="outline" onClick={() => setProjectsOpen(true)}><FolderOpenIcon data-icon="inline-start" />项目</Button><Button size="sm" onClick={() => setCreateOpen(true)}><PlusIcon data-icon="inline-start" />新建项目</Button></header>

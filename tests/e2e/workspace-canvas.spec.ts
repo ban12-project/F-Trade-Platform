@@ -21,4 +21,9 @@ test("empty project canvas has one creation entry and centers its dialog", async
   expect(viewport).not.toBeNull();
   expect(Math.abs((box!.x + box!.width / 2) - viewport!.width / 2)).toBeLessThanOrEqual(2);
   expect(Math.abs((box!.y + box!.height / 2) - viewport!.height / 2)).toBeLessThanOrEqual(2);
+
+  await dialog.getByLabel("项目名称").fill("Synthetic canvas project");
+  await dialog.getByRole("button", { name: "创建并打开画布" }).click();
+  await expect(page.getByText(/useActionState.*transition/)).toHaveCount(0);
+  await expect(dialog.getByText("无权访问项目工作区。", { exact: true })).toBeVisible();
 });

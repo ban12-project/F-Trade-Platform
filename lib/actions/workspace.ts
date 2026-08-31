@@ -9,7 +9,6 @@ import { createWorkspaceProjectSchema, saveWorkspaceCanvasSchema, type Workspace
 import { WorkspaceCanvasRevisionConflictError, createWorkspaceProject, saveWorkspaceCanvas } from "@/lib/workspace/store";
 
 export type WorkspaceActionState = { status: "idle" | "success" | "error" | "conflict"; message: string; projectId?: string; revision?: number };
-export const initialWorkspaceActionState: WorkspaceActionState = { status: "idle", message: "" };
 
 async function requireWorkspaceUser() {
   const session = await auth.api.getSession({ headers: await headers() });

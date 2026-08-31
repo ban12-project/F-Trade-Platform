@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = 3000;
+const port = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
 const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
@@ -23,6 +23,7 @@ export default defineConfig({
   webServer: {
     command: "pnpm build:test && pnpm start",
     env: {
+      PORT: String(port),
       NEXT_ENABLE_TESTING_API: "1",
       BETTER_AUTH_SECRET: "synthetic-playwright-secret-1234567890",
       BETTER_AUTH_URL: baseURL,
