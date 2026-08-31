@@ -1,0 +1,26 @@
+services:
+  social-worker:
+    image: ${SOCIAL_WORKER_IMAGE:?Set SOCIAL_WORKER_IMAGE to the reviewed worker image}
+    restart: unless-stopped
+    env_file:
+      - .env
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    volumes:
+      - social-worker-state:/var/lib/social-worker
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      replicas: 1
+    healthcheck:
+      test: ["CMD", "/app/worker", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  social-worker-state:
+    driver: local
