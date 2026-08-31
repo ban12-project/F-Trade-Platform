@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { workspaceCanvasDocumentSchema, type WorkspaceCanvasDocument } from "@/lib/workspace/contracts";
 import type { WorkspaceProjectDetail } from "@/lib/workspace/store";
 
@@ -24,8 +24,10 @@ function toDocument(document: WorkspaceCanvasDocument, nodes: CanvasNode[]): Wor
 function statusLabel(state: "saved" | "saving" | "unsaved" | "conflict" | "error") { return ({ saved: "云端已保存", saving: "正在保存", unsaved: "尚未保存", conflict: "版本冲突", error: "保存失败" })[state]; }
 
 function Inspector({ project, selected, onClose }: { project: WorkspaceProjectDetail; selected: CanvasNode | null; onClose: () => void }) {
+  const isMobile = useIsMobile();
   const body = selected ? <div className="flex flex-col gap-4"><div className="flex flex-wrap gap-2"><Badge variant="secondary">{selected.data.kind}</Badge>{selected.data.aggregateId ? <Badge variant="outline">已关联记录</Badge> : <Badge variant="outline">流程节点</Badge>}</div><div><h3 className="font-medium">{selected.data.label}</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">{selected.data.aggregateId ? "此节点仅引用受控业务记录；事实、审核与状态仍由原工作流维护。" : "这是项目模板中的固定流程步骤。"}</p></div><Alert><AlertTitle>受控操作</AlertTitle><AlertDescription>产品事实、报价、交期和发布不能通过拖动或连线直接更改。</AlertDescription></Alert></div> : <p className="text-sm leading-6 text-muted-foreground">选择一个节点以查看其上下文和可执行操作。</p>;
-  return <><div className="hidden md:block"><aside className="fixed right-6 top-6 z-10 flex w-[min(26rem,calc(100vw-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden rounded-xl border bg-popover shadow-lg"><header className="shrink-0 border-b p-4"><h2 className="font-semibold">项目检查器</h2><p className="mt-1 text-sm text-muted-foreground">{project.title}</p></header><ScrollArea className="min-h-0 flex-1"><div className="p-4">{body}</div></ScrollArea><footer className="shrink-0 border-t p-4"><Button className="w-full" variant="outline"><Settings2Icon data-icon="inline-start" />项目设置</Button></footer></aside></div><Drawer open={Boolean(selected)} onOpenChange={(open) => { if (!open) onClose(); }} showSwipeHandle><DrawerContent className="md:hidden"><DrawerHeader><DrawerTitle>项目检查器</DrawerTitle><DrawerDescription>{selected?.data.label ?? "选择节点"}</DrawerDescription></DrawerHeader><ScrollArea className="min-h-0 flex-1"><div className="p-4">{body}</div></ScrollArea></DrawerContent></Drawer></>;
+  if (isMobile) return <Drawer open={Boolean(selected)} onOpenChange={(open) => { if (!open) onClose(); }} showSwipeHandle><DrawerContent><DrawerHeader><DrawerTitle>项目检查器</DrawerTitle><DrawerDescription>{selected?.data.label ?? "选择节点"}</DrawerDescription></DrawerHeader><ScrollArea className="min-h-0 flex-1"><div className="p-4">{body}</div></ScrollArea></DrawerContent></Drawer>;
+  return <aside className="fixed right-6 top-6 z-10 hidden w-[min(26rem,calc(100vw-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden rounded-xl border bg-popover shadow-lg md:flex"><header className="shrink-0 border-b p-4"><h2 className="font-semibold">项目检查器</h2><p className="mt-1 text-sm text-muted-foreground">{project.title}</p></header><ScrollArea className="min-h-0 flex-1"><div className="p-4">{body}</div></ScrollArea><footer className="shrink-0 border-t p-4"><Button className="w-full" variant="outline"><Settings2Icon data-icon="inline-start" />项目设置</Button></footer></aside>;
 }
 
 export function ProjectCanvas({ project }: { project: WorkspaceProjectDetail }) {
