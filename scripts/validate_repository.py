@@ -342,20 +342,20 @@ def check_database_baseline() -> None:
     proxy_source = (ROOT / "proxy.ts").read_text(encoding="utf-8")
     for required in (
         "getSessionCookie",
-        'matcher: ["/console/:path*"]',
+        'matcher: ["/workspace/:path*"]',
     ):
         if required not in proxy_source:
-            raise AssertionError(f"Optimistic console proxy protection is missing: {required}")
+            raise AssertionError(f"Optimistic workspace proxy protection is missing: {required}")
     if "auth.api.getSession" in proxy_source:
-        raise AssertionError("Console Proxy must not query the session database")
+        raise AssertionError("Workspace Proxy must not query the session database")
     role_guard_source = (ROOT / "lib/auth-guard.ts").read_text(encoding="utf-8")
     for required in ("requireRole", "auth.api.getSession", "allowedRoles.includes"):
         if required not in role_guard_source:
             raise AssertionError(f"Strict server role guard is missing: {required}")
     next_config = (ROOT / "next.config.ts").read_text(encoding="utf-8")
-    for required in ('source: "/admin/:path*"', 'destination: "/console/:path*"', "permanent: true"):
+    for required in ('source: "/admin/:path*"', 'destination: "/workspace"', "permanent: true"):
         if required not in next_config:
-            raise AssertionError(f"Console route migration is missing: {required}")
+            raise AssertionError(f"Workspace route migration is missing: {required}")
     invitation_actions = (ROOT / "lib/actions/invitations.ts").read_text(encoding="utf-8")
     for required in (
         '"use server"',
@@ -366,12 +366,10 @@ def check_database_baseline() -> None:
     ):
         if required not in invitation_actions:
             raise AssertionError(f"Invitation Server Action contract is missing: {required}")
-    invitation_panel = (ROOT / "app/console/invitations/panel.tsx").read_text(encoding="utf-8")
-    for required in ("useForm", "zodResolver", "createInvitationAction", "FieldError"):
-        if required not in invitation_panel:
-            raise AssertionError(f"Invitation form contract is missing: {required}")
-    if 'fetch("/api/invitations"' in invitation_panel:
-        raise AssertionError("Invitation UI must use a Server Action instead of an internal API route")
+    workspace_hub = (ROOT / "components/workspace/workspace-hub.tsx").read_text(encoding="utf-8")
+    for required in ("useForm", "zodResolver", "createWorkspaceProjectAction", "FieldError"):
+        if required not in workspace_hub:
+            raise AssertionError(f"Workspace project form contract is missing: {required}")
     product_actions = (ROOT / "lib/actions/products.ts").read_text(encoding="utf-8")
     for required in (
         '"use server"',
@@ -385,34 +383,14 @@ def check_database_baseline() -> None:
     ):
         if required not in product_actions:
             raise AssertionError(f"Product catalog Server Action contract is missing: {required}")
-    product_panel = (ROOT / "app/console/products/product-catalog-panel.tsx").read_text(encoding="utf-8")
-    for required in ("useForm", "zodResolver", "createProductCatalogDraftAction", "FieldError"):
-        if required not in product_panel:
-            raise AssertionError(f"Product catalog form contract is missing: {required}")
-    product_review_panel = (ROOT / "app/console/products/[productId]/product-review-panel.tsx").read_text(encoding="utf-8")
-    for required in ("useForm", "zodResolver", "decideProductCatalogReviewAction", "evidenceRef"):
-        if required not in product_review_panel:
-            raise AssertionError(f"Product Gate 01 review form contract is missing: {required}")
-    product_revision_panel = (ROOT / "app/console/products/[productId]/revise/product-revision-panel.tsx").read_text(encoding="utf-8")
-    for required in ("useForm", "zodResolver", "reviseProductCatalogDraftAction", "productId"):
-        if required not in product_revision_panel:
-            raise AssertionError(f"Product Gate 01 revision form contract is missing: {required}")
     content_actions = (ROOT / "lib/actions/content.ts").read_text(encoding="utf-8")
     for required in ("contentDraftFormSchema.safeParse", "contentReviewFormSchema.safeParse", "createContentDraft", "decideContentReview", "reviseContentDraft"):
         if required not in content_actions:
             raise AssertionError(f"Content Server Action contract is missing: {required}")
-    content_panel = (ROOT / "app/console/content/content-catalog-panel.tsx").read_text(encoding="utf-8")
-    for required in ("useForm", "zodResolver", "createContentDraftAction", "factPath"):
-        if required not in content_panel:
-            raise AssertionError(f"Content draft form contract is missing: {required}")
-    content_review_panel = (ROOT / "app/console/content/[contentId]/content-review-panel.tsx").read_text(encoding="utf-8")
-    for required in ("useForm", "zodResolver", "decideContentReviewAction", "evidenceRef"):
-        if required not in content_review_panel:
-            raise AssertionError(f"Content Gate 01 review form contract is missing: {required}")
-    content_revision_panel = (ROOT / "app/console/content/[contentId]/revise/content-revision-panel.tsx").read_text(encoding="utf-8")
-    for required in ("useForm", "zodResolver", "reviseContentDraftAction", "contentId"):
-        if required not in content_revision_panel:
-            raise AssertionError(f"Content Gate 01 revision form contract is missing: {required}")
+    workspace_canvas = (ROOT / "components/workspace/project-canvas.tsx").read_text(encoding="utf-8")
+    for required in ("saveWorkspaceCanvasAction", "100dvh", "Drawer", "ScrollArea"):
+        if required not in workspace_canvas:
+            raise AssertionError(f"Workspace canvas contract is missing: {required}")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:
