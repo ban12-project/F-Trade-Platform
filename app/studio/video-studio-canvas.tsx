@@ -41,6 +41,8 @@ import { createVideoProjectFromCanvasAction, saveVideoCanvasAction, type VideoAc
 import { videoCanvasAssetBindingSchema, videoCanvasBriefSchema, videoCanvasFactBindingSchema, videoCanvasPlatformSchema, videoCanvasSceneSchema, type VideoCanvasAssetBinding, type VideoCanvasBrief, type VideoCanvasDocument, type VideoCanvasFactBinding, type VideoCanvasScene } from "@/lib/video/canvas-contracts";
 import type { ReadyVideoProductSource, VideoWorkspaceEntry } from "@/lib/video/store";
 
+import { PrivateVideoPreview } from "./private-video-preview";
+
 const starterNodes: Node[] = [
   { id: "brief", position: { x: 0, y: 80 }, data: { label: "营销简报\n目标与受众" }, type: "studio", deletable: false },
   { id: "facts", position: { x: 280, y: 0 }, data: { label: "已验证事实\n只读证据引用" }, type: "studio", deletable: false },
@@ -623,6 +625,7 @@ export function VideoStudioCanvas({ products, entries, initialCanvas }: {
             <Field data-invalid={!!form.formState.errors.detail}><FieldLabel htmlFor="studio-node-detail">说明</FieldLabel><Input id="studio-node-detail" aria-invalid={!!form.formState.errors.detail} {...form.register("detail")} /><FieldError>{form.formState.errors.detail?.message}</FieldError></Field>
             <div className="flex flex-wrap gap-2"><Button type="submit" size="sm">保存节点</Button>{selected.deletable !== false ? <><Button type="button" size="sm" variant="outline" onClick={duplicateSelected}><CopyIcon data-icon="inline-start" />复制</Button><Button type="button" size="sm" variant="outline" onClick={removeSelected}><Trash2Icon data-icon="inline-start" />删除</Button></> : null}</div>
           </FieldGroup></form> : null}
+          {entries.filter((entry) => entry.previewAssetRef).map((entry) => <PrivateVideoPreview key={entry.id} assetRef={entry.previewAssetRef!} title={entry.productName} />)}
           {products.length === 0 ? <Empty className="border"><EmptyHeader><EmptyMedia variant="icon"><ClapperboardIcon /></EmptyMedia><EmptyTitle>暂无已核验产品</EmptyTitle><EmptyDescription>请先完成产品事实确认。</EmptyDescription></EmptyHeader></Empty> : null}
         </CardContent>
       </Card>

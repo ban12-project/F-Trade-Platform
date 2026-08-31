@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/db/client";
-import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
+import { aggregateRecord, approval, auditEvent, videoJob, workflowEvent } from "@/lib/db/schema";
 import type { VideoProject } from "./contracts";
 import { buildVideoCreative } from "./creative";
 import type { ProductReady } from "@/lib/product/verification";
@@ -14,7 +14,7 @@ import { type VideoCanvasDocument } from "./canvas-contracts";
 
 export type VideoProjectDraftInput = z.infer<typeof videoProjectDraftFormSchema>;
 export type ReadyVideoProductSource = { id: string; productName: string; internalSku: string; factOptions: Array<{ value: string; label: string }> };
-export type VideoWorkspaceEntry = { id: string; state: string; createdAt: Date; productId: string; productName: string; objective: string; platforms: VideoProject["platforms"]; approvalStatus: "pending" | "approved" | "rejected" | null };
+export type VideoWorkspaceEntry = { id: string; state: string; createdAt: Date; productId: string; productName: string; objective: string; platforms: VideoProject["platforms"]; approvalStatus: "pending" | "approved" | "rejected" | null; previewAssetRef: string | null };
 
 function hasValue(value: unknown) { return value !== undefined && value !== null && value !== ""; }
 function factOptions(product: ProductReady) {
@@ -106,11 +106,16 @@ export async function createVideoProjectFromCanvas(document: VideoCanvasDocument
 export async function listVideoWorkspaceEntries(limit = 50): Promise<VideoWorkspaceEntry[]> {
   const rows = await getDatabase().select().from(aggregateRecord).where(eq(aggregateRecord.type, "video")).orderBy(desc(aggregateRecord.createdAt)).limit(limit);
   if (!rows.length) return [];
-  const approvals = await getDatabase().select({ aggregateId: approval.aggregateId, status: approval.status }).from(approval).where(and(eq(approval.gate, "gate_01_truth"), inArray(approval.aggregateId, rows.map((row) => row.id)))).orderBy(desc(approval.requestedAt));
+  const [approvals, completedJobs] = await Promise.all([
+    getDatabase().select({ aggregateId: approval.aggregateId, status: approval.status }).from(approval).where(and(eq(approval.gate, "gate_01_truth"), inArray(approval.aggregateId, rows.map((row) => row.id)))).orderBy(desc(approval.requestedAt)),
+    getDatabase().select({ videoProjectId: videoJob.videoProjectId, resultAssetRef: videoJob.resultAssetRef }).from(videoJob).where(and(inArray(videoJob.videoProjectId, rows.map((row) => row.id)), eq(videoJob.status, "succeeded"))).orderBy(desc(videoJob.updatedAt)),
+  ]);
   const statusByProject = new Map<string, "pending" | "approved" | "rejected">(); for (const item of approvals) if (!statusByProject.has(item.aggregateId)) statusByProject.set(item.aggregateId, item.status);
+  const previewAssetByProject = new Map<string, string>();
+  for (const job of completedJobs) if (job.resultAssetRef && !previewAssetByProject.has(job.videoProjectId)) previewAssetByProject.set(job.videoProjectId, job.resultAssetRef);
   return rows.flatMap((row) => {
     const project = row.payload as Partial<VideoProject>; const productName = project.factualClaims?.find((claim) => claim.field === "product.product_name")?.value ?? "已核验产品";
     if (!project.productId || !project.objective || !project.platforms) return [];
-    return [{ id: row.id, state: row.state, createdAt: row.createdAt, productId: project.productId, productName, objective: project.objective, platforms: project.platforms, approvalStatus: statusByProject.get(row.id) ?? null }];
+    return [{ id: row.id, state: row.state, createdAt: row.createdAt, productId: project.productId, productName, objective: project.objective, platforms: project.platforms, approvalStatus: statusByProject.get(row.id) ?? null, previewAssetRef: previewAssetByProject.get(row.id) ?? null }];
   });
 }
