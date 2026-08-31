@@ -614,6 +614,29 @@ export const socialMessage = pgTable(
   ],
 );
 
+/** Explicit, fail-closed operational control for a single social channel/account. */
+export const socialChannelControl = pgTable(
+  "social_channel_control",
+  {
+    id: text("id").primaryKey(),
+    channelRef: text("channel_ref").notNull(),
+    accountRef: text("account_ref").notNull(),
+    enabled: boolean("enabled").default(false).notNull(),
+    circuitStatus: text("circuit_status").default("paused").notNull(),
+    pauseReason: text("pause_reason"),
+    pauseEvidenceRef: text("pause_evidence_ref"),
+    changedBy: text("changed_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    changedAt: timestamp("changed_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("social_channel_control_account_uidx").on(table.channelRef, table.accountRef),
+    check("social_channel_control_status_valid", sql`${table.circuitStatus} IN ('active', 'paused')`),
+    check("social_channel_control_pause_consistent", sql`(${table.circuitStatus} = 'active' AND ${table.pauseReason} IS NULL) OR (${table.circuitStatus} = 'paused' AND ${table.pauseReason} IS NOT NULL)`),
+  ],
+);
+
 /** Singleton, encrypted-at-rest configuration for the Product Agent's model provider. */
 export const productAgentModelConfig = pgTable(
   "product_agent_model_config",
