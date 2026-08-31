@@ -32,6 +32,7 @@
     "test:inbound-lead-intake": "tsx scripts/test-inbound-lead-intake.ts",
     "test:rfq-reply-policy": "tsx scripts/test-rfq-reply-policy.ts",
     "test:social-control-record": "tsx scripts/test-social-control-record.ts",
+    "test:social-controlled-pilot": "tsx scripts/test-social-controlled-pilot-template.ts",
     "test:inbound-delivery": "tsx scripts/test-inbound-delivery-store.ts",
     "test:database-driver": "tsx scripts/test-database-transaction-driver.ts",
     "test:github-governance": "python3 scripts/test-github-governance.py",
