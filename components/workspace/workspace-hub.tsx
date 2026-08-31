@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { Background, Controls, ReactFlow, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { BriefcaseBusinessIcon, FolderOpenIcon, PlusIcon } from "lucide-react";
+import { FolderOpenIcon, PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,7 +40,6 @@ export function WorkspaceHub({ projects }: { projects: WorkspaceProjectSummary[]
   function openProject(id: string) { setProjectsOpen(false); router.push(`/workspace/${id}`); }
   return <main id="main-content" className="fixed inset-0 overflow-hidden bg-muted" aria-label="项目总画布"><ReactFlow className="bg-background" nodes={nodes} edges={[]} onNodeClick={(_, node) => openProject(node.id)} fitView><Background /><Controls position="top-right" /></ReactFlow>
     <header className="absolute left-3 top-3 z-10 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 rounded-lg border bg-background/90 p-2 shadow-sm backdrop-blur md:left-6 md:top-6"><Badge variant="secondary">项目画布</Badge><Badge variant="outline">人工审核受控</Badge><Button size="sm" variant="outline" onClick={() => setProjectsOpen(true)}><FolderOpenIcon data-icon="inline-start" />项目</Button><Button size="sm" onClick={() => setCreateOpen(true)}><PlusIcon data-icon="inline-start" />新建项目</Button></header>
-    {projects.length === 0 ? <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center p-6"><Empty className="pointer-events-auto w-full max-w-md border bg-background/95 shadow-sm"><EmptyHeader><EmptyMedia variant="icon"><BriefcaseBusinessIcon /></EmptyMedia><EmptyTitle>从一张项目画布开始</EmptyTitle><EmptyDescription>请使用画布左上角的“新建项目”开始工作。</EmptyDescription></EmptyHeader></Empty></div> : null}
     <div className="hidden md:block"><Sheet open={projectsOpen} onOpenChange={setProjectsOpen}><SheetContent side="right" className="gap-0"><SheetHeader><SheetTitle>项目</SheetTitle><SheetDescription>从列表切换项目，不离开画布工作方式。</SheetDescription></SheetHeader><ProjectList projects={projects} onOpen={openProject} /></SheetContent></Sheet></div><Drawer open={projectsOpen} onOpenChange={setProjectsOpen} showSwipeHandle><DrawerContent className="md:hidden"><DrawerHeader><DrawerTitle>项目</DrawerTitle><DrawerDescription>选择要打开的项目。</DrawerDescription></DrawerHeader><ProjectList projects={projects} onOpen={openProject} /></DrawerContent></Drawer>
     <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>新建项目</DialogTitle><DialogDescription>创建后立即进入项目画布。</DialogDescription></DialogHeader><form className="min-h-0 overflow-y-auto" onSubmit={form.handleSubmit(submit)}><FieldGroup><Field data-invalid={!!form.formState.errors.title}><FieldLabel htmlFor="workspace-title">项目名称</FieldLabel><Input id="workspace-title" placeholder="例如：离合器新品推广" aria-invalid={!!form.formState.errors.title} {...form.register("title")} /><FieldError>{form.formState.errors.title?.message}</FieldError></Field><Field><FieldLabel>项目类型</FieldLabel><Controller control={form.control} name="kind" render={({ field }) => <ToggleGroup value={[field.value]} onValueChange={(value) => value[0] && field.onChange(value[0])} variant="outline" spacing={2}><ToggleGroupItem value="marketing">产品营销</ToggleGroupItem><ToggleGroupItem value="sales">销售机会</ToggleGroupItem></ToggleGroup>} /></Field><Button type="submit" disabled={pending}><PlusIcon data-icon="inline-start" />{pending ? "正在创建…" : "创建并打开画布"}</Button></FieldGroup></form>{state.status === "error" ? <p className="text-sm text-destructive" aria-live="polite">{state.message}</p> : null}</DialogContent></Dialog>
   </main>;
