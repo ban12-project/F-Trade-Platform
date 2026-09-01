@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { getDatabase, type Database } from "@/lib/db/client";
 import { aggregateRecord, approval, auditEvent, videoJob, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
@@ -19,6 +19,7 @@ export type VideoReviewInput = z.infer<typeof videoReviewFormSchema>;
 export type ReadyVideoProductSource = { id: string; productName: string; internalSku: string; factOptions: Array<{ value: string; label: string }> };
 export type VideoWorkspaceEntry = { id: string; state: string; createdAt: Date; productId: string; productName: string; objective: string; platforms: VideoProject["platforms"]; approvalStatus: "pending" | "approved" | "rejected" | null; previewAssetRef: string | null };
 export type MarketingVideoEditorEntry = VideoWorkspaceEntry & { draft: MarketingVideoDraft; targetAudience: string };
+export type MarketingVideoCopyCandidate = { id: string; projectTitle: string; productName: string; objective: string };
 
 function hasValue(value: unknown) { return value !== undefined && value !== null && value !== ""; }
 function factOptions(product: ProductReady) {
@@ -80,7 +81,7 @@ export async function createMarketingVideoEditProject(input: unknown, actorId: s
     }, ready, id);
     const project = videoProjectSchema.parse({ ...creative, status: "draft", editDraft });
     await tx.insert(aggregateRecord).values({ id, type: "video", state: "VIDEO_DRAFT", payload: project, createdByType: "human", createdById: actorId });
-    await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId: value.projectId, aggregateId: id, role: "marketing_video" });
+    await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId: value.projectId, aggregateId: id, role: "marketing_video", relation: "owned" });
     await tx.update(workspaceProject).set({ updatedAt: now }).where(eq(workspaceProject.id, value.projectId));
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "marketing_video_edit.created", actorType: "human", actorId, aggregateId: id, subjectType: "video", subjectId: id, metadata: { project_id: value.projectId, platform: value.platform, clip_count: clips.length }, occurredAt: now });
     return { id, project };
@@ -90,7 +91,7 @@ export async function createMarketingVideoEditProject(input: unknown, actorId: s
 export async function listProjectMarketingVideoEntries(projectId: string, database: Database = getDatabase()): Promise<MarketingVideoEditorEntry[]> {
   const rows = await database.select({ record: aggregateRecord, createdAt: workspaceProjectItem.createdAt })
     .from(workspaceProjectItem).innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(aggregateRecord.type, "video"))).orderBy(desc(workspaceProjectItem.createdAt));
+    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "marketing_video"), eq(workspaceProjectItem.relation, "owned"), eq(aggregateRecord.type, "video"))).orderBy(desc(workspaceProjectItem.createdAt));
   if (!rows.length) return [];
   const approvals = await database.select({ aggregateId: approval.aggregateId, status: approval.status }).from(approval)
     .where(and(eq(approval.gate, "gate_01_truth"), inArray(approval.aggregateId, rows.map(({ record }) => record.id)))).orderBy(desc(approval.requestedAt));
@@ -101,6 +102,41 @@ export async function listProjectMarketingVideoEntries(projectId: string, databa
     if (!project.success || !project.data.editDraft) return [];
     const productName = project.data.factualClaims.find((claim) => claim.field === "product.product_name")?.value ?? "已核验产品";
     return [{ id: record.id, state: record.state, createdAt, productId: project.data.productId, productName, objective: project.data.objective, targetAudience: project.data.targetAudience, platforms: project.data.platforms, approvalStatus: approvalByVideo.get(record.id) ?? null, previewAssetRef: project.data.renderedAssetRef ?? null, draft: project.data.editDraft }];
+  });
+}
+
+export async function listCrossProjectMarketingVideoCandidates(projectId: string, database: Database = getDatabase()): Promise<MarketingVideoCopyCandidate[]> {
+  const rows = await database.select({ id: aggregateRecord.id, payload: aggregateRecord.payload, projectTitle: workspaceProject.title })
+    .from(workspaceProjectItem).innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId)).innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
+    .where(and(ne(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "marketing_video"), eq(workspaceProjectItem.relation, "owned"), eq(aggregateRecord.type, "video")))
+    .orderBy(desc(workspaceProjectItem.createdAt));
+  return rows.flatMap((row) => {
+    const parsed = videoProjectSchema.safeParse(row.payload);
+    if (!parsed.success || !parsed.data.editDraft) return [];
+    return [{ id: row.id, projectTitle: row.projectTitle, productName: parsed.data.factualClaims.find((claim) => claim.field === "product.product_name")?.value ?? "已核验产品", objective: parsed.data.objective }];
+  });
+}
+
+export async function copyMarketingVideoDraftToProject(sourceVideoId: string, projectId: string, actorId: string, database: Database = getDatabase()) {
+  const id = randomUUID(); const now = new Date();
+  return database.transaction(async (tx) => {
+    const [workspace] = await tx.select({ kind: workspaceProject.kind }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
+    if (!workspace || workspace.kind !== "marketing") throw new Error("视频只能复制到产品营销项目。");
+    const [source] = await tx.select({ payload: aggregateRecord.payload, ownerProjectId: workspaceProjectItem.projectId }).from(aggregateRecord)
+      .innerJoin(workspaceProjectItem, and(eq(workspaceProjectItem.aggregateId, aggregateRecord.id), eq(workspaceProjectItem.role, "marketing_video"), eq(workspaceProjectItem.relation, "owned")))
+      .where(and(eq(aggregateRecord.id, sourceVideoId), eq(aggregateRecord.type, "video"))).for("update");
+    if (!source || source.ownerProjectId === projectId) throw new Error(source ? "该视频已经属于当前项目。" : "源视频不存在或没有明确归属。");
+    const current = videoProjectSchema.parse(source.payload);
+    if (!current.editDraft) throw new Error("只能复制 MVP1 营销剪辑项目。");
+    const [product] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord).where(and(eq(aggregateRecord.id, current.productId), eq(aggregateRecord.type, "product"))).for("update");
+    if (!product || product.state !== "PRODUCT_READY") throw new Error("源视频引用的产品已不再可用于新草稿。");
+    await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: current.productId, role: "product_reference", relation: "reference" }).onConflictDoNothing();
+    const project = videoProjectSchema.parse({ ...current, id, status: "draft", approvalRefs: [], renderedAssetRef: undefined });
+    await tx.insert(aggregateRecord).values({ id, type: "video", state: "VIDEO_DRAFT", payload: project, createdByType: "human", createdById: actorId });
+    await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "marketing_video", relation: "owned" });
+    await tx.update(workspaceProject).set({ updatedAt: now }).where(eq(workspaceProject.id, projectId));
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: "marketing_video_edit.copied_to_project", actorType: "human", actorId, aggregateId: id, subjectType: "video", subjectId: id, metadata: { copied_from: sourceVideoId, project_id: projectId }, occurredAt: now });
+    return { id, project };
   });
 }
 
@@ -115,7 +151,7 @@ export async function getMarketingVideoEditProject(videoId: string, database: Da
 
 export async function assertMarketingVideoProjectLink(projectId: string, videoId: string, database: Database = getDatabase()) {
   const [link] = await database.select({ id: workspaceProjectItem.id }).from(workspaceProjectItem)
-    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.aggregateId, videoId)));
+    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.aggregateId, videoId), eq(workspaceProjectItem.role, "marketing_video"), eq(workspaceProjectItem.relation, "owned")));
   if (!link) throw new Error("该营销视频不属于当前项目。");
 }
 

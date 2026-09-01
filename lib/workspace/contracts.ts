@@ -8,7 +8,7 @@ export const workspaceEdgeKindSchema = z.enum(["depends_on", "derived_from", "re
 const nodeId = z.string().trim().min(1).max(160).regex(/^[a-z][a-z0-9_-]*$/i, "节点标识格式不正确。");
 const position = z.object({ x: z.number().finite().min(-100_000).max(100_000), y: z.number().finite().min(-100_000).max(100_000) }).strict();
 
-export const workspaceCanvasDocumentSchema = z.object({
+const workspaceCanvasDocumentInputSchema = z.object({
   version: z.literal(1),
   nodes: z.array(z.object({
     id: nodeId,
@@ -35,6 +35,11 @@ export const workspaceCanvasDocumentSchema = z.object({
     pairs.add(pair);
   }
 });
+
+export const workspaceCanvasDocumentSchema = workspaceCanvasDocumentInputSchema.transform((document) => ({
+  ...document,
+  nodes: document.nodes.map(({ aggregateId: _aggregateId, aggregateType: _aggregateType, ...node }) => node),
+}));
 
 export type WorkspaceCanvasDocument = z.infer<typeof workspaceCanvasDocumentSchema>;
 

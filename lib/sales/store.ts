@@ -42,7 +42,7 @@ export async function createRfq(input: RfqFormInput, actorId: string, projectId?
       if (!project || project.kind !== "sales") throw new Error("询盘只能关联到销售机会项目。");
     }
     await tx.insert(aggregateRecord).values({ id, type: "rfq", state: "RFQ_COLLECTING", payload: draft, createdByType: "human", createdById: actorId });
-    if (projectId) await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "sales_rfq" });
+    if (projectId) await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "sales_rfq", relation: "owned" });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "rfq_collecting_created", actorType: "human", actorId, aggregateId: id, subjectType: "rfq", subjectId: id, metadata: { completeness_score: draft.completeness_score, missing_fields: draft.missing_fields, evidence_ref: input.evidenceRef }, occurredAt: now });
   });
   return { id, draft };
@@ -57,7 +57,7 @@ export async function listProjectRfqEntries(projectId: string, limit = 50): Prom
   const rows = await getDatabase().select({ record: aggregateRecord })
     .from(workspaceProjectItem)
     .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(aggregateRecord.type, "rfq")))
+    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "sales_rfq"), eq(workspaceProjectItem.relation, "owned"), eq(aggregateRecord.type, "rfq")))
     .orderBy(desc(workspaceProjectItem.createdAt))
     .limit(limit);
   return rows.flatMap(({ record }) => entryFromRecord(record) ?? []);
