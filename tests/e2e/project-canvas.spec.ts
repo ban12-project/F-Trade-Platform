@@ -13,6 +13,18 @@ test("desktop node selection updates the inspector without a drawer overlay", as
   await expect(page.locator('[data-slot="drawer-popup"]')).toHaveCount(0);
 });
 
+test("select triggers display the same label as their selected item", async ({ page }) => {
+  await page.goto("/testing/project-canvas?panel=content");
+  await page.waitForLoadState("networkidle");
+
+  const inspector = page.getByRole("complementary");
+  const selects = inspector.getByRole("combobox");
+  await expect(selects.nth(0)).toContainText("SYN-001 · Verified clutch kit");
+  await expect(selects.nth(0)).not.toContainText("00000000-0000-4000-8000-000000000301");
+  await expect(selects.nth(1)).toContainText("产品推广");
+  await expect(selects.nth(1)).not.toHaveText("product");
+});
+
 test("marketing content work stays in the canvas panel", async ({ page }) => {
   await page.goto("/testing/project-canvas");
   await page.getByText("营销内容", { exact: true }).click();
