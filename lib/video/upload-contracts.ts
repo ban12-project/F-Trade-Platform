@@ -10,6 +10,9 @@ const allowedContentTypes = [
 
 export const videoUploadContentTypeSchema = z.enum(allowedContentTypes);
 
+/** One signed URL authorizes one non-multipart PUT to one exact private pathname. */
+export const videoPresignedUploadUsesMultipart = false;
+
 export const videoPresignedUploadPayloadSchema = z.object({
   receiptId: z.uuid(),
   projectId: z.uuid(),

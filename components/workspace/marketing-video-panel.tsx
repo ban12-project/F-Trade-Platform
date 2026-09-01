@@ -29,7 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createMarketingVideoDraftFormSchema, marketingVideoDraftSchema, marketingVideoDurationMs, type MarketingVideoDraft } from "@/lib/video/edit-contracts";
-import { videoPresignedUploadPayloadSchema, videoUploadBlobPath } from "@/lib/video/upload-contracts";
+import { videoPresignedUploadPayloadSchema, videoPresignedUploadUsesMultipart, videoUploadBlobPath } from "@/lib/video/upload-contracts";
 import type { MarketingVideoCopyCandidate, MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
 import { useWorkspaceDirty } from "./dirty-state";
 
@@ -79,7 +79,7 @@ function CreateVideoForm({ projectId, products }: { projectId: string; products:
           contentType: payload.contentType,
           handleUploadUrl: "/api/video-assets/upload",
           clientPayload: JSON.stringify(payload),
-          multipart: file.size >= 5 * 1024 * 1024,
+          multipart: videoPresignedUploadUsesMultipart,
           onUploadProgress: ({ percentage }) => {
             uploadProgressRef.current[index] = percentage;
             setUploadProgress(uploadProgressRef.current.reduce((total, value) => total + value, 0) / files.length);
@@ -107,7 +107,7 @@ function CreateVideoForm({ projectId, products }: { projectId: string; products:
       <Field data-invalid={Boolean(form.formState.errors.objective)}><FieldLabel htmlFor="video-objective">视频目标</FieldLabel><Input id="video-objective" aria-invalid={Boolean(form.formState.errors.objective)} {...form.register("objective")} /><FieldError>{form.formState.errors.objective?.message}</FieldError></Field>
       <Field data-invalid={Boolean(form.formState.errors.targetAudience)}><FieldLabel htmlFor="video-audience">目标受众</FieldLabel><Input id="video-audience" aria-invalid={Boolean(form.formState.errors.targetAudience)} {...form.register("targetAudience")} /><FieldError>{form.formState.errors.targetAudience?.message}</FieldError></Field>
       <Field><FieldLabel>输出平台</FieldLabel><Controller control={form.control} name="platform" render={({ field }) => <ToggleGroup value={[field.value]} onValueChange={(value) => value[0] && field.onChange(value[0])} variant="outline" className="flex-wrap"><ToggleGroupItem value="facebook">Facebook</ToggleGroupItem><ToggleGroupItem value="instagram">Instagram</ToggleGroupItem><ToggleGroupItem value="tiktok">TikTok</ToggleGroupItem><ToggleGroupItem value="youtube">YouTube</ToggleGroupItem><ToggleGroupItem value="x">X</ToggleGroupItem></ToggleGroup>} /></Field>
-      <Field><FieldLabel htmlFor="video-assets">素材（1–3 个）</FieldLabel><Input ref={filesRef} id="video-assets" name="assets" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple required disabled={uploading || pending} onChange={(event) => { setHasFiles(Boolean(event.target.files?.length)); setUploadError(""); }} /><FieldDescription>浏览器通过短期预签名 URL 直传私有 Blob；单次总计不超过 20MB。</FieldDescription></Field>
+      <Field><FieldLabel htmlFor="video-assets">素材（1–3 个）</FieldLabel><Input ref={filesRef} id="video-assets" name="assets" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple required disabled={uploading || pending} onChange={(event) => { setHasFiles(Boolean(event.target.files?.length)); setUploadError(""); }} /><FieldDescription>每个文件使用一条短期、精确路径、仅 PUT 的预签名 URL 直传私有 Blob；总计不超过 20MB。</FieldDescription></Field>
       <Field data-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}><FieldLabel htmlFor="video-rights">素材权利证据</FieldLabel><Input id="video-rights" placeholder="evidence-rights-001" aria-invalid={Boolean(form.formState.errors.rightsEvidenceRef)} {...form.register("rightsEvidenceRef")} /><FieldError>{form.formState.errors.rightsEvidenceRef?.message}</FieldError></Field>
       {uploading ? <Progress aria-label="素材上传进度" value={uploadProgress}><ProgressLabel>私有上传</ProgressLabel><ProgressValue>{() => `${Math.round(uploadProgress)}%`}</ProgressValue></Progress> : null}
     </FieldGroup></form></CardContent>
