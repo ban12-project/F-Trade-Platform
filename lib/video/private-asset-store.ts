@@ -37,7 +37,7 @@ export type PrivateGeneratedVideoRead = {
 
 /** Materializes a private stream only for a callback and deletes it afterwards. */
 export async function withTemporaryPrivateVideoFile<T>(
-  asset: PrivateGeneratedVideoRead,
+  asset: Pick<PrivateGeneratedVideoRead, "body" | "contentType"> & Partial<Pick<PrivateGeneratedVideoRead, "sizeBytes" | "responseSizeBytes" | "contentRange" | "etag">>,
   callback: (filePath: string, contentType: string) => Promise<T>,
 ): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), "f-trade-video-"));
