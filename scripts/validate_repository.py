@@ -367,13 +367,21 @@ def check_database_baseline() -> None:
         if required not in invitation_actions:
             raise AssertionError(f"Invitation Server Action contract is missing: {required}")
     workspace_hub = (ROOT / "components/workspace/workspace-hub.tsx").read_text(encoding="utf-8")
+    workspace_action_dock = (ROOT / "components/workspace/workspace-action-dock.tsx").read_text(encoding="utf-8")
     for required in ("useForm", "zodResolver", "createWorkspaceProjectAction", "FieldError"):
-        if required not in workspace_hub:
+        if required not in workspace_action_dock:
             raise AssertionError(f"Workspace project form contract is missing: {required}")
+    for required in ("WorkspaceActionDock", "WorkspaceDirtyProvider"):
+        if required not in workspace_hub:
+            raise AssertionError(f"Workspace canvas shell contract is missing: {required}")
     workspace_loading = (ROOT / "components/workspace/workspace-canvas-skeleton.tsx").read_text(encoding="utf-8")
-    for required in ("WorkspaceCanvasSkeleton", 'className="fixed inset-0', "Skeleton", "100dvh", "projectNodePlaceholders"):
+    for required in ("WorkspaceCanvasSkeleton", 'className="fixed inset-0', "Skeleton", "bottom-3", "projectNodePlaceholders"):
         if required not in workspace_loading:
             raise AssertionError(f"Workspace canvas loading shell is missing: {required}")
+    workspace_schema = (ROOT / "lib/db/schema.ts").read_text(encoding="utf-8")
+    for required in ("workspaceItemRelation", "workspace_project_item_single_owner_uidx", "workspace_project_item_relation_matches_role"):
+        if required not in workspace_schema:
+            raise AssertionError(f"Workspace ownership contract is missing: {required}")
     for route in (ROOT / "app/workspace/page.tsx", ROOT / "app/workspace/[projectId]/page.tsx"):
         source = route.read_text(encoding="utf-8")
         if "WorkspaceCanvasSkeleton" not in source or "ConsoleLoading" in source:
@@ -682,7 +690,7 @@ def check_repository_hygiene() -> None:
 
 def check_local_markdown_links() -> None:
     pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
-    ignored_directories = {".git", ".next", "node_modules", "playwright-report"}
+    ignored_directories = {".git", ".next", ".venv", "node_modules", "playwright-report"}
     missing: list[str] = []
     for markdown in ROOT.rglob("*.md"):
         if ignored_directories.intersection(markdown.parts):
