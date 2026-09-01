@@ -50,6 +50,9 @@ const safeDraft = {
 
 test("validates the persisted provider configuration without allowing plaintext credential headers", () => {
   const input = {
+    configId: "",
+    name: "Synthetic gateway",
+    isDefault: true,
     provider: "openai-compatible",
     model: "gateway-model",
     baseUrl: "https://gateway.example.test/v1",
@@ -71,12 +74,16 @@ test("validates the persisted provider configuration without allowing plaintext 
 
 test("accepts only an authorized, bounded Product Agent text envelope", () => {
   expect(productAgentRunFormSchema.safeParse({
+    modelConfigId: "00000000-0000-4000-8000-000000000501",
+    model: "gpt-5-mini",
     sourceRef: "source-catalog-001",
     evidenceRef: "evidence-catalog-001",
     sourceText: "Product name: Synthetic Clutch Kit\nProduct type: clutch_kit",
     hasUpload: false,
   }).success).toBe(true);
   expect(productAgentRunFormSchema.safeParse({
+    modelConfigId: "00000000-0000-4000-8000-000000000501",
+    model: "gpt-5-mini",
     sourceRef: "/tmp/factory.xlsx",
     evidenceRef: "evidence-catalog-001",
     sourceText: "Product name: Synthetic Clutch Kit\nProduct type: clutch_kit",

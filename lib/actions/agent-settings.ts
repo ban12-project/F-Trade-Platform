@@ -11,6 +11,7 @@ import { saveProductAgentModelSettings } from "@/lib/ai/product-agent-model-conf
 export type AgentSettingsActionState = {
   status: "idle" | "success" | "error";
   message: string;
+  savedConfigId?: string;
 };
 
 function formValue(formData: FormData, name: string) {
@@ -27,6 +28,9 @@ export async function saveProductAgentModelSettingsAction(
     return { status: "error", message: "无权修改 Agent 配置。" };
   }
   const parsed = productAgentModelSettingsSchema.safeParse({
+    configId: formValue(formData, "configId"),
+    name: formValue(formData, "name"),
+    isDefault: formData.get("isDefault") === "true",
     provider: formValue(formData, "provider"),
     model: formValue(formData, "model"),
     baseUrl: formValue(formData, "baseUrl"),
@@ -43,15 +47,16 @@ export async function saveProductAgentModelSettingsAction(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "配置无效。" };
   }
   try {
-    await saveProductAgentModelSettings({
+    const savedConfigId = await saveProductAgentModelSettings({
       ...parsed.data,
+      configId: parsed.data.configId || undefined,
       headers: parsed.data.headersJson ? JSON.parse(parsed.data.headersJson) : {},
       apiKey: parsed.data.apiKey || undefined,
       authToken: parsed.data.authToken || undefined,
       actorId: session.user.id,
     });
     revalidatePath("/workspace");
-    return { status: "success", message: "Agent 模型配置已保存。密钥不会显示或返回给浏览器。" };
+    return { status: "success", message: "Agent 模型配置已保存。密钥不会显示或返回给浏览器。", savedConfigId };
   } catch (error) {
     return {
       status: "error",

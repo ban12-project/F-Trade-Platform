@@ -127,6 +127,20 @@
       "when": 1788269580225,
       "tag": "0017_lowly_sister_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788277015515,
+      "tag": "0018_exotic_rumiko_fujikawa",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788277879851,
+      "tag": "0019_brave_tiger_shark",
+      "breakpoints": true
     }
   ]
 }

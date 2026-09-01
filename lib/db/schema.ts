@@ -776,13 +776,16 @@ export const socialChannelControl = pgTable(
   ],
 );
 
-/** Singleton, encrypted-at-rest configuration for the Product Agent's model provider. */
+/** Named, encrypted-at-rest model configurations shared by AI-assisted workflows. */
 export const productAgentModelConfig = pgTable(
   "product_agent_model_config",
   {
     id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    isDefault: boolean("is_default").default(false).notNull(),
     provider: text("provider").notNull(),
     model: text("model").notNull(),
+    discoveredModels: jsonb("discovered_models").$type<string[]>().default([]).notNull(),
     baseUrl: text("base_url"),
     headers: jsonb("headers").$type<Record<string, string>>().default({}).notNull(),
     providerName: text("provider_name"),
@@ -797,7 +800,9 @@ export const productAgentModelConfig = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    check("product_agent_model_config_singleton", sql`${table.id} = 'product_agent'`),
+    uniqueIndex("product_agent_model_config_name_uidx").on(table.name),
+    uniqueIndex("product_agent_model_config_default_uidx").on(table.isDefault).where(sql`${table.isDefault} = true`),
+    check("product_agent_model_config_name_nonempty", sql`length(btrim(${table.name})) > 0`),
     check("product_agent_model_config_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
     check("product_agent_model_config_model_nonempty", sql`length(btrim(${table.model})) > 0`),
   ],

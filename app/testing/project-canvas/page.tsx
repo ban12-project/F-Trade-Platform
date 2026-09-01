@@ -6,6 +6,7 @@ import { ProjectCanvas } from "@/components/workspace/project-canvas";
 import { ProductPanel } from "@/components/workspace/product-panel";
 import { ProductReferencePanel, QuotationHandoffPanel, RfqPanel } from "@/components/workspace/sales-panels";
 import type { ContentCatalogDetail } from "@/lib/content/store";
+import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type { WorkspaceProjectDetail, WorkspaceProjectSummary } from "@/lib/workspace/store";
 
@@ -41,6 +42,10 @@ const syntheticSalesProject: WorkspaceProjectDetail = {
 const syntheticProjects: WorkspaceProjectSummary[] = [syntheticMarketingProject, syntheticSalesProject].map(({ document: _document, revision: _revision, ...project }) => project);
 
 const syntheticProduct = { id: "00000000-0000-4000-8000-000000000301", productName: "Verified clutch kit", internalSku: "SYN-001", factOptions: [{ path: "product.product_name", label: "product.product_name", value: "Verified clutch kit", evidenceRef: "evidence-product-001" }] };
+const syntheticAgentModels: ProductAgentModelSettings[] = [
+  { id: "00000000-0000-4000-8000-000000000501", name: "日常产品导入", isDefault: true, provider: "openai", model: "gpt-5-mini", discoveredModels: ["gpt-5-mini", "gpt-5.6-terra"], baseUrl: "", headersJson: "{}", providerName: "", organization: "", project: "", apiKeyConfigured: true, authTokenConfigured: false, source: "database" },
+  { id: "00000000-0000-4000-8000-000000000502", name: "复杂目录识别", isDefault: false, provider: "anthropic", model: "claude-sonnet-test", discoveredModels: ["claude-sonnet-test"], baseUrl: "", headersJson: "{}", providerName: "", organization: "", project: "", apiKeyConfigured: true, authTokenConfigured: false, source: "database" },
+];
 const syntheticProductDetail: ProductCatalogDetail = {
   id: syntheticProduct.id, state: "PRODUCT_REVIEW_REQUIRED", createdAt: new Date("2026-09-01T00:00:00.000Z"), productName: syntheticProduct.productName, internalSku: syntheticProduct.internalSku, productType: "clutch_kit", verificationStatus: "review_required", blockingFields: [], approvalStatus: "pending", approvalId: "00000000-0000-4000-8000-000000000302",
   draft: { record_id: syntheticProduct.id, source_ref: "source-product-001", evidence_refs: ["evidence-product-001"], field_evidence: { "product.product_name": "evidence-product-001", "product.product_type": "evidence-product-001", "product.internal_sku": "evidence-product-001", "product.oe_numbers": "evidence-product-001" }, verification_status: "review_required", blocking_missing_fields: [], optional_missing_fields: [], product: { product_name: syntheticProduct.productName, product_type: "clutch_kit", internal_sku: syntheticProduct.internalSku, oe_numbers: ["OE-SYN-001"] } },
@@ -61,7 +66,7 @@ async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ 
   const productDetail = state === "product-review" ? syntheticProductDetail : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
   return <ProjectCanvas project={syntheticMarketingProject} projects={syntheticProjects} tasks={[]} panels={{
-    product: <ProductPanel projectId={syntheticMarketingProject.id} entries={productDetail ? [productDetail] : []} detail={productDetail} canReview agentConfigured />,
+    product: <ProductPanel projectId={syntheticMarketingProject.id} entries={productDetail ? [productDetail] : []} detail={productDetail} canReview agentModelConfigs={syntheticAgentModels} />,
     content: <ContentPanel projectId={syntheticMarketingProject.id} products={[syntheticProduct]} entries={contentDetail ? [contentDetail] : []} copyCandidates={[]} detail={contentDetail} canReview />,
   }} videoEditor={{
     canReview: true,

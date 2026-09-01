@@ -60,6 +60,12 @@ test("desktop workspace settings open in a sheet and keep video generation out",
   await expect(sheet.getByRole("tab", { name: "安全" })).toBeVisible();
   await expect(sheet.getByRole("tab", { name: "渠道" })).toBeVisible();
   await expect(sheet.getByRole("button", { name: /生成视频|视频供应商|重试生成/ })).toHaveCount(0);
+  await sheet.getByRole("tab", { name: "Agent" }).click();
+  const modelConfig = sheet.getByRole("combobox", { name: "模型配置" });
+  await expect(modelConfig).toContainText("日常产品导入（默认）");
+  await modelConfig.click();
+  await expect(page.getByRole("option", { name: "复杂目录识别" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "新建模型配置" })).toBeVisible();
   await expect(page.locator('[data-slot="drawer-overlay"]')).toHaveCount(0);
 });
 
