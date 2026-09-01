@@ -11,6 +11,7 @@ import { evidence, videoUploadReceipt, workspaceProject } from "@/lib/db/schema"
 import {
   claimVideoUploadReceiptsSchema,
   completedVideoUploadTokenSchema,
+  maximumVideoUploadBatchBytes,
   mediaTypeForVideoUpload,
   type VideoPresignedUploadPayload,
   videoUploadBlobPath,
@@ -103,6 +104,7 @@ export async function claimCompletedVideoUploads(receiptIdsInput: unknown, actor
     if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 200));
   }
   if (rows.length !== receiptIds.length || rows.some((row) => row.rightsEvidenceRef !== rightsEvidenceRef)) throw new Error("部分上传回执不存在或不属于当前项目。");
+  if (rows.reduce((total, row) => total + row.sizeBytes, 0) > maximumVideoUploadBatchBytes) throw new Error("一次素材总计必须小于 3GB。");
   if (rows.some((row) => row.expiresAt.getTime() < Date.now())) throw new Error("上传回执已过期，请重新上传素材。");
 
   const result: UploadedVideoSourceAsset[] = [];

@@ -107,7 +107,7 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
     if (!asset) return null;
     const safeRange = range && /^bytes=\d*-\d*$/.test(range) ? range : null;
     const result = await get(asset.blobPath, { access: "private", token: process.env.BLOB_READ_WRITE_TOKEN, headers: safeRange ? { Range: safeRange } : undefined });
-    if (!result || result.statusCode !== 200 || !result.stream || !result.blob.contentType.startsWith("video/")) return null;
+    if (!result || ![200, 206].includes(Number(result.statusCode)) || !result.stream || !result.blob.contentType?.startsWith("video/")) return null;
     const contentRange = result.headers.get("content-range");
     const responseSizeBytes = Number(result.headers.get("content-length") ?? asset.sizeBytes);
     return { body: result.stream, contentType: result.blob.contentType, sizeBytes: asset.sizeBytes, responseSizeBytes, contentRange, etag: result.blob.etag };

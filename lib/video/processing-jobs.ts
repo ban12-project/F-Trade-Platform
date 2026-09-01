@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getDatabase, type Database } from "@/lib/db/client";
 import { aggregateRecord, videoProcessingJob } from "@/lib/db/schema";
@@ -28,8 +28,23 @@ export async function queueVideoProcessingJob(videoId: string, kind: VideoProces
   return { job: existing, created: false };
 }
 
-export async function attachVideoWorkflowRun(jobId: string, runId: string, database: Database = getDatabase()) {
-  await database.update(videoProcessingJob).set({ workflowRunId: runId }).where(and(eq(videoProcessingJob.id, jobId), eq(videoProcessingJob.status, "queued")));
+export async function reserveVideoWorkflowStart(jobId: string, claimId: string, database: Database = getDatabase()) {
+  const [claimed] = await database.update(videoProcessingJob).set({ workflowRunId: claimId })
+    .where(and(eq(videoProcessingJob.id, jobId), eq(videoProcessingJob.status, "queued"), isNull(videoProcessingJob.workflowRunId)))
+    .returning({ id: videoProcessingJob.id });
+  return Boolean(claimed);
+}
+
+export async function attachVideoWorkflowRun(jobId: string, claimId: string, runId: string, database: Database = getDatabase()) {
+  const [attached] = await database.update(videoProcessingJob).set({ workflowRunId: runId })
+    .where(and(eq(videoProcessingJob.id, jobId), eq(videoProcessingJob.workflowRunId, claimId)))
+    .returning({ id: videoProcessingJob.id });
+  if (!attached) throw new Error("视频处理任务的 Workflow 启动所有权已发生变化。");
+}
+
+export async function releaseVideoWorkflowStart(jobId: string, claimId: string, database: Database = getDatabase()) {
+  await database.update(videoProcessingJob).set({ workflowRunId: null })
+    .where(and(eq(videoProcessingJob.id, jobId), eq(videoProcessingJob.status, "queued"), eq(videoProcessingJob.workflowRunId, claimId)));
 }
 
 export async function markVideoJobRunning(jobId: string, database: Database = getDatabase()) {

@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -7,7 +9,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { type MarketingVideoDraft } from "@/lib/video/edit-contracts";
-import { attachVideoWorkflowRun, queueVideoProcessingJob } from "@/lib/video/processing-jobs";
+import { attachVideoWorkflowRun, queueVideoProcessingJob, releaseVideoWorkflowStart, reserveVideoWorkflowStart } from "@/lib/video/processing-jobs";
 import {
   assertMarketingVideoProjectLink,
   copyMarketingVideoDraftToProject,
@@ -28,10 +30,17 @@ async function requireVideoWriter() {
 
 async function startVideoJob(kind: "ai_draft" | "render", videoId: string, actorId: string) {
   const queued = await queueVideoProcessingJob(videoId, kind, actorId);
-  if (queued.job.status === "queued" && !queued.job.workflowRunId) {
+  if (queued.job.status === "queued") {
+    const claimId = `starting:${randomUUID()}`;
+    if (!await reserveVideoWorkflowStart(queued.job.id, claimId)) return queued.job;
     const workflow = kind === "ai_draft" ? generateMarketingVideoAiDraftWorkflow : renderMarketingVideoPreviewWorkflow;
-    const run = await start(workflow, [{ jobId: queued.job.id, videoId, actorId }]);
-    await attachVideoWorkflowRun(queued.job.id, run.runId);
+    try {
+      const run = await start(workflow, [{ jobId: queued.job.id, videoId, actorId }]);
+      await attachVideoWorkflowRun(queued.job.id, claimId, run.runId);
+    } catch (error) {
+      await releaseVideoWorkflowStart(queued.job.id, claimId);
+      throw error;
+    }
   }
   return queued.job;
 }
