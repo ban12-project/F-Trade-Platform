@@ -5,7 +5,7 @@ import { and, desc, eq, inArray, sql, type InferInsertModel } from "drizzle-orm"
 import type { ProductApproval, ProductDraft } from "@/lib/product/verification";
 import { approveProductDraft, rejectProductDraft, reviewProductDraft } from "@/lib/product/verification";
 import { getDatabase } from "@/lib/db/client";
-import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
+import { aggregateRecord, approval, auditEvent, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
 import type { productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
 import { assertTransition } from "@/lib/workflow/transitions";
 import type { z } from "zod";
@@ -98,7 +98,7 @@ export function buildProductCatalogDraft(input: ProductCatalogInput, recordId: s
   });
 }
 
-export async function createProductCatalogDraft(input: ProductCatalogInput, actorId: string) {
+export async function createProductCatalogDraft(input: ProductCatalogInput, actorId: string, projectId?: string) {
   const id = randomUUID();
   const draft = buildProductCatalogDraft(input, id);
   const now = new Date();
@@ -159,7 +159,12 @@ export async function createProductCatalogDraft(input: ProductCatalogInput, acto
     occurredAt: now,
   };
   await database.transaction(async (tx) => {
+    if (projectId) {
+      const [project] = await tx.select({ kind: workspaceProject.kind }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
+      if (!project || project.kind !== "marketing") throw new Error("产品草稿只能关联到产品营销项目。");
+    }
     await tx.insert(aggregateRecord).values(aggregateValues);
+    if (projectId) await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "product_source" });
     await tx.insert(approval).values(approvalValues);
     await tx.insert(workflowEvent).values(workflowValues);
     await tx.insert(auditEvent).values(auditValues);
@@ -169,7 +174,7 @@ export async function createProductCatalogDraft(input: ProductCatalogInput, acto
 }
 
 /** Persists a Product Agent result as review-only work; callers must never promote it to Ready. */
-export async function createProductAgentDraft(draft: ProductDraft, actorId: string, metadata: Record<string, unknown>) {
+export async function createProductAgentDraft(draft: ProductDraft, actorId: string, metadata: Record<string, unknown>, projectId?: string) {
   if (draft.verification_status !== "review_required") throw new Error("Product Agent output must require Gate 01 review.");
   const id = draft.record_id;
   const now = new Date();
@@ -177,7 +182,12 @@ export async function createProductAgentDraft(draft: ProductDraft, actorId: stri
   const eventId = randomUUID();
   assertTransition({ eventId, entityType: "product", entityId: id, fromState: "PRODUCT_IMPORTED", toState: "PRODUCT_REVIEW_REQUIRED", actorType: "agent", actorId: "product_agent", occurredAt: now.toISOString(), evidenceRefs: draft.evidence_refs });
   await getDatabase().transaction(async (tx) => {
+    if (projectId) {
+      const [project] = await tx.select({ kind: workspaceProject.kind }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
+      if (!project || project.kind !== "marketing") throw new Error("Product Agent 草稿只能关联到产品营销项目。");
+    }
     await tx.insert(aggregateRecord).values({ id, type: "product", state: "PRODUCT_REVIEW_REQUIRED", payload: draft as unknown as Record<string, unknown>, createdByType: "agent", createdById: "product_agent" });
+    if (projectId) await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "product_source" });
     await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_01_truth", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
     await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "PRODUCT_IMPORTED", toState: "PRODUCT_REVIEW_REQUIRED", actorType: "agent", actorId: "product_agent", evidenceRefs: draft.evidence_refs, occurredAt: now });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "product_agent_draft_created", actorType: "agent", actorId: "product_agent", aggregateId: id, subjectType: "product", subjectId: id, metadata: { ...metadata, requested_by: actorId, blocking_field_count: draft.blocking_missing_fields.length }, occurredAt: now });
@@ -240,6 +250,16 @@ export async function listProductCatalogEntries(limit = 50) {
   return catalogEntriesForRows(rows);
 }
 
+export async function listProjectProductCatalogEntries(projectId: string, limit = 50) {
+  const rows = await getDatabase().select({ record: aggregateRecord })
+    .from(workspaceProjectItem)
+    .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
+    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(aggregateRecord.type, "product")))
+    .orderBy(desc(workspaceProjectItem.createdAt))
+    .limit(limit);
+  return catalogEntriesForRows(rows.map((row) => row.record));
+}
+
 export async function getProductCatalogDashboard(queueLimit = 6): Promise<ProductCatalogDashboard> {
   const database = getDatabase();
   const [totalRows, pendingReviewRows, readyRows, queueRows] = await Promise.all([
@@ -277,6 +297,12 @@ export async function getProductCatalogDetail(productId: string): Promise<Produc
   const entry = catalogEntry(row, approvalRow);
   if (!entry) return null;
   return { ...entry, draft: row.payload as unknown as ProductDraft, approvalId: approvalRow?.id ?? null };
+}
+
+export async function getProjectProductCatalogDetail(projectId: string, productId: string): Promise<ProductCatalogDetail | null> {
+  const [link] = await getDatabase().select({ id: workspaceProjectItem.id }).from(workspaceProjectItem)
+    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.aggregateId, productId)));
+  return link ? getProductCatalogDetail(productId) : null;
 }
 
 export async function decideProductCatalogReview(

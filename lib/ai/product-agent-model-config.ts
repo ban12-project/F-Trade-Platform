@@ -89,7 +89,7 @@ export async function getSavedProductAgentModelConfig(): Promise<ProductAgentMod
 
 export async function resolveProductAgentModelConfig(): Promise<ProductAgentModelConfig> {
   const config = await getSavedProductAgentModelConfig();
-  if (!config) throw new Error("No saved Product Agent provider configuration. Configure it in the console first.");
+  if (!config) throw new Error("No saved Product Agent provider configuration. Configure it in workspace settings first.");
   return config;
 }
 

@@ -10,6 +10,7 @@ import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { listReadyProductContentSources } from "@/lib/content/store";
 import { contentAgentRequestSchema } from "@/lib/form-schemas";
+import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 const outputSchema = z.object({
   hook: z.string().min(1).max(500),
@@ -20,15 +21,16 @@ const outputSchema = z.object({
 });
 
 export type ContentAgentActionState = { status: "idle" | "success" | "error"; message: string; draft?: z.infer<typeof outputSchema> };
-export const initialContentAgentActionState: ContentAgentActionState = { status: "idle", message: "" };
-
 export async function generateContentDraftAction(_previous: ContentAgentActionState, formData: FormData): Promise<ContentAgentActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !hasPermission(session.user.role, "content:write")) return { status: "error", message: "无权生成内容初稿。" };
   const parsed = contentAgentRequestSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "内容请求格式不正确。" };
   try {
-    const product = (await listReadyProductContentSources()).find((candidate) => candidate.id === parsed.data.productId);
+    const rawProjectId = formData.get("projectId");
+    const projectId = rawProjectId === null || rawProjectId === "" ? undefined : z.uuid("项目标识无效。").parse(rawProjectId);
+    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
+    const product = (await listReadyProductContentSources(projectId)).find((candidate) => candidate.id === parsed.data.productId);
     const selected = product?.factOptions.find((fact) => fact.path === parsed.data.factPath);
     const productName = product?.factOptions.find((fact) => fact.path === "product.product_name");
     if (!product || !selected || !productName) throw new Error("只能引用仍处于 Product Ready 的已核验字段。");

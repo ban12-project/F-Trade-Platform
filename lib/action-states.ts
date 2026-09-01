@@ -1,0 +1,9 @@
+export const initialAgentSettingsActionState = { status: "idle", message: "" } as const;
+export const initialContentAgentActionState = { status: "idle", message: "" } as const;
+export const initialContentActionState = { status: "idle", message: "" } as const;
+export const initialInvitationActionState = { status: "idle", message: "" } as const;
+export const initialMarketingVideoActionState = { status: "idle", message: "" } as const;
+export const initialProductAgentActionState = { status: "idle", message: "" } as const;
+export const initialProductActionState = { status: "idle", message: "" } as const;
+export const initialSalesActionState = { status: "idle", message: "" } as const;
+export const initialSocialControlActionState = { status: "idle", message: "" } as const;

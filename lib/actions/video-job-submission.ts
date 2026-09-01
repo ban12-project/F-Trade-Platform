@@ -13,8 +13,6 @@ export type VideoJobSubmissionActionState = {
   jobId?: string;
 };
 
-export const initialVideoJobSubmissionActionState: VideoJobSubmissionActionState = { status: "idle", message: "" };
-
 function value(formData: FormData, name: string) {
   const item = formData.get(name);
   return typeof item === "string" ? item : "";

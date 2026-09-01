@@ -2,18 +2,31 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
 import { createProductCatalogDraft, decideProductCatalogReview, reviseProductCatalogDraft } from "@/lib/products";
+import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type ProductActionState = {
   status: "idle" | "success" | "error";
   message: string;
+  productId?: string;
 };
 
-export const initialProductActionState: ProductActionState = { status: "idle", message: "" };
+function projectIdFrom(formData: FormData) {
+  const value = formData.get("projectId");
+  if (value === null || value === "") return undefined;
+  return z.uuid("项目标识无效。").parse(value);
+}
+
+function revalidateProductPaths(projectId: string | undefined, productId?: string) {
+  void productId;
+  revalidatePath("/workspace");
+  if (projectId) revalidatePath(`/workspace/${projectId}`);
+}
 
 export async function createProductCatalogDraftAction(
   _previousState: ProductActionState,
@@ -30,11 +43,14 @@ export async function createProductCatalogDraftAction(
   }
 
   try {
-    const result = await createProductCatalogDraft(parsed.data, session.user.id);
-    revalidatePath("/console/products");
+    const projectId = projectIdFrom(formData);
+    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
+    const result = await createProductCatalogDraft(parsed.data, session.user.id, projectId);
+    revalidateProductPaths(projectId, result.id);
     return {
       status: "success",
       message: `产品草稿已创建（${result.id.slice(0, 8)}）。仍需 Gate 01 人工核验。`,
+      productId: result.id,
     };
   } catch (error) {
     return {
@@ -57,9 +73,10 @@ export async function decideProductCatalogReviewAction(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "审核资料格式不正确。" };
   }
   try {
+    const projectId = projectIdFrom(formData);
+    if (projectId) await assertWorkspaceAggregateLink(projectId, parsed.data.productId, "marketing", "product");
     const result = await decideProductCatalogReview(parsed.data, session.user.id);
-    revalidatePath("/console/products");
-    revalidatePath(`/console/products/${parsed.data.productId}`);
+    revalidateProductPaths(projectId, parsed.data.productId);
     return {
       status: "success",
       message: result.state === "PRODUCT_READY" ? "Gate 01 已批准，产品已进入 Ready。" : "Gate 01 已退回，产品需要修订。",
@@ -85,11 +102,11 @@ export async function reviseProductCatalogDraftAction(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "产品资料格式不正确。" };
   }
   try {
+    const projectId = projectIdFrom(formData);
+    if (projectId) await assertWorkspaceAggregateLink(projectId, parsedProductId.data.productId, "marketing", "product");
     await reviseProductCatalogDraft(parsedProductId.data.productId, parsed.data, session.user.id);
-    revalidatePath("/console/products");
-    revalidatePath(`/console/products/${parsedProductId.data.productId}`);
-    revalidatePath(`/console/products/${parsedProductId.data.productId}/revise`);
-    return { status: "success", message: "修订已保存，并已重新提交 Gate 01 审核。" };
+    revalidateProductPaths(projectId, parsedProductId.data.productId);
+    return { status: "success", message: "修订已保存，并已重新提交 Gate 01 审核。", productId: parsedProductId.data.productId };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法保存产品修订。" };
   }

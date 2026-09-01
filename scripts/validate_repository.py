@@ -389,7 +389,7 @@ def check_database_baseline() -> None:
         "createProductCatalogDraft",
         "decideProductCatalogReview",
         "reviseProductCatalogDraft",
-        'revalidatePath("/console/products")',
+        'revalidatePath("/workspace")',
     ):
         if required not in product_actions:
             raise AssertionError(f"Product catalog Server Action contract is missing: {required}")
@@ -398,7 +398,7 @@ def check_database_baseline() -> None:
         if required not in content_actions:
             raise AssertionError(f"Content Server Action contract is missing: {required}")
     workspace_canvas = (ROOT / "components/workspace/project-canvas.tsx").read_text(encoding="utf-8")
-    for required in ("saveWorkspaceCanvasAction", "100dvh", "Drawer", "ScrollArea"):
+    for required in ("saveWorkspaceCanvasAction", "100dvh", "Drawer", "ScrollArea", "ProjectCanvasPanels"):
         if required not in workspace_canvas:
             raise AssertionError(f"Workspace canvas contract is missing: {required}")
 

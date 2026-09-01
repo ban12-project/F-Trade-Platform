@@ -5,7 +5,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import contentSchema from "@/contracts/content/content.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
 import { getDatabase } from "@/lib/db/client";
-import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
+import { aggregateRecord, approval, auditEvent, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
 import type { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
@@ -155,12 +155,7 @@ function contentEntry(
   };
 }
 
-export async function listReadyProductContentSources(): Promise<ReadyProductContentSource[]> {
-  const rows = await getDatabase()
-    .select()
-    .from(aggregateRecord)
-    .where(and(eq(aggregateRecord.type, "product"), eq(aggregateRecord.state, "PRODUCT_READY")))
-    .orderBy(desc(aggregateRecord.createdAt));
+function readyProductSources(rows: Array<typeof aggregateRecord.$inferSelect>): ReadyProductContentSource[] {
   return rows.flatMap((row) => {
     const product = row.payload as unknown as ProductReady;
     if (product.verification_status !== "verified" || typeof product.product?.product_name !== "string" || typeof product.product?.internal_sku !== "string") return [];
@@ -168,12 +163,32 @@ export async function listReadyProductContentSources(): Promise<ReadyProductCont
   });
 }
 
-export async function createContentDraft(input: ContentDraftInput, actorId: string) {
+export async function listReadyProductContentSources(projectId?: string): Promise<ReadyProductContentSource[]> {
+  if (projectId) {
+    const rows = await getDatabase().select({ record: aggregateRecord }).from(workspaceProjectItem)
+      .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
+      .where(and(eq(workspaceProjectItem.projectId, projectId), eq(aggregateRecord.type, "product"), eq(aggregateRecord.state, "PRODUCT_READY")))
+      .orderBy(desc(workspaceProjectItem.createdAt));
+    return readyProductSources(rows.map((row) => row.record));
+  }
+  return readyProductSources(await getDatabase().select().from(aggregateRecord)
+    .where(and(eq(aggregateRecord.type, "product"), eq(aggregateRecord.state, "PRODUCT_READY")))
+    .orderBy(desc(aggregateRecord.createdAt)));
+}
+
+export async function createContentDraft(input: ContentDraftInput, actorId: string, projectId?: string) {
   const now = new Date();
   const id = randomUUID();
   const approvalId = randomUUID();
   const eventId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    if (projectId) {
+      const [workspace] = await tx.select({ kind: workspaceProject.kind }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
+      if (!workspace || workspace.kind !== "marketing") throw new Error("内容草稿只能关联到产品营销项目。");
+      const [productLink] = await tx.select({ id: workspaceProjectItem.id }).from(workspaceProjectItem)
+        .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.aggregateId, input.productId)));
+      if (!productLink) throw new Error("只能使用当前营销项目中已核验的产品。");
+    }
     const [product] = await tx
       .select({ id: aggregateRecord.id, state: aggregateRecord.state, payload: aggregateRecord.payload })
       .from(aggregateRecord)
@@ -194,6 +209,7 @@ export async function createContentDraft(input: ContentDraftInput, actorId: stri
       evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
     });
     await tx.insert(aggregateRecord).values({ id, type: "content", state: "CONTENT_REVIEW_REQUIRED", payload: content, createdByType: "human", createdById: actorId });
+    if (projectId) await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "marketing_content" });
     await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_01_truth", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
     await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "CONTENT_GENERATING", toState: "CONTENT_REVIEW_REQUIRED", actorType: "human", actorId, evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref), occurredAt: now });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "content_draft_created", actorType: "human", actorId, aggregateId: id, subjectType: "content", subjectId: id, metadata: { content_type: content.content_type, product_id: product.id }, occurredAt: now });
@@ -215,6 +231,21 @@ export async function listContentCatalogEntries(limit = 50) {
   const rows = await getDatabase().select().from(aggregateRecord).where(eq(aggregateRecord.type, "content")).orderBy(desc(aggregateRecord.createdAt)).limit(limit);
   const approvals = await latestApprovals(rows);
   return rows.flatMap((row) => {
+    const entry = contentEntry(row, approvals.get(row.id));
+    return entry ? [entry] : [];
+  });
+}
+
+export async function listProjectContentCatalogEntries(projectId: string, limit = 50) {
+  const rows = await getDatabase().select({ record: aggregateRecord })
+    .from(workspaceProjectItem)
+    .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
+    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(aggregateRecord.type, "content")))
+    .orderBy(desc(workspaceProjectItem.createdAt))
+    .limit(limit);
+  const records = rows.map((row) => row.record);
+  const approvals = await latestApprovals(records);
+  return records.flatMap((row) => {
     const entry = contentEntry(row, approvals.get(row.id));
     return entry ? [entry] : [];
   });
@@ -251,6 +282,12 @@ export async function getContentCatalogDetail(contentId: string): Promise<Conten
     .orderBy(desc(approval.requestedAt), desc(approval.createdAt)).limit(1);
   const entry = contentEntry(row, approvalRow);
   return entry ? { ...entry, content: row.payload as ContentRecord, approvalId: approvalRow?.id ?? null } : null;
+}
+
+export async function getProjectContentCatalogDetail(projectId: string, contentId: string): Promise<ContentCatalogDetail | null> {
+  const [link] = await getDatabase().select({ id: workspaceProjectItem.id }).from(workspaceProjectItem)
+    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.aggregateId, contentId)));
+  return link ? getContentCatalogDetail(contentId) : null;
 }
 
 export async function decideContentReview(input: ContentReviewInput, actorId: string) {
