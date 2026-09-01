@@ -54,3 +54,7 @@ blob-report/
 docs/reference/*.pdf
 .vercel
 .env*.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
