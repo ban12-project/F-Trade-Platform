@@ -8,8 +8,6 @@ import { saveSocialChannelControl } from "@/lib/social/control-store";
 import { socialControlChangeSchema } from "@/lib/social/control-record";
 
 export type SocialControlActionState = { status: "idle" | "success" | "error"; message: string };
-export const initialSocialControlActionState: SocialControlActionState = { status: "idle", message: "" };
-
 /** Server-side authorization, validation and minimal return boundary for social channel operations. */
 export async function saveSocialChannelControlAction(
   _previous: SocialControlActionState,
@@ -24,7 +22,7 @@ export async function saveSocialChannelControlAction(
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "社交渠道控制输入无效。" };
   try {
     const result = await saveSocialChannelControl(parsed.data);
-    revalidatePath("/console/social");
+    revalidatePath("/workspace");
     return { status: "success", message: `渠道已${result.circuitStatus === "active" ? "启用" : "暂停"}；操作已写入审计记录。` };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法保存社交渠道控制状态。" };

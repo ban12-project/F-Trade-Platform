@@ -12,11 +12,6 @@ export type InvitationActionState = {
   message: string;
 };
 
-export const initialInvitationActionState: InvitationActionState = {
-  status: "idle",
-  message: "",
-};
-
 function actionError(error: unknown, fallback: string): InvitationActionState {
   return {
     status: "error",

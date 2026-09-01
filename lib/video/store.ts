@@ -30,8 +30,13 @@ function factOptions(product: ProductReady) {
     }));
 }
 
-export async function listReadyVideoProductSources(): Promise<ReadyVideoProductSource[]> {
-  const rows = await getDatabase().select().from(aggregateRecord).where(and(eq(aggregateRecord.type, "product"), eq(aggregateRecord.state, "PRODUCT_READY"))).orderBy(desc(aggregateRecord.createdAt));
+export async function listReadyVideoProductSources(projectId?: string): Promise<ReadyVideoProductSource[]> {
+  const rows = projectId
+    ? (await getDatabase().select({ record: aggregateRecord }).from(workspaceProjectItem)
+      .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
+      .where(and(eq(workspaceProjectItem.projectId, projectId), eq(aggregateRecord.type, "product"), eq(aggregateRecord.state, "PRODUCT_READY")))
+      .orderBy(desc(workspaceProjectItem.createdAt))).map((row) => row.record)
+    : await getDatabase().select().from(aggregateRecord).where(and(eq(aggregateRecord.type, "product"), eq(aggregateRecord.state, "PRODUCT_READY"))).orderBy(desc(aggregateRecord.createdAt));
   return rows.flatMap((row) => {
     const product = row.payload as unknown as ProductReady;
     if (product.record_id !== row.id || product.verification_status !== "verified" || typeof product.product?.product_name !== "string" || typeof product.product?.internal_sku !== "string") return [];

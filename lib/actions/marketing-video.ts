@@ -30,8 +30,6 @@ import { prepareUploadedVideoAssets, withTemporaryUploadedVideoAssets } from "@/
 import { extractMarketingVisualSamples } from "@/lib/video/visual-sampling";
 
 export type MarketingVideoActionState = { status: "idle" | "success" | "error"; message: string; videoId?: string };
-export const initialMarketingVideoActionState: MarketingVideoActionState = { status: "idle", message: "" };
-
 async function requireVideoWriter() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !hasPermission(session.user.role, "video:write")) throw new Error("无权编辑营销视频。");

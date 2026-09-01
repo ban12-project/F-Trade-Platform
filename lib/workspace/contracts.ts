@@ -37,5 +37,27 @@ export const workspaceCanvasDocumentSchema = z.object({
 });
 
 export type WorkspaceCanvasDocument = z.infer<typeof workspaceCanvasDocumentSchema>;
+
+export function createWorkspaceTemplate(kind: "marketing" | "sales"): WorkspaceCanvasDocument {
+  const labels = kind === "marketing"
+    ? [["product", "product", "产品资料"], ["content", "content", "营销内容"], ["video", "video", "营销视频"]] as const
+    : [["rfq", "rfq", "客户询盘"], ["product", "product", "产品引用"], ["quotation", "quotation", "报价交接"]] as const;
+  const nodes = labels.map(([id, kindName, label], index) => ({ id, kind: kindName, label, locked: true, position: { x: index * 260, y: index % 2 ? 140 : 40 } })) as WorkspaceCanvasDocument["nodes"];
+  return { version: 1, nodes, edges: nodes.slice(1).map((node, index) => ({ id: `edge-${index + 1}`, source: nodes[index]!.id, target: node.id, kind: "depends_on" })) };
+}
+
+export function normalizeLegacyWorkspaceTemplate(kind: "marketing" | "sales", document: WorkspaceCanvasDocument): WorkspaceCanvasDocument {
+  const expected = kind === "marketing"
+    ? [["product", "product"], ["approval", "approval"], ["content", "content"], ["video", "video"]] as const
+    : [["rfq", "rfq"], ["product", "product"], ["quotation", "quotation"], ["approval", "approval"]] as const;
+  const isLegacyTemplate = document.nodes.length === expected.length && expected.every(([id, nodeKind]) => document.nodes.some((node) => node.id === id && node.kind === nodeKind && node.locked));
+  if (!isLegacyTemplate) return document;
+  const current = createWorkspaceTemplate(kind);
+  return {
+    ...current,
+    nodes: current.nodes.map((node) => ({ ...node, position: document.nodes.find((legacyNode) => legacyNode.id === node.id)?.position ?? node.position })),
+  };
+}
+
 export const createWorkspaceProjectSchema = z.object({ kind: workspaceProjectKindSchema, title: z.string().trim().min(1, "请输入项目名称。").max(120, "项目名称不能超过 120 个字符。") }).strict();
 export const saveWorkspaceCanvasSchema = z.object({ expectedRevision: z.number().int().min(0), document: workspaceCanvasDocumentSchema }).strict();

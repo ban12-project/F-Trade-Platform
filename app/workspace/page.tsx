@@ -1,13 +1,18 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 
 import { WorkspaceCanvasSkeleton } from "@/components/workspace/workspace-canvas-skeleton";
 import { WorkspaceHub } from "@/components/workspace/workspace-hub";
+import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-settings-panel";
+import { getStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { requirePermission } from "@/lib/auth-guard";
+import { hasPermission } from "@/lib/authz";
 import { listWorkspaceProjects } from "@/lib/workspace/store";
 
 async function WorkspaceContent() {
-  await requirePermission("workspace:view");
-  return <WorkspaceHub projects={await listWorkspaceProjects()} />;
+  await connection();
+  const [session, projects, settings] = await Promise.all([requirePermission("workspace:view"), listWorkspaceProjects(), getStoredProductAgentModelSettings()]);
+  return <WorkspaceHub projects={projects} settingsPanel={<WorkspaceSettingsPanel settings={settings ?? undefined} canManage={hasPermission(session.user.role, "settings:manage")} />} />;
 }
 
 export default function WorkspacePage() { return <Suspense fallback={<WorkspaceCanvasSkeleton />}><WorkspaceContent /></Suspense>; }

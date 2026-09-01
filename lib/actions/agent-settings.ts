@@ -13,11 +13,6 @@ export type AgentSettingsActionState = {
   message: string;
 };
 
-export const initialAgentSettingsActionState: AgentSettingsActionState = {
-  status: "idle",
-  message: "",
-};
-
 function formValue(formData: FormData, name: string) {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
@@ -55,7 +50,7 @@ export async function saveProductAgentModelSettingsAction(
       authToken: parsed.data.authToken || undefined,
       actorId: session.user.id,
     });
-    revalidatePath("/console/agent-settings");
+    revalidatePath("/workspace");
     return { status: "success", message: "Agent 模型配置已保存。密钥不会显示或返回给浏览器。" };
   } catch (error) {
     return {

@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { createWorkspaceProjectSchema, saveWorkspaceCanvasSchema, type WorkspaceCanvasDocument } from "@/lib/workspace/contracts";
-import { WorkspaceCanvasRevisionConflictError, createWorkspaceProject, saveWorkspaceCanvas } from "@/lib/workspace/store";
+import { WorkspaceCanvasRevisionConflictError, createWorkspaceProject, linkReadyProductToSalesProject, saveWorkspaceCanvas } from "@/lib/workspace/store";
 
 export type WorkspaceActionState = { status: "idle" | "success" | "error" | "conflict"; message: string; projectId?: string; revision?: number };
 
@@ -38,5 +39,19 @@ export async function saveWorkspaceCanvasAction(projectId: string, input: { expe
   } catch (error) {
     if (error instanceof WorkspaceCanvasRevisionConflictError) return { status: "conflict", message: error.message };
     return { status: "error", message: error instanceof Error ? error.message : "无法保存项目画布。" };
+  }
+}
+
+export async function linkReadyProductToSalesProjectAction(projectIdInput: string, productIdInput: string): Promise<WorkspaceActionState> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session || !hasPermission(session.user.role, "sales:write")) throw new Error("无权为销售项目引用产品。");
+    const projectId = z.uuid("项目标识无效。").parse(projectIdInput);
+    const productId = z.uuid("产品记录标识无效。").parse(productIdInput);
+    await linkReadyProductToSalesProject(projectId, productId, session.user.id);
+    revalidatePath(`/workspace/${projectId}`);
+    return { status: "success", message: "已引用 Product Ready，不会复制或改写产品事实。", projectId };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "无法引用产品。" };
   }
 }

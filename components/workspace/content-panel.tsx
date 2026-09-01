@@ -1,0 +1,83 @@
+"use client";
+
+import { startTransition, useActionState, useEffect, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { BotIcon, CheckCircle2Icon, FilePenLineIcon, PlusIcon, RotateCcwIcon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { generateContentDraftAction } from "@/lib/actions/content-agent";
+import { createContentDraftAction, decideContentReviewAction, reviseContentDraftAction } from "@/lib/actions/content";
+import { initialContentActionState, initialContentAgentActionState } from "@/lib/action-states";
+import { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
+import type { ContentCatalogDetail, ContentCatalogEntry, ReadyProductContentSource } from "@/lib/content/store";
+
+const contentTypes = [["product", "产品推广"], ["factory_capability", "工厂能力"], ["industry_knowledge", "行业知识"]] as const;
+type ContentValues = z.infer<typeof contentDraftFormSchema>;
+type ReviewValues = z.infer<typeof contentReviewFormSchema>;
+
+function stateLabel(state: string) { return ({ CONTENT_REVIEW_REQUIRED: "待 Gate 01", CONTENT_REVISION_REQUIRED: "待修订", CONTENT_APPROVED: "已批准", CONTENT_PUBLISHED: "已发布" } as Record<string, string>)[state] ?? state; }
+function contentTypeLabel(value: string) { return contentTypes.find(([key]) => key === value)?.[1] ?? value; }
+
+function defaultValues(products: ReadyProductContentSource[]): ContentValues {
+  return { productId: products[0]?.id ?? "", contentType: "product", factPath: products[0]?.factOptions[0]?.path ?? "", objective: "Generate qualified distributor inquiries", targetCustomer: "Overseas automotive parts distributors", hook: "", body: "", callToAction: "", hashtags: "", visualInstruction: "" };
+}
+
+function valuesFromDetail(detail: ContentCatalogDetail): ContentValues {
+  return { productId: detail.content.product_id, contentType: detail.content.content_type, factPath: detail.content.product_facts.find((fact) => fact.field !== "product.product_name")?.field ?? detail.content.product_facts[0]?.field ?? "product.product_name", objective: detail.content.objective, targetCustomer: detail.content.target_customer, hook: detail.content.hook, body: detail.content.body, callToAction: detail.content.call_to_action, hashtags: detail.content.hashtags.join(" "), visualInstruction: detail.content.visual_instruction };
+}
+
+function ContentDraftForm({ projectId, products, detail }: { projectId: string; products: ReadyProductContentSource[]; detail?: ContentCatalogDetail }) {
+  const router = useRouter(); const revising = detail?.state === "CONTENT_REVISION_REQUIRED";
+  const [saveState, saveAction, saving] = useActionState(revising ? reviseContentDraftAction : createContentDraftAction, initialContentActionState);
+  const [aiState, aiAction, generating] = useActionState(generateContentDraftAction, initialContentAgentActionState);
+  const form = useForm<ContentValues>({ resolver: zodResolver(contentDraftFormSchema), defaultValues: detail ? valuesFromDetail(detail) : defaultValues(products) });
+  const productId = form.watch("productId"); const product = products.find((item) => item.id === productId);
+  useEffect(() => { if (!aiState.draft) return; form.setValue("hook", aiState.draft.hook, { shouldDirty: true }); form.setValue("body", aiState.draft.body, { shouldDirty: true }); form.setValue("callToAction", aiState.draft.callToAction, { shouldDirty: true }); form.setValue("hashtags", aiState.draft.hashtags.join(" "), { shouldDirty: true }); form.setValue("visualInstruction", aiState.draft.visualInstruction, { shouldDirty: true }); }, [aiState.draft, form]);
+  useEffect(() => { if (saveState.status === "success") { if (!revising) form.reset(defaultValues(products)); router.refresh(); } }, [form, products, revising, router, saveState.status]);
+  function data(values: ContentValues) { const result = new FormData(); result.set("projectId", projectId); if (detail) result.set("contentId", detail.id); for (const [key, value] of Object.entries(values)) result.set(key, value); return result; }
+  function generate() { const values = form.getValues(); const subset = contentDraftFormSchema.pick({ productId: true, contentType: true, factPath: true, objective: true, targetCustomer: true }).safeParse(values); if (!subset.success) { void form.trigger(["productId", "contentType", "factPath", "objective", "targetCustomer"]); return; } startTransition(() => aiAction(data(values))); }
+  if (!products.length) return <Empty><EmptyHeader><EmptyMedia variant="icon"><FilePenLineIcon /></EmptyMedia><EmptyTitle>当前项目没有已核验产品</EmptyTitle><EmptyDescription>先在“产品资料”节点完成 Gate 01，内容不能引用其他项目或草稿产品。</EmptyDescription></EmptyHeader></Empty>;
+  return <Card><CardHeader><CardTitle>{revising ? "修订内容草稿" : "新建待审内容"}</CardTitle><CardDescription>AI 只能使用所选的已核验事实；人工仍需检查文案和视觉说明。</CardDescription></CardHeader><CardContent><form id={revising ? "revise-content" : "create-content"} onSubmit={form.handleSubmit((values) => startTransition(() => saveAction(data(values))))}><FieldGroup>
+    <Field data-invalid={!!form.formState.errors.productId}><FieldLabel>产品</FieldLabel><Controller control={form.control} name="productId" render={({ field }) => <Select value={field.value} onValueChange={(value) => { field.onChange(value); form.setValue("factPath", products.find((item) => item.id === value)?.factOptions[0]?.path ?? ""); }} disabled={revising}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{products.map((item) => <SelectItem key={item.id} value={item.id}>{item.internalSku} · {item.productName}</SelectItem>)}</SelectGroup></SelectContent></Select>} /><FieldError errors={[form.formState.errors.productId]} /></Field>
+    <Field><FieldLabel>内容类型</FieldLabel><Controller control={form.control} name="contentType" render={({ field }) => <Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{contentTypes.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent></Select>} /></Field>
+    <Field data-invalid={!!form.formState.errors.factPath}><FieldLabel>允许引用的产品事实</FieldLabel><Controller control={form.control} name="factPath" render={({ field }) => <Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{product?.factOptions.map((fact) => <SelectItem key={fact.path} value={fact.path}>{fact.label}</SelectItem>)}</SelectGroup></SelectContent></Select>} /><FieldError errors={[form.formState.errors.factPath]} /></Field>
+    <Field data-invalid={!!form.formState.errors.objective}><FieldLabel htmlFor="content-objective">营销目标</FieldLabel><Input id="content-objective" {...form.register("objective")} /><FieldError errors={[form.formState.errors.objective]} /></Field>
+    <Field data-invalid={!!form.formState.errors.targetCustomer}><FieldLabel htmlFor="target-customer">目标客户</FieldLabel><Input id="target-customer" {...form.register("targetCustomer")} /><FieldError errors={[form.formState.errors.targetCustomer]} /></Field>
+    <Button type="button" variant="outline" disabled={generating} onClick={generate}>{generating ? <Spinner data-icon="inline-start" /> : <BotIcon data-icon="inline-start" />}生成可编辑初稿</Button>
+    <Field data-invalid={!!form.formState.errors.hook}><FieldLabel htmlFor="content-hook">开场句</FieldLabel><Textarea id="content-hook" rows={2} {...form.register("hook")} /><FieldError errors={[form.formState.errors.hook]} /></Field>
+    <Field data-invalid={!!form.formState.errors.body}><FieldLabel htmlFor="content-body">正文</FieldLabel><Textarea id="content-body" rows={8} {...form.register("body")} /><FieldError errors={[form.formState.errors.body]} /></Field>
+    <Field data-invalid={!!form.formState.errors.callToAction}><FieldLabel htmlFor="content-cta">行动号召</FieldLabel><Input id="content-cta" {...form.register("callToAction")} /><FieldError errors={[form.formState.errors.callToAction]} /></Field>
+    <Field><FieldLabel htmlFor="content-hashtags">标签</FieldLabel><Input id="content-hashtags" {...form.register("hashtags")} /></Field>
+    <Field data-invalid={!!form.formState.errors.visualInstruction}><FieldLabel htmlFor="visual-instruction">视觉说明</FieldLabel><Textarea id="visual-instruction" rows={4} {...form.register("visualInstruction")} /><FieldDescription>不能推断尺寸、材料、结构或零件数量。</FieldDescription><FieldError errors={[form.formState.errors.visualInstruction]} /></Field>
+  </FieldGroup></form></CardContent><CardFooter className="flex-col items-stretch gap-3"><Button form={revising ? "revise-content" : "create-content"} type="submit" disabled={saving}>{saving ? <Spinner data-icon="inline-start" /> : revising ? <RotateCcwIcon data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}{revising ? "提交修订并送审" : "创建待审内容"}</Button>{aiState.message ? <p className="text-sm text-muted-foreground" aria-live="polite">{aiState.message}</p> : null}{saveState.message ? <p className={saveState.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} aria-live="polite">{saveState.message}</p> : null}</CardFooter></Card>;
+}
+
+function ContentReview({ projectId, detail, product, canReview }: { projectId: string; detail: ContentCatalogDetail; product: ReadyProductContentSource | undefined; canReview: boolean }) {
+  const router = useRouter(); const [state, action, pending] = useActionState(decideContentReviewAction, initialContentActionState);
+  const form = useForm<ReviewValues>({ resolver: zodResolver(contentReviewFormSchema), defaultValues: { contentId: detail.id, decision: "approved", evidenceRef: "", notes: "" } });
+  useEffect(() => { if (state.status === "success") router.refresh(); }, [router, state.status]);
+  function submit(values: ReviewValues) { const data = new FormData(); data.set("projectId", projectId); for (const [key, value] of Object.entries(values)) data.set(key, value); startTransition(() => action(data)); }
+  const canDecide = canReview && detail.state === "CONTENT_REVIEW_REQUIRED" && detail.approvalStatus === "pending";
+  return <div className="flex flex-col gap-4"><div className="flex flex-wrap gap-2"><Badge variant="secondary">{stateLabel(detail.state)}</Badge><Badge variant="outline">{contentTypeLabel(detail.contentType)}</Badge></div><Card><CardHeader><CardTitle>{detail.content.hook}</CardTitle><CardDescription>{detail.productName}</CardDescription></CardHeader><CardContent className="flex flex-col gap-4"><p className="whitespace-pre-wrap text-sm leading-6">{detail.content.body}</p><p className="text-sm"><span className="font-medium">CTA：</span>{detail.content.call_to_action}</p><p className="text-sm"><span className="font-medium">视觉：</span>{detail.content.visual_instruction}</p><Table><TableHeader><TableRow><TableHead>事实</TableHead><TableHead>值 / 证据</TableHead></TableRow></TableHeader><TableBody>{detail.content.product_facts.map((fact) => <TableRow key={fact.field}><TableCell className="font-mono text-xs">{fact.field}</TableCell><TableCell className="whitespace-normal break-words">{fact.value}<span className="mt-1 block font-mono text-xs text-muted-foreground">{fact.evidence_ref}</span></TableCell></TableRow>)}</TableBody></Table></CardContent></Card>{canDecide ? <Card><CardHeader><CardTitle>Gate 01 内容审核</CardTitle><CardDescription>批准不等于发布。</CardDescription></CardHeader><CardContent><form id="content-review" onSubmit={form.handleSubmit(submit)}><FieldGroup><Field><FieldLabel>决定</FieldLabel><Controller control={form.control} name="decision" render={({ field }) => <Select value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="approved">批准内容</SelectItem><SelectItem value="rejected">退回修订</SelectItem></SelectGroup></SelectContent></Select>} /></Field><Field data-invalid={!!form.formState.errors.evidenceRef}><FieldLabel htmlFor="content-review-evidence">审核证据</FieldLabel><Input id="content-review-evidence" placeholder="evidence-content-review-001" {...form.register("evidenceRef")} /><FieldError errors={[form.formState.errors.evidenceRef]} /></Field><Field><FieldLabel htmlFor="content-review-notes">审核备注</FieldLabel><Textarea id="content-review-notes" {...form.register("notes")} /></Field></FieldGroup></form></CardContent><CardFooter className="flex-col items-stretch gap-3"><Button form="content-review" type="submit" disabled={pending}>{pending ? <Spinner data-icon="inline-start" /> : form.watch("decision") === "approved" ? <CheckCircle2Icon data-icon="inline-start" /> : <XCircleIcon data-icon="inline-start" />}提交人工决定</Button>{state.message ? <p className="text-sm text-muted-foreground" aria-live="polite">{state.message}</p> : null}</CardFooter></Card> : <Alert><ShieldCheckIcon /><AlertTitle>{canReview ? "当前无需审核" : "等待管理员审核"}</AlertTitle><AlertDescription>审核仍在内容面板内完成，不需要跳转到通用审核节点。</AlertDescription></Alert>}{detail.state === "CONTENT_REVISION_REQUIRED" && product ? <ContentDraftForm projectId={projectId} products={[product]} detail={detail} /> : null}</div>;
+}
+
+export function ContentPanel({ projectId, products, entries, detail, canReview }: { projectId: string; products: ReadyProductContentSource[]; entries: ContentCatalogEntry[]; detail: ContentCatalogDetail | null; canReview: boolean }) {
+  const pathname = usePathname(); const searchParams = useSearchParams(); const [tab, setTab] = useState(detail ? "records" : "create");
+  function href(item: string) { const params = new URLSearchParams(searchParams.toString()); params.set("panel", "content"); params.set("item", item); return `${pathname}?${params}`; }
+  return <div className="flex flex-col gap-4"><div><div className="flex flex-wrap gap-2"><Badge variant="secondary">营销内容</Badge><Badge variant="outline">渠道未自动发布</Badge></div><p className="mt-2 text-sm text-muted-foreground">从当前项目的 Product Ready 事实创建、审核和修订营销内容。</p></div><Tabs value={tab} onValueChange={setTab}><TabsList className="w-full"><TabsTrigger value="create"><PlusIcon />新建</TabsTrigger><TabsTrigger value="records">记录 {entries.length}</TabsTrigger></TabsList><TabsContent value="create"><ContentDraftForm projectId={projectId} products={products} /></TabsContent><TabsContent value="records"><div className="flex flex-col gap-3">{entries.length ? entries.map((entry) => <Button key={entry.id} render={<Link href={href(entry.id)} />} variant={detail?.id === entry.id ? "secondary" : "outline"} className="h-auto justify-start py-3 text-left"><span className="flex min-w-0 flex-1 flex-col gap-1"><span className="truncate font-medium">{entry.productName} · {contentTypeLabel(entry.contentType)}</span><span className="truncate text-xs text-muted-foreground">{stateLabel(entry.state)} · {entry.hook}</span></span></Button>) : <Empty><EmptyHeader><EmptyMedia variant="icon"><FilePenLineIcon /></EmptyMedia><EmptyTitle>当前项目还没有内容</EmptyTitle><EmptyDescription>从已核验产品创建第一条待审内容。</EmptyDescription></EmptyHeader></Empty>}{detail ? <ContentReview projectId={projectId} detail={detail} product={products.find((item) => item.id === detail.productId)} canReview={canReview} /> : null}</div></TabsContent></Tabs></div>;
+}

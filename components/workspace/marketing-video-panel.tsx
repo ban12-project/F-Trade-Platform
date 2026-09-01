@@ -10,11 +10,11 @@ import { z } from "zod";
 import {
   createMarketingVideoDraftAction,
   generateMarketingVideoAiDraftAction,
-  initialMarketingVideoActionState,
   renderMarketingVideoDraftAction,
   reviewMarketingVideoAction,
   saveMarketingVideoDraftAction,
 } from "@/lib/actions/marketing-video";
+import { initialMarketingVideoActionState } from "@/lib/action-states";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

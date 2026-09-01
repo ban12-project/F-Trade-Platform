@@ -35,7 +35,7 @@ export function AuthPanel() {
     }
   }, []);
 
-  function enterConsole() {
+  function enterWorkspace() {
     // Authentication changes the cookie set used by the proxy. A document
     // navigation guarantees the next request evaluates that fresh session.
     window.location.assign("/workspace");
@@ -92,12 +92,12 @@ export function AuthPanel() {
       }),
       "登录成功。你现在可以注册 Passkey。",
     );
-    if (signedIn) enterConsole();
+    if (signedIn) enterWorkspace();
   }
 
   async function signInPasskey() {
     const signedIn = await run(() => authClient.signIn.passkey(), "Passkey 登录成功。");
-    if (signedIn) enterConsole();
+    if (signedIn) enterWorkspace();
   }
 
   async function addPasskey() {

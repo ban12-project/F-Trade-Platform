@@ -46,3 +46,29 @@ test("mobile project switcher renders only a drawer overlay", async ({ page }) =
   await expect(page.locator('[data-slot="drawer-overlay"]')).toBeVisible();
   await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCount(0);
 });
+
+test("desktop workspace settings open in a sheet and keep video generation out", async ({ page }) => {
+  await page.goto("/testing/workspace-canvas");
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+
+  const sheet = page.locator('[data-slot="sheet-content"]');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("heading", { name: "工作区设置" })).toBeVisible();
+  await expect(sheet.getByText("视频生成仍未启用")).toBeVisible();
+  await expect(sheet.getByRole("tab", { name: "Agent" })).toBeVisible();
+  await expect(sheet.getByRole("tab", { name: "团队" })).toBeVisible();
+  await expect(sheet.getByRole("tab", { name: "安全" })).toBeVisible();
+  await expect(sheet.getByRole("tab", { name: "渠道" })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /生成视频|视频供应商|重试生成/ })).toHaveCount(0);
+  await expect(page.locator('[data-slot="drawer-overlay"]')).toHaveCount(0);
+});
+
+test("mobile workspace settings open in a drawer", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/testing/workspace-canvas");
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+
+  await expect(page.locator('[data-slot="drawer-popup"]')).toBeVisible();
+  await expect(page.getByText("视频生成仍未启用")).toBeVisible();
+  await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCount(0);
+});

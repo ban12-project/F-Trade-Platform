@@ -15,11 +15,6 @@ export type VideoProviderSettingsActionState = {
   message: string;
 };
 
-export const initialVideoProviderSettingsActionState: VideoProviderSettingsActionState = {
-  status: "idle",
-  message: "",
-};
-
 function text(formData: FormData, name: string) {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
@@ -85,7 +80,7 @@ export async function saveVideoProviderModelSettingsAction(
       },
       actorId: session.user.id,
     });
-    revalidatePath("/console/video/settings");
+    revalidatePath("/workspace");
     return { status: "success", message: "视频提供商配置已保存；凭据不会显示或返回到浏览器。" };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法保存视频提供商配置。" };
