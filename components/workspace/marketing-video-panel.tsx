@@ -6,6 +6,7 @@ import { ArrowDownIcon, ArrowUpIcon, BotIcon, CopyIcon, FilmIcon, PlusIcon, Save
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { uploadPresigned } from "@vercel/blob/client";
 
 import {
   createMarketingVideoDraftAction,
@@ -28,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createMarketingVideoDraftFormSchema, marketingVideoDraftSchema, marketingVideoDurationMs, type MarketingVideoDraft } from "@/lib/video/edit-contracts";
+import { videoPresignedUploadPayloadSchema, videoUploadBlobPath } from "@/lib/video/upload-contracts";
 import type { MarketingVideoCopyCandidate, MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
 import { useWorkspaceDirty } from "./dirty-state";
 
@@ -40,7 +42,11 @@ function stateLabel(state: string) {
 function CreateVideoForm({ projectId, products }: { projectId: string; products: ReadyVideoProductSource[] }) {
   const router = useRouter();
   const filesRef = useRef<HTMLInputElement>(null);
+  const uploadProgressRef = useRef<number[]>([]);
   const [hasFiles, setHasFiles] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [state, action, pending] = useActionState(createMarketingVideoDraftAction, initialMarketingVideoActionState);
   const firstProduct = products[0];
   const form = useForm<CreateValues>({
@@ -51,10 +57,45 @@ function CreateVideoForm({ projectId, products }: { projectId: string; products:
   const selectedProductId = form.watch("productId");
   const selectedProduct = products.find((product) => product.id === selectedProductId) ?? firstProduct;
   useEffect(() => { if (state.status === "success") { form.reset(form.getValues()); if (filesRef.current) filesRef.current.value = ""; setHasFiles(false); router.refresh(); } }, [form, router, state.status]);
-  function submit(values: CreateValues) {
+  async function submit(values: CreateValues) {
+    const files = [...(filesRef.current?.files ?? [])];
+    if (files.length < 1 || files.length > 3) { setUploadError("请选择 1–3 个营销素材。"); return; }
+    if (files.reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) { setUploadError("素材总计不能超过 20MB。"); return; }
+    setUploadError(""); setUploading(true); setUploadProgress(0); uploadProgressRef.current = files.map(() => 0);
+    let receiptIds: string[];
+    try {
+      receiptIds = await Promise.all(files.map(async (file, index) => {
+        const receiptId = crypto.randomUUID();
+        const payload = videoPresignedUploadPayloadSchema.parse({
+          receiptId,
+          projectId,
+          originalFilename: file.name,
+          contentType: file.type,
+          sizeBytes: file.size,
+          rightsEvidenceRef: values.rightsEvidenceRef,
+        });
+        await uploadPresigned(videoUploadBlobPath(payload), file, {
+          access: "private",
+          contentType: payload.contentType,
+          handleUploadUrl: "/api/video-assets/upload",
+          clientPayload: JSON.stringify(payload),
+          multipart: file.size >= 5 * 1024 * 1024,
+          onUploadProgress: ({ percentage }) => {
+            uploadProgressRef.current[index] = percentage;
+            setUploadProgress(uploadProgressRef.current.reduce((total, value) => total + value, 0) / files.length);
+          },
+        });
+        return receiptId;
+      }));
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "无法上传营销素材。");
+      setUploading(false);
+      return;
+    }
+    setUploading(false);
     const data = new FormData();
     for (const [key, value] of Object.entries(values)) data.set(key, value);
-    for (const file of filesRef.current?.files ?? []) data.append("assets", file);
+    data.set("receiptIds", JSON.stringify(receiptIds));
     startTransition(() => action(data));
   }
   if (!products.length) return <Alert><AlertTitle>需要已核验产品</AlertTitle><AlertDescription>先在“产品资料”节点完成产品事实审核，再创建营销视频。</AlertDescription></Alert>;
@@ -66,10 +107,11 @@ function CreateVideoForm({ projectId, products }: { projectId: string; products:
       <Field data-invalid={Boolean(form.formState.errors.objective)}><FieldLabel htmlFor="video-objective">视频目标</FieldLabel><Input id="video-objective" aria-invalid={Boolean(form.formState.errors.objective)} {...form.register("objective")} /><FieldError>{form.formState.errors.objective?.message}</FieldError></Field>
       <Field data-invalid={Boolean(form.formState.errors.targetAudience)}><FieldLabel htmlFor="video-audience">目标受众</FieldLabel><Input id="video-audience" aria-invalid={Boolean(form.formState.errors.targetAudience)} {...form.register("targetAudience")} /><FieldError>{form.formState.errors.targetAudience?.message}</FieldError></Field>
       <Field><FieldLabel>输出平台</FieldLabel><Controller control={form.control} name="platform" render={({ field }) => <ToggleGroup value={[field.value]} onValueChange={(value) => value[0] && field.onChange(value[0])} variant="outline" className="flex-wrap"><ToggleGroupItem value="facebook">Facebook</ToggleGroupItem><ToggleGroupItem value="instagram">Instagram</ToggleGroupItem><ToggleGroupItem value="tiktok">TikTok</ToggleGroupItem><ToggleGroupItem value="youtube">YouTube</ToggleGroupItem><ToggleGroupItem value="x">X</ToggleGroupItem></ToggleGroup>} /></Field>
-      <Field><FieldLabel htmlFor="video-assets">素材（1–3 个）</FieldLabel><Input ref={filesRef} id="video-assets" name="assets" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple required onChange={(event) => setHasFiles(Boolean(event.target.files?.length))} /><FieldDescription>单次总计不超过 20MB，支持 JPG、PNG、WebP、MP4、MOV。</FieldDescription></Field>
+      <Field><FieldLabel htmlFor="video-assets">素材（1–3 个）</FieldLabel><Input ref={filesRef} id="video-assets" name="assets" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple required disabled={uploading || pending} onChange={(event) => { setHasFiles(Boolean(event.target.files?.length)); setUploadError(""); }} /><FieldDescription>浏览器通过短期预签名 URL 直传私有 Blob；单次总计不超过 20MB。</FieldDescription></Field>
       <Field data-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}><FieldLabel htmlFor="video-rights">素材权利证据</FieldLabel><Input id="video-rights" placeholder="evidence-rights-001" aria-invalid={Boolean(form.formState.errors.rightsEvidenceRef)} {...form.register("rightsEvidenceRef")} /><FieldError>{form.formState.errors.rightsEvidenceRef?.message}</FieldError></Field>
+      {uploading ? <Progress aria-label="素材上传进度" value={uploadProgress}><ProgressLabel>私有上传</ProgressLabel><ProgressValue>{() => `${Math.round(uploadProgress)}%`}</ProgressValue></Progress> : null}
     </FieldGroup></form></CardContent>
-    <CardFooter className="flex-col items-stretch gap-3"><Button form="create-marketing-video" type="submit" disabled={pending}><PlusIcon data-icon="inline-start" />{pending ? "正在保存素材…" : "创建私有剪辑稿"}</Button>{state.message ? <p className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} aria-live="polite">{state.message}</p> : null}</CardFooter>
+    <CardFooter className="flex-col items-stretch gap-3"><Button form="create-marketing-video" type="submit" disabled={pending || uploading}><PlusIcon data-icon="inline-start" />{uploading ? "正在直传素材…" : pending ? "正在创建剪辑稿…" : "上传并生成 AI 初稿"}</Button>{uploadError ? <p className="text-sm text-destructive" aria-live="polite">{uploadError}</p> : null}{state.message ? <p className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} aria-live="polite">{state.message}</p> : null}</CardFooter>
   </Card>;
 }
 
@@ -92,24 +134,27 @@ function EditVideo({ projectId, entry, canReview, onDirtyChange }: { projectId: 
   const router = useRouter(); const [pending, startAction] = useTransition(); const [draft, setDraft] = useState(entry.draft); const [message, setMessage] = useState(""); const [reviewEvidence, setReviewEvidence] = useState("");
   const dirty = JSON.stringify(draft) !== JSON.stringify(entry.draft);
   const durationMs = marketingVideoDurationMs(draft); const editable = ["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(entry.state);
+  const processing = entry.processingJob?.status === "queued" || entry.processingJob?.status === "running";
   useEffect(() => { setDraft(entry.draft); }, [entry.draft]);
   useEffect(() => { onDirtyChange(dirty); return () => onDirtyChange(false); }, [dirty, onDirtyChange]);
   useEffect(() => { const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); }; window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn); }, [dirty]);
+  useEffect(() => { if (!processing) return; const timer = window.setInterval(() => router.refresh(), 3_000); return () => window.clearInterval(timer); }, [processing, router]);
   function run(action: () => Promise<{ status: string; message: string }>) { startAction(async () => { const result = await action(); setMessage(result.message); if (result.status === "success") router.refresh(); }); }
   function validatedDraft() { const result = marketingVideoDraftSchema.safeParse(draft); if (!result.success) { setMessage(result.error.issues[0]?.message ?? "剪辑稿无效。"); return null; } return result.data; }
   return <div className="flex flex-col gap-4">
-    <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{stateLabel(entry.state)}</Badge><Badge variant="outline">{entry.draft.platform}</Badge><Badge variant="outline">最长 15 秒</Badge></div>
+    <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{stateLabel(entry.state)}</Badge>{processing ? <Badge>后台处理中</Badge> : null}<Badge variant="outline">{entry.draft.platform}</Badge><Badge variant="outline">最长 15 秒</Badge></div>
     <div><h3 className="font-medium">{entry.productName}</h3><p className="mt-1 text-sm text-muted-foreground">{entry.objective}</p></div>
     {entry.previewAssetRef ? <Card><CardHeader><CardTitle>私有预览</CardTitle><CardDescription>审核通过也不会自动发布。</CardDescription></CardHeader><CardContent><video className="aspect-video w-full rounded-lg bg-muted" controls preload="metadata" src={`/api/video-preview/${entry.previewAssetRef}`} /></CardContent></Card> : null}
     {editable ? <>
       <Progress aria-label="视频总时长" value={Math.min(100, durationMs / 150)}><ProgressLabel>总时长</ProgressLabel><ProgressValue>{() => `${(durationMs / 1_000).toFixed(1)} / 15 秒`}</ProgressValue></Progress>
       {durationMs > 15_000 ? <Alert variant="destructive"><AlertTitle>视频过长</AlertTitle><AlertDescription>请缩短片段，总时长必须不超过 15 秒。</AlertDescription></Alert> : null}
-      <ClipEditor draft={draft} onChange={setDraft} disabled={pending} />
+      <ClipEditor draft={draft} onChange={setDraft} disabled={pending || processing} />
       <Separator />
       <Field><FieldLabel htmlFor="video-cta">最后两秒 CTA</FieldLabel><Input id="video-cta" maxLength={40} value={draft.ctaText} onChange={(event) => setDraft({ ...draft, ctaText: event.target.value })} /><FieldDescription>固定居中样式，不增加视频总时长。</FieldDescription></Field>
-      <div className="grid gap-2 sm:grid-cols-3"><Button variant="outline" disabled={pending} onClick={() => run(() => generateMarketingVideoAiDraftAction(projectId, entry.id))}><BotIcon data-icon="inline-start" />AI 初稿</Button><Button variant="outline" disabled={pending || !dirty} onClick={() => { const value = validatedDraft(); if (value) run(() => saveMarketingVideoDraftAction(projectId, entry.id, value)); }}><SaveIcon data-icon="inline-start" />保存</Button><Button disabled={pending || durationMs > 15_000} onClick={() => { const value = validatedDraft(); if (value) run(() => renderMarketingVideoDraftAction(projectId, entry.id, value)); }}><ScissorsIcon data-icon="inline-start" />合成预览</Button></div>
+      <div className="grid gap-2 sm:grid-cols-3"><Button variant="outline" disabled={pending || processing} onClick={() => run(() => generateMarketingVideoAiDraftAction(projectId, entry.id))}><BotIcon data-icon="inline-start" />AI 初稿</Button><Button variant="outline" disabled={pending || processing || !dirty} onClick={() => { const value = validatedDraft(); if (value) run(() => saveMarketingVideoDraftAction(projectId, entry.id, value)); }}><SaveIcon data-icon="inline-start" />保存</Button><Button disabled={pending || processing || durationMs > 15_000} onClick={() => { const value = validatedDraft(); if (value) run(() => renderMarketingVideoDraftAction(projectId, entry.id, value)); }}><ScissorsIcon data-icon="inline-start" />合成预览</Button></div>
     </> : null}
     {entry.state === "VIDEO_RENDERING" ? <Alert><FilmIcon /><AlertTitle>正在合成</AlertTitle><AlertDescription>服务器正在生成私有预览，请稍后刷新。</AlertDescription></Alert> : null}
+    {entry.processingJob?.status === "failed" ? <Alert variant="destructive"><AlertTitle>{entry.processingJob.kind === "render" ? "合成失败" : "AI 初稿失败"}</AlertTitle><AlertDescription>{entry.processingJob.failureMessage ?? "后台任务失败，请重试。"}</AlertDescription></Alert> : null}
     {entry.state === "VIDEO_REVIEW_REQUIRED" && canReview ? <Card><CardHeader><CardTitle>成片审核</CardTitle><CardDescription>核对画面、字幕、CTA 和产品事实后再决定。</CardDescription></CardHeader><CardContent><Field><FieldLabel htmlFor="video-review-evidence">审核证据</FieldLabel><Input id="video-review-evidence" placeholder="evidence-review-001" value={reviewEvidence} onChange={(event) => setReviewEvidence(event.target.value)} /></Field></CardContent><CardFooter className="grid grid-cols-2 gap-2"><Button variant="outline" disabled={pending || !reviewEvidence} onClick={() => run(() => reviewMarketingVideoAction(projectId, entry.id, "rejected", reviewEvidence, "成片需要修改"))}>退回修改</Button><Button disabled={pending || !reviewEvidence} onClick={() => run(() => reviewMarketingVideoAction(projectId, entry.id, "approved", reviewEvidence, "成片已人工确认"))}>通过成片</Button></CardFooter></Card> : null}
     {message ? <p className="text-sm text-muted-foreground" aria-live="polite">{message}</p> : null}
   </div>;

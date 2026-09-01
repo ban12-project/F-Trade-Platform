@@ -14,9 +14,6 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
-    serverActions: {
-      bodySizeLimit: "26mb",
-    },
     exposeTestingApiInProductionBuild:
       process.env.NEXT_ENABLE_TESTING_API === "1",
     turbopackRustReactCompiler: true,

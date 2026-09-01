@@ -13,12 +13,13 @@ import type { z } from "zod";
 import { type VideoCanvasDocument } from "./canvas-contracts";
 import { createMarketingVideoDraftFormSchema, marketingVideoDraftSchema, type MarketingVideoDraft } from "./edit-contracts";
 import type { UploadedVideoSourceAsset } from "./uploaded-assets";
+import { latestVideoProcessingJobs, type VideoProcessingSummary } from "./processing-jobs";
 
 export type VideoProjectDraftInput = z.infer<typeof videoProjectDraftFormSchema>;
 export type VideoReviewInput = z.infer<typeof videoReviewFormSchema>;
 export type ReadyVideoProductSource = { id: string; productName: string; internalSku: string; factOptions: Array<{ value: string; label: string }> };
 export type VideoWorkspaceEntry = { id: string; state: string; createdAt: Date; productId: string; productName: string; objective: string; platforms: VideoProject["platforms"]; approvalStatus: "pending" | "approved" | "rejected" | null; previewAssetRef: string | null };
-export type MarketingVideoEditorEntry = VideoWorkspaceEntry & { draft: MarketingVideoDraft; targetAudience: string };
+export type MarketingVideoEditorEntry = VideoWorkspaceEntry & { draft: MarketingVideoDraft; targetAudience: string; processingJob: VideoProcessingSummary | null };
 export type MarketingVideoCopyCandidate = { id: string; projectTitle: string; productName: string; objective: string };
 
 function hasValue(value: unknown) { return value !== undefined && value !== null && value !== ""; }
@@ -97,11 +98,12 @@ export async function listProjectMarketingVideoEntries(projectId: string, databa
     .where(and(eq(approval.gate, "gate_01_truth"), inArray(approval.aggregateId, rows.map(({ record }) => record.id)))).orderBy(desc(approval.requestedAt));
   const approvalByVideo = new Map<string, "pending" | "approved" | "rejected">();
   for (const item of approvals) if (!approvalByVideo.has(item.aggregateId)) approvalByVideo.set(item.aggregateId, item.status);
+  const jobsByVideo = await latestVideoProcessingJobs(rows.map(({ record }) => record.id), database);
   return rows.flatMap(({ record, createdAt }) => {
     const project = videoProjectSchema.safeParse(record.payload);
     if (!project.success || !project.data.editDraft) return [];
     const productName = project.data.factualClaims.find((claim) => claim.field === "product.product_name")?.value ?? "已核验产品";
-    return [{ id: record.id, state: record.state, createdAt, productId: project.data.productId, productName, objective: project.data.objective, targetAudience: project.data.targetAudience, platforms: project.data.platforms, approvalStatus: approvalByVideo.get(record.id) ?? null, previewAssetRef: project.data.renderedAssetRef ?? null, draft: project.data.editDraft }];
+    return [{ id: record.id, state: record.state, createdAt, productId: project.data.productId, productName, objective: project.data.objective, targetAudience: project.data.targetAudience, platforms: project.data.platforms, approvalStatus: approvalByVideo.get(record.id) ?? null, previewAssetRef: project.data.renderedAssetRef ?? null, draft: project.data.editDraft, processingJob: jobsByVideo.get(record.id) ?? null }];
   });
 }
 

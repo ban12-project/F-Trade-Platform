@@ -30,6 +30,9 @@ export type PrivateGeneratedVideoRead = {
   body: ReadableStream;
   contentType: string;
   sizeBytes: number;
+  responseSizeBytes: number;
+  contentRange: string | null;
+  etag: string;
 };
 
 /** Materializes a private stream only for a callback and deletes it afterwards. */
@@ -76,9 +79,9 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
   }
 
   /** Stores a deterministic FFmpeg composition without pretending it came from a generation model. */
-  async putRenderedVideo(input: { data: Uint8Array; contentType: "video/mp4" }): Promise<string> {
+  async putRenderedVideo(input: { data: Uint8Array; contentType: "video/mp4"; assetRef?: string }): Promise<string> {
     if (!input.data.byteLength) throw new Error("合成视频不能为空。");
-    const assetRef = `asset-${randomUUID()}`;
+    const assetRef = generatedVideoAssetRefSchema.parse(input.assetRef ?? `asset-${randomUUID()}`);
     const pathname = `video/rendered/mvp1/${assetRef}.mp4`;
     const result = await put(pathname, new Blob([input.data.slice().buffer as ArrayBuffer], { type: input.contentType }), {
       access: "private",
@@ -93,18 +96,21 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
       sizeBytes: input.data.byteLength,
       provider: "ffmpeg",
       modelId: "mvp1-editor",
-    });
+    }).onConflictDoNothing({ target: videoGeneratedAsset.assetRef });
     return assetRef;
   }
 
   /** Reads a generated asset by opaque reference without exposing its Blob path or URL. */
-  async getGeneratedVideo(assetRefInput: string): Promise<PrivateGeneratedVideoRead | null> {
+  async getGeneratedVideo(assetRefInput: string, range?: string | null): Promise<PrivateGeneratedVideoRead | null> {
     const assetRef = generatedVideoAssetRefSchema.parse(assetRefInput);
     const [asset] = await this.database.select().from(videoGeneratedAsset).where(eq(videoGeneratedAsset.assetRef, assetRef));
     if (!asset) return null;
-    const result = await get(asset.blobPath, { access: "private", token: process.env.BLOB_READ_WRITE_TOKEN });
+    const safeRange = range && /^bytes=\d*-\d*$/.test(range) ? range : null;
+    const result = await get(asset.blobPath, { access: "private", token: process.env.BLOB_READ_WRITE_TOKEN, headers: safeRange ? { Range: safeRange } : undefined });
     if (!result || result.statusCode !== 200 || !result.stream || !result.blob.contentType.startsWith("video/")) return null;
-    return { body: result.stream, contentType: result.blob.contentType, sizeBytes: asset.sizeBytes };
+    const contentRange = result.headers.get("content-range");
+    const responseSizeBytes = Number(result.headers.get("content-length") ?? asset.sizeBytes);
+    return { body: result.stream, contentType: result.blob.contentType, sizeBytes: asset.sizeBytes, responseSizeBytes, contentRange, etag: result.blob.etag };
   }
 }
 
