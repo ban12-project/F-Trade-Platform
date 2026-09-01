@@ -38,28 +38,29 @@ function requireAuthSecret() {
 }
 
 export const auth = betterAuth({
-    appName: "F-Trade Platform",
-    secret: requireAuthSecret(),
-    baseURL: process.env.BETTER_AUTH_URL,
-    database: drizzleAdapter(getDatabase(), {
-      provider: "pg",
-      schema: authSchema,
+  appName: "F-Trade Platform",
+  secret: requireAuthSecret(),
+  baseURL: process.env.BETTER_AUTH_URL,
+  database: drizzleAdapter(getDatabase(), {
+    provider: "pg",
+    schema: authSchema,
+  }),
+  emailAndPassword: { enabled: false },
+  plugins: [
+    invitationActivationPlugin(),
+    admin(),
+    emailOTP({
+      disableSignUp: true,
+      expiresIn: 600,
+      allowedAttempts: 5,
+      overrideDefaultEmailVerification: true,
+      sendVerificationOTP: sendEmailOtp,
     }),
-    emailAndPassword: { enabled: false },
-    plugins: [
-      invitationActivationPlugin(),
-      admin(),
-      emailOTP({
-        disableSignUp: true,
-        expiresIn: 600,
-        allowedAttempts: 5,
-        overrideDefaultEmailVerification: true,
-        sendVerificationOTP: sendEmailOtp,
-      }),
-      passkey({
-        rpID: process.env.BETTER_AUTH_PASSKEY_RP_ID,
-        rpName: "F-Trade Platform",
-        origin: process.env.BETTER_AUTH_URL,
-      }),
-    ],
+    passkey({
+      rpID: process.env.BETTER_AUTH_PASSKEY_RP_ID,
+      rpName: "F-Trade Platform",
+      origin: process.env.BETTER_AUTH_URL,
+    }),
+  ],
+  trustedOrigins: ["https://*.vercel.app"],
 });
