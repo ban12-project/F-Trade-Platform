@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
-import { extname } from "node:path";
+import { createWriteStream } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { extname, join } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/db/client";
 import { evidence } from "@/lib/db/schema";
@@ -66,4 +71,33 @@ export async function prepareUploadedVideoAssets(files: File[], actorId: string,
     stored.push({ assetRef, mediaType: metadata.mediaType, rightsEvidenceRef });
   }
   return stored;
+}
+
+function extensionForContentType(contentType: string) {
+  return ({ "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "video/mp4": ".mp4", "video/quicktime": ".mov" } as Record<string, string>)[contentType] ?? ".bin";
+}
+
+/** Materializes only authorized upload references for the duration of one render callback. */
+export async function withTemporaryUploadedVideoAssets<T>(assetRefs: string[], callback: (paths: ReadonlyMap<string, string>) => Promise<T>): Promise<T> {
+  const uniqueRefs = [...new Set(assetRefs)];
+  if (!uniqueRefs.length || uniqueRefs.some((assetRef) => !/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i.test(assetRef))) {
+    throw new Error("只能渲染已上传到私有证据库的营销素材。");
+  }
+  const rows = await getDatabase().select({ id: evidence.id, blobKey: evidence.blobKey, contentType: evidence.contentType }).from(evidence).where(inArray(evidence.id, uniqueRefs));
+  if (rows.length !== uniqueRefs.length) throw new Error("部分私有营销素材不存在或已被移除。");
+  const directory = await mkdtemp(join(tmpdir(), "f-trade-edit-assets-"));
+  try {
+    const paths = new Map<string, string>();
+    const store = new VercelPrivateBlobEvidenceStore();
+    for (const row of rows) {
+      const asset = await store.get(row.blobKey);
+      if (!asset) throw new Error("无法读取私有营销素材。");
+      const filePath = join(/* turbopackIgnore: true */ directory, `${row.id}${extensionForContentType(row.contentType)}`);
+      await pipeline(Readable.fromWeb(asset.body as unknown as import("node:stream/web").ReadableStream), createWriteStream(filePath, { flags: "wx" }));
+      paths.set(row.id, filePath);
+    }
+    return await callback(paths);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 }

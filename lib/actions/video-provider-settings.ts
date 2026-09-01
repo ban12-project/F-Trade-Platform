@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/authz";
 import { videoProviderModelSettingsFormSchema } from "@/lib/form-schemas";
 import { saveVideoProviderModelSettings } from "@/lib/video/provider-config-store";
 import { videoAspectRatioSchema, videoCapabilitySchema } from "@/lib/video/provider-capabilities";
+import { assertVideoGenerationEnabled } from "@/lib/video/mvp-policy";
 
 export type VideoProviderSettingsActionState = {
   status: "idle" | "success" | "error";
@@ -36,6 +37,7 @@ export async function saveVideoProviderModelSettingsAction(
   if (!session || !hasPermission(session.user.role, "settings:manage")) {
     return { status: "error", message: "无权修改视频提供商配置。" };
   }
+  try { assertVideoGenerationEnabled(); } catch (error) { return { status: "error", message: error instanceof Error ? error.message : "视频生成能力当前未启用。" }; }
   const parsed = videoProviderModelSettingsFormSchema.safeParse({
     provider: text(formData, "provider"),
     providerEnabled: formData.get("providerEnabled") === "true",

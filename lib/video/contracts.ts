@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { marketingVideoDraftSchema } from "./edit-contracts";
+
 const privateRef = z.string().trim().regex(/^(?:source|evidence|asset)-[a-z0-9][a-z0-9_-]{2,120}$/i, "必须是脱敏的私有引用。");
 
 export const videoPlatformSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
@@ -28,7 +30,7 @@ export const videoSceneSchema = z.object({
 export const videoProjectSchema = z.object({
   id: z.uuid(),
   productId: z.uuid(),
-  status: z.enum(["draft", "ready_for_generation", "review_required", "revision_required", "approved", "export_ready"]),
+  status: z.enum(["draft", "rendering", "ready_for_generation", "review_required", "revision_required", "approved", "export_ready"]),
   objective: z.string().trim().min(1).max(2_000),
   targetAudience: z.string().trim().min(1).max(240),
   platforms: z.array(videoPlatformSchema).min(1).max(5),
@@ -36,6 +38,8 @@ export const videoProjectSchema = z.object({
   sourceAssets: z.array(videoAssetSchema).max(16),
   scenes: z.array(videoSceneSchema).min(1).max(20),
   approvalRefs: z.array(z.string().trim().min(1)).max(2).default([]),
+  editDraft: marketingVideoDraftSchema.optional(),
+  renderedAssetRef: privateRef.optional(),
 }).strict().superRefine((project, context) => {
   const claimFields = new Set(project.factualClaims.map((claim) => claim.field));
   const assetRefs = new Set(project.sourceAssets.map((asset) => asset.assetRef));

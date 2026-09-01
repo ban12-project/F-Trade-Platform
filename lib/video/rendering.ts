@@ -29,6 +29,7 @@ export async function renderApprovedMarketingTimeline(
   }
   if (!Number.isInteger(request.fps) || request.fps < 1 || request.fps > 120) throw new Error("渲染帧率无效。 ");
   if (!request.timeline.scenes.length || request.timeline.durationSeconds <= 0) throw new Error("没有可渲染的已审核镜头。 ");
+  if (request.timeline.durationSeconds > 15) throw new Error("整条营销视频不能超过 15 秒。 ");
   const expectedEnd = request.timeline.scenes.at(-1)!.startSeconds + request.timeline.scenes.at(-1)!.durationSeconds;
   if (Math.abs(expectedEnd - request.timeline.durationSeconds) > 0.001) throw new Error("剪辑时间线不连续或总时长不一致。 ");
   const output = await renderer.render(request);
