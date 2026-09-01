@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { submitApprovedVideoJob, videoJobSubmissionSchema } from "@/lib/video/submission";
+import { assertVideoGenerationEnabled } from "@/lib/video/mvp-policy";
 
 export type VideoJobSubmissionActionState = {
   status: "idle" | "success" | "error";
@@ -25,6 +26,7 @@ export async function submitApprovedVideoJobAction(
 ): Promise<VideoJobSubmissionActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !hasPermission(session.user.role, "video:write")) return { status: "error", message: "无权提交视频生成任务。" };
+  try { assertVideoGenerationEnabled(); } catch (error) { return { status: "error", message: error instanceof Error ? error.message : "视频生成能力当前未启用。" }; }
   const parsed = videoJobSubmissionSchema.safeParse({
     videoId: value(formData, "videoId"),
     provider: value(formData, "provider"),

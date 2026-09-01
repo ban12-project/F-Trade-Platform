@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { videoProjectSchema, type VideoProject } from "./contracts";
+import { marketingVideoDraftSchema, type MarketingVideoDraft } from "./edit-contracts";
 
 const privateAssetRef = z.string().trim().regex(/^asset-[a-z0-9][a-z0-9_-]{2,120}$/i, "必须是脱敏的私有素材引用。");
 
@@ -23,6 +24,10 @@ export type MarketingTimeline = {
   scenes: Array<{
     sceneId: string;
     assetRef: string;
+    mediaType?: "image" | "video";
+    trimStartSeconds?: number;
+    fitMode?: "contain" | "cover";
+    audioMode?: "muted" | "source";
     startSeconds: number;
     durationSeconds: number;
     prompt: string;
@@ -30,6 +35,7 @@ export type MarketingTimeline = {
     narration?: { text: string; claimRefs: string[]; startSeconds: number; durationSeconds: number };
     subtitles: Array<{ text: string; startSeconds: number; endSeconds: number; claimRefs: string[] }>;
   }>;
+  cta?: { text: string; startSeconds: number; endSeconds: number };
 };
 
 /**
@@ -68,4 +74,38 @@ export function createMarketingTimeline(projectInput: VideoProject, input: z.inp
   });
 
   return { durationSeconds: startSeconds, ...(value.soundtrackAssetRef ? { soundtrackAssetRef: value.soundtrackAssetRef } : {}), scenes };
+}
+
+/** Builds the deterministic MVP1 edit timeline before any external media work begins. */
+export function createMarketingEditTimeline(projectInput: VideoProject, draftInput: MarketingVideoDraft): MarketingTimeline {
+  const project = videoProjectSchema.parse(projectInput);
+  const draft = marketingVideoDraftSchema.parse(draftInput);
+  const sourceAssets = new Map(project.sourceAssets.map((asset) => [asset.assetRef, asset]));
+  const permittedClaims = new Set(project.factualClaims.map((claim) => claim.field));
+  let startSeconds = 0;
+  const scenes = draft.clips.map((clip) => {
+    const source = sourceAssets.get(clip.assetRef);
+    if (!source || source.mediaType !== clip.mediaType) throw new Error(`片段 ${clip.clipId} 引用了未授权或类型不匹配的素材。`);
+    if (!clip.claimRefs.every((claimRef) => permittedClaims.has(claimRef))) {
+      throw new Error(`片段 ${clip.clipId} 的字幕引用了未绑定证据的产品字段。`);
+    }
+    const durationSeconds = clip.durationMs / 1_000;
+    const sceneStart = startSeconds;
+    startSeconds += durationSeconds;
+    return {
+      sceneId: clip.clipId,
+      assetRef: clip.assetRef,
+      mediaType: clip.mediaType,
+      trimStartSeconds: clip.trimStartMs / 1_000,
+      fitMode: clip.fitMode,
+      audioMode: clip.audioMode,
+      startSeconds: sceneStart,
+      durationSeconds,
+      prompt: "用户授权素材剪辑",
+      claimRefs: clip.claimRefs,
+      subtitles: clip.subtitle ? [{ text: clip.subtitle, startSeconds: sceneStart, endSeconds: startSeconds, claimRefs: clip.claimRefs }] : [],
+    };
+  });
+  const cta = draft.ctaText ? { text: draft.ctaText, startSeconds: Math.max(0, startSeconds - 2), endSeconds: startSeconds } : undefined;
+  return { durationSeconds: startSeconds, scenes, ...(cta ? { cta } : {}) };
 }

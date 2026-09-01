@@ -3,7 +3,9 @@ import {
   generateText,
   Output,
   type FlexibleSchema,
+  type ImagePart,
   type LanguageModel,
+  type TextPart,
 } from "ai";
 
 export interface VerifiedFact {
@@ -18,6 +20,7 @@ export interface StructuredGenerationRequest<T> {
   schemaName: string;
   task: string;
   verifiedFacts: readonly VerifiedFact[];
+  visualSamples?: readonly { label: string; data: Uint8Array; mediaType: string }[];
 }
 
 export interface StructuredGenerator {
@@ -62,13 +65,18 @@ function assertVerifiedProductFacts(value: unknown, verifiedFacts: readonly Veri
 export class AiSdkStructuredGenerator implements StructuredGenerator {
   async generate<T>(request: StructuredGenerationRequest<T>): Promise<T> {
     assertSchemaValidates(request.schema);
+    const prompt = JSON.stringify({ task: request.task, verifiedFacts: request.verifiedFacts });
+    const visualContent: Array<TextPart | ImagePart> | undefined = request.visualSamples?.length ? [
+      { type: "text", text: prompt },
+      ...request.visualSamples.flatMap((sample): Array<TextPart | ImagePart> => [
+        { type: "text", text: `Authorized visual sample: ${sample.label}` },
+        { type: "image", image: sample.data, mediaType: sample.mediaType },
+      ]),
+    ] : undefined;
     const result = await generateText({
       model: request.model,
       instructions: safetyInstruction,
-      prompt: JSON.stringify({
-        task: request.task,
-        verifiedFacts: request.verifiedFacts,
-      }),
+      ...(visualContent ? { messages: [{ role: "user" as const, content: visualContent }] } : { prompt }),
       output: Output.object({
         schema: request.schema,
         name: request.schemaName,

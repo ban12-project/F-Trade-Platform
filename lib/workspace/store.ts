@@ -17,7 +17,7 @@ export type WorkspaceProjectDetail = WorkspaceProjectSummary & { document: Works
 
 function template(kind: "marketing" | "sales"): WorkspaceCanvasDocument {
   const labels = kind === "marketing"
-    ? [["product", "product", "产品资料"], ["approval", "approval", "人工事实审核"], ["content", "content", "营销内容"], ["video", "video", "视频计划"]] as const
+    ? [["product", "product", "产品资料"], ["approval", "approval", "人工事实审核"], ["content", "content", "营销内容"], ["video", "video", "营销视频"]] as const
     : [["rfq", "rfq", "客户询盘"], ["product", "product", "产品引用"], ["quotation", "quotation", "报价交接"], ["approval", "approval", "人工确认"]] as const;
   const nodes = labels.map(([id, kindName, label], index) => ({ id, kind: kindName, label, locked: true, position: { x: index * 260, y: index % 2 ? 140 : 40 } })) as WorkspaceCanvasDocument["nodes"];
   return { version: 1, nodes, edges: nodes.slice(1).map((node, index) => ({ id: `edge-${index + 1}`, source: nodes[index]!.id, target: node.id, kind: index === 0 ? "requires_review" : "depends_on" })) };

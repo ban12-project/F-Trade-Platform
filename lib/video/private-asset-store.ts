@@ -75,6 +75,28 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
     return assetRef;
   }
 
+  /** Stores a deterministic FFmpeg composition without pretending it came from a generation model. */
+  async putRenderedVideo(input: { data: Uint8Array; contentType: "video/mp4" }): Promise<string> {
+    if (!input.data.byteLength) throw new Error("合成视频不能为空。");
+    const assetRef = `asset-${randomUUID()}`;
+    const pathname = `video/rendered/mvp1/${assetRef}.mp4`;
+    const result = await put(pathname, new Blob([input.data.slice().buffer as ArrayBuffer], { type: input.contentType }), {
+      access: "private",
+      addRandomSuffix: false,
+      contentType: input.contentType,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    await this.database.insert(videoGeneratedAsset).values({
+      assetRef,
+      blobPath: result.pathname,
+      contentType: input.contentType,
+      sizeBytes: input.data.byteLength,
+      provider: "ffmpeg",
+      modelId: "mvp1-editor",
+    });
+    return assetRef;
+  }
+
   /** Reads a generated asset by opaque reference without exposing its Blob path or URL. */
   async getGeneratedVideo(assetRefInput: string): Promise<PrivateGeneratedVideoRead | null> {
     const assetRef = generatedVideoAssetRefSchema.parse(assetRefInput);

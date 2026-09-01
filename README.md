@@ -15,6 +15,8 @@ AI 外贸工作流平台第一阶段 MVP，试点品类为汽车离合器。
 
 应用以项目画布为默认入口：产品营销项目和销售机会项目分别组织受控业务对象，列表、表单和设置在画布的面板中完成。画布只保存关系与布局；工程事实、报价、审核和发布仍由既有受控工作流与人工 Gate 决定。
 
+MVP1 的主要视频能力是在项目画布中把用户已有且登记权利证据的素材剪成最长 15 秒的营销视频。AI 只提出可编辑剪辑初稿；文本／图片生成视频及其模型、供应商和任务管理不在 MVP1 投入使用。
+
 ## 重要边界
 
 - 工程事实（OE、车型适配、尺寸、花键、材料、认证、寿命等）必须来自工厂资料或已确认证据，AI 不得猜测。
@@ -31,6 +33,7 @@ AI 外贸工作流平台第一阶段 MVP，试点品类为汽车离合器。
 - [数据契约总览](docs/architecture/data-contracts.md)
 - [ADR 0001：MVP 应用技术栈](docs/decisions/0001-mvp-application-stack.md)
 - [ADR 0003：项目画布与角色边界](docs/decisions/0003-console-task-flow.md)
+- [ADR 0004：MVP1 营销视频采用已有素材剪辑](docs/decisions/0004-mvp1-marketing-video-editing.md)
 - [研发工作约定](CONTRIBUTING.md)
 - [安全与数据分级](SECURITY.md)
 - [项目状态](docs/PROJECT_STATUS.md)

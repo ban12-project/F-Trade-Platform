@@ -4,6 +4,7 @@
 
 - [ADR 0001：MVP 应用技术栈](0001-mvp-application-stack.md)
 - [ADR 0003：控制台任务流与角色边界](0003-console-task-flow.md)
+- [ADR 0004：MVP1 营销视频采用已有素材剪辑](0004-mvp1-marketing-video-editing.md)
 
 每个未确定但会影响实现的选择创建一个 `type:decision` Issue；决策关闭后再补充 ADR。
 
