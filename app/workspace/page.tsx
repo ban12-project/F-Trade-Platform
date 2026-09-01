@@ -7,12 +7,12 @@ import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-setting
 import { getStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { requirePermission } from "@/lib/auth-guard";
 import { hasPermission } from "@/lib/authz";
-import { listWorkspaceProjects } from "@/lib/workspace/store";
+import { listWorkspaceProjects, listWorkspaceTasks } from "@/lib/workspace/store";
 
 async function WorkspaceContent() {
   await connection();
-  const [session, projects, settings] = await Promise.all([requirePermission("workspace:view"), listWorkspaceProjects(), getStoredProductAgentModelSettings()]);
-  return <WorkspaceHub projects={projects} settingsPanel={<WorkspaceSettingsPanel settings={settings ?? undefined} canManage={hasPermission(session.user.role, "settings:manage")} />} />;
+  const [session, projects, tasks, settings] = await Promise.all([requirePermission("workspace:view"), listWorkspaceProjects(), listWorkspaceTasks(), getStoredProductAgentModelSettings()]);
+  return <WorkspaceHub projects={projects} tasks={tasks} settingsPanel={<WorkspaceSettingsPanel settings={settings ?? undefined} canManage={hasPermission(session.user.role, "settings:manage")} />} />;
 }
 
 export default function WorkspacePage() { return <Suspense fallback={<WorkspaceCanvasSkeleton />}><WorkspaceContent /></Suspense>; }

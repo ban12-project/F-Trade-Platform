@@ -107,9 +107,20 @@ test("marketing video editor blocks a draft longer than 15 seconds in the browse
   await expect(page.getByRole("button", { name: "合成预览" })).toBeDisabled();
 });
 
+test("switching nodes protects an unsaved video draft", async ({ page }) => {
+  await page.goto("/testing/project-canvas?panel=video");
+  await page.getByLabel("成片时长（秒）").first().fill("6");
+  page.once("dialog", async (dialog) => { expect(dialog.message()).toContain("未保存"); await dialog.dismiss(); });
+  await page.getByText("营销内容", { exact: true }).click();
+  await expect(page).toHaveURL(/panel=video/);
+  page.once("dialog", async (dialog) => dialog.accept());
+  await page.getByText("营销内容", { exact: true }).click();
+  await expect(page).toHaveURL(/panel=content/);
+});
+
 test("marketing video panel exposes upload and post-render review without generation controls", async ({ page }) => {
   await page.goto("/testing/project-canvas?panel=video");
-  await page.getByRole("button", { name: "新建" }).click();
+  await page.getByRole("complementary").getByRole("button", { name: "新建" }).click();
 
   await expect(page.getByLabel("素材（1–3 个）")).toHaveAttribute("accept", /video\/mp4/);
   await expect(page.getByLabel("素材权利证据")).toBeVisible();

@@ -17,6 +17,9 @@ assert.equal(workspaceCanvasDocumentSchema.parse(document).nodes.length, 2);
 assert.throws(() => workspaceCanvasDocumentSchema.parse({ ...document, nodes: [...document.nodes, { ...document.nodes[0], position: { x: 1, y: 1 } }] }), /不能重复/);
 assert.throws(() => workspaceCanvasDocumentSchema.parse({ ...document, edges: [{ id: "broken", source: "product", target: "missing", kind: "depends_on" }] }), /现有节点/);
 assert.throws(() => workspaceCanvasDocumentSchema.parse({ ...document, nodes: [{ ...document.nodes[0], aggregateId: "00000000-0000-4000-8000-000000000001" }, document.nodes[1]] }), /同时包含/);
+const legacyAggregateDocument = workspaceCanvasDocumentSchema.parse({ ...document, nodes: [{ ...document.nodes[0], aggregateId: "00000000-0000-4000-8000-000000000001", aggregateType: "product" }, document.nodes[1]] });
+assert.equal("aggregateId" in legacyAggregateDocument.nodes[0]!, false);
+assert.equal("aggregateType" in legacyAggregateDocument.nodes[0]!, false);
 
 const marketing = createWorkspaceTemplate("marketing");
 assert.deepEqual(marketing.nodes.map((node) => node.kind), ["product", "content", "video"]);

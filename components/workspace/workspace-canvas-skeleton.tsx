@@ -18,12 +18,10 @@ export function WorkspaceCanvasSkeleton({ project = false }: { project?: boolean
     >
       <div className="absolute inset-0 bg-[radial-gradient(var(--border)_1px,transparent_1px)] [background-size:16px_16px] opacity-60" aria-hidden="true" />
 
-      <div className="absolute left-3 top-3 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 rounded-lg border bg-background/90 p-2 shadow-sm md:left-6 md:top-6">
-        {project ? <Skeleton className="size-8" /> : null}
+      <div className="absolute left-3 top-3 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 md:left-6 md:top-6">
         <Skeleton className="h-5 w-20 rounded-full" />
         <Skeleton className="h-5 w-16 rounded-full" />
-        <Skeleton className="h-7 w-20" />
-        <Skeleton className="h-7 w-24" />
+        {project ? <><Skeleton className="h-5 w-20 rounded-full" /><Skeleton className="h-5 w-24 rounded-full" /></> : null}
       </div>
 
       {project ? projectNodePlaceholders.map((position) => (
@@ -36,22 +34,9 @@ export function WorkspaceCanvasSkeleton({ project = false }: { project?: boolean
         </div>
       ) : null}
 
-      {project ? (
-        <aside className="fixed right-6 top-6 hidden max-h-[calc(100dvh-3rem)] w-[min(26rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-xl border bg-popover shadow-lg md:flex">
-          <header className="flex shrink-0 flex-col gap-2 border-b p-4">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-4 w-44" />
-          </header>
-          <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-          <footer className="shrink-0 border-t p-4">
-            <Skeleton className="h-8 w-full" />
-          </footer>
-        </aside>
-      ) : null}
+      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1 rounded-xl border bg-background/95 p-1.5 shadow-lg md:bottom-6">
+        {Array.from({ length: project ? 5 : 4 }).map((_, index) => <Skeleton key={index} className="h-8 w-16" />)}
+      </div>
     </main>
   );
 }

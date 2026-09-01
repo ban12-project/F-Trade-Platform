@@ -62,6 +62,7 @@ export const videoReviewStage = pgEnum("video_review_stage", ["pre_generation", 
 export const videoReviewOutcome = pgEnum("video_review_outcome", ["accepted", "changes_requested", "skipped"]);
 export const workspaceProjectKind = pgEnum("workspace_project_kind", ["marketing", "sales"]);
 export const workspaceProjectStatus = pgEnum("workspace_project_status", ["active", "archived"]);
+export const workspaceItemRelation = pgEnum("workspace_item_relation", ["owned", "reference"]);
 
 export const user = pgTable(
   "user",
@@ -481,7 +482,7 @@ export const workspaceProject = pgTable(
   ],
 );
 
-/** Links an existing governed aggregate to a project without duplicating it. */
+/** Owns or references a governed aggregate from a project without duplicating facts. */
 export const workspaceProjectItem = pgTable(
   "workspace_project_item",
   {
@@ -489,12 +490,15 @@ export const workspaceProjectItem = pgTable(
     projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
     aggregateId: text("aggregate_id").notNull().references(() => aggregateRecord.id, { onDelete: "restrict" }),
     role: text("role").notNull(),
+    relation: workspaceItemRelation("relation").default("owned").notNull(),
     createdAt: createdAt(),
   },
   (table) => [
     uniqueIndex("workspace_project_item_project_aggregate_uidx").on(table.projectId, table.aggregateId),
+    uniqueIndex("workspace_project_item_single_owner_uidx").on(table.aggregateId).where(sql`${table.relation} = 'owned'`),
     index("workspace_project_item_aggregate_idx").on(table.aggregateId),
-    check("workspace_project_item_role_nonempty", sql`length(btrim(${table.role})) > 0`),
+    check("workspace_project_item_role_allowed", sql`${table.role} in ('product_source', 'product_reference', 'marketing_content', 'marketing_video', 'sales_rfq')`),
+    check("workspace_project_item_relation_matches_role", sql`(${table.role} = 'product_reference' and ${table.relation} = 'reference') or (${table.role} <> 'product_reference' and ${table.relation} = 'owned')`),
   ],
 );
 

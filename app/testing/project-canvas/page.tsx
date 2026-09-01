@@ -7,7 +7,7 @@ import { ProductPanel } from "@/components/workspace/product-panel";
 import { ProductReferencePanel, QuotationHandoffPanel, RfqPanel } from "@/components/workspace/sales-panels";
 import type { ContentCatalogDetail } from "@/lib/content/store";
 import type { ProductCatalogDetail } from "@/lib/products";
-import type { WorkspaceProjectDetail } from "@/lib/workspace/store";
+import type { WorkspaceProjectDetail, WorkspaceProjectSummary } from "@/lib/workspace/store";
 
 const syntheticMarketingProject: WorkspaceProjectDetail = {
   id: "00000000-0000-4000-8000-000000000202",
@@ -38,6 +38,7 @@ const syntheticSalesProject: WorkspaceProjectDetail = {
     { id: "quotation", kind: "quotation", position: { x: 560, y: 0 }, locked: true, label: "报价交接" },
   ], edges: [] },
 };
+const syntheticProjects: WorkspaceProjectSummary[] = [syntheticMarketingProject, syntheticSalesProject].map(({ document: _document, revision: _revision, ...project }) => project);
 
 const syntheticProduct = { id: "00000000-0000-4000-8000-000000000301", productName: "Verified clutch kit", internalSku: "SYN-001", factOptions: [{ path: "product.product_name", label: "product.product_name", value: "Verified clutch kit", evidenceRef: "evidence-product-001" }] };
 const syntheticProductDetail: ProductCatalogDetail = {
@@ -52,18 +53,19 @@ const syntheticContentDetail: ContentCatalogDetail = {
 async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string }> }) {
   const { state, kind } = await searchParams;
   const reviewState = state === "review";
-  if (kind === "sales") return <ProjectCanvas project={syntheticSalesProject} panels={{
+  if (kind === "sales") return <ProjectCanvas project={syntheticSalesProject} projects={syntheticProjects} tasks={[]} panels={{
     rfq: <RfqPanel projectId={syntheticSalesProject.id} entries={[]} />,
     product: <ProductReferencePanel projectId={syntheticSalesProject.id} available={[syntheticProduct]} linked={[]} />,
     quotation: <QuotationHandoffPanel rfqs={[]} products={[]} />,
   }} />;
   const productDetail = state === "product-review" ? syntheticProductDetail : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
-  return <ProjectCanvas project={syntheticMarketingProject} panels={{
+  return <ProjectCanvas project={syntheticMarketingProject} projects={syntheticProjects} tasks={[]} panels={{
     product: <ProductPanel projectId={syntheticMarketingProject.id} entries={productDetail ? [productDetail] : []} detail={productDetail} canReview agentConfigured />,
-    content: <ContentPanel projectId={syntheticMarketingProject.id} products={[syntheticProduct]} entries={contentDetail ? [contentDetail] : []} detail={contentDetail} canReview />,
+    content: <ContentPanel projectId={syntheticMarketingProject.id} products={[syntheticProduct]} entries={contentDetail ? [contentDetail] : []} copyCandidates={[]} detail={contentDetail} canReview />,
   }} videoEditor={{
     canReview: true,
+    copyCandidates: [],
     products: [{ id: "00000000-0000-4000-8000-000000000301", productName: "Verified clutch kit", internalSku: "SYN-001", factOptions: [{ value: "product.product_name", label: "product.product_name" }] }],
     entries: [{
       id: "00000000-0000-4000-8000-000000000401",

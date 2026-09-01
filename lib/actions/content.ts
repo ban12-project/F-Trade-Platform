@@ -7,7 +7,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
-import { createContentDraft, decideContentReview, reviseContentDraft } from "@/lib/content/store";
+import { copyContentDraftToProject, createContentDraft, decideContentReview, reviseContentDraft } from "@/lib/content/store";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type ContentActionState = {
@@ -85,5 +85,22 @@ export async function reviseContentDraftAction(
     return { status: "success", message: "内容修订已保存，并已重新提交 Gate 01 审核。", contentId: parsedContentId.data.contentId };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法保存内容修订。" };
+  }
+}
+
+export async function copyContentDraftToProjectAction(
+  _previousState: ContentActionState,
+  formData: FormData,
+): Promise<ContentActionState> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || !hasPermission(session.user.role, "content:write")) return { status: "error", message: "无权复制内容草稿。" };
+  const parsed = z.object({ projectId: z.uuid(), sourceContentId: z.uuid() }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "复制参数无效。" };
+  try {
+    const result = await copyContentDraftToProject(parsed.data.sourceContentId, parsed.data.projectId, session.user.id);
+    revalidateContentPaths(parsed.data.projectId, result.id);
+    return { status: "success", message: "已复制为当前项目的新待审草稿，原记录不会共享修改。", contentId: result.id };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "无法复制内容草稿。" };
   }
 }

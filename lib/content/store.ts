@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import contentSchema from "@/contracts/content/content.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
@@ -61,6 +61,7 @@ export type ContentCatalogDashboard = {
   pendingReview: number;
   queue: ContentCatalogEntry[];
 };
+export type ContentCopyCandidate = { id: string; projectTitle: string; productName: string; hook: string };
 
 const parseContent = compileContract<ContentRecord>(contentSchema);
 const forbiddenVisualClaims = [
@@ -209,10 +210,50 @@ export async function createContentDraft(input: ContentDraftInput, actorId: stri
       evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
     });
     await tx.insert(aggregateRecord).values({ id, type: "content", state: "CONTENT_REVIEW_REQUIRED", payload: content, createdByType: "human", createdById: actorId });
-    if (projectId) await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "marketing_content" });
+    if (projectId) await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "marketing_content", relation: "owned" });
     await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_01_truth", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
     await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "CONTENT_GENERATING", toState: "CONTENT_REVIEW_REQUIRED", actorType: "human", actorId, evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref), occurredAt: now });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "content_draft_created", actorType: "human", actorId, aggregateId: id, subjectType: "content", subjectId: id, metadata: { content_type: content.content_type, product_id: product.id }, occurredAt: now });
+    return { id, approvalId, content };
+  });
+}
+
+export async function listCrossProjectContentCandidates(projectId: string): Promise<ContentCopyCandidate[]> {
+  const rows = await getDatabase().select({ id: aggregateRecord.id, payload: aggregateRecord.payload, projectTitle: workspaceProject.title })
+    .from(workspaceProjectItem)
+    .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
+    .innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
+    .where(and(ne(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "marketing_content"), eq(workspaceProjectItem.relation, "owned"), eq(aggregateRecord.type, "content")))
+    .orderBy(desc(workspaceProjectItem.createdAt));
+  return rows.flatMap((row) => {
+    const parsed = (() => { try { return parseContent(row.payload); } catch { return null; } })();
+    if (!parsed) return [];
+    return [{ id: row.id, projectTitle: row.projectTitle, productName: parsed.product_facts.find((fact) => fact.field === "product.product_name")?.value ?? "已核验产品", hook: parsed.hook }];
+  });
+}
+
+export async function copyContentDraftToProject(sourceContentId: string, projectId: string, actorId: string) {
+  const id = randomUUID(); const approvalId = randomUUID(); const eventId = randomUUID(); const now = new Date();
+  return getDatabase().transaction(async (tx) => {
+    const [workspace] = await tx.select({ kind: workspaceProject.kind }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
+    if (!workspace || workspace.kind !== "marketing") throw new Error("内容只能复制到产品营销项目。");
+    const [source] = await tx.select({ payload: aggregateRecord.payload, ownerProjectId: workspaceProjectItem.projectId }).from(aggregateRecord)
+      .innerJoin(workspaceProjectItem, and(eq(workspaceProjectItem.aggregateId, aggregateRecord.id), eq(workspaceProjectItem.role, "marketing_content"), eq(workspaceProjectItem.relation, "owned")))
+      .where(and(eq(aggregateRecord.id, sourceContentId), eq(aggregateRecord.type, "content"))).for("update");
+    if (!source || source.ownerProjectId === projectId) throw new Error(source ? "该内容已经属于当前项目。" : "源内容不存在或没有明确归属。");
+    const current = parseContent(source.payload);
+    const [product] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord).where(and(eq(aggregateRecord.id, current.product_id), eq(aggregateRecord.type, "product"))).for("update");
+    if (!product || product.state !== "PRODUCT_READY") throw new Error("源内容引用的产品已不再可用于新草稿。");
+    await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: current.product_id, role: "product_reference", relation: "reference" }).onConflictDoNothing();
+    const content = parseContent({ ...current, content_id: id, status: "review_required", approval_ref: undefined });
+    const evidenceRefs = content.product_facts.map((fact) => fact.evidence_ref);
+    assertTransition({ eventId, entityType: "content", entityId: id, fromState: "CONTENT_GENERATING", toState: "CONTENT_REVIEW_REQUIRED", actorType: "human", actorId, occurredAt: now.toISOString(), evidenceRefs });
+    await tx.insert(aggregateRecord).values({ id, type: "content", state: "CONTENT_REVIEW_REQUIRED", payload: content, createdByType: "human", createdById: actorId });
+    await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "marketing_content", relation: "owned" });
+    await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_01_truth", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
+    await tx.insert(workflowEvent).values({ id: eventId, aggregateId: id, fromState: "CONTENT_GENERATING", toState: "CONTENT_REVIEW_REQUIRED", actorType: "human", actorId, evidenceRefs, occurredAt: now });
+    await tx.update(workspaceProject).set({ updatedAt: now }).where(eq(workspaceProject.id, projectId));
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: "content_draft.copied_to_project", actorType: "human", actorId, aggregateId: id, subjectType: "content", subjectId: id, metadata: { copied_from: sourceContentId, project_id: projectId }, occurredAt: now });
     return { id, approvalId, content };
   });
 }
@@ -240,7 +281,7 @@ export async function listProjectContentCatalogEntries(projectId: string, limit 
   const rows = await getDatabase().select({ record: aggregateRecord })
     .from(workspaceProjectItem)
     .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(aggregateRecord.type, "content")))
+    .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "marketing_content"), eq(workspaceProjectItem.relation, "owned"), eq(aggregateRecord.type, "content")))
     .orderBy(desc(workspaceProjectItem.createdAt))
     .limit(limit);
   const records = rows.map((row) => row.record);

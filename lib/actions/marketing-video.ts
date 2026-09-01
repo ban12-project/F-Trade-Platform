@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { z } from "zod";
 
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
@@ -19,6 +20,7 @@ import {
   assertMarketingVideoProjectLink,
   beginMarketingVideoRender,
   completeMarketingVideoRender,
+  copyMarketingVideoDraftToProject,
   createMarketingVideoEditProject,
   decideVideoReview,
   failMarketingVideoRender,
@@ -34,6 +36,18 @@ async function requireVideoWriter() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !hasPermission(session.user.role, "video:write")) throw new Error("无权编辑营销视频。");
   return session;
+}
+
+export async function copyMarketingVideoDraftAction(projectIdInput: string, sourceVideoIdInput: string): Promise<MarketingVideoActionState> {
+  try {
+    const session = await requireVideoWriter();
+    const { projectId, sourceVideoId } = z.object({ projectId: z.uuid(), sourceVideoId: z.uuid() }).parse({ projectId: projectIdInput, sourceVideoId: sourceVideoIdInput });
+    const result = await copyMarketingVideoDraftToProject(sourceVideoId, projectId, session.user.id);
+    revalidatePath(`/workspace/${projectId}`);
+    return { status: "success", message: "已复制为当前项目的独立剪辑稿；预览和审核状态不会共享。", videoId: result.id };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "无法复制营销视频。" };
+  }
 }
 
 function text(formData: FormData, name: string) {

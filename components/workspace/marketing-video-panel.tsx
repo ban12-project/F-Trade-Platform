@@ -2,13 +2,14 @@
 
 import { startTransition, useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowDownIcon, ArrowUpIcon, BotIcon, FilmIcon, PlusIcon, SaveIcon, ScissorsIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, BotIcon, CopyIcon, FilmIcon, PlusIcon, SaveIcon, ScissorsIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import {
   createMarketingVideoDraftAction,
+  copyMarketingVideoDraftAction,
   generateMarketingVideoAiDraftAction,
   renderMarketingVideoDraftAction,
   reviewMarketingVideoAction,
@@ -27,7 +28,8 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createMarketingVideoDraftFormSchema, marketingVideoDraftSchema, marketingVideoDurationMs, type MarketingVideoDraft } from "@/lib/video/edit-contracts";
-import type { MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
+import type { MarketingVideoCopyCandidate, MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
+import { useWorkspaceDirty } from "./dirty-state";
 
 type CreateValues = z.infer<typeof createMarketingVideoDraftFormSchema>;
 
@@ -38,15 +40,17 @@ function stateLabel(state: string) {
 function CreateVideoForm({ projectId, products }: { projectId: string; products: ReadyVideoProductSource[] }) {
   const router = useRouter();
   const filesRef = useRef<HTMLInputElement>(null);
+  const [hasFiles, setHasFiles] = useState(false);
   const [state, action, pending] = useActionState(createMarketingVideoDraftAction, initialMarketingVideoActionState);
   const firstProduct = products[0];
   const form = useForm<CreateValues>({
     resolver: zodResolver(createMarketingVideoDraftFormSchema),
     defaultValues: { projectId, productId: firstProduct?.id ?? "", factPath: firstProduct?.factOptions[0]?.value ?? "", objective: "Create a concise product inquiry video", targetAudience: "Overseas automotive parts distributors", platform: "facebook", rightsEvidenceRef: "" },
   });
+  useWorkspaceDirty("video-create", form.formState.isDirty || hasFiles);
   const selectedProductId = form.watch("productId");
   const selectedProduct = products.find((product) => product.id === selectedProductId) ?? firstProduct;
-  useEffect(() => { if (state.status === "success") { form.reset(form.getValues()); if (filesRef.current) filesRef.current.value = ""; router.refresh(); } }, [form, router, state.status]);
+  useEffect(() => { if (state.status === "success") { form.reset(form.getValues()); if (filesRef.current) filesRef.current.value = ""; setHasFiles(false); router.refresh(); } }, [form, router, state.status]);
   function submit(values: CreateValues) {
     const data = new FormData();
     for (const [key, value] of Object.entries(values)) data.set(key, value);
@@ -62,7 +66,7 @@ function CreateVideoForm({ projectId, products }: { projectId: string; products:
       <Field data-invalid={Boolean(form.formState.errors.objective)}><FieldLabel htmlFor="video-objective">视频目标</FieldLabel><Input id="video-objective" aria-invalid={Boolean(form.formState.errors.objective)} {...form.register("objective")} /><FieldError>{form.formState.errors.objective?.message}</FieldError></Field>
       <Field data-invalid={Boolean(form.formState.errors.targetAudience)}><FieldLabel htmlFor="video-audience">目标受众</FieldLabel><Input id="video-audience" aria-invalid={Boolean(form.formState.errors.targetAudience)} {...form.register("targetAudience")} /><FieldError>{form.formState.errors.targetAudience?.message}</FieldError></Field>
       <Field><FieldLabel>输出平台</FieldLabel><Controller control={form.control} name="platform" render={({ field }) => <ToggleGroup value={[field.value]} onValueChange={(value) => value[0] && field.onChange(value[0])} variant="outline" className="flex-wrap"><ToggleGroupItem value="facebook">Facebook</ToggleGroupItem><ToggleGroupItem value="instagram">Instagram</ToggleGroupItem><ToggleGroupItem value="tiktok">TikTok</ToggleGroupItem><ToggleGroupItem value="youtube">YouTube</ToggleGroupItem><ToggleGroupItem value="x">X</ToggleGroupItem></ToggleGroup>} /></Field>
-      <Field><FieldLabel htmlFor="video-assets">素材（1–3 个）</FieldLabel><Input ref={filesRef} id="video-assets" name="assets" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple required /><FieldDescription>单次总计不超过 20MB，支持 JPG、PNG、WebP、MP4、MOV。</FieldDescription></Field>
+      <Field><FieldLabel htmlFor="video-assets">素材（1–3 个）</FieldLabel><Input ref={filesRef} id="video-assets" name="assets" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple required onChange={(event) => setHasFiles(Boolean(event.target.files?.length))} /><FieldDescription>单次总计不超过 20MB，支持 JPG、PNG、WebP、MP4、MOV。</FieldDescription></Field>
       <Field data-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}><FieldLabel htmlFor="video-rights">素材权利证据</FieldLabel><Input id="video-rights" placeholder="evidence-rights-001" aria-invalid={Boolean(form.formState.errors.rightsEvidenceRef)} {...form.register("rightsEvidenceRef")} /><FieldError>{form.formState.errors.rightsEvidenceRef?.message}</FieldError></Field>
     </FieldGroup></form></CardContent>
     <CardFooter className="flex-col items-stretch gap-3"><Button form="create-marketing-video" type="submit" disabled={pending}><PlusIcon data-icon="inline-start" />{pending ? "正在保存素材…" : "创建私有剪辑稿"}</Button>{state.message ? <p className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} aria-live="polite">{state.message}</p> : null}</CardFooter>
@@ -111,12 +115,14 @@ function EditVideo({ projectId, entry, canReview, onDirtyChange }: { projectId: 
   </div>;
 }
 
-export function MarketingVideoPanel({ projectId, products, entries, canReview, onDirtyChange }: { projectId: string; products: ReadyVideoProductSource[]; entries: MarketingVideoEditorEntry[]; canReview: boolean; onDirtyChange: (dirty: boolean) => void }) {
-  const [activeId, setActiveId] = useState(entries[0]?.id ?? "new");
+export function MarketingVideoPanel({ projectId, products, entries, copyCandidates, canReview, selectedId, onDirtyChange }: { projectId: string; products: ReadyVideoProductSource[]; entries: MarketingVideoEditorEntry[]; copyCandidates: MarketingVideoCopyCandidate[]; canReview: boolean; selectedId?: string; onDirtyChange: (dirty: boolean) => void }) {
+  const [activeId, setActiveId] = useState(selectedId && entries.some((entry) => entry.id === selectedId) ? selectedId : entries[0]?.id ?? "new");
+  const [copyId, setCopyId] = useState(copyCandidates[0]?.id ?? ""); const [copyMessage, setCopyMessage] = useState(""); const [copyPending, startCopy] = useTransition(); const router = useRouter();
   const active = useMemo(() => entries.find((entry) => entry.id === activeId), [activeId, entries]);
   useEffect(() => { if (activeId !== "new" && !entries.some((entry) => entry.id === activeId)) setActiveId(entries[0]?.id ?? "new"); }, [activeId, entries]);
   return <div className="flex flex-col gap-4">
     <ToggleGroup value={[activeId]} onValueChange={(value) => value[0] && setActiveId(value[0])} variant="outline" className="w-full flex-wrap justify-start"><ToggleGroupItem value="new"><PlusIcon data-icon="inline-start" />新建</ToggleGroupItem>{entries.map((entry, index) => <ToggleGroupItem key={entry.id} value={entry.id}>视频 {entries.length - index}</ToggleGroupItem>)}</ToggleGroup>
     {active ? <EditVideo projectId={projectId} entry={active} canReview={canReview} onDirtyChange={onDirtyChange} /> : <CreateVideoForm projectId={projectId} products={products} />}
+    <Card><CardHeader><CardTitle>复制其他项目剪辑</CardTitle><CardDescription>复制素材编排为独立草稿，不继承预览与审核状态。</CardDescription></CardHeader><CardContent>{copyCandidates.length ? <Field><FieldLabel>源剪辑</FieldLabel><Select value={copyId} onValueChange={(value) => value && setCopyId(value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{copyCandidates.map((item) => <SelectItem key={item.id} value={item.id}>{item.projectTitle} · {item.productName} · {item.objective}</SelectItem>)}</SelectGroup></SelectContent></Select></Field> : <p className="text-sm text-muted-foreground">其他项目暂无可复制剪辑。</p>}</CardContent><CardFooter className="flex-col items-stretch gap-3"><Button variant="outline" disabled={copyPending || !copyId} onClick={() => startCopy(async () => { const result = await copyMarketingVideoDraftAction(projectId, copyId); setCopyMessage(result.message); if (result.status === "success") router.refresh(); })}><CopyIcon data-icon="inline-start" />复制为新剪辑稿</Button>{copyMessage ? <p className="text-sm text-muted-foreground">{copyMessage}</p> : null}</CardFooter></Card>
   </div>;
 }
