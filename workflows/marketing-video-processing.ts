@@ -7,9 +7,9 @@ import { VercelPrivateVideoAssetStore } from "@/lib/video/private-asset-store";
 import { completeVideoJob, failVideoJob, markVideoJobRunning } from "@/lib/video/processing-jobs";
 import { renderApprovedMarketingTimeline } from "@/lib/video/rendering";
 import { extractMarketingVisualSamplesInSandbox, renderMarketingTimelineInSandbox } from "@/lib/video/sandbox-media";
+import { issueSandboxVideoSources } from "@/lib/video/sandbox-sources";
 import { beginMarketingVideoRender, completeMarketingVideoRender, failMarketingVideoRender, getMarketingVideoEditProject, updateMarketingVideoEditDraft } from "@/lib/video/store";
 import { createMarketingEditTimeline } from "@/lib/video/timeline";
-import { withTemporaryUploadedVideoAssets } from "@/lib/video/uploaded-assets";
 
 export type MarketingVideoWorkflowInput = { jobId: string; videoId: string; actorId: string };
 
@@ -20,14 +20,15 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
   try {
     const { project, state } = await getMarketingVideoEditProject(input.videoId);
     if (!["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(state)) throw new Error("当前视频状态不能生成 AI 初稿。");
-    const suggestion = await withTemporaryUploadedVideoAssets(project.sourceAssets.map((asset) => asset.assetRef), async (paths) => new AiSdkStructuredGenerator().generate({
+    const sources = await issueSandboxVideoSources(project.sourceAssets.map((asset) => asset.assetRef));
+    const suggestion = await new AiSdkStructuredGenerator().generate({
       model: createProductAgentModel(await resolveProductAgentModelConfig()),
       schema: marketingVideoAiDraftSchema,
       schemaName: "marketing_video_edit_draft",
       task: `Create an editable B2B marketing cut draft, never new media. Use 1-3 of these authorized assets: ${JSON.stringify(project.sourceAssets.map(({ assetRef, mediaType }) => ({ assetRef, mediaType })))}. Total duration must be at most 15000ms and every clip 1000-10000ms. Choose trimStartMs only from supplied sample timestamps or 0. Captions and CTA may use only supplied verified facts. Prefer concise captions, hard cuts, and a muted default.`,
       verifiedFacts: project.factualClaims.map(({ field, value, evidenceRef }) => ({ field, value, evidenceRef })),
-      visualSamples: await extractMarketingVisualSamplesInSandbox(project.sourceAssets, paths),
-    }));
+      visualSamples: await extractMarketingVisualSamplesInSandbox(project.sourceAssets, sources),
+    });
     const sourceByRef = new Map(project.sourceAssets.map((asset) => [asset.assetRef, asset]));
     const draft = marketingVideoDraftSchema.parse({
       version: 1,
@@ -58,12 +59,10 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
     const preset = videoExportPresets.find((candidate) => candidate.platform === project.editDraft!.platform && candidate.verification === "verified");
     if (!preset) throw new Error("目标平台没有可用的已核验导出预设。");
     const request = { timeline, platform: preset.platform, width: preset.width, height: preset.height, fps: preset.fps } as const;
-    const bytes = await withTemporaryUploadedVideoAssets(project.editDraft!.clips.map((clip) => clip.assetRef), async (paths) => {
-      let rendered: Uint8Array | undefined;
-      await renderApprovedMarketingTimeline(request, { render: async (validated) => { rendered = await renderMarketingTimelineInSandbox(validated, paths); return { assetRef: `asset-render-${input.jobId}` }; } });
-      if (!rendered) throw new Error("Sandbox 未生成视频输出。");
-      return rendered;
-    });
+    const sources = await issueSandboxVideoSources(project.editDraft!.clips.map((clip) => clip.assetRef));
+    let bytes: Uint8Array | undefined;
+    await renderApprovedMarketingTimeline(request, { render: async (validated) => { bytes = await renderMarketingTimelineInSandbox(validated, sources); return { assetRef: `asset-render-${input.jobId}` }; } });
+    if (!bytes) throw new Error("Sandbox 未生成视频输出。");
     const assetRef = await new VercelPrivateVideoAssetStore().putRenderedVideo({ data: bytes, contentType: "video/mp4", assetRef: `asset-render-${input.jobId}` });
     await completeMarketingVideoRender(input.videoId, assetRef);
     await completeVideoJob(input.jobId);

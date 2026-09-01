@@ -18,11 +18,12 @@ import {
 } from "./upload-contracts";
 import type { UploadedVideoSourceAsset } from "./uploaded-assets";
 
-const uploadLifetimeMs = 15 * 60 * 1_000;
+const imageUploadLifetimeMs = 15 * 60 * 1_000;
+const videoUploadLifetimeMs = 60 * 60 * 1_000;
 
 export async function issueVideoUploadReceipt(input: VideoPresignedUploadPayload, actorId: string, database: Database = getDatabase()) {
   const blobPath = videoUploadBlobPath(input);
-  let expiresAt = new Date(Date.now() + uploadLifetimeMs);
+  let expiresAt = new Date(Date.now() + (input.contentType.startsWith("video/") ? videoUploadLifetimeMs : imageUploadLifetimeMs));
   await database.transaction(async (tx) => {
     const [project] = await tx.select({ kind: workspaceProject.kind, status: workspaceProject.status })
       .from(workspaceProject).where(eq(workspaceProject.id, input.projectId)).for("update");

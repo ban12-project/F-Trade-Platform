@@ -9,18 +9,28 @@ const allowedContentTypes = [
 ] as const;
 
 export const videoUploadContentTypeSchema = z.enum(allowedContentTypes);
+export const maximumVideoUploadImageBytes = 20 * 1024 * 1024;
+export const maximumVideoUploadVideoBytes = 1024 * 1024 * 1024 - 1;
+export const maximumVideoUploadBatchBytes = maximumVideoUploadVideoBytes * 3;
+export const videoUploadMultipartThresholdBytes = 100 * 1024 * 1024;
 
-/** One signed URL authorizes one non-multipart PUT to one exact private pathname. */
-export const videoPresignedUploadUsesMultipart = false;
+/** Vercel recommends multipart above 100MB; the signed token remains exact-path and put-only. */
+export function shouldUseMultipartVideoUpload(sizeBytes: number) {
+  return sizeBytes > videoUploadMultipartThresholdBytes;
+}
 
 export const videoPresignedUploadPayloadSchema = z.object({
   receiptId: z.uuid(),
   projectId: z.uuid(),
   originalFilename: z.string().trim().min(1).max(240),
   contentType: videoUploadContentTypeSchema,
-  sizeBytes: z.number().int().min(1).max(20 * 1024 * 1024),
+  sizeBytes: z.number().int().min(1).max(maximumVideoUploadVideoBytes),
   rightsEvidenceRef: z.string().trim().regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.contentType.startsWith("image/") && value.sizeBytes > maximumVideoUploadImageBytes) {
+    context.addIssue({ code: "custom", path: ["sizeBytes"], message: "单张图片不能超过 20MB。" });
+  }
+});
 
 export const completedVideoUploadTokenSchema = videoPresignedUploadPayloadSchema.extend({
   actorId: z.string().trim().min(1).max(160),

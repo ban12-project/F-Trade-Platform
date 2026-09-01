@@ -1,8 +1,12 @@
 # Video Sandbox image
 
 This image is the deterministic media worker for MVP1. It contains FFmpeg,
-libass/subtitles, H.264 encoding, AAC encoding, and DejaVu fonts. The Next.js
+libass/subtitles, H.264 encoding, AAC encoding, curl, and DejaVu fonts. The Next.js
 deployment does not run FFmpeg inside a request function.
+
+Source assets are streamed into the network-restricted Sandbox with ten-minute,
+exact-path, GET-only private Blob URLs. They are never buffered in a Vercel
+Function before FFmpeg runs.
 
 ## Publish to Vercel Container Registry
 

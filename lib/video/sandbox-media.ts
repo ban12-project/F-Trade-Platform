@@ -1,13 +1,12 @@
-import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
-
 import { Sandbox } from "@vercel/sandbox";
 
 import type { VideoProject } from "./contracts";
 import type { MarketingVisualSample } from "./visual-sampling";
 import type { VideoRenderRequest } from "./rendering";
+import type { SandboxVideoSource } from "./sandbox-sources";
 
-type SourcePaths = ReadonlyMap<string, string>;
+type SignedSources = ReadonlyMap<string, SandboxVideoSource>;
+export const maximumMarketingSourceDurationSeconds = 120;
 
 function sandboxImage() {
   const image = process.env.VIDEO_SANDBOX_IMAGE?.trim();
@@ -21,12 +20,12 @@ async function command(sandbox: Sandbox, executable: string, args: string[]) {
   return result.stdout();
 }
 
-async function createMediaSandbox() {
+async function createMediaSandbox(sources: SignedSources) {
   const sandbox = await Sandbox.create({
     image: sandboxImage(),
     timeout: 10 * 60 * 1_000,
     resources: { vcpus: Number(process.env.VIDEO_SANDBOX_VCPUS ?? 2) },
-    networkPolicy: "deny-all",
+    networkPolicy: { allow: [...new Set([...sources.values()].map((source) => source.hostname))] },
     persistent: false,
   });
   const filters = await command(sandbox, "ffmpeg", ["-hide_banner", "-filters"]);
@@ -39,13 +38,16 @@ async function createMediaSandbox() {
   return sandbox;
 }
 
-async function uploadSources(sandbox: Sandbox, assetRefs: string[], paths: SourcePaths) {
+async function downloadSources(sandbox: Sandbox, assetRefs: string[], sources: SignedSources) {
   const remote = new Map<string, string>();
   for (const [index, assetRef] of [...new Set(assetRefs)].entries()) {
-    const source = paths.get(assetRef);
+    const source = sources.get(assetRef);
     if (!source) throw new Error("无法读取视频任务所需的私有素材。");
-    const destination = `/vercel/sandbox/work/source-${index}${extname(source).toLowerCase() || ".bin"}`;
-    await sandbox.fs.writeFile(destination, await readFile(source));
+    const destination = `/vercel/sandbox/work/source-${index}${source.extension}`;
+    const config = `/vercel/sandbox/work/download-${index}.conf`;
+    await sandbox.fs.writeFile(config, `url = "${source.signedGetUrl}"\noutput = "${destination}"\n`);
+    await command(sandbox, "curl", ["--fail", "--silent", "--show-error", "--location", "--config", config]);
+    await sandbox.fs.rm(config, { force: true });
     remote.set(assetRef, destination);
   }
   return remote;
@@ -64,20 +66,21 @@ function assDocument(request: VideoRenderRequest) {
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${request.width}\nPlayResY: ${request.height}\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,DejaVu Sans,${Math.max(32, Math.round(request.height * .04))},&H00FFFFFF,&H000000FF,&H00111111,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,60,60,${Math.max(54, Math.round(request.height * .07))},1\nStyle: CTA,DejaVu Sans,${Math.max(42, Math.round(request.height * .055))},&H00FFFFFF,&H000000FF,&H00111111,&H90000000,-1,0,0,0,100,100,0,0,3,2,0,5,80,80,80,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${lines.join("\n")}\n`;
 }
 
-export async function extractMarketingVisualSamplesInSandbox(sourceAssets: VideoProject["sourceAssets"], paths: SourcePaths): Promise<MarketingVisualSample[]> {
-  const sandbox = await createMediaSandbox();
+export async function extractMarketingVisualSamplesInSandbox(sourceAssets: VideoProject["sourceAssets"], sources: SignedSources): Promise<MarketingVisualSample[]> {
+  const sandbox = await createMediaSandbox(sources);
   try {
-    const remote = await uploadSources(sandbox, sourceAssets.map((asset) => asset.assetRef), paths);
+    const remote = await downloadSources(sandbox, sourceAssets.map((asset) => asset.assetRef), sources);
     const samples: MarketingVisualSample[] = [];
     for (const [sourceIndex, source] of sourceAssets.slice(0, 3).entries()) {
       const input = remote.get(source.assetRef)!;
       if (source.mediaType === "image") {
-        samples.push({ label: `${source.assetRef} at 0ms`, data: new Uint8Array(await sandbox.fs.readFile(input)), mediaType: source.mediaType === "image" && input.endsWith(".png") ? "image/png" : input.endsWith(".webp") ? "image/webp" : "image/jpeg" });
+        samples.push({ label: `${source.assetRef} at 0ms`, data: new Uint8Array(await sandbox.fs.readFile(input)), mediaType: sources.get(source.assetRef)!.contentType });
         continue;
       }
       const rawDuration = await command(sandbox, "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input]);
       const duration = Number(rawDuration.trim());
       if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取上传视频的时长。");
+      if (duration > maximumMarketingSourceDurationSeconds) throw new Error(`源视频不能超过 ${maximumMarketingSourceDurationSeconds} 秒。`);
       for (const [frameIndex, timestamp] of [duration * .2, duration * .5, duration * .8].entries()) {
         const output = `/vercel/sandbox/work/sample-${sourceIndex}-${frameIndex}.jpg`;
         await command(sandbox, "ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(timestamp), "-i", input, "-frames:v", "1", "-vf", "scale=640:-2", output]);
@@ -88,10 +91,10 @@ export async function extractMarketingVisualSamplesInSandbox(sourceAssets: Video
   } finally { await sandbox.stop(); }
 }
 
-export async function renderMarketingTimelineInSandbox(request: VideoRenderRequest, paths: SourcePaths) {
-  const sandbox = await createMediaSandbox();
+export async function renderMarketingTimelineInSandbox(request: VideoRenderRequest, sources: SignedSources) {
+  const sandbox = await createMediaSandbox(sources);
   try {
-    const remote = await uploadSources(sandbox, request.timeline.scenes.map((scene) => scene.assetRef), paths);
+    const remote = await downloadSources(sandbox, request.timeline.scenes.map((scene) => scene.assetRef), sources);
     const normalized: string[] = [];
     for (const [index, scene] of request.timeline.scenes.entries()) {
       const input = remote.get(scene.assetRef)!;
@@ -100,6 +103,7 @@ export async function renderMarketingTimelineInSandbox(request: VideoRenderReque
       if (scene.mediaType === "video") {
         const probe = JSON.parse(await command(sandbox, "ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=codec_type", "-of", "json", input])) as { format?: { duration?: string }; streams?: { codec_type?: string }[] };
         const sourceDuration = Number(probe.format?.duration);
+        if (Number.isFinite(sourceDuration) && sourceDuration > maximumMarketingSourceDurationSeconds) throw new Error(`源视频不能超过 ${maximumMarketingSourceDurationSeconds} 秒。`);
         if (Number.isFinite(sourceDuration) && (scene.trimStartSeconds ?? 0) + scene.durationSeconds > sourceDuration + .05) throw new Error(`片段 ${scene.sceneId} 的截取区间超过源素材长度。`);
         hasAudio = probe.streams?.some((stream) => stream.codec_type === "audio") ?? false;
       }

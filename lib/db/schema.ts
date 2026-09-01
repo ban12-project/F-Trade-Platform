@@ -565,7 +565,7 @@ export const videoUploadReceipt = pgTable(
     uniqueIndex("video_upload_receipt_blob_path_uidx").on(table.blobPath),
     index("video_upload_receipt_owner_status_idx").on(table.ownerId, table.status),
     index("video_upload_receipt_expiry_idx").on(table.expiresAt),
-    check("video_upload_receipt_size_positive", sql`${table.sizeBytes} > 0 AND ${table.sizeBytes} <= 20971520`),
+    check("video_upload_receipt_size_positive", sql`${table.sizeBytes} > 0 AND ((${table.contentType} LIKE 'image/%' AND ${table.sizeBytes} <= 20971520) OR (${table.contentType} IN ('video/mp4', 'video/quicktime') AND ${table.sizeBytes} < 1073741824))`),
     check("video_upload_receipt_rights_nonempty", sql`length(btrim(${table.rightsEvidenceRef})) > 0`),
     check("video_upload_receipt_claim_consistent", sql`(${table.status} = 'claimed' AND ${table.evidenceId} IS NOT NULL AND ${table.claimedAt} IS NOT NULL) OR ${table.status} <> 'claimed'`),
   ],
