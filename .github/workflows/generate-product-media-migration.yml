@@ -31,7 +31,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate ProductMedia migration
-        run: pnpm db:generate -- --name=product_media_asset
+        run: pnpm db:generate --name=product_media_asset
 
       - name: Collect generated migration files
         run: |
