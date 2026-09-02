@@ -45,20 +45,24 @@ export async function resolveWorkspacePrivateVideoPreview(
   assetRefInput: string,
   store: PrivateVideoPreviewStore = new VercelPrivateVideoAssetStore(),
   isAuthorizedAsset: (assetRef: string) => Promise<boolean> = isMvpRenderedAsset,
+  range?: string | null,
 ): Promise<PrivateVideoPreviewResolution> {
   if (!hasPermission(session?.user?.role, "workspace:view")) return { kind: "forbidden" };
   const assetRef = generatedVideoAssetRefSchema.safeParse(assetRefInput);
   if (!assetRef.success || !await isAuthorizedAsset(assetRef.data)) return { kind: "not_found" };
-  const asset = await store.getGeneratedVideo(assetRef.data);
+  const asset = await store.getGeneratedVideo(assetRef.data, range);
   return asset ? { kind: "ready", asset } : { kind: "not_found" };
 }
 
-export function privateVideoPreviewHeaders(asset: Pick<PrivateGeneratedVideoRead, "contentType" | "sizeBytes">) {
+export function privateVideoPreviewHeaders(asset: Pick<PrivateGeneratedVideoRead, "contentType" | "responseSizeBytes" | "contentRange" | "etag">) {
   return {
+    "Accept-Ranges": "bytes",
     "Cache-Control": "private, no-cache",
     "Content-Disposition": "inline",
-    "Content-Length": String(asset.sizeBytes),
+    "Content-Length": String(asset.responseSizeBytes),
+    ...(asset.contentRange ? { "Content-Range": asset.contentRange } : {}),
     "Content-Type": asset.contentType,
+    "ETag": asset.etag,
     "Cross-Origin-Resource-Policy": "same-origin",
     "Referrer-Policy": "same-origin",
     "Vary": "Cookie",

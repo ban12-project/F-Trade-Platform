@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { privateVideoPreviewHeaders, resolveAdminPrivateVideoPreview, resolveWorkspacePrivateVideoPreview } from "../lib/video/preview-delivery";
 
-const asset = { body: new ReadableStream<Uint8Array>(), contentType: "video/mp4", sizeBytes: 1234 };
+const asset = { body: new ReadableStream<Uint8Array>(), contentType: "video/mp4", sizeBytes: 1234, responseSizeBytes: 1234, contentRange: null, etag: "synthetic-etag" };
 
 void (async () => {
   let reads = 0;
@@ -20,6 +20,7 @@ void (async () => {
   const headers = privateVideoPreviewHeaders(asset);
   assert.equal(headers["Cache-Control"], "private, no-cache");
   assert.equal(headers["Content-Type"], "video/mp4");
+  assert.equal(headers["Accept-Ranges"], "bytes");
   assert.equal("Location" in headers, false);
   console.log("PASS private video preview requires workspace access, a linked render, and exposes no Blob URL");
 })();

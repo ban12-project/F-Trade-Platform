@@ -58,6 +58,22 @@ export const videoJobStatus = pgEnum("video_job_status", [
   "failed",
   "cancelled",
 ]);
+export const videoUploadReceiptStatus = pgEnum("video_upload_receipt_status", [
+  "issued",
+  "uploaded",
+  "claimed",
+  "failed",
+]);
+export const videoProcessingJobKind = pgEnum("video_processing_job_kind", [
+  "ai_draft",
+  "render",
+]);
+export const videoProcessingJobStatus = pgEnum("video_processing_job_status", [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+]);
 export const videoReviewStage = pgEnum("video_review_stage", ["pre_generation", "post_generation"]);
 export const videoReviewOutcome = pgEnum("video_review_outcome", ["accepted", "changes_requested", "skipped"]);
 export const workspaceProjectKind = pgEnum("workspace_project_kind", ["marketing", "sales"]);
@@ -519,6 +535,70 @@ export const workspaceCanvasDocument = pgTable(
   ],
 );
 
+/**
+ * A narrowly scoped receipt for a browser-to-Blob presigned upload. The
+ * browser chooses only the receipt ID; ownership and the exact pathname are
+ * bound by the authenticated signing route and verified completion callback.
+ */
+export const videoUploadReceipt = pgTable(
+  "video_upload_receipt",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
+    ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    blobPath: text("blob_path").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    rightsEvidenceRef: text("rights_evidence_ref").notNull(),
+    status: videoUploadReceiptStatus("status").default("issued").notNull(),
+    sha256: text("sha256"),
+    evidenceId: text("evidence_id").references(() => evidence.id, { onDelete: "restrict" }),
+    failureCode: text("failure_code"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("video_upload_receipt_blob_path_uidx").on(table.blobPath),
+    index("video_upload_receipt_owner_status_idx").on(table.ownerId, table.status),
+    index("video_upload_receipt_expiry_idx").on(table.expiresAt),
+    check("video_upload_receipt_size_positive", sql`${table.sizeBytes} > 0 AND ((${table.contentType} LIKE 'image/%' AND ${table.sizeBytes} <= 20971520) OR (${table.contentType} IN ('video/mp4', 'video/quicktime') AND ${table.sizeBytes} < 1073741824))`),
+    check("video_upload_receipt_rights_nonempty", sql`length(btrim(${table.rightsEvidenceRef})) > 0`),
+    check("video_upload_receipt_claim_consistent", sql`(${table.status} = 'claimed' AND ${table.evidenceId} IS NOT NULL AND ${table.claimedAt} IS NOT NULL) OR ${table.status} <> 'claimed'`),
+  ],
+);
+
+/** Durable status for MVP1 AI-draft and FFmpeg Workflow runs. */
+export const videoProcessingJob = pgTable(
+  "video_processing_job",
+  {
+    id: text("id").primaryKey(),
+    videoProjectId: text("video_project_id").notNull().references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    kind: videoProcessingJobKind("kind").notNull(),
+    status: videoProcessingJobStatus("status").default("queued").notNull(),
+    requestKey: text("request_key").notNull(),
+    workflowRunId: text("workflow_run_id"),
+    attempts: integer("attempts").default(0).notNull(),
+    failureCode: text("failure_code"),
+    failureMessage: text("failure_message"),
+    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("video_processing_job_request_uidx").on(table.requestKey),
+    index("video_processing_job_project_created_idx").on(table.videoProjectId, table.createdAt),
+    index("video_processing_job_status_created_idx").on(table.status, table.createdAt),
+    check("video_processing_job_attempts_nonnegative", sql`${table.attempts} >= 0`),
+    check("video_processing_job_request_nonempty", sql`length(btrim(${table.requestKey})) > 0`),
+  ],
+);
+
 /** Opaque reference to a generated video held only in private object storage. */
 export const videoGeneratedAsset = pgTable(
   "video_generated_asset",
@@ -696,13 +776,16 @@ export const socialChannelControl = pgTable(
   ],
 );
 
-/** Singleton, encrypted-at-rest configuration for the Product Agent's model provider. */
+/** Named, encrypted-at-rest model configurations shared by AI-assisted workflows. */
 export const productAgentModelConfig = pgTable(
   "product_agent_model_config",
   {
     id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    isDefault: boolean("is_default").default(false).notNull(),
     provider: text("provider").notNull(),
     model: text("model").notNull(),
+    discoveredModels: jsonb("discovered_models").$type<string[]>().default([]).notNull(),
     baseUrl: text("base_url"),
     headers: jsonb("headers").$type<Record<string, string>>().default({}).notNull(),
     providerName: text("provider_name"),
@@ -717,7 +800,9 @@ export const productAgentModelConfig = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    check("product_agent_model_config_singleton", sql`${table.id} = 'product_agent'`),
+    uniqueIndex("product_agent_model_config_name_uidx").on(table.name),
+    uniqueIndex("product_agent_model_config_default_uidx").on(table.isDefault).where(sql`${table.isDefault} = true`),
+    check("product_agent_model_config_name_nonempty", sql`length(btrim(${table.name})) > 0`),
     check("product_agent_model_config_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
     check("product_agent_model_config_model_nonempty", sql`length(btrim(${table.model})) > 0`),
   ],

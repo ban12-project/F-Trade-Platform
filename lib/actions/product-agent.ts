@@ -20,6 +20,8 @@ export async function runProductAgentAction(_previous: ProductAgentActionState, 
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !hasPermission(session.user.role, "product:write")) return { status: "error", message: "无权运行 Product Agent。" };
   try {
+    const modelConfigId = z.string().trim().min(1, "请选择模型配置。").max(120, "模型配置标识无效。").parse(formData.get("modelConfigId"));
+    const selectedModel = z.string().trim().min(1, "请选择模型。").max(240, "模型名称无效。").parse(formData.get("model"));
     const rawProjectId = formData.get("projectId");
     const projectId = rawProjectId === null || rawProjectId === "" ? undefined : z.uuid("项目标识无效。").parse(rawProjectId);
     if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
@@ -31,7 +33,7 @@ export async function runProductAgentAction(_previous: ProductAgentActionState, 
           if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "资料格式不正确。");
           return { record_id: randomUUID(), source_ref: parsed.data.sourceRef!, evidence_refs: [parsed.data.evidenceRef!], source_text: parsed.data.sourceText, image_availability: "none" as const, image_refs: [] };
         })();
-    const result = await new AiSdkProductAgent().run({ model: createProductAgentModel(await resolveProductAgentModelConfig()), source, timeout_ms: 75_000 });
+    const result = await new AiSdkProductAgent().run({ model: createProductAgentModel(await resolveProductAgentModelConfig(modelConfigId, selectedModel)), source, timeout_ms: 75_000 });
     const saved = await createProductAgentDraft(result.draft, session.user.id, { prompt_version: result.metadata.prompt_version, prompt_hash: result.metadata.prompt_hash }, projectId);
     revalidatePath("/workspace");
     if (projectId) revalidatePath(`/workspace/${projectId}`);

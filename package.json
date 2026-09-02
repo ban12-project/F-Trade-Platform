@@ -2,7 +2,7 @@
   "name": "f-trade-platform",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.22.0",
+  "packageManager": "pnpm@11.24.0",
   "engines": {
     "node": ">=24 <25"
   },
@@ -68,6 +68,7 @@
     "test:video-execution": "tsx scripts/test-video-execution.ts",
     "test:video-workspace": "tsx scripts/test-video-workspace.ts",
     "test:video-material-intake": "tsx scripts/test-video-material-intake.ts",
+    "test:video-presigned-upload": "tsx scripts/test-video-presigned-upload.ts",
     "test:ai-sdk-video-adapters": "tsx scripts/test-ai-sdk-video-adapters.ts",
     "test:video-media-probe": "tsx scripts/test-video-media-probe.ts",
     "test:video-timeline": "tsx scripts/test-video-timeline.ts",
@@ -96,6 +97,7 @@
     "@hookform/resolvers": "^5.9.1",
     "@neondatabase/serverless": "1.1.0",
     "@vercel/blob": "2.8.0",
+    "@vercel/sandbox": "3.2.1",
     "@xyflow/react": "^12.11.5",
     "ai": "7.0.77",
     "ajv": "8.20.0",

@@ -13,6 +13,41 @@ test("desktop node selection updates the inspector without a drawer overlay", as
   await expect(page.locator('[data-slot="drawer-popup"]')).toHaveCount(0);
 });
 
+test("select triggers display the same label as their selected item", async ({ page }) => {
+  await page.goto("/testing/project-canvas?panel=content");
+  await page.waitForLoadState("networkidle");
+
+  const inspector = page.getByRole("complementary");
+  const selects = inspector.getByRole("combobox");
+  await expect(selects.nth(0)).toContainText("SYN-001 · Verified clutch kit");
+  await expect(selects.nth(0)).not.toContainText("00000000-0000-4000-8000-000000000301");
+  await expect(selects.nth(1)).toContainText("产品推广");
+  await expect(selects.nth(1)).not.toHaveText("product");
+});
+
+test("Product Agent keeps saved models selectable for each import", async ({ page }) => {
+  await page.goto("/testing/project-canvas?panel=product");
+  await page.waitForLoadState("networkidle");
+
+  const inspector = page.getByRole("complementary");
+  const model = inspector.getByRole("combobox", { name: "模型", exact: true });
+  await expect(model).toContainText("日常产品导入 · gpt-5-mini");
+  await model.focus();
+  await page.keyboard.press("Enter");
+  await expect(model).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("option", { name: "日常产品导入 · gpt-5.6-terra" })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(model).toContainText("日常产品导入 · gpt-5.6-terra");
+  await model.focus();
+  await page.keyboard.press("Enter");
+  await expect(model).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("option", { name: "复杂目录识别 · claude-sonnet-test" })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(model).toContainText("复杂目录识别 · claude-sonnet-test");
+});
+
 test("marketing content work stays in the canvas panel", async ({ page }) => {
   await page.goto("/testing/project-canvas");
   await page.getByText("营销内容", { exact: true }).click();

@@ -9,7 +9,7 @@ import { WorkspaceCanvasSkeleton } from "@/components/workspace/workspace-canvas
 import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-settings-panel";
 import { ProjectCanvas } from "@/components/workspace/project-canvas";
 import { ProductReferencePanel, QuotationHandoffPanel, RfqPanel } from "@/components/workspace/sales-panels";
-import { getStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
+import { listStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { requirePermission } from "@/lib/auth-guard";
 import { hasPermission } from "@/lib/authz";
 import { getProjectContentCatalogDetail, listCrossProjectContentCandidates, listProjectContentCatalogEntries, listReadyProductContentSources } from "@/lib/content/store";
@@ -23,7 +23,7 @@ async function ProjectContent({ params, searchParams }: { params: Promise<{ proj
   const [{ projectId }, query, session] = await Promise.all([params, searchParams, requirePermission("workspace:view")]);
   const project = await getWorkspaceProject(projectId);
   if (!project) notFound();
-  const shellPromise = Promise.all([listWorkspaceProjects(), listWorkspaceTasks(), getStoredProductAgentModelSettings()]);
+  const shellPromise = Promise.all([listWorkspaceProjects(), listWorkspaceTasks(), listStoredProductAgentModelSettings()]);
   const selectedId = z.uuid().safeParse(query.item).success ? query.item : undefined;
   const canReview = hasPermission(session.user.role, "content:review");
   if (project.kind === "marketing") {
@@ -40,15 +40,15 @@ async function ProjectContent({ params, searchParams }: { params: Promise<{ proj
       shellPromise,
     ]);
     const [projects, tasks, settings] = shell;
-    const settingsPanel = <WorkspaceSettingsPanel settings={settings ?? undefined} canManage={hasPermission(session.user.role, "settings:manage")} />;
+    const settingsPanel = <WorkspaceSettingsPanel settings={settings} canManage={hasPermission(session.user.role, "settings:manage")} />;
     return <ProjectCanvas project={project} projects={projects} tasks={tasks} settingsPanel={settingsPanel} panels={{
-      product: <ProductPanel projectId={projectId} entries={productEntries} detail={productDetail} canReview={canReview} agentConfigured={Boolean(settings?.apiKeyConfigured || settings?.authTokenConfigured)} />,
+      product: <ProductPanel projectId={projectId} entries={productEntries} detail={productDetail} canReview={canReview} agentModelConfigs={settings} />,
       content: <ContentPanel projectId={projectId} products={contentProducts} entries={contentEntries} copyCandidates={contentCopyCandidates} detail={contentDetail} canReview={canReview} />,
     }} videoEditor={{ products: videoProducts, entries: videoEntries, copyCandidates: videoCopyCandidates, canReview, selectedId }} />;
   }
   const [rfqs, availableProducts, linkedProducts, shell] = await Promise.all([listProjectRfqEntries(projectId), listReadyProductContentSources(), listProjectReadyProductReferences(projectId), shellPromise]);
   const [projects, tasks, settings] = shell;
-  return <ProjectCanvas project={project} projects={projects} tasks={tasks} settingsPanel={<WorkspaceSettingsPanel settings={settings ?? undefined} canManage={hasPermission(session.user.role, "settings:manage")} />} panels={{
+  return <ProjectCanvas project={project} projects={projects} tasks={tasks} settingsPanel={<WorkspaceSettingsPanel settings={settings} canManage={hasPermission(session.user.role, "settings:manage")} />} panels={{
     rfq: <RfqPanel projectId={projectId} entries={rfqs} selectedId={selectedId} />,
     product: <ProductReferencePanel projectId={projectId} available={availableProducts} linked={linkedProducts} />,
     quotation: <QuotationHandoffPanel rfqs={rfqs} products={linkedProducts} />,

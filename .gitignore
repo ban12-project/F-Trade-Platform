@@ -52,3 +52,9 @@ blob-report/
 
 # Authorized local catalog references must never be committed or uploaded.
 docs/reference/*.pdf
+.vercel
+.env*.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

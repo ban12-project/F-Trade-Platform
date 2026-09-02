@@ -47,6 +47,8 @@ export const productReviewFormSchema = z.object({
 
 /** Deliberately accepts pre-authorized, sanitized text only; raw factory files stay in private evidence storage. */
 export const productAgentRunFormSchema = z.object({
+  modelConfigId: z.string().trim().min(1, "请选择模型配置。").max(120, "模型配置标识无效。"),
+  model: z.string().trim().min(1, "请选择模型。").max(240, "模型名称无效。"),
   sourceRef: privateReference.optional().or(z.literal("")),
   evidenceRef: privateReference.optional().or(z.literal("")),
   sourceText: z.string().trim().max(120_000, "资料文本不能超过 120000 个字符。"),
@@ -144,6 +146,9 @@ const modelProvider = z.enum(["openai", "anthropic", "google", "openai-compatibl
 const optionalProviderText = z.string().trim().max(2_000, "字段不能超过 2000 个字符。");
 
 export const productAgentModelSettingsSchema = z.object({
+  configId: z.string().trim().max(120, "模型配置标识无效。"),
+  name: z.string().trim().min(1, "请填写配置名称。").max(120, "配置名称不能超过 120 个字符。"),
+  isDefault: z.boolean(),
   provider: modelProvider,
   model: z.string().trim().min(1, "请填写模型名称。").max(240, "模型名称不能超过 240 个字符。"),
   baseUrl: z.string().trim().max(2_000, "端点不能超过 2000 个字符。").refine(

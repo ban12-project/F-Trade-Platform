@@ -1,0 +1,2 @@
+ALTER TABLE "video_upload_receipt" DROP CONSTRAINT "video_upload_receipt_size_positive";--> statement-breakpoint
+ALTER TABLE "video_upload_receipt" ADD CONSTRAINT "video_upload_receipt_size_positive" CHECK ("video_upload_receipt"."size_bytes" > 0 AND (("video_upload_receipt"."content_type" LIKE 'image/%' AND "video_upload_receipt"."size_bytes" <= 20971520) OR ("video_upload_receipt"."content_type" IN ('video/mp4', 'video/quicktime') AND "video_upload_receipt"."size_bytes" < 1073741824)));
