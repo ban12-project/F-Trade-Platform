@@ -30,9 +30,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test ProductMedia policies
-        run: |
-          pnpm exec tsx scripts/test-video-ready.ts
-          pnpm exec tsx scripts/test-product-media-persistence.ts
+        run: pnpm test:product-media
 
       - name: Set up Python
         uses: actions/setup-python@v5
