@@ -2,10 +2,9 @@ import "server-only";
 
 import { Sandbox } from "@vercel/sandbox";
 
-import { productMediaProbeSchema, type ProductMediaProbe } from "./media-service";
+import { parseProductMediaProbeOutput, type RawProductMediaProbe } from "./media-probe-parser";
+import type { ProductMediaProbe } from "./media-service";
 import type { SandboxVideoSource } from "../video/sandbox-sources";
-
-const maximumProductMediaDurationSeconds = 120;
 
 function sandboxImage() {
   const image = process.env.VIDEO_SANDBOX_IMAGE?.trim();
@@ -20,27 +19,6 @@ async function command(sandbox: Sandbox, executable: string, args: string[]) {
   }
   return result.stdout();
 }
-
-function frameRate(value: string | undefined) {
-  if (!value) return null;
-  const [numeratorText, denominatorText = "1"] = value.split("/");
-  const numerator = Number(numeratorText);
-  const denominator = Number(denominatorText);
-  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator <= 0 || denominator <= 0) return null;
-  const rate = numerator / denominator;
-  return Number.isFinite(rate) && rate > 0 ? rate : null;
-}
-
-type RawProbe = {
-  streams?: Array<{
-    codec_type?: string;
-    width?: number;
-    height?: number;
-    avg_frame_rate?: string;
-    r_frame_rate?: string;
-  }>;
-  format?: { duration?: string };
-};
 
 /**
  * Downloads one exact, short-lived private source into an isolated Sandbox and
@@ -74,47 +52,8 @@ export async function probeProductMediaEvidenceInSandbox(
       "-show_entries", "format=duration:stream=codec_type,width,height,avg_frame_rate,r_frame_rate",
       "-of", "json",
       input,
-    ])) as RawProbe;
-    const visual = raw.streams?.find((stream) => stream.codec_type === "video");
-    const width = Number(visual?.width);
-    const height = Number(visual?.height);
-    if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
-      throw new Error("无法从私有源文件读取有效画面尺寸。");
-    }
-
-    if (source.contentType.startsWith("image/")) {
-      return productMediaProbeSchema.parse({
-        mediaType: "image",
-        technical: {
-          contentType: source.contentType,
-          width,
-          height,
-          durationMs: null,
-          fps: null,
-          hasAudio: false,
-        },
-      });
-    }
-    if (!source.contentType.startsWith("video/")) throw new Error("产品媒体仅支持受控图片或视频类型。");
-
-    const durationSeconds = Number(raw.format?.duration);
-    const fps = frameRate(visual?.avg_frame_rate) ?? frameRate(visual?.r_frame_rate);
-    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > maximumProductMediaDurationSeconds) {
-      throw new Error(`产品视频时长必须介于 0 和 ${maximumProductMediaDurationSeconds} 秒之间。`);
-    }
-    if (fps === null) throw new Error("无法从产品视频读取有效帧率。");
-
-    return productMediaProbeSchema.parse({
-      mediaType: "video",
-      technical: {
-        contentType: source.contentType,
-        width,
-        height,
-        durationMs: Math.max(1, Math.round(durationSeconds * 1_000)),
-        fps,
-        hasAudio: raw.streams?.some((stream) => stream.codec_type === "audio") ?? false,
-      },
-    });
+    ])) as RawProductMediaProbe;
+    return parseProductMediaProbeOutput(raw, source.contentType);
   } finally {
     await sandbox.stop();
   }
