@@ -76,7 +76,144 @@
         "sample_available": {"type": "boolean"}
       }
     },
-    "approval_ref": {"type": "string", "minLength": 1}
+    "approval_ref": {"type": "string", "minLength": 1},
+    "media_assets": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {"$ref": "#/$defs/productMediaAsset"}
+    }
+  },
+  "$defs": {
+    "evidenceRef": {
+      "type": "string",
+      "pattern": "^evidence-[a-zA-Z0-9][a-zA-Z0-9_-]{2,120}$"
+    },
+    "productMediaAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "productId", "evidenceRef", "mediaType", "origin", "technical", "semantic", "rights", "review", "createdAt"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "productId": {"type": "string", "format": "uuid"},
+        "evidenceRef": {"$ref": "#/$defs/evidenceRef"},
+        "mediaType": {"enum": ["image", "video"]},
+        "origin": {"enum": ["factory", "user_upload", "licensed"]},
+        "technical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["contentType", "width", "height", "durationMs", "fps", "hasAudio"],
+          "properties": {
+            "contentType": {"type": "string", "pattern": "^(image|video)/[a-zA-Z0-9.+-]+$"},
+            "width": {"type": "integer", "minimum": 1, "maximum": 32768},
+            "height": {"type": "integer", "minimum": 1, "maximum": 32768},
+            "durationMs": {"type": ["integer", "null"], "minimum": 1, "maximum": 120000},
+            "fps": {"type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 240},
+            "hasAudio": {"type": "boolean"}
+          }
+        },
+        "semantic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["role", "description", "tags", "productVisible", "logoVisible", "textPresent"],
+          "properties": {
+            "role": {"enum": ["product_hero", "product_detail", "packaging", "factory", "inspection", "application", "other"]},
+            "description": {"type": "string", "maxLength": 500},
+            "tags": {"type": "array", "maxItems": 20, "items": {"type": "string", "minLength": 1, "maxLength": 64}},
+            "productVisible": {"type": "boolean"},
+            "logoVisible": {"type": "boolean"},
+            "textPresent": {"type": "boolean"}
+          }
+        },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rightsEvidenceRef", "editingAllowed", "publicDistributionAllowed", "paidAdvertisingAllowed", "imageToVideoAllowed", "referenceToVideoAllowed", "expiresAt"],
+          "properties": {
+            "rightsEvidenceRef": {"$ref": "#/$defs/evidenceRef"},
+            "editingAllowed": {"type": "boolean"},
+            "publicDistributionAllowed": {"type": "boolean"},
+            "paidAdvertisingAllowed": {"type": "boolean"},
+            "imageToVideoAllowed": {"type": "boolean"},
+            "referenceToVideoAllowed": {"type": "boolean"},
+            "expiresAt": {"type": ["string", "null"], "format": "date-time"}
+          },
+          "allOf": [
+            {
+              "if": {
+                "anyOf": [
+                  {"properties": {"imageToVideoAllowed": {"const": true}}, "required": ["imageToVideoAllowed"]},
+                  {"properties": {"referenceToVideoAllowed": {"const": true}}, "required": ["referenceToVideoAllowed"]}
+                ]
+              },
+              "then": {"properties": {"editingAllowed": {"const": true}}, "required": ["editingAllowed"]}
+            }
+          ]
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reviewedBy", "reviewedAt", "evidenceRef", "notes"],
+          "properties": {
+            "status": {"enum": ["pending", "approved", "rejected"]},
+            "reviewedBy": {"type": ["string", "null"], "minLength": 1, "maxLength": 240},
+            "reviewedAt": {"type": ["string", "null"], "format": "date-time"},
+            "evidenceRef": {"anyOf": [{"$ref": "#/$defs/evidenceRef"}, {"type": "null"}]},
+            "notes": {"type": "string", "maxLength": 1000}
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"status": {"const": "pending"}}, "required": ["status"]},
+              "then": {
+                "properties": {
+                  "reviewedBy": {"type": "null"},
+                  "reviewedAt": {"type": "null"},
+                  "evidenceRef": {"type": "null"}
+                }
+              },
+              "else": {
+                "properties": {
+                  "reviewedBy": {"type": "string", "minLength": 1, "maxLength": 240},
+                  "reviewedAt": {"type": "string", "format": "date-time"},
+                  "evidenceRef": {"$ref": "#/$defs/evidenceRef"}
+                }
+              }
+            }
+          ]
+        },
+        "createdAt": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"mediaType": {"const": "image"}}, "required": ["mediaType"]},
+          "then": {
+            "properties": {
+              "technical": {
+                "properties": {
+                  "contentType": {"type": "string", "pattern": "^image/"},
+                  "durationMs": {"type": "null"},
+                  "fps": {"type": "null"},
+                  "hasAudio": {"const": false}
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "technical": {
+                "properties": {
+                  "contentType": {"type": "string", "pattern": "^video/"},
+                  "durationMs": {"type": "integer", "minimum": 1, "maximum": 120000},
+                  "fps": {"type": "number", "exclusiveMinimum": 0, "maximum": 240}
+                }
+              },
+              "rights": {
+                "properties": {"imageToVideoAllowed": {"const": false}}
+              }
+            }
+          }
+        }
+      ]
+    }
   },
   "allOf": [
     {
