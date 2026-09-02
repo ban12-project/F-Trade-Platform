@@ -76,7 +76,15 @@ export const productMediaReviewFormSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
   evidenceRef: evidenceReferenceSchema,
   notes: z.string().trim().max(1_000, "审核备注不能超过 1000 个字符。"),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.decision === "rejected" && !value.notes) {
+    context.addIssue({
+      code: "custom",
+      path: ["notes"],
+      message: "拒绝或撤销产品媒体时必须填写原因。",
+    });
+  }
+});
 
 export type ProductMediaRegistrationFields = z.input<typeof productMediaRegistrationFieldsSchema>;
 export type ProductMediaRegistrationSubmission = z.infer<typeof productMediaRegistrationSubmissionSchema>;
