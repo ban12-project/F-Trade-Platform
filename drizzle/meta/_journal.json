@@ -141,6 +141,13 @@
       "when": 1788277879851,
       "tag": "0019_brave_tiger_shark",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788361081881,
+      "tag": "0020_product_media_asset",
+      "breakpoints": true
     }
   ]
 }
