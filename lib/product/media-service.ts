@@ -93,8 +93,9 @@ export function createPendingProductMediaAsset(
 }
 
 /**
- * Applies a human media decision. This approval governs media rights and
- * suitability only; it does not approve or create product engineering facts.
+ * Applies an independent human media decision. Pending media may be approved
+ * or rejected. Approved media may later be revoked with fresh evidence and a
+ * reason; rejected media is terminal and must be replaced by a new record.
  */
 export function applyProductMediaReview(
   assetInput: unknown,
@@ -106,9 +107,19 @@ export function applyProductMediaReview(
   const asset = productMediaAssetSchema.parse(assetInput);
   const review = reviewProductMediaInputSchema.parse(reviewInput);
   if (asset.id !== review.assetId) throw new Error("素材审核决定与目标素材不匹配。");
-  if (asset.review.status !== "pending") throw new Error("只有待审核素材可以提交审核决定。");
   if (!reviewerId.trim()) throw new Error("素材审核必须由明确的人工账号执行。");
+  if (Number.isNaN(reviewedAt.getTime())) throw new Error("素材审核时间无效。");
   if (!evidenceById(evidence).has(review.evidenceRef)) throw new Error("素材审核证据不存在。");
+
+  const currentStatus = asset.review.status;
+  const initialDecision = currentStatus === "pending";
+  const revocation = currentStatus === "approved" && review.decision === "rejected";
+  if (!initialDecision && !revocation) {
+    throw new Error("当前素材审核状态不允许该决定。");
+  }
+  if (revocation && !review.notes.trim()) {
+    throw new Error("撤销已批准素材时必须填写原因。");
+  }
 
   return productMediaAssetSchema.parse({
     ...asset,

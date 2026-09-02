@@ -171,7 +171,11 @@ export async function registerProductMediaAsset(
   });
 }
 
-/** Records an independent human media-rights/content decision. */
+/**
+ * Records an independent human media decision. Approval re-checks and locks
+ * ProductReady. Rejection and revocation remain available even if the product
+ * later leaves ProductReady, so unsafe media can always be disabled.
+ */
 export async function reviewProductMediaAsset(
   input: ReviewProductMediaInput,
   reviewerId: string,
@@ -186,17 +190,20 @@ export async function reviewProductMediaAsset(
       .for("update");
     if (!row) throw new Error("产品媒体不存在。");
 
-    const [productRow] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord)
-      .where(and(eq(aggregateRecord.id, row.productId), eq(aggregateRecord.type, "product")))
-      .for("update");
-    if (!productRow || productRow.state !== "PRODUCT_READY") {
-      throw new Error("产品已不再处于 ProductReady，不能批准其媒体。");
+    if (value.decision === "approved") {
+      const [productRow] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord)
+        .where(and(eq(aggregateRecord.id, row.productId), eq(aggregateRecord.type, "product")))
+        .for("update");
+      if (!productRow || productRow.state !== "PRODUCT_READY") {
+        throw new Error("产品已不再处于 ProductReady，不能批准其媒体。");
+      }
     }
 
     const [reviewEvidence] = await tx.select({ id: evidenceTable.id, contentType: evidenceTable.contentType })
       .from(evidenceTable)
       .where(eq(evidenceTable.id, value.evidenceRef))
       .limit(1);
+    const previousStatus = row.reviewStatus;
     const reviewedAt = new Date();
     const reviewed = applyProductMediaReview(
       rowToProductMediaAsset(row),
@@ -215,9 +222,15 @@ export async function reviewProductMediaAsset(
       version: sql`${productMediaAsset.version} + 1`,
       updatedAt: reviewedAt,
     }).where(eq(productMediaAsset.id, reviewed.id));
+
+    const action = reviewed.review.status === "approved"
+      ? "product_media.approved"
+      : previousStatus === "approved"
+        ? "product_media.revoked"
+        : "product_media.rejected";
     await tx.insert(auditEvent).values({
       id: randomUUID(),
-      action: reviewed.review.status === "approved" ? "product_media.approved" : "product_media.rejected",
+      action,
       actorType: "human",
       actorId: reviewerId,
       aggregateId: reviewed.productId,
@@ -225,6 +238,7 @@ export async function reviewProductMediaAsset(
       subjectId: reviewed.id,
       metadata: {
         decision: reviewed.review.status,
+        previous_status: previousStatus,
         evidence_ref: reviewed.review.evidenceRef,
       },
       occurredAt: reviewedAt,

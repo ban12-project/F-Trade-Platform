@@ -74,6 +74,7 @@ const evidence = [
   { id: "evidence-media-301", contentType: "image/jpeg" },
   { id: "evidence-rights-301", contentType: "application/json" },
   { id: "evidence-review-301", contentType: "application/json" },
+  { id: "evidence-revocation-301", contentType: "application/json" },
 ];
 
 const pending = createPendingProductMediaAsset(input, product, evidence, {
@@ -117,10 +118,34 @@ assert.equal(approved.review.reviewedAt, "2026-09-02T13:00:00.000Z");
 
 assert.throws(() => applyProductMediaReview(
   approved,
-  { assetId, decision: "rejected", evidenceRef: "evidence-review-301", notes: "" },
+  { assetId, decision: "rejected", evidenceRef: "evidence-revocation-301", notes: "" },
   "user-admin-301",
   evidence,
-), /只有待审核素材/);
+), /必须填写原因/);
+
+const revoked = applyProductMediaReview(
+  approved,
+  {
+    assetId,
+    decision: "rejected",
+    evidenceRef: "evidence-revocation-301",
+    notes: "The factory withdrew public-distribution permission.",
+  },
+  "user-admin-302",
+  evidence,
+  new Date("2026-09-02T14:00:00.000Z"),
+);
+assert.equal(revoked.review.status, "rejected");
+assert.equal(revoked.review.reviewedBy, "user-admin-302");
+assert.equal(revoked.review.evidenceRef, "evidence-revocation-301");
+assert.equal(revoked.review.reviewedAt, "2026-09-02T14:00:00.000Z");
+
+assert.throws(() => applyProductMediaReview(
+  revoked,
+  { assetId, decision: "approved", evidenceRef: "evidence-review-301", notes: "" },
+  "user-admin-301",
+  evidence,
+), /状态不允许/);
 
 assert.throws(() => applyProductMediaReview(
   pending,
@@ -141,4 +166,12 @@ assert.throws(() => applyProductMediaReview(
   evidence,
 ), /审核证据不存在/);
 
-console.log("PASS ProductMedia registration and review remain evidence-bound and human-controlled");
+assert.throws(() => applyProductMediaReview(
+  pending,
+  { assetId, decision: "approved", evidenceRef: "evidence-review-301", notes: "" },
+  "user-admin-301",
+  evidence,
+  new Date("invalid"),
+), /审核时间无效/);
+
+console.log("PASS ProductMedia registration, review, and revocation remain evidence-bound and human-controlled");
