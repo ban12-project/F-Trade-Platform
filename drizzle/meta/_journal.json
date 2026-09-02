@@ -148,6 +148,13 @@
       "when": 1788361081881,
       "tag": "0020_product_media_asset",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788362050266,
+      "tag": "0021_harden_product_media_asset",
+      "breakpoints": true
     }
   ]
 }
