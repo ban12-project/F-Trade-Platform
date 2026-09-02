@@ -6,17 +6,18 @@ on:
       - "lib/db/**"
       - "drizzle.config.ts"
       - ".github/workflows/generate-product-media-migration.yml"
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Check out pull-request branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -33,20 +34,12 @@ jobs:
       - name: Generate ProductMedia migration
         run: pnpm db:generate --name=product_media_asset
 
-      - name: Collect generated migration files
+      - name: Commit migration and remove one-shot workflow
         run: |
-          mkdir -p generated
-          git status --porcelain -- drizzle | while read -r status path; do
-            test -n "$path" || continue
-            mkdir -p "generated/$(dirname "$path")"
-            cp "$path" "generated/$path"
-          done
-          find generated -type f -print
-
-      - name: Upload generated migration
-        uses: actions/upload-artifact@v4
-        with:
-          name: product-media-migration
-          path: generated/
-          if-no-files-found: error
-          retention-days: 1
+          rm .github/workflows/generate-product-media-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add drizzle .github/workflows/generate-product-media-migration.yml
+          git diff --cached --stat
+          git commit -m "chore(db): generate ProductMedia migration"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
