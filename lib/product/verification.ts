@@ -1,6 +1,7 @@
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import productReadySchema from "../../contracts/data/product-ready.schema.json";
 import { compileContract } from "../contracts/validator";
+import type { ProductMediaAsset } from "./video-readiness";
 
 type ProductSection = Record<string, unknown>;
 
@@ -20,6 +21,7 @@ export interface ProductDraft {
 export interface ProductReady extends Omit<ProductDraft, "verification_status"> {
   verification_status: "verified";
   approval_ref: string;
+  media_assets?: ProductMediaAsset[];
 }
 
 export interface ProductApproval {
@@ -112,6 +114,10 @@ function assertApproval(draft: ProductDraft, approval: ProductApproval) {
   if (Number.isNaN(Date.parse(approval.decision.decided_at))) {
     throw new Error("Product approval requires a valid decision time");
   }
+}
+
+export function parseProductReadyRecord(value: unknown): ProductReady {
+  return parseProductReady(value);
 }
 
 export function reviewProductDraft(value: unknown): ProductDraft {
