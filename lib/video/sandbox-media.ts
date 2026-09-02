@@ -78,9 +78,10 @@ async function downloadSources(sandbox: Sandbox, assetRefs: string[], sources: S
 export async function probeProductMediaInSandbox(assetRef: string, sources: SignedSources) {
   const source = sources.get(assetRef);
   if (!source) throw new Error("无法读取产品媒体探测所需的私有素材。");
-  const sandbox = await createRestrictedMediaSandbox(sources);
+  const scopedSources = new Map([[assetRef, source]]);
+  const sandbox = await createRestrictedMediaSandbox(scopedSources);
   try {
-    const remote = await downloadSources(sandbox, [assetRef], sources);
+    const remote = await downloadSources(sandbox, [assetRef], scopedSources);
     const input = remote.get(assetRef);
     if (!input) throw new Error("Sandbox 未取得产品媒体源文件。");
     const report = JSON.parse(await command(sandbox, "ffprobe", [
