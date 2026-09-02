@@ -79,6 +79,10 @@ function mediaDimensions(asset: ProductMediaAsset) {
   return `${technical.width}×${technical.height}${duration}`;
 }
 
+function formatRightsExpiry(value: string) {
+  return new Date(value).toISOString().replace(".000Z", "Z");
+}
+
 function RegistrationForm({ projectId, productId }: { projectId: string; productId: string }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -289,7 +293,7 @@ function AssetCard({ projectId, productId, asset, canReview }: { projectId: stri
       <div className="text-xs text-muted-foreground">
         <p>源证据：{asset.evidenceRef}</p>
         <p>权利证据：{asset.rights.rightsEvidenceRef}</p>
-        {asset.rights.expiresAt ? <p>授权到期：{new Date(asset.rights.expiresAt).toLocaleString()}</p> : null}
+        {asset.rights.expiresAt ? <p>授权到期：{formatRightsExpiry(asset.rights.expiresAt)}</p> : null}
         {asset.review.evidenceRef ? <p>审核证据：{asset.review.evidenceRef}</p> : null}
       </div>
       {generative ? <Alert><SparklesIcon /><AlertTitle>仅记录生成式使用权</AlertTitle><AlertDescription>视频生成服务仍保持关闭；授权记录本身不会触发模型调用。</AlertDescription></Alert> : null}
