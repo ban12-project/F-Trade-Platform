@@ -69,6 +69,8 @@
     "test:video-workspace": "tsx scripts/test-video-workspace.ts",
     "test:video-material-intake": "tsx scripts/test-video-material-intake.ts",
     "test:video-presigned-upload": "tsx scripts/test-video-presigned-upload.ts",
+    "test:video-ready": "tsx scripts/test-video-ready.ts",
+    "test:product-media-store": "tsx scripts/test-product-media-store.ts",
     "test:ai-sdk-video-adapters": "tsx scripts/test-ai-sdk-video-adapters.ts",
     "test:video-media-probe": "tsx scripts/test-video-media-probe.ts",
     "test:video-timeline": "tsx scripts/test-video-timeline.ts",
