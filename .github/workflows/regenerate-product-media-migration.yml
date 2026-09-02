@@ -1,0 +1,60 @@
+name: regenerate-product-media-migration
+
+on:
+  pull_request:
+    paths:
+      - "lib/db/product-media-schema.ts"
+      - ".github/workflows/regenerate-product-media-migration.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull-request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Remove the unmerged migration generation
+        run: |
+          rm drizzle/0020_product_media_asset.sql drizzle/meta/0020_snapshot.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("drizzle/meta/_journal.json")
+          journal = json.loads(path.read_text())
+          entries = journal.get("entries", [])
+          if not entries or entries[-1].get("tag") != "0020_product_media_asset":
+              raise SystemExit("Expected 0020_product_media_asset as the latest migration")
+          journal["entries"] = entries[:-1]
+          path.write_text(json.dumps(journal, ensure_ascii=False, indent=2) + "\n")
+          PY
+
+      - name: Regenerate ProductMedia migration
+        run: pnpm db:generate --name=product_media_asset
+
+      - name: Commit migration and remove one-shot workflow
+        run: |
+          rm .github/workflows/regenerate-product-media-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add drizzle .github/workflows/regenerate-product-media-migration.yml
+          git diff --cached --stat
+          git commit -m "chore(db): regenerate hardened ProductMedia migration"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
