@@ -1,0 +1,44 @@
+name: regenerate-product-media-migration
+
+on:
+  pull_request:
+    paths:
+      - "lib/db/product-media-schema.ts"
+      - ".github/workflows/regenerate-product-media-migration.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull-request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate ProductMedia hardening migration
+        run: pnpm db:generate --name=harden_product_media_asset
+
+      - name: Commit migration and remove one-shot workflow
+        run: |
+          rm .github/workflows/regenerate-product-media-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add drizzle .github/workflows/regenerate-product-media-migration.yml
+          git diff --cached --stat
+          git commit -m "chore(db): generate ProductMedia hardening migration"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
