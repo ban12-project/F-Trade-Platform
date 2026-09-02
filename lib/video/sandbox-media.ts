@@ -31,8 +31,13 @@ async function createRestrictedMediaSandbox(sources: SignedSources) {
     networkPolicy: { allow: [...new Set([...sources.values()].map((source) => source.hostname))] },
     persistent: false,
   });
-  await sandbox.fs.mkdir("/vercel/sandbox/work", { recursive: true });
-  return sandbox;
+  try {
+    await sandbox.fs.mkdir("/vercel/sandbox/work", { recursive: true });
+    return sandbox;
+  } catch (error) {
+    await sandbox.stop();
+    throw error;
+  }
 }
 
 async function createMediaSandbox(sources: SignedSources) {
@@ -80,7 +85,7 @@ export async function probeProductMediaInSandbox(assetRef: string, sources: Sign
     if (!input) throw new Error("Sandbox 未取得产品媒体源文件。");
     const report = JSON.parse(await command(sandbox, "ffprobe", [
       "-v", "error",
-      "-show_entries", "format=duration:stream=codec_type,width,height,duration,avg_frame_rate,r_frame_rate:stream_disposition=attached_pic",
+      "-show_entries", "format=format_name,duration:stream=codec_type,codec_name,width,height,duration,avg_frame_rate,r_frame_rate:stream_disposition=attached_pic",
       "-of", "json",
       input,
     ])) as unknown;
