@@ -1,5 +1,8 @@
+import "server-only";
+
 import { Sandbox } from "@vercel/sandbox";
 
+import { parseProductMediaFfprobeReport } from "../product/media-probe";
 import type { VideoProject } from "./contracts";
 import type { MarketingVisualSample } from "./visual-sampling";
 import type { VideoRenderRequest } from "./rendering";
@@ -20,7 +23,7 @@ async function command(sandbox: Sandbox, executable: string, args: string[]) {
   return result.stdout();
 }
 
-async function createMediaSandbox(sources: SignedSources) {
+async function createRestrictedMediaSandbox(sources: SignedSources) {
   const sandbox = await Sandbox.create({
     image: sandboxImage(),
     timeout: 10 * 60 * 1_000,
@@ -28,14 +31,23 @@ async function createMediaSandbox(sources: SignedSources) {
     networkPolicy: { allow: [...new Set([...sources.values()].map((source) => source.hostname))] },
     persistent: false,
   });
-  const filters = await command(sandbox, "ffmpeg", ["-hide_banner", "-filters"]);
-  const encoders = await command(sandbox, "ffmpeg", ["-hide_banner", "-encoders"]);
-  if (!/\bsubtitles\b/.test(filters) || !/\blibx264\b/.test(encoders) || !/\baac\b/.test(encoders)) {
-    await sandbox.stop();
-    throw new Error("Sandbox FFmpeg 缺少 subtitles/libass、libx264 或 AAC 能力。");
-  }
   await sandbox.fs.mkdir("/vercel/sandbox/work", { recursive: true });
   return sandbox;
+}
+
+async function createMediaSandbox(sources: SignedSources) {
+  const sandbox = await createRestrictedMediaSandbox(sources);
+  try {
+    const filters = await command(sandbox, "ffmpeg", ["-hide_banner", "-filters"]);
+    const encoders = await command(sandbox, "ffmpeg", ["-hide_banner", "-encoders"]);
+    if (!/\bsubtitles\b/.test(filters) || !/\blibx264\b/.test(encoders) || !/\baac\b/.test(encoders)) {
+      throw new Error("Sandbox FFmpeg 缺少 subtitles/libass、libx264 或 AAC 能力。");
+    }
+    return sandbox;
+  } catch (error) {
+    await sandbox.stop();
+    throw error;
+  }
 }
 
 async function downloadSources(sandbox: Sandbox, assetRefs: string[], sources: SignedSources) {
@@ -51,6 +63,31 @@ async function downloadSources(sandbox: Sandbox, assetRefs: string[], sources: S
     remote.set(assetRef, destination);
   }
   return remote;
+}
+
+/**
+ * Downloads one exact private evidence object into a network-restricted
+ * Sandbox and derives technical metadata through ffprobe. The source content
+ * type comes from the evidence record carried by the signed source map.
+ */
+export async function probeProductMediaInSandbox(assetRef: string, sources: SignedSources) {
+  const source = sources.get(assetRef);
+  if (!source) throw new Error("无法读取产品媒体探测所需的私有素材。");
+  const sandbox = await createRestrictedMediaSandbox(sources);
+  try {
+    const remote = await downloadSources(sandbox, [assetRef], sources);
+    const input = remote.get(assetRef);
+    if (!input) throw new Error("Sandbox 未取得产品媒体源文件。");
+    const report = JSON.parse(await command(sandbox, "ffprobe", [
+      "-v", "error",
+      "-show_entries", "format=duration:stream=codec_type,width,height,duration,avg_frame_rate,r_frame_rate:stream_disposition=attached_pic",
+      "-of", "json",
+      input,
+    ])) as unknown;
+    return parseProductMediaFfprobeReport(source.contentType, report);
+  } finally {
+    await sandbox.stop();
+  }
 }
 
 function assTime(seconds: number) {
