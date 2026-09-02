@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import {
-  registerProductMediaInputSchema,
   reviewProductMediaInputSchema,
   type RegisterProductMediaInput,
   type ReviewProductMediaInput,
@@ -13,10 +12,9 @@ const evidenceReferenceSchema = z.string().trim().regex(
   "必须引用私有证据记录。",
 );
 
-export const productMediaRegistrationFormSchema = z.object({
+const registrationShape = {
   projectId: z.uuid("项目标识无效。"),
   productId: z.uuid("产品标识无效。"),
-  evidenceRef: evidenceReferenceSchema,
   origin: z.enum(["factory", "user_upload", "licensed"]),
   role: productMediaRoleSchema,
   description: z.string().trim().max(500, "素材说明不能超过 500 个字符。"),
@@ -31,14 +29,32 @@ export const productMediaRegistrationFormSchema = z.object({
   imageToVideoAllowed: z.boolean(),
   referenceToVideoAllowed: z.boolean(),
   rightsExpiresAt: z.string().trim().max(64, "授权到期时间格式不正确。"),
-}).strict().superRefine((value, context) => {
+} as const;
+
+function validateRegistrationRights(
+  value: {
+    imageToVideoAllowed: boolean;
+    referenceToVideoAllowed: boolean;
+    editingAllowed: boolean;
+    rightsExpiresAt: string;
+  },
+  context: z.RefinementCtx,
+) {
   if ((value.imageToVideoAllowed || value.referenceToVideoAllowed) && !value.editingAllowed) {
     context.addIssue({ code: "custom", path: ["editingAllowed"], message: "生成式使用必须同时取得编辑授权。" });
   }
   if (value.rightsExpiresAt && Number.isNaN(Date.parse(value.rightsExpiresAt))) {
     context.addIssue({ code: "custom", path: ["rightsExpiresAt"], message: "授权到期时间无效。" });
   }
-});
+}
+
+export const productMediaRegistrationFieldsSchema = z.object(registrationShape).strict()
+  .superRefine(validateRegistrationRights);
+
+export const productMediaRegistrationSubmissionSchema = z.object({
+  ...registrationShape,
+  receiptId: z.uuid("上传回执无效。"),
+}).strict().superRefine(validateRegistrationRights);
 
 export const productMediaReviewFormSchema = z.object({
   projectId: z.uuid("项目标识无效。"),
@@ -49,7 +65,8 @@ export const productMediaReviewFormSchema = z.object({
   notes: z.string().trim().max(1_000, "审核备注不能超过 1000 个字符。"),
 }).strict();
 
-export type ProductMediaRegistrationForm = z.infer<typeof productMediaRegistrationFormSchema>;
+export type ProductMediaRegistrationFields = z.infer<typeof productMediaRegistrationFieldsSchema>;
+export type ProductMediaRegistrationSubmission = z.infer<typeof productMediaRegistrationSubmissionSchema>;
 export type ProductMediaReviewForm = z.infer<typeof productMediaReviewFormSchema>;
 
 function booleanValue(value: FormDataEntryValue | undefined) {
@@ -66,13 +83,16 @@ function tags(value: string) {
 
 export function parseProductMediaRegistrationFormData(formData: FormData): {
   projectId: string;
-  input: RegisterProductMediaInput;
+  productId: string;
+  receiptId: string;
+  rightsEvidenceRef: string;
+  input: Omit<RegisterProductMediaInput, "evidenceRef">;
 } {
   const values = Object.fromEntries(formData);
-  const parsed = productMediaRegistrationFormSchema.parse({
+  const parsed = productMediaRegistrationSubmissionSchema.parse({
     projectId: textValue(values.projectId),
     productId: textValue(values.productId),
-    evidenceRef: textValue(values.evidenceRef),
+    receiptId: textValue(values.receiptId),
     origin: textValue(values.origin),
     role: textValue(values.role),
     description: textValue(values.description),
@@ -88,29 +108,33 @@ export function parseProductMediaRegistrationFormData(formData: FormData): {
     referenceToVideoAllowed: booleanValue(values.referenceToVideoAllowed),
     rightsExpiresAt: textValue(values.rightsExpiresAt),
   });
-  const input = registerProductMediaInputSchema.parse({
+  return {
+    projectId: parsed.projectId,
     productId: parsed.productId,
-    evidenceRef: parsed.evidenceRef,
-    origin: parsed.origin,
-    semantic: {
-      role: parsed.role,
-      description: parsed.description,
-      tags: tags(parsed.tags),
-      productVisible: parsed.productVisible,
-      logoVisible: parsed.logoVisible,
-      textPresent: parsed.textPresent,
+    receiptId: parsed.receiptId,
+    rightsEvidenceRef: parsed.rightsEvidenceRef,
+    input: {
+      productId: parsed.productId,
+      origin: parsed.origin,
+      semantic: {
+        role: parsed.role,
+        description: parsed.description,
+        tags: tags(parsed.tags),
+        productVisible: parsed.productVisible,
+        logoVisible: parsed.logoVisible,
+        textPresent: parsed.textPresent,
+      },
+      rights: {
+        rightsEvidenceRef: parsed.rightsEvidenceRef,
+        editingAllowed: parsed.editingAllowed,
+        publicDistributionAllowed: parsed.publicDistributionAllowed,
+        paidAdvertisingAllowed: parsed.paidAdvertisingAllowed,
+        imageToVideoAllowed: parsed.imageToVideoAllowed,
+        referenceToVideoAllowed: parsed.referenceToVideoAllowed,
+        expiresAt: parsed.rightsExpiresAt ? new Date(parsed.rightsExpiresAt).toISOString() : null,
+      },
     },
-    rights: {
-      rightsEvidenceRef: parsed.rightsEvidenceRef,
-      editingAllowed: parsed.editingAllowed,
-      publicDistributionAllowed: parsed.publicDistributionAllowed,
-      paidAdvertisingAllowed: parsed.paidAdvertisingAllowed,
-      imageToVideoAllowed: parsed.imageToVideoAllowed,
-      referenceToVideoAllowed: parsed.referenceToVideoAllowed,
-      expiresAt: parsed.rightsExpiresAt ? new Date(parsed.rightsExpiresAt).toISOString() : null,
-    },
-  });
-  return { projectId: parsed.projectId, input };
+  };
 }
 
 export function parseProductMediaReviewFormData(formData: FormData): {
