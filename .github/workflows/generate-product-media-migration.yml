@@ -1,0 +1,52 @@
+name: generate-product-media-migration
+
+on:
+  pull_request:
+    paths:
+      - "lib/db/**"
+      - "drizzle.config.ts"
+      - ".github/workflows/generate-product-media-migration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate ProductMedia migration
+        run: pnpm db:generate -- --name=product_media_asset
+
+      - name: Collect generated migration files
+        run: |
+          mkdir -p generated
+          git status --porcelain -- drizzle | while read -r status path; do
+            test -n "$path" || continue
+            mkdir -p "generated/$(dirname "$path")"
+            cp "$path" "generated/$path"
+          done
+          find generated -type f -print
+
+      - name: Upload generated migration
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-media-migration
+          path: generated/
+          if-no-files-found: error
+          retention-days: 1
