@@ -1,3 +1,5 @@
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -11,8 +13,10 @@ import { aggregateRecord, auditEvent, evidence as evidenceTable } from "../db/sc
 import {
   applyProductMediaReview,
   createPendingProductMediaAsset,
+  productMediaProbeSchema,
   registerProductMediaInputSchema,
   reviewProductMediaInputSchema,
+  type ProductMediaProbe,
   type RegisterProductMediaInput,
   type ReviewProductMediaInput,
 } from "./media-service";
@@ -121,13 +125,18 @@ async function loadProduct(productId: string, database: Database) {
   return { state: row.state, product };
 }
 
-/** Registers one reusable media record after private evidence and ProductReady checks. */
+/**
+ * Registers one reusable media record. User input carries only semantics and
+ * rights; technical facts must come from a trusted server-side media probe.
+ */
 export async function registerProductMediaAsset(
   input: RegisterProductMediaInput,
+  probeInput: ProductMediaProbe,
   actorId: string,
   database: Database = getDatabase(),
 ): Promise<ProductMediaAsset> {
   const value = registerProductMediaInputSchema.parse(input);
+  const probe = productMediaProbeSchema.parse(probeInput);
   if (!actorId.trim()) throw new Error("创建产品媒体需要明确的人工账号。");
 
   return database.transaction(async (tx) => {
@@ -145,7 +154,7 @@ export async function registerProductMediaAsset(
     const evidenceRows = await tx.select({ id: evidenceTable.id, contentType: evidenceTable.contentType })
       .from(evidenceTable)
       .where(inArray(evidenceTable.id, requiredEvidence));
-    const asset = createPendingProductMediaAsset(value, product, evidenceRows);
+    const asset = createPendingProductMediaAsset(value, probe, product, evidenceRows);
 
     await tx.insert(productMediaAsset).values(insertValues(asset, actorId));
     await tx.insert(auditEvent).values({

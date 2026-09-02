@@ -19,14 +19,43 @@ const evidenceReferenceSchema = z.string().trim().regex(
 export const registerProductMediaInputSchema = z.object({
   productId: z.uuid(),
   evidenceRef: evidenceReferenceSchema,
-  mediaType: z.enum(["image", "video"]),
   origin: z.enum(["factory", "user_upload", "licensed"]),
-  technical: productMediaTechnicalSchema,
   semantic: productMediaSemanticSchema,
   rights: productMediaRightsSchema,
 }).strict();
 
 export type RegisterProductMediaInput = z.infer<typeof registerProductMediaInputSchema>;
+
+/** Server-derived media facts. Never populate this object from form fields. */
+export const productMediaProbeSchema = z.object({
+  mediaType: z.enum(["image", "video"]),
+  technical: productMediaTechnicalSchema,
+}).strict().superRefine((probe, context) => {
+  if (!probe.technical.contentType.startsWith(`${probe.mediaType}/`)) {
+    context.addIssue({
+      code: "custom",
+      path: ["technical", "contentType"],
+      message: "媒体探测类型与 Content-Type 不一致。",
+    });
+  }
+  if (probe.mediaType === "image") {
+    if (probe.technical.durationMs !== null || probe.technical.fps !== null || probe.technical.hasAudio) {
+      context.addIssue({
+        code: "custom",
+        path: ["technical"],
+        message: "图片探测结果不能包含时长、帧率或音轨。",
+      });
+    }
+  } else if (probe.technical.durationMs === null || probe.technical.fps === null) {
+    context.addIssue({
+      code: "custom",
+      path: ["technical"],
+      message: "视频探测结果必须包含时长和帧率。",
+    });
+  }
+});
+
+export type ProductMediaProbe = z.infer<typeof productMediaProbeSchema>;
 
 export const reviewProductMediaInputSchema = z.object({
   assetId: z.uuid(),
@@ -47,17 +76,19 @@ function evidenceById(evidence: readonly ProductMediaEvidenceDescriptor[]) {
 }
 
 /**
- * Creates a pending metadata record from a ProductReady product and evidence
- * that the server has already resolved from private storage. It never accepts
- * public URLs and never turns media metadata into product facts.
+ * Creates a pending metadata record from a ProductReady product, private
+ * evidence, and a trusted server-side media probe. User-facing inputs cannot
+ * declare technical media facts or turn media metadata into product facts.
  */
 export function createPendingProductMediaAsset(
   input: unknown,
+  probeInput: unknown,
   product: ProductReady,
   evidence: readonly ProductMediaEvidenceDescriptor[],
   options: { id?: string; createdAt?: Date } = {},
 ): ProductMediaAsset {
   const value = registerProductMediaInputSchema.parse(input);
+  const probe = productMediaProbeSchema.parse(probeInput);
   if (product.verification_status !== "verified" || product.record_id !== value.productId) {
     throw new Error("只能把媒体绑定到匹配的 ProductReady 产品。");
   }
@@ -65,8 +96,8 @@ export function createPendingProductMediaAsset(
   const availableEvidence = evidenceById(evidence);
   const sourceEvidence = availableEvidence.get(value.evidenceRef);
   if (!sourceEvidence) throw new Error("产品媒体的私有源文件证据不存在。");
-  if (sourceEvidence.contentType !== value.technical.contentType) {
-    throw new Error("产品媒体技术类型与私有证据记录不一致。");
+  if (sourceEvidence.contentType !== probe.technical.contentType) {
+    throw new Error("产品媒体探测类型与私有证据记录不一致。");
   }
   if (!availableEvidence.has(value.rights.rightsEvidenceRef)) {
     throw new Error("产品媒体的权利证据不存在。");
@@ -76,9 +107,9 @@ export function createPendingProductMediaAsset(
     id: options.id ?? randomUUID(),
     productId: value.productId,
     evidenceRef: value.evidenceRef,
-    mediaType: value.mediaType,
+    mediaType: probe.mediaType,
     origin: value.origin,
-    technical: value.technical,
+    technical: probe.technical,
     semantic: value.semantic,
     rights: value.rights,
     review: {

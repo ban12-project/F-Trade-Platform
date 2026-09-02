@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   applyProductMediaReview,
   createPendingProductMediaAsset,
+  registerProductMediaInputSchema,
 } from "../lib/product/media-service";
 import type { ProductReady } from "../lib/product/verification";
 
@@ -41,16 +42,7 @@ const product: ProductReady = {
 const input = {
   productId,
   evidenceRef: "evidence-media-301",
-  mediaType: "image" as const,
   origin: "factory" as const,
-  technical: {
-    contentType: "image/jpeg",
-    width: 1600,
-    height: 1600,
-    durationMs: null,
-    fps: null,
-    hasAudio: false,
-  },
   semantic: {
     role: "product_hero" as const,
     description: "Authorized front product image",
@@ -70,6 +62,18 @@ const input = {
   },
 };
 
+const probe = {
+  mediaType: "image" as const,
+  technical: {
+    contentType: "image/jpeg",
+    width: 1600,
+    height: 1600,
+    durationMs: null,
+    fps: null,
+    hasAudio: false,
+  },
+};
+
 const evidence = [
   { id: "evidence-media-301", contentType: "image/jpeg" },
   { id: "evidence-rights-301", contentType: "application/json" },
@@ -77,7 +81,7 @@ const evidence = [
   { id: "evidence-revocation-301", contentType: "application/json" },
 ];
 
-const pending = createPendingProductMediaAsset(input, product, evidence, {
+const pending = createPendingProductMediaAsset(input, probe, product, evidence, {
   id: assetId,
   createdAt: new Date("2026-09-02T12:00:00.000Z"),
 });
@@ -87,17 +91,28 @@ assert.equal(pending.review.status, "pending");
 assert.equal(pending.review.reviewedBy, null);
 assert.equal(pending.createdAt, "2026-09-02T12:00:00.000Z");
 
+assert.throws(() => registerProductMediaInputSchema.parse({
+  ...input,
+  mediaType: "image",
+  technical: probe.technical,
+}), /Unrecognized key|unrecognized/i);
+
 assert.throws(() => createPendingProductMediaAsset(
   { ...input, productId: "00000000-0000-4000-8000-000000000399" },
+  probe,
   product,
   evidence,
 ), /ProductReady/);
 
-assert.throws(() => createPendingProductMediaAsset(input, product, evidence.filter((item) => item.id !== "evidence-rights-301")), /权利证据不存在/);
-assert.throws(() => createPendingProductMediaAsset(input, product, [
-  { id: "evidence-media-301", contentType: "image/png" },
-  { id: "evidence-rights-301", contentType: "application/json" },
-]), /技术类型/);
+assert.throws(() => createPendingProductMediaAsset(input, probe, product, evidence.filter((item) => item.id !== "evidence-rights-301")), /权利证据不存在/);
+assert.throws(() => createPendingProductMediaAsset(input, {
+  ...probe,
+  technical: { ...probe.technical, contentType: "image/png" },
+}, product, evidence), /探测类型/);
+assert.throws(() => createPendingProductMediaAsset(input, {
+  mediaType: "video",
+  technical: { ...probe.technical, contentType: "video/mp4" },
+}, product, evidence), /视频探测结果/);
 
 const approved = applyProductMediaReview(
   pending,
@@ -174,4 +189,4 @@ assert.throws(() => applyProductMediaReview(
   new Date("invalid"),
 ), /审核时间无效/);
 
-console.log("PASS ProductMedia registration, review, and revocation remain evidence-bound and human-controlled");
+console.log("PASS ProductMedia registration, trusted probing, review, and revocation remain evidence-bound");
