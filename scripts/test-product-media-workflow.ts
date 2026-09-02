@@ -39,6 +39,7 @@ assert.deepEqual(parsed.input.semantic.tags, ["product", "hero", "catalog"]);
 assert.equal(parsed.input.rights.expiresAt, "2027-09-03T00:00:00+08:00");
 assert.equal("evidenceRef" in parsed.input, false);
 
+const browserLocalExpiry = "2027-09-03T00:00";
 const browserFields = productMediaRegistrationFieldsSchema.parse({
   projectId,
   productId,
@@ -55,9 +56,9 @@ const browserFields = productMediaRegistrationFieldsSchema.parse({
   paidAdvertisingAllowed: false,
   imageToVideoAllowed: false,
   referenceToVideoAllowed: false,
-  rightsExpiresAt: "2027-09-03T00:00",
+  rightsExpiresAt: browserLocalExpiry,
 });
-assert.match(browserFields.rightsExpiresAt, /^2027-09-03T\d{2}:00:00\.000Z$/);
+assert.equal(browserFields.rightsExpiresAt, new Date(browserLocalExpiry).toISOString());
 
 assert.throws(() => productMediaRegistrationFieldsSchema.parse({
   projectId,
