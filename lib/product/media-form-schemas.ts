@@ -48,11 +48,24 @@ function validateRegistrationRights(
   }
 }
 
-export const productMediaRegistrationFieldsSchema = z.object(registrationShape).strict()
+const productMediaRegistrationFieldsBaseSchema = z.object(registrationShape).strict()
   .superRefine(validateRegistrationRights);
 
+/** Browser-local datetime values are normalized in the browser before submission. */
+export const productMediaRegistrationFieldsSchema = productMediaRegistrationFieldsBaseSchema.transform((value) => ({
+  ...value,
+  rightsExpiresAt: value.rightsExpiresAt ? new Date(value.rightsExpiresAt).toISOString() : "",
+}));
+
+const rightsExpirySubmissionSchema = z.union([
+  z.literal(""),
+  z.string().datetime({ offset: true, message: "授权到期时间必须包含时区。" }),
+]);
+
+/** The server rejects ambiguous timezone-free expiry values. */
 export const productMediaRegistrationSubmissionSchema = z.object({
   ...registrationShape,
+  rightsExpiresAt: rightsExpirySubmissionSchema,
   receiptId: z.uuid("上传回执无效。"),
 }).strict().superRefine(validateRegistrationRights);
 
@@ -65,7 +78,7 @@ export const productMediaReviewFormSchema = z.object({
   notes: z.string().trim().max(1_000, "审核备注不能超过 1000 个字符。"),
 }).strict();
 
-export type ProductMediaRegistrationFields = z.infer<typeof productMediaRegistrationFieldsSchema>;
+export type ProductMediaRegistrationFields = z.input<typeof productMediaRegistrationFieldsSchema>;
 export type ProductMediaRegistrationSubmission = z.infer<typeof productMediaRegistrationSubmissionSchema>;
 export type ProductMediaReviewForm = z.infer<typeof productMediaReviewFormSchema>;
 
@@ -131,7 +144,7 @@ export function parseProductMediaRegistrationFormData(formData: FormData): {
         paidAdvertisingAllowed: parsed.paidAdvertisingAllowed,
         imageToVideoAllowed: parsed.imageToVideoAllowed,
         referenceToVideoAllowed: parsed.referenceToVideoAllowed,
-        expiresAt: parsed.rightsExpiresAt ? new Date(parsed.rightsExpiresAt).toISOString() : null,
+        expiresAt: parsed.rightsExpiresAt || null,
       },
     },
   };
