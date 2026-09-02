@@ -198,7 +198,16 @@ export function assessProductVideoReadiness(
   mediaInput: readonly unknown[],
   evaluatedAt = new Date(),
 ): VideoReadyAssessment {
-  const media = mediaInput.map((asset) => productMediaAssetSchema.parse(asset));
+  if (Number.isNaN(evaluatedAt.getTime())) throw new Error("VideoReady 评估时间无效。");
+  const media: ProductMediaAsset[] = [];
+  const mediaIds = new Set<string>();
+  for (const input of mediaInput) {
+    const asset = productMediaAssetSchema.parse(input);
+    if (mediaIds.has(asset.id)) throw new Error(`产品媒体标识不能重复：${asset.id}`);
+    mediaIds.add(asset.id);
+    media.push(asset);
+  }
+
   const facts = verifiedFactPaths(product);
   const factSet = new Set(facts);
   const blockers: z.infer<typeof videoReadyIssueSchema>[] = [];

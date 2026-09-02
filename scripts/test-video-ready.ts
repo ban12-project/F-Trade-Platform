@@ -171,4 +171,13 @@ assert.throws(() => productMediaAssetSchema.parse({
   },
 }), /编辑授权/);
 
+assert.throws(
+  () => assessProductVideoReadiness(product, [baseAsset, baseAsset], evaluatedAt),
+  /产品媒体标识不能重复/,
+);
+assert.throws(
+  () => assessProductVideoReadiness(product, [baseAsset], new Date("invalid")),
+  /评估时间无效/,
+);
+
 console.log("PASS ProductMedia rights and VideoReady remain evidence-bound and generation-safe");

@@ -1,7 +1,10 @@
 import { Pool } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 
-import * as schema from "./schema";
+import * as productMediaSchema from "./product-media-schema";
+import * as coreSchema from "./schema";
+
+const schema = { ...coreSchema, ...productMediaSchema };
 
 function requireDatabaseUrl() {
   const value = process.env.DATABASE_URL;
