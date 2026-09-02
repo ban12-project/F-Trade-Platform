@@ -103,6 +103,12 @@ assert.deepEqual(parsedReview.input, {
   notes: "Source, rights, and visible product identity confirmed.",
 });
 
+const rejectedWithoutReason = new FormData();
+for (const [key, value] of review.entries()) rejectedWithoutReason.set(key, value);
+rejectedWithoutReason.set("decision", "rejected");
+rejectedWithoutReason.set("notes", "");
+assert.throws(() => parseProductMediaReviewFormData(rejectedWithoutReason), /必须填写原因/);
+
 review.set("evidenceRef", "https://example.com/review");
 assert.throws(() => parseProductMediaReviewFormData(review), /私有证据/);
 
