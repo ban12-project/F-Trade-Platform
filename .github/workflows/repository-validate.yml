@@ -30,7 +30,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test ProductMedia policies
-        run: pnpm test:product-media
+        run: pnpm test:product-media && pnpm test:product-media-workflow
 
       - name: Set up Python
         uses: actions/setup-python@v5
