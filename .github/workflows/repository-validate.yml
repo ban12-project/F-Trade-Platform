@@ -29,6 +29,11 @@ jobs:
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test ProductMedia policies
+        run: |
+          pnpm exec tsx scripts/test-video-ready.ts
+          pnpm exec tsx scripts/test-product-media-persistence.ts
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
