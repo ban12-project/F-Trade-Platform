@@ -41,3 +41,6 @@ jobs:
 
       - name: Validate contracts and repository hygiene
         run: python scripts/validate_repository.py
+
+      - name: Test ProductMedia and VideoReady policies
+        run: pnpm test:video-ready && pnpm test:product-media-store
