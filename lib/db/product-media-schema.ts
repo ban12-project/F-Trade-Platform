@@ -49,7 +49,9 @@ export const productMediaAsset = pgTable(
     logoVisible: boolean("logo_visible").default(false).notNull(),
     textPresent: boolean("text_present").default(false).notNull(),
 
-    rightsEvidenceRef: text("rights_evidence_ref").notNull(),
+    rightsEvidenceRef: text("rights_evidence_ref")
+      .notNull()
+      .references(() => evidence.id, { onDelete: "restrict" }),
     editingAllowed: boolean("editing_allowed").default(false).notNull(),
     publicDistributionAllowed: boolean("public_distribution_allowed").default(false).notNull(),
     paidAdvertisingAllowed: boolean("paid_advertising_allowed").default(false).notNull(),
@@ -60,7 +62,7 @@ export const productMediaAsset = pgTable(
     reviewStatus: text("review_status").default("pending").notNull(),
     reviewedBy: text("reviewed_by").references(() => user.id, { onDelete: "restrict" }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-    reviewEvidenceRef: text("review_evidence_ref"),
+    reviewEvidenceRef: text("review_evidence_ref").references(() => evidence.id, { onDelete: "restrict" }),
     reviewNotes: text("review_notes").default("").notNull(),
 
     version: integer("version").default(1).notNull(),
@@ -79,12 +81,15 @@ export const productMediaAsset = pgTable(
     check("product_media_type_allowed", sql`${table.mediaType} in ('image', 'video')`),
     check("product_media_role_allowed", sql`${table.role} in ('product_hero', 'product_detail', 'packaging', 'factory', 'inspection', 'application', 'other')`),
     check("product_media_review_status_allowed", sql`${table.reviewStatus} in ('pending', 'approved', 'rejected')`),
-    check("product_media_dimensions_positive", sql`${table.width} > 0 and ${table.height} > 0`),
+    check("product_media_dimensions_bounded", sql`${table.width} between 1 and 32768 and ${table.height} between 1 and 32768`),
     check("product_media_version_positive", sql`${table.version} > 0`),
     check("product_media_content_type_matches", sql`lower(${table.contentType}) like (${table.mediaType} || '/%')`),
+    check("product_media_description_bounded", sql`length(${table.description}) <= 500`),
+    check("product_media_review_notes_bounded", sql`length(${table.reviewNotes}) <= 1000`),
+    check("product_media_tags_array", sql`jsonb_typeof(${table.tags}) = 'array'`),
     check(
       "product_media_technical_consistent",
-      sql`(${table.mediaType} = 'image' and ${table.durationMs} is null and ${table.fps} is null and not ${table.hasAudio}) or (${table.mediaType} = 'video' and ${table.durationMs} > 0 and ${table.fps} > 0)`,
+      sql`(${table.mediaType} = 'image' and ${table.durationMs} is null and ${table.fps} is null and not ${table.hasAudio}) or (${table.mediaType} = 'video' and ${table.durationMs} between 1 and 120000 and ${table.fps} > 0 and ${table.fps} <= 240)`,
     ),
     check(
       "product_media_generation_requires_editing",
@@ -96,7 +101,7 @@ export const productMediaAsset = pgTable(
     ),
     check(
       "product_media_review_consistent",
-      sql`(${table.reviewStatus} = 'pending' and ${table.reviewedBy} is null and ${table.reviewedAt} is null and ${table.reviewEvidenceRef} is null) or (${table.reviewStatus} in ('approved', 'rejected') and ${table.reviewedBy} is not null and ${table.reviewedAt} is not null and length(btrim(${table.reviewEvidenceRef})) > 0)`,
+      sql`(${table.reviewStatus} = 'pending' and ${table.reviewedBy} is null and ${table.reviewedAt} is null and ${table.reviewEvidenceRef} is null) or (${table.reviewStatus} in ('approved', 'rejected') and ${table.reviewedBy} is not null and ${table.reviewedAt} is not null and ${table.reviewEvidenceRef} is not null and length(btrim(${table.reviewEvidenceRef})) > 0)`,
     ),
     check("product_media_rights_evidence_nonempty", sql`length(btrim(${table.rightsEvidenceRef})) > 0`),
     check("product_media_creator_nonempty", sql`length(btrim(${table.createdBy})) > 0`),
