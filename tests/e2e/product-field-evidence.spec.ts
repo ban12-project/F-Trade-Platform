@@ -12,9 +12,9 @@ test("manual product intake exposes one evidence input per fact", async ({ page 
   const form = page.locator("form#create-product");
   await expect(form.getByText("每个事实必须绑定自己的私有证据", { exact: false })).toBeVisible();
   await expect(form.locator('input[id$="-evidence"]')).toHaveCount(11);
-  await expect(form.getByLabel("产品名称证据", { exact: true })).toBeRequired();
-  await expect(form.getByLabel("产品类型证据", { exact: true })).toBeRequired();
-  await expect(form.getByLabel("内部编号证据", { exact: true })).toBeRequired();
+  await expect(form.getByLabel("产品名称证据", { exact: true })).toHaveAttribute("required", "");
+  await expect(form.getByLabel("产品类型证据", { exact: true })).toHaveAttribute("required", "");
+  await expect(form.getByLabel("内部编号证据", { exact: true })).toHaveAttribute("required", "");
   await expect(form.locator("#evidence-ref")).toHaveCount(0);
 
   await form.getByLabel("产品名称", { exact: true }).fill("Synthetic clutch disc");
