@@ -15,7 +15,7 @@ import type { ProductReady } from "@/lib/product/verification";
 
 import { videoProjectSchema } from "./contracts";
 import { buildVideoCreative } from "./creative";
-import { createMarketingVideoDraftFormSchema, marketingVideoDraftSchema } from "./edit-contracts";
+import { createMarketingVideoFromProductMediaSchema, marketingVideoDraftSchema } from "./edit-contracts";
 
 const parseProductReady = compileContract<ProductReady>(productReadySchema);
 type ProductMediaRow = typeof productMediaAsset.$inferSelect;
@@ -73,8 +73,7 @@ export async function createMarketingVideoEditProjectFromProductMedia(
   actorId: string,
   database: Database = getDatabase(),
 ) {
-  const value = createMarketingVideoDraftFormSchema.parse(input);
-  if (value.sourceMode !== "product_media") throw new Error("该入口只接受已审核产品媒体。");
+  const value = createMarketingVideoFromProductMediaSchema.parse(input);
   if (!actorId.trim()) throw new Error("创建营销视频需要明确的人工账号。");
 
   const id = randomUUID();
