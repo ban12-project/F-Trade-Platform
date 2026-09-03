@@ -180,3 +180,9 @@ test("marketing video panel exposes upload and post-render review without genera
   await expect(page.getByRole("button", { name: "退回修改" })).toBeVisible();
   await expect(page.getByRole("button", { name: "通过成片" })).toBeVisible();
 });
+
+test("approved marketing video exposes its controlled MP4 download", async ({ page }) => {
+  await page.goto("/testing/project-canvas?panel=video&state=approved");
+  await expect(page.getByRole("link", { name: "下载 MP4" })).toHaveAttribute("href", "/api/video-download/00000000-0000-4000-8000-000000000401");
+  await expect(page.getByRole("button", { name: "通过成片" })).toHaveCount(0);
+});

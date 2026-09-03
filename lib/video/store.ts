@@ -23,6 +23,7 @@ export type MarketingVideoEditorEntry = VideoWorkspaceEntry & {
   draft: MarketingVideoDraft;
   targetAudience: string;
   captionFactOptions: Array<{ field: string; value: string }>;
+  downloadAvailable: boolean;
   processingJob: VideoProcessingSummary | null;
 };
 export type MarketingVideoCopyCandidate = { id: string; projectTitle: string; productName: string; objective: string };
@@ -120,6 +121,7 @@ export async function listProjectMarketingVideoEntries(projectId: string, databa
       previewAssetRef: project.data.renderedAssetRef ?? null,
       draft: project.data.editDraft,
       captionFactOptions: project.data.factualClaims.map(({ field, value }) => ({ field, value })),
+      downloadAvailable: record.state === "VIDEO_APPROVED" && project.data.exportArtifact?.status === "approved",
       processingJob: jobsByVideo.get(record.id) ?? null,
     }];
   });

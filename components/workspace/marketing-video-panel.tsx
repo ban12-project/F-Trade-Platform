@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowDownIcon, ArrowUpIcon, BotIcon, CopyIcon, FilmIcon, PlusIcon, SaveIcon, ScissorsIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, BotIcon, CopyIcon, DownloadIcon, FilmIcon, PlusIcon, SaveIcon, ScissorsIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -19,7 +19,7 @@ import {
 import { initialMarketingVideoActionState } from "@/lib/action-states";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -155,7 +155,7 @@ function EditVideo({ projectId, entry, canReview, onDirtyChange }: { projectId: 
   return <div className="flex flex-col gap-4">
     <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{stateLabel(entry.state)}</Badge>{processing ? <Badge>后台处理中</Badge> : null}<Badge variant="outline">{entry.draft.platform}</Badge><Badge variant="outline">最长 15 秒</Badge></div>
     <div><h3 className="font-medium">{entry.productName}</h3><p className="mt-1 text-sm text-muted-foreground">{entry.objective}</p></div>
-    {entry.previewAssetRef ? <Card><CardHeader><CardTitle>私有预览</CardTitle><CardDescription>审核通过也不会自动发布。</CardDescription></CardHeader><CardContent><video className="aspect-video w-full rounded-lg bg-muted" controls preload="metadata" src={`/api/video-preview/${entry.previewAssetRef}`} /></CardContent></Card> : null}
+    {entry.previewAssetRef ? <Card><CardHeader><CardTitle>私有预览</CardTitle><CardDescription>审核通过也不会自动发布。</CardDescription></CardHeader><CardContent><video className="aspect-video w-full rounded-lg bg-muted" controls preload="metadata" src={`/api/video-preview/${entry.previewAssetRef}`} /></CardContent>{entry.downloadAvailable ? <CardFooter><LinkButton className="w-full" href={`/api/video-download/${entry.id}`} download prefetch={false}><DownloadIcon data-icon="inline-start" />下载 MP4</LinkButton></CardFooter> : null}</Card> : null}
     {editable ? <>
       <Progress aria-label="视频总时长" value={Math.min(100, durationMs / 150)}><ProgressLabel>总时长</ProgressLabel><ProgressValue>{() => `${(durationMs / 1_000).toFixed(1)} / 15 秒`}</ProgressValue></Progress>
       {durationMs > 15_000 ? <Alert variant="destructive"><AlertTitle>视频过长</AlertTitle><AlertDescription>请缩短片段，总时长必须不超过 15 秒。</AlertDescription></Alert> : null}
