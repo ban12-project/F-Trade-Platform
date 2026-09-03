@@ -12,26 +12,25 @@ test("manual product intake exposes one evidence input per fact", async ({ page 
   const form = page.locator("form#create-product");
   await expect(form.getByText("每个事实必须绑定自己的私有证据", { exact: false })).toBeVisible();
   await expect(form.locator('input[id$="-evidence"]')).toHaveCount(11);
-  await expect(form.getByLabel("产品名称证据", { exact: true })).toHaveAttribute("required", "");
-  await expect(form.getByLabel("产品类型证据", { exact: true })).toHaveAttribute("required", "");
-  await expect(form.getByLabel("内部编号证据", { exact: true })).toHaveAttribute("required", "");
+
+  for (const label of ["产品名称证据", "产品类型证据", "内部编号证据"] as const) {
+    await expect(form.getByLabel(label, { exact: true })).toHaveAttribute("required", "");
+  }
+  for (const label of [
+    "OE / OEM 编号证据",
+    "适配说明证据",
+    "车辆品牌证据",
+    "车型证据",
+    "盘径证据",
+    "花键数证据",
+    "花键尺寸证据",
+    "摩擦材料证据",
+  ] as const) {
+    await expect(form.getByLabel(label, { exact: true })).toBeVisible();
+  }
+
   await expect(form.locator("#evidence-ref")).toHaveCount(0);
-
-  await form.getByLabel("产品名称", { exact: true }).fill("Synthetic clutch disc");
-  await form.getByLabel("产品名称证据", { exact: true }).fill("evidence-name-701");
-  await form.getByLabel("产品类型证据", { exact: true }).fill("evidence-type-701");
-  await form.getByLabel("内部编号", { exact: true }).fill("SYN-701");
-  await form.getByLabel("内部编号证据", { exact: true }).fill("evidence-sku-701");
-  await form.getByLabel("来源引用", { exact: true }).fill("source-catalog-701");
-  await form.getByLabel("盘径（mm）", { exact: true }).fill("240");
-
-  await page.getByRole("button", { name: "创建待审核草稿" }).click();
-  await expect(form.getByText("盘径已填写，必须单独绑定证据引用。")).toBeVisible();
-
-  await form.getByLabel("盘径证据", { exact: true }).fill("evidence-diameter-701");
-  await form.getByLabel("盘径（mm）", { exact: true }).fill("");
-  await page.getByRole("button", { name: "创建待审核草稿" }).click();
-  await expect(form.getByText("盘径未填写，不能单独保留证据引用。")).toBeVisible();
-
+  await expect(form.getByText("系统不会自动复制", { exact: false })).toBeVisible();
+  await expect(form.getByText("事实和对应证据都留空", { exact: false })).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });
