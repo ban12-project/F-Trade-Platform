@@ -128,6 +128,27 @@ export const safeAiCtaTexts = [
   "Start a distributor inquiry",
 ] as const;
 
+export const marketingVideoAbcdRoles = ["attention", "branding", "connection", "direction"] as const;
+export const marketingVideoAbcdRoleSchema = z.enum(marketingVideoAbcdRoles);
+export const marketingVideoMotionPresetSchema = z.enum(["punch_in", "hero_reveal", "slow_pan", "cta_hold"]);
+
+export type MarketingVideoAbcdRole = z.infer<typeof marketingVideoAbcdRoleSchema>;
+
+function defaultAbcdRoles(index: number, clipCount: number): MarketingVideoAbcdRole[] {
+  if (clipCount === 1) return [...marketingVideoAbcdRoles];
+  if (clipCount === 2) return index === 0 ? ["attention", "branding"] : ["connection", "direction"];
+  if (index === 0) return ["attention", "branding"];
+  if (index === 1) return ["connection"];
+  return ["direction"];
+}
+
+function defaultMotionPreset(roles: MarketingVideoAbcdRole[]) {
+  if (roles.includes("attention")) return "punch_in" as const;
+  if (roles.includes("branding")) return "hero_reveal" as const;
+  if (roles.includes("connection")) return "slow_pan" as const;
+  return "cta_hold" as const;
+}
+
 /**
  * Keep the model-facing caption contract as one flat object. Some structured-output
  * providers reject the `oneOf` emitted by Zod discriminated unions before the
@@ -150,7 +171,7 @@ const marketingVideoAiCaptionSchema = z.object({
   }
 });
 
-export const marketingVideoClipSchema = z.object({
+const marketingVideoClipV2Schema = z.object({
   clipId: z.string().trim().regex(/^clip-[a-z0-9][a-z0-9_-]{2,80}$/i, "片段标识无效。"),
   assetRef: privateAssetRef,
   mediaType: z.enum(["image", "video"]),
@@ -168,10 +189,51 @@ export const marketingVideoClipSchema = z.object({
   }
 });
 
+export const marketingVideoClipSchema = z.object({
+  ...marketingVideoClipV2Schema.shape,
+  abcdRoles: z.array(marketingVideoAbcdRoleSchema).min(1, "每个片段至少承担一个 ABCD 节拍。").max(4),
+  motionPreset: marketingVideoMotionPresetSchema,
+}).strict().superRefine((clip, context) => {
+  if (new Set(clip.abcdRoles).size !== clip.abcdRoles.length) {
+    context.addIssue({ code: "custom", path: ["abcdRoles"], message: "同一片段的 ABCD 节拍不能重复。" });
+  }
+  if (clip.mediaType === "image" && clip.trimStartMs !== 0) {
+    context.addIssue({ code: "custom", path: ["trimStartMs"], message: "图片素材不能设置起始裁剪时间。" });
+  }
+  if (clip.mediaType === "image" && clip.audioMode !== "muted") {
+    context.addIssue({ code: "custom", path: ["audioMode"], message: "图片素材没有可保留的原声。" });
+  }
+});
+
+const marketingVideoDraftV3Schema = z.object({
+  version: z.literal(3),
+  creativeFramework: z.literal("google_abcd"),
+  platform: editingPlatformSchema,
+  clips: z.array(marketingVideoClipSchema).min(1, "至少需要一个片段。").max(3, "MVP1 最多支持三个片段。"),
+  ctaText: creativeMarketingText(40, "CTA 不能超过 40 个字符。"),
+}).strict().superRefine((draft, context) => {
+  const totalDurationMs = draft.clips.reduce((total, clip) => total + clip.durationMs, 0);
+  if (totalDurationMs > 15_000) {
+    context.addIssue({ code: "custom", path: ["clips"], message: "整条营销视频不能超过 15 秒。" });
+  }
+  const clipIds = new Set<string>();
+  for (const [index, clip] of draft.clips.entries()) {
+    if (clipIds.has(clip.clipId)) context.addIssue({ code: "custom", path: ["clips", index, "clipId"], message: "片段标识不能重复。" });
+    clipIds.add(clip.clipId);
+  }
+  const coveredRoles = new Set(draft.clips.flatMap((clip) => clip.abcdRoles));
+  for (const role of marketingVideoAbcdRoles) {
+    if (!coveredRoles.has(role)) context.addIssue({ code: "custom", path: ["clips"], message: `ABCD 创意结构缺少 ${role} 节拍。` });
+  }
+  if (!draft.clips[0]?.abcdRoles.includes("attention")) context.addIssue({ code: "custom", path: ["clips", 0, "abcdRoles"], message: "Attention 必须从第一个片段开始。" });
+  if (!draft.clips[0]?.abcdRoles.includes("branding")) context.addIssue({ code: "custom", path: ["clips", 0, "abcdRoles"], message: "Branding 必须在第一个片段出现。" });
+  if (!draft.clips.at(-1)?.abcdRoles.includes("direction")) context.addIssue({ code: "custom", path: ["clips"], message: "Direction 必须由最后一个片段收束。" });
+});
+
 const marketingVideoDraftV2Schema = z.object({
   version: z.literal(2),
   platform: editingPlatformSchema,
-  clips: z.array(marketingVideoClipSchema).min(1, "至少需要一个片段。").max(3, "MVP1 最多支持三个片段。"),
+  clips: z.array(marketingVideoClipV2Schema).min(1, "至少需要一个片段。").max(3, "MVP1 最多支持三个片段。"),
   ctaText: z.literal("").or(creativeMarketingText(40, "CTA 不能超过 40 个字符。")),
 }).strict().superRefine((draft, context) => {
   const totalDurationMs = draft.clips.reduce((total, clip) => total + clip.durationMs, 0);
@@ -183,7 +245,16 @@ const marketingVideoDraftV2Schema = z.object({
     if (clipIds.has(clip.clipId)) context.addIssue({ code: "custom", path: ["clips", index, "clipId"], message: "片段标识不能重复。" });
     clipIds.add(clip.clipId);
   }
-});
+}).transform((draft) => marketingVideoDraftV3Schema.parse({
+  version: 3,
+  creativeFramework: "google_abcd",
+  platform: draft.platform,
+  clips: draft.clips.map((clip, index) => {
+    const abcdRoles = defaultAbcdRoles(index, draft.clips.length);
+    return { ...clip, abcdRoles, motionPreset: defaultMotionPreset(abcdRoles) };
+  }),
+  ctaText: draft.ctaText || "Contact our sales team",
+}));
 
 const legacyMarketingVideoClipSchema = z.object({
   clipId: z.string().trim().regex(/^clip-[a-z0-9][a-z0-9_-]{2,80}$/i, "片段标识无效。"),
@@ -226,8 +297,8 @@ const legacyMarketingVideoDraftSchema = z.object({
   ctaText: draft.ctaText,
 }));
 
-/** Reads safe legacy v1 drafts but always returns the governed v2 shape. */
-export const marketingVideoDraftSchema = z.union([marketingVideoDraftV2Schema, legacyMarketingVideoDraftSchema]);
+/** Reads safe legacy drafts but always returns the governed ABCD v3 shape. */
+export const marketingVideoDraftSchema = z.union([marketingVideoDraftV3Schema, marketingVideoDraftV2Schema, legacyMarketingVideoDraftSchema]);
 
 export const marketingVideoAiDraftSchema = z.object({
   clips: z.array(z.object({
@@ -236,9 +307,20 @@ export const marketingVideoAiDraftSchema = z.object({
     fitMode: z.enum(["contain", "cover"]),
     audioMode: z.enum(["muted", "source"]),
     caption: marketingVideoAiCaptionSchema,
+    abcdRoles: z.array(marketingVideoAbcdRoleSchema).min(1).max(4),
+    motionPreset: marketingVideoMotionPresetSchema,
   }).strict()).min(1).max(3),
-  ctaText: z.enum(["", ...safeAiCtaTexts]),
-}).strict();
+  ctaText: z.enum(safeAiCtaTexts),
+}).strict().superRefine((draft, context) => {
+  const coveredRoles = new Set(draft.clips.flatMap((clip) => clip.abcdRoles));
+  for (const role of marketingVideoAbcdRoles) {
+    if (!coveredRoles.has(role)) context.addIssue({ code: "custom", path: ["clips"], message: `AI 初稿缺少 ${role} 节拍。` });
+  }
+  if (!draft.clips[0]?.abcdRoles.includes("attention") || !draft.clips[0]?.abcdRoles.includes("branding")) {
+    context.addIssue({ code: "custom", path: ["clips", 0, "abcdRoles"], message: "AI 初稿必须在第一个片段完成 Attention 和早期 Branding。" });
+  }
+  if (!draft.clips.at(-1)?.abcdRoles.includes("direction")) context.addIssue({ code: "custom", path: ["clips"], message: "AI 初稿必须在最后一个片段完成 Direction。" });
+});
 
 export type MarketingVideoClip = z.infer<typeof marketingVideoClipSchema>;
 export type MarketingVideoCaption = z.infer<typeof marketingVideoCaptionSchema>;

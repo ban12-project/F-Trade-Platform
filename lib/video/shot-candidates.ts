@@ -75,7 +75,9 @@ export function compileMarketingVideoAiDraft(input: {
       fitMode: clip.fitMode,
       audioMode: clip.audioMode,
       caption,
+      abcdRoles: clip.abcdRoles,
+      motionPreset: clip.motionPreset,
     };
   });
-  return marketingVideoDraftSchema.parse({ version: 2, platform: input.platform, clips, ctaText: suggestion.ctaText });
+  return marketingVideoDraftSchema.parse({ version: 3, creativeFramework: "google_abcd", platform: input.platform, clips, ctaText: suggestion.ctaText });
 }
