@@ -195,21 +195,25 @@ export async function createProductAgentDraft(draft: ProductDraft, actorId: stri
   return { id, approvalId, draft };
 }
 
+export function productCatalogDisplayIdentity(product: ProductDraft["product"] | undefined) {
+  return {
+    productName: typeof product?.product_name === "string" ? product.product_name : "未填写产品名称",
+    internalSku: typeof product?.internal_sku === "string" ? product.internal_sku : "未填写产品编号",
+  };
+}
+
 function catalogEntry(
   row: typeof aggregateRecord.$inferSelect,
   approvalRow?: Pick<typeof approval.$inferSelect, "id" | "status">,
-): ProductCatalogEntry | null {
+): ProductCatalogEntry {
   const payload = row.payload as Partial<ProductDraft>;
-  const product = payload.product;
-  if (!product || typeof product.product_name !== "string" || typeof product.internal_sku !== "string") {
-    return null;
-  }
+  const product = payload.product ?? {};
+  const identity = productCatalogDisplayIdentity(payload.product);
   return {
     id: row.id,
     state: row.state,
     createdAt: row.createdAt,
-    productName: product.product_name,
-    internalSku: product.internal_sku,
+    ...identity,
     productType: typeof product.product_type === "string" ? product.product_type : "unknown",
     verificationStatus: typeof payload.verification_status === "string" ? payload.verification_status : "review_required",
     blockingFields: Array.isArray(payload.blocking_missing_fields)
@@ -234,10 +238,7 @@ async function catalogEntriesForRows(rows: Array<typeof aggregateRecord.$inferSe
       approvalsByAggregate.set(approvalRow.aggregateId, approvalRow);
     }
   }
-  return rows.flatMap((row) => {
-    const entry = catalogEntry(row, approvalsByAggregate.get(row.id));
-    return entry ? [entry] : [];
-  });
+  return rows.map((row) => catalogEntry(row, approvalsByAggregate.get(row.id)));
 }
 
 export async function listProductCatalogEntries(limit = 50) {
@@ -295,7 +296,6 @@ export async function getProductCatalogDetail(productId: string): Promise<Produc
     .orderBy(desc(approval.requestedAt), desc(approval.createdAt))
     .limit(1);
   const entry = catalogEntry(row, approvalRow);
-  if (!entry) return null;
   return { ...entry, draft: row.payload as unknown as ProductDraft, approvalId: approvalRow?.id ?? null };
 }
 
