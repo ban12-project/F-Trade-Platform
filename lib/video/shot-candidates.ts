@@ -61,6 +61,11 @@ export function compileMarketingVideoAiDraft(input: {
     selected.add(candidate.id);
     if (clip.durationMs > candidate.maximumDurationMs) throw new Error(`AI 初稿片段超过候选镜头可用时长：${candidate.id}`);
     if (candidate.mediaType === "image" && clip.audioMode !== "muted") throw new Error(`图片候选镜头不能保留原声：${candidate.id}`);
+    const caption = clip.caption.kind === "none"
+      ? { kind: "none" as const }
+      : clip.caption.kind === "creative"
+        ? { kind: "creative" as const, text: clip.caption.text }
+        : { kind: "verified_fact" as const, claimRef: clip.caption.claimRef };
     return {
       clipId: `clip-${String(index + 1).padStart(3, "0")}`,
       assetRef: candidate.assetRef,
@@ -69,7 +74,7 @@ export function compileMarketingVideoAiDraft(input: {
       durationMs: clip.durationMs,
       fitMode: clip.fitMode,
       audioMode: clip.audioMode,
-      caption: clip.caption,
+      caption,
     };
   });
   return marketingVideoDraftSchema.parse({ version: 2, platform: input.platform, clips, ctaText: suggestion.ctaText });

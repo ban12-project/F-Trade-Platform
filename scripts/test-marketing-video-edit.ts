@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { z } from "zod";
 
 import type { VideoProject } from "../lib/video/contracts";
 import { marketingVideoAiDraftSchema, marketingVideoDraftSchema } from "../lib/video/edit-contracts";
@@ -53,23 +54,25 @@ assert.equal(marketingVideoAiDraftSchema.safeParse({
 }).success, false);
 
 assert.equal(marketingVideoAiDraftSchema.safeParse({
-  clips: [{ ...aiBaseClip, caption: { kind: "creative", text: "Built with ten splines" } }],
+  clips: [{ ...aiBaseClip, caption: { kind: "creative", text: "Built with ten splines", claimRef: "" } }],
   ctaText: "Contact our sales team",
 }).success, false);
 assert.equal(marketingVideoAiDraftSchema.safeParse({
-  clips: [{ ...aiBaseClip, caption: { kind: "creative", text: "For distributor inquiries" } }],
+  clips: [{ ...aiBaseClip, caption: { kind: "creative", text: "For distributor inquiries", claimRef: "" } }],
   ctaText: "Request product details",
 }).success, true);
 assert.equal(marketingVideoAiDraftSchema.safeParse({
-  clips: [{ ...aiBaseClip, caption: { kind: "verified_fact", claimRef: "product.oe_number" } }],
+  clips: [{ ...aiBaseClip, caption: { kind: "verified_fact", text: "", claimRef: "product.oe_number" } }],
   ctaText: "Start a distributor inquiry",
 }).success, true);
 for (const text of ["OE 99999", "Diameter 300 mm", "Spline 10", "MOQ 1", "Lead time 7 days"]) {
   assert.equal(marketingVideoAiDraftSchema.safeParse({
-    clips: [{ ...aiBaseClip, caption: { kind: "creative", text } }],
+    clips: [{ ...aiBaseClip, caption: { kind: "creative", text, claimRef: "" } }],
     ctaText: "Contact our sales team",
   }).success, false);
 }
+const aiJsonSchema = z.toJSONSchema(marketingVideoAiDraftSchema);
+assert.equal(JSON.stringify(aiJsonSchema).includes('"oneOf"'), false);
 assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, ctaText: "MOQ 1" }), /核验事实/);
 
 const shotCandidates: MarketingShotCandidate[] = [{
@@ -80,7 +83,7 @@ const shotCandidates: MarketingShotCandidate[] = [{
   maximumDurationMs: 3_000,
 }];
 const aiSuggestion = marketingVideoAiDraftSchema.parse({
-  clips: [{ ...aiBaseClip, caption: { kind: "verified_fact", claimRef: "product.oe_number" } }],
+  clips: [{ ...aiBaseClip, caption: { kind: "verified_fact", text: "", claimRef: "product.oe_number" } }],
   ctaText: "Contact our sales team",
 });
 const compiledAiDraft = compileMarketingVideoAiDraft({ suggestion: aiSuggestion, candidates: shotCandidates, platform: "facebook" });
