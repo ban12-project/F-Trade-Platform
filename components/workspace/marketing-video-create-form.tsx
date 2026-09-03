@@ -78,7 +78,6 @@ export function MarketingVideoCreateForm({ projectId, products }: { projectId: s
   const selectedProductId = form.watch("productId");
   const selectedProduct = products.find((product) => product.id === selectedProductId) ?? firstProduct;
   const mediaOptions = selectedProduct?.mediaOptions ?? [];
-  const selectedMediaIds = form.watch("productMediaIds");
   useWorkspaceDirty("video-create", form.formState.isDirty || hasFiles || uploading);
 
   useEffect(() => {
@@ -105,7 +104,8 @@ export function MarketingVideoCreateForm({ projectId, products }: { projectId: s
     }
   }
 
-  function selectProduct(productId: string, onChange: (value: string) => void) {
+  function selectProduct(productId: string | null, onChange: (value: string) => void) {
+    if (!productId) return;
     onChange(productId);
     const product = products.find((item) => item.id === productId);
     form.setValue("factPath", product?.factOptions[0]?.value ?? "", { shouldDirty: true, shouldValidate: true });
@@ -211,12 +211,12 @@ export function MarketingVideoCreateForm({ projectId, products }: { projectId: s
           </Field>
           <Field data-invalid={Boolean(form.formState.errors.productId)}>
             <FieldLabel>已核验产品</FieldLabel>
-            <Controller control={form.control} name="productId" render={({ field }) => <Select items={Object.fromEntries(products.map((product) => [product.id, `${product.productName} · ${product.internalSku}`]))} value={field.value} onValueChange={(value) => selectProduct(value, field.onChange)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{products.map((product) => <SelectItem key={product.id} value={product.id}>{product.productName} · {product.internalSku}</SelectItem>)}</SelectGroup></Select>} />
+            <Controller control={form.control} name="productId" render={({ field }) => <Select items={Object.fromEntries(products.map((product) => [product.id, `${product.productName} · ${product.internalSku}`]))} value={field.value} onValueChange={(value) => selectProduct(value, field.onChange)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{products.map((product) => <SelectItem key={product.id} value={product.id}>{product.productName} · {product.internalSku}</SelectItem>)}</SelectGroup></SelectContent></Select>} />
             <FieldError>{form.formState.errors.productId?.message}</FieldError>
           </Field>
           <Field data-invalid={Boolean(form.formState.errors.factPath)}>
             <FieldLabel>字幕可引用的事实</FieldLabel>
-            <Controller control={form.control} name="factPath" render={({ field }) => <Select items={Object.fromEntries((selectedProduct?.factOptions ?? []).map((fact) => [fact.value, fact.label]))} value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{selectedProduct?.factOptions.map((fact) => <SelectItem key={fact.value} value={fact.value}>{fact.label}</SelectItem>)}</SelectGroup></Select>} />
+            <Controller control={form.control} name="factPath" render={({ field }) => <Select items={Object.fromEntries((selectedProduct?.factOptions ?? []).map((fact) => [fact.value, fact.label]))} value={field.value} onValueChange={(value) => value && field.onChange(value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{selectedProduct?.factOptions.map((fact) => <SelectItem key={fact.value} value={fact.value}>{fact.label}</SelectItem>)}</SelectGroup></SelectContent></Select>} />
             <FieldError>{form.formState.errors.factPath?.message}</FieldError>
           </Field>
           <Field data-invalid={Boolean(form.formState.errors.objective)}><FieldLabel htmlFor="video-objective">视频目标</FieldLabel><Input id="video-objective" aria-invalid={Boolean(form.formState.errors.objective)} {...form.register("objective")} /><FieldError>{form.formState.errors.objective?.message}</FieldError></Field>
@@ -258,7 +258,7 @@ export function MarketingVideoCreateForm({ projectId, products }: { projectId: s
     </CardContent>
     <CardFooter className="flex-col items-stretch gap-3">
       <Button form="create-marketing-video" type="submit" disabled={busy}>
-        <PlusIcon data-icon="inline-start" />
+        {busy ? <Spinner data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
         {uploading ? "正在直传素材…" : pending ? "正在创建剪辑稿…" : sourceMode === "product_media" ? "复用媒体并生成 AI 初稿" : "上传并生成 AI 初稿"}
       </Button>
       {uploadError ? <p className="text-sm text-destructive" aria-live="polite">{uploadError}</p> : null}
