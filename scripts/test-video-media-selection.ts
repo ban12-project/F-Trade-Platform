@@ -138,7 +138,11 @@ assert.throws(() => selectProductVideoMedia(product, [expired], {
   usage: "organic",
 }, evaluatedAt), /授权已经过期|没有同时满足/);
 
-const otherProduct = asset({ productId: "00000000-0000-4000-8000-000000000899" });
+const otherProduct = asset({
+  id: "00000000-0000-4000-8000-000000000805",
+  productId: "00000000-0000-4000-8000-000000000899",
+  evidenceRef: "evidence-media-805",
+});
 assert.throws(() => selectProductVideoMedia(product, [hero, otherProduct], {
   productId,
   assetIds: [otherProduct.id],
