@@ -27,7 +27,7 @@ export const createMarketingVideoFromProductMediaSchema = z.object({
   productMediaIds: z.array(z.uuid("产品媒体标识无效。"))
     .min(1, "至少选择一个已审核产品媒体。")
     .max(3, "MVP1 最多选择三个产品媒体。"),
-  rightsEvidenceRef: z.literal("").optional().default(""),
+  rightsEvidenceRef: z.literal(""),
 }).strict().superRefine((value, context) => {
   if (new Set(value.productMediaIds).size !== value.productMediaIds.length) {
     context.addIssue({ code: "custom", path: ["productMediaIds"], message: "产品媒体不能重复选择。" });
