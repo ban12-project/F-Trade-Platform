@@ -1,7 +1,7 @@
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { AiSdkStructuredGenerator } from "@/lib/ai/structured-generator";
-import { marketingVideoAiDraftSchema, marketingVideoDraftSchema, safeAiCreativeCaptions, safeAiCtaTexts } from "@/lib/video/edit-contracts";
+import { marketingVideoAiDraftSchema, safeAiCreativeCaptions, safeAiCtaTexts } from "@/lib/video/edit-contracts";
 import { createReviewVideoExport } from "@/lib/video/export-artifact";
 import { videoExportPresets } from "@/lib/video/export-presets";
 import {
@@ -15,6 +15,7 @@ import { completeVideoJob, failVideoJob, markVideoJobRunning } from "@/lib/video
 import { renderApprovedMarketingTimeline } from "@/lib/video/rendering";
 import { extractMarketingVisualSamplesInSandbox, renderMarketingTimelineInSandbox } from "@/lib/video/sandbox-media";
 import { issueSandboxVideoSources } from "@/lib/video/sandbox-sources";
+import { compileMarketingVideoAiDraft } from "@/lib/video/shot-candidates";
 import { failMarketingVideoRender, getMarketingVideoEditProject, updateMarketingVideoEditDraft } from "@/lib/video/store";
 import { createMarketingEditTimeline } from "@/lib/video/timeline";
 
@@ -32,25 +33,16 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
       assertCurrentProductMediaUsageForVideo(project),
     ]);
     const sources = await issueSandboxVideoSources(project.sourceAssets.map((asset) => asset.assetRef));
+    const sampling = await extractMarketingVisualSamplesInSandbox(project.sourceAssets, sources);
     const suggestion = await new AiSdkStructuredGenerator().generate({
       model: createProductAgentModel(await resolveProductAgentModelConfig()),
       schema: marketingVideoAiDraftSchema,
       schemaName: "marketing_video_edit_draft",
-      task: `Create an editable B2B marketing cut draft, never new media. Use 1-3 of these authorized assets: ${JSON.stringify(project.sourceAssets.map(({ assetRef, mediaType }) => ({ assetRef, mediaType })))}. Total duration must be at most 15000ms and every clip 1000-10000ms. Choose trimStartMs only from supplied sample timestamps or 0. A factual caption must use { kind: "verified_fact", claimRef } and must never provide the fact text. A creative caption must exactly match one of ${JSON.stringify(safeAiCreativeCaptions)}. Use { kind: "none" } when no caption is needed. CTA must be empty or exactly match one of ${JSON.stringify(safeAiCtaTexts)}. Prefer concise captions, hard cuts, and a muted default.`,
+      task: `Create an editable B2B marketing cut draft, never new media. Select 1-3 unique shotCandidateId values from ${JSON.stringify(sampling.candidates.map(({ id, mediaType, maximumDurationMs }) => ({ id, mediaType, maximumDurationMs })))}. Never provide an asset reference or trim timestamp. Total duration must be at most 15000ms, every clip 1000-10000ms, and each durationMs must not exceed its candidate maximumDurationMs. Image candidates must be muted. A factual caption must use { kind: "verified_fact", claimRef } and must never provide the fact text. A creative caption must exactly match one of ${JSON.stringify(safeAiCreativeCaptions)}. Use { kind: "none" } when no caption is needed. CTA must be empty or exactly match one of ${JSON.stringify(safeAiCtaTexts)}. Prefer concise captions and hard cuts.`,
       verifiedFacts: project.factualClaims.map(({ field, value, evidenceRef }) => ({ field, value, evidenceRef })),
-      visualSamples: await extractMarketingVisualSamplesInSandbox(project.sourceAssets, sources),
+      visualSamples: sampling.visualSamples,
     });
-    const sourceByRef = new Map(project.sourceAssets.map((asset) => [asset.assetRef, asset]));
-    const draft = marketingVideoDraftSchema.parse({
-      version: 2,
-      platform: project.editDraft!.platform,
-      clips: suggestion.clips.map((clip, index) => {
-        const source = sourceByRef.get(clip.assetRef);
-        if (!source || !["image", "video"].includes(source.mediaType)) throw new Error("AI 初稿引用了未授权素材。");
-        return { ...clip, clipId: `clip-${String(index + 1).padStart(3, "0")}`, mediaType: source.mediaType, ...(source.mediaType === "image" ? { trimStartMs: 0, audioMode: "muted" as const } : {}) };
-      }),
-      ctaText: suggestion.ctaText,
-    });
+    const draft = compileMarketingVideoAiDraft({ suggestion, candidates: sampling.candidates, platform: project.editDraft!.platform });
     await updateMarketingVideoEditDraft(input.videoId, draft, input.actorId);
     await completeVideoJob(input.jobId);
   } catch (error) {

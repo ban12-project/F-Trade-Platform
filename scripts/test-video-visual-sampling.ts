@@ -15,16 +15,22 @@ void (async () => {
   const directory = await mkdtemp(join(tmpdir(), "f-trade-visual-sampling-test-"));
   try {
     const source = join(directory, "source.mp4");
-    await execFileAsync(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=blue:s=320x240:d=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", source]);
-    const samples = await extractMarketingVisualSamples(
+    await execFileAsync(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=blue:s=320x240:d=5", "-c:v", "libx264", "-pix_fmt", "yuv420p", source]);
+    const sampling = await extractMarketingVisualSamples(
       [{ assetRef: "evidence-video-sample", mediaType: "video", rightsEvidenceRef: "evidence-rights-sample" }],
       new Map([["evidence-video-sample", source]]),
       ffmpegBin,
       ffprobeBin,
     );
-    assert.equal(samples.length, 3);
-    assert.ok(samples.every((sample) => sample.mediaType === "image/jpeg" && sample.data.byteLength > 0));
-    assert.match(samples[1]!.label, /evidence-video-sample/);
+    assert.equal(sampling.visualSamples.length, 3);
+    assert.equal(sampling.candidates.length, 3);
+    assert.ok(sampling.visualSamples.every((sample) => sample.mediaType === "image/jpeg" && sample.data.byteLength > 0));
+    assert.deepEqual(sampling.candidates.map(({ id, trimStartMs, maximumDurationMs }) => ({ id, trimStartMs, maximumDurationMs })), [
+      { id: "shot-001-001", trimStartMs: 1_000, maximumDurationMs: 4_000 },
+      { id: "shot-001-002", trimStartMs: 2_500, maximumDurationMs: 2_500 },
+      { id: "shot-001-003", trimStartMs: 4_000, maximumDurationMs: 1_000 },
+    ]);
+    assert.ok(sampling.visualSamples.every((sample, index) => sample.label.includes(sampling.candidates[index]!.id)));
     console.log("PASS AI edit assistant receives bounded representative frames, not generated media");
   } finally { await rm(directory, { recursive: true, force: true }); }
 })();

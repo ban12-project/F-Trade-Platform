@@ -42,7 +42,7 @@ jobs:
         run: pnpm test:rendered-video-inspection
 
       - name: Test governed marketing-video captions
-        run: pnpm test:marketing-video-edit && pnpm test:video-product-fact-runtime
+        run: pnpm test:marketing-video-edit && pnpm test:video-product-fact-runtime && pnpm test:video-visual-sampling
 
       - name: Set up Python
         uses: actions/setup-python@v5

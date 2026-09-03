@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { VideoProject } from "../lib/video/contracts";
 import { marketingVideoAiDraftSchema, marketingVideoDraftSchema } from "../lib/video/edit-contracts";
 import { renderApprovedMarketingTimeline } from "../lib/video/rendering";
+import { compileMarketingVideoAiDraft, type MarketingShotCandidate } from "../lib/video/shot-candidates";
 import { createMarketingEditTimeline } from "../lib/video/timeline";
 
 const baseClip = {
@@ -16,8 +17,7 @@ const baseClip = {
   caption: { kind: "verified_fact" as const, claimRef: "product.oe_number" },
 };
 const aiBaseClip = {
-  assetRef: "evidence-source-001",
-  trimStartMs: 0,
+  shotCandidateId: "shot-001-001",
   durationMs: 2_000,
   fitMode: "contain" as const,
   audioMode: "muted" as const,
@@ -47,6 +47,10 @@ assert.equal(marketingVideoAiDraftSchema.safeParse({
   clips: [{ ...legacyBaseClip, subtitle: "Incorrect OE 99999", claimRefs: ["product.oe_number"] }],
   ctaText: "Contact us",
 }).success, false);
+assert.equal(marketingVideoAiDraftSchema.safeParse({
+  clips: [{ ...aiBaseClip, assetRef: "evidence-source-001", trimStartMs: 999 }],
+  ctaText: "Contact our sales team",
+}).success, false);
 
 assert.equal(marketingVideoAiDraftSchema.safeParse({
   clips: [{ ...aiBaseClip, caption: { kind: "creative", text: "Built with ten splines" } }],
@@ -67,6 +71,29 @@ for (const text of ["OE 99999", "Diameter 300 mm", "Spline 10", "MOQ 1", "Lead t
   }).success, false);
 }
 assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, ctaText: "MOQ 1" }), /核验事实/);
+
+const shotCandidates: MarketingShotCandidate[] = [{
+  id: "shot-001-001",
+  assetRef: "evidence-source-001",
+  mediaType: "video",
+  trimStartMs: 4_000,
+  maximumDurationMs: 3_000,
+}];
+const aiSuggestion = marketingVideoAiDraftSchema.parse({
+  clips: [{ ...aiBaseClip, caption: { kind: "verified_fact", claimRef: "product.oe_number" } }],
+  ctaText: "Contact our sales team",
+});
+const compiledAiDraft = compileMarketingVideoAiDraft({ suggestion: aiSuggestion, candidates: shotCandidates, platform: "facebook" });
+assert.equal(compiledAiDraft.clips[0]?.assetRef, "evidence-source-001");
+assert.equal(compiledAiDraft.clips[0]?.trimStartMs, 4_000);
+assert.throws(() => compileMarketingVideoAiDraft({ suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0]!, shotCandidateId: "shot-999-999" }] }, candidates: shotCandidates, platform: "facebook" }), /未知候选镜头/);
+assert.throws(() => compileMarketingVideoAiDraft({ suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0]!, durationMs: 3_001 }] }, candidates: shotCandidates, platform: "facebook" }), /可用时长/);
+assert.throws(() => compileMarketingVideoAiDraft({ suggestion: { ...aiSuggestion, clips: [aiSuggestion.clips[0]!, aiSuggestion.clips[0]!] }, candidates: shotCandidates, platform: "facebook" }), /重复选择/);
+assert.throws(() => compileMarketingVideoAiDraft({
+  suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0]!, audioMode: "source" }] },
+  candidates: [{ ...shotCandidates[0]!, mediaType: "image", trimStartMs: 0, maximumDurationMs: 10_000 }],
+  platform: "facebook",
+}), /图片候选镜头/);
 
 const project: VideoProject = {
   id: "00000000-0000-4000-8000-000000000501", productId: "00000000-0000-4000-8000-000000000502", status: "draft",
