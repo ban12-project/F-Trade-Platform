@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Controller, type UseFormReturn } from "react-hook-form";
 
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
@@ -119,7 +120,7 @@ function EvidenceInput({
   </Field>;
 }
 
-function FactPair({ children }: { children: React.ReactNode }) {
+function FactPair({ children }: { children: ReactNode }) {
   return <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">{children}</div>;
 }
 
