@@ -14,6 +14,7 @@ import {
   type ProductAgentEvidenceLocatedSource,
 } from "../lib/product/evidence-locations";
 import type { ProductDraft } from "../lib/product/verification";
+import { videoFactClaimSchema } from "../lib/video/contracts";
 
 const source: ProductAgentSource = {
   record_id: "synthetic-evidence-product-001",
@@ -47,7 +48,8 @@ assert.deepEqual(firstLocations, secondLocations, "Evidence location refs must b
 assert.equal(firstLocations.length, 5);
 assert.deepEqual(firstLocations.map((location) => location.start_line), [2, 3, 4, 5, 6]);
 assert.equal(firstLocations.every((location) => location.kind === "line"), true);
-assert.equal(firstLocations.every((location) => location.ref.startsWith("evidence-document-001#loc=line-")), true);
+assert.equal(firstLocations.every((location) => location.ref.startsWith("evidence-loc-line-")), true);
+assert.equal(firstLocations.every((location) => location.ref.length <= 130), true);
 assert.equal(firstLocations.some((location) => location.text.includes("marketing narrative")), false);
 
 const prepared = prepareProductAgentEvidenceSource(source);
@@ -59,12 +61,24 @@ assert.deepEqual(prepared.evidence_refs, prepared.evidence_locations.map((locati
 assert.match(prepared.source_text, /<evidence-location ref=/);
 assert.match(prepared.source_text, /lines="2-2"/);
 assert.doesNotMatch(prepared.source_text, /marketing narrative/);
+assert.throws(
+  () => prepareProductAgentEvidenceSource({
+    ...source,
+    evidence_refs: ["evidence-document-001", "evidence-document-002"],
+  }),
+  /exactly one base evidence reference/,
+);
 
 const productNameRef = locationContaining(prepared, "Product name:").ref;
 const productTypeRef = locationContaining(prepared, "Product type:").ref;
 const skuRef = locationContaining(prepared, "Internal SKU:").ref;
 const oeRef = locationContaining(prepared, "OEM No.:").ref;
 const moqRef = locationContaining(prepared, "MOQ:").ref;
+assert.doesNotThrow(() => videoFactClaimSchema.parse({
+  field: "product.product_name",
+  value: "Synthetic Clutch Kit",
+  evidenceRef: productNameRef,
+}));
 
 const locatedDraftInput = {
   record_id: prepared.record_id,
@@ -109,7 +123,7 @@ assert.throws(
     ...locatedDraft,
     field_evidence: {
       ...locatedDraft.field_evidence,
-      "product.product_name": "evidence-document-001#loc=unknown",
+      "product.product_name": "evidence-loc-line-999999-999999-00000000000000000000000000000000",
     },
   }, prepared, finalizeProductAgentDraft),
   /cites an unknown evidence location/,
@@ -131,6 +145,7 @@ assert.equal(tablePrepared.evidence_locations.length, 2);
 assert.deepEqual(tablePrepared.evidence_locations.map((location) => location.start_line), [3, 4]);
 for (const location of tablePrepared.evidence_locations) {
   assert.equal(location.kind, "table_row");
+  assert.match(location.ref, /^evidence-loc-row-/);
   assert.match(location.text, /\| --- \| --- \| --- \| --- \| --- \|/);
   assert.equal(location.text.split("\n").length, 3);
 }
