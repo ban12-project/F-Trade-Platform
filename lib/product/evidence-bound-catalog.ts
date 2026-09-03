@@ -1,5 +1,3 @@
-import "server-only";
-
 import { randomUUID } from "node:crypto";
 
 import { and, eq, sql, type InferInsertModel } from "drizzle-orm";
@@ -31,23 +29,23 @@ function splitOeNumbers(value: string) {
   return numbers.length > 0 ? [...new Set(numbers)] : undefined;
 }
 
-function fieldEvidence(input: EvidenceBoundProductCatalogInput) {
-  const entries: Array<[string, unknown, string]> = [
-    ["product.product_name", input.productName, input.productNameEvidenceRef],
-    ["product.product_type", input.productType, input.productTypeEvidenceRef],
-    ["product.internal_sku", input.internalSku, input.internalSkuEvidenceRef],
-    ["product.oe_numbers", splitOeNumbers(input.oeNumbers), input.oeNumbersEvidenceRef],
-    ["product.application", optionalText(input.application), input.applicationEvidenceRef],
-    ["product.vehicle_brand", optionalText(input.vehicleBrand), input.vehicleBrandEvidenceRef],
-    ["product.vehicle_model", optionalText(input.vehicleModel), input.vehicleModelEvidenceRef],
-    ["specifications.clutch_diameter_mm", optionalNumber(input.clutchDiameterMm), input.clutchDiameterMmEvidenceRef],
-    ["specifications.spline_count", optionalNumber(input.splineCount), input.splineCountEvidenceRef],
-    ["specifications.spline_size", optionalText(input.splineSize), input.splineSizeEvidenceRef],
-    ["specifications.friction_material", optionalText(input.frictionMaterial), input.frictionMaterialEvidenceRef],
+function fieldEvidence(input: EvidenceBoundProductCatalogInput): Record<string, string> {
+  const entries: Array<{ path: string; value: unknown; evidenceRef: string }> = [
+    { path: "product.product_name", value: input.productName, evidenceRef: input.productNameEvidenceRef },
+    { path: "product.product_type", value: input.productType, evidenceRef: input.productTypeEvidenceRef },
+    { path: "product.internal_sku", value: input.internalSku, evidenceRef: input.internalSkuEvidenceRef },
+    { path: "product.oe_numbers", value: splitOeNumbers(input.oeNumbers), evidenceRef: input.oeNumbersEvidenceRef },
+    { path: "product.application", value: optionalText(input.application), evidenceRef: input.applicationEvidenceRef },
+    { path: "product.vehicle_brand", value: optionalText(input.vehicleBrand), evidenceRef: input.vehicleBrandEvidenceRef },
+    { path: "product.vehicle_model", value: optionalText(input.vehicleModel), evidenceRef: input.vehicleModelEvidenceRef },
+    { path: "specifications.clutch_diameter_mm", value: optionalNumber(input.clutchDiameterMm), evidenceRef: input.clutchDiameterMmEvidenceRef },
+    { path: "specifications.spline_count", value: optionalNumber(input.splineCount), evidenceRef: input.splineCountEvidenceRef },
+    { path: "specifications.spline_size", value: optionalText(input.splineSize), evidenceRef: input.splineSizeEvidenceRef },
+    { path: "specifications.friction_material", value: optionalText(input.frictionMaterial), evidenceRef: input.frictionMaterialEvidenceRef },
   ];
-  return Object.fromEntries(entries.flatMap(([path, value, evidenceRef]) =>
-    value === undefined || value === null || value === "" ? [] : [[path, evidenceRef]],
-  ));
+  return Object.fromEntries(entries
+    .filter(({ value }) => value !== undefined && value !== null && value !== "")
+    .map(({ path, evidenceRef }) => [path, evidenceRef]));
 }
 
 /** Builds a review-only manual draft without copying one evidence ref to every fact. */
@@ -56,20 +54,28 @@ export function buildEvidenceBoundProductCatalogDraft(
   recordId: string = randomUUID(),
 ): ProductDraft {
   const input = productCatalogFormSchema.parse(inputValue);
+  const oeNumbers = splitOeNumbers(input.oeNumbers);
+  const application = optionalText(input.application);
+  const vehicleBrand = optionalText(input.vehicleBrand);
+  const vehicleModel = optionalText(input.vehicleModel);
+  const clutchDiameterMm = optionalNumber(input.clutchDiameterMm);
+  const splineCount = optionalNumber(input.splineCount);
+  const splineSize = optionalText(input.splineSize);
+  const frictionMaterial = optionalText(input.frictionMaterial);
   const product = {
     product_name: input.productName,
     product_type: input.productType,
     internal_sku: input.internalSku,
-    ...(splitOeNumbers(input.oeNumbers) ? { oe_numbers: splitOeNumbers(input.oeNumbers) } : {}),
-    ...(optionalText(input.application) ? { application: optionalText(input.application) } : {}),
-    ...(optionalText(input.vehicleBrand) ? { vehicle_brand: optionalText(input.vehicleBrand) } : {}),
-    ...(optionalText(input.vehicleModel) ? { vehicle_model: optionalText(input.vehicleModel) } : {}),
+    ...(oeNumbers ? { oe_numbers: oeNumbers } : {}),
+    ...(application ? { application } : {}),
+    ...(vehicleBrand ? { vehicle_brand: vehicleBrand } : {}),
+    ...(vehicleModel ? { vehicle_model: vehicleModel } : {}),
   };
   const specifications = {
-    ...(optionalNumber(input.clutchDiameterMm) ? { clutch_diameter_mm: optionalNumber(input.clutchDiameterMm) } : {}),
-    ...(optionalNumber(input.splineCount) ? { spline_count: optionalNumber(input.splineCount) } : {}),
-    ...(optionalText(input.splineSize) ? { spline_size: optionalText(input.splineSize) } : {}),
-    ...(optionalText(input.frictionMaterial) ? { friction_material: optionalText(input.frictionMaterial) } : {}),
+    ...(clutchDiameterMm ? { clutch_diameter_mm: clutchDiameterMm } : {}),
+    ...(splineCount ? { spline_count: splineCount } : {}),
+    ...(splineSize ? { spline_size: splineSize } : {}),
+    ...(frictionMaterial ? { friction_material: frictionMaterial } : {}),
   };
   const explicitEvidence = fieldEvidence(input);
   const evidenceRefs = [...new Set(Object.values(explicitEvidence))];
