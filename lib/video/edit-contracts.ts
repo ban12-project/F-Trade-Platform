@@ -34,6 +34,34 @@ export const createMarketingVideoFromProductMediaSchema = z.object({
   }
 });
 
+/** Shared React Hook Form contract for choosing one of the two source modes. */
+export const createMarketingVideoUiFormSchema = z.object({
+  ...marketingVideoCreationShape,
+  sourceMode: z.enum(["product_media", "upload"]),
+  productMediaIds: z.array(z.uuid("产品媒体标识无效。")).max(3, "MVP1 最多选择三个产品媒体。"),
+  rightsEvidenceRef: z.string().trim().max(140, "素材权利证据引用过长。"),
+}).strict().superRefine((value, context) => {
+  if (value.sourceMode === "upload") {
+    if (!evidenceRef.safeParse(value.rightsEvidenceRef).success) {
+      context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "上传新素材时必须填写私有权利证据引用。" });
+    }
+    if (value.productMediaIds.length) {
+      context.addIssue({ code: "custom", path: ["productMediaIds"], message: "上传模式不能同时选择已有产品媒体。" });
+    }
+    return;
+  }
+
+  if (!value.productMediaIds.length) {
+    context.addIssue({ code: "custom", path: ["productMediaIds"], message: "至少选择一个已审核产品媒体。" });
+  }
+  if (new Set(value.productMediaIds).size !== value.productMediaIds.length) {
+    context.addIssue({ code: "custom", path: ["productMediaIds"], message: "产品媒体不能重复选择。" });
+  }
+  if (value.rightsEvidenceRef) {
+    context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "复用模式由服务端读取逐素材权利证据。" });
+  }
+});
+
 export const marketingVideoClipSchema = z.object({
   clipId: z.string().trim().regex(/^clip-[a-z0-9][a-z0-9_-]{2,80}$/i, "片段标识无效。"),
   assetRef: privateAssetRef,
