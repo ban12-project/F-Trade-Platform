@@ -50,7 +50,7 @@ export const productCatalogFormSchema = z.object({
   frictionMaterial: optionalCatalogText,
   frictionMaterialEvidenceRef: optionalEvidenceReference,
   sourceRef: sourceReference,
-}).strict().superRefine((value, context) => {
+}).superRefine((value, context) => {
   for (const [valueKey, evidenceKey, label] of manualProductFactEvidenceFields.slice(3)) {
     const fact = value[valueKey];
     const evidence = value[evidenceKey];
