@@ -6,8 +6,13 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
-import { productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
-import { createProductCatalogDraft, decideProductCatalogReview, reviseProductCatalogDraft } from "@/lib/products";
+import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
+import {
+  createEvidenceBoundProductCatalogDraft,
+  reviseEvidenceBoundProductCatalogDraft,
+} from "@/lib/product/evidence-bound-catalog";
+import { productReviewFormSchema } from "@/lib/form-schemas";
+import { decideProductCatalogReview } from "@/lib/products";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type ProductActionState = {
@@ -45,11 +50,11 @@ export async function createProductCatalogDraftAction(
   try {
     const projectId = projectIdFrom(formData);
     if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
-    const result = await createProductCatalogDraft(parsed.data, session.user.id, projectId);
+    const result = await createEvidenceBoundProductCatalogDraft(parsed.data, session.user.id, projectId);
     revalidateProductPaths(projectId, result.id);
     return {
       status: "success",
-      message: `产品草稿已创建（${result.id.slice(0, 8)}）。仍需 Gate 01 人工核验。`,
+      message: `产品草稿已创建（${result.id.slice(0, 8)}）。每个事实均保留独立证据，仍需 Gate 01 人工核验。`,
       productId: result.id,
     };
   } catch (error) {
@@ -104,9 +109,9 @@ export async function reviseProductCatalogDraftAction(
   try {
     const projectId = projectIdFrom(formData);
     if (projectId) await assertWorkspaceAggregateLink(projectId, parsedProductId.data.productId, "marketing", "product");
-    await reviseProductCatalogDraft(parsedProductId.data.productId, parsed.data, session.user.id);
+    await reviseEvidenceBoundProductCatalogDraft(parsedProductId.data.productId, parsed.data, session.user.id);
     revalidateProductPaths(projectId, parsedProductId.data.productId);
-    return { status: "success", message: "修订已保存，并已重新提交 Gate 01 审核。", productId: parsedProductId.data.productId };
+    return { status: "success", message: "修订及逐字段证据已保存，并重新提交 Gate 01 审核。", productId: parsedProductId.data.productId };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法保存产品修订。" };
   }
