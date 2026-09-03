@@ -8,7 +8,12 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
-import { type MarketingVideoDraft } from "@/lib/video/edit-contracts";
+import {
+  createMarketingVideoDraftFormSchema,
+  createMarketingVideoFromProductMediaSchema,
+  type MarketingVideoDraft,
+} from "@/lib/video/edit-contracts";
+import { createMarketingVideoEditProjectFromProductMedia } from "@/lib/video/product-media-create";
 import { attachVideoWorkflowRun, queueVideoProcessingJob, releaseVideoWorkflowStart, reserveVideoWorkflowStart } from "@/lib/video/processing-jobs";
 import {
   assertMarketingVideoProjectLink,
@@ -18,6 +23,7 @@ import {
   updateMarketingVideoEditDraft,
 } from "@/lib/video/store";
 import { claimCompletedVideoUploads } from "@/lib/video/upload-receipts";
+import { assertWorkspaceAggregateLink } from "@/lib/workspace/store";
 import { start } from "workflow/api";
 import { generateMarketingVideoAiDraftWorkflow, renderMarketingVideoPreviewWorkflow } from "@/workflows/marketing-video-processing";
 
@@ -45,6 +51,12 @@ async function startVideoJob(kind: "ai_draft" | "render", videoId: string, actor
   return queued.job;
 }
 
+async function finishVideoCreation(result: { id: string }, projectId: string, actorId: string, message: string): Promise<MarketingVideoActionState> {
+  await startVideoJob("ai_draft", result.id, actorId);
+  revalidatePath(`/workspace/${projectId}`);
+  return { status: "success", message, videoId: result.id };
+}
+
 export async function copyMarketingVideoDraftAction(projectIdInput: string, sourceVideoIdInput: string): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
@@ -62,20 +74,60 @@ function text(formData: FormData, name: string) {
   return typeof value === "string" ? value : "";
 }
 
+function jsonValue(formData: FormData, name: string, fallback: unknown) {
+  const value = text(formData, name);
+  return value ? JSON.parse(value) as unknown : fallback;
+}
+
+function creationFields(formData: FormData) {
+  return {
+    projectId: text(formData, "projectId"),
+    productId: text(formData, "productId"),
+    factPath: text(formData, "factPath"),
+    objective: text(formData, "objective"),
+    targetAudience: text(formData, "targetAudience"),
+    platform: text(formData, "platform"),
+  };
+}
+
 export async function createMarketingVideoDraftAction(_previous: MarketingVideoActionState, formData: FormData): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
-    const rightsEvidenceRef = text(formData, "rightsEvidenceRef");
-    const projectId = text(formData, "projectId");
-    const receiptIds = JSON.parse(text(formData, "receiptIds") || "[]") as unknown;
-    const uploadedAssets = await claimCompletedVideoUploads(receiptIds, session.user.id, projectId, rightsEvidenceRef);
-    const result = await createMarketingVideoEditProject({
-      projectId, productId: text(formData, "productId"), factPath: text(formData, "factPath"),
-      objective: text(formData, "objective"), targetAudience: text(formData, "targetAudience"), platform: text(formData, "platform"), rightsEvidenceRef,
-    }, session.user.id, uploadedAssets);
-    await startVideoJob("ai_draft", result.id, session.user.id);
-    revalidatePath(`/workspace/${projectId}`);
-    return { status: "success", message: "素材已保存，AI 剪辑初稿已进入后台队列。", videoId: result.id };
+    const fields = creationFields(formData);
+    const sourceMode = z.enum(["", "upload", "product_media"], { message: "素材来源模式无效。" })
+      .parse(text(formData, "sourceMode"));
+
+    if (sourceMode === "product_media") {
+      const request = createMarketingVideoFromProductMediaSchema.parse({
+        ...fields,
+        sourceMode,
+        productMediaIds: jsonValue(formData, "productMediaIds", []),
+        rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
+      });
+      await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product");
+      const result = await createMarketingVideoEditProjectFromProductMedia(request, session.user.id);
+      return finishVideoCreation(
+        result,
+        request.projectId,
+        session.user.id,
+        "已复用审核通过的产品媒体，AI 剪辑初稿已进入后台队列。",
+      );
+    }
+
+    const request = createMarketingVideoDraftFormSchema.parse({
+      ...fields,
+      rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
+    });
+    await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product");
+    const receiptIds = jsonValue(formData, "receiptIds", []);
+    const uploadedAssets = await claimCompletedVideoUploads(
+      receiptIds,
+      session.user.id,
+      request.projectId,
+      request.rightsEvidenceRef,
+    );
+    const result = await createMarketingVideoEditProject(request, session.user.id, uploadedAssets);
+    return finishVideoCreation(result, request.projectId, session.user.id, "素材已保存，AI 剪辑初稿已进入后台队列。");
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法创建营销视频剪辑稿。" };
   }
