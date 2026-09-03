@@ -2,25 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { z } from "zod";
 
-import { videoPlatformSchema } from "./contracts";
+import { videoExportArtifactSchema, videoPlatformSchema, type VideoExportArtifact } from "./contracts";
 import { type ProbedVideo, validateProbedVideoExport } from "./media-probe";
 
 const privateAssetRef = z.string().trim().regex(/^asset-[a-z0-9][a-z0-9_-]{2,120}$/i);
 
-export type ReviewVideoExport = {
-  id: string;
-  videoId: string;
-  sourceAssetRef: string;
-  platform: z.infer<typeof videoPlatformSchema>;
-  surface: "video" | "reels";
-  presetVersion: string;
-  presetSourceUrl: string;
-  status: "review_required" | "approved";
-  approvalRef?: string;
-  timelineDurationSeconds?: number;
-  measured: Pick<ProbedVideo, "width" | "height" | "fps" | "durationSeconds" | "subtitleStreamCount">;
-  createdAt: string;
-};
+export type ReviewVideoExport = VideoExportArtifact;
 
 export const reviewVideoExportInputSchema = z.object({
   videoId: z.uuid(),
@@ -36,7 +23,7 @@ export const reviewVideoExportInputSchema = z.object({
     durationSeconds: z.number().positive(),
     subtitleStreamCount: z.number().int().min(0),
   }).strict(),
-  timeline: z.object({ durationSeconds: z.number().positive() }).strict().optional(),
+  timeline: z.object({ durationSeconds: z.number().positive() }).strict(),
 }).strict();
 
 /**
@@ -45,11 +32,11 @@ export const reviewVideoExportInputSchema = z.object({
  */
 export function createReviewVideoExport(input: z.input<typeof reviewVideoExportInputSchema>): ReviewVideoExport {
   const value = reviewVideoExportInputSchema.parse(input);
-  if (value.timeline && Math.abs(value.media.durationSeconds - value.timeline.durationSeconds) > 0.1) {
+  if (Math.abs(value.media.durationSeconds - value.timeline.durationSeconds) > 0.1) {
     throw new Error("导出媒体时长与已审核剪辑时间线不一致。 ");
   }
   const preset = validateProbedVideoExport(value.platform, value.media);
-  return {
+  return videoExportArtifactSchema.parse({
     id: randomUUID(),
     videoId: value.videoId,
     sourceAssetRef: value.sourceAssetRef,
@@ -58,8 +45,11 @@ export function createReviewVideoExport(input: z.input<typeof reviewVideoExportI
     presetVersion: preset.version,
     presetSourceUrl: preset.sourceUrl,
     status: "review_required",
-    ...(value.timeline ? { timelineDurationSeconds: value.timeline.durationSeconds } : {}),
+    timelineDurationSeconds: value.timeline.durationSeconds,
     measured: {
+      container: value.media.container,
+      videoCodec: value.media.videoCodec,
+      audioCodec: value.media.audioCodec,
       width: value.media.width,
       height: value.media.height,
       fps: value.media.fps,
@@ -67,12 +57,12 @@ export function createReviewVideoExport(input: z.input<typeof reviewVideoExportI
       subtitleStreamCount: value.media.subtitleStreamCount,
     },
     createdAt: new Date().toISOString(),
-  };
+  });
 }
 
 /** A human evidence reference is required before an export can enter an API draft. */
 export function approveReviewVideoExport(exportArtifact: ReviewVideoExport, approvalRef: string): ReviewVideoExport {
   if (exportArtifact.status !== "review_required") throw new Error("只有待审核导出物可以批准。 ");
   if (!/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i.test(approvalRef)) throw new Error("导出批准必须关联脱敏证据引用。 ");
-  return { ...exportArtifact, status: "approved", approvalRef };
+  return videoExportArtifactSchema.parse({ ...exportArtifact, status: "approved", approvalRef });
 }

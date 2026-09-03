@@ -2,6 +2,7 @@ import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { AiSdkStructuredGenerator } from "@/lib/ai/structured-generator";
 import { marketingVideoAiDraftSchema, marketingVideoDraftSchema } from "@/lib/video/edit-contracts";
+import { createReviewVideoExport } from "@/lib/video/export-artifact";
 import { videoExportPresets } from "@/lib/video/export-presets";
 import {
   beginGuardedMarketingVideoRender,
@@ -66,11 +67,22 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
     if (!preset) throw new Error("目标平台没有可用的已核验导出预设。");
     const request = { timeline, platform: preset.platform, width: preset.width, height: preset.height, fps: preset.fps } as const;
     const sources = await issueSandboxVideoSources(project.editDraft!.clips.map((clip) => clip.assetRef));
-    let bytes: Uint8Array | undefined;
-    await renderApprovedMarketingTimeline(request, { render: async (validated) => { bytes = await renderMarketingTimelineInSandbox(validated, sources); return { assetRef: `asset-render-${input.jobId}` }; } });
-    if (!bytes) throw new Error("Sandbox 未生成视频输出。");
-    const assetRef = await new VercelPrivateVideoAssetStore().putRenderedVideo({ data: bytes, contentType: "video/mp4", assetRef: `asset-render-${input.jobId}` });
-    await completeGuardedMarketingVideoRender(input.videoId, assetRef);
+    const expectedAssetRef = `asset-render-${input.jobId}`;
+    let rendered: Awaited<ReturnType<typeof renderMarketingTimelineInSandbox>> | undefined;
+    await renderApprovedMarketingTimeline(request, { render: async (validated) => {
+      rendered = await renderMarketingTimelineInSandbox(validated, sources);
+      return { assetRef: expectedAssetRef };
+    } });
+    if (!rendered) throw new Error("Sandbox 未生成视频输出。");
+    const exportArtifact = createReviewVideoExport({
+      videoId: input.videoId,
+      sourceAssetRef: expectedAssetRef,
+      platform: preset.platform,
+      media: rendered.probe,
+      timeline: { durationSeconds: timeline.durationSeconds },
+    });
+    const assetRef = await new VercelPrivateVideoAssetStore().putRenderedVideo({ data: rendered.data, contentType: "video/mp4", assetRef: expectedAssetRef });
+    await completeGuardedMarketingVideoRender(input.videoId, assetRef, exportArtifact);
     await completeVideoJob(input.jobId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知渲染错误";

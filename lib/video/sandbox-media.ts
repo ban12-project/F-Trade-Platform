@@ -4,6 +4,7 @@ import type { VideoProject } from "./contracts";
 import type { MarketingVisualSample } from "./visual-sampling";
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
+import { parseFfprobeOutput } from "./media-probe";
 
 type SignedSources = ReadonlyMap<string, SandboxVideoSource>;
 export const maximumMarketingSourceDurationSeconds = 120;
@@ -124,6 +125,12 @@ export async function renderMarketingTimelineInSandbox(request: VideoRenderReque
       await sandbox.fs.writeFile(captions, assDocument(request));
       await command(sandbox, "ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", joined, "-vf", `subtitles=filename='${captions}'`, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "copy", output]);
     } else await sandbox.fs.copyFile(joined, output);
-    return new Uint8Array(await sandbox.fs.readFile(output));
+    const probe = parseFfprobeOutput(JSON.parse(await command(sandbox, "ffprobe", [
+      "-v", "error",
+      "-show_entries", "format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate",
+      "-of", "json",
+      output,
+    ])));
+    return { data: new Uint8Array(await sandbox.fs.readFile(output)), probe };
   } finally { await sandbox.stop(); }
 }

@@ -35,6 +35,9 @@ jobs:
       - name: Test ProductMedia policies
         run: pnpm test:product-media && pnpm test:product-media-workflow
 
+      - name: Inspect a real rendered video
+        run: pnpm test:rendered-video-inspection
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

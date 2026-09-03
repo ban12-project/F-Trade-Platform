@@ -16,8 +16,11 @@ const receipt = createReviewVideoExport({ videoId: "00000000-0000-4000-8000-0000
 assert.equal(receipt.status, "review_required");
 assert.equal(receipt.presetVersion, "2026-08");
 assert.equal(receipt.timelineDurationSeconds, 5);
+assert.equal(receipt.measured.videoCodec, "h264");
+assert.equal(receipt.measured.audioCodec, "aac");
 assert.equal("publicUrl" in receipt, false);
 assert.throws(() => createReviewVideoExport({ videoId: "00000000-0000-4000-8000-000000000601", sourceAssetRef: "asset-video-601", platform: "tiktok", media: measured, timeline: { durationSeconds: 4 } }), /时间线/);
 assert.throws(() => parseFfprobeOutput({ format: { format_name: "matroska", duration: "5" }, streams: [] }), /MP4/);
 assert.throws(() => validateProbedVideoExport("facebook", { ...measured, durationSeconds: 2 }), /不满足/);
+assert.throws(() => createReviewVideoExport({ videoId: "00000000-0000-4000-8000-000000000601", sourceAssetRef: "asset-video-601", platform: "tiktok", media: { ...measured, videoCodec: "vp9" }, timeline: { durationSeconds: 5 } }), /h264|invalid/i);
 console.log("PASS video export validation consumes measured ffprobe metadata");
