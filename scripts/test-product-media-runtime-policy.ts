@@ -39,7 +39,7 @@ const project: VideoProject = videoProjectSchema.parse({
   }],
   approvalRefs: [],
   editDraft: {
-    version: 1,
+    version: 2,
     platform: "facebook",
     clips: [{
       clipId: "clip-001",
@@ -49,8 +49,7 @@ const project: VideoProject = videoProjectSchema.parse({
       durationMs: 3_000,
       fitMode: "contain",
       audioMode: "muted",
-      subtitle: "",
-      claimRefs: [],
+      caption: { kind: "none" },
     }],
     ctaText: "Contact us",
   },

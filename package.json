@@ -77,6 +77,7 @@
     "test:rendered-video-inspection": "tsx scripts/test-rendered-video-inspection.ts",
     "test:video-timeline": "tsx scripts/test-video-timeline.ts",
     "test:marketing-video-edit": "tsx scripts/test-marketing-video-edit.ts",
+    "test:video-product-fact-runtime": "tsx scripts/test-video-product-fact-runtime-policy.ts",
     "test:video-mvp-policy": "tsx scripts/test-video-mvp-policy.ts",
     "test:video-visual-sampling": "tsx scripts/test-video-visual-sampling.ts",
     "test:video-rendering": "tsx scripts/test-video-rendering.ts",

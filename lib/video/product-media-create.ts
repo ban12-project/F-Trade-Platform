@@ -125,11 +125,10 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       durationMs: asset.mediaType === "image" ? 3_000 : Math.min(5_000, asset.technical.durationMs!),
       fitMode: "contain" as const,
       audioMode: "muted" as const,
-      subtitle: "",
-      claimRefs: [] as string[],
+      caption: { kind: "none" as const },
     }));
     const editDraft = marketingVideoDraftSchema.parse({
-      version: 1,
+      version: 2,
       platform: value.platform,
       clips,
       ctaText: "Contact us for details",

@@ -142,6 +142,18 @@ test("marketing video editor blocks a draft longer than 15 seconds in the browse
   await expect(page.getByRole("button", { name: "合成预览" })).toBeDisabled();
 });
 
+test("marketing video editor keeps factual caption values server-controlled", async ({ page }) => {
+  await page.goto("/testing/project-canvas?panel=video");
+  await page.getByLabel("字幕类型").first().selectOption("creative");
+  await page.getByLabel("创意字幕").fill("OE 99999");
+  await page.getByRole("complementary").getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.getByText("创意文案不能包含工程或商业事实；请改用核验事实字段。")).toBeVisible();
+
+  await page.getByLabel("字幕类型").first().selectOption("verified_fact");
+  await expect(page.getByLabel("创意字幕")).toHaveCount(0);
+  await expect(page.getByLabel("事实字段")).toContainText("product.product_name · Verified clutch kit");
+});
+
 test("switching nodes protects an unsaved video draft", async ({ page }) => {
   await page.goto("/testing/project-canvas?panel=video");
   await page.getByLabel("成片时长（秒）").first().fill("6");

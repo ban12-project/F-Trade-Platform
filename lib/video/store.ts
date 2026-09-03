@@ -19,7 +19,12 @@ export type VideoProjectDraftInput = z.infer<typeof videoProjectDraftFormSchema>
 export type VideoReviewInput = z.infer<typeof videoReviewFormSchema>;
 export type ReadyVideoProductSource = { id: string; productName: string; internalSku: string; factOptions: Array<{ value: string; label: string }> };
 export type VideoWorkspaceEntry = { id: string; state: string; createdAt: Date; productId: string; productName: string; objective: string; platforms: VideoProject["platforms"]; approvalStatus: "pending" | "approved" | "rejected" | null; previewAssetRef: string | null };
-export type MarketingVideoEditorEntry = VideoWorkspaceEntry & { draft: MarketingVideoDraft; targetAudience: string; processingJob: VideoProcessingSummary | null };
+export type MarketingVideoEditorEntry = VideoWorkspaceEntry & {
+  draft: MarketingVideoDraft;
+  targetAudience: string;
+  captionFactOptions: Array<{ field: string; value: string }>;
+  processingJob: VideoProcessingSummary | null;
+};
 export type MarketingVideoCopyCandidate = { id: string; projectTitle: string; productName: string; objective: string };
 
 function hasValue(value: unknown) { return value !== undefined && value !== null && value !== ""; }
@@ -67,10 +72,9 @@ export async function createMarketingVideoEditProject(input: unknown, actorId: s
       durationMs: asset.mediaType === "image" ? 3_000 : 5_000,
       fitMode: "contain" as const,
       audioMode: "muted" as const,
-      subtitle: "",
-      claimRefs: [] as string[],
+      caption: { kind: "none" as const },
     }));
-    const editDraft = marketingVideoDraftSchema.parse({ version: 1, platform: value.platform, clips, ctaText: "Contact us for details" });
+    const editDraft = marketingVideoDraftSchema.parse({ version: 2, platform: value.platform, clips, ctaText: "Contact us for details" });
     const creative = buildVideoCreative({
       productId: product.id,
       objective: value.objective,
@@ -103,7 +107,21 @@ export async function listProjectMarketingVideoEntries(projectId: string, databa
     const project = videoProjectSchema.safeParse(record.payload);
     if (!project.success || !project.data.editDraft) return [];
     const productName = project.data.factualClaims.find((claim) => claim.field === "product.product_name")?.value ?? "已核验产品";
-    return [{ id: record.id, state: record.state, createdAt, productId: project.data.productId, productName, objective: project.data.objective, targetAudience: project.data.targetAudience, platforms: project.data.platforms, approvalStatus: approvalByVideo.get(record.id) ?? null, previewAssetRef: project.data.renderedAssetRef ?? null, draft: project.data.editDraft, processingJob: jobsByVideo.get(record.id) ?? null }];
+    return [{
+      id: record.id,
+      state: record.state,
+      createdAt,
+      productId: project.data.productId,
+      productName,
+      objective: project.data.objective,
+      targetAudience: project.data.targetAudience,
+      platforms: project.data.platforms,
+      approvalStatus: approvalByVideo.get(record.id) ?? null,
+      previewAssetRef: project.data.renderedAssetRef ?? null,
+      draft: project.data.editDraft,
+      captionFactOptions: project.data.factualClaims.map(({ field, value }) => ({ field, value })),
+      processingJob: jobsByVideo.get(record.id) ?? null,
+    }];
   });
 }
 
@@ -167,7 +185,7 @@ export async function updateMarketingVideoEditDraft(videoId: string, draftInput:
     const claimRefs = new Set(current.factualClaims.map((claim) => claim.field));
     for (const clip of draft.clips) {
       if (!assetRefs.has(clip.assetRef)) throw new Error("剪辑稿引用了不属于当前视频的素材。");
-      if (!clip.claimRefs.every((claimRef) => claimRefs.has(claimRef))) throw new Error("剪辑稿引用了未经核验的产品事实。");
+      if (clip.caption.kind === "verified_fact" && !claimRefs.has(clip.caption.claimRef)) throw new Error("剪辑稿引用了未经核验的产品事实。");
     }
     const project = videoProjectSchema.parse({ ...current, status: record.state === "VIDEO_REVISION_REQUIRED" ? "revision_required" : "draft", editDraft: draft, renderedAssetRef: undefined, exportArtifact: undefined });
     await tx.update(aggregateRecord).set({ payload: project, version: sql`${aggregateRecord.version} + 1` }).where(eq(aggregateRecord.id, videoId));

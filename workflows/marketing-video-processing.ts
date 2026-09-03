@@ -1,7 +1,7 @@
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { AiSdkStructuredGenerator } from "@/lib/ai/structured-generator";
-import { marketingVideoAiDraftSchema, marketingVideoDraftSchema } from "@/lib/video/edit-contracts";
+import { marketingVideoAiDraftSchema, marketingVideoDraftSchema, safeAiCreativeCaptions, safeAiCtaTexts } from "@/lib/video/edit-contracts";
 import { createReviewVideoExport } from "@/lib/video/export-artifact";
 import { videoExportPresets } from "@/lib/video/export-presets";
 import {
@@ -9,6 +9,7 @@ import {
   completeGuardedMarketingVideoRender,
 } from "@/lib/video/product-media-guarded-operations";
 import { assertCurrentProductMediaUsageForVideo } from "@/lib/video/product-media-runtime-store";
+import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
 import { VercelPrivateVideoAssetStore } from "@/lib/video/private-asset-store";
 import { completeVideoJob, failVideoJob, markVideoJobRunning } from "@/lib/video/processing-jobs";
 import { renderApprovedMarketingTimeline } from "@/lib/video/rendering";
@@ -26,19 +27,22 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
   try {
     const { project, state } = await getMarketingVideoEditProject(input.videoId);
     if (!["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(state)) throw new Error("当前视频状态不能生成 AI 初稿。");
-    await assertCurrentProductMediaUsageForVideo(project);
+    await Promise.all([
+      assertCurrentProductFactsForVideo(project),
+      assertCurrentProductMediaUsageForVideo(project),
+    ]);
     const sources = await issueSandboxVideoSources(project.sourceAssets.map((asset) => asset.assetRef));
     const suggestion = await new AiSdkStructuredGenerator().generate({
       model: createProductAgentModel(await resolveProductAgentModelConfig()),
       schema: marketingVideoAiDraftSchema,
       schemaName: "marketing_video_edit_draft",
-      task: `Create an editable B2B marketing cut draft, never new media. Use 1-3 of these authorized assets: ${JSON.stringify(project.sourceAssets.map(({ assetRef, mediaType }) => ({ assetRef, mediaType })))}. Total duration must be at most 15000ms and every clip 1000-10000ms. Choose trimStartMs only from supplied sample timestamps or 0. Captions and CTA may use only supplied verified facts. Prefer concise captions, hard cuts, and a muted default.`,
+      task: `Create an editable B2B marketing cut draft, never new media. Use 1-3 of these authorized assets: ${JSON.stringify(project.sourceAssets.map(({ assetRef, mediaType }) => ({ assetRef, mediaType })))}. Total duration must be at most 15000ms and every clip 1000-10000ms. Choose trimStartMs only from supplied sample timestamps or 0. A factual caption must use { kind: "verified_fact", claimRef } and must never provide the fact text. A creative caption must exactly match one of ${JSON.stringify(safeAiCreativeCaptions)}. Use { kind: "none" } when no caption is needed. CTA must be empty or exactly match one of ${JSON.stringify(safeAiCtaTexts)}. Prefer concise captions, hard cuts, and a muted default.`,
       verifiedFacts: project.factualClaims.map(({ field, value, evidenceRef }) => ({ field, value, evidenceRef })),
       visualSamples: await extractMarketingVisualSamplesInSandbox(project.sourceAssets, sources),
     });
     const sourceByRef = new Map(project.sourceAssets.map((asset) => [asset.assetRef, asset]));
     const draft = marketingVideoDraftSchema.parse({
-      version: 1,
+      version: 2,
       platform: project.editDraft!.platform,
       clips: suggestion.clips.map((clip, index) => {
         const source = sourceByRef.get(clip.assetRef);

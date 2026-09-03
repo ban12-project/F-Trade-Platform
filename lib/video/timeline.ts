@@ -81,14 +81,18 @@ export function createMarketingEditTimeline(projectInput: VideoProject, draftInp
   const project = videoProjectSchema.parse(projectInput);
   const draft = marketingVideoDraftSchema.parse(draftInput);
   const sourceAssets = new Map(project.sourceAssets.map((asset) => [asset.assetRef, asset]));
-  const permittedClaims = new Set(project.factualClaims.map((claim) => claim.field));
+  const claimsByField = new Map(project.factualClaims.map((claim) => [claim.field, claim]));
   let startSeconds = 0;
   const scenes = draft.clips.map((clip) => {
     const source = sourceAssets.get(clip.assetRef);
     if (!source || source.mediaType !== clip.mediaType) throw new Error(`片段 ${clip.clipId} 引用了未授权或类型不匹配的素材。`);
-    if (!clip.claimRefs.every((claimRef) => permittedClaims.has(claimRef))) {
-      throw new Error(`片段 ${clip.clipId} 的字幕引用了未绑定证据的产品字段。`);
-    }
+    const verifiedClaim = clip.caption.kind === "verified_fact" ? claimsByField.get(clip.caption.claimRef) : undefined;
+    if (clip.caption.kind === "verified_fact" && !verifiedClaim) throw new Error(`片段 ${clip.clipId} 的字幕引用了未绑定证据的产品字段。`);
+    const caption = clip.caption.kind === "none"
+      ? undefined
+      : clip.caption.kind === "creative"
+        ? { text: clip.caption.text, claimRefs: [] as string[] }
+        : { text: verifiedClaim!.value, claimRefs: [verifiedClaim!.field] };
     const durationSeconds = clip.durationMs / 1_000;
     const sceneStart = startSeconds;
     startSeconds += durationSeconds;
@@ -102,8 +106,8 @@ export function createMarketingEditTimeline(projectInput: VideoProject, draftInp
       startSeconds: sceneStart,
       durationSeconds,
       prompt: "用户授权素材剪辑",
-      claimRefs: clip.claimRefs,
-      subtitles: clip.subtitle ? [{ text: clip.subtitle, startSeconds: sceneStart, endSeconds: startSeconds, claimRefs: clip.claimRefs }] : [],
+      claimRefs: caption?.claimRefs ?? [],
+      subtitles: caption ? [{ ...caption, startSeconds: sceneStart, endSeconds: startSeconds }] : [],
     };
   });
   const cta = draft.ctaText ? { text: draft.ctaText, startSeconds: Math.max(0, startSeconds - 2), endSeconds: startSeconds } : undefined;
