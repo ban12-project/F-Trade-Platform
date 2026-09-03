@@ -83,10 +83,14 @@ async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ 
       platforms: ["facebook"],
       approvalStatus: reviewState ? "pending" : null,
       previewAssetRef: reviewState ? "asset-rendered-preview-001" : null,
+      captionFactOptions: [
+        { field: "product.product_name", value: "Verified clutch kit" },
+        { field: "product.oe_numbers", value: "OE-SYN-001" },
+      ],
       processingJob: null,
-      draft: { version: 1, platform: "facebook", ctaText: "Contact us", clips: [
-        { clipId: "clip-001", assetRef: "evidence-video-001", mediaType: "video", trimStartMs: 0, durationMs: 5_000, fitMode: "contain", audioMode: "muted", subtitle: "", claimRefs: [] },
-        { clipId: "clip-002", assetRef: "evidence-image-002", mediaType: "image", trimStartMs: 0, durationMs: 3_000, fitMode: "contain", audioMode: "muted", subtitle: "", claimRefs: [] },
+      draft: { version: 2, platform: "facebook", ctaText: "Contact us", clips: [
+        { clipId: "clip-001", assetRef: "evidence-video-001", mediaType: "video", trimStartMs: 0, durationMs: 5_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" } },
+        { clipId: "clip-002", assetRef: "evidence-image-002", mediaType: "image", trimStartMs: 0, durationMs: 3_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" } },
       ] },
     }],
   }} />;

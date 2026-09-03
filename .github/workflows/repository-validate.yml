@@ -41,6 +41,9 @@ jobs:
       - name: Inspect a real rendered video
         run: pnpm test:rendered-video-inspection
 
+      - name: Test governed marketing-video captions
+        run: pnpm test:marketing-video-edit && pnpm test:video-product-fact-runtime
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

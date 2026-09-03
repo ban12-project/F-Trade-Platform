@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -117,9 +118,15 @@ function CreateVideoForm({ projectId, products }: { projectId: string; products:
   </Card>;
 }
 
-function ClipEditor({ draft, onChange, disabled }: { draft: MarketingVideoDraft; onChange: (draft: MarketingVideoDraft) => void; disabled: boolean }) {
+function ClipEditor({ draft, factOptions, onChange, disabled }: { draft: MarketingVideoDraft; factOptions: MarketingVideoEditorEntry["captionFactOptions"]; onChange: (draft: MarketingVideoDraft) => void; disabled: boolean }) {
   function patchClip(index: number, patch: Partial<MarketingVideoDraft["clips"][number]>) { onChange({ ...draft, clips: draft.clips.map((clip, clipIndex) => clipIndex === index ? { ...clip, ...patch } : clip) }); }
   function move(index: number, offset: -1 | 1) { const clips = [...draft.clips]; const target = index + offset; if (target < 0 || target >= clips.length) return; [clips[index], clips[target]] = [clips[target]!, clips[index]!]; onChange({ ...draft, clips }); }
+  function changeCaptionKind(index: number, kind: "none" | "creative" | "verified_fact") {
+    const current = draft.clips[index]!.caption;
+    if (kind === "none") patchClip(index, { caption: { kind } });
+    else if (kind === "creative") patchClip(index, { caption: { kind, text: current.kind === "creative" ? current.text : "" } });
+    else if (factOptions[0]) patchClip(index, { caption: { kind, claimRef: current.kind === "verified_fact" ? current.claimRef : factOptions[0].field } });
+  }
   return <FieldSet disabled={disabled}><FieldLegend>剪辑顺序</FieldLegend><div className="flex flex-col gap-3">{draft.clips.map((clip, index) => <Card key={clip.clipId}>
     <CardHeader className="flex-row items-start justify-between"><div className="flex flex-col gap-1"><CardTitle className="text-sm">片段 {index + 1}</CardTitle><CardDescription>{clip.mediaType === "image" ? "图片" : "视频"} · {clip.assetRef.slice(0, 20)}…</CardDescription></div><div className="flex gap-1"><Button type="button" size="icon-sm" variant="ghost" aria-label={`片段 ${index + 1} 上移`} disabled={index === 0 || disabled} onClick={() => move(index, -1)}><ArrowUpIcon /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label={`片段 ${index + 1} 下移`} disabled={index === draft.clips.length - 1 || disabled} onClick={() => move(index, 1)}><ArrowDownIcon /></Button></div></CardHeader>
     <CardContent><FieldGroup>
@@ -127,7 +134,9 @@ function ClipEditor({ draft, onChange, disabled }: { draft: MarketingVideoDraft;
       <Field><FieldLabel htmlFor={`${clip.clipId}-duration`}>成片时长（秒）</FieldLabel><Input id={`${clip.clipId}-duration`} type="number" min="1" max="10" step="0.1" value={clip.durationMs / 1_000} onChange={(event) => patchClip(index, { durationMs: Math.round(Number(event.target.value) * 1_000) })} /></Field>
       <Field><FieldLabel>画面适配</FieldLabel><ToggleGroup value={[clip.fitMode]} onValueChange={(value) => value[0] && patchClip(index, { fitMode: value[0] as "contain" | "cover" })} variant="outline"><ToggleGroupItem value="contain">完整显示</ToggleGroupItem><ToggleGroupItem value="cover">铺满裁切</ToggleGroupItem></ToggleGroup></Field>
       {clip.mediaType === "video" ? <Field><FieldLabel>声音</FieldLabel><ToggleGroup value={[clip.audioMode]} onValueChange={(value) => value[0] && patchClip(index, { audioMode: value[0] as "muted" | "source" })} variant="outline"><ToggleGroupItem value="muted">静音</ToggleGroupItem><ToggleGroupItem value="source">保留原声</ToggleGroupItem></ToggleGroup></Field> : null}
-      <Field><FieldLabel htmlFor={`${clip.clipId}-subtitle`}>字幕</FieldLabel><Textarea id={`${clip.clipId}-subtitle`} maxLength={120} value={clip.subtitle} onChange={(event) => patchClip(index, { subtitle: event.target.value })} /><FieldDescription>涉及产品事实的文字必须来自已核验字段；提交时服务端会再次检查引用。</FieldDescription></Field>
+      <Field><FieldLabel htmlFor={`${clip.clipId}-caption-kind`}>字幕类型</FieldLabel><NativeSelect className="w-full" id={`${clip.clipId}-caption-kind`} value={clip.caption.kind} onChange={(event) => changeCaptionKind(index, event.target.value as "none" | "creative" | "verified_fact")}><NativeSelectOption value="none">无字幕</NativeSelectOption><NativeSelectOption value="creative">创意文案</NativeSelectOption><NativeSelectOption value="verified_fact">核验事实</NativeSelectOption></NativeSelect><FieldDescription>事实字幕由服务端读取当前 ProductReady 值，不能手工改写。</FieldDescription></Field>
+      {clip.caption.kind === "creative" ? <Field><FieldLabel htmlFor={`${clip.clipId}-caption-text`}>创意字幕</FieldLabel><Textarea id={`${clip.clipId}-caption-text`} maxLength={120} value={clip.caption.text} onChange={(event) => patchClip(index, { caption: { kind: "creative", text: event.target.value } })} /><FieldDescription>仅写营销表达；工程和商业事实请使用“核验事实”。</FieldDescription></Field> : null}
+      {clip.caption.kind === "verified_fact" ? <Field><FieldLabel htmlFor={`${clip.clipId}-caption-fact`}>事实字段</FieldLabel><NativeSelect className="w-full" id={`${clip.clipId}-caption-fact`} value={clip.caption.claimRef} onChange={(event) => patchClip(index, { caption: { kind: "verified_fact", claimRef: event.target.value } })}>{factOptions.map((fact) => <NativeSelectOption key={fact.field} value={fact.field}>{fact.field} · {fact.value}</NativeSelectOption>)}</NativeSelect><FieldDescription>成片使用服务端保存的核验值，不接受浏览器提交事实文字。</FieldDescription></Field> : null}
     </FieldGroup></CardContent>
   </Card>)}</div></FieldSet>;
 }
@@ -150,7 +159,7 @@ function EditVideo({ projectId, entry, canReview, onDirtyChange }: { projectId: 
     {editable ? <>
       <Progress aria-label="视频总时长" value={Math.min(100, durationMs / 150)}><ProgressLabel>总时长</ProgressLabel><ProgressValue>{() => `${(durationMs / 1_000).toFixed(1)} / 15 秒`}</ProgressValue></Progress>
       {durationMs > 15_000 ? <Alert variant="destructive"><AlertTitle>视频过长</AlertTitle><AlertDescription>请缩短片段，总时长必须不超过 15 秒。</AlertDescription></Alert> : null}
-      <ClipEditor draft={draft} onChange={setDraft} disabled={pending || processing} />
+      <ClipEditor draft={draft} factOptions={entry.captionFactOptions} onChange={setDraft} disabled={pending || processing} />
       <Separator />
       <Field><FieldLabel htmlFor="video-cta">最后两秒 CTA</FieldLabel><Input id="video-cta" maxLength={40} value={draft.ctaText} onChange={(event) => setDraft({ ...draft, ctaText: event.target.value })} /><FieldDescription>固定居中样式，不增加视频总时长。</FieldDescription></Field>
       <div className="grid gap-2 sm:grid-cols-3"><Button variant="outline" disabled={pending || processing} onClick={() => run(() => generateMarketingVideoAiDraftAction(projectId, entry.id))}><BotIcon data-icon="inline-start" />AI 初稿</Button><Button variant="outline" disabled={pending || processing || !dirty} onClick={() => { const value = validatedDraft(); if (value) run(() => saveMarketingVideoDraftAction(projectId, entry.id, value)); }}><SaveIcon data-icon="inline-start" />保存</Button><Button disabled={pending || processing || durationMs > 15_000} onClick={() => { const value = validatedDraft(); if (value) run(() => renderMarketingVideoDraftAction(projectId, entry.id, value)); }}><ScissorsIcon data-icon="inline-start" />合成预览</Button></div>

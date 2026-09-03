@@ -12,6 +12,7 @@ import { assertTransition } from "@/lib/workflow/transitions";
 
 import { videoProjectSchema, type VideoProject } from "./contracts";
 import { approveReviewVideoExport, type ReviewVideoExport } from "./export-artifact";
+import { assertCurrentProductFacts } from "./product-fact-runtime-policy";
 import {
   assertCurrentProductMediaUsage,
   productMediaIdsForVideoProject,
@@ -31,15 +32,16 @@ async function assertLockedCurrentProductMedia(
   evaluatedAt: Date,
 ) {
   const mediaIds = productMediaIdsForVideoProject(project);
-  if (!mediaIds.length) return;
 
-  const [product] = await tx.select({ id: aggregateRecord.id, state: aggregateRecord.state })
+  const [product] = await tx.select({ id: aggregateRecord.id, state: aggregateRecord.state, payload: aggregateRecord.payload })
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, project.productId), eq(aggregateRecord.type, "product")))
     .for("update");
   if (!product || product.state !== "PRODUCT_READY") {
     throw new Error("视频引用的产品已不再处于 ProductReady，不能继续处理。");
   }
+  assertCurrentProductFacts(project, product.payload);
+  if (!mediaIds.length) return;
 
   const mediaRows = await tx.select().from(productMediaAsset)
     .where(inArray(productMediaAsset.id, mediaIds))
