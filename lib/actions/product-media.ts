@@ -27,11 +27,6 @@ export type ProductMediaActionState = {
   assetId?: string;
 };
 
-export const initialProductMediaActionState: ProductMediaActionState = {
-  status: "idle",
-  message: "",
-};
-
 function revalidateProductMedia(projectId: string) {
   revalidatePath("/workspace");
   revalidatePath(`/workspace/${projectId}`);
