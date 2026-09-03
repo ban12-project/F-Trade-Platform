@@ -3,12 +3,17 @@ import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-con
 import { AiSdkStructuredGenerator } from "@/lib/ai/structured-generator";
 import { marketingVideoAiDraftSchema, marketingVideoDraftSchema } from "@/lib/video/edit-contracts";
 import { videoExportPresets } from "@/lib/video/export-presets";
+import {
+  beginGuardedMarketingVideoRender,
+  completeGuardedMarketingVideoRender,
+} from "@/lib/video/product-media-guarded-operations";
+import { assertCurrentProductMediaUsageForVideo } from "@/lib/video/product-media-runtime-store";
 import { VercelPrivateVideoAssetStore } from "@/lib/video/private-asset-store";
 import { completeVideoJob, failVideoJob, markVideoJobRunning } from "@/lib/video/processing-jobs";
 import { renderApprovedMarketingTimeline } from "@/lib/video/rendering";
 import { extractMarketingVisualSamplesInSandbox, renderMarketingTimelineInSandbox } from "@/lib/video/sandbox-media";
 import { issueSandboxVideoSources } from "@/lib/video/sandbox-sources";
-import { beginMarketingVideoRender, completeMarketingVideoRender, failMarketingVideoRender, getMarketingVideoEditProject, updateMarketingVideoEditDraft } from "@/lib/video/store";
+import { failMarketingVideoRender, getMarketingVideoEditProject, updateMarketingVideoEditDraft } from "@/lib/video/store";
 import { createMarketingEditTimeline } from "@/lib/video/timeline";
 
 export type MarketingVideoWorkflowInput = { jobId: string; videoId: string; actorId: string };
@@ -20,6 +25,7 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
   try {
     const { project, state } = await getMarketingVideoEditProject(input.videoId);
     if (!["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(state)) throw new Error("当前视频状态不能生成 AI 初稿。");
+    await assertCurrentProductMediaUsageForVideo(project);
     const sources = await issueSandboxVideoSources(project.sourceAssets.map((asset) => asset.assetRef));
     const suggestion = await new AiSdkStructuredGenerator().generate({
       model: createProductAgentModel(await resolveProductAgentModelConfig()),
@@ -53,7 +59,7 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
   if (job.status === "succeeded" || job.status === "failed") return;
   let rendering = false;
   try {
-    const project = await beginMarketingVideoRender(input.videoId, input.actorId);
+    const project = await beginGuardedMarketingVideoRender(input.videoId, input.actorId);
     rendering = true;
     const timeline = createMarketingEditTimeline(project, project.editDraft!);
     const preset = videoExportPresets.find((candidate) => candidate.platform === project.editDraft!.platform && candidate.verification === "verified");
@@ -64,7 +70,7 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
     await renderApprovedMarketingTimeline(request, { render: async (validated) => { bytes = await renderMarketingTimelineInSandbox(validated, sources); return { assetRef: `asset-render-${input.jobId}` }; } });
     if (!bytes) throw new Error("Sandbox 未生成视频输出。");
     const assetRef = await new VercelPrivateVideoAssetStore().putRenderedVideo({ data: bytes, contentType: "video/mp4", assetRef: `asset-render-${input.jobId}` });
-    await completeMarketingVideoRender(input.videoId, assetRef);
+    await completeGuardedMarketingVideoRender(input.videoId, assetRef);
     await completeVideoJob(input.jobId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知渲染错误";
