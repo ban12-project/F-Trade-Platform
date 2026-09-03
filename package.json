@@ -17,6 +17,7 @@
     "start": "next start",
     "product-agent": "tsx scripts/run-product-agent.ts",
     "product-agent:catalog": "tsx scripts/run-product-agent-catalog.ts",
+    "test:product-agent-evidence": "tsx scripts/test-product-agent-evidence-locations.ts",
     "test:catalog-preflight": "tsx scripts/test-product-catalog-preflight.ts",
     "test:product-catalog-entry": "tsx scripts/test-product-catalog-entry.ts",
     "test:content-catalog-entry": "tsx scripts/test-content-catalog-entry.ts",
