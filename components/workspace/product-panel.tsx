@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
@@ -24,49 +24,29 @@ import { runProductAgentAction } from "@/lib/actions/product-agent";
 import { createProductCatalogDraftAction, decideProductCatalogReviewAction, reviseProductCatalogDraftAction } from "@/lib/actions/products";
 import { initialProductActionState, initialProductAgentActionState } from "@/lib/action-states";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
-import { productAgentRunFormSchema, productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
+import { productAgentRunFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
+import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
 import type { ProductCatalogDetail, ProductCatalogEntry } from "@/lib/products";
 import { useWorkspaceDirty } from "./dirty-state";
+import { ProductFields, emptyProduct, productDraftValues, type ProductValues } from "./product-fact-fields";
 
-const productTypes = [
-  ["clutch_disc", "离合器片"], ["clutch_cover", "离合器盖 / 压盘"], ["release_bearing", "分离轴承"], ["clutch_kit", "离合器套件"],
-] as const;
-type ProductValues = z.infer<typeof productCatalogFormSchema>;
 type ReviewValues = z.infer<typeof productReviewFormSchema>;
 type AgentValues = z.infer<typeof productAgentRunFormSchema>;
-
-const emptyProduct: ProductValues = { productName: "", productType: "clutch_disc", internalSku: "", oeNumbers: "", application: "", vehicleBrand: "", vehicleModel: "", clutchDiameterMm: "", splineCount: "", splineSize: "", frictionMaterial: "", sourceRef: "", evidenceRef: "" };
 
 function stateLabel(state: string) {
   return ({ PRODUCT_REVIEW_REQUIRED: "待 Gate 01", PRODUCT_REVISION_REQUIRED: "待修订", PRODUCT_READY: "已核验" } as Record<string, string>)[state] ?? state;
 }
 
 function textValue(value: unknown) { return typeof value === "string" || typeof value === "number" ? String(value) : ""; }
-function draftValues(detail: ProductCatalogDetail): ProductValues {
-  const product = detail.draft.product; const specifications = detail.draft.specifications ?? {};
-  return { productName: textValue(product.product_name), productType: (product.product_type as ProductValues["productType"]) ?? "clutch_disc", internalSku: textValue(product.internal_sku), oeNumbers: Array.isArray(product.oe_numbers) ? product.oe_numbers.filter((value): value is string => typeof value === "string").join(", ") : "", application: textValue(product.application), vehicleBrand: textValue(product.vehicle_brand), vehicleModel: textValue(product.vehicle_model), clutchDiameterMm: textValue(specifications.clutch_diameter_mm), splineCount: textValue(specifications.spline_count), splineSize: textValue(specifications.spline_size), frictionMaterial: textValue(specifications.friction_material), sourceRef: detail.draft.source_ref, evidenceRef: detail.draft.evidence_refs[0] ?? "" };
-}
-
-function ProductFields({ form }: { form: ReturnType<typeof useForm<ProductValues>> }) {
-  return <FieldGroup>
-    <Field data-invalid={!!form.formState.errors.productName}><FieldLabel htmlFor="product-name">产品名称</FieldLabel><Input id="product-name" aria-invalid={!!form.formState.errors.productName} {...form.register("productName")} /><FieldError errors={[form.formState.errors.productName]} /></Field>
-    <Field data-invalid={!!form.formState.errors.productType}><FieldLabel>产品类型</FieldLabel><Controller control={form.control} name="productType" render={({ field }) => <Select items={Object.fromEntries(productTypes)} value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full" aria-invalid={!!form.formState.errors.productType}><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{productTypes.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent></Select>} /><FieldError errors={[form.formState.errors.productType]} /></Field>
-    <Field data-invalid={!!form.formState.errors.internalSku}><FieldLabel htmlFor="internal-sku">内部编号</FieldLabel><Input id="internal-sku" aria-invalid={!!form.formState.errors.internalSku} {...form.register("internalSku")} /><FieldError errors={[form.formState.errors.internalSku]} /></Field>
-    <Field><FieldLabel htmlFor="oe-numbers">OE / OEM 编号</FieldLabel><Input id="oe-numbers" placeholder="多个编号用逗号分隔" {...form.register("oeNumbers")} /></Field>
-    <FieldSet><FieldLegend>适配信息</FieldLegend><FieldGroup><Field><FieldLabel htmlFor="application">适配说明</FieldLabel><Input id="application" {...form.register("application")} /></Field><Field><FieldLabel htmlFor="vehicle-brand">车辆品牌</FieldLabel><Input id="vehicle-brand" {...form.register("vehicleBrand")} /></Field><Field><FieldLabel htmlFor="vehicle-model">车型</FieldLabel><Input id="vehicle-model" {...form.register("vehicleModel")} /></Field></FieldGroup></FieldSet>
-    <FieldSet><FieldLegend>离合器规格</FieldLegend><FieldDescription>没有来源依据时留空，AI 不能补齐。</FieldDescription><FieldGroup><Field data-invalid={!!form.formState.errors.clutchDiameterMm}><FieldLabel htmlFor="clutch-diameter">盘径（mm）</FieldLabel><Input id="clutch-diameter" inputMode="decimal" aria-invalid={!!form.formState.errors.clutchDiameterMm} {...form.register("clutchDiameterMm")} /><FieldError errors={[form.formState.errors.clutchDiameterMm]} /></Field><Field data-invalid={!!form.formState.errors.splineCount}><FieldLabel htmlFor="spline-count">花键数</FieldLabel><Input id="spline-count" inputMode="numeric" aria-invalid={!!form.formState.errors.splineCount} {...form.register("splineCount")} /><FieldError errors={[form.formState.errors.splineCount]} /></Field><Field><FieldLabel htmlFor="spline-size">花键尺寸</FieldLabel><Input id="spline-size" {...form.register("splineSize")} /></Field><Field><FieldLabel htmlFor="friction-material">摩擦材料</FieldLabel><Input id="friction-material" {...form.register("frictionMaterial")} /></Field></FieldGroup></FieldSet>
-    <FieldSet><FieldLegend>来源与证据</FieldLegend><FieldGroup><Field data-invalid={!!form.formState.errors.sourceRef}><FieldLabel htmlFor="source-ref">来源引用</FieldLabel><Input id="source-ref" placeholder="source-catalog-001" aria-invalid={!!form.formState.errors.sourceRef} {...form.register("sourceRef")} /><FieldError errors={[form.formState.errors.sourceRef]} /></Field><Field data-invalid={!!form.formState.errors.evidenceRef}><FieldLabel htmlFor="evidence-ref">字段证据引用</FieldLabel><Input id="evidence-ref" placeholder="evidence-product-001" aria-invalid={!!form.formState.errors.evidenceRef} {...form.register("evidenceRef")} /><FieldError errors={[form.formState.errors.evidenceRef]} /></Field></FieldGroup></FieldSet>
-  </FieldGroup>;
-}
 
 function ProductDraftForm({ projectId, detail }: { projectId: string; detail?: ProductCatalogDetail }) {
   const router = useRouter(); const revising = detail?.state === "PRODUCT_REVISION_REQUIRED";
   const [state, action, pending] = useActionState(revising ? reviseProductCatalogDraftAction : createProductCatalogDraftAction, initialProductActionState);
-  const form = useForm<ProductValues>({ resolver: zodResolver(productCatalogFormSchema), defaultValues: detail ? draftValues(detail) : emptyProduct });
+  const form = useForm<ProductValues>({ resolver: zodResolver(productCatalogFormSchema), defaultValues: detail ? productDraftValues(detail) : emptyProduct });
   useWorkspaceDirty(`product-draft-${detail?.id ?? "new"}`, form.formState.isDirty);
   useEffect(() => { if (state.status === "success") { form.reset(revising ? form.getValues() : emptyProduct); router.refresh(); } }, [form, revising, router, state.status]);
   function submit(values: ProductValues) { const data = new FormData(); data.set("projectId", projectId); if (detail) data.set("productId", detail.id); for (const [key, value] of Object.entries(values)) data.set(key, value); startTransition(() => action(data)); }
-  return <Card><CardHeader><CardTitle>{revising ? "修订产品草稿" : "手动新建产品草稿"}</CardTitle><CardDescription>{revising ? "只更正有来源依据的字段，提交后重新进入 Gate 01。" : "保存后只创建待审核记录，不会直接成为 Product Ready。"}</CardDescription></CardHeader><CardContent><form id={revising ? "revise-product" : "create-product"} onSubmit={form.handleSubmit(submit)}><ProductFields form={form} /></form></CardContent><CardFooter className="flex-col items-stretch gap-3"><Button form={revising ? "revise-product" : "create-product"} type="submit" disabled={pending}>{pending ? <Spinner data-icon="inline-start" /> : revising ? <RotateCcwIcon data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}{revising ? "提交修订并送审" : "创建待审核草稿"}</Button>{state.message ? <p className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} aria-live="polite">{state.message}</p> : null}</CardFooter></Card>;
+  return <Card><CardHeader><CardTitle>{revising ? "修订产品草稿" : "手动新建产品草稿"}</CardTitle><CardDescription>{revising ? "只更正有来源依据的字段及其独立证据，提交后重新进入 Gate 01。" : "每个事实独立绑定证据；保存后只创建待审核记录，不会直接成为 Product Ready。"}</CardDescription></CardHeader><CardContent><form id={revising ? "revise-product" : "create-product"} onSubmit={form.handleSubmit(submit)}><ProductFields form={form} /></form></CardContent><CardFooter className="flex-col items-stretch gap-3"><Button form={revising ? "revise-product" : "create-product"} type="submit" disabled={pending}>{pending ? <Spinner data-icon="inline-start" /> : revising ? <RotateCcwIcon data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}{revising ? "提交修订并送审" : "创建待审核草稿"}</Button>{state.message ? <p className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} aria-live="polite">{state.message}</p> : null}</CardFooter></Card>;
 }
 
 function ProductAgentForm({ projectId, modelConfigs }: { projectId: string; modelConfigs: ProductAgentModelSettings[] }) {
