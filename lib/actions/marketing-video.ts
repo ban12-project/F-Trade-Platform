@@ -19,6 +19,7 @@ import {
   updateMarketingVideoEditDraft,
 } from "@/lib/video/store";
 import { claimCompletedVideoUploads } from "@/lib/video/upload-receipts";
+import { assertWorkspaceAggregateLink } from "@/lib/workspace/store";
 import { start } from "workflow/api";
 import { generateMarketingVideoAiDraftWorkflow, renderMarketingVideoPreviewWorkflow } from "@/workflows/marketing-video-processing";
 
@@ -82,6 +83,7 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
       productMediaIds: jsonValue(formData, "productMediaIds", []),
       rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
     });
+    await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product");
 
     const result = request.sourceMode === "product_media"
       ? await createMarketingVideoEditProjectFromProductMedia(request, session.user.id)
