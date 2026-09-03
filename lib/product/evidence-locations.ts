@@ -36,7 +36,13 @@ function markdownRow(line: string) {
   return trimmed.slice(1, -1).split("|").map((cell) => cell.trim());
 }
 
-function locationRef(baseEvidenceRef: string, kind: ProductAgentEvidenceLocation["kind"], startLine: number, endLine: number, text: string) {
+function locationRef(
+  baseEvidenceRef: string,
+  kind: ProductAgentEvidenceLocation["kind"],
+  startLine: number,
+  endLine: number,
+  text: string,
+) {
   const digest = createHash("sha256")
     .update(`${baseEvidenceRef}\0${kind}\0${startLine}\0${endLine}\0${text}`)
     .digest("hex")
@@ -44,10 +50,16 @@ function locationRef(baseEvidenceRef: string, kind: ProductAgentEvidenceLocation
   return `${baseEvidenceRef}#loc=${kind}-${String(startLine).padStart(6, "0")}-${String(endLine).padStart(6, "0")}-${digest}`;
 }
 
+function assertLocationLimit(locations: ProductAgentEvidenceLocation[]) {
+  if (locations.length > MAX_EVIDENCE_LOCATIONS) {
+    throw new Error(`Product Agent source contains more than ${MAX_EVIDENCE_LOCATIONS} labelled evidence locations; split the catalog before extraction`);
+  }
+}
+
 /**
  * Produces deterministic, bounded excerpts from explicitly labelled source text.
- * Table locations contain their header and one data row; prose locations contain
- * one labelled line. Unlabelled narrative is deliberately excluded as fact evidence.
+ * Table locations contain their header, separator, and exactly one data row;
+ * prose locations contain one labelled line. Unlabelled narrative is excluded.
  */
 export function buildProductAgentEvidenceLocations(
   baseEvidenceRef: string,
@@ -57,7 +69,6 @@ export function buildProductAgentEvidenceLocations(
   const lines = sourceText.split(/\r?\n/);
   const tableLines = new Set<number>();
   const locations: ProductAgentEvidenceLocation[] = [];
-  let tableIndex = 0;
 
   for (let index = 0; index < lines.length - 1; index += 1) {
     const header = markdownRow(lines[index]!);
@@ -65,33 +76,27 @@ export function buildProductAgentEvidenceLocations(
     if (!header || !separator || header.length !== separator.length || !separator.every((cell) => MARKDOWN_SEPARATOR.test(cell))) continue;
     if (!header.some((cell) => SUPPORTED_LABEL.test(cell))) continue;
 
-    tableIndex += 1;
     tableLines.add(index);
     tableLines.add(index + 1);
     const headerLine = lines[index]!;
+    const separatorLine = lines[index + 1]!;
     index += 2;
-    let rowIndex = 0;
     while (index < lines.length) {
       const row = markdownRow(lines[index]!);
       if (!row || row.length !== header.length) break;
       tableLines.add(index);
-      rowIndex += 1;
-      const text = `${headerLine}\n${lines[index]!}`;
-      const startLine = index + 1;
+      const text = [headerLine, separatorLine, lines[index]!].join("\n");
+      const rowLine = index + 1;
       locations.push({
-        ref: locationRef(baseEvidenceRef, "table_row", startLine, startLine, text),
+        ref: locationRef(baseEvidenceRef, "table_row", rowLine, rowLine, text),
         kind: "table_row",
-        start_line: startLine,
-        end_line: startLine,
+        start_line: rowLine,
+        end_line: rowLine,
         text,
       });
-      if (locations.length > MAX_EVIDENCE_LOCATIONS) {
-        throw new Error(`Product Agent source contains more than ${MAX_EVIDENCE_LOCATIONS} labelled evidence locations; split the catalog before extraction`);
-      }
+      assertLocationLimit(locations);
       index += 1;
     }
-    void tableIndex;
-    void rowIndex;
     index -= 1;
   }
 
@@ -106,9 +111,7 @@ export function buildProductAgentEvidenceLocations(
       end_line: lineNumber,
       text,
     });
-    if (locations.length > MAX_EVIDENCE_LOCATIONS) {
-      throw new Error(`Product Agent source contains more than ${MAX_EVIDENCE_LOCATIONS} labelled evidence locations; split the catalog before extraction`);
-    }
+    assertLocationLimit(locations);
   }
 
   if (!locations.length) {
@@ -131,7 +134,9 @@ function taggedSourceText(locations: ProductAgentEvidenceLocation[]) {
 }
 
 /** Rebuilds locations from the current, possibly candidate-scoped source text. */
-export function prepareProductAgentEvidenceSource<T extends LocatableProductAgentSource>(source: T): T & ProductAgentEvidenceLocatedSource {
+export function prepareProductAgentEvidenceSource<T extends LocatableProductAgentSource>(
+  source: T,
+): T & ProductAgentEvidenceLocatedSource {
   const baseEvidenceRef = source.evidence_refs[0] ?? source.source_ref;
   const evidenceLocations = buildProductAgentEvidenceLocations(baseEvidenceRef, source.source_text);
   return {
@@ -144,10 +149,17 @@ export function prepareProductAgentEvidenceSource<T extends LocatableProductAgen
 
 function valueAt(draft: ProductDraft, field: string) {
   const [section, key] = field.split(".");
-  if (section === "product") return draft.product[key];
-  if (section === "specifications") return draft.specifications?.[key];
-  if (section === "commercial") return draft.commercial?.[key];
-  return undefined;
+  if (!key) return undefined;
+  const fields = section === "product"
+    ? draft.product
+    : section === "specifications"
+      ? draft.specifications
+      : section === "commercial"
+        ? draft.commercial
+        : undefined;
+  return fields && typeof fields === "object"
+    ? (fields as Record<string, unknown>)[key]
+    : undefined;
 }
 
 function singleFieldDraft(draft: ProductDraft, field: string, evidenceRef: string): ProductDraft {
