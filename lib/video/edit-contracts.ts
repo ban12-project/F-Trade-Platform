@@ -5,35 +5,32 @@ const claimRef = z.string().trim().regex(/^(?:product|specifications|commercial)
 const editingPlatformSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
 const evidenceRef = z.string().trim().regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写素材权利证据引用。");
 
-export const createMarketingVideoDraftFormSchema = z.object({
+const marketingVideoCreationShape = {
   projectId: z.uuid("项目标识无效。"),
   productId: z.uuid("产品记录标识无效。"),
   factPath: claimRef,
   objective: z.string().trim().min(1, "请填写视频目标。").max(2_000),
   targetAudience: z.string().trim().min(1, "请填写目标受众。").max(240),
   platform: editingPlatformSchema,
-  sourceMode: z.enum(["upload", "product_media"]).default("upload"),
-  productMediaIds: z.array(z.uuid("产品媒体标识无效。")).max(3, "MVP1 最多选择三个产品媒体。").default([]),
-  rightsEvidenceRef: z.union([evidenceRef, z.literal("")]),
-}).strict().superRefine((value, context) => {
-  if (value.sourceMode === "upload") {
-    if (!value.rightsEvidenceRef) {
-      context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "上传新素材时必须填写素材权利证据引用。" });
-    }
-    if (value.productMediaIds.length) {
-      context.addIssue({ code: "custom", path: ["productMediaIds"], message: "上传模式不能同时选择已有产品媒体。" });
-    }
-    return;
-  }
+} as const;
 
-  if (value.productMediaIds.length < 1) {
-    context.addIssue({ code: "custom", path: ["productMediaIds"], message: "至少选择一个已审核产品媒体。" });
-  }
+/** Existing browser-upload form contract. */
+export const createMarketingVideoDraftFormSchema = z.object({
+  ...marketingVideoCreationShape,
+  rightsEvidenceRef: evidenceRef,
+}).strict();
+
+/** Separate contract for reusing independently approved ProductMedia. */
+export const createMarketingVideoFromProductMediaSchema = z.object({
+  ...marketingVideoCreationShape,
+  sourceMode: z.literal("product_media"),
+  productMediaIds: z.array(z.uuid("产品媒体标识无效。"))
+    .min(1, "至少选择一个已审核产品媒体。")
+    .max(3, "MVP1 最多选择三个产品媒体。"),
+  rightsEvidenceRef: z.literal("").optional().default(""),
+}).strict().superRefine((value, context) => {
   if (new Set(value.productMediaIds).size !== value.productMediaIds.length) {
     context.addIssue({ code: "custom", path: ["productMediaIds"], message: "产品媒体不能重复选择。" });
-  }
-  if (value.rightsEvidenceRef) {
-    context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "复用产品媒体时由服务端读取逐素材权利证据。" });
   }
 });
 
