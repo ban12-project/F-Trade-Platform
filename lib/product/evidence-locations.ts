@@ -46,8 +46,9 @@ function locationRef(
   const digest = createHash("sha256")
     .update(`${baseEvidenceRef}\0${kind}\0${startLine}\0${endLine}\0${text}`)
     .digest("hex")
-    .slice(0, 16);
-  return `${baseEvidenceRef}#loc=${kind}-${String(startLine).padStart(6, "0")}-${String(endLine).padStart(6, "0")}-${digest}`;
+    .slice(0, 32);
+  const kindToken = kind === "table_row" ? "row" : "line";
+  return `evidence-loc-${kindToken}-${String(startLine).padStart(6, "0")}-${String(endLine).padStart(6, "0")}-${digest}`;
 }
 
 function assertLocationLimit(locations: ProductAgentEvidenceLocation[]) {
@@ -137,8 +138,10 @@ function taggedSourceText(locations: ProductAgentEvidenceLocation[]) {
 export function prepareProductAgentEvidenceSource<T extends LocatableProductAgentSource>(
   source: T,
 ): T & ProductAgentEvidenceLocatedSource {
-  const baseEvidenceRef = source.evidence_refs[0] ?? source.source_ref;
-  const evidenceLocations = buildProductAgentEvidenceLocations(baseEvidenceRef, source.source_text);
+  if (source.evidence_refs.length !== 1) {
+    throw new Error("Product Agent bounded locations require exactly one base evidence reference");
+  }
+  const evidenceLocations = buildProductAgentEvidenceLocations(source.evidence_refs[0]!, source.source_text);
   return {
     ...source,
     evidence_refs: evidenceLocations.map((location) => location.ref),
