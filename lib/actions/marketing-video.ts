@@ -13,13 +13,13 @@ import {
   createMarketingVideoFromProductMediaSchema,
   type MarketingVideoDraft,
 } from "@/lib/video/edit-contracts";
+import { decideGuardedVideoReview } from "@/lib/video/product-media-guarded-operations";
 import { createMarketingVideoEditProjectFromProductMedia } from "@/lib/video/product-media-create";
 import { attachVideoWorkflowRun, queueVideoProcessingJob, releaseVideoWorkflowStart, reserveVideoWorkflowStart } from "@/lib/video/processing-jobs";
 import {
   assertMarketingVideoProjectLink,
   copyMarketingVideoDraftToProject,
   createMarketingVideoEditProject,
-  decideVideoReview,
   updateMarketingVideoEditDraft,
 } from "@/lib/video/store";
 import { claimCompletedVideoUploads } from "@/lib/video/upload-receipts";
@@ -175,7 +175,7 @@ export async function reviewMarketingVideoAction(projectId: string, videoId: str
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session || !hasPermission(session.user.role, "content:review")) throw new Error("只有管理员可以审核营销视频成片。");
     await assertMarketingVideoProjectLink(projectId, videoId);
-    await decideVideoReview({ videoId, decision, evidenceRef, notes }, session.user.id);
+    await decideGuardedVideoReview({ videoId, decision, evidenceRef, notes }, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
     return { status: "success", message: decision === "approved" ? "成片已通过人工审核；不会自动发布。" : "成片已退回修改。", videoId };
   } catch (error) {
