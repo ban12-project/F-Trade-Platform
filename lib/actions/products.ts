@@ -8,8 +8,8 @@ import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
 import {
-  createEvidenceBoundProductCatalogDraft,
-  reviseEvidenceBoundProductCatalogDraft,
+  createEvidenceBoundProductCatalogDraft as createProductCatalogDraft,
+  reviseEvidenceBoundProductCatalogDraft as reviseProductCatalogDraft,
 } from "@/lib/product/evidence-bound-catalog";
 import { productReviewFormSchema } from "@/lib/form-schemas";
 import { decideProductCatalogReview } from "@/lib/products";
@@ -50,7 +50,7 @@ export async function createProductCatalogDraftAction(
   try {
     const projectId = projectIdFrom(formData);
     if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
-    const result = await createEvidenceBoundProductCatalogDraft(parsed.data, session.user.id, projectId);
+    const result = await createProductCatalogDraft(parsed.data, session.user.id, projectId);
     revalidateProductPaths(projectId, result.id);
     return {
       status: "success",
@@ -109,7 +109,7 @@ export async function reviseProductCatalogDraftAction(
   try {
     const projectId = projectIdFrom(formData);
     if (projectId) await assertWorkspaceAggregateLink(projectId, parsedProductId.data.productId, "marketing", "product");
-    await reviseEvidenceBoundProductCatalogDraft(parsedProductId.data.productId, parsed.data, session.user.id);
+    await reviseProductCatalogDraft(parsedProductId.data.productId, parsed.data, session.user.id);
     revalidateProductPaths(projectId, parsedProductId.data.productId);
     return { status: "success", message: "修订及逐字段证据已保存，并重新提交 Gate 01 审核。", productId: parsedProductId.data.productId };
   } catch (error) {
