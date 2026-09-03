@@ -10,6 +10,15 @@ const evidenceReference = z.string().trim().regex(
 );
 const optionalEvidenceReference = z.union([evidenceReference, z.literal("")]);
 const optionalCatalogText = z.string().trim().max(240, "字段不能超过 240 个字符。");
+const optionalPositiveDecimal = (label: string) => z.string().trim()
+  .regex(/^$|^\d+(?:\.\d+)?$/, `${label}必须是正数。`)
+  .refine((value) => value === "" || Number(value) > 0, `${label}必须大于 0。`);
+const optionalPositiveInteger = (label: string) => z.string().trim()
+  .regex(/^$|^[1-9]\d*$/, `${label}必须是正整数。`);
+const optionalNonNegativeInteger = (label: string) => z.string().trim()
+  .regex(/^$|^(?:0|[1-9]\d*)$/, `${label}必须是非负整数。`);
+
+export const kitContentValues = ["clutch_disc", "pressure_plate", "release_bearing"] as const;
 
 export const manualProductFactEvidenceFields = [
   ["productName", "productNameEvidenceRef", "产品名称"],
@@ -23,6 +32,15 @@ export const manualProductFactEvidenceFields = [
   ["splineCount", "splineCountEvidenceRef", "花键数"],
   ["splineSize", "splineSizeEvidenceRef", "花键尺寸"],
   ["frictionMaterial", "frictionMaterialEvidenceRef", "摩擦材料"],
+  ["kitContents", "kitContentsEvidenceRef", "套件组成"],
+  ["grossWeightKg", "grossWeightKgEvidenceRef", "毛重"],
+  ["netWeightKg", "netWeightKgEvidenceRef", "净重"],
+  ["packageSize", "packageSizeEvidenceRef", "包装尺寸"],
+  ["moq", "moqEvidenceRef", "最小起订量"],
+  ["estimatedLeadTimeDays", "estimatedLeadTimeDaysEvidenceRef", "预计交期"],
+  ["packaging", "packagingEvidenceRef", "包装方式"],
+  ["supportedCustomization", "supportedCustomizationEvidenceRef", "支持定制"],
+  ["sampleAvailable", "sampleAvailableEvidenceRef", "样品可用性"],
 ] as const;
 
 export const productCatalogFormSchema = z.object({
@@ -40,15 +58,32 @@ export const productCatalogFormSchema = z.object({
   vehicleBrandEvidenceRef: optionalEvidenceReference,
   vehicleModel: optionalCatalogText,
   vehicleModelEvidenceRef: optionalEvidenceReference,
-  clutchDiameterMm: z.string().trim().regex(/^$|^\d+(?:\.\d+)?$/, "盘径必须是正数。")
-    .refine((value) => value === "" || Number(value) > 0, "盘径必须大于 0。"),
+  clutchDiameterMm: optionalPositiveDecimal("盘径"),
   clutchDiameterMmEvidenceRef: optionalEvidenceReference,
-  splineCount: z.string().trim().regex(/^$|^[1-9]\d*$/, "花键数必须是正整数。"),
+  splineCount: optionalPositiveInteger("花键数"),
   splineCountEvidenceRef: optionalEvidenceReference,
   splineSize: optionalCatalogText,
   splineSizeEvidenceRef: optionalEvidenceReference,
   frictionMaterial: optionalCatalogText,
   frictionMaterialEvidenceRef: optionalEvidenceReference,
+  kitContents: optionalCatalogText,
+  kitContentsEvidenceRef: optionalEvidenceReference,
+  grossWeightKg: optionalPositiveDecimal("毛重"),
+  grossWeightKgEvidenceRef: optionalEvidenceReference,
+  netWeightKg: optionalPositiveDecimal("净重"),
+  netWeightKgEvidenceRef: optionalEvidenceReference,
+  packageSize: optionalCatalogText,
+  packageSizeEvidenceRef: optionalEvidenceReference,
+  moq: optionalPositiveInteger("最小起订量"),
+  moqEvidenceRef: optionalEvidenceReference,
+  estimatedLeadTimeDays: optionalNonNegativeInteger("预计交期"),
+  estimatedLeadTimeDaysEvidenceRef: optionalEvidenceReference,
+  packaging: optionalCatalogText,
+  packagingEvidenceRef: optionalEvidenceReference,
+  supportedCustomization: optionalCatalogText,
+  supportedCustomizationEvidenceRef: optionalEvidenceReference,
+  sampleAvailable: z.enum(["", "yes", "no"]),
+  sampleAvailableEvidenceRef: optionalEvidenceReference,
   sourceRef: sourceReference,
 }).superRefine((value, context) => {
   for (const [valueKey, evidenceKey, label] of manualProductFactEvidenceFields.slice(3)) {
@@ -57,19 +92,31 @@ export const productCatalogFormSchema = z.object({
     const hasFact = typeof fact === "string" ? fact.trim().length > 0 : fact !== undefined && fact !== null;
     const hasEvidence = typeof evidence === "string" && evidence.trim().length > 0;
     if (hasFact && !hasEvidence) {
-      context.addIssue({
-        code: "custom",
-        path: [evidenceKey],
-        message: `${label}已填写，必须单独绑定证据引用。`,
-      });
+      context.addIssue({ code: "custom", path: [evidenceKey], message: `${label}已填写，必须单独绑定证据引用。` });
     }
     if (!hasFact && hasEvidence) {
-      context.addIssue({
-        code: "custom",
-        path: [evidenceKey],
-        message: `${label}未填写，不能单独保留证据引用。`,
-      });
+      context.addIssue({ code: "custom", path: [evidenceKey], message: `${label}未填写，不能单独保留证据引用。` });
     }
+  }
+
+  const kitContents = value.kitContents
+    .split(/[\s,;，；]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const invalidKitContent = kitContents.find((item) => !kitContentValues.includes(item as typeof kitContentValues[number]));
+  if (invalidKitContent) {
+    context.addIssue({
+      code: "custom",
+      path: ["kitContents"],
+      message: `套件组成包含不支持的值：${invalidKitContent}。`,
+    });
+  }
+  if (kitContents.length && value.productType !== "clutch_kit") {
+    context.addIssue({ code: "custom", path: ["kitContents"], message: "只有离合器套件可以填写套件组成。" });
+  }
+
+  if (value.grossWeightKg && value.netWeightKg && Number(value.netWeightKg) > Number(value.grossWeightKg)) {
+    context.addIssue({ code: "custom", path: ["netWeightKg"], message: "净重不能大于毛重。" });
   }
 });
 
