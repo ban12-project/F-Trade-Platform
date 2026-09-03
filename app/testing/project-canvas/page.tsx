@@ -58,6 +58,7 @@ const syntheticContentDetail: ContentCatalogDetail = {
 async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string }> }) {
   const { state, kind } = await searchParams;
   const reviewState = state === "review";
+  const approvedState = state === "approved";
   if (kind === "sales") return <ProjectCanvas project={syntheticSalesProject} projects={syntheticProjects} tasks={[]} panels={{
     rfq: <RfqPanel projectId={syntheticSalesProject.id} entries={[]} />,
     product: <ProductReferencePanel projectId={syntheticSalesProject.id} available={[syntheticProduct]} linked={[]} />,
@@ -74,19 +75,20 @@ async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ 
     products: [{ id: "00000000-0000-4000-8000-000000000301", productName: "Verified clutch kit", internalSku: "SYN-001", factOptions: [{ value: "product.product_name", label: "product.product_name" }] }],
     entries: [{
       id: "00000000-0000-4000-8000-000000000401",
-      state: reviewState ? "VIDEO_REVIEW_REQUIRED" : "VIDEO_DRAFT",
+      state: approvedState ? "VIDEO_APPROVED" : reviewState ? "VIDEO_REVIEW_REQUIRED" : "VIDEO_DRAFT",
       createdAt: new Date("2026-09-01T00:00:00.000Z"),
       productId: "00000000-0000-4000-8000-000000000301",
       productName: "Verified clutch kit",
       objective: "Create a concise product inquiry video",
       targetAudience: "Overseas distributors",
       platforms: ["facebook"],
-      approvalStatus: reviewState ? "pending" : null,
-      previewAssetRef: reviewState ? "asset-rendered-preview-001" : null,
+      approvalStatus: approvedState ? "approved" : reviewState ? "pending" : null,
+      previewAssetRef: approvedState || reviewState ? "asset-rendered-preview-001" : null,
       captionFactOptions: [
         { field: "product.product_name", value: "Verified clutch kit" },
         { field: "product.oe_numbers", value: "OE-SYN-001" },
       ],
+      downloadAvailable: approvedState,
       processingJob: null,
       draft: { version: 2, platform: "facebook", ctaText: "Contact us", clips: [
         { clipId: "clip-001", assetRef: "evidence-video-001", mediaType: "video", trimStartMs: 0, durationMs: 5_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" } },
