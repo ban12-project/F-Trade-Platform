@@ -32,6 +32,7 @@ import { createMarketingVideoDraftFormSchema, marketingVideoDraftSchema, marketi
 import { maximumVideoUploadBatchBytes, shouldUseMultipartVideoUpload, videoPresignedUploadPayloadSchema, videoUploadBlobPath } from "@/lib/video/upload-contracts";
 import type { MarketingVideoCopyCandidate, MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
 import { useWorkspaceDirty } from "./dirty-state";
+import { MarketingVideoCreateForm } from "./marketing-video-create-form";
 
 type CreateValues = z.infer<typeof createMarketingVideoDraftFormSchema>;
 
@@ -168,7 +169,7 @@ export function MarketingVideoPanel({ projectId, products, entries, copyCandidat
   useEffect(() => { if (activeId !== "new" && !entries.some((entry) => entry.id === activeId)) setActiveId(entries[0]?.id ?? "new"); }, [activeId, entries]);
   return <div className="flex flex-col gap-4">
     <ToggleGroup value={[activeId]} onValueChange={(value) => value[0] && setActiveId(value[0])} variant="outline" className="w-full flex-wrap justify-start"><ToggleGroupItem value="new"><PlusIcon data-icon="inline-start" />新建</ToggleGroupItem>{entries.map((entry, index) => <ToggleGroupItem key={entry.id} value={entry.id}>视频 {entries.length - index}</ToggleGroupItem>)}</ToggleGroup>
-    {active ? <EditVideo projectId={projectId} entry={active} canReview={canReview} onDirtyChange={onDirtyChange} /> : <CreateVideoForm projectId={projectId} products={products} />}
+    {active ? <EditVideo projectId={projectId} entry={active} canReview={canReview} onDirtyChange={onDirtyChange} /> : <MarketingVideoCreateForm projectId={projectId} products={products} />}
     <Card><CardHeader><CardTitle>复制其他项目剪辑</CardTitle><CardDescription>复制素材编排为独立草稿，不继承预览与审核状态。</CardDescription></CardHeader><CardContent>{copyCandidates.length ? <Field><FieldLabel>源剪辑</FieldLabel><Select items={Object.fromEntries(copyCandidates.map((item) => [item.id, item.projectTitle + " · " + item.productName + " · " + item.objective]))} value={copyId} onValueChange={(value) => value && setCopyId(value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{copyCandidates.map((item) => <SelectItem key={item.id} value={item.id}>{item.projectTitle} · {item.productName} · {item.objective}</SelectItem>)}</SelectGroup></SelectContent></Select></Field> : <p className="text-sm text-muted-foreground">其他项目暂无可复制剪辑。</p>}</CardContent><CardFooter className="flex-col items-stretch gap-3"><Button variant="outline" disabled={copyPending || !copyId} onClick={() => startCopy(async () => { const result = await copyMarketingVideoDraftAction(projectId, copyId); setCopyMessage(result.message); if (result.status === "success") router.refresh(); })}><CopyIcon data-icon="inline-start" />复制为新剪辑稿</Button>{copyMessage ? <p className="text-sm text-muted-foreground">{copyMessage}</p> : null}</CardFooter></Card>
   </div>;
 }
