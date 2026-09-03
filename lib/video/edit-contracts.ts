@@ -12,8 +12,30 @@ export const createMarketingVideoDraftFormSchema = z.object({
   objective: z.string().trim().min(1, "请填写视频目标。").max(2_000),
   targetAudience: z.string().trim().min(1, "请填写目标受众。").max(240),
   platform: editingPlatformSchema,
-  rightsEvidenceRef: evidenceRef,
-}).strict();
+  sourceMode: z.enum(["upload", "product_media"]).default("upload"),
+  productMediaIds: z.array(z.uuid("产品媒体标识无效。")).max(3, "MVP1 最多选择三个产品媒体。").default([]),
+  rightsEvidenceRef: z.union([evidenceRef, z.literal("")]),
+}).strict().superRefine((value, context) => {
+  if (value.sourceMode === "upload") {
+    if (!value.rightsEvidenceRef) {
+      context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "上传新素材时必须填写素材权利证据引用。" });
+    }
+    if (value.productMediaIds.length) {
+      context.addIssue({ code: "custom", path: ["productMediaIds"], message: "上传模式不能同时选择已有产品媒体。" });
+    }
+    return;
+  }
+
+  if (value.productMediaIds.length < 1) {
+    context.addIssue({ code: "custom", path: ["productMediaIds"], message: "至少选择一个已审核产品媒体。" });
+  }
+  if (new Set(value.productMediaIds).size !== value.productMediaIds.length) {
+    context.addIssue({ code: "custom", path: ["productMediaIds"], message: "产品媒体不能重复选择。" });
+  }
+  if (value.rightsEvidenceRef) {
+    context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "复用产品媒体时由服务端读取逐素材权利证据。" });
+  }
+});
 
 export const marketingVideoClipSchema = z.object({
   clipId: z.string().trim().regex(/^clip-[a-z0-9][a-z0-9_-]{2,80}$/i, "片段标识无效。"),
