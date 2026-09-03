@@ -85,11 +85,27 @@ export const safeAiCtaTexts = [
   "Start a distributor inquiry",
 ] as const;
 
-const marketingVideoAiCaptionSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("none") }).strict(),
-  z.object({ kind: z.literal("creative"), text: z.enum(safeAiCreativeCaptions) }).strict(),
-  z.object({ kind: z.literal("verified_fact"), claimRef }).strict(),
-]);
+/**
+ * Keep the model-facing caption contract as one flat object. Some structured-output
+ * providers reject the `oneOf` emitted by Zod discriminated unions before the
+ * response reaches our runtime validator. The compiler below converts this
+ * transport shape into the governed domain union.
+ */
+const marketingVideoAiCaptionSchema = z.object({
+  kind: z.enum(["none", "creative", "verified_fact"]),
+  text: z.enum(["", ...safeAiCreativeCaptions]),
+  claimRef: z.string().trim().max(120),
+}).strict().superRefine((caption, context) => {
+  if (caption.kind === "none" && (caption.text || caption.claimRef)) {
+    context.addIssue({ code: "custom", message: "无字幕时文字和事实引用必须为空。" });
+  }
+  if (caption.kind === "creative" && (!caption.text || caption.claimRef)) {
+    context.addIssue({ code: "custom", message: "创意字幕必须使用允许的文字且不能引用产品事实。" });
+  }
+  if (caption.kind === "verified_fact" && (caption.text || !claimRef.safeParse(caption.claimRef).success)) {
+    context.addIssue({ code: "custom", message: "事实字幕必须只提供有效的产品事实引用。" });
+  }
+});
 
 export const marketingVideoClipSchema = z.object({
   clipId: z.string().trim().regex(/^clip-[a-z0-9][a-z0-9_-]{2,80}$/i, "片段标识无效。"),
@@ -178,7 +194,7 @@ export const marketingVideoAiDraftSchema = z.object({
     audioMode: z.enum(["muted", "source"]),
     caption: marketingVideoAiCaptionSchema,
   }).strict()).min(1).max(3),
-  ctaText: z.literal("").or(z.enum(safeAiCtaTexts)),
+  ctaText: z.enum(["", ...safeAiCtaTexts]),
 }).strict();
 
 export type MarketingVideoClip = z.infer<typeof marketingVideoClipSchema>;
