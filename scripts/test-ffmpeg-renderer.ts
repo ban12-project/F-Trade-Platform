@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { createFfmpegTimelineRenderer } from "../lib/video/ffmpeg-renderer";
+import { inspectVideoFile, validateProbedVideoExport } from "../lib/video/media-probe";
 
 const execFileAsync = promisify(execFile);
 
@@ -18,7 +19,17 @@ void (async () => {
     let stored = false;
     const renderer = createFfmpegTimelineRenderer({ ffmpegBin,
       resolvePrivateAssetPath: async () => source,
-      storeRenderedVideo: async ({ filePath }) => { assert.ok((await stat(filePath)).size > 0); stored = true; return "asset-rendered-ffmpeg-001"; },
+      storeRenderedVideo: async ({ filePath }) => {
+        assert.ok((await stat(filePath)).size > 0);
+        const measured = await inspectVideoFile(filePath);
+        assert.equal(measured.videoCodec, "h264");
+        assert.equal(measured.audioCodec, "aac");
+        assert.equal(measured.width, 1080);
+        assert.equal(measured.height, 1920);
+        assert.equal(validateProbedVideoExport("tiktok", measured).platform, "tiktok");
+        stored = true;
+        return "asset-rendered-ffmpeg-001";
+      },
     });
     const timeline = { durationSeconds: 1, scenes: [{ sceneId: "scene-001", assetRef: "asset-source-ffmpeg-001", mediaType: "video" as const, trimStartSeconds: 0.5, fitMode: "cover" as const, audioMode: "muted" as const, startSeconds: 0, durationSeconds: 1, prompt: "真实产品素材", claimRefs: [], subtitles: [{ text: "Verified product", startSeconds: 0, endSeconds: 1, claimRefs: [] }] }], cta: { text: "Contact us", startSeconds: 0, endSeconds: 1 } };
     const result = await renderer.render({ platform: "tiktok", width: 1080, height: 1920, fps: 30, timeline });

@@ -11,6 +11,7 @@ import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/s
 import { assertTransition } from "@/lib/workflow/transitions";
 
 import { videoProjectSchema, type VideoProject } from "./contracts";
+import { approveReviewVideoExport, type ReviewVideoExport } from "./export-artifact";
 import {
   assertCurrentProductMediaUsage,
   productMediaIdsForVideoProject,
@@ -89,6 +90,7 @@ export async function beginGuardedMarketingVideoRender(
       ...project,
       status: "rendering",
       renderedAssetRef: undefined,
+      exportArtifact: undefined,
     });
     await tx.update(aggregateRecord).set({
       state: "VIDEO_RENDERING",
@@ -127,6 +129,7 @@ export async function beginGuardedMarketingVideoRender(
 export async function completeGuardedMarketingVideoRender(
   videoId: string,
   assetRef: string,
+  exportArtifact: ReviewVideoExport,
   database: Database = getDatabase(),
 ) {
   const now = new Date();
@@ -142,6 +145,12 @@ export async function completeGuardedMarketingVideoRender(
     }
     const project = videoProjectSchema.parse(record.payload);
     await assertLockedCurrentProductMedia(tx, project, now);
+    if (exportArtifact.status !== "review_required" || exportArtifact.videoId !== videoId || exportArtifact.sourceAssetRef !== assetRef) {
+      throw new Error("合成结果缺少与当前视频匹配的媒体校验记录。");
+    }
+    if (!project.editDraft || exportArtifact.platform !== project.editDraft.platform) {
+      throw new Error("媒体校验记录与当前剪辑平台不一致。");
+    }
 
     const evidenceRefs = [...new Set([
       ...project.factualClaims.map((claim) => claim.evidenceRef),
@@ -163,6 +172,7 @@ export async function completeGuardedMarketingVideoRender(
       ...project,
       status: "review_required",
       renderedAssetRef: assetRef,
+      exportArtifact,
     });
     await tx.insert(approval).values({
       id: approvalId,
@@ -199,6 +209,8 @@ export async function completeGuardedMarketingVideoRender(
       metadata: {
         asset_ref: assetRef,
         approval_id: approvalId,
+        export_artifact_id: exportArtifact.id,
+        measured_media: exportArtifact.measured,
         product_media_revalidated: productMediaIdsForVideoProject(project).length,
       },
       occurredAt: now,
@@ -236,12 +248,20 @@ export async function decideGuardedVideoReview(
     if (!pendingApproval) throw new Error("未找到待处理的视频事实确认请求。");
 
     const current = videoProjectSchema.parse(aggregate.payload);
-    if (value.decision === "approved") await assertLockedCurrentProductMedia(tx, current, now);
+    if (value.decision === "approved") {
+      if (!current.exportArtifact) {
+        throw new Error("成片缺少真实媒体校验记录，必须重新合成后才能批准。");
+      }
+      await assertLockedCurrentProductMedia(tx, current, now);
+    }
     const nextState = value.decision === "approved" ? "VIDEO_APPROVED" : "VIDEO_REVISION_REQUIRED";
     const project = videoProjectSchema.parse({
       ...current,
       status: value.decision === "approved" ? "approved" : "revision_required",
       ...(value.decision === "approved" ? { approvalRefs: [...current.approvalRefs, pendingApproval.id] } : {}),
+      ...(value.decision === "approved" && current.exportArtifact
+        ? { exportArtifact: approveReviewVideoExport(current.exportArtifact, value.evidenceRef) }
+        : {}),
     });
     assertTransition({
       eventId,

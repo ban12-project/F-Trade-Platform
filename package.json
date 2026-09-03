@@ -74,6 +74,7 @@
     "test:video-presigned-upload": "tsx scripts/test-video-presigned-upload.ts",
     "test:ai-sdk-video-adapters": "tsx scripts/test-ai-sdk-video-adapters.ts",
     "test:video-media-probe": "tsx scripts/test-video-media-probe.ts",
+    "test:rendered-video-inspection": "tsx scripts/test-rendered-video-inspection.ts",
     "test:video-timeline": "tsx scripts/test-video-timeline.ts",
     "test:marketing-video-edit": "tsx scripts/test-marketing-video-edit.ts",
     "test:video-mvp-policy": "tsx scripts/test-video-mvp-policy.ts",

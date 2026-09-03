@@ -133,7 +133,7 @@ export async function copyMarketingVideoDraftToProject(sourceVideoId: string, pr
     const [product] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord).where(and(eq(aggregateRecord.id, current.productId), eq(aggregateRecord.type, "product"))).for("update");
     if (!product || product.state !== "PRODUCT_READY") throw new Error("源视频引用的产品已不再可用于新草稿。");
     await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: current.productId, role: "product_reference", relation: "reference" }).onConflictDoNothing();
-    const project = videoProjectSchema.parse({ ...current, id, status: "draft", approvalRefs: [], renderedAssetRef: undefined });
+    const project = videoProjectSchema.parse({ ...current, id, status: "draft", approvalRefs: [], renderedAssetRef: undefined, exportArtifact: undefined });
     await tx.insert(aggregateRecord).values({ id, type: "video", state: "VIDEO_DRAFT", payload: project, createdByType: "human", createdById: actorId });
     await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "marketing_video", relation: "owned" });
     await tx.update(workspaceProject).set({ updatedAt: now }).where(eq(workspaceProject.id, projectId));
@@ -169,7 +169,7 @@ export async function updateMarketingVideoEditDraft(videoId: string, draftInput:
       if (!assetRefs.has(clip.assetRef)) throw new Error("剪辑稿引用了不属于当前视频的素材。");
       if (!clip.claimRefs.every((claimRef) => claimRefs.has(claimRef))) throw new Error("剪辑稿引用了未经核验的产品事实。");
     }
-    const project = videoProjectSchema.parse({ ...current, status: record.state === "VIDEO_REVISION_REQUIRED" ? "revision_required" : "draft", editDraft: draft, renderedAssetRef: undefined });
+    const project = videoProjectSchema.parse({ ...current, status: record.state === "VIDEO_REVISION_REQUIRED" ? "revision_required" : "draft", editDraft: draft, renderedAssetRef: undefined, exportArtifact: undefined });
     await tx.update(aggregateRecord).set({ payload: project, version: sql`${aggregateRecord.version} + 1` }).where(eq(aggregateRecord.id, videoId));
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "marketing_video_edit.saved", actorType: "human", actorId, aggregateId: videoId, subjectType: "video", subjectId: videoId, metadata: { duration_ms: draft.clips.reduce((sum, clip) => sum + clip.durationMs, 0), clip_count: draft.clips.length }, occurredAt: new Date() });
     return project;
@@ -185,7 +185,7 @@ export async function beginMarketingVideoRender(videoId: string, actorId: string
     if (!project.editDraft) throw new Error("视频缺少可合成的剪辑稿。");
     const evidenceRefs = [...new Set([...project.factualClaims.map((claim) => claim.evidenceRef), ...project.sourceAssets.map((asset) => asset.rightsEvidenceRef)])];
     assertTransition({ eventId, entityType: "video", entityId: videoId, fromState: record.state, toState: "VIDEO_RENDERING", actorType: "human", actorId, occurredAt: now.toISOString(), evidenceRefs });
-    const renderingProject = videoProjectSchema.parse({ ...project, status: "rendering", renderedAssetRef: undefined });
+    const renderingProject = videoProjectSchema.parse({ ...project, status: "rendering", renderedAssetRef: undefined, exportArtifact: undefined });
     await tx.update(aggregateRecord).set({ state: "VIDEO_RENDERING", payload: renderingProject, version: sql`${aggregateRecord.version} + 1` }).where(eq(aggregateRecord.id, videoId));
     await tx.insert(workflowEvent).values({ id: eventId, aggregateId: videoId, fromState: record.state, toState: "VIDEO_RENDERING", actorType: "human", actorId, evidenceRefs, occurredAt: now });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "marketing_video_render.started", actorType: "human", actorId, aggregateId: videoId, subjectType: "video", subjectId: videoId, metadata: { duration_ms: project.editDraft.clips.reduce((sum, clip) => sum + clip.durationMs, 0) }, occurredAt: now });

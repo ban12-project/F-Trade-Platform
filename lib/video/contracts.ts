@@ -8,6 +8,36 @@ const evidenceRef = z.string().trim().regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}
 export const videoPlatformSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
 export type VideoPlatform = z.infer<typeof videoPlatformSchema>;
 
+export const videoExportArtifactSchema = z.object({
+  id: z.uuid(),
+  videoId: z.uuid(),
+  sourceAssetRef: privateRef,
+  platform: videoPlatformSchema,
+  surface: z.enum(["video", "reels"]),
+  presetVersion: z.string().trim().min(1).max(40),
+  presetSourceUrl: z.url(),
+  status: z.enum(["review_required", "approved"]),
+  approvalRef: z.string().trim().regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i).optional(),
+  timelineDurationSeconds: z.number().positive(),
+  measured: z.object({
+    container: z.literal("mp4"),
+    videoCodec: z.string().trim().min(1),
+    audioCodec: z.string().trim().min(1),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    fps: z.number().positive(),
+    durationSeconds: z.number().positive(),
+    subtitleStreamCount: z.number().int().min(0),
+  }).strict(),
+  createdAt: z.iso.datetime(),
+}).strict().superRefine((artifact, context) => {
+  if ((artifact.status === "approved") !== Boolean(artifact.approvalRef)) {
+    context.addIssue({ code: "custom", path: ["approvalRef"], message: "导出物批准状态必须与人工审核证据一致。" });
+  }
+});
+
+export type VideoExportArtifact = z.infer<typeof videoExportArtifactSchema>;
+
 export const videoFactClaimSchema = z.object({
   field: z.string().trim().regex(/^(?:product|specifications|commercial)\.[a-z_]+$/, "必须引用已核验产品字段。"),
   value: z.string().trim().min(1).max(500),
@@ -53,10 +83,22 @@ export const videoProjectSchema = z.object({
   approvalRefs: z.array(z.string().trim().min(1)).max(2).default([]),
   editDraft: marketingVideoDraftSchema.optional(),
   renderedAssetRef: privateRef.optional(),
+  exportArtifact: videoExportArtifactSchema.optional(),
 }).strict().superRefine((project, context) => {
   const claimFields = new Set(project.factualClaims.map((claim) => claim.field));
   const assetRefs = new Set(project.sourceAssets.map((asset) => asset.assetRef));
   const productMediaIds = new Set<string>();
+  if (project.exportArtifact) {
+    if (project.exportArtifact.videoId !== project.id) {
+      context.addIssue({ code: "custom", path: ["exportArtifact", "videoId"], message: "导出物必须属于当前视频项目。" });
+    }
+    if (project.exportArtifact.sourceAssetRef !== project.renderedAssetRef) {
+      context.addIssue({ code: "custom", path: ["exportArtifact", "sourceAssetRef"], message: "导出物必须绑定当前合成文件。" });
+    }
+    if (project.editDraft && project.exportArtifact.platform !== project.editDraft.platform) {
+      context.addIssue({ code: "custom", path: ["exportArtifact", "platform"], message: "导出物平台必须与当前剪辑稿一致。" });
+    }
+  }
   for (const [assetIndex, asset] of project.sourceAssets.entries()) {
     if (!asset.productMediaId) continue;
     if (productMediaIds.has(asset.productMediaId)) {
