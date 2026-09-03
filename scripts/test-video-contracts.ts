@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { saveVideoCanvasSchema, videoCanvasDocumentSchema } from "../lib/video/canvas-contracts";
-import { videoProjectSchema } from "../lib/video/contracts";
+import { assertVideoPublicationEligible, isPrivateTestOnlyVideo, videoProjectSchema } from "../lib/video/contracts";
 import { assertTransition, type WorkflowEventInput } from "../lib/workflow/transitions";
 
 const project = {
@@ -18,6 +18,10 @@ const project = {
 };
 
 assert.equal(videoProjectSchema.parse(project).status, "export_ready");
+assert.equal(isPrivateTestOnlyVideo(videoProjectSchema.parse(project)), false);
+const privateTestProject = videoProjectSchema.parse({ ...project, sourceAssets: [{ ...project.sourceAssets[0], usagePolicy: "private_test_only" }] });
+assert.equal(isPrivateTestOnlyVideo(privateTestProject), true);
+assert.throws(() => assertVideoPublicationEligible(privateTestProject), /不能批准/);
 assert.equal(videoProjectSchema.parse({ ...project, approvalRefs: [] }).status, "export_ready");
 assert.throws(() => videoProjectSchema.parse({ ...project, scenes: [{ ...project.scenes[0], claimRefs: ["product.oe_number"] }] }), /未绑定证据/);
 

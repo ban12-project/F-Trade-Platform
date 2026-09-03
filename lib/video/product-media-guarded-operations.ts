@@ -10,7 +10,7 @@ import { productMediaAsset } from "@/lib/db/product-media-schema";
 import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
 
-import { videoProjectSchema, type VideoProject } from "./contracts";
+import { assertVideoPublicationEligible, videoProjectSchema, type VideoProject } from "./contracts";
 import { approveReviewVideoExport, type ReviewVideoExport } from "./export-artifact";
 import { assertCurrentProductFacts } from "./product-fact-runtime-policy";
 import {
@@ -251,6 +251,7 @@ export async function decideGuardedVideoReview(
 
     const current = videoProjectSchema.parse(aggregate.payload);
     if (value.decision === "approved") {
+      assertVideoPublicationEligible(current);
       if (!current.exportArtifact) {
         throw new Error("成片缺少真实媒体校验记录，必须重新合成后才能批准。");
       }

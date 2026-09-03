@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { hasPermission } from "@/lib/authz";
 
-import { videoProjectSchema, type VideoProject } from "./contracts";
+import { isPrivateTestOnlyVideo, videoProjectSchema, type VideoProject } from "./contracts";
 import type { PrivateGeneratedVideoRead } from "./private-asset-store";
 
 export type DownloadSession = { user?: { role?: string | null } | null } | null;
@@ -33,6 +33,7 @@ export async function resolveApprovedVideoDownload(
   const parsed = videoProjectSchema.safeParse(record.payload);
   if (!parsed.success) return { kind: "unavailable" };
   const project = parsed.data;
+  if (isPrivateTestOnlyVideo(project)) return { kind: "unavailable" };
   if (!project.renderedAssetRef || project.exportArtifact?.status !== "approved" || project.exportArtifact.sourceAssetRef !== project.renderedAssetRef) {
     return { kind: "unavailable" };
   }

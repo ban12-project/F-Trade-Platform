@@ -89,6 +89,7 @@ async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ 
         { field: "product.oe_numbers", value: "OE-SYN-001" },
       ],
       downloadAvailable: approvedState,
+      privateTestOnly: false,
       processingJob: null,
       draft: { version: 2, platform: "facebook", ctaText: "Contact us", clips: [
         { clipId: "clip-001", assetRef: "evidence-video-001", mediaType: "video", trimStartMs: 0, durationMs: 5_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" } },
