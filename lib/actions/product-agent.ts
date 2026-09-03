@@ -10,7 +10,7 @@ import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-con
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
-import { AiSdkProductAgent } from "@/lib/product/agent";
+import { EvidenceLocatedProductAgent } from "@/lib/product/evidence-located-agent";
 import { createProductAgentDraft } from "@/lib/products";
 import { prepareUploadedProductAgentDocument } from "@/lib/product/uploaded-document";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
@@ -33,11 +33,11 @@ export async function runProductAgentAction(_previous: ProductAgentActionState, 
           if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "资料格式不正确。");
           return { record_id: randomUUID(), source_ref: parsed.data.sourceRef!, evidence_refs: [parsed.data.evidenceRef!], source_text: parsed.data.sourceText, image_availability: "none" as const, image_refs: [] };
         })();
-    const result = await new AiSdkProductAgent().run({ model: createProductAgentModel(await resolveProductAgentModelConfig(modelConfigId, selectedModel)), source, timeout_ms: 75_000 });
-    const saved = await createProductAgentDraft(result.draft, session.user.id, { prompt_version: result.metadata.prompt_version, prompt_hash: result.metadata.prompt_hash }, projectId);
+    const result = await new EvidenceLocatedProductAgent().run({ model: createProductAgentModel(await resolveProductAgentModelConfig(modelConfigId, selectedModel)), source, timeout_ms: 75_000 });
+    const saved = await createProductAgentDraft(result.draft, session.user.id, { prompt_version: result.metadata.prompt_version, prompt_hash: result.metadata.prompt_hash, evidence_mode: "bounded_location" }, projectId);
     revalidatePath("/workspace");
     if (projectId) revalidatePath(`/workspace/${projectId}`);
-    return { status: "success", message: `已生成待 Gate 01 审核草稿（${saved.id.slice(0, 8)}）。`, productId: saved.id };
+    return { status: "success", message: `已生成待 Gate 01 审核草稿（${saved.id.slice(0, 8)}），每个事实均绑定可核查位置。`, productId: saved.id };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "Product Agent 运行失败。" };
   }
