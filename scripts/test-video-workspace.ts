@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { videoProjectDraftFormSchema } from "../lib/form-schemas";
+import { createMarketingVideoDraftFormSchema } from "../lib/video/edit-contracts";
 
 const valid = {
   productId: "00000000-0000-4000-8000-000000000501",
@@ -20,4 +21,53 @@ assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, factPath: "eng
 assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, platforms: [] }), /至少选择/);
 assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, assetRef: "https://example.com/image.png" }), /私有素材/);
 assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, rightsEvidenceRef: "" }), /权利证据/);
+
+const marketingBase = {
+  projectId: "00000000-0000-4000-8000-000000000510",
+  productId: valid.productId,
+  factPath: valid.factPath,
+  objective: valid.objective,
+  targetAudience: valid.targetAudience,
+  platform: "facebook" as const,
+};
+const upload = createMarketingVideoDraftFormSchema.parse({
+  ...marketingBase,
+  rightsEvidenceRef: "evidence-rights-501",
+});
+assert.equal(upload.sourceMode, "upload");
+assert.deepEqual(upload.productMediaIds, []);
+assert.throws(() => createMarketingVideoDraftFormSchema.parse({
+  ...marketingBase,
+  sourceMode: "upload",
+  productMediaIds: [],
+  rightsEvidenceRef: "",
+}), /上传新素材/);
+
+const mediaId = "00000000-0000-4000-8000-000000000511";
+const reused = createMarketingVideoDraftFormSchema.parse({
+  ...marketingBase,
+  sourceMode: "product_media",
+  productMediaIds: [mediaId],
+  rightsEvidenceRef: "",
+});
+assert.deepEqual(reused.productMediaIds, [mediaId]);
+assert.throws(() => createMarketingVideoDraftFormSchema.parse({
+  ...marketingBase,
+  sourceMode: "product_media",
+  productMediaIds: [],
+  rightsEvidenceRef: "",
+}), /至少选择/);
+assert.throws(() => createMarketingVideoDraftFormSchema.parse({
+  ...marketingBase,
+  sourceMode: "product_media",
+  productMediaIds: [mediaId, mediaId],
+  rightsEvidenceRef: "",
+}), /不能重复选择/);
+assert.throws(() => createMarketingVideoDraftFormSchema.parse({
+  ...marketingBase,
+  sourceMode: "product_media",
+  productMediaIds: [mediaId],
+  rightsEvidenceRef: "evidence-rights-501",
+}), /服务端读取逐素材权利证据/);
+
 console.log("PASS video workspace form accepts only bounded, private, evidence-oriented input");
