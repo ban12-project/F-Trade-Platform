@@ -43,6 +43,11 @@ function optionalBoolean(value: ProductCatalogForm["sampleAvailable"]) {
   return value === "" ? undefined : value === "yes";
 }
 
+function kitContentCount(draft: ProductDraft) {
+  const value = draft.specifications?.kit_contents;
+  return Array.isArray(value) ? value.length : 0;
+}
+
 function fieldEvidence(input: EvidenceBoundProductCatalogInput): Record<string, string> {
   const entries: Array<{ path: string; value: unknown; evidenceRef: string }> = [
     { path: "product.product_name", value: input.productName, evidenceRef: input.productNameEvidenceRef },
@@ -201,7 +206,7 @@ export async function createEvidenceBoundProductCatalogDraft(
       field_evidence_count: Object.keys(draft.field_evidence).length,
       evidence_ref_count: draft.evidence_refs.length,
       evidence_mode: "per_field",
-      product_type_specific_fields: draft.specifications?.kit_contents?.length ?? 0,
+      product_type_specific_fields: kitContentCount(draft),
       commercial_field_count: Object.keys(draft.commercial ?? {}).length,
     },
     occurredAt: now,
@@ -305,7 +310,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
         field_evidence_count: Object.keys(draft.field_evidence).length,
         evidence_ref_count: draft.evidence_refs.length,
         evidence_mode: "per_field",
-        product_type_specific_fields: draft.specifications?.kit_contents?.length ?? 0,
+        product_type_specific_fields: kitContentCount(draft),
         commercial_field_count: Object.keys(draft.commercial ?? {}).length,
       },
       occurredAt: now,
