@@ -6,7 +6,7 @@ import { getDatabase } from "@/lib/db/client";
 import { aggregateRecord, approval, auditEvent, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
 
-import { productCatalogFormSchema, type ProductCatalogForm } from "./catalog-form-schema";
+import { kitContentValues, productCatalogFormSchema, type ProductCatalogForm } from "./catalog-form-schema";
 import { reviewProductDraft, type ProductDraft } from "./verification";
 
 export type EvidenceBoundProductCatalogInput = ProductCatalogForm;
@@ -29,6 +29,20 @@ function splitOeNumbers(value: string) {
   return numbers.length > 0 ? [...new Set(numbers)] : undefined;
 }
 
+function splitKitContents(value: string) {
+  const contents = value
+    .split(/[\s,;，；]+/)
+    .map((item) => item.trim())
+    .filter((item): item is typeof kitContentValues[number] =>
+      kitContentValues.includes(item as typeof kitContentValues[number]),
+    );
+  return contents.length > 0 ? [...new Set(contents)] : undefined;
+}
+
+function optionalBoolean(value: ProductCatalogForm["sampleAvailable"]) {
+  return value === "" ? undefined : value === "yes";
+}
+
 function fieldEvidence(input: EvidenceBoundProductCatalogInput): Record<string, string> {
   const entries: Array<{ path: string; value: unknown; evidenceRef: string }> = [
     { path: "product.product_name", value: input.productName, evidenceRef: input.productNameEvidenceRef },
@@ -42,6 +56,15 @@ function fieldEvidence(input: EvidenceBoundProductCatalogInput): Record<string, 
     { path: "specifications.spline_count", value: optionalNumber(input.splineCount), evidenceRef: input.splineCountEvidenceRef },
     { path: "specifications.spline_size", value: optionalText(input.splineSize), evidenceRef: input.splineSizeEvidenceRef },
     { path: "specifications.friction_material", value: optionalText(input.frictionMaterial), evidenceRef: input.frictionMaterialEvidenceRef },
+    { path: "specifications.kit_contents", value: splitKitContents(input.kitContents), evidenceRef: input.kitContentsEvidenceRef },
+    { path: "specifications.gross_weight_kg", value: optionalNumber(input.grossWeightKg), evidenceRef: input.grossWeightKgEvidenceRef },
+    { path: "specifications.net_weight_kg", value: optionalNumber(input.netWeightKg), evidenceRef: input.netWeightKgEvidenceRef },
+    { path: "specifications.package_size", value: optionalText(input.packageSize), evidenceRef: input.packageSizeEvidenceRef },
+    { path: "commercial.moq", value: optionalNumber(input.moq), evidenceRef: input.moqEvidenceRef },
+    { path: "commercial.estimated_lead_time_days", value: optionalNumber(input.estimatedLeadTimeDays), evidenceRef: input.estimatedLeadTimeDaysEvidenceRef },
+    { path: "commercial.packaging", value: optionalText(input.packaging), evidenceRef: input.packagingEvidenceRef },
+    { path: "commercial.supported_customization", value: optionalText(input.supportedCustomization), evidenceRef: input.supportedCustomizationEvidenceRef },
+    { path: "commercial.sample_available", value: optionalBoolean(input.sampleAvailable), evidenceRef: input.sampleAvailableEvidenceRef },
   ];
   return Object.fromEntries(entries
     .filter(({ value }) => value !== undefined && value !== null && value !== "")
@@ -62,6 +85,16 @@ export function buildEvidenceBoundProductCatalogDraft(
   const splineCount = optionalNumber(input.splineCount);
   const splineSize = optionalText(input.splineSize);
   const frictionMaterial = optionalText(input.frictionMaterial);
+  const kitContents = splitKitContents(input.kitContents);
+  const grossWeightKg = optionalNumber(input.grossWeightKg);
+  const netWeightKg = optionalNumber(input.netWeightKg);
+  const packageSize = optionalText(input.packageSize);
+  const moq = optionalNumber(input.moq);
+  const estimatedLeadTimeDays = optionalNumber(input.estimatedLeadTimeDays);
+  const packaging = optionalText(input.packaging);
+  const supportedCustomization = optionalText(input.supportedCustomization);
+  const sampleAvailable = optionalBoolean(input.sampleAvailable);
+
   const product = {
     product_name: input.productName,
     product_type: input.productType,
@@ -76,6 +109,17 @@ export function buildEvidenceBoundProductCatalogDraft(
     ...(splineCount ? { spline_count: splineCount } : {}),
     ...(splineSize ? { spline_size: splineSize } : {}),
     ...(frictionMaterial ? { friction_material: frictionMaterial } : {}),
+    ...(kitContents ? { kit_contents: kitContents } : {}),
+    ...(grossWeightKg ? { gross_weight_kg: grossWeightKg } : {}),
+    ...(netWeightKg ? { net_weight_kg: netWeightKg } : {}),
+    ...(packageSize ? { package_size: packageSize } : {}),
+  };
+  const commercial = {
+    ...(moq ? { moq } : {}),
+    ...(estimatedLeadTimeDays !== undefined ? { estimated_lead_time_days: estimatedLeadTimeDays } : {}),
+    ...(packaging ? { packaging } : {}),
+    ...(supportedCustomization ? { supported_customization: supportedCustomization } : {}),
+    ...(sampleAvailable !== undefined ? { sample_available: sampleAvailable } : {}),
   };
   const explicitEvidence = fieldEvidence(input);
   const evidenceRefs = [...new Set(Object.values(explicitEvidence))];
@@ -89,6 +133,7 @@ export function buildEvidenceBoundProductCatalogDraft(
     optional_missing_fields: [],
     product,
     ...(Object.keys(specifications).length > 0 ? { specifications } : {}),
+    ...(Object.keys(commercial).length > 0 ? { commercial } : {}),
   });
 }
 
@@ -156,6 +201,8 @@ export async function createEvidenceBoundProductCatalogDraft(
       field_evidence_count: Object.keys(draft.field_evidence).length,
       evidence_ref_count: draft.evidence_refs.length,
       evidence_mode: "per_field",
+      product_type_specific_fields: draft.specifications?.kit_contents?.length ?? 0,
+      commercial_field_count: Object.keys(draft.commercial ?? {}).length,
     },
     occurredAt: now,
   };
@@ -258,6 +305,8 @@ export async function reviseEvidenceBoundProductCatalogDraft(
         field_evidence_count: Object.keys(draft.field_evidence).length,
         evidence_ref_count: draft.evidence_refs.length,
         evidence_mode: "per_field",
+        product_type_specific_fields: draft.specifications?.kit_contents?.length ?? 0,
+        commercial_field_count: Object.keys(draft.commercial ?? {}).length,
       },
       occurredAt: now,
     });
