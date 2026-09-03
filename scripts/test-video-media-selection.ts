@@ -94,6 +94,7 @@ assert.deepEqual(selected.sourceAssets, [{
   assetRef: "evidence-media-801",
   mediaType: "image",
   rightsEvidenceRef: "evidence-rights-801",
+  productMediaId: heroId,
 }]);
 assert.equal("signedGetUrl" in selected.sourceAssets[0]!, false);
 

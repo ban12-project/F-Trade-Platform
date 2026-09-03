@@ -31,6 +31,7 @@ export type SelectedProductVideoMedia = {
     assetRef: string;
     mediaType: "image" | "video";
     rightsEvidenceRef: string;
+    productMediaId: string;
   }>;
 };
 
@@ -84,6 +85,7 @@ export function selectProductVideoMedia(
       assetRef: asset.evidenceRef,
       mediaType: asset.mediaType,
       rightsEvidenceRef: asset.rights.rightsEvidenceRef,
+      productMediaId: asset.id,
     })),
   };
 }
