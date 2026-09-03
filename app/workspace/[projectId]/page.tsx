@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 
 import { ContentPanel } from "@/components/workspace/content-panel";
+import { ProductMediaPanel } from "@/components/workspace/product-media-panel";
 import { ProductPanel } from "@/components/workspace/product-panel";
 import { WorkspaceCanvasSkeleton } from "@/components/workspace/workspace-canvas-skeleton";
 import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-settings-panel";
@@ -13,6 +14,7 @@ import { listStoredProductAgentModelSettings } from "@/lib/ai/product-agent-mode
 import { requirePermission } from "@/lib/auth-guard";
 import { hasPermission } from "@/lib/authz";
 import { getProjectContentCatalogDetail, listCrossProjectContentCandidates, listProjectContentCatalogEntries, listReadyProductContentSources } from "@/lib/content/store";
+import { getProductVideoReadiness, listProductMediaAssets } from "@/lib/product/media-store";
 import { getProjectProductCatalogDetail, listProjectProductCatalogEntries } from "@/lib/products";
 import { listProjectRfqEntries } from "@/lib/sales/store";
 import { getWorkspaceProject, listProjectReadyProductReferences, listWorkspaceProjects, listWorkspaceTasks } from "@/lib/workspace/store";
@@ -25,7 +27,8 @@ async function ProjectContent({ params, searchParams }: { params: Promise<{ proj
   if (!project) notFound();
   const shellPromise = Promise.all([listWorkspaceProjects(), listWorkspaceTasks(), listStoredProductAgentModelSettings()]);
   const selectedId = z.uuid().safeParse(query.item).success ? query.item : undefined;
-  const canReview = hasPermission(session.user.role, "content:review");
+  const canProductReview = hasPermission(session.user.role, "product:review");
+  const canContentReview = hasPermission(session.user.role, "content:review");
   if (project.kind === "marketing") {
     const [productEntries, contentEntries, contentProducts, contentCopyCandidates, videoProducts, videoEntries, videoCopyCandidates, productDetail, contentDetail, shell] = await Promise.all([
       listProjectProductCatalogEntries(projectId),
@@ -41,10 +44,25 @@ async function ProjectContent({ params, searchParams }: { params: Promise<{ proj
     ]);
     const [projects, tasks, settings] = shell;
     const settingsPanel = <WorkspaceSettingsPanel settings={settings} canManage={hasPermission(session.user.role, "settings:manage")} />;
+    const productMediaPanel = productDetail?.state === "PRODUCT_READY"
+      ? await Promise.all([
+          listProductMediaAssets(productDetail.id),
+          getProductVideoReadiness(productDetail.id),
+        ]).then(([assets, assessment]) => <ProductMediaPanel
+          projectId={projectId}
+          productId={productDetail.id}
+          assets={assets}
+          assessment={assessment}
+          canReview={canProductReview}
+        />)
+      : null;
     return <ProjectCanvas project={project} projects={projects} tasks={tasks} settingsPanel={settingsPanel} panels={{
-      product: <ProductPanel projectId={projectId} entries={productEntries} detail={productDetail} canReview={canReview} agentModelConfigs={settings} />,
-      content: <ContentPanel projectId={projectId} products={contentProducts} entries={contentEntries} copyCandidates={contentCopyCandidates} detail={contentDetail} canReview={canReview} />,
-    }} videoEditor={{ products: videoProducts, entries: videoEntries, copyCandidates: videoCopyCandidates, canReview, selectedId }} />;
+      product: <div className="flex flex-col gap-6">
+        <ProductPanel projectId={projectId} entries={productEntries} detail={productDetail} canReview={canProductReview} agentModelConfigs={settings} />
+        {productMediaPanel}
+      </div>,
+      content: <ContentPanel projectId={projectId} products={contentProducts} entries={contentEntries} copyCandidates={contentCopyCandidates} detail={contentDetail} canReview={canContentReview} />,
+    }} videoEditor={{ products: videoProducts, entries: videoEntries, copyCandidates: videoCopyCandidates, canReview: canContentReview, selectedId }} />;
   }
   const [rfqs, availableProducts, linkedProducts, shell] = await Promise.all([listProjectRfqEntries(projectId), listReadyProductContentSources(), listProjectReadyProductReferences(projectId), shellPromise]);
   const [projects, tasks, settings] = shell;
