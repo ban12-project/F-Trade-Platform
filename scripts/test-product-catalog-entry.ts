@@ -29,6 +29,24 @@ const validInput = productCatalogFormSchema.parse({
   splineSizeEvidenceRef: "evidence-catalog-spline-size-001",
   frictionMaterial: "Synthetic material",
   frictionMaterialEvidenceRef: "evidence-catalog-material-001",
+  kitContents: "",
+  kitContentsEvidenceRef: "",
+  grossWeightKg: "",
+  grossWeightKgEvidenceRef: "",
+  netWeightKg: "",
+  netWeightKgEvidenceRef: "",
+  packageSize: "",
+  packageSizeEvidenceRef: "",
+  moq: "",
+  moqEvidenceRef: "",
+  estimatedLeadTimeDays: "",
+  estimatedLeadTimeDaysEvidenceRef: "",
+  packaging: "",
+  packagingEvidenceRef: "",
+  supportedCustomization: "",
+  supportedCustomizationEvidenceRef: "",
+  sampleAvailable: "",
+  sampleAvailableEvidenceRef: "",
   sourceRef: "source-catalog-001",
   projectId: "00000000-0000-4000-8000-000000000011",
 });
@@ -53,27 +71,44 @@ assert.deepEqual(draft.evidence_refs, [
 ]);
 assert.equal(Object.values(draft.field_evidence).every((ref) => draft.evidence_refs.includes(ref)), true);
 
+assert.equal(productCatalogFormSchema.safeParse({ ...validInput, sourceRef: "/private/tmp/catalog.pdf" }).success, false);
+assert.equal(productCatalogFormSchema.safeParse({ ...validInput, clutchDiameterMm: "0" }).success, false);
+assert.equal(productCatalogFormSchema.safeParse({ ...validInput, clutchDiameterMmEvidenceRef: "" }).success, false);
+assert.equal(productCatalogFormSchema.safeParse({ ...validInput, splineSize: "", splineSizeEvidenceRef: "evidence-orphaned-001" }).success, false);
+assert.equal(productCatalogFormSchema.safeParse({ ...validInput, productNameEvidenceRef: "" }).success, false);
 assert.equal(productCatalogFormSchema.safeParse({
   ...validInput,
-  sourceRef: "/private/tmp/catalog.pdf",
-}).success, false, "Catalog entry must reject local file paths as source references");
+  kitContents: "clutch_disc,pressure_plate",
+  kitContentsEvidenceRef: "evidence-kit-001",
+}).success, false, "Non-kit products cannot declare kit contents");
 assert.equal(productCatalogFormSchema.safeParse({
   ...validInput,
-  clutchDiameterMm: "0",
-}).success, false, "Catalog entry must reject a zero clutch diameter");
+  productType: "clutch_kit",
+  kitContents: "clutch_disc,flywheel",
+  kitContentsEvidenceRef: "evidence-kit-001",
+}).success, false, "Unknown kit content must be rejected");
 assert.equal(productCatalogFormSchema.safeParse({
   ...validInput,
-  clutchDiameterMmEvidenceRef: "",
-}).success, false, "A present fact must have its own evidence reference");
+  grossWeightKg: "8",
+  grossWeightKgEvidenceRef: "evidence-weight-001",
+  netWeightKg: "9",
+  netWeightKgEvidenceRef: "evidence-weight-001",
+}).success, false, "Net weight cannot exceed gross weight");
 assert.equal(productCatalogFormSchema.safeParse({
   ...validInput,
-  splineSize: "",
-  splineSizeEvidenceRef: "evidence-orphaned-001",
-}).success, false, "An absent fact cannot retain an orphaned evidence reference");
+  moq: "0",
+  moqEvidenceRef: "evidence-commercial-001",
+}).success, false, "MOQ must be positive");
 assert.equal(productCatalogFormSchema.safeParse({
   ...validInput,
-  productNameEvidenceRef: "",
-}).success, false, "Core product identity evidence is mandatory");
+  estimatedLeadTimeDays: "-1",
+  estimatedLeadTimeDaysEvidenceRef: "evidence-commercial-001",
+}).success, false, "Lead time must be non-negative");
+assert.equal(productCatalogFormSchema.safeParse({
+  ...validInput,
+  sampleAvailable: "yes",
+  sampleAvailableEvidenceRef: "",
+}).success, false, "Sample availability requires evidence");
 
 const reviewerApproval = {
   approval_id: "synthetic-approval-001",
@@ -88,18 +123,8 @@ const reviewerApproval = {
     evidence_ref: "evidence-review-001",
   },
 };
-assert.equal(productReviewFormSchema.safeParse({
-  productId: "not-a-uuid",
-  decision: "approved",
-  evidenceRef: "evidence-review-001",
-  notes: "",
-}).success, false);
-assert.equal(productReviewFormSchema.safeParse({
-  productId: "00000000-0000-4000-8000-000000000001",
-  decision: "approved",
-  evidenceRef: "/tmp/review",
-  notes: "",
-}).success, false);
+assert.equal(productReviewFormSchema.safeParse({ productId: "not-a-uuid", decision: "approved", evidenceRef: "evidence-review-001", notes: "" }).success, false);
+assert.equal(productReviewFormSchema.safeParse({ productId: "00000000-0000-4000-8000-000000000001", decision: "approved", evidenceRef: "/tmp/review", notes: "" }).success, false);
 
 assert.throws(() => approveProductDraft(draft, reviewerApproval), /Product cannot be Ready/);
 const revision = rejectProductDraft(draft, { ...reviewerApproval, status: "rejected" as const });
@@ -118,11 +143,42 @@ assertTransition({
 
 const completeDraft = buildEvidenceBoundProductCatalogDraft({
   ...validInput,
+  productName: "Synthetic clutch kit",
+  productType: "clutch_kit",
+  internalSku: "SYN-KIT-002",
   oeNumbers: "OE-001, OE-002, OE-001",
   oeNumbersEvidenceRef: "evidence-catalog-oe-001",
+  kitContents: "clutch_disc,pressure_plate,release_bearing,clutch_disc",
+  kitContentsEvidenceRef: "evidence-catalog-kit-001",
+  grossWeightKg: "8.4",
+  grossWeightKgEvidenceRef: "evidence-catalog-package-001",
+  netWeightKg: "7.9",
+  netWeightKgEvidenceRef: "evidence-catalog-package-001",
+  packageSize: "40 x 40 x 12 cm",
+  packageSizeEvidenceRef: "evidence-catalog-package-001",
+  moq: "50",
+  moqEvidenceRef: "evidence-catalog-commercial-001",
+  estimatedLeadTimeDays: "0",
+  estimatedLeadTimeDaysEvidenceRef: "evidence-catalog-commercial-001",
+  packaging: "Neutral box",
+  packagingEvidenceRef: "evidence-catalog-commercial-001",
+  supportedCustomization: "Logo and color box",
+  supportedCustomizationEvidenceRef: "evidence-catalog-commercial-001",
+  sampleAvailable: "no",
+  sampleAvailableEvidenceRef: "evidence-catalog-commercial-001",
 }, "synthetic-product-002");
 assert.deepEqual(completeDraft.product.oe_numbers, ["OE-001", "OE-002"]);
-assert.equal(completeDraft.field_evidence["product.oe_numbers"], "evidence-catalog-oe-001");
+assert.deepEqual(completeDraft.specifications?.kit_contents, ["clutch_disc", "pressure_plate", "release_bearing"]);
+assert.equal(completeDraft.specifications?.gross_weight_kg, 8.4);
+assert.equal(completeDraft.specifications?.net_weight_kg, 7.9);
+assert.equal(completeDraft.specifications?.package_size, "40 x 40 x 12 cm");
+assert.equal(completeDraft.commercial?.moq, 50);
+assert.equal(completeDraft.commercial?.estimated_lead_time_days, 0);
+assert.equal(completeDraft.commercial?.packaging, "Neutral box");
+assert.equal(completeDraft.commercial?.supported_customization, "Logo and color box");
+assert.equal(completeDraft.commercial?.sample_available, false);
+assert.equal(completeDraft.field_evidence["specifications.kit_contents"], "evidence-catalog-kit-001");
+assert.equal(completeDraft.field_evidence["commercial.sample_available"], "evidence-catalog-commercial-001");
 assert.equal(completeDraft.blocking_missing_fields.includes("oe_numbers_or_verified_application"), false);
 const approved = approveProductDraft(completeDraft, {
   ...reviewerApproval,
@@ -132,4 +188,4 @@ const approved = approveProductDraft(completeDraft, {
 assert.equal(approved.verification_status, "verified");
 assert.equal(approved.approval_ref, "synthetic-approval-002");
 
-console.log("PASS manual product catalog binds every populated fact to explicit evidence");
+console.log("PASS governed intake reaches every ProductReady specification and commercial field");
