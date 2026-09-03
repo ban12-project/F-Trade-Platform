@@ -3,9 +3,9 @@ import { dirname, resolve } from "node:path";
 
 import { createProductAgentModel } from "../lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "../lib/ai/product-agent-model-config";
-import { AiSdkProductAgent } from "../lib/product/agent";
 import { discoverCatalogCandidates } from "../lib/product/catalog-candidates";
 import { preprocessProductAgentDocument } from "../lib/product/document-source";
+import { EvidenceLocatedProductAgent } from "../lib/product/evidence-located-agent";
 import { PRODUCT_AGENT_PROMPT_VERSION } from "../lib/product/product-agent-prompt";
 import { PRODUCT_AGENT_PROMPT_HASH } from "../lib/product/product-agent-prompt";
 
@@ -125,7 +125,7 @@ async function main() {
   if (candidates.length === 0) throw new Error("No supported catalog product identifiers found");
 
   const modelConfig = await resolveProductAgentModelConfig();
-  const agent = new AiSdkProductAgent();
+  const agent = new EvidenceLocatedProductAgent();
   const model = createProductAgentModel(modelConfig);
   const results: CatalogResult[] = candidates.map((candidate) => ({
     identifier: candidate.identifier,
@@ -141,6 +141,7 @@ async function main() {
       await writeFile(temporaryPath, `${JSON.stringify({
         model: `${modelConfig.provider}/${modelConfig.model}`,
         prompt: { version: PRODUCT_AGENT_PROMPT_VERSION, hash: PRODUCT_AGENT_PROMPT_HASH },
+        evidence_mode: "bounded_location",
         document: {
           document_sha256: document.document_sha256,
           filename: document.filename,

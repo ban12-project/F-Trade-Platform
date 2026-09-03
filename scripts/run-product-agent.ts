@@ -3,8 +3,9 @@ import { dirname, resolve } from "node:path";
 
 import { createProductAgentModel } from "../lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "../lib/ai/product-agent-model-config";
-import { AiSdkProductAgent, validateProductAgentSource } from "../lib/product/agent";
+import { validateProductAgentSource } from "../lib/product/agent";
 import { preprocessProductAgentDocument } from "../lib/product/document-source";
+import { EvidenceLocatedProductAgent } from "../lib/product/evidence-located-agent";
 
 function option(name: string, fallback: string) {
   const index = process.argv.indexOf(name);
@@ -27,7 +28,7 @@ async function main() {
   const source = preparedDocument
     ? preparedDocument.source
     : validateProductAgentSource(JSON.parse(await readFile(inputPath, "utf8")));
-  const result = await new AiSdkProductAgent().run({
+  const result = await new EvidenceLocatedProductAgent().run({
     model: createProductAgentModel(await resolveProductAgentModelConfig()),
     source,
   });
@@ -36,7 +37,7 @@ async function main() {
     outputPath,
     `${JSON.stringify({
       draft: result.draft,
-      _evaluation: result.metadata,
+      _evaluation: { ...result.metadata, evidence_mode: "bounded_location" },
       document: preparedDocument && {
         document_sha256: preparedDocument.document_sha256,
         filename: preparedDocument.filename,

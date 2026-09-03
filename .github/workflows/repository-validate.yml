@@ -29,6 +29,9 @@ jobs:
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test Product Agent evidence locations
+        run: pnpm test:product-agent-evidence
+
       - name: Test ProductMedia policies
         run: pnpm test:product-media && pnpm test:product-media-workflow
 
