@@ -216,11 +216,15 @@ const delegate: ProductAgent = {
     };
   },
 };
-const wrappedResult = await new EvidenceLocatedProductAgent(delegate).run({
+
+new EvidenceLocatedProductAgent(delegate).run({
   model: {} as never,
   source,
+}).then((wrappedResult) => {
+  assert.deepEqual(wrappedResult.draft.evidence_refs, [productNameRef, productTypeRef, skuRef]);
+  assert.equal(wrappedResult.metadata.prompt_version, "synthetic");
+  console.log("PASS Product Agent facts cite deterministic, bounded line or table-row evidence");
+}).catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
 });
-assert.deepEqual(wrappedResult.draft.evidence_refs, [productNameRef, productTypeRef, skuRef]);
-assert.equal(wrappedResult.metadata.prompt_version, "synthetic");
-
-console.log("PASS Product Agent facts cite deterministic, bounded line or table-row evidence");
