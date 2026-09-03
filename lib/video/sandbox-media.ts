@@ -2,6 +2,7 @@ import { Sandbox } from "@vercel/sandbox";
 
 import type { VideoProject } from "./contracts";
 import type { MarketingVisualSample } from "./visual-sampling";
+import { createMarketingShotCandidate, videoShotCandidateStarts, type MarketingShotCandidate } from "./shot-candidates";
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
 import { parseFfprobeOutput } from "./media-probe";
@@ -67,28 +68,35 @@ function assDocument(request: VideoRenderRequest) {
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${request.width}\nPlayResY: ${request.height}\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,DejaVu Sans,${Math.max(32, Math.round(request.height * .04))},&H00FFFFFF,&H000000FF,&H00111111,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,60,60,${Math.max(54, Math.round(request.height * .07))},1\nStyle: CTA,DejaVu Sans,${Math.max(42, Math.round(request.height * .055))},&H00FFFFFF,&H000000FF,&H00111111,&H90000000,-1,0,0,0,100,100,0,0,3,2,0,5,80,80,80,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${lines.join("\n")}\n`;
 }
 
-export async function extractMarketingVisualSamplesInSandbox(sourceAssets: VideoProject["sourceAssets"], sources: SignedSources): Promise<MarketingVisualSample[]> {
+export async function extractMarketingVisualSamplesInSandbox(sourceAssets: VideoProject["sourceAssets"], sources: SignedSources): Promise<{ candidates: MarketingShotCandidate[]; visualSamples: MarketingVisualSample[] }> {
   const sandbox = await createMediaSandbox(sources);
   try {
     const remote = await downloadSources(sandbox, sourceAssets.map((asset) => asset.assetRef), sources);
     const samples: MarketingVisualSample[] = [];
+    const candidates: MarketingShotCandidate[] = [];
     for (const [sourceIndex, source] of sourceAssets.slice(0, 3).entries()) {
       const input = remote.get(source.assetRef)!;
       if (source.mediaType === "image") {
-        samples.push({ label: `${source.assetRef} at 0ms`, data: new Uint8Array(await sandbox.fs.readFile(input)), mediaType: sources.get(source.assetRef)!.contentType });
+        const candidate = createMarketingShotCandidate({ sourceIndex, candidateIndex: 0, assetRef: source.assetRef, mediaType: "image", trimStartMs: 0 });
+        candidates.push(candidate);
+        samples.push({ label: `${candidate.id} · image · max ${candidate.maximumDurationMs}ms`, data: new Uint8Array(await sandbox.fs.readFile(input)), mediaType: sources.get(source.assetRef)!.contentType });
         continue;
       }
       const rawDuration = await command(sandbox, "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input]);
       const duration = Number(rawDuration.trim());
       if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取上传视频的时长。");
       if (duration > maximumMarketingSourceDurationSeconds) throw new Error(`源视频不能超过 ${maximumMarketingSourceDurationSeconds} 秒。`);
-      for (const [frameIndex, timestamp] of [duration * .2, duration * .5, duration * .8].entries()) {
+      const durationMs = Math.round(duration * 1_000);
+      for (const [frameIndex, trimStartMs] of videoShotCandidateStarts(durationMs).entries()) {
+        const timestamp = trimStartMs / 1_000;
         const output = `/vercel/sandbox/work/sample-${sourceIndex}-${frameIndex}.jpg`;
         await command(sandbox, "ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(timestamp), "-i", input, "-frames:v", "1", "-vf", "scale=640:-2", output]);
-        samples.push({ label: `${source.assetRef} at ${Math.round(timestamp * 1000)}ms`, data: new Uint8Array(await sandbox.fs.readFile(output)), mediaType: "image/jpeg" });
+        const candidate = createMarketingShotCandidate({ sourceIndex, candidateIndex: frameIndex, assetRef: source.assetRef, mediaType: "video", trimStartMs, sourceDurationMs: durationMs });
+        candidates.push(candidate);
+        samples.push({ label: `${candidate.id} · video · max ${candidate.maximumDurationMs}ms`, data: new Uint8Array(await sandbox.fs.readFile(output)), mediaType: "image/jpeg" });
       }
     }
-    return samples;
+    return { candidates, visualSamples: samples };
   } finally { await sandbox.stop(); }
 }
 

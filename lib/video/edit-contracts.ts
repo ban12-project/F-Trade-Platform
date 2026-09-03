@@ -172,8 +172,7 @@ export const marketingVideoDraftSchema = z.union([marketingVideoDraftV2Schema, l
 
 export const marketingVideoAiDraftSchema = z.object({
   clips: z.array(z.object({
-    assetRef: privateAssetRef,
-    trimStartMs: z.number().int().min(0),
+    shotCandidateId: z.string().trim().regex(/^shot-[0-9]{3}-[0-9]{3}$/),
     durationMs: z.number().int().min(1_000).max(10_000),
     fitMode: z.enum(["contain", "cover"]),
     audioMode: z.enum(["muted", "source"]),
