@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { getDatabase, type Database } from "@/lib/db/client";
 import { aggregateRecord, approval, auditEvent, videoJob, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
-import { videoProjectSchema, type VideoProject } from "./contracts";
+import { isPrivateTestOnlyVideo, videoProjectSchema, type VideoProject } from "./contracts";
 import { buildVideoCreative } from "./creative";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
@@ -24,6 +24,7 @@ export type MarketingVideoEditorEntry = VideoWorkspaceEntry & {
   targetAudience: string;
   captionFactOptions: Array<{ field: string; value: string }>;
   downloadAvailable: boolean;
+  privateTestOnly: boolean;
   processingJob: VideoProcessingSummary | null;
 };
 export type MarketingVideoCopyCandidate = { id: string; projectTitle: string; productName: string; objective: string };
@@ -108,6 +109,7 @@ export async function listProjectMarketingVideoEntries(projectId: string, databa
     const project = videoProjectSchema.safeParse(record.payload);
     if (!project.success || !project.data.editDraft) return [];
     const productName = project.data.factualClaims.find((claim) => claim.field === "product.product_name")?.value ?? "已核验产品";
+    const privateTestOnly = isPrivateTestOnlyVideo(project.data);
     return [{
       id: record.id,
       state: record.state,
@@ -121,7 +123,8 @@ export async function listProjectMarketingVideoEntries(projectId: string, databa
       previewAssetRef: project.data.renderedAssetRef ?? null,
       draft: project.data.editDraft,
       captionFactOptions: project.data.factualClaims.map(({ field, value }) => ({ field, value })),
-      downloadAvailable: record.state === "VIDEO_APPROVED" && project.data.exportArtifact?.status === "approved",
+      downloadAvailable: record.state === "VIDEO_APPROVED" && project.data.exportArtifact?.status === "approved" && !privateTestOnly,
+      privateTestOnly,
       processingJob: jobsByVideo.get(record.id) ?? null,
     }];
   });

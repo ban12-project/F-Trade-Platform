@@ -10,9 +10,16 @@ import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import {
   createMarketingVideoDraftFormSchema,
+  createMarketingVideoFromInternetSchema,
   createMarketingVideoFromProductMediaSchema,
   type MarketingVideoDraft,
 } from "@/lib/video/edit-contracts";
+import {
+  importInternetVideoMedia,
+  internetMediaSearchInputSchema,
+  searchInternetVideoMedia,
+  type InternetMediaSearchResult,
+} from "@/lib/video/internet-media-search";
 import { decideGuardedVideoReview } from "@/lib/video/product-media-guarded-operations";
 import { createMarketingVideoEditProjectFromProductMedia } from "@/lib/video/product-media-create";
 import { attachVideoWorkflowRun, queueVideoProcessingJob, releaseVideoWorkflowStart, reserveVideoWorkflowStart } from "@/lib/video/processing-jobs";
@@ -28,6 +35,7 @@ import { start } from "workflow/api";
 import { generateMarketingVideoAiDraftWorkflow, renderMarketingVideoPreviewWorkflow } from "@/workflows/marketing-video-processing";
 
 export type MarketingVideoActionState = { status: "idle" | "success" | "error"; message: string; videoId?: string };
+export type InternetMediaSearchActionState = { status: "idle" | "success" | "error"; message: string; results: InternetMediaSearchResult[] };
 async function requireVideoWriter() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !hasPermission(session.user.role, "video:write")) throw new Error("无权编辑营销视频。");
@@ -94,7 +102,7 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
   try {
     const session = await requireVideoWriter();
     const fields = creationFields(formData);
-    const sourceMode = z.enum(["", "upload", "product_media"], { message: "素材来源模式无效。" })
+    const sourceMode = z.enum(["", "upload", "product_media", "internet_search"], { message: "素材来源模式无效。" })
       .parse(text(formData, "sourceMode"));
 
     if (sourceMode === "product_media") {
@@ -114,6 +122,33 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
       );
     }
 
+    if (sourceMode === "internet_search") {
+      const request = createMarketingVideoFromInternetSchema.parse({
+        ...fields,
+        sourceMode,
+        internetSearchQuery: text(formData, "internetSearchQuery"),
+        internetMediaIds: jsonValue(formData, "internetMediaIds", []),
+        rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
+      });
+      await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product");
+      const importedAssets = await importInternetVideoMedia({
+        projectId: request.projectId,
+        productId: request.productId,
+        query: request.internetSearchQuery,
+        resultIds: request.internetMediaIds,
+      }, session.user.id);
+      const result = await createMarketingVideoEditProject({
+        ...fields,
+        rightsEvidenceRef: importedAssets[0]?.rightsEvidenceRef,
+      }, session.user.id, importedAssets);
+      return finishVideoCreation(
+        result,
+        request.projectId,
+        session.user.id,
+        "互联网素材已私有导入；仅限测试预览，AI 剪辑初稿已进入后台队列。",
+      );
+    }
+
     const request = createMarketingVideoDraftFormSchema.parse({
       ...fields,
       rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
@@ -130,6 +165,22 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
     return finishVideoCreation(result, request.projectId, session.user.id, "素材已保存，AI 剪辑初稿已进入后台队列。");
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法创建营销视频剪辑稿。" };
+  }
+}
+
+export async function searchInternetVideoMediaAction(input: unknown): Promise<InternetMediaSearchActionState> {
+  try {
+    await requireVideoWriter();
+    const value = internetMediaSearchInputSchema.parse(input);
+    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product");
+    const results = await searchInternetVideoMedia(value.query);
+    return {
+      status: "success",
+      message: results.length ? `找到 ${results.length} 个可导入图片。` : "没有找到可导入图片，请换一个检索词。",
+      results,
+    };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "无法检索互联网素材。", results: [] };
   }
 }
 

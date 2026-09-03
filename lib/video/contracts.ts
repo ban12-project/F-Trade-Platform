@@ -49,6 +49,7 @@ export const videoAssetSchema = z.object({
   mediaType: z.enum(["image", "video", "audio", "logo", "subtitle"]),
   rightsEvidenceRef: privateRef,
   productMediaId: z.uuid("ProductMedia 标识无效。").optional(),
+  usagePolicy: z.enum(["publishable", "private_test_only"]).optional(),
 }).strict().superRefine((asset, context) => {
   if (!asset.productMediaId) return;
   if (!evidenceRef.safeParse(asset.assetRef).success) {
@@ -117,3 +118,13 @@ export const videoProjectSchema = z.object({
 });
 
 export type VideoProject = z.infer<typeof videoProjectSchema>;
+
+export function isPrivateTestOnlyVideo(project: Pick<VideoProject, "sourceAssets">) {
+  return project.sourceAssets.some((asset) => asset.usagePolicy === "private_test_only");
+}
+
+export function assertVideoPublicationEligible(project: Pick<VideoProject, "sourceAssets">) {
+  if (isPrivateTestOnlyVideo(project)) {
+    throw new Error("互联网测试素材只能生成私有预览，不能批准为可发布成片。");
+  }
+}

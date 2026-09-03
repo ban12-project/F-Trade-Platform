@@ -4,6 +4,7 @@ const privateAssetRef = z.string().trim().regex(/^(?:asset|evidence)-[a-z0-9][a-
 const claimRef = z.string().trim().regex(/^(?:product|specifications|commercial)\.[a-z_]+$/, "产品事实引用无效。");
 const editingPlatformSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
 const evidenceRef = z.string().trim().regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写素材权利证据引用。");
+const internetSearchQuery = z.string().trim().min(2, "检索词至少需要两个字符。").max(120, "检索词不能超过 120 个字符。");
 const protectedFactLanguage = /\d|\boe[m]?\b|\b(?:diameter|dimension|spline|material|certif(?:ied|ication)|lifetime|moq|lead[ -]?time|fit(?:s|ment)?|compatib(?:le|ility)|price|usd|eur|rmb|days?|mm|kg)\b|尺寸|直径|花键|材料|认证|寿命|起订|交期|适配|兼容|价格/i;
 
 const creativeMarketingText = (maximum: number, tooLongMessage: string) => z.string().trim().min(1).max(maximum, tooLongMessage).refine(
@@ -40,12 +41,29 @@ export const createMarketingVideoFromProductMediaSchema = z.object({
   }
 });
 
-/** Shared React Hook Form contract for choosing one of the two source modes. */
+/** Internet results are re-resolved by provider ID; browser-supplied URLs are never imported. */
+export const createMarketingVideoFromInternetSchema = z.object({
+  ...marketingVideoCreationShape,
+  sourceMode: z.literal("internet_search"),
+  internetSearchQuery,
+  internetMediaIds: z.array(z.string().regex(/^wikimedia:\d+$/, "互联网素材标识无效。"))
+    .min(1, "至少选择一个互联网素材。")
+    .max(3, "每条视频最多选择三个互联网素材。"),
+  rightsEvidenceRef: z.literal(""),
+}).strict().superRefine((value, context) => {
+  if (new Set(value.internetMediaIds).size !== value.internetMediaIds.length) {
+    context.addIssue({ code: "custom", path: ["internetMediaIds"], message: "互联网素材不能重复选择。" });
+  }
+});
+
+/** Shared React Hook Form contract for choosing one of the three source modes. */
 export const createMarketingVideoUiFormSchema = z.object({
   ...marketingVideoCreationShape,
-  sourceMode: z.enum(["product_media", "upload"]),
+  sourceMode: z.enum(["product_media", "upload", "internet_search"]),
   productMediaIds: z.array(z.uuid("产品媒体标识无效。")).max(3, "MVP1 最多选择三个产品媒体。"),
   rightsEvidenceRef: z.string().trim().max(140, "素材权利证据引用过长。"),
+  internetSearchQuery: z.string().trim().max(120, "检索词不能超过 120 个字符。"),
+  internetMediaIds: z.array(z.string().regex(/^wikimedia:\d+$/, "互联网素材标识无效。")).max(3, "每条视频最多选择三个互联网素材。"),
 }).strict().superRefine((value, context) => {
   if (value.sourceMode === "upload") {
     if (!evidenceRef.safeParse(value.rightsEvidenceRef).success) {
@@ -53,6 +71,28 @@ export const createMarketingVideoUiFormSchema = z.object({
     }
     if (value.productMediaIds.length) {
       context.addIssue({ code: "custom", path: ["productMediaIds"], message: "上传模式不能同时选择已有产品媒体。" });
+    }
+    if (value.internetMediaIds.length) {
+      context.addIssue({ code: "custom", path: ["internetMediaIds"], message: "上传模式不能同时选择互联网素材。" });
+    }
+    return;
+  }
+
+  if (value.sourceMode === "internet_search") {
+    if (!internetSearchQuery.safeParse(value.internetSearchQuery).success) {
+      context.addIssue({ code: "custom", path: ["internetSearchQuery"], message: "请先输入至少两个字符并检索素材。" });
+    }
+    if (!value.internetMediaIds.length) {
+      context.addIssue({ code: "custom", path: ["internetMediaIds"], message: "请从检索结果中选择 1–3 个素材。" });
+    }
+    if (new Set(value.internetMediaIds).size !== value.internetMediaIds.length) {
+      context.addIssue({ code: "custom", path: ["internetMediaIds"], message: "互联网素材不能重复选择。" });
+    }
+    if (value.productMediaIds.length) {
+      context.addIssue({ code: "custom", path: ["productMediaIds"], message: "互联网检索模式不能同时选择已有产品媒体。" });
+    }
+    if (value.rightsEvidenceRef) {
+      context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "互联网测试素材由服务端自动记录来源。" });
     }
     return;
   }
@@ -65,6 +105,9 @@ export const createMarketingVideoUiFormSchema = z.object({
   }
   if (value.rightsEvidenceRef) {
     context.addIssue({ code: "custom", path: ["rightsEvidenceRef"], message: "复用模式由服务端读取逐素材权利证据。" });
+  }
+  if (value.internetMediaIds.length) {
+    context.addIssue({ code: "custom", path: ["internetMediaIds"], message: "复用模式不能同时选择互联网素材。" });
   }
 });
 

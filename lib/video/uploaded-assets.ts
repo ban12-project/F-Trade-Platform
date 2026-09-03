@@ -8,7 +8,7 @@ import { pipeline } from "node:stream/promises";
 
 import { eq, inArray } from "drizzle-orm";
 
-import { getDatabase } from "@/lib/db/client";
+import { getDatabase, type Database } from "@/lib/db/client";
 import { evidence } from "@/lib/db/schema";
 import { VercelPrivateBlobEvidenceStore } from "@/lib/evidence/vercel-private-blob";
 
@@ -36,11 +36,10 @@ export function validateUploadedVideoSourceAsset(file: File) {
 }
 
 /** Stores user-provided visual assets privately and exposes only the existing evidence reference. */
-export async function prepareUploadedVideoAssets(files: File[], actorId: string, rightsEvidenceRef: string): Promise<UploadedVideoSourceAsset[]> {
+export async function prepareUploadedVideoAssets(files: File[], actorId: string, rightsEvidenceRef: string, database: Database = getDatabase()): Promise<UploadedVideoSourceAsset[]> {
   if (files.length > maximumAssetCount) throw new Error(`一次最多上传 ${maximumAssetCount} 个营销素材。`);
   if (files.reduce((total, file) => total + file.size, 0) > maximumTotalAssetBytes) throw new Error("一次上传的营销素材总计不能超过 20MB。 ");
   if (files.length && !rightsEvidenceRef.trim()) throw new Error("上传营销素材时必须提供权利证据引用。 ");
-  const database = getDatabase();
   const stored: UploadedVideoSourceAsset[] = [];
   for (const file of files) {
     const metadata = validateUploadedVideoSourceAsset(file);

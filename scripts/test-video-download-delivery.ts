@@ -67,6 +67,7 @@ void (async () => {
   assert.equal((await resolveApprovedVideoDownload({ user: { role: "user" } }, videoId, null, store, async () => ({ state: "VIDEO_REVIEW_REQUIRED", payload: approvedProject }), async () => undefined)).kind, "not_found");
   assert.equal((await resolveApprovedVideoDownload({ user: { role: "user" } }, videoId, null, store, findApproved, async () => { throw new Error("rights revoked"); })).kind, "unavailable");
   assert.equal((await resolveApprovedVideoDownload({ user: { role: "user" } }, videoId, null, store, async () => ({ state: "VIDEO_APPROVED", payload: { ...approvedProject, renderedAssetRef: "asset-other-701" } }), async () => undefined)).kind, "unavailable");
+  assert.equal((await resolveApprovedVideoDownload({ user: { role: "user" } }, videoId, null, store, async () => ({ state: "VIDEO_APPROVED", payload: { ...approvedProject, sourceAssets: approvedProject.sourceAssets.map((source) => ({ ...source, usagePolicy: "private_test_only" })) } }), async () => undefined)).kind, "unavailable");
   assert.equal((await resolveApprovedVideoDownload({ user: { role: "user" } }, videoId, null, { async getGeneratedVideo() { return null; } }, findApproved, async () => undefined)).kind, "not_found");
   assert.equal((await resolveApprovedVideoDownload({ user: { role: "user" } }, "invalid", null, store, findApproved, async () => undefined)).kind, "not_found");
   console.log("PASS approved video downloads remain private, current, and rights-governed");
