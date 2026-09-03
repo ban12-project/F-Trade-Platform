@@ -38,7 +38,7 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
       model: createProductAgentModel(await resolveProductAgentModelConfig()),
       schema: marketingVideoAiDraftSchema,
       schemaName: "marketing_video_edit_draft",
-      task: `Create an editable B2B marketing cut draft, never new media. Select 1-3 unique shotCandidateId values from ${JSON.stringify(sampling.candidates.map(({ id, mediaType, maximumDurationMs }) => ({ id, mediaType, maximumDurationMs })))}. Never provide an asset reference or trim timestamp. Total duration must be at most 15000ms, every clip 1000-10000ms, and each durationMs must not exceed its candidate maximumDurationMs. Image candidates must be muted. Every caption object must contain kind, text, and claimRef. A factual caption must use { kind: "verified_fact", text: "", claimRef: <verified field> } and must never provide the fact text. A creative caption must use claimRef: "" and text exactly matching one of ${JSON.stringify(safeAiCreativeCaptions)}. Use { kind: "none", text: "", claimRef: "" } when no caption is needed. CTA must be empty or exactly match one of ${JSON.stringify(safeAiCtaTexts)}. Prefer concise captions and hard cuts.`,
+      task: `Create an editable B2B marketing cut draft, never new media. Follow Google's ABCD creative structure: Attention in the first 1-2 seconds, Branding early, Connection through a clear distributor or product-use context, and Direction through a CTA. Select 1-3 unique shotCandidateId values from ${JSON.stringify(sampling.candidates.map(({ id, mediaType, maximumDurationMs }) => ({ id, mediaType, maximumDurationMs })))}. A clip may cover multiple abcdRoles, but the complete draft must cover attention, branding, connection, and direction. Choose one bounded motionPreset per clip from punch_in, hero_reveal, slow_pan, or cta_hold. Never provide an asset reference or trim timestamp. Total duration must be at most 15000ms, every clip 1000-10000ms, and each durationMs must not exceed its candidate maximumDurationMs. Image candidates must be muted. Every caption object must contain kind, text, and claimRef. A factual caption must use { kind: "verified_fact", text: "", claimRef: <verified field> } and must never provide the fact text. A creative caption must use claimRef: "" and text exactly matching one of ${JSON.stringify(safeAiCreativeCaptions)}. Use { kind: "none", text: "", claimRef: "" } when no caption is needed. CTA must exactly match one of ${JSON.stringify(safeAiCtaTexts)}. Use purposeful pacing and motion; do not invent product facts.`,
       verifiedFacts: project.factualClaims.map(({ field, value, evidenceRef }) => ({ field, value, evidenceRef })),
       visualSamples: sampling.visualSamples,
     });
@@ -63,10 +63,16 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
     if (!preset) throw new Error("目标平台没有可用的已核验导出预设。");
     const request = { timeline, platform: preset.platform, width: preset.width, height: preset.height, fps: preset.fps } as const;
     const sources = await issueSandboxVideoSources(project.editDraft!.clips.map((clip) => clip.assetRef));
+    const useRemotion = process.env.VIDEO_COMPOSITOR === "remotion" && preset.width === 1080 && preset.height === 1920 && preset.fps === 30;
     const expectedAssetRef = `asset-render-${input.jobId}`;
     let rendered: Awaited<ReturnType<typeof renderMarketingTimelineInSandbox>> | undefined;
     await renderApprovedMarketingTimeline(request, { render: async (validated) => {
-      rendered = await renderMarketingTimelineInSandbox(validated, sources);
+      if (useRemotion) {
+        const productName = project.factualClaims.find((claim) => claim.field === "product.product_name")?.value;
+        if (!productName) throw new Error("Remotion ABCD 合成需要已核验的产品名称。");
+        const { renderMarketingTimelineWithRemotion } = await import("@/lib/video/remotion-sandbox");
+        rendered = await renderMarketingTimelineWithRemotion(validated, sources, productName);
+      } else rendered = await renderMarketingTimelineInSandbox(validated, sources);
       return { assetRef: expectedAssetRef };
     } });
     if (!rendered) throw new Error("Sandbox 未生成视频输出。");

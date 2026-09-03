@@ -18,3 +18,12 @@
 ## 后果
 
 用户只需选择已核验产品、上传授权素材、检查 AI 初稿、合成和审核。系统保留未来评估视频生成的技术资产，但不得把它表述为 MVP1 已投入使用的能力。
+
+## 2026-09-04 补充：ABCD 与 Remotion 合成
+
+- 剪辑草稿采用 Google ABCD 创意结构：首个片段必须覆盖 Attention 与早期 Branding，中间建立 Connection，最后一个片段必须覆盖 Direction 与 CTA；一份素材可以跨多个节拍复用。
+- Remotion 只负责确定性的运动设计、图层和转场，不扩大 AI 的事实权限。事实字幕仍由服务端从当前 ProductReady 值解析。
+- 首个模板只支持 1080×1920、30fps 的竖屏成片。其他平台预设继续走 FFmpeg 合成。
+- Remotion 在 Vercel Sandbox 内运行；输入只来自服务端签发的短期私有素材地址，地址不写入项目、任务或客户端状态。
+- FFmpeg 继续承担素材探测和成片验收。`VIDEO_COMPOSITOR=remotion` 是显式开关，未开启时保留原 FFmpeg 合成路径。
+- `@remotion/vercel` 仍是实验性 API，生产启用前还需确认适用的 Remotion 商业许可、持续渲染成本和回滚观测。

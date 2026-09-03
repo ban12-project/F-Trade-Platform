@@ -91,9 +91,9 @@ async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ 
       downloadAvailable: approvedState,
       privateTestOnly: false,
       processingJob: null,
-      draft: { version: 2, platform: "facebook", ctaText: "Contact us", clips: [
-        { clipId: "clip-001", assetRef: "evidence-video-001", mediaType: "video", trimStartMs: 0, durationMs: 5_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" } },
-        { clipId: "clip-002", assetRef: "evidence-image-002", mediaType: "image", trimStartMs: 0, durationMs: 3_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" } },
+      draft: { version: 3, creativeFramework: "google_abcd", platform: "facebook", ctaText: "Contact us", clips: [
+        { clipId: "clip-001", assetRef: "evidence-video-001", mediaType: "video", trimStartMs: 0, durationMs: 5_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" }, abcdRoles: ["attention", "branding"], motionPreset: "punch_in" },
+        { clipId: "clip-002", assetRef: "evidence-image-002", mediaType: "image", trimStartMs: 0, durationMs: 3_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" }, abcdRoles: ["connection", "direction"], motionPreset: "cta_hold" },
       ] },
     }],
   }} />;

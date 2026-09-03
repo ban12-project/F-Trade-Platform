@@ -28,6 +28,8 @@ export type MarketingTimeline = {
     trimStartSeconds?: number;
     fitMode?: "contain" | "cover";
     audioMode?: "muted" | "source";
+    abcdRoles?: Array<"attention" | "branding" | "connection" | "direction">;
+    motionPreset?: "punch_in" | "hero_reveal" | "slow_pan" | "cta_hold";
     startSeconds: number;
     durationSeconds: number;
     prompt: string;
@@ -103,6 +105,8 @@ export function createMarketingEditTimeline(projectInput: VideoProject, draftInp
       trimStartSeconds: clip.trimStartMs / 1_000,
       fitMode: clip.fitMode,
       audioMode: clip.audioMode,
+      abcdRoles: clip.abcdRoles,
+      motionPreset: clip.motionPreset,
       startSeconds: sceneStart,
       durationSeconds,
       prompt: "用户授权素材剪辑",

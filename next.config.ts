@@ -4,6 +4,9 @@ import { withWorkflow } from "workflow/next";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   reactCompiler: true,
+  outputFileTracingIncludes: {
+    "/.well-known/workflow/v1/*": [".remotion/**/*"],
+  },
   async redirects() {
     return [
       {

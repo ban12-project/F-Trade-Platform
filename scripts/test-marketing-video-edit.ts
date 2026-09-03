@@ -22,13 +22,15 @@ const aiBaseClip = {
   durationMs: 2_000,
   fitMode: "contain" as const,
   audioMode: "muted" as const,
+  abcdRoles: ["attention", "branding", "connection", "direction"] as const,
+  motionPreset: "punch_in" as const,
 };
 const exact = marketingVideoDraftSchema.parse({ version: 2, platform: "facebook", clips: [baseClip, { ...baseClip, clipId: "clip-002", durationMs: 5_000 }], ctaText: "Contact us" });
 const { caption: _caption, ...legacyBaseClip } = baseClip;
 assert.equal(exact.clips.reduce((sum, clip) => sum + clip.durationMs, 0), 15_000);
-assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, clips: [baseClip, { ...baseClip, clipId: "clip-002", durationMs: 5_001 }] }), /15 秒/);
-assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, clips: [{ ...baseClip, durationMs: 10_001 }] }), /10 秒/);
-assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, clips: [{ ...baseClip, mediaType: "image", trimStartMs: 1 }] }), /图片素材/);
+assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, clips: [{ ...exact.clips[0]!, durationMs: 10_000 }, { ...exact.clips[1]!, durationMs: 5_001 }] }), /15 秒/);
+assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, clips: [{ ...exact.clips[0]!, durationMs: 10_001 }] }), /10 秒/);
+assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, clips: [{ ...exact.clips[0]!, mediaType: "image", trimStartMs: 1 }] }), /图片素材/);
 
 const legacy = marketingVideoDraftSchema.parse({
   version: 1,
@@ -36,7 +38,8 @@ const legacy = marketingVideoDraftSchema.parse({
   clips: [{ ...legacyBaseClip, subtitle: "Incorrect OE 99999", claimRefs: ["product.oe_number"] }],
   ctaText: "Contact us",
 });
-assert.equal(legacy.version, 2);
+assert.equal(legacy.version, 3);
+assert.deepEqual(legacy.clips[0]?.abcdRoles, ["attention", "branding", "connection", "direction"]);
 assert.deepEqual(legacy.clips[0]?.caption, { kind: "verified_fact", claimRef: "product.oe_number" });
 assert.throws(() => marketingVideoDraftSchema.parse({
   version: 1,
@@ -113,7 +116,7 @@ void (async () => {
   assert.equal(timeline.scenes[0]?.subtitles[0]?.text, "12345");
   assert.deepEqual(timeline.scenes[0]?.subtitles[0]?.claimRefs, ["product.oe_number"]);
   assert.equal(timeline.cta?.startSeconds, 8);
-  assert.throws(() => createMarketingEditTimeline(project, { ...project.editDraft!, clips: [{ ...baseClip, caption: { kind: "verified_fact", claimRef: "specifications.diameter" } }] }), /未绑定证据/);
+  assert.throws(() => createMarketingEditTimeline(project, { ...project.editDraft!, clips: [{ ...project.editDraft!.clips[0]!, caption: { kind: "verified_fact", claimRef: "specifications.diameter" } }] }), /未绑定证据/);
   await assert.rejects(() => renderApprovedMarketingTimeline({ timeline: { ...timeline, durationSeconds: 16, scenes: [{ ...timeline.scenes[0]!, durationSeconds: 16 }] }, platform: "facebook", width: 1080, height: 1920, fps: 30 }, { async render() { return { assetRef: "asset-invalid" }; } }), /15 秒/);
   console.log("PASS MVP1 marketing edit compiles verified captions server-side and enforces 15 seconds");
 })();
