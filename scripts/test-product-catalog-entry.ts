@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { productReviewFormSchema } from "../lib/form-schemas";
+import { productCatalogDisplayIdentity } from "../lib/products";
 import { productCatalogFormSchema } from "../lib/product/catalog-form-schema";
 import { buildEvidenceBoundProductCatalogDraft } from "../lib/product/evidence-bound-catalog";
 import { approveProductDraft, rejectProductDraft } from "../lib/product/verification";
@@ -187,5 +188,14 @@ const approved = approveProductDraft(completeDraft, {
 });
 assert.equal(approved.verification_status, "verified");
 assert.equal(approved.approval_ref, "synthetic-approval-002");
+
+assert.deepEqual(productCatalogDisplayIdentity(undefined), {
+  productName: "未填写产品名称",
+  internalSku: "未填写产品编号",
+});
+assert.deepEqual(productCatalogDisplayIdentity({ internal_sku: "SYN-PARTIAL-001" }), {
+  productName: "未填写产品名称",
+  internalSku: "SYN-PARTIAL-001",
+});
 
 console.log("PASS governed intake reaches every ProductReady specification and commercial field");
