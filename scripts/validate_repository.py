@@ -688,6 +688,26 @@ def check_repository_hygiene() -> None:
         raise AssertionError("Reference PDF is missing or unexpectedly small")
 
 
+def check_server_action_exports() -> None:
+    invalid: list[str] = []
+    for path in sorted((ROOT / "lib" / "actions").glob("*.ts")):
+        source = path.read_text(encoding="utf-8")
+        if not re.match(r'^\s*["\']use server["\'];', source):
+            continue
+        for line_number, line in enumerate(source.splitlines(), start=1):
+            statement = line.strip()
+            if not statement.startswith("export "):
+                continue
+            if statement.startswith(("export type ", "export interface ", "export async function ")):
+                continue
+            invalid.append(f"{path.relative_to(ROOT)}:{line_number}: {statement}")
+    if invalid:
+        raise AssertionError(
+            "Top-level use server files may export only async functions at runtime: "
+            + "; ".join(invalid)
+        )
+
+
 def check_local_markdown_links() -> None:
     pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
     ignored_directories = {".git", ".next", ".venv", "node_modules", "playwright-report"}
@@ -743,6 +763,7 @@ def main() -> int:
         ("follow-up cadence", check_follow_up_cadence),
         ("content Gate 01", check_content_gate),
         ("content safety policy", check_content_policy),
+        ("Server Action runtime exports", check_server_action_exports),
         ("repository hygiene", check_repository_hygiene),
         ("local Markdown links", check_local_markdown_links),
     ]

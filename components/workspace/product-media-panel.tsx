@@ -18,9 +18,9 @@ import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 
 import {
-  initialProductMediaActionState,
   registerProductMediaAction,
   reviewProductMediaAction,
+  type ProductMediaActionState,
 } from "@/lib/actions/product-media";
 import {
   productMediaRegistrationFieldsSchema,
@@ -46,6 +46,11 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspaceDirty } from "./dirty-state";
+
+const initialProductMediaActionState: ProductMediaActionState = {
+  status: "idle",
+  message: "",
+};
 
 const roleLabels: Record<ProductMediaAsset["semantic"]["role"], string> = {
   product_hero: "产品主图",
