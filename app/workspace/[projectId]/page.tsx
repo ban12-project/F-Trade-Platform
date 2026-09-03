@@ -18,7 +18,8 @@ import { getProductVideoReadiness, listProductMediaAssets } from "@/lib/product/
 import { getProjectProductCatalogDetail, listProjectProductCatalogEntries } from "@/lib/products";
 import { listProjectRfqEntries } from "@/lib/sales/store";
 import { getWorkspaceProject, listProjectReadyProductReferences, listWorkspaceProjects, listWorkspaceTasks } from "@/lib/workspace/store";
-import { listCrossProjectMarketingVideoCandidates, listProjectMarketingVideoEntries, listReadyVideoProductSources } from "@/lib/video/store";
+import { listReadyVideoProductSourcesWithMedia } from "@/lib/video/product-media-sources";
+import { listCrossProjectMarketingVideoCandidates, listProjectMarketingVideoEntries } from "@/lib/video/store";
 
 async function ProjectContent({ params, searchParams }: { params: Promise<{ projectId: string }>; searchParams: Promise<{ panel?: string; item?: string }> }) {
   await connection();
@@ -35,7 +36,7 @@ async function ProjectContent({ params, searchParams }: { params: Promise<{ proj
       listProjectContentCatalogEntries(projectId),
       listReadyProductContentSources(projectId),
       listCrossProjectContentCandidates(projectId),
-      listReadyVideoProductSources(projectId),
+      listReadyVideoProductSourcesWithMedia(projectId),
       listProjectMarketingVideoEntries(projectId),
       listCrossProjectMarketingVideoCandidates(projectId),
       query.panel === "product" && selectedId ? getProjectProductCatalogDetail(projectId, selectedId) : null,
