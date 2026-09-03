@@ -94,11 +94,13 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
   try {
     const session = await requireVideoWriter();
     const fields = creationFields(formData);
+    const sourceMode = z.enum(["", "upload", "product_media"], { message: "素材来源模式无效。" })
+      .parse(text(formData, "sourceMode"));
 
-    if (text(formData, "sourceMode") === "product_media") {
+    if (sourceMode === "product_media") {
       const request = createMarketingVideoFromProductMediaSchema.parse({
         ...fields,
-        sourceMode: "product_media",
+        sourceMode,
         productMediaIds: jsonValue(formData, "productMediaIds", []),
         rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
       });
