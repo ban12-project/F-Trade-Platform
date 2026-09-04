@@ -445,6 +445,7 @@ write(
     "app/testing/video-workspace/page.tsx",
     dedent(
         '''
+        import { Suspense } from "react";
         import { notFound } from "next/navigation";
 
         import { VideoWorkspace } from "@/components/workspace/video-workspace";
@@ -481,12 +482,16 @@ write(
           };
         }
 
-        export default async function VideoWorkspaceTestingPage({ searchParams }: { searchParams: Promise<{ state?: string }> }) {
-          if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
+        async function VideoWorkspaceFixture({ searchParams }: { searchParams: Promise<{ state?: string }> }) {
           const query = await searchParams;
           const state = query.state === "review" || query.state === "approved" ? query.state : "draft";
           const current = entry(state);
           return <VideoWorkspace projectId={projectId} projectTitle="Synthetic project workspace" products={products} entries={[current]} copyCandidates={[]} canReview selectedId={current.id} />;
+        }
+
+        export default function VideoWorkspaceTestingPage({ searchParams }: { searchParams: Promise<{ state?: string }> }) {
+          if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
+          return <Suspense fallback={null}><VideoWorkspaceFixture searchParams={searchParams} /></Suspense>;
         }
         '''
     ),
