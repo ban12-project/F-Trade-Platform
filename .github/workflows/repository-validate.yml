@@ -32,6 +32,9 @@ jobs:
       - name: Test Product Agent evidence locations
         run: pnpm test:product-agent-evidence
 
+      - name: Run synthetic Product Agent control ablation
+        run: pnpm eval:product-safety-ablation
+
       - name: Test ProductMedia policies
         run: pnpm test:product-media && pnpm test:product-media-workflow
 

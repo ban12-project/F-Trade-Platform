@@ -46,6 +46,7 @@ MVP1 的主要视频能力是在营销项目的“营销视频”步骤中，把
 - [产品目录接收清单模板](docs/testing/product-catalog-intake.template.md)
 - [官方渠道接入清单模板](docs/testing/channel-onboarding.template.md)
 - [Product Agent 验收矩阵](docs/testing/product-agent-acceptance.md)
+- [Product Agent 安全控制消融与 Issue 审计](docs/testing/product-safety-ablation.md)
 - [参考资料说明](docs/reference/README.md)
 
 ## 研发流
