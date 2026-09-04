@@ -23,7 +23,8 @@ jobs:
           package-manager-cache: false
       - uses: pnpm/action-setup@v5
       - run: pnpm install --frozen-lockfile
-      - name: Apply navigation refactor and safe formatting
+      - run: pnpm add --save-dev --save-exact server-only@0.0.1
+      - name: Apply validation corrections and safe formatting
         run: |
           mkdir -p /tmp/navigation-audit
           if test -f scripts/apply-navigation-migration.py; then
@@ -35,22 +36,29 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- . ':!.github/workflows'
           if ! git diff --cached --quiet; then
-            git commit -m 'fix: persist workspace navigation shell and isolate stage reads (#263) [skip ci]'
+            git commit -m 'fix: close navigation validation gaps and refresh shared layout after writes (#263) [skip ci]'
             git push origin HEAD:fix/263-workspace-navigation-biome
           fi
           git archive --format=tar.gz --output=/tmp/navigation-audit/source.tar.gz HEAD
+          find node_modules/.pnpm -path '*/@biomejs/cli-linux-x64/biome' -exec cp {} /tmp/navigation-audit/biome-bin \;
       - name: Capture typecheck and navigation regression results
         run: |
           pnpm typecheck > /tmp/navigation-audit/typecheck.log 2>&1 || echo 'Typecheck failed; see artifact'
           pnpm test:workspace-navigation > /tmp/navigation-audit/navigation-unit.log 2>&1 || echo 'Unit tests failed; see artifact'
           pnpm test:workspace >> /tmp/navigation-audit/navigation-unit.log 2>&1 || echo 'Workspace tests failed; see artifact'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Capture repository validation
+        run: python scripts/validate_repository.py > /tmp/navigation-audit/repository.log 2>&1 || echo 'Repository validation failed; see artifact'
       - run: pnpm exec playwright install --with-deps chromium
       - name: Validate navigation with a production build
         run: pnpm exec playwright test tests/e2e/workspace-navigation.spec.ts tests/e2e/workspace-dashboard.spec.ts > /tmp/navigation-audit/e2e.log 2>&1 || echo 'Browser tests failed; see artifact'
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: navigation-audit-refactor
+          name: navigation-audit-validation
           path: /tmp/navigation-audit/
           retention-days: 1
           if-no-files-found: error
