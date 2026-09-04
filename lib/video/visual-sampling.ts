@@ -5,7 +5,8 @@ import { extname, join } from "node:path";
 import { promisify } from "node:util";
 
 import type { VideoProject } from "./contracts";
-import { createMarketingShotCandidate, maximumMarketingVisualCandidates, videoShotCandidateStarts, type MarketingShotCandidate } from "./shot-candidates";
+import { detectShotIntervals, frameDifferenceFilter, sceneDetectionFilter } from "./shot-analysis";
+import { createMarketingShotCandidate, createScoredVideoShotCandidates, maximumMarketingVisualCandidates, type MarketingShotCandidate } from "./shot-candidates";
 
 const execFileAsync = promisify(execFile);
 
@@ -17,6 +18,14 @@ async function videoDuration(filePath: string, ffprobeBin: string) {
   const duration = Number(stdout.trim());
   if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取上传视频的时长。");
   return duration;
+}
+
+async function analyzeVideo(filePath: string, durationMs: number, ffmpegBin: string) {
+  const analyze = (filter: string) => execFileAsync(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-i", filePath, "-an", "-vf", filter, "-f", "null", "-"], { maxBuffer: 8 * 1024 * 1024 });
+  // Run sequentially so a two-vCPU worker does not decode the same long source twice at once.
+  const { stdout: sceneMetadata } = await analyze(sceneDetectionFilter());
+  const { stdout: motionMetadata } = await analyze(frameDifferenceFilter());
+  return detectShotIntervals({ durationMs, sceneMetadata, motionMetadata });
 }
 
 /** Extracts a small, bounded visual contact sheet for the language/vision model; it never creates video. */
@@ -47,13 +56,15 @@ export async function extractMarketingVisualSamples(
       if (source.mediaType !== "video") continue;
       const duration = await videoDuration(filePath, ffprobeBin);
       const durationMs = Math.round(duration * 1_000);
-      for (const [index, trimStartMs] of videoShotCandidateStarts(durationMs, candidatesPerSource).entries()) {
-        const timestamp = trimStartMs / 1_000;
-        const output = join(/* turbopackIgnore: true */ directory, `${source.assetRef}-${index}.jpg`);
+      const intervals = await analyzeVideo(filePath, durationMs, ffmpegBin);
+      const sourceCandidates = createScoredVideoShotCandidates({ sourceIndex, assetRef: source.assetRef, sourceDurationMs: durationMs, maximumCandidates: candidatesPerSource, intervals });
+      for (const [candidateIndex, candidate] of sourceCandidates.entries()) {
+        const timestamp = (candidate.sourceAnalysis?.representativeMs ?? candidate.trimStartMs) / 1_000;
+        const output = join(/* turbopackIgnore: true */ directory, `${source.assetRef}-${candidateIndex}.jpg`);
         await execFileAsync(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(timestamp), "-i", filePath, "-frames:v", "1", "-vf", "scale=640:-2", output]);
-        const candidate = createMarketingShotCandidate({ sourceIndex, candidateIndex: index, assetRef: source.assetRef, mediaType: "video", trimStartMs, sourceDurationMs: durationMs });
         candidates.push(candidate);
-        samples.push({ label: `${candidate.id} · video · max ${candidate.maximumDurationMs}ms`, data: new Uint8Array(await readFile(output)), mediaType: "image/jpeg" });
+        const analysis = candidate.sourceAnalysis;
+        samples.push({ label: `${candidate.id} · video · interval ${analysis?.intervalStartMs ?? candidate.trimStartMs}-${analysis?.intervalEndMs ?? candidate.trimStartMs + candidate.maximumDurationMs}ms · action ${analysis?.actionScore ?? 0}/100 · max ${candidate.maximumDurationMs}ms`, data: new Uint8Array(await readFile(output)), mediaType: "image/jpeg" });
       }
     }
     return { candidates, visualSamples: samples };

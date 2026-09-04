@@ -2,7 +2,8 @@ import { Sandbox } from "@vercel/sandbox";
 
 import type { VideoProject } from "./contracts";
 import type { MarketingVisualSample } from "./visual-sampling";
-import { createMarketingShotCandidate, maximumMarketingSourceDurationSeconds, maximumMarketingVisualCandidates, videoShotCandidateStarts, type MarketingShotCandidate } from "./shot-candidates";
+import { detectShotIntervals, frameDifferenceFilter, sceneDetectionFilter } from "./shot-analysis";
+import { createMarketingShotCandidate, createScoredVideoShotCandidates, maximumMarketingSourceDurationSeconds, maximumMarketingVisualCandidates, type MarketingShotCandidate } from "./shot-candidates";
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
 import { parseFfprobeOutput } from "./media-probe";
@@ -89,13 +90,17 @@ export async function extractMarketingVisualSamplesInSandbox(sourceAssets: Video
       if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取上传视频的时长。");
       if (duration > maximumMarketingSourceDurationSeconds) throw new Error(`源视频不能超过 ${maximumMarketingSourceDurationSeconds} 秒。`);
       const durationMs = Math.round(duration * 1_000);
-      for (const [frameIndex, trimStartMs] of videoShotCandidateStarts(durationMs, candidatesPerSource).entries()) {
-        const timestamp = trimStartMs / 1_000;
+      const sceneMetadata = await command(sandbox, "ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", input, "-an", "-vf", sceneDetectionFilter(), "-f", "null", "-"]);
+      const motionMetadata = await command(sandbox, "ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", input, "-an", "-vf", frameDifferenceFilter(), "-f", "null", "-"]);
+      const intervals = detectShotIntervals({ durationMs, sceneMetadata, motionMetadata });
+      const sourceCandidates = createScoredVideoShotCandidates({ sourceIndex, assetRef: source.assetRef, sourceDurationMs: durationMs, maximumCandidates: candidatesPerSource, intervals });
+      for (const [frameIndex, candidate] of sourceCandidates.entries()) {
+        const timestamp = (candidate.sourceAnalysis?.representativeMs ?? candidate.trimStartMs) / 1_000;
         const output = `/vercel/sandbox/work/sample-${sourceIndex}-${frameIndex}.jpg`;
         await command(sandbox, "ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(timestamp), "-i", input, "-frames:v", "1", "-vf", "scale=640:-2", output]);
-        const candidate = createMarketingShotCandidate({ sourceIndex, candidateIndex: frameIndex, assetRef: source.assetRef, mediaType: "video", trimStartMs, sourceDurationMs: durationMs });
         candidates.push(candidate);
-        samples.push({ label: `${candidate.id} · video · max ${candidate.maximumDurationMs}ms`, data: new Uint8Array(await sandbox.fs.readFile(output)), mediaType: "image/jpeg" });
+        const analysis = candidate.sourceAnalysis;
+        samples.push({ label: `${candidate.id} · video · interval ${analysis?.intervalStartMs ?? candidate.trimStartMs}-${analysis?.intervalEndMs ?? candidate.trimStartMs + candidate.maximumDurationMs}ms · action ${analysis?.actionScore ?? 0}/100 · max ${candidate.maximumDurationMs}ms`, data: new Uint8Array(await sandbox.fs.readFile(output)), mediaType: "image/jpeg" });
       }
     }
     return { candidates, visualSamples: samples };

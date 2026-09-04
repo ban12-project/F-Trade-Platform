@@ -83,6 +83,7 @@
     "test:video-download-delivery": "tsx scripts/test-video-download-delivery.ts",
     "test:video-mvp-policy": "tsx scripts/test-video-mvp-policy.ts",
     "test:video-visual-sampling": "tsx scripts/test-video-visual-sampling.ts",
+    "test:video-shot-analysis": "tsx scripts/test-video-shot-analysis.ts",
     "test:video-rendering": "tsx scripts/test-video-rendering.ts",
     "test:ffmpeg-renderer": "tsx scripts/test-ffmpeg-renderer.ts",
     "test:remotion-abcd": "tsx scripts/test-remotion-abcd.ts",

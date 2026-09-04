@@ -84,6 +84,7 @@ const shotCandidates: MarketingShotCandidate[] = [{
   mediaType: "video",
   trimStartMs: 4_000,
   maximumDurationMs: 3_000,
+  sourceAnalysis: { version: "ffmpeg-scdet-frame-diff-v1", intervalStartMs: 3_000, intervalEndMs: 7_000, representativeMs: 5_000, actionScore: 63, actionLevel: "high", startBoundary: "scene", endBoundary: "window" },
 }];
 const aiSuggestion = marketingVideoAiDraftSchema.parse({
   clips: [{ ...aiBaseClip, caption: { kind: "verified_fact", text: "", claimRef: "product.oe_number" } }],
@@ -92,12 +93,13 @@ const aiSuggestion = marketingVideoAiDraftSchema.parse({
 const compiledAiDraft = compileMarketingVideoAiDraft({ suggestion: aiSuggestion, candidates: shotCandidates, platform: "facebook" });
 assert.equal(compiledAiDraft.clips[0]?.assetRef, "evidence-source-001");
 assert.equal(compiledAiDraft.clips[0]?.trimStartMs, 4_000);
+assert.equal(compiledAiDraft.clips[0]?.sourceAnalysis?.actionScore, 63);
 assert.throws(() => compileMarketingVideoAiDraft({ suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0]!, shotCandidateId: "shot-999-999" }] }, candidates: shotCandidates, platform: "facebook" }), /未知候选镜头/);
 assert.throws(() => compileMarketingVideoAiDraft({ suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0]!, durationMs: 3_001 }] }, candidates: shotCandidates, platform: "facebook" }), /可用时长/);
 assert.throws(() => compileMarketingVideoAiDraft({ suggestion: { ...aiSuggestion, clips: [aiSuggestion.clips[0]!, aiSuggestion.clips[0]!] }, candidates: shotCandidates, platform: "facebook" }), /重复选择/);
 assert.throws(() => compileMarketingVideoAiDraft({
   suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0]!, audioMode: "source" }] },
-  candidates: [{ ...shotCandidates[0]!, mediaType: "image", trimStartMs: 0, maximumDurationMs: 10_000 }],
+  candidates: [{ ...shotCandidates[0]!, mediaType: "image", trimStartMs: 0, maximumDurationMs: 10_000, sourceAnalysis: undefined }],
   platform: "facebook",
 }), /图片候选镜头/);
 

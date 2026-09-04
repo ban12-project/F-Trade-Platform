@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { marketingVideoAiDraftSchema, marketingVideoDraftSchema, type MarketingVideoAiDraft, type MarketingVideoDraft } from "./edit-contracts";
+import { selectDiverseActionIntervals, shotSourceAnalysisSchema, type ShotSourceAnalysis } from "./shot-analysis";
 
 const privateAssetRef = z.string().trim().regex(/^(?:asset|evidence)-[a-z0-9][a-z0-9_-]{2,120}$/i);
 
@@ -10,9 +11,16 @@ export const marketingShotCandidateSchema = z.object({
   mediaType: z.enum(["image", "video"]),
   trimStartMs: z.number().int().min(0),
   maximumDurationMs: z.number().int().min(1_000).max(10_000),
+  sourceAnalysis: shotSourceAnalysisSchema.optional(),
 }).strict().superRefine((candidate, context) => {
   if (candidate.mediaType === "image" && candidate.trimStartMs !== 0) {
     context.addIssue({ code: "custom", path: ["trimStartMs"], message: "图片候选镜头必须从 0ms 开始。" });
+  }
+  if (candidate.mediaType === "image" && candidate.sourceAnalysis) {
+    context.addIssue({ code: "custom", path: ["sourceAnalysis"], message: "图片候选镜头不能携带视频镜头分析。" });
+  }
+  if (candidate.sourceAnalysis && (candidate.trimStartMs < candidate.sourceAnalysis.intervalStartMs || candidate.trimStartMs + candidate.maximumDurationMs > candidate.sourceAnalysis.intervalEndMs)) {
+    context.addIssue({ code: "custom", path: ["sourceAnalysis"], message: "候选镜头必须位于检测区间内。" });
   }
 });
 
@@ -44,6 +52,7 @@ export function createMarketingShotCandidate(input: {
   mediaType: "image" | "video";
   trimStartMs: number;
   sourceDurationMs?: number;
+  sourceAnalysis?: ShotSourceAnalysis;
 }) {
   if (input.mediaType === "video" && (!Number.isInteger(input.sourceDurationMs) || input.sourceDurationMs! - input.trimStartMs < 1_000)) {
     throw new Error("视频候选镜头必须保留至少 1 秒可用源素材。");
@@ -53,7 +62,35 @@ export function createMarketingShotCandidate(input: {
     assetRef: input.assetRef,
     mediaType: input.mediaType,
     trimStartMs: input.trimStartMs,
-    maximumDurationMs: input.mediaType === "image" ? 10_000 : Math.min(10_000, input.sourceDurationMs! - input.trimStartMs),
+    maximumDurationMs: input.mediaType === "image" ? 10_000 : Math.min(10_000, Math.min(input.sourceAnalysis?.intervalEndMs ?? input.sourceDurationMs!, input.sourceDurationMs!) - input.trimStartMs),
+    sourceAnalysis: input.sourceAnalysis,
+  });
+}
+
+export function createScoredVideoShotCandidates(input: {
+  sourceIndex: number;
+  assetRef: string;
+  sourceDurationMs: number;
+  maximumCandidates: number;
+  intervals: ShotSourceAnalysis[];
+}) {
+  const desiredCount = videoShotCandidateStarts(input.sourceDurationMs, input.maximumCandidates).length;
+  const selected = selectDiverseActionIntervals(input.intervals, desiredCount);
+  const analyses = selected.length >= desiredCount
+    ? selected
+    : videoShotCandidateStarts(input.sourceDurationMs, input.maximumCandidates).map((startMs) => input.intervals.find((interval) => startMs >= interval.intervalStartMs && startMs < interval.intervalEndMs) ?? input.intervals[0]).filter((interval): interval is ShotSourceAnalysis => Boolean(interval));
+  return analyses.map((analysis, candidateIndex) => {
+    const desiredStartMs = selected.length >= desiredCount ? analysis.representativeMs - 1_000 : videoShotCandidateStarts(input.sourceDurationMs, input.maximumCandidates)[candidateIndex]!;
+    const trimStartMs = Math.max(analysis.intervalStartMs, Math.min(desiredStartMs, analysis.intervalEndMs - 1_000));
+    return createMarketingShotCandidate({
+      sourceIndex: input.sourceIndex,
+      candidateIndex,
+      assetRef: input.assetRef,
+      mediaType: "video",
+      trimStartMs,
+      sourceDurationMs: input.sourceDurationMs,
+      sourceAnalysis: analysis,
+    });
   });
 }
 
@@ -90,6 +127,7 @@ export function compileMarketingVideoAiDraft(input: {
       caption,
       abcdRoles: clip.abcdRoles,
       motionPreset: clip.motionPreset,
+      sourceAnalysis: candidate.sourceAnalysis,
     };
   });
   return marketingVideoDraftSchema.parse({ version: 3, creativeFramework: "google_abcd", platform: input.platform, clips, ctaText: suggestion.ctaText });
