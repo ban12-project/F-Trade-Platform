@@ -1,7 +1,7 @@
 import { compileContract } from "../contracts/validator";
 import quotationHandoffSchema from "../../contracts/sales/quotation-handoff.schema.json";
 
-type Quote = {
+export type Quote = {
   unit_price: number;
   currency: string;
   moq: number;
@@ -27,15 +27,18 @@ export interface HumanQuoteDecision {
   decidedAt: string;
 }
 
-type QuotationHandoff = {
+export type QuotationHandoff = {
   handoff_id: string;
   rfq_id: string;
+  product_id?: string;
   created_by_actor_type: "human";
   created_by_actor_id: string;
   status: "draft" | "review_required" | "revision_required" | "approved" | "sent";
   quote: Quote;
   approval_ref?: string;
   sent_at?: string;
+  sent_channel?: string;
+  sent_ref?: string;
 };
 
 const validateQuotation = compileContract<QuotationHandoff>(quotationHandoffSchema);
@@ -96,12 +99,16 @@ export function sendManualQuotation(
   actorType: ManualQuotationInput["actorType"],
   actorId: string,
   sentAt: string,
+  sentChannel: string,
+  sentRef: string,
 ): QuotationHandoff {
   if (actorType !== "human") throw new Error("An agent cannot send a formal quotation");
   if (quotation.status !== "approved" || !quotation.approval_ref) {
     throw new Error("Only a Gate 02-approved quotation can be sent");
   }
   assertNonEmpty(actorId, "actorId");
+  assertNonEmpty(sentChannel, "sentChannel");
+  assertNonEmpty(sentRef, "sentRef");
   if (Number.isNaN(Date.parse(sentAt))) throw new Error("Quotation send time must be an ISO date-time");
-  return validateQuotation({ ...quotation, status: "sent", sent_at: sentAt });
+  return validateQuotation({ ...quotation, status: "sent", sent_at: sentAt, sent_channel: sentChannel, sent_ref: sentRef });
 }

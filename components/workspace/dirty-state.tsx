@@ -2,18 +2,21 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 type DirtyStateContextValue = {
   dirty: boolean;
   setDirty: (key: string, value: boolean) => void;
-  confirmNavigation: () => boolean;
+  requestNavigation: (action: () => void) => void;
 };
 
 const DirtyStateContext = createContext<DirtyStateContextValue | null>(null);
-const leaveMessage = "还有未保存的修改，确定离开吗？";
 
 export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(() => new Set());
-  const restoringHistory = useRef(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const pendingAction = useRef<(() => void) | null>(null);
+  const allowNextPop = useRef(false);
   const dirty = dirtyKeys.size > 0;
   const setDirty = useCallback((key: string, value: boolean) => {
     setDirtyKeys((current) => {
@@ -22,7 +25,17 @@ export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
       return next.size === current.size && [...next].every((item) => current.has(item)) ? current : next;
     });
   }, []);
-  const confirmNavigation = useCallback(() => !dirty || window.confirm(leaveMessage), [dirty]);
+  const requestNavigation = useCallback((action: () => void) => {
+    if (!dirty) { action(); return; }
+    pendingAction.current = action;
+    setConfirmOpen(true);
+  }, [dirty]);
+  function discardAndContinue() {
+    const action = pendingAction.current;
+    pendingAction.current = null;
+    setConfirmOpen(false);
+    action?.();
+  }
   useEffect(() => {
     if (!dirty) return;
     const beforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -32,16 +45,15 @@ export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!dirty) return;
     const popState = () => {
-      if (restoringHistory.current) { restoringHistory.current = false; return; }
-      if (window.confirm(leaveMessage)) return;
-      restoringHistory.current = true;
+      if (allowNextPop.current) { allowNextPop.current = false; return; }
       window.history.forward();
+      requestNavigation(() => { allowNextPop.current = true; window.history.back(); });
     };
     window.addEventListener("popstate", popState);
     return () => window.removeEventListener("popstate", popState);
-  }, [dirty]);
-  const value = useMemo(() => ({ dirty, setDirty, confirmNavigation }), [confirmNavigation, dirty, setDirty]);
-  return <DirtyStateContext value={value}>{children}</DirtyStateContext>;
+  }, [dirty, requestNavigation]);
+  const value = useMemo(() => ({ dirty, setDirty, requestNavigation }), [dirty, requestNavigation, setDirty]);
+  return <DirtyStateContext value={value}>{children}<AlertDialog open={confirmOpen} onOpenChange={(open) => { setConfirmOpen(open); if (!open) pendingAction.current = null; }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle><AlertDialogDescription>当前画布或面板还有未保存内容。继续后这些修改无法恢复。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>继续编辑</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={discardAndContinue}>放弃修改并离开</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></DirtyStateContext>;
 }
 
 export function useWorkspaceDirtyState() {

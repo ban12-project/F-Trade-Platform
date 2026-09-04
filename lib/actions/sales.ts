@@ -25,7 +25,7 @@ export async function createRfqAction(_previous: SalesActionState, formData: For
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "询盘资料格式不正确。" };
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceProjectKind(projectId, "sales");
+    if (projectId) await assertWorkspaceProjectKind(projectId, "sales", session.user.id);
     const result = await createRfq(parsed.data, session.user.id, projectId);
     revalidatePath("/workspace");
     if (projectId) revalidatePath(`/workspace/${projectId}`);
@@ -42,7 +42,7 @@ export async function submitRfqReadyAction(_previous: SalesActionState, formData
   if (typeof rfqId !== "string" || typeof evidenceRef !== "string" || !/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i.test(evidenceRef)) return { status: "error", message: "RFQ 或证据引用无效。" };
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceAggregateLink(projectId, rfqId, "sales", "rfq");
+    if (projectId) await assertWorkspaceAggregateLink(projectId, rfqId, "sales", "rfq", session.user.id);
     const result = await submitRfqReady(rfqId, evidenceRef, session.user.id, projectId);
     revalidatePath("/workspace");
     if (projectId) revalidatePath(`/workspace/${projectId}`);
@@ -59,7 +59,7 @@ export async function reviseRfqAction(_previous: SalesActionState, formData: For
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "询盘资料格式不正确。" };
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceAggregateLink(projectId, rfqId, "sales", "rfq");
+    if (projectId) await assertWorkspaceAggregateLink(projectId, rfqId, "sales", "rfq", session.user.id);
     const result = await reviseRfq(rfqId, parsed.data, session.user.id, projectId);
     revalidatePath("/workspace");
     if (projectId) revalidatePath(`/workspace/${projectId}`);

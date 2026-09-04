@@ -23,6 +23,8 @@ function createDatabase() {
 }
 
 export type Database = ReturnType<typeof createDatabase>;
+export type DatabaseTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+export type DatabaseExecutor = Database | DatabaseTransaction;
 
 let database: Database | undefined;
 

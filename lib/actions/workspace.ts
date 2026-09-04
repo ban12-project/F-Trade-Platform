@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { createWorkspaceProjectSchema, saveWorkspaceCanvasSchema, type WorkspaceCanvasDocument } from "@/lib/workspace/contracts";
 import { WorkspaceCanvasRevisionConflictError, createWorkspaceProject, linkReadyProductToSalesProject, saveWorkspaceCanvas } from "@/lib/workspace/store";
+import { upsertWorkspaceProjectMember, workspaceMemberFormSchema } from "@/lib/workspace/access";
 
 export type WorkspaceActionState = { status: "idle" | "success" | "error" | "conflict"; message: string; projectId?: string; revision?: number };
 
@@ -54,4 +55,15 @@ export async function linkReadyProductToSalesProjectAction(projectIdInput: strin
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法引用产品。" };
   }
+}
+
+export async function upsertWorkspaceProjectMemberAction(_previous: WorkspaceActionState, formData: FormData): Promise<WorkspaceActionState> {
+  try {
+    const session = await requireWorkspaceUser();
+    const parsed = workspaceMemberFormSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "成员资料无效。" };
+    await upsertWorkspaceProjectMember(parsed.data, session.user.id);
+    revalidatePath(`/workspace/${parsed.data.projectId}`);
+    return { status: "success", message: "项目成员角色已保存。", projectId: parsed.data.projectId };
+  } catch (error) { return { status: "error", message: error instanceof Error ? error.message : "无法保存项目成员。" }; }
 }

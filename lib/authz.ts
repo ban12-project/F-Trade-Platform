@@ -9,6 +9,8 @@ export const permissions = [
   "content:review",
   "video:write",
   "sales:write",
+  "quotation:review",
+  "delivery:review",
   "settings:manage",
   "team:manage",
 ] as const;

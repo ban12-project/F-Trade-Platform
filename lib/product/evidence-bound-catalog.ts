@@ -5,6 +5,7 @@ import { and, eq, sql, type InferInsertModel } from "drizzle-orm";
 import { getDatabase } from "@/lib/db/client";
 import { aggregateRecord, approval, auditEvent, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
+import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
 
 import { kitContentValues, productCatalogFormSchema, type ProductCatalogForm } from "./catalog-form-schema";
 import { reviewProductDraft, type ProductDraft } from "./verification";
@@ -214,6 +215,7 @@ export async function createEvidenceBoundProductCatalogDraft(
 
   await getDatabase().transaction(async (tx) => {
     if (projectId) {
+      await assertAndLinkProjectEvidence(projectId, draft.evidence_refs, actorId, tx);
       const [project] = await tx.select({ kind: workspaceProject.kind, status: workspaceProject.status })
         .from(workspaceProject)
         .where(eq(workspaceProject.id, projectId))
@@ -242,12 +244,15 @@ export async function reviseEvidenceBoundProductCatalogDraft(
   productId: string,
   inputValue: unknown,
   actorId: string,
+  projectId: string,
 ) {
   const input = productCatalogFormSchema.parse(inputValue);
   const now = new Date();
   const eventId = randomUUID();
   const approvalId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    const draft = buildEvidenceBoundProductCatalogDraft(input, productId);
+    await assertAndLinkProjectEvidence(projectId, draft.evidence_refs, actorId, tx);
     const [aggregate] = await tx.select({
       id: aggregateRecord.id,
       state: aggregateRecord.state,
@@ -258,7 +263,6 @@ export async function reviseEvidenceBoundProductCatalogDraft(
     if (!aggregate) throw new Error("产品草稿不存在。");
     if (aggregate.state !== "PRODUCT_REVISION_REQUIRED") throw new Error("该产品当前不处于待修订状态。");
 
-    const draft = buildEvidenceBoundProductCatalogDraft(input, productId);
     assertTransition({
       eventId,
       entityType: "product",

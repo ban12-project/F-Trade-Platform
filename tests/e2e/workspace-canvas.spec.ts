@@ -1,14 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-test("empty project canvas has one creation entry and centers its dialog", async ({ page }) => {
+test("workspace shows real project nodes and centers the creation dialog", async ({ page }) => {
   await page.goto("/testing/workspace-canvas");
 
   const canvas = page.getByRole("main", { name: "项目总画布" });
   await expect(canvas).toBeVisible();
   await expect(page.getByText("从一张项目画布开始")).toHaveCount(0);
-  await expect(page.getByText("Synthetic project", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Synthetic project/ })).toBeVisible();
 
-  const createProject = page.getByRole("button", { name: "新建", exact: true });
+  const createProject = page.getByRole("button", { name: "新建项目", exact: true });
   await expect(createProject).toHaveCount(1);
   await createProject.click();
 
@@ -29,12 +29,13 @@ test("empty project canvas has one creation entry and centers its dialog", async
   await expect(dialog.getByText("无权访问项目工作区。", { exact: true })).toBeVisible();
 });
 
-test("desktop project switcher renders only a sheet overlay", async ({ page }) => {
+test("desktop project switcher is a nonmodal sheet without an overlay", async ({ page }) => {
   await page.goto("/testing/workspace-canvas");
   await page.getByRole("button", { name: "项目", exact: true }).click();
-  await expect(page.locator('[data-slot="sheet-content"]')).toBeVisible();
-  await expect(page.getByText("Synthetic project", { exact: true })).toBeVisible();
-  await expect(page.locator('[data-slot="sheet-overlay"]')).toBeVisible();
+  const sheet = page.locator('[data-slot="sheet-content"]');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText("Synthetic project", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCount(0);
   await expect(page.locator('[data-slot="drawer-overlay"]')).toHaveCount(0);
 });
 
@@ -49,7 +50,7 @@ test("mobile project switcher renders only a drawer overlay", async ({ page }) =
 
 test("desktop workspace settings open in a sheet and keep video generation out", async ({ page }) => {
   await page.goto("/testing/workspace-canvas");
-  await page.getByRole("button", { name: "工具", exact: true }).click();
+  await page.getByRole("button", { name: "账号与工具", exact: true }).click();
 
   const sheet = page.locator('[data-slot="sheet-content"]');
   await expect(sheet).toBeVisible();
@@ -72,7 +73,7 @@ test("desktop workspace settings open in a sheet and keep video generation out",
 test("mobile workspace settings open in a drawer", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/testing/workspace-canvas");
-  await page.getByRole("button", { name: "工具", exact: true }).click();
+  await page.getByRole("button", { name: "账号与工具", exact: true }).click();
 
   await expect(page.locator('[data-slot="drawer-popup"]')).toBeVisible();
   await expect(page.getByText("视频生成仍未启用")).toBeVisible();
@@ -81,7 +82,7 @@ test("mobile workspace settings open in a drawer", async ({ page }) => {
 
 test("cross-project tasks expose an exact project node deep link", async ({ page }) => {
   await page.goto("/testing/workspace-canvas");
-  await page.getByRole("button", { name: /待办/ }).click();
+  await page.getByRole("button", { name: "待办，1 项" }).click();
   const task = page.getByRole("button", { name: /Synthetic content review/ });
   await expect(task).toBeVisible();
   await expect(task).toHaveAttribute("data-target", "/workspace/00000000-0000-4000-8000-000000000197?panel=content&view=records&item=00000000-0000-4000-8000-000000000198");

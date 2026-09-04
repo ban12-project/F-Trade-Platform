@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { Controller, type UseFormReturn } from "react-hook-form";
 
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ProductCatalogDetail } from "@/lib/products";
+import type { EvidenceOption } from "@/lib/workspace/access";
 import { kitContentValues, type ProductCatalogForm } from "@/lib/product/catalog-form-schema";
 
 export type ProductValues = ProductCatalogForm;
 type EvidenceFieldName = Extract<keyof ProductValues, `${string}EvidenceRef`>;
+const EvidenceOptionsContext = createContext<EvidenceOption[]>([]);
 
 const productTypes = [
   ["clutch_disc", "离合器片"],
@@ -147,16 +149,14 @@ function EvidenceInput({
   disabled?: boolean;
 }) {
   const error = form.formState.errors[name];
+  const options = useContext(EvidenceOptionsContext);
   return <Field data-invalid={Boolean(error)}>
     <FieldLabel htmlFor={id}>{label}</FieldLabel>
-    <Input
-      id={id}
-      placeholder="evidence-product-001"
-      aria-invalid={Boolean(error)}
-      required={required}
-      disabled={disabled}
-      {...form.register(name)}
-    />
+    <Controller control={form.control} name={name} render={({ field }) => <Select value={field.value} onValueChange={(value) => field.onChange(value ?? "")} disabled={disabled || !options.length}>
+      <SelectTrigger id={id} className="min-h-11 w-full" aria-invalid={Boolean(error)} aria-required={required}><SelectValue>{options.find((option) => option.id === field.value) ? `${options.find((option) => option.id === field.value)!.sourceLabel} · ${field.value.slice(-8)}` : "选择已上传证据"}</SelectValue></SelectTrigger>
+      <SelectContent><SelectGroup>{options.map((option) => <SelectItem key={option.id} value={option.id}>{option.sourceLabel} · {option.classification} · {option.id.slice(-8)}</SelectItem>)}</SelectGroup></SelectContent>
+    </Select>} />
+    {!options.length ? <FieldDescription>先通过智能导入上传资料，系统持久化后才能选择。</FieldDescription> : null}
     <FieldError errors={[error]} />
   </Field>;
 }
@@ -165,10 +165,10 @@ function FactPair({ children }: { children: ReactNode }) {
   return <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">{children}</div>;
 }
 
-export function ProductFields({ form }: { form: UseFormReturn<ProductValues> }) {
+export function ProductFields({ form, evidenceOptions }: { form: UseFormReturn<ProductValues>; evidenceOptions: EvidenceOption[] }) {
   const productType = form.watch("productType");
   const kitDisabled = productType !== "clutch_kit";
-  return <FieldGroup>
+  return <EvidenceOptionsContext.Provider value={evidenceOptions}><FieldGroup>
     <FieldSet>
       <FieldLegend>核心产品身份</FieldLegend>
       <FieldDescription>每个事实必须绑定自己的私有证据；相同来源可以重复填写同一 evidence 引用，但系统不会自动复制。</FieldDescription>
@@ -359,5 +359,5 @@ export function ProductFields({ form }: { form: UseFormReturn<ProductValues> }) 
         <FieldError errors={[form.formState.errors.sourceRef]} />
       </Field>
     </FieldSet>
-  </FieldGroup>;
+  </FieldGroup></EvidenceOptionsContext.Provider>;
 }

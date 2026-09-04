@@ -21,7 +21,7 @@ const approved = applyHumanQuoteDecision(draft, {
   evidenceRef: "synthetic-quote-evidence-gate-02",
   decidedAt: "2026-08-24T12:00:00Z",
 });
-assert.equal(sendManualQuotation(approved, "human", "synthetic-sales-user", "2026-08-24T12:01:00Z").status, "sent");
+assert.equal(sendManualQuotation(approved, "human", "synthetic-sales-user", "2026-08-24T12:01:00Z", "synthetic-channel", "evidence-quote-send-001").status, "sent");
 assert.throws(
   () => createManualQuotation({
     handoffId: "synthetic-agent-handoff",
@@ -33,5 +33,5 @@ assert.throws(
   /human actor/,
 );
 assert.throws(() => applyHumanQuoteDecision(draft, { actorType: "agent", actorId: "agent", status: "approved", approvalRef: "a", evidenceRef: "e", decidedAt: "2026-08-24T12:00:00Z" }), /human actor/);
-assert.throws(() => sendManualQuotation(approved, "agent", "synthetic-agent", "2026-08-24T12:01:00Z"), /agent cannot send/);
+assert.throws(() => sendManualQuotation(approved, "agent", "synthetic-agent", "2026-08-24T12:01:00Z", "synthetic-channel", "evidence-quote-send-002"), /agent cannot send/);
 console.log("PASS Gate 02 quotation handoff");

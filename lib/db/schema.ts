@@ -78,6 +78,7 @@ export const videoReviewStage = pgEnum("video_review_stage", ["pre_generation", 
 export const videoReviewOutcome = pgEnum("video_review_outcome", ["accepted", "changes_requested", "skipped"]);
 export const workspaceProjectKind = pgEnum("workspace_project_kind", ["marketing", "sales"]);
 export const workspaceProjectStatus = pgEnum("workspace_project_status", ["active", "archived"]);
+export const workspaceProjectMemberRole = pgEnum("workspace_project_member_role", ["owner", "editor", "viewer"]);
 export const workspaceItemRelation = pgEnum("workspace_item_relation", ["owned", "reference"]);
 
 export const user = pgTable(
@@ -498,6 +499,40 @@ export const workspaceProject = pgTable(
   ],
 );
 
+/** Explicit authorization boundary for a user inside one workspace project. */
+export const workspaceProjectMember = pgTable(
+  "workspace_project_member",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    role: workspaceProjectMemberRole("role").notNull(),
+    createdById: text("created_by_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("workspace_project_member_project_user_uidx").on(table.projectId, table.userId),
+    index("workspace_project_member_user_idx").on(table.userId, table.projectId),
+  ],
+);
+
+/** Makes private evidence discoverable inside a project without exposing the global evidence catalog. */
+export const workspaceProjectEvidence = pgTable(
+  "workspace_project_evidence",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
+    evidenceId: text("evidence_id").notNull().references(() => evidence.id, { onDelete: "restrict" }),
+    linkedById: text("linked_by_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("workspace_project_evidence_project_evidence_uidx").on(table.projectId, table.evidenceId),
+    index("workspace_project_evidence_evidence_idx").on(table.evidenceId),
+  ],
+);
+
 /** Owns or references a governed aggregate from a project without duplicating facts. */
 export const workspaceProjectItem = pgTable(
   "workspace_project_item",
@@ -513,7 +548,7 @@ export const workspaceProjectItem = pgTable(
     uniqueIndex("workspace_project_item_project_aggregate_uidx").on(table.projectId, table.aggregateId),
     uniqueIndex("workspace_project_item_single_owner_uidx").on(table.aggregateId).where(sql`${table.relation} = 'owned'`),
     index("workspace_project_item_aggregate_idx").on(table.aggregateId),
-    check("workspace_project_item_role_allowed", sql`${table.role} in ('product_source', 'product_reference', 'marketing_content', 'marketing_video', 'sales_rfq')`),
+    check("workspace_project_item_role_allowed", sql`${table.role} in ('product_source', 'product_reference', 'marketing_content', 'marketing_video', 'sales_rfq', 'sales_quotation', 'sales_lead', 'delivery_confirmation')`),
     check("workspace_project_item_relation_matches_role", sql`(${table.role} = 'product_reference' and ${table.relation} = 'reference') or (${table.role} <> 'product_reference' and ${table.relation} = 'owned')`),
   ],
 );

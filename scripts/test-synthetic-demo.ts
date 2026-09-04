@@ -11,9 +11,10 @@ async function main() {
     rfq: "RFQ_READY",
     quotation: "QUOTE_SENT",
     lead: "OPPORTUNITY",
+    delivery: "DELIVERY_CONFIRMATION_CONFIRMED",
   });
-  assert.equal(report.transitionCount, 11);
-  assert.deepEqual(report.approvedGates, ["gate_01_truth", "gate_02_quote"]);
+  assert.equal(report.transitionCount, 12);
+  assert.deepEqual(report.approvedGates, ["gate_01_truth", "gate_02_quote", "gate_03_delivery"]);
   assert.deepEqual(report.inboundMessaging, {
     deliveryStatus: "accepted",
     duplicateStatus: "duplicate",

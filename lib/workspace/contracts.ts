@@ -2,14 +2,14 @@ import { z } from "zod";
 
 export const workspaceProjectKindSchema = z.enum(["marketing", "sales"]);
 export const workspaceProjectStatusSchema = z.enum(["active", "archived"]);
-export const workspaceNodeKindSchema = z.enum(["product", "content", "video", "rfq", "approval", "quotation", "delivery", "note"]);
+export const workspaceNodeKindSchema = z.enum(["product", "content", "video", "publication", "rfq", "approval", "quotation", "lead", "delivery", "note"]);
 export const workspaceEdgeKindSchema = z.enum(["depends_on", "derived_from", "requires_review", "relates_to"]);
 
 const nodeId = z.string().trim().min(1).max(160).regex(/^[a-z][a-z0-9_-]*$/i, "节点标识格式不正确。");
 const position = z.object({ x: z.number().finite().min(-100_000).max(100_000), y: z.number().finite().min(-100_000).max(100_000) }).strict();
 
 const workspaceCanvasDocumentInputSchema = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
   nodes: z.array(z.object({
     id: nodeId,
     kind: workspaceNodeKindSchema,
@@ -38,29 +38,62 @@ const workspaceCanvasDocumentInputSchema = z.object({
 
 export const workspaceCanvasDocumentSchema = workspaceCanvasDocumentInputSchema.transform((document) => ({
   ...document,
+  version: 2 as const,
   nodes: document.nodes.map(({ aggregateId: _aggregateId, aggregateType: _aggregateType, ...node }) => node),
 }));
 
 export type WorkspaceCanvasDocument = z.infer<typeof workspaceCanvasDocumentSchema>;
 
 export function createWorkspaceTemplate(kind: "marketing" | "sales"): WorkspaceCanvasDocument {
-  const labels = kind === "marketing"
-    ? [["product", "product", "产品资料"], ["content", "content", "营销内容"], ["video", "video", "营销视频"]] as const
-    : [["rfq", "rfq", "客户询盘"], ["product", "product", "产品引用"], ["quotation", "quotation", "报价交接"]] as const;
-  const nodes = labels.map(([id, kindName, label], index) => ({ id, kind: kindName, label, locked: true, position: { x: index * 260, y: index % 2 ? 140 : 40 } })) as WorkspaceCanvasDocument["nodes"];
-  return { version: 1, nodes, edges: nodes.slice(1).map((node, index) => ({ id: `edge-${index + 1}`, source: nodes[index]!.id, target: node.id, kind: "depends_on" })) };
+  if (kind === "marketing") return {
+    version: 2,
+    nodes: [
+      { id: "product", kind: "product", label: "产品事实", locked: true, position: { x: 40, y: 120 } },
+      { id: "content", kind: "content", label: "营销内容", locked: true, position: { x: 320, y: 40 } },
+      { id: "video", kind: "video", label: "营销视频", locked: true, position: { x: 320, y: 220 } },
+      { id: "publication", kind: "publication", label: "受控发布", locked: true, position: { x: 600, y: 120 } },
+    ],
+    edges: [
+      { id: "edge-product-content", source: "product", target: "content", kind: "derived_from" },
+      { id: "edge-product-video", source: "product", target: "video", kind: "derived_from" },
+      { id: "edge-content-publication", source: "content", target: "publication", kind: "requires_review" },
+      { id: "edge-video-publication", source: "video", target: "publication", kind: "requires_review" },
+    ],
+  };
+  return {
+    version: 2,
+    nodes: [
+      { id: "rfq", kind: "rfq", label: "客户询盘", locked: true, position: { x: 40, y: 40 } },
+      { id: "product", kind: "product", label: "产品引用", locked: true, position: { x: 40, y: 220 } },
+      { id: "quotation", kind: "quotation", label: "人工报价", locked: true, position: { x: 320, y: 130 } },
+      { id: "lead", kind: "lead", label: "跟进与商机", locked: true, position: { x: 600, y: 130 } },
+      { id: "delivery", kind: "delivery", label: "交期确认", locked: true, position: { x: 600, y: 310 } },
+    ],
+    edges: [
+      { id: "edge-rfq-quotation", source: "rfq", target: "quotation", kind: "depends_on" },
+      { id: "edge-product-quotation", source: "product", target: "quotation", kind: "depends_on" },
+      { id: "edge-quotation-lead", source: "quotation", target: "lead", kind: "depends_on" },
+      { id: "edge-lead-delivery", source: "lead", target: "delivery", kind: "relates_to" },
+      { id: "edge-delivery-lead", source: "delivery", target: "lead", kind: "relates_to" },
+    ],
+  };
 }
 
-export function normalizeLegacyWorkspaceTemplate(kind: "marketing" | "sales", document: WorkspaceCanvasDocument): WorkspaceCanvasDocument {
-  const expected = kind === "marketing"
-    ? [["product", "product"], ["approval", "approval"], ["content", "content"], ["video", "video"]] as const
-    : [["rfq", "rfq"], ["product", "product"], ["quotation", "quotation"], ["approval", "approval"]] as const;
-  const isLegacyTemplate = document.nodes.length === expected.length && expected.every(([id, nodeKind]) => document.nodes.some((node) => node.id === id && node.kind === nodeKind && node.locked));
-  if (!isLegacyTemplate) return document;
+type LegacyWorkspaceCanvasDocument = Omit<WorkspaceCanvasDocument, "version"> & { version: 1 | 2 };
+
+export function normalizeLegacyWorkspaceTemplate(kind: "marketing" | "sales", document: LegacyWorkspaceCanvasDocument): WorkspaceCanvasDocument {
   const current = createWorkspaceTemplate(kind);
+  const alreadyCurrent = document.nodes.length === current.nodes.length && current.nodes.every((expected) =>
+    document.nodes.some((node) => node.id === expected.id && node.kind === expected.kind),
+  );
+  if (alreadyCurrent) return workspaceCanvasDocumentSchema.parse(document);
+  const customNodes = document.nodes.filter((node) => node.kind === "note" && !current.nodes.some((expected) => expected.id === node.id));
   return {
     ...current,
-    nodes: current.nodes.map((node) => ({ ...node, position: document.nodes.find((legacyNode) => legacyNode.id === node.id)?.position ?? node.position })),
+    nodes: [
+      ...current.nodes.map((node) => ({ ...node, position: document.nodes.find((legacyNode) => legacyNode.id === node.id)?.position ?? node.position })),
+      ...customNodes,
+    ],
   };
 }
 

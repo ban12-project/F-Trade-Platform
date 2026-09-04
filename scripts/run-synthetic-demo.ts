@@ -4,6 +4,7 @@ import path from "node:path";
 import { compileContract } from "../lib/contracts/validator";
 import { decideContent } from "../lib/content/gate";
 import { publishThroughChannel } from "../lib/content/publication-policy";
+import { decideDeliveryConfirmation, requestDeliveryConfirmation } from "../lib/delivery/confirmation";
 import { acceptInboundChannelEvent, assessInboundDelivery, assessReplyWindow } from "../lib/social/inbound-policy";
 import {
   replayTransitions,
@@ -113,6 +114,7 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
   const rfqId = rfq.rfq_id;
   const quotationId = quotation.handoff_id;
   const leadId = "synthetic-lead-demo-001";
+  const deliveryConfirmationId = "synthetic-delivery-confirmation-001";
   const socialPolicy = {
     channelRef: "synthetic-facebook-channel",
     accountRef: "synthetic-factory-account",
@@ -155,6 +157,9 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
   const productApproval = approval("synthetic-approval-001", productId, "gate_01_truth", "approved", "synthetic-reviewer");
   const contentApproval = approval("synthetic-content-approval-001", contentId, "gate_01_truth", "approved", "synthetic-reviewer");
   const quoteApproval = approval("synthetic-quote-approval-001", quotationId, "gate_02_quote", "approved", "synthetic-sales-reviewer");
+  const deliveryApproval = approval("synthetic-delivery-approval-001", deliveryConfirmationId, "gate_03_delivery", "approved", "synthetic-delivery-reviewer");
+  const deliveryRequest = requestDeliveryConfirmation({ confirmationId: deliveryConfirmationId, relatedEntityType: "rfq", relatedEntityId: rfqId, requestedByType: "human", requestedById: "synthetic-sales-user", requestedAt: "2026-08-24T09:09:30Z" });
+  decideDeliveryConfirmation(deliveryRequest, { actorType: "human", actorId: "synthetic-delivery-reviewer", status: "confirmed", approvalRef: deliveryApproval.id, evidenceRef: deliveryApproval.evidenceRef, decidedAt: "2026-08-24T09:09:45Z", leadTimeDays: 21 });
   const approvedContent = decideContent(content, {
     actorType: "human",
     approved: true,
@@ -184,11 +189,14 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
   const quotationEvents = [
     { event: event("synthetic-quote-review-001", "quotation", quotationId, "QUOTE_DRAFT", "QUOTE_REVIEW_REQUIRED", "human", "synthetic-sales-user", "2026-08-24T09:06:00Z") },
     { event: event("synthetic-quote-approved-001", "quotation", quotationId, "QUOTE_REVIEW_REQUIRED", "QUOTE_APPROVED", "human", "synthetic-sales-reviewer", "2026-08-24T09:07:00Z", "gate_02_quote", quoteApproval.id), approval: quoteApproval },
-    { event: event("synthetic-quote-sent-001", "quotation", quotationId, "QUOTE_APPROVED", "QUOTE_SENT", "system", "synthetic-quotation-adapter", "2026-08-24T09:08:00Z") },
+    { event: event("synthetic-quote-sent-001", "quotation", quotationId, "QUOTE_APPROVED", "QUOTE_SENT", "human", "synthetic-sales-user", "2026-08-24T09:08:00Z") },
   ];
   const leadEvents = [
     { event: event("synthetic-lead-follow-up-001", "lead", leadId, "LEAD_RECEIVED", "FOLLOW_UP", "agent", "synthetic-follow-up-agent", "2026-08-24T09:09:00Z") },
-    { event: event("synthetic-lead-opportunity-001", "lead", leadId, "FOLLOW_UP", "OPPORTUNITY", "agent", "synthetic-follow-up-agent", "2026-08-24T09:10:00Z") },
+    { event: event("synthetic-lead-opportunity-001", "lead", leadId, "FOLLOW_UP", "OPPORTUNITY", "human", "synthetic-sales-user", "2026-08-24T09:10:00Z") },
+  ];
+  const deliveryEvents = [
+    { event: event("synthetic-delivery-confirmed-001", "delivery_confirmation", deliveryConfirmationId, "DELIVERY_CONFIRMATION_PENDING", "DELIVERY_CONFIRMATION_CONFIRMED", "human", "synthetic-delivery-reviewer", "2026-08-24T09:09:45Z", "gate_03_delivery", deliveryApproval.id), approval: deliveryApproval },
   ];
 
   const finalStates = {
@@ -197,15 +205,16 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     rfq: replayTransitions("rfq", rfqId, "RFQ_COLLECTING", rfqEvents),
     quotation: replayTransitions("quotation", quotationId, "QUOTE_DRAFT", quotationEvents),
     lead: replayTransitions("lead", leadId, "LEAD_RECEIVED", leadEvents),
+    delivery: replayTransitions("delivery_confirmation", deliveryConfirmationId, "DELIVERY_CONFIRMATION_PENDING", deliveryEvents),
   };
-  const transitionCount = [productEvents, contentEvents, rfqEvents, quotationEvents, leadEvents]
+  const transitionCount = [productEvents, contentEvents, rfqEvents, quotationEvents, leadEvents, deliveryEvents]
     .reduce((count, events) => count + events.length, 0);
 
   return {
     classification: "synthetic",
     finalStates,
     transitionCount,
-    approvedGates: ["gate_01_truth", "gate_02_quote"],
+    approvedGates: ["gate_01_truth", "gate_02_quote", "gate_03_delivery"],
     inboundMessaging: {
       deliveryStatus: inboundDelivery.status,
       duplicateStatus: duplicateDelivery.status,

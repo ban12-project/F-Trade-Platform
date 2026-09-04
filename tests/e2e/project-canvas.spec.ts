@@ -2,11 +2,11 @@ import { expect, test } from "@playwright/test";
 
 test("desktop node selection updates the inspector without a drawer overlay", async ({ page }) => {
   await page.goto("/testing/project-canvas");
-  await page.locator(".react-flow__node").first().click();
+  await page.getByRole("button", { name: "产品事实，打开流程面板" }).click();
 
   const inspector = page.getByRole("complementary");
   await expect(inspector).toBeVisible();
-  await expect(inspector.getByRole("heading", { name: "产品资料" })).toBeVisible();
+  await expect(inspector.getByRole("heading", { name: "产品事实" })).toBeVisible();
   await expect(inspector.getByText("导入、录入、审核和修订都在当前营销项目中完成。")).toBeVisible();
   await expect(inspector.getByRole("tab", { name: "智能导入" })).toBeVisible();
   await expect(page.locator('[data-slot="drawer-overlay"]')).toHaveCount(0);
@@ -32,15 +32,13 @@ test("Product Agent keeps saved models selectable for each import", async ({ pag
   const inspector = page.getByRole("complementary");
   const model = inspector.getByRole("combobox", { name: "模型", exact: true });
   await expect(model).toContainText("日常产品导入 · gpt-5-mini");
-  await model.focus();
-  await page.keyboard.press("Enter");
+  await model.press("Enter");
   await expect(model).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("option", { name: "日常产品导入 · gpt-5.6-terra" })).toBeVisible();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(model).toContainText("日常产品导入 · gpt-5.6-terra");
-  await model.focus();
-  await page.keyboard.press("Enter");
+  await model.press("Enter");
   await expect(model).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("option", { name: "复杂目录识别 · claude-sonnet-test" })).toBeVisible();
   await page.keyboard.press("ArrowDown");
@@ -50,7 +48,7 @@ test("Product Agent keeps saved models selectable for each import", async ({ pag
 
 test("marketing content work stays in the canvas panel", async ({ page }) => {
   await page.goto("/testing/project-canvas");
-  await page.getByText("营销内容", { exact: true }).click();
+  await page.getByRole("button", { name: "营销内容，打开流程面板" }).click();
 
   await expect(page).toHaveURL(/panel=content/);
   const inspector = page.getByRole("complementary");
@@ -66,7 +64,10 @@ test("product Gate 01 review stays inside the product panel", async ({ page }) =
   const inspector = page.getByRole("complementary");
   await expect(inspector.getByText("产品事实与证据")).toBeVisible();
   await expect(inspector.getByText("Gate 01 决定")).toBeVisible();
-  await expect(inspector.getByRole("button", { name: "提交人工决定" })).toBeVisible();
+  const decision = inspector.getByRole("button", { name: "请先选择决定" });
+  await expect(decision).toBeVisible();
+  await expect(decision).toBeDisabled();
+  await expect(inspector.getByText("请选择审核决定")).toBeVisible();
 });
 
 test("rejected content exposes revision in the same content panel", async ({ page }) => {
@@ -78,19 +79,21 @@ test("rejected content exposes revision in the same content panel", async ({ pag
   await expect(page.locator(".react-flow__node").filter({ hasText: "审核" })).toHaveCount(0);
 });
 
-test("sales canvas classifies RFQ, product references and quotation handoff", async ({ page }) => {
+test("sales canvas exposes the complete human-controlled flow", async ({ page }) => {
   await page.goto("/testing/project-canvas?kind=sales");
-  await page.getByText("客户询盘", { exact: true }).click();
+  await page.getByRole("button", { name: "客户询盘，打开流程面板" }).click();
   await expect(page.getByRole("complementary").getByText("录入询盘", { exact: true })).toBeVisible();
 
-  await page.getByText("产品引用", { exact: true }).click();
+  await page.getByRole("button", { name: "产品引用，打开流程面板" }).click();
   await expect(page).toHaveURL(/panel=product/);
   await expect(page.getByRole("complementary").getByText("添加产品引用", { exact: true })).toBeVisible();
 
-  await page.getByText("报价交接", { exact: true }).click();
+  await page.getByRole("button", { name: "人工报价，打开流程面板" }).click();
   await expect(page).toHaveURL(/panel=quotation/);
-  await expect(page.getByRole("complementary").getByText("没有自动报价")).toBeVisible();
-  await expect(page.getByRole("button", { name: /创建报价|发送报价|自动报价/ })).toHaveCount(0);
+  await expect(page.getByRole("complementary").getByText("创建人工报价", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /自动报价/ })).toHaveCount(0);
+  await expect(page.getByText("跟进与商机", { exact: true })).toBeVisible();
+  await expect(page.getByText("交期确认", { exact: true })).toBeVisible();
 });
 
 test("desktop control panel is viewport-bound and scrolls internally", async ({ page }) => {
@@ -107,11 +110,45 @@ test("desktop control panel is viewport-bound and scrolls internally", async ({ 
 test("mobile node selection opens the drawer overlay", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/testing/project-canvas");
-  await page.locator(".react-flow__node").first().click();
+  await page.getByRole("button", { name: "产品事实，打开流程面板" }).click();
 
   await expect(page.locator('[data-slot="drawer-popup"]')).toBeVisible();
   await expect(page.locator('[data-slot="drawer-overlay"]')).toBeVisible();
   await expect(page.getByRole("complementary")).toHaveCount(0);
+  for (const target of await page.locator(".react-flow__node button, .react-flow__controls-button, nav[aria-label='画布操作坞'] button").all()) {
+    const box = await target.boundingBox();
+    if (box) expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+});
+
+test("keyboard opens and closes a node panel and restores focus", async ({ page }) => {
+  await page.goto("/testing/project-canvas");
+  const node = page.getByRole("button", { name: "产品事实，打开流程面板" });
+  await node.focus();
+  await page.keyboard.press("Enter");
+  const inspector = page.getByRole("complementary");
+  await expect(inspector.getByRole("heading", { name: "产品事实" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(inspector).toHaveCount(0);
+  await expect(node).toBeFocused();
+});
+
+test("arrange mode enables precise keyboard movement and cancel", async ({ page }) => {
+  await page.goto("/testing/project-canvas");
+  await expect(page.locator(".react-flow")).toHaveClass(/opacity-100/);
+  const node = page.getByRole("button", { name: "产品事实，打开流程面板" });
+  const before = await node.boundingBox();
+  await page.getByRole("button", { name: "整理画布" }).click();
+  await node.focus();
+  await page.keyboard.press("ArrowRight");
+  const moved = await node.boundingBox();
+  expect(Math.round(moved!.x - before!.x)).toBe(8);
+  await page.keyboard.press("Shift+ArrowLeft");
+  const precise = await node.boundingBox();
+  expect(Math.round(precise!.x - before!.x)).toBe(7);
+  await page.getByRole("button", { name: "取消" }).click();
+  const restored = await node.boundingBox();
+  expect(Math.round(restored!.x - before!.x)).toBe(0);
 });
 
 test("marketing video node opens the viewport-bound editor and reflects URL state", async ({ page }) => {
@@ -157,11 +194,13 @@ test("marketing video editor keeps factual caption values server-controlled", as
 test("switching nodes protects an unsaved video draft", async ({ page }) => {
   await page.goto("/testing/project-canvas?panel=video");
   await page.getByLabel("成片时长（秒）").first().fill("6");
-  page.once("dialog", async (dialog) => { expect(dialog.message()).toContain("未保存"); await dialog.dismiss(); });
   await page.getByText("营销内容", { exact: true }).click();
+  const alert = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await expect(alert).toBeVisible();
+  await alert.getByRole("button", { name: "继续编辑" }).click();
   await expect(page).toHaveURL(/panel=video/);
-  page.once("dialog", async (dialog) => dialog.accept());
   await page.getByText("营销内容", { exact: true }).click();
+  await alert.getByRole("button", { name: "放弃修改并离开" }).click();
   await expect(page).toHaveURL(/panel=content/);
 });
 
