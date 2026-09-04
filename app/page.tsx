@@ -29,7 +29,7 @@ export default function HomePage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <LinkButton href="/auth" size="lg">进入工作台 <ArrowRightIcon data-icon="inline-end" /></LinkButton>
-              <LinkButton href="/workspace" size="lg" variant="outline">打开项目画布</LinkButton>
+              <LinkButton href="/workspace" size="lg" variant="outline">查看工作台</LinkButton>
             </div>
             <p className="text-xs leading-5 text-muted-foreground">仅受邀用户可访问 · 不生成正式报价、交期或未经确认的工程事实</p>
           </div>
