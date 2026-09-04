@@ -23,7 +23,8 @@ export function WorkspaceLink({ href, onFollow, ...props }: Props) {
         event.preventDefault();
         requestNavigation(() => {
           onFollow?.();
-          router.push(href);
+          if (props.replace) router.replace(href, { scroll: props.scroll });
+          else router.push(href, { scroll: props.scroll });
         });
       }}
     />

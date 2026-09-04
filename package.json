@@ -153,6 +153,7 @@
     "@types/react-dom": "19.2.4",
     "drizzle-kit": "0.31.10",
     "postcss": "^8.5.26",
+    "server-only": "0.0.1",
     "tailwindcss": "^4.3.3",
     "tsx": "4.23.12",
     "typescript": "7.0.2"

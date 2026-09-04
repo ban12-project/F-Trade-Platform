@@ -146,7 +146,7 @@ export function InboundRoutingList({
   );
   if (!items.length) return null;
   return (
-    <div role="region" className="mb-4 space-y-3" aria-label="待分流入站消息">
+    <section className="mb-4 space-y-3" aria-label="待分流入站消息">
       {items.map((item) => (
         <div key={item.id} className="rounded-xl border bg-muted/30 p-4">
           <div className="flex items-start gap-3">
@@ -172,6 +172,6 @@ export function InboundRoutingList({
           </div>
         </div>
       ))}
-    </div>
+    </section>
   );
 }

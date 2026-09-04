@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -135,8 +136,10 @@ export function useWorkspaceDirtyState() {
 
 export function useWorkspaceDirty(key: string, dirty: boolean) {
   const { setDirty } = useWorkspaceDirtyState();
+  const instanceId = useId();
   useEffect(() => {
-    setDirty(key, dirty);
-    return () => setDirty(key, false);
-  }, [dirty, key, setDirty]);
+    const registration = `${key}:${instanceId}`;
+    setDirty(registration, dirty);
+    return () => setDirty(registration, false);
+  }, [dirty, instanceId, key, setDirty]);
 }

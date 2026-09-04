@@ -27,14 +27,13 @@ async function VideoContent({
     searchParams,
     requirePermission("workspace:view"),
   ]);
-  const projectPromise = getWorkspaceProject(projectId, session.user.id);
-  const [project, products, entries, copyCandidates] = await Promise.all([
-    projectPromise,
+  const project = await getWorkspaceProject(projectId, session.user.id);
+  if (!project || project.kind !== "marketing") notFound();
+  const [products, entries, copyCandidates] = await Promise.all([
     listReadyVideoProductSourcesWithMedia(projectId),
     listProjectMarketingVideoEntries(projectId),
     listCrossProjectMarketingVideoCandidates(projectId, session.user.id),
   ]);
-  if (!project || project.kind !== "marketing") notFound();
   return (
     <VideoWorkspace
       projectId={project.id}

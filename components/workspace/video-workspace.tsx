@@ -49,7 +49,7 @@ function VideoWorkspaceInner({
     requestNavigation(() => router.push(`/workspace/${projectId}?panel=video`));
   }
   return (
-    <main id="main-content" className="min-h-screen bg-muted/30">
+    <main id="main-content" className="min-h-screen bg-muted/30 pb-24">
       <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">

@@ -29,6 +29,7 @@ class Query implements PromiseLike<Row[]> {
   limit(_count: number) {
     return this;
   }
+  // biome-ignore lint/suspicious/noThenProperty: This deliberately models Drizzle's lazy thenable query execution.
   then<A = Row[], B = never>(
     resolve?: ((rows: Row[]) => A | PromiseLike<A>) | null,
     reject?: ((reason: unknown) => B | PromiseLike<B>) | null,

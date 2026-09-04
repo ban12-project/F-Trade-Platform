@@ -79,6 +79,7 @@ export async function upsertWorkspaceProjectMemberAction(
       return { status: "error", message: parsed.error.issues[0]?.message ?? "成员资料无效。" };
     await upsertWorkspaceProjectMember(parsed.data, session.user.id);
     revalidatePath(`/workspace/${parsed.data.projectId}`);
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "项目成员角色已保存。", projectId: parsed.data.projectId };
   } catch (error) {
     return {
@@ -99,6 +100,7 @@ export async function removeWorkspaceProjectMemberAction(
       return { status: "error", message: parsed.error.issues[0]?.message ?? "成员资料无效。" };
     await removeWorkspaceProjectMember(parsed.data, session.user.id);
     revalidatePath(`/workspace/${parsed.data.projectId}`);
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "项目成员已移除。", projectId: parsed.data.projectId };
   } catch (error) {
     return {

@@ -86,6 +86,7 @@ async function finishVideoCreation(
 ): Promise<MarketingVideoActionState> {
   await startVideoJob("ai_draft", result.id, actorId);
   revalidatePath(`/workspace/${projectId}`);
+  revalidatePath("/workspace", "layout");
   return { status: "success", message, videoId: result.id };
 }
 
@@ -104,6 +105,7 @@ export async function copyMarketingVideoDraftAction(
       session.user.id,
     );
     revalidatePath(`/workspace/${projectId}`);
+    revalidatePath("/workspace", "layout");
     return {
       status: "success",
       message: "已复制为当前项目的独立剪辑稿；预览和审核状态不会共享。",
@@ -287,6 +289,7 @@ export async function generateMarketingVideoAiDraftAction(
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await startVideoJob("ai_draft", videoId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "AI 初稿已进入后台队列，完成后会自动刷新。", videoId };
   } catch (error) {
     return {
@@ -306,6 +309,7 @@ export async function saveMarketingVideoDraftAction(
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await updateMarketingVideoEditDraft(videoId, draft, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "剪辑稿已保存。", videoId };
   } catch (error) {
     return {
@@ -326,6 +330,7 @@ export async function renderMarketingVideoDraftAction(
     await updateMarketingVideoEditDraft(videoId, draft, session.user.id);
     await startVideoJob("render", videoId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "私有预览已进入后台合成队列。", videoId };
   } catch (error) {
     return {
@@ -349,6 +354,7 @@ export async function reviewMarketingVideoAction(
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await decideGuardedVideoReview({ videoId, decision, evidenceRef, notes }, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
+    revalidatePath("/workspace", "layout");
     return {
       status: "success",
       message: decision === "approved" ? "成片已通过人工审核；不会自动发布。" : "成片已退回修改。",
