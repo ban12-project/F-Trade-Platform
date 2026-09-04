@@ -24,7 +24,7 @@ test("workspace shows real project nodes and centers the creation dialog", async
   expect(Math.abs((box!.y + box!.height / 2) - viewport!.height / 2)).toBeLessThanOrEqual(2);
 
   await dialog.getByLabel("项目名称").fill("Synthetic canvas project");
-  await dialog.getByRole("button", { name: "创建并打开画布" }).click();
+  await dialog.getByRole("button", { name: "创建并进入项目" }).click();
   await expect(page.getByText(/useActionState.*transition/)).toHaveCount(0);
   await expect(dialog.getByText("无权访问项目工作区。", { exact: true })).toBeVisible();
 });
@@ -35,6 +35,7 @@ test("desktop project switcher is a nonmodal sheet without an overlay", async ({
   const sheet = page.locator('[data-slot="sheet-content"]');
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText("Synthetic project", { exact: true })).toBeVisible();
+  await expect(sheet.getByText("工作台", { exact: true })).toBeVisible();
   await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCount(0);
   await expect(page.locator('[data-slot="drawer-overlay"]')).toHaveCount(0);
 });
@@ -80,10 +81,10 @@ test("mobile workspace settings open in a drawer", async ({ page }) => {
   await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCount(0);
 });
 
-test("cross-project tasks expose an exact project node deep link", async ({ page }) => {
+test("cross-project tasks expose an exact project-step deep link", async ({ page }) => {
   await page.goto("/testing/workspace-canvas");
   await page.getByRole("button", { name: "待办，1 项" }).click();
   const task = page.getByRole("button", { name: /Synthetic content review/ });
   await expect(task).toBeVisible();
-  await expect(task).toHaveAttribute("data-target", "/workspace/00000000-0000-4000-8000-000000000197?panel=content&view=records&item=00000000-0000-4000-8000-000000000198");
+  await expect(task).toHaveAttribute("data-target", "/workspace/00000000-0000-4000-8000-000000000197?panel=content&item=00000000-0000-4000-8000-000000000198");
 });
