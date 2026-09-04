@@ -12,7 +12,7 @@ jobs:
   snapshot:
     if: github.ref == 'refs/heads/fix/263-workspace-navigation-biome'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
@@ -22,37 +22,35 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - uses: pnpm/action-setup@v5
-      - name: Install and pin Biome v2
-        run: pnpm add --save-dev --save-exact @biomejs/biome@2
-      - name: Configure Biome following Next.js with-biome
-        run: |
-          node --input-type=module <<'NODE'
-          import {readFileSync, writeFileSync} from 'node:fs';
-          const p = JSON.parse(readFileSync('package.json', 'utf8'));
-          Object.assign(p.scripts, {lint: 'biome lint .', check: 'biome check .', 'check:ci': 'biome ci .', format: 'biome format --write .', 'lint:fix': 'biome check --write .'});
-          writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
-          const version = p.devDependencies['@biomejs/biome'];
-          writeFileSync('biome.json', JSON.stringify({$schema: `https://biomejs.dev/schemas/${version}/schema.json`, vcs: {enabled: true, clientKind: 'git', useIgnoreFile: true}, files: {ignoreUnknown: true, includes: ['**', '!**/.next', '!**/.remotion', '!**/node_modules', '!**/playwright-report', '!**/blob-report', '!**/test-results', '!pnpm-lock.yaml']}, formatter: {indentStyle: 'space', indentWidth: 2, lineWidth: 100}, linter: {domains: {next: 'recommended', react: 'recommended'}}, css: {parser: {tailwindDirectives: true}}}, null, 2) + '\n');
-          NODE
-      - name: Apply safe formatting and lint fixes
+      - run: pnpm install --frozen-lockfile
+      - name: Apply navigation refactor and safe formatting
         run: |
           mkdir -p /tmp/navigation-audit
-          pnpm exec biome check --write --max-diagnostics=1000 . > /tmp/navigation-audit/biome.log 2>&1 || echo 'Remaining diagnostics recorded for review'
+          if test -f scripts/apply-navigation-migration.py; then
+            python3 scripts/apply-navigation-migration.py > /tmp/navigation-audit/migration.log 2>&1
+            rm scripts/apply-navigation-migration.py
+          fi
+          pnpm exec biome check --write --max-diagnostics=1000 . > /tmp/navigation-audit/biome.log 2>&1 || echo 'Diagnostics captured for review'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- . ':!.github/workflows'
           if ! git diff --cached --quiet; then
-            git commit -m 'style: apply Biome migration for #263 [skip ci]'
+            git commit -m 'fix: persist workspace navigation shell and isolate stage reads (#263) [skip ci]'
             git push origin HEAD:fix/263-workspace-navigation-biome
           fi
           git archive --format=tar.gz --output=/tmp/navigation-audit/source.tar.gz HEAD
-          cp -R node_modules/next/dist/docs /tmp/navigation-audit/next-docs
-      - name: Capture typecheck baseline
-        run: pnpm typecheck > /tmp/navigation-audit/typecheck.log 2>&1 || echo 'Typecheck diagnostics recorded for review'
+      - name: Capture typecheck and navigation regression results
+        run: |
+          pnpm typecheck > /tmp/navigation-audit/typecheck.log 2>&1 || echo 'Typecheck failed; see artifact'
+          pnpm test:workspace-navigation > /tmp/navigation-audit/navigation-unit.log 2>&1 || echo 'Unit tests failed; see artifact'
+          pnpm test:workspace >> /tmp/navigation-audit/navigation-unit.log 2>&1 || echo 'Workspace tests failed; see artifact'
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Validate navigation with a production build
+        run: pnpm exec playwright test tests/e2e/workspace-navigation.spec.ts tests/e2e/workspace-dashboard.spec.ts > /tmp/navigation-audit/e2e.log 2>&1 || echo 'Browser tests failed; see artifact'
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: navigation-audit-migration
+          name: navigation-audit-refactor
           path: /tmp/navigation-audit/
           retention-days: 1
           if-no-files-found: error
