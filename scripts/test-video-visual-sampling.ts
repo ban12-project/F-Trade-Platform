@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { extractMarketingVisualSamples } from "../lib/video/visual-sampling";
+import { maximumMarketingSourceDurationSeconds, maximumMarketingVisualCandidates, videoShotCandidateStarts } from "../lib/video/shot-candidates";
 
 const execFileAsync = promisify(execFile);
 
@@ -31,6 +32,13 @@ void (async () => {
       { id: "shot-001-003", trimStartMs: 4_000, maximumDurationMs: 1_000 },
     ]);
     assert.ok(sampling.visualSamples.every((sample, index) => sample.label.includes(sampling.candidates[index]!.id)));
+    const longFormStarts = videoShotCandidateStarts(661_361, maximumMarketingVisualCandidates);
+    assert.equal(longFormStarts.length, 12);
+    assert.equal(new Set(longFormStarts).size, longFormStarts.length);
+    assert.ok(longFormStarts.every((start) => start >= 0 && start <= 660_361));
+    assert.ok(longFormStarts.some((start) => start >= 540_000 && start <= 570_000));
+    assert.throws(() => videoShotCandidateStarts(5_000, maximumMarketingVisualCandidates + 1), /候选镜头数量/);
+    assert.throws(() => videoShotCandidateStarts(maximumMarketingSourceDurationSeconds * 1_000 + 1), /不能超过 900 秒/);
     console.log("PASS AI edit assistant receives bounded representative frames, not generated media");
   } finally { await rm(directory, { recursive: true, force: true }); }
 })();

@@ -18,10 +18,23 @@ export const marketingShotCandidateSchema = z.object({
 
 export type MarketingShotCandidate = z.infer<typeof marketingShotCandidateSchema>;
 
-export function videoShotCandidateStarts(durationMs: number) {
+export const maximumMarketingVisualCandidates = 12;
+export const maximumMarketingSourceDurationSeconds = 15 * 60;
+
+export function videoShotCandidateStarts(durationMs: number, maximumCandidates = 3) {
   if (!Number.isInteger(durationMs) || durationMs < 1_000) throw new Error("源视频不足 1 秒，不能生成候选镜头。");
+  if (durationMs > maximumMarketingSourceDurationSeconds * 1_000) {
+    throw new Error(`源视频不能超过 ${maximumMarketingSourceDurationSeconds} 秒。`);
+  }
+  if (!Number.isInteger(maximumCandidates) || maximumCandidates < 1 || maximumCandidates > maximumMarketingVisualCandidates) {
+    throw new Error(`候选镜头数量必须介于 1 和 ${maximumMarketingVisualCandidates} 之间。`);
+  }
   const latestStartMs = durationMs - 1_000;
-  return [...new Set([0.2, 0.5, 0.8].map((position) => Math.min(Math.round(durationMs * position), latestStartMs)))];
+  const desiredCandidates = Math.min(maximumCandidates, Math.max(3, Math.ceil(durationMs / 60_000)));
+  const positions = desiredCandidates === 3
+    ? [0.2, 0.5, 0.8]
+    : Array.from({ length: desiredCandidates }, (_, index) => (index + 1) / (desiredCandidates + 1));
+  return [...new Set(positions.map((position) => Math.min(Math.round(durationMs * position), latestStartMs)))];
 }
 
 export function createMarketingShotCandidate(input: {

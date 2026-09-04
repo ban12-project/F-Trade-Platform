@@ -2,13 +2,13 @@ import { Sandbox } from "@vercel/sandbox";
 
 import type { VideoProject } from "./contracts";
 import type { MarketingVisualSample } from "./visual-sampling";
-import { createMarketingShotCandidate, videoShotCandidateStarts, type MarketingShotCandidate } from "./shot-candidates";
+import { createMarketingShotCandidate, maximumMarketingSourceDurationSeconds, maximumMarketingVisualCandidates, videoShotCandidateStarts, type MarketingShotCandidate } from "./shot-candidates";
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
 import { parseFfprobeOutput } from "./media-probe";
 
 type SignedSources = ReadonlyMap<string, SandboxVideoSource>;
-export const maximumMarketingSourceDurationSeconds = 120;
+export { maximumMarketingSourceDurationSeconds } from "./shot-candidates";
 
 function sandboxImage() {
   const image = process.env.VIDEO_SANDBOX_IMAGE?.trim();
@@ -74,7 +74,9 @@ export async function extractMarketingVisualSamplesInSandbox(sourceAssets: Video
     const remote = await downloadSources(sandbox, sourceAssets.map((asset) => asset.assetRef), sources);
     const samples: MarketingVisualSample[] = [];
     const candidates: MarketingShotCandidate[] = [];
-    for (const [sourceIndex, source] of sourceAssets.slice(0, 3).entries()) {
+    const boundedSources = sourceAssets.slice(0, 3);
+    const candidatesPerSource = Math.max(1, Math.floor(maximumMarketingVisualCandidates / Math.max(1, boundedSources.length)));
+    for (const [sourceIndex, source] of boundedSources.entries()) {
       const input = remote.get(source.assetRef)!;
       if (source.mediaType === "image") {
         const candidate = createMarketingShotCandidate({ sourceIndex, candidateIndex: 0, assetRef: source.assetRef, mediaType: "image", trimStartMs: 0 });
@@ -87,7 +89,7 @@ export async function extractMarketingVisualSamplesInSandbox(sourceAssets: Video
       if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取上传视频的时长。");
       if (duration > maximumMarketingSourceDurationSeconds) throw new Error(`源视频不能超过 ${maximumMarketingSourceDurationSeconds} 秒。`);
       const durationMs = Math.round(duration * 1_000);
-      for (const [frameIndex, trimStartMs] of videoShotCandidateStarts(durationMs).entries()) {
+      for (const [frameIndex, trimStartMs] of videoShotCandidateStarts(durationMs, candidatesPerSource).entries()) {
         const timestamp = trimStartMs / 1_000;
         const output = `/vercel/sandbox/work/sample-${sourceIndex}-${frameIndex}.jpg`;
         await command(sandbox, "ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(timestamp), "-i", input, "-frames:v", "1", "-vf", "scale=640:-2", output]);
