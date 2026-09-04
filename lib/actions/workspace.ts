@@ -1,3 +1,4 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -6,11 +7,11 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
-import { createWorkspaceProjectSchema, saveWorkspaceCanvasSchema, type WorkspaceCanvasDocument } from "@/lib/workspace/contracts";
-import { WorkspaceCanvasRevisionConflictError, createWorkspaceProject, getWorkspaceProject, linkReadyProductToSalesProject, saveWorkspaceCanvas } from "@/lib/workspace/store";
+import { createWorkspaceProjectSchema } from "@/lib/workspace/contracts";
+import { createWorkspaceProject, linkReadyProductToSalesProject } from "@/lib/workspace/store";
 import { removeWorkspaceProjectMember, upsertWorkspaceProjectMember, workspaceMemberFormSchema, workspaceMemberRemovalSchema } from "@/lib/workspace/access";
 
-export type WorkspaceActionState = { status: "idle" | "success" | "error" | "conflict"; message: string; projectId?: string; revision?: number; document?: WorkspaceCanvasDocument };
+export type WorkspaceActionState = { status: "idle" | "success" | "error"; message: string; projectId?: string };
 
 async function requireWorkspaceUser() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -25,29 +26,8 @@ export async function createWorkspaceProjectAction(_previous: WorkspaceActionSta
     if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "项目资料无效。" };
     const project = await createWorkspaceProject(parsed.data, session.user.id);
     revalidatePath("/workspace");
-    return { status: "success", message: "项目已创建。", projectId: project.id, revision: project.revision };
+    return { status: "success", message: "项目已创建。", projectId: project.id };
   } catch (error) { return { status: "error", message: error instanceof Error ? error.message : "无法创建项目。" }; }
-}
-
-export async function saveWorkspaceCanvasAction(projectId: string, input: { expectedRevision: number; document: WorkspaceCanvasDocument }): Promise<WorkspaceActionState> {
-  let actorId: string | undefined;
-  try {
-    const session = await requireWorkspaceUser();
-    actorId = session.user.id;
-    const parsed = saveWorkspaceCanvasSchema.safeParse(input);
-    if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "画布数据无效。" };
-    const project = await saveWorkspaceCanvas(projectId, parsed.data, session.user.id);
-    revalidatePath(`/workspace/${projectId}`);
-    return { status: "success", message: "项目画布已保存。", revision: project.revision };
-  } catch (error) {
-    if (error instanceof WorkspaceCanvasRevisionConflictError && actorId) {
-      const latest = await getWorkspaceProject(projectId, actorId);
-      return latest
-        ? { status: "conflict", message: error.message, revision: latest.revision, document: latest.document }
-        : { status: "error", message: "项目画布已不存在或无权访问。" };
-    }
-    return { status: "error", message: error instanceof Error ? error.message : "无法保存项目画布。" };
-  }
 }
 
 export async function linkReadyProductToSalesProjectAction(projectIdInput: string, productIdInput: string): Promise<WorkspaceActionState> {

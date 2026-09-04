@@ -176,6 +176,13 @@
       "when": 1788513179838,
       "tag": "0024_marvelous_misty_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788534453251,
+      "tag": "0025_remove_workspace_canvas",
+      "breakpoints": true
     }
   ]
 }

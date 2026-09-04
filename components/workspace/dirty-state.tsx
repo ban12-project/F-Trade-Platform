@@ -53,7 +53,7 @@ export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("popstate", popState);
   }, [dirty, requestNavigation]);
   const value = useMemo(() => ({ dirty, setDirty, requestNavigation }), [dirty, requestNavigation, setDirty]);
-  return <DirtyStateContext value={value}>{children}<AlertDialog open={confirmOpen} onOpenChange={(open) => { setConfirmOpen(open); if (!open) pendingAction.current = null; }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle><AlertDialogDescription>当前画布或面板还有未保存内容。继续后这些修改无法恢复。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>继续编辑</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={discardAndContinue}>放弃修改并离开</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></DirtyStateContext>;
+  return <DirtyStateContext value={value}>{children}<AlertDialog open={confirmOpen} onOpenChange={(open) => { setConfirmOpen(open); if (!open) pendingAction.current = null; }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle><AlertDialogDescription>当前页面还有未保存内容。继续后这些修改无法恢复。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>继续编辑</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={discardAndContinue}>放弃修改并离开</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></DirtyStateContext>;
 }
 
 export function useWorkspaceDirtyState() {

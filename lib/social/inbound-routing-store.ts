@@ -7,10 +7,9 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import leadSchema from "@/contracts/sales/lead.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
 import { getDatabase, type Database } from "@/lib/db/client";
-import { aggregateRecord, auditEvent, socialConversation, workspaceCanvasDocument, workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
+import { aggregateRecord, auditEvent, socialConversation, workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
 import { inboundRoutingFormSchema } from "@/lib/form-schemas";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
-import { createWorkspaceTemplate } from "@/lib/workspace/contracts";
 
 type InitialLead = {
   lead_id: string;
@@ -59,7 +58,6 @@ export async function routeInboundConversation(input: unknown, actorId: string, 
       const now = new Date();
       await tx.insert(workspaceProject).values({ id: projectId, title: `入站线索 ${shortReference(conversation.id)}`, kind: "sales", createdById: actorId });
       await tx.insert(workspaceProjectMember).values({ id: randomUUID(), projectId, userId: actorId, role: "owner", createdById: actorId });
-      await tx.insert(workspaceCanvasDocument).values({ id: randomUUID(), projectId, document: createWorkspaceTemplate("sales"), revision: 1 });
       await tx.insert(auditEvent).values({ id: randomUUID(), action: "workspace_project.created_from_inbound", actorType: "human", actorId, subjectType: "workspace_project", subjectId: projectId, metadata: { source: "inbound_routing" }, occurredAt: now });
     } else {
       await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);

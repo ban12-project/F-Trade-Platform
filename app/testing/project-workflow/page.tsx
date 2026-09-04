@@ -3,34 +3,30 @@ import { Suspense } from "react";
 
 import { ContentPanel } from "@/components/workspace/content-panel";
 import { DeliveryPanel, LeadPanel, PublicationPanel, QuotationPanel } from "@/components/workspace/closing-panels";
-import { ProjectCanvas } from "@/components/workspace/project-canvas";
+import { ProjectWorkspace, VideoStageEntry, type ProjectStage } from "@/components/workspace/project-workspace";
 import { ProductPanel } from "@/components/workspace/product-panel";
 import { ProductReferencePanel, RfqPanel } from "@/components/workspace/sales-panels";
 import type { ContentCatalogDetail } from "@/lib/content/store";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type { LeadEntry } from "@/lib/sales/closing-store";
-import type { WorkspaceProjectDetail, WorkspaceProjectSummary } from "@/lib/workspace/store";
-import { createWorkspaceTemplate } from "@/lib/workspace/contracts";
+import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
 
-const syntheticMarketingProject: WorkspaceProjectDetail = {
+const syntheticMarketingProject: WorkspaceProjectSummary = {
   id: "00000000-0000-4000-8000-000000000202",
   title: "Synthetic project canvas",
   kind: "marketing",
   status: "active",
   updatedAt: new Date("2026-09-01T00:00:00.000Z"),
-  revision: 1,
-  document: createWorkspaceTemplate("marketing"),
 };
 
-const syntheticSalesProject: WorkspaceProjectDetail = {
+const syntheticSalesProject: WorkspaceProjectSummary = {
   ...syntheticMarketingProject,
   id: "00000000-0000-4000-8000-000000000203",
   title: "Synthetic sales canvas",
   kind: "sales",
-  document: createWorkspaceTemplate("sales"),
 };
-const syntheticProjects: WorkspaceProjectSummary[] = [syntheticMarketingProject, syntheticSalesProject].map(({ document: _document, revision: _revision, ...project }) => project);
+const syntheticProjects: WorkspaceProjectSummary[] = [syntheticMarketingProject, syntheticSalesProject];
 const syntheticLead: LeadEntry = {
   id: "00000000-0000-4000-8000-000000000601",
   state: "FOLLOW_UP",
@@ -58,55 +54,51 @@ const syntheticContentDetail: ContentCatalogDetail = {
   content: { content_id: "00000000-0000-4000-8000-000000000303", product_id: syntheticProduct.id, content_type: "product", objective: "Generate qualified distributor inquiries", target_customer: "Overseas automotive parts distributors", platform: "pending-channel-decision", hook: "Ask about this verified clutch kit", body: "A concise, evidence-grounded product introduction.", product_facts: [{ field: "product.product_name", value: syntheticProduct.productName, evidence_ref: "evidence-product-001" }], call_to_action: "Contact our sales team", hashtags: ["#clutch"], visual_instruction: "Show only the supplied product image.", status: "revision_required" },
 };
 
-async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string; view?: string }> }) {
-  const { state, kind, view } = await searchParams;
-  const reviewState = state === "review";
-  const approvedState = state === "approved";
-  if (kind === "sales") return <ProjectCanvas readOnly={view === "flow"} project={syntheticSalesProject} projects={syntheticProjects} tasks={[]} panels={{
-    rfq: <RfqPanel projectId={syntheticSalesProject.id} entries={[]} />,
-    product: <ProductReferencePanel projectId={syntheticSalesProject.id} available={[syntheticProduct]} linked={[]} />,
-    quotation: <QuotationPanel projectId={syntheticSalesProject.id} rfqs={[]} products={[]} entries={[]} canReview />,
-    lead: <LeadPanel projectId={syntheticSalesProject.id} entries={[syntheticLead]} />,
-    delivery: <DeliveryPanel projectId={syntheticSalesProject.id} entries={[]} canReview />,
-  }} />;
+
+const marketingStages: ProjectStage[] = [
+  { id: "product", panelKind: "product", label: "产品资料", description: "导入资料，补全字段并完成产品事实核验。" },
+  { id: "content", panelKind: "content", label: "营销内容", description: "基于已核验产品事实生成、修改并审核营销内容。" },
+  { id: "video", panelKind: "video", label: "营销视频", description: "选择授权素材，在独立编辑器生成剪辑初稿、预览并提审。" },
+  { id: "publication", panelKind: "publication", label: "发布", description: "人工确认渠道、账户与载荷，提交后等待平台回执。" },
+];
+const salesStages: ProjectStage[] = [
+  { id: "inbound", panelKind: "lead", label: "客户线索", description: "查看已关联到当前项目的询盘、消息和跟进上下文。" },
+  { id: "rfq", panelKind: "rfq", label: "需求确认", description: "补齐产品身份、数量、目的地、证据与产品引用。" },
+  { id: "quotation", panelKind: "quotation", label: "报价", description: "人工录入价格与商业条款，并完成报价确认。" },
+  { id: "follow-up", panelKind: "lead", label: "跟进", description: "人工编辑并发送回复，安排下一次跟进。" },
+  { id: "delivery", panelKind: "delivery", label: "交期", description: "客户询问交期时发起并完成人工确认。" },
+  { id: "opportunity", panelKind: "lead", label: "商机", description: "达到条件后，仍由业务人员显式确认有效商机。" },
+];
+
+async function ProjectWorkflowFixture({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string; panel?: string }> }) {
+  const { state, kind, panel } = await searchParams;
+  if (kind === "sales") {
+    const panels = {
+      rfq: <div className="flex flex-col gap-6"><RfqPanel projectId={syntheticSalesProject.id} entries={[]} leads={[syntheticLead]} /><ProductReferencePanel projectId={syntheticSalesProject.id} available={[syntheticProduct]} linked={[]} /></div>,
+      quotation: <QuotationPanel projectId={syntheticSalesProject.id} rfqs={[]} products={[]} entries={[]} canReview />,
+      lead: <LeadPanel projectId={syntheticSalesProject.id} entries={[syntheticLead]} />,
+      delivery: <DeliveryPanel projectId={syntheticSalesProject.id} entries={[]} canReview />,
+      opportunity: <LeadPanel projectId={syntheticSalesProject.id} entries={[]} />,
+    };
+    const active = salesStages.some((stage) => stage.id === panel) ? panel! : panel === "lead" ? "follow-up" : "inbound";
+    const panelKind = salesStages.find((stage) => stage.id === active)!.panelKind;
+    const activePanel = active === "opportunity" ? panels.opportunity : panels[panelKind as keyof typeof panels];
+    return <ProjectWorkspace project={syntheticSalesProject} projects={syntheticProjects} tasks={[]} stages={salesStages} activeStage={active} panel={activePanel} basePath="/testing/project-workflow" />;
+  }
   const productDetail = state === "product-review" ? syntheticProductDetail : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
-  return <ProjectCanvas readOnly={view === "flow"} project={syntheticMarketingProject} projects={syntheticProjects} tasks={[]} panels={{
+  const panels = {
     product: <ProductPanel projectId={syntheticMarketingProject.id} entries={productDetail ? [productDetail] : []} detail={productDetail} canReview agentModelConfigs={syntheticAgentModels} />,
     content: <ContentPanel projectId={syntheticMarketingProject.id} products={[syntheticProduct]} entries={contentDetail ? [contentDetail] : []} copyCandidates={[]} detail={contentDetail} canReview />,
+    video: <VideoStageEntry projectId={syntheticMarketingProject.id} count={1} pendingReview={state === "review" ? 1 : 0} />,
     publication: <PublicationPanel projectId={syntheticMarketingProject.id} candidates={[]} channels={[]} publications={[]} />,
-  }} videoEditor={{
-    canReview: true,
-    copyCandidates: [],
-    products: [{ id: "00000000-0000-4000-8000-000000000301", productName: "Verified clutch kit", internalSku: "SYN-001", factOptions: [{ value: "product.product_name", label: "product.product_name" }] }],
-    entries: [{
-      id: "00000000-0000-4000-8000-000000000401",
-      state: approvedState ? "VIDEO_APPROVED" : reviewState ? "VIDEO_REVIEW_REQUIRED" : "VIDEO_DRAFT",
-      createdAt: new Date("2026-09-01T00:00:00.000Z"),
-      productId: "00000000-0000-4000-8000-000000000301",
-      productName: "Verified clutch kit",
-      objective: "Create a concise product inquiry video",
-      targetAudience: "Overseas distributors",
-      platforms: ["facebook"],
-      approvalStatus: approvedState ? "approved" : reviewState ? "pending" : null,
-      previewAssetRef: approvedState || reviewState ? "asset-rendered-preview-001" : null,
-      captionFactOptions: [
-        { field: "product.product_name", value: "Verified clutch kit" },
-        { field: "product.oe_numbers", value: "OE-SYN-001" },
-      ],
-      downloadAvailable: approvedState,
-      privateTestOnly: false,
-      processingJob: null,
-      draft: { version: 3, creativeFramework: "google_abcd", platform: "facebook", ctaText: "Contact us", clips: [
-        { clipId: "clip-001", assetRef: "evidence-video-001", mediaType: "video", trimStartMs: 0, durationMs: 5_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" }, abcdRoles: ["attention", "branding"], motionPreset: "punch_in" },
-        { clipId: "clip-002", assetRef: "evidence-image-002", mediaType: "image", trimStartMs: 0, durationMs: 3_000, fitMode: "contain", audioMode: "muted", caption: { kind: "none" }, abcdRoles: ["connection", "direction"], motionPreset: "cta_hold" },
-      ] },
-    }],
-  }} />;
+  };
+  const active = marketingStages.some((stage) => stage.id === panel) ? panel! : "product";
+  return <ProjectWorkspace project={syntheticMarketingProject} projects={syntheticProjects} tasks={[]} stages={marketingStages} activeStage={active} panel={panels[active as keyof typeof panels]} basePath="/testing/project-workflow" />;
 }
 
-/** Test-only fixture: production project canvas access remains permission protected. */
-export default function ProjectCanvasTestingPage({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string; view?: string }> }) {
+/** Test-only fixture: production project access remains permission protected. */
+export default function ProjectWorkflowTestingPage({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string; panel?: string }> }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
-  return <Suspense fallback={null}><ProjectCanvasFixture searchParams={searchParams} /></Suspense>;
+  return <Suspense fallback={null}><ProjectWorkflowFixture searchParams={searchParams} /></Suspense>;
 }

@@ -4,18 +4,13 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDatabase, type Database } from "@/lib/db/client";
-import { aggregateRecord, approval, auditEvent, socialPublication, workspaceCanvasDocument, workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
+import { aggregateRecord, approval, auditEvent, socialPublication, workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertWorkspaceProjectAccess } from "./access";
 
-import { createWorkspaceProjectSchema, createWorkspaceTemplate, normalizeLegacyWorkspaceTemplate, saveWorkspaceCanvasSchema, workspaceCanvasDocumentSchema, type WorkspaceCanvasDocument } from "./contracts";
-
-export class WorkspaceCanvasRevisionConflictError extends Error {
-  constructor() { super("项目画布已在另一处更新。请刷新后再保存，避免覆盖他人的修改。"); }
-}
+import { createWorkspaceProjectSchema } from "./contracts";
 
 export type WorkspaceProjectSummary = { id: string; title: string; kind: "marketing" | "sales"; status: "active" | "archived"; updatedAt: Date };
-export type WorkspaceProjectDetail = WorkspaceProjectSummary & { document: WorkspaceCanvasDocument; revision: number };
 export type WorkspaceProductReference = { id: string; productName: string; internalSku: string };
 export type WorkspaceTaskSummary = {
   id: string;
@@ -160,39 +155,23 @@ export async function listWorkspacePipeline(actorId: string, database: Database 
   });
 }
 
-export async function createWorkspaceProject(input: unknown, actorId: string, database: Database = getDatabase()): Promise<WorkspaceProjectDetail> {
+
+export async function createWorkspaceProject(input: unknown, actorId: string, database: Database = getDatabase()): Promise<WorkspaceProjectSummary> {
   const value = createWorkspaceProjectSchema.parse(input);
-  const id = randomUUID(); const document = createWorkspaceTemplate(value.kind); const now = new Date();
+  const id = randomUUID(); const now = new Date();
   await database.transaction(async (tx) => {
     await tx.insert(workspaceProject).values({ id, title: value.title, kind: value.kind, createdById: actorId });
     await tx.insert(workspaceProjectMember).values({ id: randomUUID(), projectId: id, userId: actorId, role: "owner", createdById: actorId });
-    await tx.insert(workspaceCanvasDocument).values({ id: randomUUID(), projectId: id, document, revision: 1 });
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "workspace_project.created", actorType: "human", actorId, subjectType: "workspace_project", subjectId: id, metadata: { kind: value.kind }, occurredAt: now });
   });
-  return { id, title: value.title, kind: value.kind, status: "active", updatedAt: now, document, revision: 1 };
+  return { id, title: value.title, kind: value.kind, status: "active", updatedAt: now };
 }
 
-export async function getWorkspaceProject(projectId: string, actorId: string, database: Database = getDatabase()): Promise<WorkspaceProjectDetail | null> {
+export async function getWorkspaceProject(projectId: string, actorId: string, database: Database = getDatabase()): Promise<WorkspaceProjectSummary | null> {
   await assertWorkspaceProjectAccess(projectId, actorId, "view", database);
-  const [row] = await database.select({ id: workspaceProject.id, title: workspaceProject.title, kind: workspaceProject.kind, status: workspaceProject.status, updatedAt: workspaceProject.updatedAt, document: workspaceCanvasDocument.document, revision: workspaceCanvasDocument.revision })
-    .from(workspaceProject).innerJoin(workspaceCanvasDocument, eq(workspaceCanvasDocument.projectId, workspaceProject.id)).where(eq(workspaceProject.id, projectId));
-  return row ? { ...row, document: normalizeLegacyWorkspaceTemplate(row.kind, workspaceCanvasDocumentSchema.parse(row.document)) } : null;
-}
-
-export async function saveWorkspaceCanvas(projectId: string, input: unknown, actorId: string, database: Database = getDatabase()): Promise<WorkspaceProjectDetail> {
-  const value = saveWorkspaceCanvasSchema.parse(input); const now = new Date();
-  return database.transaction(async (tx) => {
-    await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
-    const [project] = await tx.select({ id: workspaceProject.id, title: workspaceProject.title, kind: workspaceProject.kind, status: workspaceProject.status }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
-    if (!project) throw new Error("项目不存在。");
-    const [existing] = await tx.select({ revision: workspaceCanvasDocument.revision }).from(workspaceCanvasDocument).where(eq(workspaceCanvasDocument.projectId, projectId)).for("update");
-    if (!existing || existing.revision !== value.expectedRevision) throw new WorkspaceCanvasRevisionConflictError();
-    const revision = existing.revision + 1;
-    await tx.update(workspaceCanvasDocument).set({ document: value.document, revision, updatedAt: now }).where(eq(workspaceCanvasDocument.projectId, projectId));
-    await tx.update(workspaceProject).set({ updatedAt: now }).where(eq(workspaceProject.id, projectId));
-    await tx.insert(auditEvent).values({ id: randomUUID(), action: "workspace_canvas.saved", actorType: "human", actorId, subjectType: "workspace_project", subjectId: projectId, metadata: { revision, node_count: value.document.nodes.length }, occurredAt: now });
-    return { ...project, document: value.document, revision, updatedAt: now };
-  });
+  const [row] = await database.select({ id: workspaceProject.id, title: workspaceProject.title, kind: workspaceProject.kind, status: workspaceProject.status, updatedAt: workspaceProject.updatedAt })
+    .from(workspaceProject).where(eq(workspaceProject.id, projectId));
+  return row ?? null;
 }
 
 export async function listWorkspaceProjectAggregateIds(

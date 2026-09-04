@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 
-import { WorkspaceCanvasSkeleton } from "@/components/workspace/workspace-canvas-skeleton";
+import { WorkspaceLoadingSkeleton } from "@/components/workspace/workspace-loading-skeleton";
 import { WorkspaceDashboard } from "@/components/workspace/workspace-dashboard";
 import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-settings-panel";
 import { listStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
@@ -26,5 +26,5 @@ async function WorkspaceContent() {
 }
 
 export default function WorkspacePage() {
-  return <Suspense fallback={<WorkspaceCanvasSkeleton />}><WorkspaceContent /></Suspense>;
+  return <Suspense fallback={<WorkspaceLoadingSkeleton />}><WorkspaceContent /></Suspense>;
 }

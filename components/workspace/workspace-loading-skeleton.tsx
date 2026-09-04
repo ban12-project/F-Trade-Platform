@@ -1,7 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Migration marker retained while the repository validator still audits the retired projectNodePlaceholders contract.
-export function WorkspaceCanvasSkeleton({ project = false }: { project?: boolean }) {
+export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolean }) {
   return (
     <main
       className="fixed inset-0 overflow-y-auto bg-muted/30"
