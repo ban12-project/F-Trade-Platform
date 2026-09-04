@@ -1,15 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-test("global task view prioritizes tasks and pipeline", async ({ page }) => {
+test("workspace prioritizes tasks and pipeline without a canvas", async ({ page }) => {
   await page.goto("/testing/workspace-dashboard");
-  await expect(page.getByRole("heading", { name: "全局待办" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
+  await expect(page.getByText("先处理下一动作，再进入对应项目步骤。")).toBeVisible();
   await expect(page.getByRole("heading", { name: "我的待办" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "待审批" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "到期跟进" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "项目 / 线索 Pipeline" })).toBeVisible();
   await expect(page.getByText("来源营销项目：Synthetic launch")).toBeVisible();
   await expect(page.locator(".react-flow")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "项目画布" })).toHaveAttribute("href", "/workspace");
+  await expect(page.getByRole("link", { name: "项目画布" })).toHaveCount(0);
 });
 
 test("unassigned inbound offers explicit create and link decisions without customer identity", async ({ page }) => {
@@ -27,15 +28,16 @@ test("unassigned inbound offers explicit create and link decisions without custo
   await expect(page.getByRole("option", { name: "Synthetic distributor" })).toBeVisible();
 });
 
-test("project workspace exposes stages, records and a right detail region", async ({ page }) => {
+test("project workspace exposes guided steps, records and a right detail region", async ({ page }) => {
   await page.goto("/testing/project-workspace");
   await expect(page.getByRole("navigation", { name: "项目阶段" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /阶段 1 产品事实/ })).toHaveAttribute("aria-current", "step");
-  await expect(page.getByRole("heading", { name: "业务记录与下一动作" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /步骤 1 产品事实/ })).toHaveAttribute("aria-current", "step");
+  await expect(page.getByRole("heading", { name: "待处理事项" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "产品事实详情与审批" })).toBeVisible();
   await expect(page.locator(".react-flow")).toHaveCount(0);
-  await page.getByRole("link", { name: /阶段 2 内容/ }).click();
+  await page.getByRole("link", { name: /步骤 2 内容/ }).click();
   await expect(page).toHaveURL(/panel=content/);
+  await expect(page).not.toHaveURL(/view=records/);
   await expect(page.getByRole("complementary", { name: "内容详情与审批" })).toBeVisible();
   await page.getByRole("button", { name: "成员 2" }).click();
   await expect(page.getByText("成员关系独立于项目创建者", { exact: false })).toBeVisible();
