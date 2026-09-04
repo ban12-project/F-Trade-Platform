@@ -4,7 +4,7 @@ import { marketingVideoDraftSchema } from "../lib/video/edit-contracts";
 import { createRemotionCompositionProps } from "../lib/video/remotion-props";
 import { createMarketingEditTimeline } from "../lib/video/timeline";
 import type { VideoProject } from "../lib/video/contracts";
-import { compositionDurationInFrames } from "../remotion/abcd-types";
+import { compositionDurationInFrames, resolveAbcdBeatState } from "../remotion/abcd-types";
 
 const migrated = marketingVideoDraftSchema.parse({
   version: 2,
@@ -43,6 +43,9 @@ const props = createRemotionCompositionProps(
 assert.equal(props.clips[0]?.trimStartFrame, 60);
 assert.equal(props.clips[0]?.caption, "RYC302 Clutch Kit");
 assert.equal(compositionDurationInFrames(props), 240);
+assert.deepEqual(resolveAbcdBeatState(props.clips[0]!, 0), { attention: true, branding: true, connection: false, direction: false, phaseStartFrame: 0 });
+assert.deepEqual(resolveAbcdBeatState(props.clips[0]!, 100), { attention: false, branding: true, connection: true, direction: false, phaseStartFrame: 80 });
+assert.deepEqual(resolveAbcdBeatState(props.clips[0]!, 200), { attention: false, branding: true, connection: false, direction: true, phaseStartFrame: 160 });
 assert.equal(JSON.stringify(project).includes("private.example"), false);
 assert.throws(() => createRemotionCompositionProps(
   { timeline, platform: "x", width: 1280, height: 720, fps: 30 },
