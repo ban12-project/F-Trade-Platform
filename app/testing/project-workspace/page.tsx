@@ -4,10 +4,9 @@ import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectWorkspace, type ProjectStage } from "@/components/workspace/project-workspace";
 import { ProjectMembersPanel } from "@/components/workspace/project-members-panel";
-import { createWorkspaceTemplate } from "@/lib/workspace/contracts";
-import type { WorkspaceProjectDetail, WorkspaceTaskSummary } from "@/lib/workspace/store";
+import type { WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
 
-const project: WorkspaceProjectDetail = { id: "00000000-0000-4000-8000-000000000721", title: "Synthetic project workspace", kind: "marketing", status: "active", updatedAt: new Date("2026-09-01T00:00:00Z"), revision: 1, document: createWorkspaceTemplate("marketing") };
+const project: WorkspaceProjectSummary = { id: "00000000-0000-4000-8000-000000000721", title: "Synthetic project workspace", kind: "marketing", status: "active", updatedAt: new Date("2026-09-01T00:00:00Z") };
 const stages: ProjectStage[] = [
   { id: "product", panelKind: "product", label: "产品事实", description: "导入、核验证据并完成 Gate 01。" },
   { id: "content", panelKind: "content", label: "内容", description: "从已核验事实创建营销内容。" },

@@ -553,23 +553,6 @@ export const workspaceProjectItem = pgTable(
   ],
 );
 
-/** Per-project visual composition with optimistic revision control. */
-export const workspaceCanvasDocument = pgTable(
-  "workspace_canvas_document",
-  {
-    id: text("id").primaryKey(),
-    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
-    document: jsonb("document").$type<Record<string, unknown>>().notNull(),
-    revision: integer("revision").default(1).notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (table) => [
-    uniqueIndex("workspace_canvas_document_project_uidx").on(table.projectId),
-    check("workspace_canvas_document_revision_positive", sql`${table.revision} > 0`),
-  ],
-);
-
 /**
  * A narrowly scoped receipt for a browser-to-Blob presigned upload. The
  * browser chooses only the receipt ID; ownership and the exact pathname are

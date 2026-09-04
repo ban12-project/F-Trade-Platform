@@ -14,7 +14,7 @@ pnpm test:video-visual-sampling
 pnpm test:ffmpeg-renderer
 pnpm test:video-preview-delivery
 pnpm test:video-mvp-policy
-pnpm test:e2e tests/e2e/workspace-dashboard.spec.ts tests/e2e/project-canvas.spec.ts
+pnpm test:e2e tests/e2e/project-workflow.spec.ts tests/e2e/video-workspace.spec.ts
 ```
 
 媒体集成测试需要通过 `FFMPEG_BIN` 和 `FFPROBE_BIN` 指向可执行文件；FFmpeg 必须包含 libass 字幕滤镜。

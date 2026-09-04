@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 
 import { VideoWorkspace } from "@/components/workspace/video-workspace";
-import { WorkspaceCanvasSkeleton } from "@/components/workspace/workspace-canvas-skeleton";
+import { WorkspaceLoadingSkeleton } from "@/components/workspace/workspace-loading-skeleton";
 import { requirePermission } from "@/lib/auth-guard";
 import { hasPermission } from "@/lib/authz";
 import { getWorkspaceProject } from "@/lib/workspace/store";
@@ -20,4 +20,4 @@ async function VideoContent({ params, searchParams }: { params: Promise<{ projec
   return <VideoWorkspace projectId={project.id} projectTitle={project.title} products={products} entries={entries} copyCandidates={copyCandidates} canReview={hasPermission(session.user.role, "content:review")} selectedId={z.uuid().safeParse(query.item).success ? query.item : undefined} />;
 }
 
-export default function VideoPage(props: { params: Promise<{ projectId: string }>; searchParams: Promise<{ item?: string }> }) { return <Suspense fallback={<WorkspaceCanvasSkeleton project />}><VideoContent {...props} /></Suspense>; }
+export default function VideoPage(props: { params: Promise<{ projectId: string }>; searchParams: Promise<{ item?: string }> }) { return <Suspense fallback={<WorkspaceLoadingSkeleton project />}><VideoContent {...props} /></Suspense>; }

@@ -9,9 +9,8 @@ import { ProductMediaPanel } from "@/components/workspace/product-media-panel";
 import { ProductPanel } from "@/components/workspace/product-panel";
 import { ProjectWorkspace, VideoStageEntry, type ProjectStage } from "@/components/workspace/project-workspace";
 import { ProjectMembersPanel } from "@/components/workspace/project-members-panel";
-import { WorkspaceCanvasSkeleton } from "@/components/workspace/workspace-canvas-skeleton";
+import { WorkspaceLoadingSkeleton } from "@/components/workspace/workspace-loading-skeleton";
 import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-settings-panel";
-import { ProjectCanvas } from "@/components/workspace/project-canvas";
 import { ProductReferencePanel, RfqPanel } from "@/components/workspace/sales-panels";
 import { listStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { requirePermission } from "@/lib/auth-guard";
@@ -41,7 +40,7 @@ const salesStages: ProjectStage[] = [
   { id: "opportunity", panelKind: "lead", label: "商机", description: "达到条件后，仍由业务人员显式确认有效商机。" },
 ];
 
-type ProjectQuery = { panel?: string; item?: string; view?: string };
+type ProjectQuery = { panel?: string; item?: string };
 
 async function ProjectContent({ params, searchParams }: { params: Promise<{ projectId: string }>; searchParams: Promise<ProjectQuery> }) {
   await connection();
@@ -90,7 +89,6 @@ async function ProjectContent({ params, searchParams }: { params: Promise<{ proj
       publication: <PublicationPanel projectId={projectId} {...publicationData} />,
       video: <VideoStageEntry projectId={projectId} count={videoEntries.length} pendingReview={videoEntries.filter((entry) => entry.state === "VIDEO_REVIEW_REQUIRED").length} />,
     };
-    if (query.view === "flow") return <ProjectCanvas readOnly project={project} projects={projects} tasks={tasks} settingsPanel={settingsPanel} panels={panels} />;
     const nextTaskStage = tasks.find((task) => task.projectId === projectId && marketingStages.some((stage) => stage.panelKind === task.nodeKind))?.nodeKind;
     const activeStage = marketingStages.some((stage) => stage.id === query.panel) ? query.panel! : nextTaskStage ?? (publicationData.publications.length ? "publication" : videoEntries.length ? "video" : contentEntries.length ? "content" : "product");
     return <ProjectWorkspace project={project} projects={projects} tasks={tasks} settingsPanel={settingsPanel} membersPanel={membersPanel} stages={marketingStages} activeStage={activeStage} panel={panels[activeStage as keyof typeof panels]} />;
@@ -109,14 +107,12 @@ async function ProjectContent({ params, searchParams }: { params: Promise<{ proj
   const membersPanel = <ProjectMembersPanel projectId={projectId} members={members} currentUserId={session.user.id} />;
   const settingsPanel = <WorkspaceSettingsPanel settings={settings} currentUser={session.user} canManage={hasPermission(session.user.role, "settings:manage")} />;
   const panels = {
-    rfq: <RfqPanel projectId={projectId} entries={rfqs} selectedId={selectedId} leads={leads} />,
-    product: <ProductReferencePanel projectId={projectId} available={availableProducts} linked={linkedProducts} />,
+    rfq: <div className="flex flex-col gap-6"><RfqPanel projectId={projectId} entries={rfqs} selectedId={selectedId} leads={leads} /><ProductReferencePanel projectId={projectId} available={availableProducts} linked={linkedProducts} /></div>,
     quotation: <QuotationPanel projectId={projectId} rfqs={rfqs} products={linkedProducts} entries={quotations} canReview={hasPermission(session.user.role, "quotation:review")} />,
     lead: <LeadPanel projectId={projectId} entries={leads} />,
     delivery: <DeliveryPanel projectId={projectId} entries={deliveries} canReview={hasPermission(session.user.role, "delivery:review")} />,
     opportunity: <LeadPanel projectId={projectId} entries={leads.filter((entry) => entry.state === "OPPORTUNITY")} />,
   };
-  if (query.view === "flow") return <ProjectCanvas readOnly project={project} projects={projects} tasks={tasks} settingsPanel={settingsPanel} panels={panels} />;
 
   const requestedTask = selectedId ? tasks.find((task) => task.projectId === projectId && task.id === selectedId) : undefined;
   const requestedStage = salesStages.some((stage) => stage.id === query.panel)
@@ -143,5 +139,5 @@ async function ProjectContent({ params, searchParams }: { params: Promise<{ proj
 }
 
 export default function ProjectPage({ params, searchParams }: { params: Promise<{ projectId: string }>; searchParams: Promise<ProjectQuery> }) {
-  return <Suspense fallback={<WorkspaceCanvasSkeleton project />}><ProjectContent params={params} searchParams={searchParams} /></Suspense>;
+  return <Suspense fallback={<WorkspaceLoadingSkeleton project />}><ProjectContent params={params} searchParams={searchParams} /></Suspense>;
 }

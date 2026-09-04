@@ -320,6 +320,7 @@ def check_channel_onboarding() -> None:
         raise AssertionError("Channel onboarding must preserve inbound-only human-approved operation")
 
 
+
 def check_database_baseline() -> None:
     database_client = (ROOT / "lib/db/client.ts").read_text(encoding="utf-8")
     for required in ("drizzle-orm/neon-serverless", "new Pool", "closeDatabase"):
@@ -340,10 +341,7 @@ def check_database_baseline() -> None:
         if required not in auth_source:
             raise AssertionError(f"Passwordless Better Auth configuration is missing: {required}")
     proxy_source = (ROOT / "proxy.ts").read_text(encoding="utf-8")
-    for required in (
-        "getSessionCookie",
-        'matcher: ["/workspace/:path*"]',
-    ):
+    for required in ("getSessionCookie", 'matcher: ["/workspace/:path*"]'):
         if required not in proxy_source:
             raise AssertionError(f"Optimistic workspace proxy protection is missing: {required}")
     if "auth.api.getSession" in proxy_source:
@@ -357,47 +355,67 @@ def check_database_baseline() -> None:
         if required not in next_config:
             raise AssertionError(f"Workspace route migration is missing: {required}")
     invitation_actions = (ROOT / "lib/actions/invitations.ts").read_text(encoding="utf-8")
-    for required in (
-        '"use server"',
-        "auth.api.getSession",
-        "issueInvitation",
-        "provisionInvitedUser",
-        "invitationFormSchema.safeParse",
-    ):
+    for required in ('"use server"', "auth.api.getSession", "issueInvitation", "provisionInvitedUser", "invitationFormSchema.safeParse"):
         if required not in invitation_actions:
             raise AssertionError(f"Invitation Server Action contract is missing: {required}")
-    workspace_hub = (ROOT / "components/workspace/workspace-hub.tsx").read_text(encoding="utf-8")
+
     workspace_action_dock = (ROOT / "components/workspace/workspace-action-dock.tsx").read_text(encoding="utf-8")
     for required in ("useForm", "zodResolver", "createWorkspaceProjectAction", "FieldError"):
         if required not in workspace_action_dock:
             raise AssertionError(f"Workspace project form contract is missing: {required}")
-    for required in ("WorkspaceActionDock", "WorkspaceDirtyProvider"):
-        if required not in workspace_hub:
-            raise AssertionError(f"Workspace canvas shell contract is missing: {required}")
-    workspace_loading = (ROOT / "components/workspace/workspace-canvas-skeleton.tsx").read_text(encoding="utf-8")
-    for required in ("WorkspaceCanvasSkeleton", 'className="fixed inset-0', "Skeleton", "bottom-3", "projectNodePlaceholders"):
+    workspace_loading = (ROOT / "components/workspace/workspace-loading-skeleton.tsx").read_text(encoding="utf-8")
+    for required in ("WorkspaceLoadingSkeleton", "Skeleton", "工作台"):
         if required not in workspace_loading:
-            raise AssertionError(f"Workspace canvas loading shell is missing: {required}")
+            raise AssertionError(f"Workspace loading shell is missing: {required}")
     workspace_schema = (ROOT / "lib/db/schema.ts").read_text(encoding="utf-8")
     for required in ("workspaceItemRelation", "workspace_project_item_single_owner_uidx", "workspace_project_item_relation_matches_role"):
         if required not in workspace_schema:
             raise AssertionError(f"Workspace ownership contract is missing: {required}")
-    for route in (ROOT / "app/workspace/page.tsx", ROOT / "app/workspace/[projectId]/page.tsx"):
+    for forbidden in ("workspaceCanvasDocument", '"workspace_canvas_document"'):
+        if forbidden in workspace_schema:
+            raise AssertionError(f"Retired project canvas persistence remains in the active schema: {forbidden}")
+    for route in (ROOT / "app/workspace/page.tsx", ROOT / "app/workspace/[projectId]/page.tsx", ROOT / "app/workspace/[projectId]/video/page.tsx"):
         source = route.read_text(encoding="utf-8")
-        if "WorkspaceCanvasSkeleton" not in source or "ConsoleLoading" in source:
-            raise AssertionError(f"Workspace route still uses the legacy Console loading shell: {route}")
+        if "WorkspaceLoadingSkeleton" not in source or "WorkspaceCanvasSkeleton" in source or "ProjectCanvas" in source or "view=flow" in source:
+            raise AssertionError(f"Workspace route still references the retired canvas shell: {route}")
+    retired_paths = (
+        ROOT / "components/workspace/project-canvas.tsx",
+        ROOT / "components/workspace/workspace-hub.tsx",
+        ROOT / "components/workspace/canvas-nodes.tsx",
+        ROOT / "components/workspace/workspace-canvas-skeleton.tsx",
+        ROOT / "app/testing/project-canvas",
+        ROOT / "app/testing/workspace-canvas",
+        ROOT / "tests/e2e/project-canvas.spec.ts",
+        ROOT / "tests/e2e/workspace-canvas.spec.ts",
+    )
+    existing_retired = [str(path.relative_to(ROOT)) for path in retired_paths if path.exists()]
+    if existing_retired:
+        raise AssertionError(f"Retired project canvas files still exist: {existing_retired}")
+    package = load_json(ROOT / "package.json")
+    for dependency in ("@xyflow/react", "elkjs"):
+        if dependency in package.get("dependencies", {}) or dependency in package.get("devDependencies", {}):
+            raise AssertionError(f"Retired canvas dependency remains: {dependency}")
+    for path in (
+        ROOT / "lib/workspace/contracts.ts",
+        ROOT / "lib/actions/workspace.ts",
+        ROOT / "lib/workspace/store.ts",
+        ROOT / "lib/social/inbound-routing-store.ts",
+    ):
+        source = path.read_text(encoding="utf-8")
+        for forbidden in ("workspaceCanvasDocument", "WorkspaceCanvasDocument", "saveWorkspaceCanvas", "createWorkspaceTemplate"):
+            if forbidden in source:
+                raise AssertionError(f"Retired canvas token {forbidden} remains in {path.relative_to(ROOT)}")
+    css = (ROOT / "app/globals.css").read_text(encoding="utf-8")
+    if "react-flow" in css:
+        raise AssertionError("React Flow styles remain in app/globals.css")
     if (ROOT / "components/console-loading.tsx").exists():
         raise AssertionError("Legacy Console loading component must be removed")
+
     product_actions = (ROOT / "lib/actions/products.ts").read_text(encoding="utf-8")
     for required in (
-        '"use server"',
-        "auth.api.getSession",
-        "productCatalogFormSchema.safeParse",
-        "productReviewFormSchema.safeParse",
-        "createProductCatalogDraft",
-        "decideProductCatalogReview",
-        "reviseProductCatalogDraft",
-        'revalidatePath("/workspace")',
+        '"use server"', "auth.api.getSession", "productCatalogFormSchema.safeParse",
+        "productReviewFormSchema.safeParse", "createProductCatalogDraft",
+        "decideProductCatalogReview", "reviseProductCatalogDraft", 'revalidatePath("/workspace")',
     ):
         if required not in product_actions:
             raise AssertionError(f"Product catalog Server Action contract is missing: {required}")
@@ -405,25 +423,18 @@ def check_database_baseline() -> None:
     for required in ("contentDraftFormSchema.safeParse", "contentReviewFormSchema.safeParse", "createContentDraft", "decideContentReview", "reviseContentDraft"):
         if required not in content_actions:
             raise AssertionError(f"Content Server Action contract is missing: {required}")
-    workspace_canvas = (ROOT / "components/workspace/project-canvas.tsx").read_text(encoding="utf-8")
-    for required in ("saveWorkspaceCanvasAction", "Drawer", "ScrollArea", "ProjectCanvasPanels"):
-        if required not in workspace_canvas:
-            raise AssertionError(f"Workspace canvas contract is missing: {required}")
-    if not any(full_viewport in workspace_canvas for full_viewport in ("100dvh", "fixed inset-0")):
-        raise AssertionError("Workspace canvas contract is missing a full-viewport layout")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:
         raise AssertionError("At least one Drizzle SQL migration is required")
-    migration = "\n".join(path.read_text(encoding="utf-8") for path in migrations)
+    migration = chr(10).join(path.read_text(encoding="utf-8") for path in migrations)
+    if 'DROP TABLE "workspace_canvas_document"' not in migration:
+        raise AssertionError("Database migration must remove retired workspace canvas persistence")
     required_tables = {
         "user", "session", "account", "verification", "invitation",
         "aggregate_record", "approval", "evidence", "workflow_event", "audit_event", "passkey",
     }
-    missing_tables = [
-        table for table in sorted(required_tables)
-        if f'CREATE TABLE "{table}"' not in migration
-    ]
+    missing_tables = [table for table in sorted(required_tables) if f'CREATE TABLE "{table}"' not in migration]
     if missing_tables:
         raise AssertionError(f"Database migration is missing tables: {missing_tables}")
     for trigger in ("audit_event_append_only", "workflow_event_append_only"):

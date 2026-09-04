@@ -11,7 +11,6 @@ test("workspace prioritizes tasks and pipeline without a canvas", async ({ page 
   await expect(page.getByText("来源营销项目：Synthetic launch")).toBeVisible();
   const videoTask = page.getByRole("link").filter({ hasText: "营销视频等待成片审核" }).first();
   await expect(videoTask).toHaveAttribute("href", "/workspace/00000000-0000-4000-8000-000000000701/video?item=00000000-0000-4000-8000-000000000713");
-  await expect(page.locator(".react-flow")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "项目画布" })).toHaveCount(0);
 });
 
@@ -36,7 +35,6 @@ test("project workspace exposes guided steps, records and a right detail region"
   await expect(page.getByRole("link", { name: /步骤 1 产品事实/ })).toHaveAttribute("aria-current", "step");
   await expect(page.getByRole("heading", { name: "待处理事项" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "产品事实详情与审批" })).toBeVisible();
-  await expect(page.locator(".react-flow")).toHaveCount(0);
   await page.getByRole("link", { name: /步骤 2 内容/ }).click();
   await expect(page).toHaveURL(/panel=content/);
   await expect(page).not.toHaveURL(/view=records/);
@@ -59,13 +57,4 @@ test("video production has a dedicated editor route", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "视频编辑器" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "素材、预览与时间线" })).toBeVisible();
   await expect(page.getByText("复制其他项目剪辑")).toBeVisible();
-  await expect(page.locator(".react-flow")).toHaveCount(0);
-});
-
-test("project flow remains an optional read-only diagnostic view", async ({ page }) => {
-  await page.goto("/testing/project-canvas?view=flow");
-  await expect(page.getByText("只读流程概览")).toBeVisible();
-  await expect(page.getByRole("button", { name: "整理画布" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "返回项目工作区" })).toHaveAttribute("href", "/workspace/00000000-0000-4000-8000-000000000202");
-  await expect(page.locator(".react-flow")).toBeVisible();
 });

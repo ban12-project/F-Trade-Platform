@@ -34,6 +34,6 @@ GitHub Issues 和 Milestones 是状态的事实来源；本页只保留阶段说
 Next.js 安全补丁发布后的受控升级步骤见[Next.js 安全补丁升级运行手册](testing/next-security-release-runbook.md)。
 真实 SKU 的脱敏授权记录格式与 A–D 分组条件见[真实 SKU 试点授权清单模板](testing/product-pilot-authorization.template.md)。
 M0 的免费治理验收口径及未消除的直接推送风险见[GitHub 治理范围决策](decisions/github-branch-protection.md)。
-应用以工作台和固定项目步骤组织受控记录；项目画布已退出生产主导航，只保留短期只读诊断视图，详见[工作台与项目采用线性引导流程](decisions/0005-guided-workspace-navigation.md)。
+应用以工作台和固定项目步骤组织受控记录；项目画布、布局表和 React Flow 依赖均已删除，详见[工作台与项目采用线性引导流程](decisions/0005-guided-workspace-navigation.md)。
 角色、权限、事务与 Human Gate 边界继续遵循[项目画布与角色边界](decisions/0003-console-task-flow.md)中未被取代的部分。
 MVP1 营销视频只剪辑用户上传的授权素材，不调用外部视频生成模型，详见[MVP1 营销视频剪辑决策](decisions/0004-mvp1-marketing-video-editing.md)。
