@@ -23,7 +23,7 @@ function RoutingDialog({ inbound, mode, salesProjects }: { inbound: InboundRouti
   useEffect(() => {
     if (state.status === "success" && state.projectId) {
       setOpen(false);
-      router.push(`/workspace/${state.projectId}?panel=lead&view=records&item=${state.id}`);
+      router.push(`/workspace/${state.projectId}?panel=lead&item=${state.id}`);
       router.refresh();
     }
   }, [router, state]);
@@ -47,5 +47,5 @@ function RoutingDialog({ inbound, mode, salesProjects }: { inbound: InboundRouti
 export function InboundRoutingList({ items, projects }: { items: InboundRoutingSummary[]; projects: WorkspaceProjectSummary[] }) {
   const salesProjects = projects.filter((project) => project.kind === "sales" && project.status === "active");
   if (!items.length) return null;
-  return <div className="mb-4 space-y-3" aria-label="待分流入站消息">{items.map((item) => <div key={item.id} className="rounded-xl border bg-muted/30 p-4"><div className="flex items-start gap-3"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-background"><InboxIcon className="size-5" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">入站消息 {item.shortReference}</p><Badge>待分流</Badge></div><p className="mt-1 text-xs text-muted-foreground">{item.channelLabel} · {item.lastMessageAt.toLocaleString("zh-CN")}</p><p className="mt-2 text-sm text-muted-foreground">选择新建项目或关联现有项目后，才会进入销售流程。</p></div></div><div className="mt-4 flex flex-col gap-2 sm:flex-row"><RoutingDialog inbound={item} mode="create" salesProjects={salesProjects} /><RoutingDialog inbound={item} mode="link" salesProjects={salesProjects} /></div></div>)}</div>;
+  return <div className="mb-4 space-y-3" aria-label="待分流入站消息">{items.map((item) => <div key={item.id} className="rounded-xl border bg-muted/30 p-4"><div className="flex items-start gap-3"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-background"><InboxIcon className="size-5" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">入站消息 {item.shortReference}</p><Badge>待分流</Badge></div><p className="mt-1 text-xs text-muted-foreground">{item.channelLabel} · {item.lastMessageAt.toLocaleString("zh-CN")}</p><p className="mt-2 text-sm text-muted-foreground">选择新建项目或关联现有项目后，直接进入销售项目的客户线索步骤。</p></div></div><div className="mt-4 flex flex-col gap-2 sm:flex-row"><RoutingDialog inbound={item} mode="create" salesProjects={salesProjects} /><RoutingDialog inbound={item} mode="link" salesProjects={salesProjects} /></div></div>)}</div>;
 }
