@@ -103,8 +103,8 @@
     "entity_id": "synthetic-lead-001",
     "from_state": "FOLLOW_UP",
     "to_state": "OPPORTUNITY",
-    "actor_type": "agent",
-    "actor_id": "synthetic-follow-up-agent",
+    "actor_type": "human",
+    "actor_id": "synthetic-sales-user",
     "occurred_at": "2026-08-23T12:08:00Z",
     "evidence_refs": ["synthetic-positive-intent-001"]
   },

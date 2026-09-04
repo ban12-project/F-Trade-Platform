@@ -5,14 +5,12 @@ import { headers } from "next/headers";
 import { ZodError } from "zod";
 
 import { auth } from "@/lib/auth";
+import type { ClosingActionState } from "@/lib/action-states";
 import { hasPermission, type Permission } from "@/lib/authz";
 import { deliveryDecisionFormSchema, deliveryRequestFormSchema, followUpFormSchema, inboundRoutingFormSchema, opportunityDecisionFormSchema, publicationConfirmationFormSchema, quotationDecisionFormSchema, quotationDraftFormSchema, quotationSendFormSchema } from "@/lib/form-schemas";
 import { confirmExternalPublication } from "@/lib/social/publication-store";
 import { routeInboundConversation } from "@/lib/social/inbound-routing-store";
 import { confirmOpportunity, createDeliveryRequest, createOrReviseQuotation, decideDelivery, decideQuotation, recordFollowUp, sendQuotation } from "@/lib/sales/closing-store";
-
-export type ClosingActionState = { status: "idle" | "success" | "error"; message: string; id?: string; projectId?: string };
-export const initialClosingActionState: ClosingActionState = { status: "idle", message: "" };
 
 async function actor(permission: Permission) {
   const session = await auth.api.getSession({ headers: await headers() });

@@ -4,7 +4,8 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FolderInputIcon, FolderPlusIcon, InboxIcon } from "lucide-react";
 
-import { routeInboundConversationAction, initialClosingActionState } from "@/lib/actions/closing";
+import { routeInboundConversationAction } from "@/lib/actions/closing";
+import { initialClosingActionState } from "@/lib/action-states";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
 import { Badge } from "@/components/ui/badge";

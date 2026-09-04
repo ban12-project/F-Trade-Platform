@@ -406,9 +406,11 @@ def check_database_baseline() -> None:
         if required not in content_actions:
             raise AssertionError(f"Content Server Action contract is missing: {required}")
     workspace_canvas = (ROOT / "components/workspace/project-canvas.tsx").read_text(encoding="utf-8")
-    for required in ("saveWorkspaceCanvasAction", "100dvh", "Drawer", "ScrollArea", "ProjectCanvasPanels"):
+    for required in ("saveWorkspaceCanvasAction", "Drawer", "ScrollArea", "ProjectCanvasPanels"):
         if required not in workspace_canvas:
             raise AssertionError(f"Workspace canvas contract is missing: {required}")
+    if not any(full_viewport in workspace_canvas for full_viewport in ("100dvh", "fixed inset-0")):
+        raise AssertionError("Workspace canvas contract is missing a full-viewport layout")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:

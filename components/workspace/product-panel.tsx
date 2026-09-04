@@ -21,7 +21,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { runProductAgentAction } from "@/lib/actions/product-agent";
-import { initialProductEvidenceActionState, uploadProductEvidenceAction } from "@/lib/actions/product-evidence";
+import { uploadProductEvidenceAction } from "@/lib/actions/product-evidence";
+import { initialProductEvidenceActionState } from "@/lib/action-states";
 import { createProductCatalogDraftAction, decideProductCatalogReviewAction, reviseProductCatalogDraftAction } from "@/lib/actions/products";
 import { initialProductActionState, initialProductAgentActionState } from "@/lib/action-states";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";

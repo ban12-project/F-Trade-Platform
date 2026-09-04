@@ -7,7 +7,8 @@ import { Controller, useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import type { z } from "zod";
 
-import { confirmOpportunityAction, confirmPublicationAction, decideDeliveryAction, decideQuotationAction, initialClosingActionState, recordFollowUpAction, requestDeliveryAction, saveQuotationAction, sendQuotationAction } from "@/lib/actions/closing";
+import { confirmOpportunityAction, confirmPublicationAction, decideDeliveryAction, decideQuotationAction, recordFollowUpAction, requestDeliveryAction, saveQuotationAction, sendQuotationAction } from "@/lib/actions/closing";
+import { initialClosingActionState } from "@/lib/action-states";
 import { deliveryDecisionFormSchema, deliveryRequestFormSchema, followUpFormSchema, opportunityDecisionFormSchema, publicationConfirmationFormSchema, quotationDecisionFormSchema, quotationDraftFormSchema, quotationSendFormSchema } from "@/lib/form-schemas";
 import type { DeliveryConfirmationEntry, LeadEntry, QuotationEntry } from "@/lib/sales/closing-store";
 import type { RfqEntry } from "@/lib/sales/store";

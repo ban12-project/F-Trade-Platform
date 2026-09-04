@@ -5,13 +5,11 @@ import { headers } from "next/headers";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
+import type { ProductEvidenceActionState } from "@/lib/action-states";
 import { hasPermission } from "@/lib/authz";
 import { prepareUploadedProductAgentDocument } from "@/lib/product/uploaded-document";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
-
-export type ProductEvidenceActionState = { status: "idle" | "success" | "error"; message: string };
-export const initialProductEvidenceActionState: ProductEvidenceActionState = { status: "idle", message: "" };
 
 export async function uploadProductEvidenceAction(_previous: ProductEvidenceActionState, formData: FormData): Promise<ProductEvidenceActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
