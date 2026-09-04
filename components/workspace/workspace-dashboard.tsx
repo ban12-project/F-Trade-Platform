@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import type { WorkspacePipelineSummary, WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
+import { workspaceTaskHref } from "@/lib/workspace/navigation";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { InboundRoutingList } from "./inbound-routing-list";
 import { WorkspaceActionDock } from "./workspace-action-dock";
@@ -16,7 +17,7 @@ import { WorkspaceDirtyProvider } from "./dirty-state";
 
 function TaskRows({ tasks, empty }: { tasks: WorkspaceTaskSummary[]; empty: string }) {
   if (!tasks.length) return <Empty className="border-0 py-8"><EmptyHeader><EmptyMedia variant="icon"><CheckCircle2Icon /></EmptyMedia><EmptyTitle>{empty}</EmptyTitle><EmptyDescription>新的事项出现后会自动汇总到这里。</EmptyDescription></EmptyHeader></Empty>;
-  return <div className="divide-y">{tasks.map((task) => <Link key={`${task.taskType}-${task.id}`} href={`/workspace/${task.projectId}?panel=${task.nodeKind}&item=${task.id}`} className="group flex min-h-16 items-center gap-3 px-1 py-3 outline-none transition-colors duration-[120ms] hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
+  return <div className="divide-y">{tasks.map((task) => <Link key={`${task.taskType}-${task.id}`} href={workspaceTaskHref(task)} className="group flex min-h-16 items-center gap-3 px-1 py-3 outline-none transition-colors duration-[120ms] hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
     <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-medium">{task.title}</span><Badge variant={task.priority === "review" ? "default" : "secondary"}>{task.actionLabel ?? (task.priority === "review" ? "审核" : "处理")}</Badge></div><p className="mt-1 truncate text-xs text-muted-foreground">{task.projectTitle} · {task.detail}</p></div><ArrowRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
   </Link>)}</div>;
 }
