@@ -9,6 +9,8 @@ test("workspace prioritizes tasks and pipeline without a canvas", async ({ page 
   await expect(page.getByRole("heading", { name: "到期跟进" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "项目 / 线索 Pipeline" })).toBeVisible();
   await expect(page.getByText("来源营销项目：Synthetic launch")).toBeVisible();
+  const videoTask = page.getByRole("link").filter({ hasText: "营销视频等待成片审核" }).first();
+  await expect(videoTask).toHaveAttribute("href", "/workspace/00000000-0000-4000-8000-000000000701/video?item=00000000-0000-4000-8000-000000000713");
   await expect(page.locator(".react-flow")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "项目画布" })).toHaveCount(0);
 });
