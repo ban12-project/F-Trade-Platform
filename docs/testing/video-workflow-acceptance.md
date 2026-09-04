@@ -14,7 +14,7 @@ pnpm test:video-visual-sampling
 pnpm test:ffmpeg-renderer
 pnpm test:video-preview-delivery
 pnpm test:video-mvp-policy
-pnpm test:e2e tests/e2e/project-canvas.spec.ts
+pnpm test:e2e tests/e2e/workspace-dashboard.spec.ts tests/e2e/project-canvas.spec.ts
 ```
 
 媒体集成测试需要通过 `FFMPEG_BIN` 和 `FFPROBE_BIN` 指向可执行文件；FFmpeg 必须包含 libass 字幕滤镜。
@@ -23,7 +23,7 @@ pnpm test:e2e tests/e2e/project-canvas.spec.ts
 
 | 验收点 | 结论 |
 | --- | --- |
-| 画布入口 | 点击项目画布“营销视频”节点，在桌面 Panel 或移动端 Drawer 中打开编辑器 |
+| 工作流入口 | 进入营销项目“营销视频”步骤后，再打开独立视频编辑器；返回时回到同一步骤，不依赖画布节点或检查器 |
 | 素材范围 | 1–3 个 JPG、PNG、WebP、MP4 或 MOV 私有素材，必须登记权利证据 |
 | 时长 | 单片段 1–10 秒，整条视频不超过 15 秒；客户端、Server Action 和渲染边界重复校验 |
 | AI 初稿 | 只读取受控代表帧、素材引用和 ProductReady 事实，输出仍需通过同一 Zod 契约 |
