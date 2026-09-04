@@ -6,16 +6,24 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import productReadySchema from "@/contracts/data/product-ready.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
-import { getDatabase, type Database } from "@/lib/db/client";
+import { type Database, getDatabase } from "@/lib/db/client";
 import { productMediaAsset } from "@/lib/db/product-media-schema";
-import { aggregateRecord, auditEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
-import { selectProductVideoMedia } from "@/lib/product/video-media-selection";
-import { productMediaAssetSchema, type ProductMediaAsset } from "@/lib/product/video-readiness";
+import {
+  aggregateRecord,
+  auditEvent,
+  workspaceProject,
+  workspaceProjectItem,
+} from "@/lib/db/schema";
 import type { ProductReady } from "@/lib/product/verification";
+import { selectProductVideoMedia } from "@/lib/product/video-media-selection";
+import { type ProductMediaAsset, productMediaAssetSchema } from "@/lib/product/video-readiness";
 
 import { videoProjectSchema } from "./contracts";
 import { buildVideoCreative } from "./creative";
-import { createMarketingVideoFromProductMediaSchema, marketingVideoDraftSchema } from "./edit-contracts";
+import {
+  createMarketingVideoFromProductMediaSchema,
+  marketingVideoDraftSchema,
+} from "./edit-contracts";
 
 const parseProductReady = compileContract<ProductReady>(productReadySchema);
 type ProductMediaRow = typeof productMediaAsset.$inferSelect;
@@ -79,7 +87,12 @@ export async function createMarketingVideoEditProjectFromProductMedia(
   const id = randomUUID();
   const now = new Date();
   return database.transaction(async (tx) => {
-    const [workspace] = await tx.select({ id: workspaceProject.id, kind: workspaceProject.kind, status: workspaceProject.status })
+    const [workspace] = await tx
+      .select({
+        id: workspaceProject.id,
+        kind: workspaceProject.kind,
+        status: workspaceProject.status,
+      })
       .from(workspaceProject)
       .where(eq(workspaceProject.id, value.projectId))
       .for("update");
@@ -87,16 +100,24 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       throw new Error("只能在进行中的产品营销项目中创建营销视频。");
     }
 
-    const [productLink] = await tx.select({ id: workspaceProjectItem.id })
+    const [productLink] = await tx
+      .select({ id: workspaceProjectItem.id })
       .from(workspaceProjectItem)
-      .where(and(
-        eq(workspaceProjectItem.projectId, value.projectId),
-        eq(workspaceProjectItem.aggregateId, value.productId),
-      ))
+      .where(
+        and(
+          eq(workspaceProjectItem.projectId, value.projectId),
+          eq(workspaceProjectItem.aggregateId, value.productId),
+        ),
+      )
       .for("update");
     if (!productLink) throw new Error("只能使用当前营销项目中已关联的产品。");
 
-    const [productRow] = await tx.select({ id: aggregateRecord.id, state: aggregateRecord.state, payload: aggregateRecord.payload })
+    const [productRow] = await tx
+      .select({
+        id: aggregateRecord.id,
+        state: aggregateRecord.state,
+        payload: aggregateRecord.payload,
+      })
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, value.productId), eq(aggregateRecord.type, "product")))
       .for("update");
@@ -104,25 +125,35 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       throw new Error("只能从已通过 Gate 01 的产品创建营销视频。");
     }
     const ready = parseProductReady(productRow.payload);
-    if (ready.record_id !== productRow.id) throw new Error("产品聚合标识与 ProductReady 契约不一致。");
+    if (ready.record_id !== productRow.id)
+      throw new Error("产品聚合标识与 ProductReady 契约不一致。");
 
-    const mediaRows = await tx.select().from(productMediaAsset)
+    const mediaRows = await tx
+      .select()
+      .from(productMediaAsset)
       .where(inArray(productMediaAsset.id, value.productMediaIds))
       .for("update");
-    const selected = selectProductVideoMedia(ready, mediaRows.map(mediaFromRow), {
-      productId: ready.record_id,
-      assetIds: value.productMediaIds,
-      usage: "organic",
-    }, now);
+    const selected = selectProductVideoMedia(
+      ready,
+      mediaRows.map(mediaFromRow),
+      {
+        productId: ready.record_id,
+        assetIds: value.productMediaIds,
+        usage: "organic",
+      },
+      now,
+    );
 
-    const selectedFacts = ["product.product_name", value.factPath]
-      .filter((path, index, paths) => paths.indexOf(path) === index && Boolean(ready.field_evidence[path]));
+    const selectedFacts = ["product.product_name", value.factPath].filter(
+      (path, index, paths) => paths.indexOf(path) === index && Boolean(ready.field_evidence[path]),
+    );
     const clips = selected.assets.map((asset, index) => ({
       clipId: `clip-${String(index + 1).padStart(3, "0")}`,
       assetRef: asset.evidenceRef,
       mediaType: asset.mediaType,
       trimStartMs: 0,
-      durationMs: asset.mediaType === "image" ? 3_000 : Math.min(5_000, asset.technical.durationMs!),
+      durationMs:
+        asset.mediaType === "image" ? 3_000 : Math.min(5_000, asset.technical.durationMs!),
       fitMode: "contain" as const,
       audioMode: "muted" as const,
       caption: { kind: "none" as const },
@@ -133,20 +164,24 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       clips,
       ctaText: "Contact us for details",
     });
-    const creative = buildVideoCreative({
-      productId: productRow.id,
-      objective: value.objective,
-      targetAudience: value.targetAudience,
-      factPaths: selectedFacts,
-      sourceAssets: selected.sourceAssets,
-      platforms: [value.platform],
-      scenes: clips.map((clip) => ({
-        prompt: "已审核的可复用产品媒体",
-        durationSeconds: clip.durationMs / 1_000,
-        claimRefs: [],
-        assetRefs: [clip.assetRef],
-      })),
-    }, ready, id);
+    const creative = buildVideoCreative(
+      {
+        productId: productRow.id,
+        objective: value.objective,
+        targetAudience: value.targetAudience,
+        factPaths: selectedFacts,
+        sourceAssets: selected.sourceAssets,
+        platforms: [value.platform],
+        scenes: clips.map((clip) => ({
+          prompt: "已审核的可复用产品媒体",
+          durationSeconds: clip.durationMs / 1_000,
+          claimRefs: [],
+          assetRefs: [clip.assetRef],
+        })),
+      },
+      ready,
+      id,
+    );
     const project = videoProjectSchema.parse({ ...creative, status: "draft", editDraft });
 
     await tx.insert(aggregateRecord).values({
@@ -164,7 +199,10 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       role: "marketing_video",
       relation: "owned",
     });
-    await tx.update(workspaceProject).set({ updatedAt: now }).where(eq(workspaceProject.id, value.projectId));
+    await tx
+      .update(workspaceProject)
+      .set({ updatedAt: now })
+      .where(eq(workspaceProject.id, value.projectId));
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       action: "marketing_video_edit.created",

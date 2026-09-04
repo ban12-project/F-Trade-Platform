@@ -7,24 +7,24 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import productReadySchema from "../../contracts/data/product-ready.schema.json";
 import { compileContract } from "../contracts/validator";
-import { getDatabase, type Database } from "../db/client";
+import { type Database, getDatabase } from "../db/client";
 import { productMediaAsset } from "../db/product-media-schema";
 import { aggregateRecord, auditEvent, evidence as evidenceTable } from "../db/schema";
 import {
   applyProductMediaReview,
   createPendingProductMediaAsset,
-  productMediaProbeSchema,
-  registerProductMediaInputSchema,
-  reviewProductMediaInputSchema,
   type ProductMediaProbe,
+  productMediaProbeSchema,
   type RegisterProductMediaInput,
   type ReviewProductMediaInput,
+  registerProductMediaInputSchema,
+  reviewProductMediaInputSchema,
 } from "./media-service";
 import type { ProductDraft, ProductReady } from "./verification";
 import {
   assessProductVideoReadiness,
-  productMediaAssetSchema,
   type ProductMediaAsset,
+  productMediaAssetSchema,
   type VideoReadyAssessment,
 } from "./video-readiness";
 
@@ -113,14 +113,14 @@ function insertValues(asset: ProductMediaAsset, actorId: string) {
 }
 
 async function loadProduct(productId: string, database: Database) {
-  const [row] = await database.select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
+  const [row] = await database
+    .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
     .limit(1);
   if (!row) throw new Error("产品不存在。");
-  const product = row.state === "PRODUCT_READY"
-    ? parseProductReady(row.payload)
-    : parseProductDraft(row.payload);
+  const product =
+    row.state === "PRODUCT_READY" ? parseProductReady(row.payload) : parseProductDraft(row.payload);
   if (product.record_id !== productId) throw new Error("产品聚合标识与产品契约不一致。");
   return { state: row.state, product };
 }
@@ -140,7 +140,8 @@ export async function registerProductMediaAsset(
   if (!actorId.trim()) throw new Error("创建产品媒体需要明确的人工账号。");
 
   return database.transaction(async (tx) => {
-    const [productRow] = await tx.select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
+    const [productRow] = await tx
+      .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, value.productId), eq(aggregateRecord.type, "product")))
       .for("update");
@@ -151,7 +152,8 @@ export async function registerProductMediaAsset(
     if (product.record_id !== value.productId) throw new Error("产品聚合标识与产品契约不一致。");
 
     const requiredEvidence = [...new Set([value.evidenceRef, value.rights.rightsEvidenceRef])];
-    const evidenceRows = await tx.select({ id: evidenceTable.id, contentType: evidenceTable.contentType })
+    const evidenceRows = await tx
+      .select({ id: evidenceTable.id, contentType: evidenceTable.contentType })
       .from(evidenceTable)
       .where(inArray(evidenceTable.id, requiredEvidence));
     const asset = createPendingProductMediaAsset(value, probe, product, evidenceRows);
@@ -194,13 +196,17 @@ export async function reviewProductMediaAsset(
   if (!reviewerId.trim()) throw new Error("素材审核必须由明确的人工账号执行。");
 
   return database.transaction(async (tx) => {
-    const [row] = await tx.select().from(productMediaAsset)
+    const [row] = await tx
+      .select()
+      .from(productMediaAsset)
       .where(eq(productMediaAsset.id, value.assetId))
       .for("update");
     if (!row) throw new Error("产品媒体不存在。");
 
     if (value.decision === "approved") {
-      const [productRow] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord)
+      const [productRow] = await tx
+        .select({ state: aggregateRecord.state })
+        .from(aggregateRecord)
         .where(and(eq(aggregateRecord.id, row.productId), eq(aggregateRecord.type, "product")))
         .for("update");
       if (!productRow || productRow.state !== "PRODUCT_READY") {
@@ -208,7 +214,8 @@ export async function reviewProductMediaAsset(
       }
     }
 
-    const [reviewEvidence] = await tx.select({ id: evidenceTable.id, contentType: evidenceTable.contentType })
+    const [reviewEvidence] = await tx
+      .select({ id: evidenceTable.id, contentType: evidenceTable.contentType })
       .from(evidenceTable)
       .where(eq(evidenceTable.id, value.evidenceRef))
       .limit(1);
@@ -222,21 +229,25 @@ export async function reviewProductMediaAsset(
       reviewedAt,
     );
 
-    await tx.update(productMediaAsset).set({
-      reviewStatus: reviewed.review.status,
-      reviewedBy: reviewed.review.reviewedBy,
-      reviewedAt,
-      reviewEvidenceRef: reviewed.review.evidenceRef,
-      reviewNotes: reviewed.review.notes,
-      version: sql`${productMediaAsset.version} + 1`,
-      updatedAt: reviewedAt,
-    }).where(eq(productMediaAsset.id, reviewed.id));
+    await tx
+      .update(productMediaAsset)
+      .set({
+        reviewStatus: reviewed.review.status,
+        reviewedBy: reviewed.review.reviewedBy,
+        reviewedAt,
+        reviewEvidenceRef: reviewed.review.evidenceRef,
+        reviewNotes: reviewed.review.notes,
+        version: sql`${productMediaAsset.version} + 1`,
+        updatedAt: reviewedAt,
+      })
+      .where(eq(productMediaAsset.id, reviewed.id));
 
-    const action = reviewed.review.status === "approved"
-      ? "product_media.approved"
-      : previousStatus === "approved"
-        ? "product_media.revoked"
-        : "product_media.rejected";
+    const action =
+      reviewed.review.status === "approved"
+        ? "product_media.approved"
+        : previousStatus === "approved"
+          ? "product_media.revoked"
+          : "product_media.rejected";
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       action,
@@ -260,7 +271,9 @@ export async function listProductMediaAssets(
   productId: string,
   database: Database = getDatabase(),
 ): Promise<ProductMediaAsset[]> {
-  const rows = await database.select().from(productMediaAsset)
+  const rows = await database
+    .select()
+    .from(productMediaAsset)
     .where(eq(productMediaAsset.productId, productId))
     .orderBy(desc(productMediaAsset.createdAt));
   return rows.map(rowToProductMediaAsset);

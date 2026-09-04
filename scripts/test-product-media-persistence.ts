@@ -91,28 +91,63 @@ assert.equal(pending.review.status, "pending");
 assert.equal(pending.review.reviewedBy, null);
 assert.equal(pending.createdAt, "2026-09-02T12:00:00.000Z");
 
-assert.throws(() => registerProductMediaInputSchema.parse({
-  ...input,
-  mediaType: "image",
-  technical: probe.technical,
-}), /Unrecognized key|unrecognized/i);
+assert.throws(
+  () =>
+    registerProductMediaInputSchema.parse({
+      ...input,
+      mediaType: "image",
+      technical: probe.technical,
+    }),
+  /Unrecognized key|unrecognized/i,
+);
 
-assert.throws(() => createPendingProductMediaAsset(
-  { ...input, productId: "00000000-0000-4000-8000-000000000399" },
-  probe,
-  product,
-  evidence,
-), /ProductReady/);
+assert.throws(
+  () =>
+    createPendingProductMediaAsset(
+      { ...input, productId: "00000000-0000-4000-8000-000000000399" },
+      probe,
+      product,
+      evidence,
+    ),
+  /ProductReady/,
+);
 
-assert.throws(() => createPendingProductMediaAsset(input, probe, product, evidence.filter((item) => item.id !== "evidence-rights-301")), /权利证据不存在/);
-assert.throws(() => createPendingProductMediaAsset(input, {
-  ...probe,
-  technical: { ...probe.technical, contentType: "image/png" },
-}, product, evidence), /探测类型/);
-assert.throws(() => createPendingProductMediaAsset(input, {
-  mediaType: "video",
-  technical: { ...probe.technical, contentType: "video/mp4" },
-}, product, evidence), /视频探测结果/);
+assert.throws(
+  () =>
+    createPendingProductMediaAsset(
+      input,
+      probe,
+      product,
+      evidence.filter((item) => item.id !== "evidence-rights-301"),
+    ),
+  /权利证据不存在/,
+);
+assert.throws(
+  () =>
+    createPendingProductMediaAsset(
+      input,
+      {
+        ...probe,
+        technical: { ...probe.technical, contentType: "image/png" },
+      },
+      product,
+      evidence,
+    ),
+  /探测类型/,
+);
+assert.throws(
+  () =>
+    createPendingProductMediaAsset(
+      input,
+      {
+        mediaType: "video",
+        technical: { ...probe.technical, contentType: "video/mp4" },
+      },
+      product,
+      evidence,
+    ),
+  /视频探测结果/,
+);
 
 const approved = applyProductMediaReview(
   pending,
@@ -131,12 +166,16 @@ assert.equal(approved.review.reviewedBy, "user-admin-301");
 assert.equal(approved.review.evidenceRef, "evidence-review-301");
 assert.equal(approved.review.reviewedAt, "2026-09-02T13:00:00.000Z");
 
-assert.throws(() => applyProductMediaReview(
-  approved,
-  { assetId, decision: "rejected", evidenceRef: "evidence-revocation-301", notes: "" },
-  "user-admin-301",
-  evidence,
-), /必须填写原因/);
+assert.throws(
+  () =>
+    applyProductMediaReview(
+      approved,
+      { assetId, decision: "rejected", evidenceRef: "evidence-revocation-301", notes: "" },
+      "user-admin-301",
+      evidence,
+    ),
+  /必须填写原因/,
+);
 
 const revoked = applyProductMediaReview(
   approved,
@@ -155,38 +194,56 @@ assert.equal(revoked.review.reviewedBy, "user-admin-302");
 assert.equal(revoked.review.evidenceRef, "evidence-revocation-301");
 assert.equal(revoked.review.reviewedAt, "2026-09-02T14:00:00.000Z");
 
-assert.throws(() => applyProductMediaReview(
-  revoked,
-  { assetId, decision: "approved", evidenceRef: "evidence-review-301", notes: "" },
-  "user-admin-301",
-  evidence,
-), /状态不允许/);
+assert.throws(
+  () =>
+    applyProductMediaReview(
+      revoked,
+      { assetId, decision: "approved", evidenceRef: "evidence-review-301", notes: "" },
+      "user-admin-301",
+      evidence,
+    ),
+  /状态不允许/,
+);
 
-assert.throws(() => applyProductMediaReview(
-  pending,
-  {
-    assetId: "00000000-0000-4000-8000-000000000398",
-    decision: "approved",
-    evidenceRef: "evidence-review-301",
-    notes: "",
-  },
-  "user-admin-301",
-  evidence,
-), /不匹配/);
+assert.throws(
+  () =>
+    applyProductMediaReview(
+      pending,
+      {
+        assetId: "00000000-0000-4000-8000-000000000398",
+        decision: "approved",
+        evidenceRef: "evidence-review-301",
+        notes: "",
+      },
+      "user-admin-301",
+      evidence,
+    ),
+  /不匹配/,
+);
 
-assert.throws(() => applyProductMediaReview(
-  pending,
-  { assetId, decision: "approved", evidenceRef: "evidence-review-missing", notes: "" },
-  "user-admin-301",
-  evidence,
-), /审核证据不存在/);
+assert.throws(
+  () =>
+    applyProductMediaReview(
+      pending,
+      { assetId, decision: "approved", evidenceRef: "evidence-review-missing", notes: "" },
+      "user-admin-301",
+      evidence,
+    ),
+  /审核证据不存在/,
+);
 
-assert.throws(() => applyProductMediaReview(
-  pending,
-  { assetId, decision: "approved", evidenceRef: "evidence-review-301", notes: "" },
-  "user-admin-301",
-  evidence,
-  new Date("invalid"),
-), /审核时间无效/);
+assert.throws(
+  () =>
+    applyProductMediaReview(
+      pending,
+      { assetId, decision: "approved", evidenceRef: "evidence-review-301", notes: "" },
+      "user-admin-301",
+      evidence,
+      new Date("invalid"),
+    ),
+  /审核时间无效/,
+);
 
-console.log("PASS ProductMedia registration, trusted probing, review, and revocation remain evidence-bound");
+console.log(
+  "PASS ProductMedia registration, trusted probing, review, and revocation remain evidence-bound",
+);

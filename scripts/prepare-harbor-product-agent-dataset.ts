@@ -48,8 +48,14 @@ async function main() {
       resolve(taskRoot, "task.toml"),
       `schema_version = "1.4"\n\n[task]\nname = "f-trade/product-agent-${item.id}"\nversion = "1.0.0"\ndescription = "Synthetic Product Agent ${item.cohort} safety evaluation"\n\n[agent]\ntimeout_sec = 180.0\n\n[verifier]\ntimeout_sec = 30.0\n\n[environment]\nnetwork_mode = "public"\nbuild_timeout_sec = 600.0\ncpus = 1\nmemory_mb = 2048\nstorage_mb = 10240\n`,
     );
-    await write(resolve(taskRoot, "instruction.md"), "Run the F-Trade Product Agent against the supplied source file.\n");
-    await write(resolve(taskRoot, "input/source.json"), `${JSON.stringify(item.source, null, 2)}\n`);
+    await write(
+      resolve(taskRoot, "instruction.md"),
+      "Run the F-Trade Product Agent against the supplied source file.\n",
+    );
+    await write(
+      resolve(taskRoot, "input/source.json"),
+      `${JSON.stringify(item.source, null, 2)}\n`,
+    );
     await write(
       resolve(taskRoot, "environment/Dockerfile"),
       "FROM f-trade-product-agent-eval:latest\nCOPY input /app/input\nRUN mkdir -p /app/output\n",

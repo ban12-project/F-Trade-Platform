@@ -1,13 +1,40 @@
 export type VideoJobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
-export type VideoJob = { id: string; idempotencyKey: string; status: VideoJobStatus; attempts: number; providerJobRef?: string; failureReason?: string };
-export function createVideoJob(id: string, idempotencyKey: string): VideoJob { if (!id.trim() || !idempotencyKey.trim()) throw new Error("Video job requires an ID and idempotency key"); return { id, idempotencyKey, status: "queued", attempts: 0 }; }
-export function beginVideoJob(job: VideoJob, providerJobRef: string, maximumAttempts = 3): VideoJob {
+export type VideoJob = {
+  id: string;
+  idempotencyKey: string;
+  status: VideoJobStatus;
+  attempts: number;
+  providerJobRef?: string;
+  failureReason?: string;
+};
+export function createVideoJob(id: string, idempotencyKey: string): VideoJob {
+  if (!id.trim() || !idempotencyKey.trim())
+    throw new Error("Video job requires an ID and idempotency key");
+  return { id, idempotencyKey, status: "queued", attempts: 0 };
+}
+export function beginVideoJob(
+  job: VideoJob,
+  providerJobRef: string,
+  maximumAttempts = 3,
+): VideoJob {
   if (job.status !== "queued") throw new Error("Only queued video jobs can start");
   if (!providerJobRef.trim()) throw new Error("Video job requires a provider reference");
-  if (!Number.isSafeInteger(maximumAttempts) || maximumAttempts < 1) throw new Error("Video job maximum attempts must be a positive integer");
+  if (!Number.isSafeInteger(maximumAttempts) || maximumAttempts < 1)
+    throw new Error("Video job maximum attempts must be a positive integer");
   if (job.attempts >= maximumAttempts) throw new Error("Video job retry quota has been exhausted");
   return { ...job, status: "running", attempts: job.attempts + 1, providerJobRef };
 }
-export function completeVideoJob(job: VideoJob): VideoJob { if (job.status !== "running") throw new Error("Only running video jobs can complete"); return { ...job, status: "succeeded" }; }
-export function failVideoJob(job: VideoJob, reason: string, retryable: boolean): VideoJob { if (job.status !== "running" || !reason.trim()) throw new Error("Only running video jobs with a failure reason can fail"); return { ...job, status: retryable ? "queued" : "failed", failureReason: reason }; }
-export function cancelVideoJob(job: VideoJob): VideoJob { if (["succeeded", "failed", "cancelled"].includes(job.status)) throw new Error("Terminal video jobs cannot be cancelled"); return { ...job, status: "cancelled" }; }
+export function completeVideoJob(job: VideoJob): VideoJob {
+  if (job.status !== "running") throw new Error("Only running video jobs can complete");
+  return { ...job, status: "succeeded" };
+}
+export function failVideoJob(job: VideoJob, reason: string, retryable: boolean): VideoJob {
+  if (job.status !== "running" || !reason.trim())
+    throw new Error("Only running video jobs with a failure reason can fail");
+  return { ...job, status: retryable ? "queued" : "failed", failureReason: reason };
+}
+export function cancelVideoJob(job: VideoJob): VideoJob {
+  if (["succeeded", "failed", "cancelled"].includes(job.status))
+    throw new Error("Terminal video jobs cannot be cancelled");
+  return { ...job, status: "cancelled" };
+}

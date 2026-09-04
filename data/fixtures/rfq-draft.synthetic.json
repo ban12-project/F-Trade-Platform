@@ -1,8 +1,12 @@
 {
   "rfq_id": "synthetic-rfq-001",
-  "customer": {"name": "Synthetic Buyer", "company": "Synthetic Auto Parts", "country": "Synthetic Country"},
-  "product": {"product_type": "clutch_kit", "vehicle_brand": "Synthetic"},
-  "commercial": {"quantity": 500},
+  "customer": {
+    "name": "Synthetic Buyer",
+    "company": "Synthetic Auto Parts",
+    "country": "Synthetic Country"
+  },
+  "product": { "product_type": "clutch_kit", "vehicle_brand": "Synthetic" },
+  "commercial": { "quantity": 500 },
   "status": "collecting",
   "completeness_score": 35,
   "missing_fields": ["vehicle_model_or_oe_number", "destination"]

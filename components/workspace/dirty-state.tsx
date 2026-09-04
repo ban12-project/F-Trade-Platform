@@ -1,8 +1,26 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type DirtyStateContextValue = {
   dirty: boolean;
@@ -21,15 +39,24 @@ export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
   const setDirty = useCallback((key: string, value: boolean) => {
     setDirtyKeys((current) => {
       const next = new Set(current);
-      if (value) next.add(key); else next.delete(key);
-      return next.size === current.size && [...next].every((item) => current.has(item)) ? current : next;
+      if (value) next.add(key);
+      else next.delete(key);
+      return next.size === current.size && [...next].every((item) => current.has(item))
+        ? current
+        : next;
     });
   }, []);
-  const requestNavigation = useCallback((action: () => void) => {
-    if (!dirty) { action(); return; }
-    pendingAction.current = action;
-    setConfirmOpen(true);
-  }, [dirty]);
+  const requestNavigation = useCallback(
+    (action: () => void) => {
+      if (!dirty) {
+        action();
+        return;
+      }
+      pendingAction.current = action;
+      setConfirmOpen(true);
+    },
+    [dirty],
+  );
   function discardAndContinue() {
     const action = pendingAction.current;
     pendingAction.current = null;
@@ -45,15 +72,50 @@ export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!dirty) return;
     const popState = () => {
-      if (allowNextPop.current) { allowNextPop.current = false; return; }
+      if (allowNextPop.current) {
+        allowNextPop.current = false;
+        return;
+      }
       window.history.forward();
-      requestNavigation(() => { allowNextPop.current = true; window.history.back(); });
+      requestNavigation(() => {
+        allowNextPop.current = true;
+        window.history.back();
+      });
     };
     window.addEventListener("popstate", popState);
     return () => window.removeEventListener("popstate", popState);
   }, [dirty, requestNavigation]);
-  const value = useMemo(() => ({ dirty, setDirty, requestNavigation }), [dirty, requestNavigation, setDirty]);
-  return <DirtyStateContext value={value}>{children}<AlertDialog open={confirmOpen} onOpenChange={(open) => { setConfirmOpen(open); if (!open) pendingAction.current = null; }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle><AlertDialogDescription>当前页面还有未保存内容。继续后这些修改无法恢复。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>继续编辑</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={discardAndContinue}>放弃修改并离开</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></DirtyStateContext>;
+  const value = useMemo(
+    () => ({ dirty, setDirty, requestNavigation }),
+    [dirty, requestNavigation, setDirty],
+  );
+  return (
+    <DirtyStateContext value={value}>
+      {children}
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) pendingAction.current = null;
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前页面还有未保存内容。继续后这些修改无法恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>继续编辑</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={discardAndContinue}>
+              放弃修改并离开
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </DirtyStateContext>
+  );
 }
 
 export function useWorkspaceDirtyState() {

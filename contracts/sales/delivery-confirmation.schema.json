@@ -4,43 +4,72 @@
   "title": "DeliveryConfirmation",
   "type": "object",
   "additionalProperties": false,
-  "required": ["confirmation_id", "related_entity_type", "related_entity_id", "status", "requested_by_type", "requested_by_id", "requested_at"],
+  "required": [
+    "confirmation_id",
+    "related_entity_type",
+    "related_entity_id",
+    "status",
+    "requested_by_type",
+    "requested_by_id",
+    "requested_at"
+  ],
   "properties": {
-    "confirmation_id": {"type": "string", "minLength": 1},
-    "related_entity_type": {"enum": ["rfq", "opportunity"]},
-    "related_entity_id": {"type": "string", "minLength": 1},
-    "status": {"enum": ["pending", "confirmed", "rejected", "expired"]},
-    "requested_by_type": {"enum": ["agent", "human", "system"]},
-    "requested_by_id": {"type": "string", "minLength": 1},
-    "requested_at": {"type": "string", "format": "date-time"},
+    "confirmation_id": { "type": "string", "minLength": 1 },
+    "related_entity_type": { "enum": ["rfq", "opportunity"] },
+    "related_entity_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pending", "confirmed", "rejected", "expired"] },
+    "requested_by_type": { "enum": ["agent", "human", "system"] },
+    "requested_by_id": { "type": "string", "minLength": 1 },
+    "requested_at": { "type": "string", "format": "date-time" },
     "result": {
       "type": "object",
       "additionalProperties": false,
       "required": ["actor_type", "decided_by", "decided_at", "evidence_ref"],
       "properties": {
-        "actor_type": {"const": "human"},
-        "decided_by": {"type": "string", "minLength": 1},
-        "decided_at": {"type": "string", "format": "date-time"},
-        "evidence_ref": {"type": "string", "minLength": 1},
-        "confirmed_lead_time_days": {"type": "integer", "minimum": 0},
-        "valid_until": {"type": "string", "format": "date-time"},
-        "notes": {"type": "string"}
+        "actor_type": { "const": "human" },
+        "decided_by": { "type": "string", "minLength": 1 },
+        "decided_at": { "type": "string", "format": "date-time" },
+        "evidence_ref": { "type": "string", "minLength": 1 },
+        "confirmed_lead_time_days": { "type": "integer", "minimum": 0 },
+        "valid_until": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" }
       }
     },
-    "approval_ref": {"type": "string", "minLength": 1}
+    "approval_ref": { "type": "string", "minLength": 1 }
   },
   "allOf": [
     {
-      "if": {"properties": {"status": {"const": "pending"}}, "required": ["status"]},
-      "then": {"not": {"anyOf": [{"properties": {"result": {}}, "required": ["result"]}, {"properties": {"approval_ref": {}}, "required": ["approval_ref"]}]}}
+      "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "properties": { "result": {} }, "required": ["result"] },
+            { "properties": { "approval_ref": {} }, "required": ["approval_ref"] }
+          ]
+        }
+      }
     },
     {
-      "if": {"properties": {"status": {"enum": ["confirmed", "rejected"]}}, "required": ["status"]},
-      "then": {"properties": {"result": {}, "approval_ref": {}}, "required": ["result", "approval_ref"]}
+      "if": {
+        "properties": { "status": { "enum": ["confirmed", "rejected"] } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": { "result": {}, "approval_ref": {} },
+        "required": ["result", "approval_ref"]
+      }
     },
     {
-      "if": {"properties": {"status": {"const": "confirmed"}}, "required": ["status"]},
-      "then": {"properties": {"result": {"type": "object", "properties": {"confirmed_lead_time_days": {}, "valid_until": {}}, "required": ["confirmed_lead_time_days", "valid_until"]}}}
+      "if": { "properties": { "status": { "const": "confirmed" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": { "confirmed_lead_time_days": {}, "valid_until": {} },
+            "required": ["confirmed_lead_time_days", "valid_until"]
+          }
+        }
+      }
     }
   ]
 }

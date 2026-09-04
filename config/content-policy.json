@@ -1,9 +1,28 @@
 {
   "types": [
-    {"id":"product","english_structure":["hook","sourced_fact","benefit","cta"],"cta":"Send OE number and vehicle model for review."},
-    {"id":"factory_capability","english_structure":["hook","verified_capability","process","cta"],"cta":"Contact our team to discuss your requirements."},
-    {"id":"industry_knowledge","english_structure":["hook","general_guidance","verification_note","cta"],"cta":"Share your application details for human review."}
+    {
+      "id": "product",
+      "english_structure": ["hook", "sourced_fact", "benefit", "cta"],
+      "cta": "Send OE number and vehicle model for review."
+    },
+    {
+      "id": "factory_capability",
+      "english_structure": ["hook", "verified_capability", "process", "cta"],
+      "cta": "Contact our team to discuss your requirements."
+    },
+    {
+      "id": "industry_knowledge",
+      "english_structure": ["hook", "general_guidance", "verification_note", "cta"],
+      "cta": "Share your application details for human review."
+    }
   ],
-  "visual_prohibitions":["spline_count","spline_geometry","bolt_hole_pattern","dimensions","friction_material","part_count"],
-  "rule":"AI visuals are illustrative only and cannot prove or alter product engineering facts."
+  "visual_prohibitions": [
+    "spline_count",
+    "spline_geometry",
+    "bolt_hole_pattern",
+    "dimensions",
+    "friction_material",
+    "part_count"
+  ],
+  "rule": "AI visuals are illustrative only and cannot prove or alter product engineering facts."
 }

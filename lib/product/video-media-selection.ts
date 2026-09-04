@@ -3,24 +3,34 @@ import { z } from "zod";
 import type { ProductReady } from "./verification";
 import {
   assessProductVideoReadiness,
-  productMediaAssetSchema,
   type ProductMediaAsset,
+  productMediaAssetSchema,
   type VideoReadyAssessment,
 } from "./video-readiness";
 
-export const productVideoMediaSelectionSchema = z.object({
-  productId: z.uuid("产品标识无效。"),
-  assetIds: z.array(z.uuid("产品媒体标识无效。")).min(1, "至少选择一个已审核产品媒体。").max(3, "MVP1 最多选择三个产品媒体。"),
-  usage: z.enum(["organic", "paid_advertising"]).default("organic"),
-}).strict().superRefine((selection, context) => {
-  const seen = new Set<string>();
-  for (const [index, assetId] of selection.assetIds.entries()) {
-    if (seen.has(assetId)) {
-      context.addIssue({ code: "custom", path: ["assetIds", index], message: "产品媒体不能重复选择。" });
+export const productVideoMediaSelectionSchema = z
+  .object({
+    productId: z.uuid("产品标识无效。"),
+    assetIds: z
+      .array(z.uuid("产品媒体标识无效。"))
+      .min(1, "至少选择一个已审核产品媒体。")
+      .max(3, "MVP1 最多选择三个产品媒体。"),
+    usage: z.enum(["organic", "paid_advertising"]).default("organic"),
+  })
+  .strict()
+  .superRefine((selection, context) => {
+    const seen = new Set<string>();
+    for (const [index, assetId] of selection.assetIds.entries()) {
+      if (seen.has(assetId)) {
+        context.addIssue({
+          code: "custom",
+          path: ["assetIds", index],
+          message: "产品媒体不能重复选择。",
+        });
+      }
+      seen.add(assetId);
     }
-    seen.add(assetId);
-  }
-});
+  });
 
 export type ProductVideoMediaSelection = z.infer<typeof productVideoMediaSelectionSchema>;
 

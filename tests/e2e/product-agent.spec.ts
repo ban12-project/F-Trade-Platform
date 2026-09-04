@@ -1,15 +1,14 @@
 import { expect, test } from "@playwright/test";
-
+import { getHarborEvaluationModelConfig } from "../../lib/ai/harbor-evaluation-model";
 import {
   createProductAgentModel,
   validateProductAgentModelConfig,
 } from "../../lib/ai/model-provider";
-import { getHarborEvaluationModelConfig } from "../../lib/ai/harbor-evaluation-model";
 import { productAgentModelSettingsSchema, productAgentRunFormSchema } from "../../lib/form-schemas";
 import {
   finalizeProductAgentDraft,
-  validateProductAgentSource,
   type ProductAgentSource,
+  validateProductAgentSource,
 } from "../../lib/product/agent";
 import { discoverCatalogCandidates } from "../../lib/product/catalog-candidates";
 
@@ -66,68 +65,84 @@ test("validates the persisted provider configuration without allowing plaintext 
     clearAuthToken: false,
   };
   expect(productAgentModelSettingsSchema.safeParse(input).success).toBe(true);
-  expect(productAgentModelSettingsSchema.safeParse({
-    ...input,
-    headersJson: '{"Authorization":"Bearer should-not-be-plaintext"}',
-  }).success).toBe(false);
+  expect(
+    productAgentModelSettingsSchema.safeParse({
+      ...input,
+      headersJson: '{"Authorization":"Bearer should-not-be-plaintext"}',
+    }).success,
+  ).toBe(false);
 });
 
 test("accepts only an authorized, bounded Product Agent text envelope", () => {
-  expect(productAgentRunFormSchema.safeParse({
-    modelConfigId: "00000000-0000-4000-8000-000000000501",
-    model: "gpt-5-mini",
-    sourceRef: "source-catalog-001",
-    evidenceRef: "evidence-catalog-001",
-    sourceText: "Product name: Synthetic Clutch Kit\nProduct type: clutch_kit",
-    hasUpload: false,
-  }).success).toBe(true);
-  expect(productAgentRunFormSchema.safeParse({
-    modelConfigId: "00000000-0000-4000-8000-000000000501",
-    model: "gpt-5-mini",
-    sourceRef: "/tmp/factory.xlsx",
-    evidenceRef: "evidence-catalog-001",
-    sourceText: "Product name: Synthetic Clutch Kit\nProduct type: clutch_kit",
-    hasUpload: false,
-  }).success).toBe(false);
+  expect(
+    productAgentRunFormSchema.safeParse({
+      modelConfigId: "00000000-0000-4000-8000-000000000501",
+      model: "gpt-5-mini",
+      sourceRef: "source-catalog-001",
+      evidenceRef: "evidence-catalog-001",
+      sourceText: "Product name: Synthetic Clutch Kit\nProduct type: clutch_kit",
+      hasUpload: false,
+    }).success,
+  ).toBe(true);
+  expect(
+    productAgentRunFormSchema.safeParse({
+      modelConfigId: "00000000-0000-4000-8000-000000000501",
+      model: "gpt-5-mini",
+      sourceRef: "/tmp/factory.xlsx",
+      evidenceRef: "evidence-catalog-001",
+      sourceText: "Product name: Synthetic Clutch Kit\nProduct type: clutch_kit",
+      hasUpload: false,
+    }).success,
+  ).toBe(false);
 });
 
 test("fails closed when a saved provider has no key", () => {
-  expect(() => createProductAgentModel({
-    provider: "openai",
-    model: "gpt-test",
-    providerOptions: {},
-  })).toThrow("Saved openai provider requires an API key");
+  expect(() =>
+    createProductAgentModel({
+      provider: "openai",
+      model: "gpt-test",
+      providerOptions: {},
+    }),
+  ).toThrow("Saved openai provider requires an API key");
 });
 
 test("fails closed when a saved OpenAI-compatible provider has no endpoint", () => {
-  expect(() => createProductAgentModel({
-    provider: "openai-compatible",
-    model: "gpt-test",
-    providerOptions: { apiKey: "test-key" },
-  })).toThrow("Saved OpenAI-compatible provider requires a Base URL");
+  expect(() =>
+    createProductAgentModel({
+      provider: "openai-compatible",
+      model: "gpt-test",
+      providerOptions: { apiKey: "test-key" },
+    }),
+  ).toThrow("Saved OpenAI-compatible provider requires a Base URL");
 });
 
 test("rejects saving a provider configuration without an authentication method", () => {
-  expect(() => validateProductAgentModelConfig({
-    provider: "openai-compatible",
-    model: "gateway-model",
-    providerOptions: { baseURL: "https://gateway.example.test/v1" },
-  })).toThrow("API key");
-  expect(() => validateProductAgentModelConfig({
-    provider: "anthropic",
-    model: "claude-test",
-    providerOptions: {},
-  })).toThrow("API key or Auth token");
+  expect(() =>
+    validateProductAgentModelConfig({
+      provider: "openai-compatible",
+      model: "gateway-model",
+      providerOptions: { baseURL: "https://gateway.example.test/v1" },
+    }),
+  ).toThrow("API key");
+  expect(() =>
+    validateProductAgentModelConfig({
+      provider: "anthropic",
+      model: "claude-test",
+      providerOptions: {},
+    }),
+  ).toThrow("API key or Auth token");
 });
 
 test("uses only the selected provider's injected Harbor credential", () => {
-  expect(getHarborEvaluationModelConfig({
-    HARBOR_MODEL: "openai-compatible/gateway-model",
-    HARBOR_OPENAI_COMPATIBLE_BASE_URL: "https://gateway.example.test/v1",
-    HARBOR_OPENAI_COMPATIBLE_API_KEY: "synthetic-evaluation-key",
-    DATABASE_URL: "must-not-be-read",
-    MODEL_CONFIG_ENCRYPTION_KEY: "must-not-be-read",
-  })).toEqual({
+  expect(
+    getHarborEvaluationModelConfig({
+      HARBOR_MODEL: "openai-compatible/gateway-model",
+      HARBOR_OPENAI_COMPATIBLE_BASE_URL: "https://gateway.example.test/v1",
+      HARBOR_OPENAI_COMPATIBLE_API_KEY: "synthetic-evaluation-key",
+      DATABASE_URL: "must-not-be-read",
+      MODEL_CONFIG_ENCRYPTION_KEY: "must-not-be-read",
+    }),
+  ).toEqual({
     provider: "openai-compatible",
     model: "gateway-model",
     providerOptions: {
@@ -146,10 +161,7 @@ test("uses only the selected provider's injected Harbor credential", () => {
 test("finalizes only source-backed review drafts", () => {
   expect(finalizeProductAgentDraft(safeDraft, source).verification_status).toBe("review_required");
   expect(() =>
-    finalizeProductAgentDraft(
-      { ...safeDraft, verification_status: "unverified" },
-      source,
-    ),
+    finalizeProductAgentDraft({ ...safeDraft, verification_status: "unverified" }, source),
   ).toThrow("review_required");
   expect(() =>
     finalizeProductAgentDraft(
@@ -173,16 +185,20 @@ test("rejects invalid source image and injection envelopes before model invocati
       image_refs: ["synthetic/front.png"],
     }),
   ).toThrow("bytes for every image reference");
-  expect(validateProductAgentSource({
-    ...source,
-    image_availability: "real_product_image",
-    image_refs: ["synthetic/front.png"],
-    image_inputs: [{
-      ref: "synthetic/front.png",
-      media_type: "image/png",
-      data_base64: "iVBORw0KGgo=",
-    }],
-  }).image_inputs).toHaveLength(1);
+  expect(
+    validateProductAgentSource({
+      ...source,
+      image_availability: "real_product_image",
+      image_refs: ["synthetic/front.png"],
+      image_inputs: [
+        {
+          ref: "synthetic/front.png",
+          media_type: "image/png",
+          data_base64: "iVBORw0KGgo=",
+        },
+      ],
+    }).image_inputs,
+  ).toHaveLength(1);
   expect(validateProductAgentSource(source)).toEqual(source);
 });
 
@@ -198,7 +214,11 @@ test("scopes catalog candidates without treating the selector as evidence", () =
       "Part No.: 10XDC200\nProduct name: Qidie disc",
     ].join("\n"),
   });
-  expect(candidates.map((candidate) => candidate.identifier)).toEqual(["RYC251", "RYC302", "10XDC200"]);
+  expect(candidates.map((candidate) => candidate.identifier)).toEqual([
+    "RYC251",
+    "RYC302",
+    "10XDC200",
+  ]);
   expect(candidates[0]?.source.record_id).toBe("synthetic-product-agent-test-ryc251");
   expect(candidates[0]?.source.candidate_identifier).toBe("RYC251");
   expect(candidates[0]?.source.evidence_refs).toEqual(source.evidence_refs);
@@ -237,7 +257,10 @@ test("rejects an adjacent catalog identifier for a selected candidate", () => {
       { ...safeDraft, product: { ...safeDraft.product, internal_sku: "RYC302" } },
       {
         ...source,
-        source_text: source.source_text.replace("Internal SKU: SYN-TEST-001", "Internal SKU: RYC302"),
+        source_text: source.source_text.replace(
+          "Internal SKU: SYN-TEST-001",
+          "Internal SKU: RYC302",
+        ),
         candidate_identifier: "RYC251",
       },
     ),
@@ -333,18 +356,24 @@ test("rejects restricted engineering and commercial values missing from labelled
 });
 
 test("rejects unsupported identity and remaining commercial facts", () => {
-  expect(() => finalizeProductAgentDraft(
-    { ...safeDraft, product: { ...safeDraft.product, product_name: "Invented Kit" } },
-    source,
-  )).toThrow("product.product_name must match an explicitly labelled source value");
-  expect(() => finalizeProductAgentDraft(
-    { ...safeDraft, product: { ...safeDraft.product, product_type: "clutch_disc" } },
-    source,
-  )).toThrow("product.product_type must match an explicitly labelled source value");
-  expect(() => finalizeProductAgentDraft(
-    { ...safeDraft, product: { ...safeDraft.product, internal_sku: "INVENTED-SKU" } },
-    source,
-  )).toThrow("product.internal_sku must match an explicitly labelled source value");
+  expect(() =>
+    finalizeProductAgentDraft(
+      { ...safeDraft, product: { ...safeDraft.product, product_name: "Invented Kit" } },
+      source,
+    ),
+  ).toThrow("product.product_name must match an explicitly labelled source value");
+  expect(() =>
+    finalizeProductAgentDraft(
+      { ...safeDraft, product: { ...safeDraft.product, product_type: "clutch_disc" } },
+      source,
+    ),
+  ).toThrow("product.product_type must match an explicitly labelled source value");
+  expect(() =>
+    finalizeProductAgentDraft(
+      { ...safeDraft, product: { ...safeDraft.product, internal_sku: "INVENTED-SKU" } },
+      source,
+    ),
+  ).toThrow("product.internal_sku must match an explicitly labelled source value");
 
   const commercialDraft = {
     ...safeDraft,
@@ -358,28 +387,32 @@ test("rejects unsupported identity and remaining commercial facts", () => {
   expect(() => finalizeProductAgentDraft(commercialDraft, source)).toThrow(
     "commercial.packaging must match an explicitly labelled source value",
   );
-  expect(() => finalizeProductAgentDraft(
-    {
-      ...safeDraft,
-      commercial: { sample_available: true },
-      field_evidence: {
-        ...safeDraft.field_evidence,
-        "commercial.sample_available": source.source_ref,
+  expect(() =>
+    finalizeProductAgentDraft(
+      {
+        ...safeDraft,
+        commercial: { sample_available: true },
+        field_evidence: {
+          ...safeDraft.field_evidence,
+          "commercial.sample_available": source.source_ref,
+        },
       },
-    },
-    source,
-  )).toThrow("commercial.sample_available must match an explicitly labelled source value");
-  expect(() => finalizeProductAgentDraft(
-    {
-      ...safeDraft,
-      commercial: { supported_customization: "invented logo service" },
-      field_evidence: {
-        ...safeDraft.field_evidence,
-        "commercial.supported_customization": source.source_ref,
+      source,
+    ),
+  ).toThrow("commercial.sample_available must match an explicitly labelled source value");
+  expect(() =>
+    finalizeProductAgentDraft(
+      {
+        ...safeDraft,
+        commercial: { supported_customization: "invented logo service" },
+        field_evidence: {
+          ...safeDraft.field_evidence,
+          "commercial.supported_customization": source.source_ref,
+        },
       },
-    },
-    source,
-  )).toThrow("commercial.supported_customization must match an explicitly labelled source value");
+      source,
+    ),
+  ).toThrow("commercial.supported_customization must match an explicitly labelled source value");
 });
 
 test("accepts restricted facts only when their labelled source values match", () => {

@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 
-import { getDatabase, type Database } from "../db/client";
+import { type Database, getDatabase } from "../db/client";
 import { socialInboundDelivery } from "../db/schema";
 import {
-  inboundDeliveryKey,
-  validateOfficialInboundWebhook,
   type ChannelInboundPolicy,
+  inboundDeliveryKey,
   type OfficialInboundWebhook,
+  validateOfficialInboundWebhook,
 } from "./inbound-policy";
 
 export interface InboundDeliveryReceipt {
@@ -51,7 +51,8 @@ export async function claimOfficialInboundDelivery(
   return {
     deliveryKey: receipt.deliveryKey,
     status,
-    nextAction: status === "accepted" ? "create_or_update_lead" as const : "ignore_duplicate" as const,
+    nextAction:
+      status === "accepted" ? ("create_or_update_lead" as const) : ("ignore_duplicate" as const),
   };
 }
 
@@ -118,7 +119,10 @@ export function databaseInboundDeliveryReceiptStore(
 export async function processDatabaseOfficialInboundDelivery<Result>(
   policy: ChannelInboundPolicy,
   webhook: OfficialInboundWebhook,
-  onAccepted: (transaction: DatabaseTransaction, receipt: InboundDeliveryReceipt) => Promise<Result>,
+  onAccepted: (
+    transaction: DatabaseTransaction,
+    receipt: InboundDeliveryReceipt,
+  ) => Promise<Result>,
   database: Database = getDatabase(),
 ) {
   return processOfficialInboundDelivery(

@@ -5,17 +5,13 @@ import { auth } from "../../../../lib/auth";
 import { getDatabase } from "../../../../lib/db/client";
 import { approval } from "../../../../lib/db/schema";
 import {
-  humanGateToken,
-  waitForHumanGate,
   type HumanGate,
   type HumanGateWorkflowInput,
+  humanGateToken,
+  waitForHumanGate,
 } from "../../../../workflows/human-gate";
 
-const gates = new Set<HumanGate>([
-  "gate_01_truth",
-  "gate_02_quote",
-  "gate_03_delivery",
-]);
+const gates = new Set<HumanGate>(["gate_01_truth", "gate_02_quote", "gate_03_delivery"]);
 
 function parseInput(value: unknown): HumanGateWorkflowInput {
   if (!value || typeof value !== "object") throw new Error("Invalid request body");

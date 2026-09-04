@@ -1,8 +1,5 @@
-import { createAnthropic, type AnthropicProviderSettings } from "@ai-sdk/anthropic";
-import {
-  createGoogleGenerativeAI,
-  type GoogleGenerativeAIProviderSettings,
-} from "@ai-sdk/google";
+import { type AnthropicProviderSettings, createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderSettings } from "@ai-sdk/google";
 import { createOpenAI, type OpenAIProviderSettings } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
@@ -56,8 +53,8 @@ export function createProductAgentModel(config: ProductAgentModelConfig): Langua
     case "anthropic":
       return createAnthropic(config.providerOptions as AnthropicProviderSettings)(config.model);
     case "google":
-      return createGoogleGenerativeAI(
-        config.providerOptions as GoogleGenerativeAIProviderSettings,
-      )(config.model);
+      return createGoogleGenerativeAI(config.providerOptions as GoogleGenerativeAIProviderSettings)(
+        config.model,
+      );
   }
 }

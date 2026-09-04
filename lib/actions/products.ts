@@ -6,15 +6,15 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
+import { productReviewFormSchema } from "@/lib/form-schemas";
 import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
 import {
   createEvidenceBoundProductCatalogDraft as createProductCatalogDraft,
   reviseEvidenceBoundProductCatalogDraft as reviseProductCatalogDraft,
 } from "@/lib/product/evidence-bound-catalog";
-import { productReviewFormSchema } from "@/lib/form-schemas";
 import { decideProductCatalogReview } from "@/lib/products";
-import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
+import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type ProductActionState = {
   status: "idle" | "success" | "error";
@@ -81,17 +81,29 @@ export async function decideProductCatalogReviewAction(
   try {
     const projectId = projectIdFrom(formData);
     if (projectId) {
-      await assertWorkspaceAggregateLink(projectId, parsed.data.productId, "marketing", "product", session.user.id);
+      await assertWorkspaceAggregateLink(
+        projectId,
+        parsed.data.productId,
+        "marketing",
+        "product",
+        session.user.id,
+      );
       await assertAndLinkProjectEvidence(projectId, [parsed.data.evidenceRef], session.user.id);
     }
     const result = await decideProductCatalogReview(parsed.data, session.user.id);
     revalidateProductPaths(projectId, parsed.data.productId);
     return {
       status: "success",
-      message: result.state === "PRODUCT_READY" ? "Gate 01 已批准，产品已进入 Ready。" : "Gate 01 已退回，产品需要修订。",
+      message:
+        result.state === "PRODUCT_READY"
+          ? "Gate 01 已批准，产品已进入 Ready。"
+          : "Gate 01 已退回，产品需要修订。",
     };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法完成 Gate 01 审核。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法完成 Gate 01 审核。",
+    };
   }
 }
 
@@ -104,20 +116,45 @@ export async function reviseProductCatalogDraftAction(
     return { status: "error", message: "无权修订产品草稿。" };
   }
   const productId = formData.get("productId");
-  const parsedProductId = productReviewFormSchema.pick({ productId: true }).safeParse({ productId });
-  if (!parsedProductId.success) return { status: "error", message: parsedProductId.error.issues[0]?.message ?? "产品记录标识无效。" };
+  const parsedProductId = productReviewFormSchema
+    .pick({ productId: true })
+    .safeParse({ productId });
+  if (!parsedProductId.success)
+    return {
+      status: "error",
+      message: parsedProductId.error.issues[0]?.message ?? "产品记录标识无效。",
+    };
   const parsed = productCatalogFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "产品资料格式不正确。" };
   }
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceAggregateLink(projectId, parsedProductId.data.productId, "marketing", "product", session.user.id);
+    if (projectId)
+      await assertWorkspaceAggregateLink(
+        projectId,
+        parsedProductId.data.productId,
+        "marketing",
+        "product",
+        session.user.id,
+      );
     if (!projectId) throw new Error("产品修订必须在所属项目中进行。");
-    await reviseProductCatalogDraft(parsedProductId.data.productId, parsed.data, session.user.id, projectId);
+    await reviseProductCatalogDraft(
+      parsedProductId.data.productId,
+      parsed.data,
+      session.user.id,
+      projectId,
+    );
     revalidateProductPaths(projectId, parsedProductId.data.productId);
-    return { status: "success", message: "修订及逐字段证据已保存，并重新提交 Gate 01 审核。", productId: parsedProductId.data.productId };
+    return {
+      status: "success",
+      message: "修订及逐字段证据已保存，并重新提交 Gate 01 审核。",
+      productId: parsedProductId.data.productId,
+    };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法保存产品修订。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法保存产品修订。",
+    };
   }
 }

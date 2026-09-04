@@ -18,9 +18,10 @@ export async function POST(request: Request) {
   const { action } = input as { action?: unknown };
   if (action === "reset") return NextResponse.json(mockServer.reset());
   if (action === "deliver" || action === "duplicate" || action === "fail" || action === "retry") {
-    const messageId = action === "deliver" || action === "duplicate"
-      ? "synthetic-webhook-001"
-      : "synthetic-webhook-002";
+    const messageId =
+      action === "deliver" || action === "duplicate"
+        ? "synthetic-webhook-001"
+        : "synthetic-webhook-002";
     const result = await mockServer.deliver(messageId, { failDownstream: action === "fail" });
     return NextResponse.json(result, { status: result.status === "rejected" ? 502 : 200 });
   }

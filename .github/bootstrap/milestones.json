@@ -1,8 +1,8 @@
 [
-  {"title": "M0 基线与治理", "description": "仓库、数据契约、校验和研发协作流"},
-  {"title": "M1 产品数据闭环", "description": "产品导入、缺失识别和真实性门禁"},
-  {"title": "M2 内容发布闭环", "description": "三类内容、人工审核和单渠道发布"},
-  {"title": "M3 询盘报价闭环", "description": "询盘澄清、RFQ Ready 和人工报价交接"},
-  {"title": "M4 跟单商机闭环", "description": "跟单策略、规则评分和交期门禁"},
-  {"title": "M5 集成 Demo 验收", "description": "端到端演示、验收报告和 Go/No-Go"}
+  { "title": "M0 基线与治理", "description": "仓库、数据契约、校验和研发协作流" },
+  { "title": "M1 产品数据闭环", "description": "产品导入、缺失识别和真实性门禁" },
+  { "title": "M2 内容发布闭环", "description": "三类内容、人工审核和单渠道发布" },
+  { "title": "M3 询盘报价闭环", "description": "询盘澄清、RFQ Ready 和人工报价交接" },
+  { "title": "M4 跟单商机闭环", "description": "跟单策略、规则评分和交期门禁" },
+  { "title": "M5 集成 Demo 验收", "description": "端到端演示、验收报告和 Go/No-Go" }
 ]

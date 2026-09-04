@@ -1,8 +1,8 @@
 import {
-  processOfficialInboundDelivery,
   type InboundDeliveryReceipt,
   type InboundDeliveryReceiptStore,
   type InboundDeliveryTransactionRunner,
+  processOfficialInboundDelivery,
 } from "../social/inbound-delivery-store";
 import type { ChannelInboundPolicy, OfficialInboundWebhook } from "../social/inbound-policy";
 
@@ -58,7 +58,10 @@ export class MockOfficialChannelServer {
     return this.snapshot("accepted", "none");
   }
 
-  async deliver(messageId: string, options: { failDownstream?: boolean } = {}): Promise<MockChannelResult> {
+  async deliver(
+    messageId: string,
+    options: { failDownstream?: boolean } = {},
+  ): Promise<MockChannelResult> {
     const runner: InboundDeliveryTransactionRunner<MockChannelContext> = {
       transaction: async <Result>(callback: (context: MockChannelContext) => Promise<Result>) => {
         const transactionState = cloneState(this.state);

@@ -19,11 +19,23 @@ const valid = {
 };
 
 assert.equal(videoProjectDraftFormSchema.parse(valid).durationSeconds, 5);
-assert.equal(videoProjectDraftFormSchema.parse({ ...valid, assetRef: "", rightsEvidenceRef: "" }).assetRef, "");
-assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, factPath: "engineering.oe_number" }), /已核验/);
+assert.equal(
+  videoProjectDraftFormSchema.parse({ ...valid, assetRef: "", rightsEvidenceRef: "" }).assetRef,
+  "",
+);
+assert.throws(
+  () => videoProjectDraftFormSchema.parse({ ...valid, factPath: "engineering.oe_number" }),
+  /已核验/,
+);
 assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, platforms: [] }), /至少选择/);
-assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, assetRef: "https://example.com/image.png" }), /私有素材/);
-assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, rightsEvidenceRef: "" }), /权利证据/);
+assert.throws(
+  () => videoProjectDraftFormSchema.parse({ ...valid, assetRef: "https://example.com/image.png" }),
+  /私有素材/,
+);
+assert.throws(
+  () => videoProjectDraftFormSchema.parse({ ...valid, rightsEvidenceRef: "" }),
+  /权利证据/,
+);
 
 const marketingBase = {
   projectId: "00000000-0000-4000-8000-000000000510",
@@ -38,16 +50,24 @@ const upload = createMarketingVideoDraftFormSchema.parse({
   rightsEvidenceRef: "evidence-rights-501",
 });
 assert.equal(upload.rightsEvidenceRef, "evidence-rights-501");
-assert.throws(() => createMarketingVideoDraftFormSchema.parse({
-  ...marketingBase,
-  rightsEvidenceRef: "",
-}), /权利证据/);
-assert.throws(() => createMarketingVideoDraftFormSchema.parse({
-  ...marketingBase,
-  sourceMode: "product_media",
-  productMediaIds: ["00000000-0000-4000-8000-000000000511"],
-  rightsEvidenceRef: "evidence-rights-501",
-}), /Unrecognized key|unrecognized/i);
+assert.throws(
+  () =>
+    createMarketingVideoDraftFormSchema.parse({
+      ...marketingBase,
+      rightsEvidenceRef: "",
+    }),
+  /权利证据/,
+);
+assert.throws(
+  () =>
+    createMarketingVideoDraftFormSchema.parse({
+      ...marketingBase,
+      sourceMode: "product_media",
+      productMediaIds: ["00000000-0000-4000-8000-000000000511"],
+      rightsEvidenceRef: "evidence-rights-501",
+    }),
+  /Unrecognized key|unrecognized/i,
+);
 
 const mediaId = "00000000-0000-4000-8000-000000000511";
 const reused = createMarketingVideoFromProductMediaSchema.parse({
@@ -57,23 +77,35 @@ const reused = createMarketingVideoFromProductMediaSchema.parse({
   rightsEvidenceRef: "",
 });
 assert.deepEqual(reused.productMediaIds, [mediaId]);
-assert.throws(() => createMarketingVideoFromProductMediaSchema.parse({
-  ...marketingBase,
-  sourceMode: "product_media",
-  productMediaIds: [],
-  rightsEvidenceRef: "",
-}), /至少选择/);
-assert.throws(() => createMarketingVideoFromProductMediaSchema.parse({
-  ...marketingBase,
-  sourceMode: "product_media",
-  productMediaIds: [mediaId, mediaId],
-  rightsEvidenceRef: "",
-}), /不能重复选择/);
-assert.throws(() => createMarketingVideoFromProductMediaSchema.parse({
-  ...marketingBase,
-  sourceMode: "product_media",
-  productMediaIds: [mediaId],
-  rightsEvidenceRef: "evidence-rights-501",
-}), /Invalid input|invalid/i);
+assert.throws(
+  () =>
+    createMarketingVideoFromProductMediaSchema.parse({
+      ...marketingBase,
+      sourceMode: "product_media",
+      productMediaIds: [],
+      rightsEvidenceRef: "",
+    }),
+  /至少选择/,
+);
+assert.throws(
+  () =>
+    createMarketingVideoFromProductMediaSchema.parse({
+      ...marketingBase,
+      sourceMode: "product_media",
+      productMediaIds: [mediaId, mediaId],
+      rightsEvidenceRef: "",
+    }),
+  /不能重复选择/,
+);
+assert.throws(
+  () =>
+    createMarketingVideoFromProductMediaSchema.parse({
+      ...marketingBase,
+      sourceMode: "product_media",
+      productMediaIds: [mediaId],
+      rightsEvidenceRef: "evidence-rights-501",
+    }),
+  /Invalid input|invalid/i,
+);
 
 console.log("PASS video workspace form accepts only bounded, private, evidence-oriented input");

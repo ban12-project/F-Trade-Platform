@@ -4,22 +4,29 @@ import { z } from "zod";
 
 const MAX_COMMAND_LIFETIME_MS = 5 * 60_000;
 
-export const socialWorkerCommandSchema = z.object({
-  commandId: z.string().trim().min(1).max(240),
-  workerId: z.string().trim().min(1).max(240),
-  jobId: z.string().trim().min(1).max(240),
-  kind: z.enum(["publish", "observe_inbound", "reply"]),
-  payloadRef: z.string().trim().min(1).max(240),
-  payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
-  nonce: z.string().regex(/^[A-Za-z0-9_-]{24,128}$/),
-  issuedAt: z.coerce.date(),
-  expiresAt: z.coerce.date(),
-}).strict().superRefine((command, context) => {
-  const lifetime = command.expiresAt.getTime() - command.issuedAt.getTime();
-  if (lifetime <= 0 || lifetime > MAX_COMMAND_LIFETIME_MS) {
-    context.addIssue({ code: "custom", path: ["expiresAt"], message: "Worker command lifetime must be between 1ms and 5 minutes" });
-  }
-});
+export const socialWorkerCommandSchema = z
+  .object({
+    commandId: z.string().trim().min(1).max(240),
+    workerId: z.string().trim().min(1).max(240),
+    jobId: z.string().trim().min(1).max(240),
+    kind: z.enum(["publish", "observe_inbound", "reply"]),
+    payloadRef: z.string().trim().min(1).max(240),
+    payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    nonce: z.string().regex(/^[A-Za-z0-9_-]{24,128}$/),
+    issuedAt: z.coerce.date(),
+    expiresAt: z.coerce.date(),
+  })
+  .strict()
+  .superRefine((command, context) => {
+    const lifetime = command.expiresAt.getTime() - command.issuedAt.getTime();
+    if (lifetime <= 0 || lifetime > MAX_COMMAND_LIFETIME_MS) {
+      context.addIssue({
+        code: "custom",
+        path: ["expiresAt"],
+        message: "Worker command lifetime must be between 1ms and 5 minutes",
+      });
+    }
+  });
 export type SocialWorkerCommand = z.infer<typeof socialWorkerCommandSchema>;
 
 export type SignedSocialWorkerCommand = {
@@ -36,7 +43,8 @@ function signingKey() {
   const encoded = process.env.SOCIAL_WORKER_SIGNING_KEY;
   if (!encoded) throw new Error("SOCIAL_WORKER_SIGNING_KEY is required for social worker commands");
   const key = Buffer.from(encoded, "base64");
-  if (key.length < 32) throw new Error("SOCIAL_WORKER_SIGNING_KEY must be a base64-encoded key of at least 32 bytes");
+  if (key.length < 32)
+    throw new Error("SOCIAL_WORKER_SIGNING_KEY must be a base64-encoded key of at least 32 bytes");
   return key;
 }
 
@@ -59,7 +67,11 @@ function sign(command: SocialWorkerCommand) {
 }
 
 function canonicalPayload(payload: Record<string, unknown>) {
-  return JSON.stringify(Object.fromEntries(Object.entries(payload).sort(([left], [right]) => left.localeCompare(right))));
+  return JSON.stringify(
+    Object.fromEntries(
+      Object.entries(payload).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+  );
 }
 
 export function digestSocialWorkerPayload(payload: Record<string, unknown>) {
@@ -67,7 +79,10 @@ export function digestSocialWorkerPayload(payload: Record<string, unknown>) {
 }
 
 /** The isolated worker verifies the separately transported payload before using it. */
-export function verifySocialWorkerPayload(command: SocialWorkerCommand, payload: Record<string, unknown>) {
+export function verifySocialWorkerPayload(
+  command: SocialWorkerCommand,
+  payload: Record<string, unknown>,
+) {
   const expected = Buffer.from(command.payloadDigest, "hex");
   const actual = Buffer.from(digestSocialWorkerPayload(payload), "hex");
   if (!timingSafeEqual(actual, expected)) throw new Error("Worker payload digest is invalid");
@@ -93,10 +108,13 @@ export async function verifySocialWorkerCommand(
   now = new Date(),
 ): Promise<SocialWorkerCommand> {
   const command = socialWorkerCommandSchema.parse(signed.command);
-  if (command.workerId !== expectedWorkerId) throw new Error("Worker command is not addressed to this worker");
-  if (command.issuedAt > now || command.expiresAt <= now) throw new Error("Worker command is expired or not yet valid");
-  if (!hasValidSignature(command, signed.signature)) throw new Error("Worker command signature is invalid");
-  if (!await nonceStore.claim(command.workerId, command.nonce, command.expiresAt)) {
+  if (command.workerId !== expectedWorkerId)
+    throw new Error("Worker command is not addressed to this worker");
+  if (command.issuedAt > now || command.expiresAt <= now)
+    throw new Error("Worker command is expired or not yet valid");
+  if (!hasValidSignature(command, signed.signature))
+    throw new Error("Worker command signature is invalid");
+  if (!(await nonceStore.claim(command.workerId, command.nonce, command.expiresAt))) {
     throw new Error("Worker command nonce has already been used");
   }
   return command;

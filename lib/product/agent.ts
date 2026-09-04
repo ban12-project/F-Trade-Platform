@@ -1,13 +1,13 @@
-import { generateText, Output, type LanguageModel, type UserModelMessage } from "ai";
+import { generateText, type LanguageModel, Output, type UserModelMessage } from "ai";
 
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import { compileContract } from "../contracts/validator";
-import { reviewProductDraft, type ProductDraft } from "./verification";
 import {
   PRODUCT_AGENT_PROMPT_HASH,
   PRODUCT_AGENT_PROMPT_VERSION,
   PRODUCT_AGENT_SYSTEM_PROMPT,
 } from "./product-agent-prompt";
+import { type ProductDraft, reviewProductDraft } from "./verification";
 
 export interface ProductAgentSource {
   record_id: string;
@@ -80,7 +80,12 @@ function normalizeOeNumber(value: string) {
 }
 
 function normalizeSourceValue(value: string) {
-  return value.trim().replace(/[.|]+$/g, "").trim().replace(/\s+/g, " ").toLowerCase();
+  return value
+    .trim()
+    .replace(/[.|]+$/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 interface MarkdownTable {
@@ -91,7 +96,10 @@ interface MarkdownTable {
 function parseMarkdownRow(line: string) {
   const trimmed = line.trim();
   if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return undefined;
-  return trimmed.slice(1, -1).split("|").map((cell) => cell.trim());
+  return trimmed
+    .slice(1, -1)
+    .split("|")
+    .map((cell) => cell.trim());
 }
 
 export function parseMarkdownTables(sourceText: string): MarkdownTable[] {
@@ -399,7 +407,10 @@ function assertSafeDraft(draft: ProductDraft, source: ProductAgentSource) {
   }
 }
 
-export function finalizeProductAgentDraft(value: unknown, source: ProductAgentSource): ProductDraft {
+export function finalizeProductAgentDraft(
+  value: unknown,
+  source: ProductAgentSource,
+): ProductDraft {
   const draft = parseProductDraft(removeNullOptionalFacts(value));
   assertSafeDraft(draft, source);
   return reviewProductDraft(draft);
@@ -417,17 +428,19 @@ export class AiSdkProductAgent implements ProductAgent {
       candidate_identifier: source.candidate_identifier,
       source_text: `<untrusted-source-text>\n${source.source_text}\n</untrusted-source-text>`,
     });
-    const messages: UserModelMessage[] = [{
-      role: "user",
-      content: [
-        { type: "text", text: promptText },
-        ...(source.image_inputs ?? []).map((input) => ({
-          type: "image" as const,
-          image: Buffer.from(input.data_base64, "base64"),
-          mediaType: input.media_type,
-        })),
-      ],
-    }];
+    const messages: UserModelMessage[] = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: promptText },
+          ...(source.image_inputs ?? []).map((input) => ({
+            type: "image" as const,
+            image: Buffer.from(input.data_base64, "base64"),
+            mediaType: input.media_type,
+          })),
+        ],
+      },
+    ];
     const result = await generateText({
       model,
       instructions: PRODUCT_AGENT_SYSTEM_PROMPT,
@@ -450,7 +463,8 @@ export class AiSdkProductAgent implements ProductAgent {
 }
 
 export function validateProductAgentSource(value: unknown): ProductAgentSource {
-  if (!value || typeof value !== "object") throw new Error("Product Agent source must be an object");
+  if (!value || typeof value !== "object")
+    throw new Error("Product Agent source must be an object");
   const source = value as Partial<ProductAgentSource>;
   if (
     !source.record_id ||
@@ -478,17 +492,22 @@ export function validateProductAgentSource(value: unknown): ProductAgentSource {
     const refs = new Set(source.image_refs);
     if (
       imageInputs.length !== refs.size ||
-      imageInputs.some((input) =>
-        !input ||
-        typeof input !== "object" ||
-        !refs.has(input.ref) ||
-        (input.media_type !== "image/png" && input.media_type !== "image/jpeg") ||
-        typeof input.data_base64 !== "string" ||
-        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input.data_base64) ||
-        Buffer.from(input.data_base64, "base64").length === 0
+      imageInputs.some(
+        (input) =>
+          !input ||
+          typeof input !== "object" ||
+          !refs.has(input.ref) ||
+          (input.media_type !== "image/png" && input.media_type !== "image/jpeg") ||
+          typeof input.data_base64 !== "string" ||
+          !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+            input.data_base64,
+          ) ||
+          Buffer.from(input.data_base64, "base64").length === 0,
       )
     ) {
-      throw new Error("Image-backed Product Agent source must include bytes for every image reference");
+      throw new Error(
+        "Image-backed Product Agent source must include bytes for every image reference",
+      );
     }
   }
   if (

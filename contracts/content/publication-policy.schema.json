@@ -6,9 +6,9 @@
   "additionalProperties": false,
   "required": ["channel_ref", "account_ref", "transport", "publishing_enabled"],
   "properties": {
-    "channel_ref": {"type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"},
-    "account_ref": {"type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"},
-    "transport": {"enum": ["official_api", "camofox_controlled_mvp1"]},
-    "publishing_enabled": {"type": "boolean"}
+    "channel_ref": { "type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$" },
+    "account_ref": { "type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$" },
+    "transport": { "enum": ["official_api", "camofox_controlled_mvp1"] },
+    "publishing_enabled": { "type": "boolean" }
   }
 }

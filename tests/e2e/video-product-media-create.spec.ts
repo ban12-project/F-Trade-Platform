@@ -1,14 +1,21 @@
 import { expect, test } from "@playwright/test";
 
-test("marketing video creation reuses approved ProductMedia without repeating rights evidence", async ({ page }) => {
+test("marketing video creation reuses approved ProductMedia without repeating rights evidence", async ({
+  page,
+}) => {
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
-  page.on("console", (message) => { if (message.type() === "error") runtimeErrors.push(message.text()); });
+  page.on("console", (message) => {
+    if (message.type() === "error") runtimeErrors.push(message.text());
+  });
 
   await page.goto("/testing/video-product-media-create");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByRole("button", { name: "复用产品媒体" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "复用产品媒体" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.getByText("当前产品有 2 个可复用媒体。")).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /产品主图/ })).toBeChecked();
   await expect(page.getByText("1600×1600", { exact: true })).toBeVisible();
@@ -34,7 +41,10 @@ test("switching to a product without reusable media falls back to upload", async
   await page.keyboard.press("Enter");
   await page.getByRole("option", { name: "Verified clutch disc · SYN-904" }).click();
 
-  await expect(page.getByRole("button", { name: "上传新素材" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "上传新素材" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.getByRole("button", { name: "复用产品媒体" })).toBeDisabled();
   await expect(page.getByText("当前产品没有审核通过且仍在授权期内的可复用媒体。")).toBeVisible();
   await expect(page.getByLabel("素材权利证据")).toBeVisible();

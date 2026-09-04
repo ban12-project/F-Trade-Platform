@@ -1,10 +1,9 @@
 import "server-only";
 
 import { Sandbox } from "@vercel/sandbox";
-
+import type { SandboxVideoSource } from "../video/sandbox-sources";
 import { parseProductMediaProbeOutput, type RawProductMediaProbe } from "./media-probe-parser";
 import type { ProductMediaProbe } from "./media-service";
-import type { SandboxVideoSource } from "../video/sandbox-sources";
 
 function sandboxImage() {
   const image = process.env.VIDEO_SANDBOX_IMAGE?.trim();
@@ -44,15 +43,27 @@ export async function probeProductMediaEvidenceInSandbox(
     const input = `/vercel/sandbox/work/product-media${source.extension}`;
     const config = "/vercel/sandbox/work/download.conf";
     await sandbox.fs.writeFile(config, `url = "${source.signedGetUrl}"\noutput = "${input}"\n`);
-    await command(sandbox, "curl", ["--fail", "--silent", "--show-error", "--location", "--config", config]);
+    await command(sandbox, "curl", [
+      "--fail",
+      "--silent",
+      "--show-error",
+      "--location",
+      "--config",
+      config,
+    ]);
     await sandbox.fs.rm(config, { force: true });
 
-    const raw = JSON.parse(await command(sandbox, "ffprobe", [
-      "-v", "error",
-      "-show_entries", "format=duration:stream=codec_type,width,height,avg_frame_rate,r_frame_rate",
-      "-of", "json",
-      input,
-    ])) as RawProductMediaProbe;
+    const raw = JSON.parse(
+      await command(sandbox, "ffprobe", [
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration:stream=codec_type,width,height,avg_frame_rate,r_frame_rate",
+        "-of",
+        "json",
+        input,
+      ]),
+    ) as RawProductMediaProbe;
     return parseProductMediaProbeOutput(raw, source.contentType);
   } finally {
     await sandbox.stop();

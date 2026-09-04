@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import {
   claimOfficialInboundDelivery,
   createInboundDeliveryReceipt,
-  processOfficialInboundDelivery,
   type InboundDeliveryReceipt,
   type InboundDeliveryReceiptStore,
   type InboundDeliveryTransactionRunner,
+  processOfficialInboundDelivery,
 } from "../lib/social/inbound-delivery-store";
 
 class InMemoryAtomicReceiptStore implements InboundDeliveryReceiptStore {
@@ -62,7 +62,8 @@ async function main() {
   const store = new InMemoryAtomicReceiptStore();
   const receipt = createInboundDeliveryReceipt(policy, webhook);
   assert.deepEqual(receipt, {
-    deliveryKey: "synthetic-facebook-channel:synthetic-factory-account:synthetic-platform-message-001",
+    deliveryKey:
+      "synthetic-facebook-channel:synthetic-factory-account:synthetic-platform-message-001",
     channelRef: policy.channelRef,
     accountRef: policy.accountRef,
     messageId: webhook.messageId,
@@ -79,7 +80,8 @@ async function main() {
     nextAction: "ignore_duplicate",
   });
   assert.throws(
-    () => createInboundDeliveryReceipt(policy, { ...webhook, accountRef: "synthetic-wrong-account" }),
+    () =>
+      createInboundDeliveryReceipt(policy, { ...webhook, accountRef: "synthetic-wrong-account" }),
     /must match/,
   );
   const transactionalStore = new TransactionalInMemoryReceiptStore();
@@ -119,18 +121,22 @@ async function main() {
       failingWebhook,
       transactionalStore,
       (keys) => transactionalStore.storeFor(keys),
-      async () => { throw new Error("lead action failed"); },
+      async () => {
+        throw new Error("lead action failed");
+      },
     ),
     /lead action failed/,
   );
   assert.equal(
-    (await processOfficialInboundDelivery(
-      policy,
-      failingWebhook,
-      transactionalStore,
-      (keys) => transactionalStore.storeFor(keys),
-      async () => "retried",
-    )).status,
+    (
+      await processOfficialInboundDelivery(
+        policy,
+        failingWebhook,
+        transactionalStore,
+        (keys) => transactionalStore.storeFor(keys),
+        async () => "retried",
+      )
+    ).status,
     "accepted",
   );
   console.log("PASS durable inbound delivery receipt boundary");

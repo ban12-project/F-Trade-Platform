@@ -1,6 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
-
 import { getSessionCookie } from "better-auth/cookies";
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function proxy(request: NextRequest) {
   // Proxy runs for navigations and prefetches. This is intentionally only an

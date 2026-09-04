@@ -1,15 +1,27 @@
 import { and, eq } from "drizzle-orm";
 
-import { getDatabase, type Database } from "@/lib/db/client";
+import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord } from "@/lib/db/schema";
-
-import { completeVideoJob, claimConfiguredVideoJob, failVideoJob, type VideoJobRecord } from "./job-store";
-import { submitVideoGeneration, type VideoGenerationAdapter } from "./execution";
-import { loadVideoExecutionConfiguration, resolveVideoProviderCredential } from "./provider-config-store";
-import { videoProjectSchema } from "./contracts";
-import { videoGenerationRequestSchema, videoProviderIdSchema, type VideoModelCapability, type VideoProviderId } from "./provider-capabilities";
-import type { VideoProviderExecutionPolicy } from "./execution";
 import type { VideoProject } from "./contracts";
+import { videoProjectSchema } from "./contracts";
+import type { VideoProviderExecutionPolicy } from "./execution";
+import { submitVideoGeneration, type VideoGenerationAdapter } from "./execution";
+import {
+  claimConfiguredVideoJob,
+  completeVideoJob,
+  failVideoJob,
+  type VideoJobRecord,
+} from "./job-store";
+import {
+  type VideoModelCapability,
+  type VideoProviderId,
+  videoGenerationRequestSchema,
+  videoProviderIdSchema,
+} from "./provider-capabilities";
+import {
+  loadVideoExecutionConfiguration,
+  resolveVideoProviderCredential,
+} from "./provider-config-store";
 
 export type RunVideoJobResult =
   | { kind: "idle" }
@@ -25,7 +37,11 @@ export type VideoJobRunnerDependencies = {
 
 export function classifyVideoJobFailure(error: unknown) {
   if (error instanceof Error && /^retryable:/i.test(error.message)) return "provider_retryable";
-  if (error instanceof Error && /未启用|未配置|尚未通过验证|不满足|不支持|预算|并发/i.test(error.message)) return "configuration_rejected";
+  if (
+    error instanceof Error &&
+    /未启用|未配置|尚未通过验证|不满足|不支持|预算|并发/i.test(error.message)
+  )
+    return "configuration_rejected";
   return "provider_submission_failed";
 }
 
@@ -49,9 +65,14 @@ export async function executeLeasedVideoJob(
   provider: VideoProviderId,
   dependencies: LeasedVideoExecutionDependencies,
 ) {
-  const policies = dependencies.policies.map((policy) => policy.provider === provider
-    ? { ...policy, budgetCommittedCents: Math.max(0, policy.budgetCommittedCents - job.reservedCostCents) }
-    : policy);
+  const policies = dependencies.policies.map((policy) =>
+    policy.provider === provider
+      ? {
+          ...policy,
+          budgetCommittedCents: Math.max(0, policy.budgetCommittedCents - job.reservedCostCents),
+        }
+      : policy,
+  );
   const generation = videoGenerationRequestSchema.parse({
     provider,
     modelId: job.modelId,
@@ -60,25 +81,31 @@ export async function executeLeasedVideoJob(
     durationSeconds: job.durationSeconds,
     resolution: job.resolution,
   });
-  const result = await submitVideoGeneration({
-    project: dependencies.project,
-    generation,
-    expectedCostCents: job.expectedCostCents,
-  }, {
-    catalog: dependencies.catalog,
-    policies,
-    adapters: dependencies.adapters,
-    activeJobsByProvider: {},
-    resolveCredential: dependencies.resolveCredential,
-  });
-  return { result, maximumAttempts: policies.find((policy) => policy.provider === provider)?.maximumAttempts ?? 1 };
+  const result = await submitVideoGeneration(
+    {
+      project: dependencies.project,
+      generation,
+      expectedCostCents: job.expectedCostCents,
+    },
+    {
+      catalog: dependencies.catalog,
+      policies,
+      adapters: dependencies.adapters,
+      activeJobsByProvider: {},
+      resolveCredential: dependencies.resolveCredential,
+    },
+  );
+  return {
+    result,
+    maximumAttempts: policies.find((policy) => policy.provider === provider)?.maximumAttempts ?? 1,
+  };
 }
 
 async function videoProjectForJob(job: VideoJobRecord, database: Database) {
-  const [row] = await database.select({ payload: aggregateRecord.payload }).from(aggregateRecord).where(and(
-    eq(aggregateRecord.id, job.videoProjectId),
-    eq(aggregateRecord.type, "video"),
-  ));
+  const [row] = await database
+    .select({ payload: aggregateRecord.payload })
+    .from(aggregateRecord)
+    .where(and(eq(aggregateRecord.id, job.videoProjectId), eq(aggregateRecord.type, "video")));
   if (!row) throw new Error("video project not found");
   return videoProjectSchema.parse(row.payload);
 }
@@ -97,7 +124,8 @@ export async function runNextConfiguredVideoJob(
   const database = dependencies.database ?? getDatabase();
   const claimed = await claimConfiguredVideoJob(workerId, provider, undefined, database);
   if (!claimed) return { kind: "idle" };
-  if (claimed.kind === "rejected") return { kind: "rejected", jobId: claimed.job.id, reason: claimed.reason };
+  if (claimed.kind === "rejected")
+    return { kind: "rejected", jobId: claimed.job.id, reason: claimed.reason };
   const job = claimed.job;
   let maximumAttempts = 1;
   try {
@@ -113,12 +141,26 @@ export async function runNextConfiguredVideoJob(
       resolveCredential: (reference) => resolveVideoProviderCredential(reference, database),
     });
     maximumAttempts = execution.maximumAttempts;
-    const completed = await completeVideoJob(job.id, workerId, execution.result.resultAssetRef, database);
-    return { kind: "succeeded", jobId: completed.id, resultAssetRef: execution.result.resultAssetRef };
+    const completed = await completeVideoJob(
+      job.id,
+      workerId,
+      execution.result.resultAssetRef,
+      database,
+    );
+    return {
+      kind: "succeeded",
+      jobId: completed.id,
+      resultAssetRef: execution.result.resultAssetRef,
+    };
   } catch (error) {
     const code = classifyVideoJobFailure(error);
     const retry = retryVideoJobAt(error, dependencies.retryDelayMs ?? 60_000);
     const failed = await failVideoJob(job.id, workerId, code, retry, maximumAttempts, database);
-    return { kind: "failed", jobId: failed.id, failureCode: code, retryScheduled: failed.status === "queued" };
+    return {
+      kind: "failed",
+      jobId: failed.id,
+      failureCode: code,
+      retryScheduled: failed.status === "queued",
+    };
   }
 }

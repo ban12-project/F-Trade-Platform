@@ -1,14 +1,25 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq, sql, type InferInsertModel } from "drizzle-orm";
+import { and, eq, type InferInsertModel, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/db/client";
-import { aggregateRecord, approval, auditEvent, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
+import {
+  aggregateRecord,
+  approval,
+  auditEvent,
+  workflowEvent,
+  workspaceProject,
+  workspaceProjectItem,
+} from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
 
-import { kitContentValues, productCatalogFormSchema, type ProductCatalogForm } from "./catalog-form-schema";
-import { reviewProductDraft, type ProductDraft } from "./verification";
+import {
+  kitContentValues,
+  type ProductCatalogForm,
+  productCatalogFormSchema,
+} from "./catalog-form-schema";
+import { type ProductDraft, reviewProductDraft } from "./verification";
 
 export type EvidenceBoundProductCatalogInput = ProductCatalogForm;
 
@@ -34,8 +45,8 @@ function splitKitContents(value: string) {
   const contents = value
     .split(/[\s,;，；]+/)
     .map((item) => item.trim())
-    .filter((item): item is typeof kitContentValues[number] =>
-      kitContentValues.includes(item as typeof kitContentValues[number]),
+    .filter((item): item is (typeof kitContentValues)[number] =>
+      kitContentValues.includes(item as (typeof kitContentValues)[number]),
     );
   return contents.length > 0 ? [...new Set(contents)] : undefined;
 }
@@ -51,30 +62,108 @@ function kitContentCount(draft: ProductDraft) {
 
 function fieldEvidence(input: EvidenceBoundProductCatalogInput): Record<string, string> {
   const entries: Array<{ path: string; value: unknown; evidenceRef: string }> = [
-    { path: "product.product_name", value: input.productName, evidenceRef: input.productNameEvidenceRef },
-    { path: "product.product_type", value: input.productType, evidenceRef: input.productTypeEvidenceRef },
-    { path: "product.internal_sku", value: input.internalSku, evidenceRef: input.internalSkuEvidenceRef },
-    { path: "product.oe_numbers", value: splitOeNumbers(input.oeNumbers), evidenceRef: input.oeNumbersEvidenceRef },
-    { path: "product.application", value: optionalText(input.application), evidenceRef: input.applicationEvidenceRef },
-    { path: "product.vehicle_brand", value: optionalText(input.vehicleBrand), evidenceRef: input.vehicleBrandEvidenceRef },
-    { path: "product.vehicle_model", value: optionalText(input.vehicleModel), evidenceRef: input.vehicleModelEvidenceRef },
-    { path: "specifications.clutch_diameter_mm", value: optionalNumber(input.clutchDiameterMm), evidenceRef: input.clutchDiameterMmEvidenceRef },
-    { path: "specifications.spline_count", value: optionalNumber(input.splineCount), evidenceRef: input.splineCountEvidenceRef },
-    { path: "specifications.spline_size", value: optionalText(input.splineSize), evidenceRef: input.splineSizeEvidenceRef },
-    { path: "specifications.friction_material", value: optionalText(input.frictionMaterial), evidenceRef: input.frictionMaterialEvidenceRef },
-    { path: "specifications.kit_contents", value: splitKitContents(input.kitContents), evidenceRef: input.kitContentsEvidenceRef },
-    { path: "specifications.gross_weight_kg", value: optionalNumber(input.grossWeightKg), evidenceRef: input.grossWeightKgEvidenceRef },
-    { path: "specifications.net_weight_kg", value: optionalNumber(input.netWeightKg), evidenceRef: input.netWeightKgEvidenceRef },
-    { path: "specifications.package_size", value: optionalText(input.packageSize), evidenceRef: input.packageSizeEvidenceRef },
+    {
+      path: "product.product_name",
+      value: input.productName,
+      evidenceRef: input.productNameEvidenceRef,
+    },
+    {
+      path: "product.product_type",
+      value: input.productType,
+      evidenceRef: input.productTypeEvidenceRef,
+    },
+    {
+      path: "product.internal_sku",
+      value: input.internalSku,
+      evidenceRef: input.internalSkuEvidenceRef,
+    },
+    {
+      path: "product.oe_numbers",
+      value: splitOeNumbers(input.oeNumbers),
+      evidenceRef: input.oeNumbersEvidenceRef,
+    },
+    {
+      path: "product.application",
+      value: optionalText(input.application),
+      evidenceRef: input.applicationEvidenceRef,
+    },
+    {
+      path: "product.vehicle_brand",
+      value: optionalText(input.vehicleBrand),
+      evidenceRef: input.vehicleBrandEvidenceRef,
+    },
+    {
+      path: "product.vehicle_model",
+      value: optionalText(input.vehicleModel),
+      evidenceRef: input.vehicleModelEvidenceRef,
+    },
+    {
+      path: "specifications.clutch_diameter_mm",
+      value: optionalNumber(input.clutchDiameterMm),
+      evidenceRef: input.clutchDiameterMmEvidenceRef,
+    },
+    {
+      path: "specifications.spline_count",
+      value: optionalNumber(input.splineCount),
+      evidenceRef: input.splineCountEvidenceRef,
+    },
+    {
+      path: "specifications.spline_size",
+      value: optionalText(input.splineSize),
+      evidenceRef: input.splineSizeEvidenceRef,
+    },
+    {
+      path: "specifications.friction_material",
+      value: optionalText(input.frictionMaterial),
+      evidenceRef: input.frictionMaterialEvidenceRef,
+    },
+    {
+      path: "specifications.kit_contents",
+      value: splitKitContents(input.kitContents),
+      evidenceRef: input.kitContentsEvidenceRef,
+    },
+    {
+      path: "specifications.gross_weight_kg",
+      value: optionalNumber(input.grossWeightKg),
+      evidenceRef: input.grossWeightKgEvidenceRef,
+    },
+    {
+      path: "specifications.net_weight_kg",
+      value: optionalNumber(input.netWeightKg),
+      evidenceRef: input.netWeightKgEvidenceRef,
+    },
+    {
+      path: "specifications.package_size",
+      value: optionalText(input.packageSize),
+      evidenceRef: input.packageSizeEvidenceRef,
+    },
     { path: "commercial.moq", value: optionalNumber(input.moq), evidenceRef: input.moqEvidenceRef },
-    { path: "commercial.estimated_lead_time_days", value: optionalNumber(input.estimatedLeadTimeDays), evidenceRef: input.estimatedLeadTimeDaysEvidenceRef },
-    { path: "commercial.packaging", value: optionalText(input.packaging), evidenceRef: input.packagingEvidenceRef },
-    { path: "commercial.supported_customization", value: optionalText(input.supportedCustomization), evidenceRef: input.supportedCustomizationEvidenceRef },
-    { path: "commercial.sample_available", value: optionalBoolean(input.sampleAvailable), evidenceRef: input.sampleAvailableEvidenceRef },
+    {
+      path: "commercial.estimated_lead_time_days",
+      value: optionalNumber(input.estimatedLeadTimeDays),
+      evidenceRef: input.estimatedLeadTimeDaysEvidenceRef,
+    },
+    {
+      path: "commercial.packaging",
+      value: optionalText(input.packaging),
+      evidenceRef: input.packagingEvidenceRef,
+    },
+    {
+      path: "commercial.supported_customization",
+      value: optionalText(input.supportedCustomization),
+      evidenceRef: input.supportedCustomizationEvidenceRef,
+    },
+    {
+      path: "commercial.sample_available",
+      value: optionalBoolean(input.sampleAvailable),
+      evidenceRef: input.sampleAvailableEvidenceRef,
+    },
   ];
-  return Object.fromEntries(entries
-    .filter(({ value }) => value !== undefined && value !== null && value !== "")
-    .map(({ path, evidenceRef }) => [path, evidenceRef]));
+  return Object.fromEntries(
+    entries
+      .filter(({ value }) => value !== undefined && value !== null && value !== "")
+      .map(({ path, evidenceRef }) => [path, evidenceRef]),
+  );
 }
 
 /** Builds a review-only manual draft without copying one evidence ref to every fact. */
@@ -122,7 +211,9 @@ export function buildEvidenceBoundProductCatalogDraft(
   };
   const commercial = {
     ...(moq ? { moq } : {}),
-    ...(estimatedLeadTimeDays !== undefined ? { estimated_lead_time_days: estimatedLeadTimeDays } : {}),
+    ...(estimatedLeadTimeDays !== undefined
+      ? { estimated_lead_time_days: estimatedLeadTimeDays }
+      : {}),
     ...(packaging ? { packaging } : {}),
     ...(supportedCustomization ? { supported_customization: supportedCustomization } : {}),
     ...(sampleAvailable !== undefined ? { sample_available: sampleAvailable } : {}),
@@ -216,7 +307,8 @@ export async function createEvidenceBoundProductCatalogDraft(
   await getDatabase().transaction(async (tx) => {
     if (projectId) {
       await assertAndLinkProjectEvidence(projectId, draft.evidence_refs, actorId, tx);
-      const [project] = await tx.select({ kind: workspaceProject.kind, status: workspaceProject.status })
+      const [project] = await tx
+        .select({ kind: workspaceProject.kind, status: workspaceProject.status })
         .from(workspaceProject)
         .where(eq(workspaceProject.id, projectId))
         .for("update");
@@ -225,13 +317,14 @@ export async function createEvidenceBoundProductCatalogDraft(
       }
     }
     await tx.insert(aggregateRecord).values(aggregateValues);
-    if (projectId) await tx.insert(workspaceProjectItem).values({
-      id: randomUUID(),
-      projectId,
-      aggregateId: id,
-      role: "product_source",
-      relation: "owned",
-    });
+    if (projectId)
+      await tx.insert(workspaceProjectItem).values({
+        id: randomUUID(),
+        projectId,
+        aggregateId: id,
+        role: "product_source",
+        relation: "owned",
+      });
     await tx.insert(approval).values(approvalValues);
     await tx.insert(workflowEvent).values(workflowValues);
     await tx.insert(auditEvent).values(auditValues);
@@ -253,15 +346,18 @@ export async function reviseEvidenceBoundProductCatalogDraft(
   return getDatabase().transaction(async (tx) => {
     const draft = buildEvidenceBoundProductCatalogDraft(input, productId);
     await assertAndLinkProjectEvidence(projectId, draft.evidence_refs, actorId, tx);
-    const [aggregate] = await tx.select({
-      id: aggregateRecord.id,
-      state: aggregateRecord.state,
-      version: aggregateRecord.version,
-    }).from(aggregateRecord)
+    const [aggregate] = await tx
+      .select({
+        id: aggregateRecord.id,
+        state: aggregateRecord.state,
+        version: aggregateRecord.version,
+      })
+      .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
       .for("update");
     if (!aggregate) throw new Error("产品草稿不存在。");
-    if (aggregate.state !== "PRODUCT_REVISION_REQUIRED") throw new Error("该产品当前不处于待修订状态。");
+    if (aggregate.state !== "PRODUCT_REVISION_REQUIRED")
+      throw new Error("该产品当前不处于待修订状态。");
 
     assertTransition({
       eventId,
@@ -274,11 +370,16 @@ export async function reviseEvidenceBoundProductCatalogDraft(
       occurredAt: now.toISOString(),
       evidenceRefs: draft.evidence_refs,
     });
-    const [updated] = await tx.update(aggregateRecord).set({
-      state: "PRODUCT_REVIEW_REQUIRED",
-      payload: draft as unknown as Record<string, unknown>,
-      version: sql`${aggregateRecord.version} + 1`,
-    }).where(and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version)))
+    const [updated] = await tx
+      .update(aggregateRecord)
+      .set({
+        state: "PRODUCT_REVIEW_REQUIRED",
+        payload: draft as unknown as Record<string, unknown>,
+        version: sql`${aggregateRecord.version} + 1`,
+      })
+      .where(
+        and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version)),
+      )
       .returning({ id: aggregateRecord.id });
     if (!updated) throw new Error("产品修订与另一项操作冲突，请刷新后重试。");
     await tx.insert(approval).values({

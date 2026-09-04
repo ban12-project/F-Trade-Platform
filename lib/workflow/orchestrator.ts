@@ -1,12 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
 
-import { getDatabase, type Database } from "../db/client";
+import { type Database, getDatabase } from "../db/client";
 import { aggregateRecord, approval, auditEvent, workflowEvent } from "../db/schema";
-import {
-  assertTransition,
-  type ApprovalDecision,
-  type WorkflowEventInput,
-} from "./transitions";
+import { type ApprovalDecision, assertTransition, type WorkflowEventInput } from "./transitions";
 
 export interface PersistedTransition {
   state: string;
@@ -14,15 +10,17 @@ export interface PersistedTransition {
 }
 
 function toApprovalDecision(
-  row: {
-    id: string;
-    aggregateId: string;
-    gate: ApprovalDecision["gate"];
-    status: "pending" | "approved" | "rejected";
-    decidedByType: "agent" | "human" | "system" | null;
-    decidedById: string | null;
-    evidenceRef: string | null;
-  } | undefined,
+  row:
+    | {
+        id: string;
+        aggregateId: string;
+        gate: ApprovalDecision["gate"];
+        status: "pending" | "approved" | "rejected";
+        decidedByType: "agent" | "human" | "system" | null;
+        decidedById: string | null;
+        evidenceRef: string | null;
+      }
+    | undefined,
 ): ApprovalDecision | undefined {
   if (
     !row ||
@@ -63,7 +61,9 @@ export async function persistTransition(
         version: aggregateRecord.version,
       })
       .from(aggregateRecord)
-      .where(and(eq(aggregateRecord.id, event.entityId), eq(aggregateRecord.type, event.entityType)))
+      .where(
+        and(eq(aggregateRecord.id, event.entityId), eq(aggregateRecord.type, event.entityType)),
+      )
       .for("update");
     if (!aggregate) throw new Error("Workflow transition rejected: aggregate not found");
     if (aggregate.state !== event.fromState) {
@@ -92,7 +92,9 @@ export async function persistTransition(
     const [updated] = await tx
       .update(aggregateRecord)
       .set({ state: event.toState, version: sql`${aggregateRecord.version} + 1` })
-      .where(and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version)))
+      .where(
+        and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version)),
+      )
       .returning({ state: aggregateRecord.state, version: aggregateRecord.version });
     if (!updated) throw new Error("Workflow transition rejected: concurrent aggregate update");
 

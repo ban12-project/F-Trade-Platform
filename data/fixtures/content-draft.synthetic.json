@@ -8,7 +8,11 @@
   "hook": "Synthetic clutch kit for demonstration",
   "body": "Synthetic content only. Confirm OE number and vehicle model before quotation.",
   "product_facts": [
-    {"field": "product_type", "value": "clutch_kit", "evidence_ref": "synthetic_factory_sheet_row_001"}
+    {
+      "field": "product_type",
+      "value": "clutch_kit",
+      "evidence_ref": "synthetic_factory_sheet_row_001"
+    }
   ],
   "call_to_action": "Send OE number, vehicle model and quantity for a quotation.",
   "hashtags": ["#SyntheticDemo", "#ClutchKit"],

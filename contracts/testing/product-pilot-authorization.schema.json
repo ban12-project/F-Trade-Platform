@@ -6,9 +6,12 @@
   "additionalProperties": false,
   "required": ["classification", "manifest_status", "authorization_ref", "slots"],
   "properties": {
-    "classification": {"enum": ["synthetic", "sanitized_aggregate"]},
-    "manifest_status": {"enum": ["draft", "authorized"]},
-    "authorization_ref": {"type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"},
+    "classification": { "enum": ["synthetic", "sanitized_aggregate"] },
+    "manifest_status": { "enum": ["draft", "authorized"] },
+    "authorization_ref": {
+      "type": "string",
+      "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"
+    },
     "slots": {
       "type": "array",
       "minItems": 20,
@@ -16,15 +19,26 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["slot_id", "cohort", "data_completeness", "image_availability", "source_ref", "confidentiality", "authorization_status"],
+        "required": [
+          "slot_id",
+          "cohort",
+          "data_completeness",
+          "image_availability",
+          "source_ref",
+          "confidentiality",
+          "authorization_status"
+        ],
         "properties": {
-          "slot_id": {"type": "string", "pattern": "^pilot-slot-(0[1-9]|1[0-9]|20)$"},
-          "cohort": {"enum": ["A", "B", "C", "D"]},
-          "data_completeness": {"enum": ["complete", "incomplete"]},
-          "image_availability": {"enum": ["real_product_image", "none"]},
-          "source_ref": {"type": "string", "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"},
-          "confidentiality": {"enum": ["internal", "confidential", "restricted"]},
-          "authorization_status": {"enum": ["planned", "authorized", "rejected"]}
+          "slot_id": { "type": "string", "pattern": "^pilot-slot-(0[1-9]|1[0-9]|20)$" },
+          "cohort": { "enum": ["A", "B", "C", "D"] },
+          "data_completeness": { "enum": ["complete", "incomplete"] },
+          "image_availability": { "enum": ["real_product_image", "none"] },
+          "source_ref": {
+            "type": "string",
+            "pattern": "^(synthetic|sanitized|evidence)-[a-z0-9-]+$"
+          },
+          "confidentiality": { "enum": ["internal", "confidential", "restricted"] },
+          "authorization_status": { "enum": ["planned", "authorized", "rejected"] }
         }
       }
     }

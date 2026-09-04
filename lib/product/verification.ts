@@ -40,11 +40,7 @@ export interface ProductApproval {
 const parseProductDraft = compileContract<ProductDraft>(productDraftSchema);
 const parseProductReady = compileContract<ProductReady>(productReadySchema);
 
-const corePaths = [
-  "product.product_name",
-  "product.product_type",
-  "product.internal_sku",
-] as const;
+const corePaths = ["product.product_name", "product.product_type", "product.internal_sku"] as const;
 
 function hasValue(value: unknown) {
   return value !== undefined && value !== null && value !== "";
@@ -52,9 +48,9 @@ function hasValue(value: unknown) {
 
 function valueAt(draft: ProductDraft, path: string) {
   const [section, field] = path.split(".");
-  return (draft[section as "product" | "specifications" | "commercial"] as
-    | ProductSection
-    | undefined)?.[field];
+  return (
+    draft[section as "product" | "specifications" | "commercial"] as ProductSection | undefined
+  )?.[field];
 }
 
 function presentFactPaths(draft: ProductDraft) {
@@ -66,11 +62,9 @@ function presentFactPaths(draft: ProductDraft) {
 }
 
 function hasApplicationIdentity(draft: ProductDraft) {
-  return [
-    "product.application",
-    "product.vehicle_brand",
-    "product.vehicle_model",
-  ].every((path) => hasValue(valueAt(draft, path)));
+  return ["product.application", "product.vehicle_brand", "product.vehicle_model"].every((path) =>
+    hasValue(valueAt(draft, path)),
+  );
 }
 
 function hasOeIdentity(draft: ProductDraft) {
@@ -79,9 +73,7 @@ function hasOeIdentity(draft: ProductDraft) {
 }
 
 function blockingFields(draft: ProductDraft, allowVerifiedApplication: boolean) {
-  const blocking: string[] = corePaths.filter(
-    (path) => !hasValue(valueAt(draft, path)),
-  );
+  const blocking: string[] = corePaths.filter((path) => !hasValue(valueAt(draft, path)));
   if (!hasOeIdentity(draft) && !(allowVerifiedApplication && hasApplicationIdentity(draft))) {
     blocking.push("oe_numbers_or_verified_application");
   }
@@ -121,10 +113,7 @@ export function reviewProductDraft(value: unknown): ProductDraft {
   return parseProductDraft(draft);
 }
 
-export function approveProductDraft(
-  draftValue: unknown,
-  approval: ProductApproval,
-): ProductReady {
+export function approveProductDraft(draftValue: unknown, approval: ProductApproval): ProductReady {
   const draft = structuredClone(parseProductDraft(draftValue));
   assertApproval(draft, approval);
   if (approval.status !== "approved") {
@@ -145,10 +134,7 @@ export function approveProductDraft(
   });
 }
 
-export function rejectProductDraft(
-  draftValue: unknown,
-  approval: ProductApproval,
-): ProductDraft {
+export function rejectProductDraft(draftValue: unknown, approval: ProductApproval): ProductDraft {
   const draft = structuredClone(parseProductDraft(draftValue));
   assertApproval(draft, approval);
   if (approval.status !== "rejected") {

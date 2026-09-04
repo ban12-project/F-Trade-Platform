@@ -132,12 +132,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -383,12 +379,8 @@
           "name": "approval_aggregate_id_aggregate_record_id_fk",
           "tableFrom": "approval",
           "tableTo": "aggregate_record",
-          "columnsFrom": [
-            "aggregate_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["aggregate_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -537,12 +529,8 @@
           "name": "audit_event_aggregate_id_aggregate_record_id_fk",
           "tableFrom": "audit_event",
           "tableTo": "aggregate_record",
-          "columnsFrom": [
-            "aggregate_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["aggregate_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -799,12 +787,8 @@
           "name": "invitation_invited_by_user_id_fk",
           "tableFrom": "invitation",
           "tableTo": "user",
-          "columnsFrom": [
-            "invited_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invited_by"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -812,12 +796,8 @@
           "name": "invitation_accepted_by_user_id_fk",
           "tableFrom": "invitation",
           "tableTo": "user",
-          "columnsFrom": [
-            "accepted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accepted_by"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -931,12 +911,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1217,12 +1193,8 @@
           "name": "workflow_event_aggregate_id_aggregate_record_id_fk",
           "tableFrom": "workflow_event",
           "tableTo": "aggregate_record",
-          "columnsFrom": [
-            "aggregate_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["aggregate_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1230,12 +1202,8 @@
           "name": "workflow_event_approval_id_approval_id_fk",
           "tableFrom": "workflow_event",
           "tableTo": "approval",
-          "columnsFrom": [
-            "approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1264,60 +1232,32 @@
     "public.actor_type": {
       "name": "actor_type",
       "schema": "public",
-      "values": [
-        "agent",
-        "human",
-        "system"
-      ]
+      "values": ["agent", "human", "system"]
     },
     "public.aggregate_type": {
       "name": "aggregate_type",
       "schema": "public",
-      "values": [
-        "product",
-        "content",
-        "rfq",
-        "quotation",
-        "lead",
-        "delivery_confirmation"
-      ]
+      "values": ["product", "content", "rfq", "quotation", "lead", "delivery_confirmation"]
     },
     "public.approval_gate": {
       "name": "approval_gate",
       "schema": "public",
-      "values": [
-        "gate_01_truth",
-        "gate_02_quote",
-        "gate_03_delivery"
-      ]
+      "values": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"]
     },
     "public.approval_status": {
       "name": "approval_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "approved",
-        "rejected"
-      ]
+      "values": ["pending", "approved", "rejected"]
     },
     "public.evidence_classification": {
       "name": "evidence_classification",
       "schema": "public",
-      "values": [
-        "internal",
-        "confidential",
-        "restricted"
-      ]
+      "values": ["internal", "confidential", "restricted"]
     },
     "public.invitation_status": {
       "name": "invitation_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "accepted",
-        "revoked",
-        "expired"
-      ]
+      "values": ["pending", "accepted", "revoked", "expired"]
     }
   },
   "schemas": {},

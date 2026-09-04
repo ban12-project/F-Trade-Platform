@@ -44,7 +44,7 @@ function parseTime(value: string, label: string) {
 export function validateChannelInboundPolicy(policy: ChannelInboundPolicy) {
   requireReference(policy.channelRef, "Channel reference");
   requireReference(policy.accountRef, "Account reference");
-  if (!['official_api', 'camofox_controlled_mvp1'].includes(policy.transport)) {
+  if (!["official_api", "camofox_controlled_mvp1"].includes(policy.transport)) {
     throw new Error("Inbound policy requires an approved channel transport");
   }
   if (policy.inboundOnly !== true) throw new Error("Inbound policy must remain inbound-only");
@@ -57,7 +57,8 @@ export function validateChannelInboundPolicy(policy: ChannelInboundPolicy) {
 export function inboundDeliveryKey(policy: ChannelInboundPolicy, message: InboundMessageReference) {
   validateChannelInboundPolicy(policy);
   requireReference(message.messageId, "External message ID");
-  if (message.direction !== "inbound") throw new Error("Only inbound messages may enter the social workflow");
+  if (message.direction !== "inbound")
+    throw new Error("Only inbound messages may enter the social workflow");
   parseTime(message.receivedAt, "Inbound received time");
   return `${policy.channelRef}:${policy.accountRef}:${message.messageId}`;
 }
@@ -70,8 +71,10 @@ export function assessInboundDelivery(
   const deliveryKey = inboundDeliveryKey(policy, message);
   return {
     deliveryKey,
-    status: processedDeliveryKeys.has(deliveryKey) ? "duplicate" as const : "accepted" as const,
-    nextAction: processedDeliveryKeys.has(deliveryKey) ? "ignore_duplicate" as const : "create_or_update_lead" as const,
+    status: processedDeliveryKeys.has(deliveryKey) ? ("duplicate" as const) : ("accepted" as const),
+    nextAction: processedDeliveryKeys.has(deliveryKey)
+      ? ("ignore_duplicate" as const)
+      : ("create_or_update_lead" as const),
   };
 }
 
@@ -80,7 +83,11 @@ export function acceptOfficialInboundWebhook(
   webhook: OfficialInboundWebhook,
   processedDeliveryKeys: ReadonlySet<string>,
 ) {
-  return assessInboundDelivery(policy, validateOfficialInboundWebhook(policy, webhook), processedDeliveryKeys);
+  return assessInboundDelivery(
+    policy,
+    validateOfficialInboundWebhook(policy, webhook),
+    processedDeliveryKeys,
+  );
 }
 
 export function acceptInboundChannelEvent(
@@ -88,7 +95,11 @@ export function acceptInboundChannelEvent(
   event: InboundChannelEvent,
   processedDeliveryKeys: ReadonlySet<string>,
 ) {
-  return assessInboundDelivery(policy, validateInboundChannelEvent(policy, event), processedDeliveryKeys);
+  return assessInboundDelivery(
+    policy,
+    validateInboundChannelEvent(policy, event),
+    processedDeliveryKeys,
+  );
 }
 
 export function validateOfficialInboundWebhook(
@@ -106,15 +117,15 @@ export function validateInboundChannelEvent(
   event: InboundChannelEvent,
 ): InboundMessageReference {
   validateChannelInboundPolicy(policy);
-  const expectedTransport = policy.transport === "official_api"
-    ? "official_webhook"
-    : "controlled_browser_observation";
+  const expectedTransport =
+    policy.transport === "official_api" ? "official_webhook" : "controlled_browser_observation";
   if (event.transport !== expectedTransport) {
     throw new Error(`Inbound event transport must match policy transport: ${expectedTransport}`);
   }
   if (event.transport === "controlled_browser_observation") {
     requireReference(event.observationRef ?? "", "Browser observation reference");
-    if (!event.messageIdentityQuality) throw new Error("Browser observation identity quality is required");
+    if (!event.messageIdentityQuality)
+      throw new Error("Browser observation identity quality is required");
   }
   if (event.channelRef !== policy.channelRef || event.accountRef !== policy.accountRef) {
     throw new Error("Inbound event channel and account must match the inbound policy");
@@ -131,12 +142,25 @@ export function assessReplyWindow(
   inboundDeliveryKey(policy, message);
   const receivedAt = parseTime(message.receivedAt, "Inbound received time");
   const evaluatedAt = parseTime(now, "Reply evaluation time");
-  if (evaluatedAt < receivedAt) throw new Error("Reply evaluation time cannot precede inbound receipt");
+  if (evaluatedAt < receivedAt)
+    throw new Error("Reply evaluation time cannot precede inbound receipt");
   const withinWindow = evaluatedAt - receivedAt <= policy.replyWindowMinutes * 60_000;
   if (withinWindow) {
-    return { status: "within_window" as const, automatedReplyAllowed: true, nextAction: "reply_per_channel_policy" as const };
+    return {
+      status: "within_window" as const,
+      automatedReplyAllowed: true,
+      nextAction: "reply_per_channel_policy" as const,
+    };
   }
   return policy.outsideWindowAction === "block"
-    ? { status: "outside_window" as const, automatedReplyAllowed: false, nextAction: "block_and_escalate_human" as const }
-    : { status: "outside_window" as const, automatedReplyAllowed: false, nextAction: "require_human_approved_template" as const };
+    ? {
+        status: "outside_window" as const,
+        automatedReplyAllowed: false,
+        nextAction: "block_and_escalate_human" as const,
+      }
+    : {
+        status: "outside_window" as const,
+        automatedReplyAllowed: false,
+        nextAction: "require_human_approved_template" as const,
+      };
 }

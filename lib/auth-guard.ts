@@ -16,7 +16,8 @@ export async function requireRole(...allowedRoles: readonly string[]) {
   }
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/auth");
-  if (!session.user.role || !allowedRoles.includes(session.user.role)) redirect("/auth?error=access-denied");
+  if (!session.user.role || !allowedRoles.includes(session.user.role))
+    redirect("/auth?error=access-denied");
   return session;
 }
 

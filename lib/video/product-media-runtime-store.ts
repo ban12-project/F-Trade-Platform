@@ -2,16 +2,16 @@ import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
 
-import { getDatabase, type Database } from "@/lib/db/client";
+import { type Database, getDatabase } from "@/lib/db/client";
 import { productMediaAsset } from "@/lib/db/product-media-schema";
 import { aggregateRecord } from "@/lib/db/schema";
 
 import { videoProjectSchema } from "./contracts";
 import {
   assertCurrentProductMediaUsage,
+  type ProductMediaRuntimeUsage,
   productMediaIdsForVideoProject,
   productMediaRuntimeRecordFromRow,
-  type ProductMediaRuntimeUsage,
 } from "./product-media-runtime-policy";
 
 /**
@@ -29,7 +29,8 @@ export async function assertCurrentProductMediaUsageForVideo(
   if (!mediaIds.length) return [];
 
   const [productRows, mediaRows] = await Promise.all([
-    database.select({ id: aggregateRecord.id, state: aggregateRecord.state })
+    database
+      .select({ id: aggregateRecord.id, state: aggregateRecord.state })
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, project.productId), eq(aggregateRecord.type, "product")))
       .limit(1),

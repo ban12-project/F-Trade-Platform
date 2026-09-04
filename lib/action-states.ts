@@ -3,7 +3,11 @@ export const initialContentAgentActionState = { status: "idle", message: "" } as
 export const initialContentActionState = { status: "idle", message: "" } as const;
 export const initialInvitationActionState = { status: "idle", message: "" } as const;
 export const initialMarketingVideoActionState = { status: "idle", message: "" } as const;
-export const initialInternetMediaSearchActionState: { status: "idle"; message: string; results: never[] } = { status: "idle", message: "", results: [] };
+export const initialInternetMediaSearchActionState: {
+  status: "idle";
+  message: string;
+  results: never[];
+} = { status: "idle", message: "", results: [] };
 export const initialProductAgentActionState = { status: "idle", message: "" } as const;
 export const initialProductActionState = { status: "idle", message: "" } as const;
 export const initialSalesActionState = { status: "idle", message: "" } as const;
@@ -23,4 +27,7 @@ export type ProductEvidenceActionState = {
   message: string;
 };
 
-export const initialProductEvidenceActionState: ProductEvidenceActionState = { status: "idle", message: "" };
+export const initialProductEvidenceActionState: ProductEvidenceActionState = {
+  status: "idle",
+  message: "",
+};

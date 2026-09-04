@@ -6,8 +6,10 @@ import { resolveProductAgentModelConfig } from "../lib/ai/product-agent-model-co
 import { discoverCatalogCandidates } from "../lib/product/catalog-candidates";
 import { preprocessProductAgentDocument } from "../lib/product/document-source";
 import { EvidenceLocatedProductAgent } from "../lib/product/evidence-located-agent";
-import { PRODUCT_AGENT_PROMPT_VERSION } from "../lib/product/product-agent-prompt";
-import { PRODUCT_AGENT_PROMPT_HASH } from "../lib/product/product-agent-prompt";
+import {
+  PRODUCT_AGENT_PROMPT_HASH,
+  PRODUCT_AGENT_PROMPT_VERSION,
+} from "../lib/product/product-agent-prompt";
 
 export interface CatalogPreflightReport {
   classification: "local_preflight";
@@ -39,7 +41,8 @@ function option(name: string, fallback: string) {
 function positiveInteger(name: string, value: string, fallback: number) {
   if (!value) return fallback;
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer`);
+  if (!Number.isInteger(parsed) || parsed < 1)
+    throw new Error(`${name} must be a positive integer`);
   return parsed;
 }
 
@@ -98,11 +101,8 @@ async function main() {
       .map((identifier) => identifier.trim())
       .filter(Boolean),
   );
-  const timeoutMs = positiveInteger(
-    "--model-timeout-seconds",
-    option("--model-timeout-seconds", ""),
-    75,
-  ) * 1000;
+  const timeoutMs =
+    positiveInteger("--model-timeout-seconds", option("--model-timeout-seconds", ""), 75) * 1000;
   const document = await preprocessProductAgentDocument({
     documentPath,
     recordId,
@@ -111,9 +111,10 @@ async function main() {
     allowEmptySource: preflight,
   });
   const discoveredCandidates = discoverCatalogCandidates(document.source);
-  const candidates = (onlyIdentifiers.size === 0
-    ? discoveredCandidates
-    : discoveredCandidates.filter((candidate) => onlyIdentifiers.has(candidate.identifier))
+  const candidates = (
+    onlyIdentifiers.size === 0
+      ? discoveredCandidates
+      : discoveredCandidates.filter((candidate) => onlyIdentifiers.has(candidate.identifier))
   ).slice(0, limit);
   if (onlyIdentifiers.size > 0 && candidates.length !== onlyIdentifiers.size) {
     throw new Error("One or more requested catalog candidate identifiers were not found");
@@ -138,22 +139,29 @@ async function main() {
       const failureCount = results.filter((result) => result.status === "failed").length;
       const temporaryPath = `${outputPath}.tmp`;
       await mkdir(dirname(outputPath), { recursive: true });
-      await writeFile(temporaryPath, `${JSON.stringify({
-        model: `${modelConfig.provider}/${modelConfig.model}`,
-        prompt: { version: PRODUCT_AGENT_PROMPT_VERSION, hash: PRODUCT_AGENT_PROMPT_HASH },
-        evidence_mode: "bounded_location",
-        document: {
-          document_sha256: document.document_sha256,
-          filename: document.filename,
-          media_type: document.media_type,
-          ocr_enabled: document.ocr_enabled,
-        },
-        candidate_count: candidates.length,
-        success_count: successCount,
-        failure_count: failureCount,
-        pending_count: candidates.length - successCount - failureCount,
-        results,
-      }, null, 2)}\n`);
+      await writeFile(
+        temporaryPath,
+        `${JSON.stringify(
+          {
+            model: `${modelConfig.provider}/${modelConfig.model}`,
+            prompt: { version: PRODUCT_AGENT_PROMPT_VERSION, hash: PRODUCT_AGENT_PROMPT_HASH },
+            evidence_mode: "bounded_location",
+            document: {
+              document_sha256: document.document_sha256,
+              filename: document.filename,
+              media_type: document.media_type,
+              ocr_enabled: document.ocr_enabled,
+            },
+            candidate_count: candidates.length,
+            success_count: successCount,
+            failure_count: failureCount,
+            pending_count: candidates.length - successCount - failureCount,
+            results,
+          },
+          null,
+          2,
+        )}\n`,
+      );
       await rename(temporaryPath, outputPath);
     });
     await reportWrite;
@@ -166,7 +174,11 @@ async function main() {
       const candidate = candidates[index]!;
       try {
         const result = await agent.run({ model, source: candidate.source, timeout_ms: timeoutMs });
-        results[index] = { identifier: candidate.identifier, status: "succeeded", draft: result.draft };
+        results[index] = {
+          identifier: candidate.identifier,
+          status: "succeeded",
+          draft: result.draft,
+        };
       } catch (error) {
         results[index] = {
           identifier: candidate.identifier,
@@ -183,7 +195,9 @@ async function main() {
 
 if (process.argv[1]?.endsWith("run-product-agent-catalog.ts")) {
   main().catch((error: unknown) => {
-    console.error(`Catalog Product Agent failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    console.error(
+      `Catalog Product Agent failed: ${error instanceof Error ? error.message : "unknown error"}`,
+    );
     process.exitCode = 1;
   });
 }

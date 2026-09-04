@@ -4,13 +4,20 @@
   "title": "ChannelInboundPolicy",
   "type": "object",
   "additionalProperties": false,
-  "required": ["channel_ref", "account_ref", "transport", "inbound_only", "reply_window_minutes", "outside_window_action"],
+  "required": [
+    "channel_ref",
+    "account_ref",
+    "transport",
+    "inbound_only",
+    "reply_window_minutes",
+    "outside_window_action"
+  ],
   "properties": {
-    "channel_ref": {"type": "string", "pattern": "^(synthetic|sanitized)-[a-z0-9-]+$"},
-    "account_ref": {"type": "string", "pattern": "^(synthetic|sanitized)-[a-z0-9-]+$"},
-    "transport": {"enum": ["official_api", "camofox_controlled_mvp1"]},
-    "inbound_only": {"const": true},
-    "reply_window_minutes": {"type": "integer", "minimum": 1, "maximum": 43200},
-    "outside_window_action": {"enum": ["block", "require_approved_template"]}
+    "channel_ref": { "type": "string", "pattern": "^(synthetic|sanitized)-[a-z0-9-]+$" },
+    "account_ref": { "type": "string", "pattern": "^(synthetic|sanitized)-[a-z0-9-]+$" },
+    "transport": { "enum": ["official_api", "camofox_controlled_mvp1"] },
+    "inbound_only": { "const": true },
+    "reply_window_minutes": { "type": "integer", "minimum": 1, "maximum": 43200 },
+    "outside_window_action": { "enum": ["block", "require_approved_template"] }
   }
 }

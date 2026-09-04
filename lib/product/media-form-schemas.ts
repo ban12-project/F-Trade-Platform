@@ -1,16 +1,16 @@
 import { z } from "zod";
 
 import {
-  reviewProductMediaInputSchema,
   type RegisterProductMediaInput,
   type ReviewProductMediaInput,
+  reviewProductMediaInputSchema,
 } from "./media-service";
 import { productMediaRoleSchema } from "./video-readiness";
 
-const evidenceReferenceSchema = z.string().trim().regex(
-  /^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i,
-  "必须引用私有证据记录。",
-);
+const evidenceReferenceSchema = z
+  .string()
+  .trim()
+  .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "必须引用私有证据记录。");
 
 const registrationShape = {
   projectId: z.uuid("项目标识无效。"),
@@ -41,21 +41,28 @@ function validateRegistrationRights(
   context: z.RefinementCtx,
 ) {
   if ((value.imageToVideoAllowed || value.referenceToVideoAllowed) && !value.editingAllowed) {
-    context.addIssue({ code: "custom", path: ["editingAllowed"], message: "生成式使用必须同时取得编辑授权。" });
+    context.addIssue({
+      code: "custom",
+      path: ["editingAllowed"],
+      message: "生成式使用必须同时取得编辑授权。",
+    });
   }
   if (value.rightsExpiresAt && Number.isNaN(Date.parse(value.rightsExpiresAt))) {
     context.addIssue({ code: "custom", path: ["rightsExpiresAt"], message: "授权到期时间无效。" });
   }
 }
 
-const productMediaRegistrationFieldsBaseSchema = z.object(registrationShape).strict()
+const productMediaRegistrationFieldsBaseSchema = z
+  .object(registrationShape)
+  .strict()
   .superRefine(validateRegistrationRights);
 
 /** Browser-local datetime values are normalized in the browser before submission. */
-export const productMediaRegistrationFieldsSchema = productMediaRegistrationFieldsBaseSchema.transform((value) => ({
-  ...value,
-  rightsExpiresAt: value.rightsExpiresAt ? new Date(value.rightsExpiresAt).toISOString() : "",
-}));
+export const productMediaRegistrationFieldsSchema =
+  productMediaRegistrationFieldsBaseSchema.transform((value) => ({
+    ...value,
+    rightsExpiresAt: value.rightsExpiresAt ? new Date(value.rightsExpiresAt).toISOString() : "",
+  }));
 
 const rightsExpirySubmissionSchema = z.union([
   z.literal(""),
@@ -63,31 +70,39 @@ const rightsExpirySubmissionSchema = z.union([
 ]);
 
 /** The server rejects ambiguous timezone-free expiry values. */
-export const productMediaRegistrationSubmissionSchema = z.object({
-  ...registrationShape,
-  rightsExpiresAt: rightsExpirySubmissionSchema,
-  receiptId: z.uuid("上传回执无效。"),
-}).strict().superRefine(validateRegistrationRights);
+export const productMediaRegistrationSubmissionSchema = z
+  .object({
+    ...registrationShape,
+    rightsExpiresAt: rightsExpirySubmissionSchema,
+    receiptId: z.uuid("上传回执无效。"),
+  })
+  .strict()
+  .superRefine(validateRegistrationRights);
 
-export const productMediaReviewFormSchema = z.object({
-  projectId: z.uuid("项目标识无效。"),
-  productId: z.uuid("产品标识无效。"),
-  assetId: z.uuid("素材标识无效。"),
-  decision: z.enum(["approved", "rejected"]),
-  evidenceRef: evidenceReferenceSchema,
-  notes: z.string().trim().max(1_000, "审核备注不能超过 1000 个字符。"),
-}).strict().superRefine((value, context) => {
-  if (value.decision === "rejected" && !value.notes) {
-    context.addIssue({
-      code: "custom",
-      path: ["notes"],
-      message: "拒绝或撤销产品媒体时必须填写原因。",
-    });
-  }
-});
+export const productMediaReviewFormSchema = z
+  .object({
+    projectId: z.uuid("项目标识无效。"),
+    productId: z.uuid("产品标识无效。"),
+    assetId: z.uuid("素材标识无效。"),
+    decision: z.enum(["approved", "rejected"]),
+    evidenceRef: evidenceReferenceSchema,
+    notes: z.string().trim().max(1_000, "审核备注不能超过 1000 个字符。"),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.decision === "rejected" && !value.notes) {
+      context.addIssue({
+        code: "custom",
+        path: ["notes"],
+        message: "拒绝或撤销产品媒体时必须填写原因。",
+      });
+    }
+  });
 
 export type ProductMediaRegistrationFields = z.input<typeof productMediaRegistrationFieldsSchema>;
-export type ProductMediaRegistrationSubmission = z.infer<typeof productMediaRegistrationSubmissionSchema>;
+export type ProductMediaRegistrationSubmission = z.infer<
+  typeof productMediaRegistrationSubmissionSchema
+>;
 export type ProductMediaReviewForm = z.infer<typeof productMediaReviewFormSchema>;
 
 function booleanValue(value: FormDataEntryValue | undefined) {
@@ -99,7 +114,14 @@ function textValue(value: FormDataEntryValue | undefined) {
 }
 
 function tags(value: string) {
-  return [...new Set(value.split(/[\s,，;；]+/).map((item) => item.trim()).filter(Boolean))].slice(0, 20);
+  return [
+    ...new Set(
+      value
+        .split(/[\s,，;；]+/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, 20);
 }
 
 export function parseProductMediaRegistrationFormData(formData: FormData): {

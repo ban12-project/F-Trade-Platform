@@ -4,8 +4,8 @@ import { randomUUID } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { start } from "workflow/api";
 import { z } from "zod";
-
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import {
@@ -15,14 +15,19 @@ import {
   type MarketingVideoDraft,
 } from "@/lib/video/edit-contracts";
 import {
+  type InternetMediaSearchResult,
   importInternetVideoMedia,
   internetMediaSearchInputSchema,
   searchInternetVideoMedia,
-  type InternetMediaSearchResult,
 } from "@/lib/video/internet-media-search";
-import { decideGuardedVideoReview } from "@/lib/video/product-media-guarded-operations";
+import {
+  attachVideoWorkflowRun,
+  queueVideoProcessingJob,
+  releaseVideoWorkflowStart,
+  reserveVideoWorkflowStart,
+} from "@/lib/video/processing-jobs";
 import { createMarketingVideoEditProjectFromProductMedia } from "@/lib/video/product-media-create";
-import { attachVideoWorkflowRun, queueVideoProcessingJob, releaseVideoWorkflowStart, reserveVideoWorkflowStart } from "@/lib/video/processing-jobs";
+import { decideGuardedVideoReview } from "@/lib/video/product-media-guarded-operations";
 import {
   assertMarketingVideoProjectLink,
   copyMarketingVideoDraftToProject,
@@ -31,14 +36,25 @@ import {
 } from "@/lib/video/store";
 import { claimCompletedVideoUploads } from "@/lib/video/upload-receipts";
 import { assertWorkspaceAggregateLink } from "@/lib/workspace/store";
-import { start } from "workflow/api";
-import { generateMarketingVideoAiDraftWorkflow, renderMarketingVideoPreviewWorkflow } from "@/workflows/marketing-video-processing";
+import {
+  generateMarketingVideoAiDraftWorkflow,
+  renderMarketingVideoPreviewWorkflow,
+} from "@/workflows/marketing-video-processing";
 
-export type MarketingVideoActionState = { status: "idle" | "success" | "error"; message: string; videoId?: string };
-export type InternetMediaSearchActionState = { status: "idle" | "success" | "error"; message: string; results: InternetMediaSearchResult[] };
+export type MarketingVideoActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  videoId?: string;
+};
+export type InternetMediaSearchActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  results: InternetMediaSearchResult[];
+};
 async function requireVideoWriter() {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "video:write")) throw new Error("无权编辑营销视频。");
+  if (!session || !hasPermission(session.user.role, "video:write"))
+    throw new Error("无权编辑营销视频。");
   return session;
 }
 
@@ -46,8 +62,11 @@ async function startVideoJob(kind: "ai_draft" | "render", videoId: string, actor
   const queued = await queueVideoProcessingJob(videoId, kind, actorId);
   if (queued.job.status === "queued") {
     const claimId = `starting:${randomUUID()}`;
-    if (!await reserveVideoWorkflowStart(queued.job.id, claimId)) return queued.job;
-    const workflow = kind === "ai_draft" ? generateMarketingVideoAiDraftWorkflow : renderMarketingVideoPreviewWorkflow;
+    if (!(await reserveVideoWorkflowStart(queued.job.id, claimId))) return queued.job;
+    const workflow =
+      kind === "ai_draft"
+        ? generateMarketingVideoAiDraftWorkflow
+        : renderMarketingVideoPreviewWorkflow;
     try {
       const run = await start(workflow, [{ jobId: queued.job.id, videoId, actorId }]);
       await attachVideoWorkflowRun(queued.job.id, claimId, run.runId);
@@ -59,21 +78,42 @@ async function startVideoJob(kind: "ai_draft" | "render", videoId: string, actor
   return queued.job;
 }
 
-async function finishVideoCreation(result: { id: string }, projectId: string, actorId: string, message: string): Promise<MarketingVideoActionState> {
+async function finishVideoCreation(
+  result: { id: string },
+  projectId: string,
+  actorId: string,
+  message: string,
+): Promise<MarketingVideoActionState> {
   await startVideoJob("ai_draft", result.id, actorId);
   revalidatePath(`/workspace/${projectId}`);
   return { status: "success", message, videoId: result.id };
 }
 
-export async function copyMarketingVideoDraftAction(projectIdInput: string, sourceVideoIdInput: string): Promise<MarketingVideoActionState> {
+export async function copyMarketingVideoDraftAction(
+  projectIdInput: string,
+  sourceVideoIdInput: string,
+): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
-    const { projectId, sourceVideoId } = z.object({ projectId: z.uuid(), sourceVideoId: z.uuid() }).parse({ projectId: projectIdInput, sourceVideoId: sourceVideoIdInput });
-    const result = await copyMarketingVideoDraftToProject(sourceVideoId, projectId, session.user.id);
+    const { projectId, sourceVideoId } = z
+      .object({ projectId: z.uuid(), sourceVideoId: z.uuid() })
+      .parse({ projectId: projectIdInput, sourceVideoId: sourceVideoIdInput });
+    const result = await copyMarketingVideoDraftToProject(
+      sourceVideoId,
+      projectId,
+      session.user.id,
+    );
     revalidatePath(`/workspace/${projectId}`);
-    return { status: "success", message: "已复制为当前项目的独立剪辑稿；预览和审核状态不会共享。", videoId: result.id };
+    return {
+      status: "success",
+      message: "已复制为当前项目的独立剪辑稿；预览和审核状态不会共享。",
+      videoId: result.id,
+    };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法复制营销视频。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法复制营销视频。",
+    };
   }
 }
 
@@ -84,7 +124,7 @@ function text(formData: FormData, name: string) {
 
 function jsonValue(formData: FormData, name: string, fallback: unknown) {
   const value = text(formData, name);
-  return value ? JSON.parse(value) as unknown : fallback;
+  return value ? (JSON.parse(value) as unknown) : fallback;
 }
 
 function creationFields(formData: FormData) {
@@ -98,11 +138,15 @@ function creationFields(formData: FormData) {
   };
 }
 
-export async function createMarketingVideoDraftAction(_previous: MarketingVideoActionState, formData: FormData): Promise<MarketingVideoActionState> {
+export async function createMarketingVideoDraftAction(
+  _previous: MarketingVideoActionState,
+  formData: FormData,
+): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
     const fields = creationFields(formData);
-    const sourceMode = z.enum(["", "upload", "product_media", "internet_search"], { message: "素材来源模式无效。" })
+    const sourceMode = z
+      .enum(["", "upload", "product_media", "internet_search"], { message: "素材来源模式无效。" })
       .parse(text(formData, "sourceMode"));
 
     if (sourceMode === "product_media") {
@@ -112,8 +156,17 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
         productMediaIds: jsonValue(formData, "productMediaIds", []),
         rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
       });
-      await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product", session.user.id);
-      const result = await createMarketingVideoEditProjectFromProductMedia(request, session.user.id);
+      await assertWorkspaceAggregateLink(
+        request.projectId,
+        request.productId,
+        "marketing",
+        "product",
+        session.user.id,
+      );
+      const result = await createMarketingVideoEditProjectFromProductMedia(
+        request,
+        session.user.id,
+      );
       return finishVideoCreation(
         result,
         request.projectId,
@@ -130,17 +183,30 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
         internetMediaIds: jsonValue(formData, "internetMediaIds", []),
         rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
       });
-      await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product", session.user.id);
-      const importedAssets = await importInternetVideoMedia({
-        projectId: request.projectId,
-        productId: request.productId,
-        query: request.internetSearchQuery,
-        resultIds: request.internetMediaIds,
-      }, session.user.id);
-      const result = await createMarketingVideoEditProject({
-        ...fields,
-        rightsEvidenceRef: importedAssets[0]?.rightsEvidenceRef,
-      }, session.user.id, importedAssets);
+      await assertWorkspaceAggregateLink(
+        request.projectId,
+        request.productId,
+        "marketing",
+        "product",
+        session.user.id,
+      );
+      const importedAssets = await importInternetVideoMedia(
+        {
+          projectId: request.projectId,
+          productId: request.productId,
+          query: request.internetSearchQuery,
+          resultIds: request.internetMediaIds,
+        },
+        session.user.id,
+      );
+      const result = await createMarketingVideoEditProject(
+        {
+          ...fields,
+          rightsEvidenceRef: importedAssets[0]?.rightsEvidenceRef,
+        },
+        session.user.id,
+        importedAssets,
+      );
       return finishVideoCreation(
         result,
         request.projectId,
@@ -153,7 +219,13 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
       ...fields,
       rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
     });
-    await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product", session.user.id);
+    await assertWorkspaceAggregateLink(
+      request.projectId,
+      request.productId,
+      "marketing",
+      "product",
+      session.user.id,
+    );
     const receiptIds = jsonValue(formData, "receiptIds", []);
     const uploadedAssets = await claimCompletedVideoUploads(
       receiptIds,
@@ -162,29 +234,54 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
       request.rightsEvidenceRef,
     );
     const result = await createMarketingVideoEditProject(request, session.user.id, uploadedAssets);
-    return finishVideoCreation(result, request.projectId, session.user.id, "素材已保存，AI 剪辑初稿已进入后台队列。");
+    return finishVideoCreation(
+      result,
+      request.projectId,
+      session.user.id,
+      "素材已保存，AI 剪辑初稿已进入后台队列。",
+    );
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法创建营销视频剪辑稿。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法创建营销视频剪辑稿。",
+    };
   }
 }
 
-export async function searchInternetVideoMediaAction(input: unknown): Promise<InternetMediaSearchActionState> {
+export async function searchInternetVideoMediaAction(
+  input: unknown,
+): Promise<InternetMediaSearchActionState> {
   try {
     const session = await requireVideoWriter();
     const value = internetMediaSearchInputSchema.parse(input);
-    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product", session.user.id);
+    await assertWorkspaceAggregateLink(
+      value.projectId,
+      value.productId,
+      "marketing",
+      "product",
+      session.user.id,
+    );
     const results = await searchInternetVideoMedia(value.query);
     return {
       status: "success",
-      message: results.length ? `找到 ${results.length} 个可导入图片。` : "没有找到可导入图片，请换一个检索词。",
+      message: results.length
+        ? `找到 ${results.length} 个可导入图片。`
+        : "没有找到可导入图片，请换一个检索词。",
       results,
     };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法检索互联网素材。", results: [] };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法检索互联网素材。",
+      results: [],
+    };
   }
 }
 
-export async function generateMarketingVideoAiDraftAction(projectId: string, videoId: string): Promise<MarketingVideoActionState> {
+export async function generateMarketingVideoAiDraftAction(
+  projectId: string,
+  videoId: string,
+): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
@@ -192,11 +289,18 @@ export async function generateMarketingVideoAiDraftAction(projectId: string, vid
     revalidatePath(`/workspace/${projectId}`);
     return { status: "success", message: "AI 初稿已进入后台队列，完成后会自动刷新。", videoId };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法生成 AI 剪辑初稿。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法生成 AI 剪辑初稿。",
+    };
   }
 }
 
-export async function saveMarketingVideoDraftAction(projectId: string, videoId: string, draft: MarketingVideoDraft): Promise<MarketingVideoActionState> {
+export async function saveMarketingVideoDraftAction(
+  projectId: string,
+  videoId: string,
+  draft: MarketingVideoDraft,
+): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
@@ -204,11 +308,18 @@ export async function saveMarketingVideoDraftAction(projectId: string, videoId: 
     revalidatePath(`/workspace/${projectId}`);
     return { status: "success", message: "剪辑稿已保存。", videoId };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法保存剪辑稿。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法保存剪辑稿。",
+    };
   }
 }
 
-export async function renderMarketingVideoDraftAction(projectId: string, videoId: string, draft: MarketingVideoDraft): Promise<MarketingVideoActionState> {
+export async function renderMarketingVideoDraftAction(
+  projectId: string,
+  videoId: string,
+  draft: MarketingVideoDraft,
+): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
@@ -217,19 +328,36 @@ export async function renderMarketingVideoDraftAction(projectId: string, videoId
     revalidatePath(`/workspace/${projectId}`);
     return { status: "success", message: "私有预览已进入后台合成队列。", videoId };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法合成营销视频。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法合成营销视频。",
+    };
   }
 }
 
-export async function reviewMarketingVideoAction(projectId: string, videoId: string, decision: "approved" | "rejected", evidenceRef: string, notes = ""): Promise<MarketingVideoActionState> {
+export async function reviewMarketingVideoAction(
+  projectId: string,
+  videoId: string,
+  decision: "approved" | "rejected",
+  evidenceRef: string,
+  notes = "",
+): Promise<MarketingVideoActionState> {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session || !hasPermission(session.user.role, "content:review")) throw new Error("只有管理员可以审核营销视频成片。");
+    if (!session || !hasPermission(session.user.role, "content:review"))
+      throw new Error("只有管理员可以审核营销视频成片。");
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await decideGuardedVideoReview({ videoId, decision, evidenceRef, notes }, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
-    return { status: "success", message: decision === "approved" ? "成片已通过人工审核；不会自动发布。" : "成片已退回修改。", videoId };
+    return {
+      status: "success",
+      message: decision === "approved" ? "成片已通过人工审核；不会自动发布。" : "成片已退回修改。",
+      videoId,
+    };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法审核营销视频。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法审核营销视频。",
+    };
   }
 }

@@ -1,15 +1,3 @@
-import { compileContract } from "../lib/contracts/validator";
-import { decideContent } from "../lib/content/gate";
-import { publishThroughChannel } from "../lib/content/publication-policy";
-import { decideDeliveryConfirmation, requestDeliveryConfirmation } from "../lib/delivery/confirmation";
-import { acceptInboundChannelEvent, assessInboundDelivery, assessReplyWindow } from "../lib/social/inbound-policy";
-import { createControlledPublicationCommand } from "../lib/social/publication-command";
-import { signPublicationWorkerResult, verifyPublicationWorkerResult } from "../lib/social/publication-result-protocol";
-import {
-  replayTransitions,
-  type ApprovalDecision,
-  type WorkflowEventInput,
-} from "../lib/workflow/transitions";
 import contentSchemaJson from "../contracts/content/content.schema.json";
 import productSchemaJson from "../contracts/data/product-ready.schema.json";
 import quotationSchemaJson from "../contracts/sales/quotation-handoff.schema.json";
@@ -18,6 +6,28 @@ import contentFixture from "../data/fixtures/content-draft.synthetic.json";
 import productFixture from "../data/fixtures/product-ready.synthetic.json";
 import quotationFixture from "../data/fixtures/quotation-handoff.synthetic.json";
 import rfqFixture from "../data/fixtures/rfq-ready.synthetic.json";
+import { decideContent } from "../lib/content/gate";
+import { publishThroughChannel } from "../lib/content/publication-policy";
+import { compileContract } from "../lib/contracts/validator";
+import {
+  decideDeliveryConfirmation,
+  requestDeliveryConfirmation,
+} from "../lib/delivery/confirmation";
+import {
+  acceptInboundChannelEvent,
+  assessInboundDelivery,
+  assessReplyWindow,
+} from "../lib/social/inbound-policy";
+import { createControlledPublicationCommand } from "../lib/social/publication-command";
+import {
+  signPublicationWorkerResult,
+  verifyPublicationWorkerResult,
+} from "../lib/social/publication-result-protocol";
+import {
+  type ApprovalDecision,
+  replayTransitions,
+  type WorkflowEventInput,
+} from "../lib/workflow/transitions";
 
 type JsonObject = Record<string, unknown>;
 
@@ -93,7 +103,34 @@ function assertSyntheticIdentifier(value: unknown, label: string): asserts value
 }
 
 export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
-  const [productSchema, contentSchema, rfqSchema, quotationSchema, product, content, rfq, quotation] = [productSchemaJson, contentSchemaJson, rfqSchemaJson, quotationSchemaJson, productFixture, contentFixture, rfqFixture, quotationFixture] as unknown as [JsonObject, JsonObject, JsonObject, JsonObject, JsonObject, JsonObject, JsonObject, JsonObject];
+  const [
+    productSchema,
+    contentSchema,
+    rfqSchema,
+    quotationSchema,
+    product,
+    content,
+    rfq,
+    quotation,
+  ] = [
+    productSchemaJson,
+    contentSchemaJson,
+    rfqSchemaJson,
+    quotationSchemaJson,
+    productFixture,
+    contentFixture,
+    rfqFixture,
+    quotationFixture,
+  ] as unknown as [
+    JsonObject,
+    JsonObject,
+    JsonObject,
+    JsonObject,
+    JsonObject,
+    JsonObject,
+    JsonObject,
+    JsonObject,
+  ];
 
   compileContract<JsonObject>(productSchema)(product);
   compileContract<JsonObject>(contentSchema)(content);
@@ -130,32 +167,81 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     direction: "inbound" as const,
     receivedAt: "2026-08-24T08:59:00Z",
   };
-  const inboundDelivery = acceptInboundChannelEvent(socialPolicy, {
-    transport: "controlled_browser_observation",
-    channelRef: socialPolicy.channelRef,
-    accountRef: socialPolicy.accountRef,
-    observationRef: "synthetic-observation-001",
-    messageIdentityQuality: "derived_fingerprint",
-    ...inboundMessage,
-  }, new Set());
-  if (inboundDelivery.status !== "accepted") throw new Error("Synthetic inbound message was not accepted");
+  const inboundDelivery = acceptInboundChannelEvent(
+    socialPolicy,
+    {
+      transport: "controlled_browser_observation",
+      channelRef: socialPolicy.channelRef,
+      accountRef: socialPolicy.accountRef,
+      observationRef: "synthetic-observation-001",
+      messageIdentityQuality: "derived_fingerprint",
+      ...inboundMessage,
+    },
+    new Set(),
+  );
+  if (inboundDelivery.status !== "accepted")
+    throw new Error("Synthetic inbound message was not accepted");
   const duplicateDelivery = assessInboundDelivery(
     socialPolicy,
     inboundMessage,
     new Set([inboundDelivery.deliveryKey]),
   );
-  if (duplicateDelivery.status !== "duplicate") throw new Error("Synthetic duplicate message was not rejected");
+  if (duplicateDelivery.status !== "duplicate")
+    throw new Error("Synthetic duplicate message was not rejected");
   const replyWindow = assessReplyWindow(socialPolicy, inboundMessage, "2026-08-24T09:00:00Z");
   const outsideWindow = assessReplyWindow(socialPolicy, inboundMessage, "2026-08-24T10:00:00Z");
-  if (replyWindow.status !== "within_window" || outsideWindow.nextAction !== "require_human_approved_template") {
+  if (
+    replyWindow.status !== "within_window" ||
+    outsideWindow.nextAction !== "require_human_approved_template"
+  ) {
     throw new Error("Synthetic inbound reply-window policy was not enforced");
   }
-  const productApproval = approval("synthetic-approval-001", productId, "gate_01_truth", "approved", "synthetic-reviewer");
-  const contentApproval = approval("synthetic-content-approval-001", contentId, "gate_01_truth", "approved", "synthetic-reviewer");
-  const quoteApproval = approval("synthetic-quote-approval-001", quotationId, "gate_02_quote", "approved", "synthetic-sales-reviewer");
-  const deliveryApproval = approval("synthetic-delivery-approval-001", deliveryConfirmationId, "gate_03_delivery", "approved", "synthetic-delivery-reviewer");
-  const deliveryRequest = requestDeliveryConfirmation({ confirmationId: deliveryConfirmationId, relatedEntityType: "rfq", relatedEntityId: rfqId, requestedByType: "human", requestedById: "synthetic-sales-user", requestedAt: "2026-08-24T09:09:30Z" });
-  decideDeliveryConfirmation(deliveryRequest, { actorType: "human", actorId: "synthetic-delivery-reviewer", status: "confirmed", approvalRef: deliveryApproval.id, evidenceRef: deliveryApproval.evidenceRef, decidedAt: "2026-08-24T09:09:45Z", leadTimeDays: 21, validUntil: "2026-08-31T09:09:45Z" });
+  const productApproval = approval(
+    "synthetic-approval-001",
+    productId,
+    "gate_01_truth",
+    "approved",
+    "synthetic-reviewer",
+  );
+  const contentApproval = approval(
+    "synthetic-content-approval-001",
+    contentId,
+    "gate_01_truth",
+    "approved",
+    "synthetic-reviewer",
+  );
+  const quoteApproval = approval(
+    "synthetic-quote-approval-001",
+    quotationId,
+    "gate_02_quote",
+    "approved",
+    "synthetic-sales-reviewer",
+  );
+  const deliveryApproval = approval(
+    "synthetic-delivery-approval-001",
+    deliveryConfirmationId,
+    "gate_03_delivery",
+    "approved",
+    "synthetic-delivery-reviewer",
+  );
+  const deliveryRequest = requestDeliveryConfirmation({
+    confirmationId: deliveryConfirmationId,
+    relatedEntityType: "rfq",
+    relatedEntityId: rfqId,
+    requestedByType: "human",
+    requestedById: "synthetic-sales-user",
+    requestedAt: "2026-08-24T09:09:30Z",
+  });
+  decideDeliveryConfirmation(deliveryRequest, {
+    actorType: "human",
+    actorId: "synthetic-delivery-reviewer",
+    status: "confirmed",
+    approvalRef: deliveryApproval.id,
+    evidenceRef: deliveryApproval.evidenceRef,
+    decidedAt: "2026-08-24T09:09:45Z",
+    leadTimeDays: 21,
+    validUntil: "2026-08-31T09:09:45Z",
+  });
   const approvedContent = decideContent(content, {
     actorType: "human",
     approved: true,
@@ -163,53 +249,251 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     evidenceRef: contentApproval.evidenceRef,
   });
   const publicationId = "synthetic-publication-001";
-  const publicationCommand = createControlledPublicationCommand(approvedContent, publicationPolicy, {
-    channelRef: publicationPolicy.channelRef,
-    accountRef: publicationPolicy.accountRef,
-    status: "active",
-    stopReason: null,
-    pausedAt: null,
-  }, { publicationId, contentRef: contentId, format: "text", humanConfirmationRef: "synthetic-human-confirmation-001", confirmedBy: "human" });
-  if (publicationCommand.jobKind !== "publish") throw new Error("Synthetic publication was not submitted to the controlled worker");
+  const publicationCommand = createControlledPublicationCommand(
+    approvedContent,
+    publicationPolicy,
+    {
+      channelRef: publicationPolicy.channelRef,
+      accountRef: publicationPolicy.accountRef,
+      status: "active",
+      stopReason: null,
+      pausedAt: null,
+    },
+    {
+      publicationId,
+      contentRef: contentId,
+      format: "text",
+      humanConfirmationRef: "synthetic-human-confirmation-001",
+      confirmedBy: "human",
+    },
+  );
+  if (publicationCommand.jobKind !== "publish")
+    throw new Error("Synthetic publication was not submitted to the controlled worker");
   process.env.SOCIAL_WORKER_SIGNING_KEY ??= Buffer.alloc(32, 11).toString("base64");
-  const publicationResult = signPublicationWorkerResult({ workerId: "synthetic-worker-001", jobId: "30000000-0000-4000-8000-000000000001", outcome: "published", externalPublicationRef: publicationId, observedAt: "2026-08-24T09:04:00.000Z" });
-  verifyPublicationWorkerResult(publicationResult, "synthetic-worker-001", new Date("2026-08-24T09:04:00.000Z"));
+  const publicationResult = signPublicationWorkerResult({
+    workerId: "synthetic-worker-001",
+    jobId: "30000000-0000-4000-8000-000000000001",
+    outcome: "published",
+    externalPublicationRef: publicationId,
+    observedAt: "2026-08-24T09:04:00.000Z",
+  });
+  verifyPublicationWorkerResult(
+    publicationResult,
+    "synthetic-worker-001",
+    new Date("2026-08-24T09:04:00.000Z"),
+  );
   const publishedContent = publishThroughChannel(
     approvedContent,
     publicationPolicy,
     "system",
     "synthetic-publication-001",
   );
-  if (publishedContent.status !== "published") throw new Error("Synthetic publication policy was not enforced");
+  if (publishedContent.status !== "published")
+    throw new Error("Synthetic publication policy was not enforced");
 
   const productEvents = [
-    { event: event("synthetic-product-submit-001", "product", productId, "PRODUCT_IMPORTED", "PRODUCT_REVIEW_REQUIRED", "agent", "synthetic-product-agent", "2026-08-24T09:00:00Z") },
-    { event: event("synthetic-product-approved-001", "product", productId, "PRODUCT_REVIEW_REQUIRED", "PRODUCT_READY", "human", "synthetic-reviewer", "2026-08-24T09:01:00Z", "gate_01_truth", productApproval.id), approval: productApproval },
+    {
+      event: event(
+        "synthetic-product-submit-001",
+        "product",
+        productId,
+        "PRODUCT_IMPORTED",
+        "PRODUCT_REVIEW_REQUIRED",
+        "agent",
+        "synthetic-product-agent",
+        "2026-08-24T09:00:00Z",
+      ),
+    },
+    {
+      event: event(
+        "synthetic-product-approved-001",
+        "product",
+        productId,
+        "PRODUCT_REVIEW_REQUIRED",
+        "PRODUCT_READY",
+        "human",
+        "synthetic-reviewer",
+        "2026-08-24T09:01:00Z",
+        "gate_01_truth",
+        productApproval.id,
+      ),
+      approval: productApproval,
+    },
   ];
   const contentEvents = [
-    { event: event("synthetic-content-generated-001", "content", contentId, "CONTENT_GENERATING", "CONTENT_REVIEW_REQUIRED", "agent", "synthetic-content-agent", "2026-08-24T09:02:00Z") },
-    { event: event("synthetic-content-approved-001", "content", contentId, "CONTENT_REVIEW_REQUIRED", "CONTENT_APPROVED", "human", "synthetic-reviewer", "2026-08-24T09:03:00Z", "gate_01_truth", contentApproval.id), approval: contentApproval },
-    { event: event("synthetic-content-published-001", "content", contentId, "CONTENT_APPROVED", "CONTENT_PUBLISHED", "system", "synthetic-publishing-adapter", "2026-08-24T09:04:00Z") },
+    {
+      event: event(
+        "synthetic-content-generated-001",
+        "content",
+        contentId,
+        "CONTENT_GENERATING",
+        "CONTENT_REVIEW_REQUIRED",
+        "agent",
+        "synthetic-content-agent",
+        "2026-08-24T09:02:00Z",
+      ),
+    },
+    {
+      event: event(
+        "synthetic-content-approved-001",
+        "content",
+        contentId,
+        "CONTENT_REVIEW_REQUIRED",
+        "CONTENT_APPROVED",
+        "human",
+        "synthetic-reviewer",
+        "2026-08-24T09:03:00Z",
+        "gate_01_truth",
+        contentApproval.id,
+      ),
+      approval: contentApproval,
+    },
+    {
+      event: event(
+        "synthetic-content-published-001",
+        "content",
+        contentId,
+        "CONTENT_APPROVED",
+        "CONTENT_PUBLISHED",
+        "system",
+        "synthetic-publishing-adapter",
+        "2026-08-24T09:04:00Z",
+      ),
+    },
   ];
   const videoId = "synthetic-video-demo-001";
   const videoEvents = [
-    { event: event("synthetic-video-review-001", "video", videoId, "VIDEO_DRAFT", "VIDEO_REVIEW_REQUIRED", "human", "synthetic-video-editor", "2026-08-24T09:02:30Z") },
-    { event: event("synthetic-video-approved-001", "video", videoId, "VIDEO_REVIEW_REQUIRED", "VIDEO_APPROVED", "human", "synthetic-reviewer", "2026-08-24T09:03:30Z", "gate_01_truth", "synthetic-video-approval-001"), approval: approval("synthetic-video-approval-001", videoId, "gate_01_truth", "approved", "synthetic-reviewer") },
+    {
+      event: event(
+        "synthetic-video-review-001",
+        "video",
+        videoId,
+        "VIDEO_DRAFT",
+        "VIDEO_REVIEW_REQUIRED",
+        "human",
+        "synthetic-video-editor",
+        "2026-08-24T09:02:30Z",
+      ),
+    },
+    {
+      event: event(
+        "synthetic-video-approved-001",
+        "video",
+        videoId,
+        "VIDEO_REVIEW_REQUIRED",
+        "VIDEO_APPROVED",
+        "human",
+        "synthetic-reviewer",
+        "2026-08-24T09:03:30Z",
+        "gate_01_truth",
+        "synthetic-video-approval-001",
+      ),
+      approval: approval(
+        "synthetic-video-approval-001",
+        videoId,
+        "gate_01_truth",
+        "approved",
+        "synthetic-reviewer",
+      ),
+    },
   ];
   const rfqEvents = [
-    { event: event("synthetic-rfq-ready-001", "rfq", rfqId, "RFQ_COLLECTING", "RFQ_READY", "agent", "synthetic-sales-agent", "2026-08-24T09:05:00Z") },
+    {
+      event: event(
+        "synthetic-rfq-ready-001",
+        "rfq",
+        rfqId,
+        "RFQ_COLLECTING",
+        "RFQ_READY",
+        "agent",
+        "synthetic-sales-agent",
+        "2026-08-24T09:05:00Z",
+      ),
+    },
   ];
   const quotationEvents = [
-    { event: event("synthetic-quote-review-001", "quotation", quotationId, "QUOTE_DRAFT", "QUOTE_REVIEW_REQUIRED", "human", "synthetic-sales-user", "2026-08-24T09:06:00Z") },
-    { event: event("synthetic-quote-approved-001", "quotation", quotationId, "QUOTE_REVIEW_REQUIRED", "QUOTE_APPROVED", "human", "synthetic-sales-reviewer", "2026-08-24T09:07:00Z", "gate_02_quote", quoteApproval.id), approval: quoteApproval },
-    { event: event("synthetic-quote-sent-001", "quotation", quotationId, "QUOTE_APPROVED", "QUOTE_SENT", "human", "synthetic-sales-user", "2026-08-24T09:08:00Z") },
+    {
+      event: event(
+        "synthetic-quote-review-001",
+        "quotation",
+        quotationId,
+        "QUOTE_DRAFT",
+        "QUOTE_REVIEW_REQUIRED",
+        "human",
+        "synthetic-sales-user",
+        "2026-08-24T09:06:00Z",
+      ),
+    },
+    {
+      event: event(
+        "synthetic-quote-approved-001",
+        "quotation",
+        quotationId,
+        "QUOTE_REVIEW_REQUIRED",
+        "QUOTE_APPROVED",
+        "human",
+        "synthetic-sales-reviewer",
+        "2026-08-24T09:07:00Z",
+        "gate_02_quote",
+        quoteApproval.id,
+      ),
+      approval: quoteApproval,
+    },
+    {
+      event: event(
+        "synthetic-quote-sent-001",
+        "quotation",
+        quotationId,
+        "QUOTE_APPROVED",
+        "QUOTE_SENT",
+        "human",
+        "synthetic-sales-user",
+        "2026-08-24T09:08:00Z",
+      ),
+    },
   ];
   const leadEvents = [
-    { event: event("synthetic-lead-follow-up-001", "lead", leadId, "LEAD_RECEIVED", "FOLLOW_UP", "human", "synthetic-sales-user", "2026-08-24T09:09:00Z") },
-    { event: event("synthetic-lead-opportunity-001", "lead", leadId, "FOLLOW_UP", "OPPORTUNITY", "human", "synthetic-sales-user", "2026-08-24T09:10:00Z") },
+    {
+      event: event(
+        "synthetic-lead-follow-up-001",
+        "lead",
+        leadId,
+        "LEAD_RECEIVED",
+        "FOLLOW_UP",
+        "human",
+        "synthetic-sales-user",
+        "2026-08-24T09:09:00Z",
+      ),
+    },
+    {
+      event: event(
+        "synthetic-lead-opportunity-001",
+        "lead",
+        leadId,
+        "FOLLOW_UP",
+        "OPPORTUNITY",
+        "human",
+        "synthetic-sales-user",
+        "2026-08-24T09:10:00Z",
+      ),
+    },
   ];
   const deliveryEvents = [
-    { event: event("synthetic-delivery-confirmed-001", "delivery_confirmation", deliveryConfirmationId, "DELIVERY_CONFIRMATION_PENDING", "DELIVERY_CONFIRMATION_CONFIRMED", "human", "synthetic-delivery-reviewer", "2026-08-24T09:09:45Z", "gate_03_delivery", deliveryApproval.id), approval: deliveryApproval },
+    {
+      event: event(
+        "synthetic-delivery-confirmed-001",
+        "delivery_confirmation",
+        deliveryConfirmationId,
+        "DELIVERY_CONFIRMATION_PENDING",
+        "DELIVERY_CONFIRMATION_CONFIRMED",
+        "human",
+        "synthetic-delivery-reviewer",
+        "2026-08-24T09:09:45Z",
+        "gate_03_delivery",
+        deliveryApproval.id,
+      ),
+      approval: deliveryApproval,
+    },
   ];
 
   const finalStates = {
@@ -219,10 +503,22 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     rfq: replayTransitions("rfq", rfqId, "RFQ_COLLECTING", rfqEvents),
     quotation: replayTransitions("quotation", quotationId, "QUOTE_DRAFT", quotationEvents),
     lead: replayTransitions("lead", leadId, "LEAD_RECEIVED", leadEvents),
-    delivery: replayTransitions("delivery_confirmation", deliveryConfirmationId, "DELIVERY_CONFIRMATION_PENDING", deliveryEvents),
+    delivery: replayTransitions(
+      "delivery_confirmation",
+      deliveryConfirmationId,
+      "DELIVERY_CONFIRMATION_PENDING",
+      deliveryEvents,
+    ),
   };
-  const transitionCount = [productEvents, contentEvents, videoEvents, rfqEvents, quotationEvents, leadEvents, deliveryEvents]
-    .reduce((count, events) => count + events.length, 0);
+  const transitionCount = [
+    productEvents,
+    contentEvents,
+    videoEvents,
+    rfqEvents,
+    quotationEvents,
+    leadEvents,
+    deliveryEvents,
+  ].reduce((count, events) => count + events.length, 0);
 
   return {
     classification: "synthetic",

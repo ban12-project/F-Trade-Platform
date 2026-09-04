@@ -19,7 +19,8 @@ export function createRemotionCompositionProps(
     throw new Error("ABCD 工业品模板当前只支持 1080×1920、30fps 的竖屏导出。");
   }
   const safeProductName = productName.trim();
-  if (!safeProductName || safeProductName.length > 80) throw new Error("ABCD 模板需要有效的已核验产品名称。");
+  if (!safeProductName || safeProductName.length > 80)
+    throw new Error("ABCD 模板需要有效的已核验产品名称。");
   if (!request.timeline.cta?.text) throw new Error("ABCD Direction 节拍必须包含 CTA。");
 
   return {
@@ -29,7 +30,13 @@ export function createRemotionCompositionProps(
     clips: request.timeline.scenes.map((scene) => {
       const source = sources.get(scene.assetRef);
       if (!source) throw new Error(`ABCD 模板无法读取片段 ${scene.sceneId} 的私有素材。`);
-      if (!scene.mediaType || !scene.fitMode || !scene.audioMode || !scene.abcdRoles?.length || !scene.motionPreset) {
+      if (
+        !scene.mediaType ||
+        !scene.fitMode ||
+        !scene.audioMode ||
+        !scene.abcdRoles?.length ||
+        !scene.motionPreset
+      ) {
         throw new Error(`片段 ${scene.sceneId} 缺少 ABCD 合成参数。`);
       }
       return {
@@ -47,4 +54,3 @@ export function createRemotionCompositionProps(
     }),
   };
 }
-

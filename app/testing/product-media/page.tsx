@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-
-import { ProductMediaPanel } from "@/components/workspace/product-media-panel";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
+import { ProductMediaPanel } from "@/components/workspace/product-media-panel";
 import type { ProductMediaAsset, VideoReadyAssessment } from "@/lib/product/video-readiness";
 
 const projectId = "00000000-0000-4000-8000-000000000701";
@@ -67,9 +66,17 @@ const assessment: VideoReadyAssessment = {
 /** Test-only ProductMedia fixture; production access remains permission protected. */
 export default function ProductMediaTestingPage() {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
-  return <main className="mx-auto min-h-screen max-w-3xl p-6">
-    <WorkspaceDirtyProvider>
-      <ProductMediaPanel projectId={projectId} productId={productId} assets={[asset]} assessment={assessment} canReview />
-    </WorkspaceDirtyProvider>
-  </main>;
+  return (
+    <main className="mx-auto min-h-screen max-w-3xl p-6">
+      <WorkspaceDirtyProvider>
+        <ProductMediaPanel
+          projectId={projectId}
+          productId={productId}
+          assets={[asset]}
+          assessment={assessment}
+          canReview
+        />
+      </WorkspaceDirtyProvider>
+    </main>
+  );
 }

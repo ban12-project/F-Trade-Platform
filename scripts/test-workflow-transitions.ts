@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 
 import {
+  type ApprovalDecision,
   assertTransition,
   replayTransitions,
-  type ApprovalDecision,
   type WorkflowEventInput,
 } from "../lib/workflow/transitions";
 
@@ -68,13 +68,7 @@ const rfqReady: WorkflowEventInput = {
   evidenceRefs: ["rfq-completeness-01"],
 };
 assertTransition(rfqReady);
-assert.throws(
-  () => assertTransition({ ...rfqReady, toState: "QUOTE_APPROVED" }),
-  /cannot move/,
-);
-assert.throws(
-  () => assertTransition({ ...rfqReady, evidenceRefs: [] }),
-  /at least one reference/,
-);
+assert.throws(() => assertTransition({ ...rfqReady, toState: "QUOTE_APPROVED" }), /cannot move/);
+assert.throws(() => assertTransition({ ...rfqReady, evidenceRefs: [] }), /at least one reference/);
 
 console.log("PASS workflow transition rules and replay");

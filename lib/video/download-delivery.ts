@@ -2,17 +2,22 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 
-import { getDatabase, type Database } from "@/lib/db/client";
+import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord } from "@/lib/db/schema";
 
 import type { VideoProject } from "./contracts";
-import { approvedVideoDownloadHeaders, resolveApprovedVideoDownload, type DownloadSession } from "./download-policy";
+import {
+  approvedVideoDownloadHeaders,
+  type DownloadSession,
+  resolveApprovedVideoDownload,
+} from "./download-policy";
+import { VercelPrivateVideoAssetStore } from "./private-asset-store";
 import { assertCurrentProductFactsForVideo } from "./product-fact-runtime-store";
 import { assertCurrentProductMediaUsageForVideo } from "./product-media-runtime-store";
-import { VercelPrivateVideoAssetStore } from "./private-asset-store";
 
 async function loadVideo(videoId: string, database: Database = getDatabase()) {
-  const [record] = await database.select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
+  const [record] = await database
+    .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
     .limit(1);

@@ -2,12 +2,17 @@ import { z } from "zod";
 
 import { hasPermission } from "@/lib/authz";
 
-import { isPrivateTestOnlyVideo, videoProjectSchema, type VideoProject } from "./contracts";
+import { isPrivateTestOnlyVideo, type VideoProject, videoProjectSchema } from "./contracts";
 import type { PrivateGeneratedVideoRead } from "./private-asset-store";
 
 export type DownloadSession = { user?: { role?: string | null } | null } | null;
 export type DownloadRecord = { state: string; payload: unknown };
-export type DownloadStore = { getGeneratedVideo(assetRef: string, range?: string | null): Promise<PrivateGeneratedVideoRead | null> };
+export type DownloadStore = {
+  getGeneratedVideo(
+    assetRef: string,
+    range?: string | null,
+  ): Promise<PrivateGeneratedVideoRead | null>;
+};
 export type LoadVideo = (videoId: string) => Promise<DownloadRecord | undefined>;
 export type RevalidateVideo = (project: VideoProject) => Promise<void>;
 
@@ -34,7 +39,11 @@ export async function resolveApprovedVideoDownload(
   if (!parsed.success) return { kind: "unavailable" };
   const project = parsed.data;
   if (isPrivateTestOnlyVideo(project)) return { kind: "unavailable" };
-  if (!project.renderedAssetRef || project.exportArtifact?.status !== "approved" || project.exportArtifact.sourceAssetRef !== project.renderedAssetRef) {
+  if (
+    !project.renderedAssetRef ||
+    project.exportArtifact?.status !== "approved" ||
+    project.exportArtifact.sourceAssetRef !== project.renderedAssetRef
+  ) {
     return { kind: "unavailable" };
   }
   try {
@@ -44,7 +53,11 @@ export async function resolveApprovedVideoDownload(
   }
   const asset = await store.getGeneratedVideo(project.renderedAssetRef, range);
   if (!asset) return { kind: "not_found" };
-  return { kind: "ready", asset, filename: `f-trade-${project.exportArtifact.platform}-${videoId.data.slice(0, 8)}.mp4` };
+  return {
+    kind: "ready",
+    asset,
+    filename: `f-trade-${project.exportArtifact.platform}-${videoId.data.slice(0, 8)}.mp4`,
+  };
 }
 
 export function approvedVideoDownloadHeaders(asset: PrivateGeneratedVideoRead, filename: string) {
@@ -55,10 +68,10 @@ export function approvedVideoDownloadHeaders(asset: PrivateGeneratedVideoRead, f
     "Content-Length": String(asset.responseSizeBytes),
     ...(asset.contentRange ? { "Content-Range": asset.contentRange } : {}),
     "Content-Type": asset.contentType,
-    "ETag": asset.etag,
+    ETag: asset.etag,
     "Cross-Origin-Resource-Policy": "same-origin",
     "Referrer-Policy": "same-origin",
-    "Vary": "Cookie",
+    Vary: "Cookie",
     "X-Content-Type-Options": "nosniff",
   };
 }

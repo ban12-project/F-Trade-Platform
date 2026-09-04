@@ -1,13 +1,16 @@
-
 import { expect, test } from "@playwright/test";
 
 test("Product Agent keeps saved models selectable in the product step", async ({ page }) => {
   await page.goto("/testing/project-workflow?panel=product");
   await page.waitForLoadState("networkidle");
-  const model = page.getByRole("complementary").getByRole("combobox", { name: "模型", exact: true });
+  const model = page
+    .getByRole("complementary")
+    .getByRole("combobox", { name: "模型", exact: true });
   await expect(model).toContainText("日常产品导入 · gpt-5-mini");
   await model.click();
-  await expect(page.getByRole("option", { name: "复杂目录识别 · claude-sonnet-test" })).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: "复杂目录识别 · claude-sonnet-test" }),
+  ).toBeVisible();
 });
 
 test("product Gate 01 review remains in the product step", async ({ page }) => {
@@ -63,5 +66,8 @@ test("desktop detail region is viewport-bound and scrolls internally", async ({ 
   await page.setViewportSize({ width: 1024, height: 600 });
   await page.goto("/testing/project-workflow?panel=product");
   const detail = page.getByRole("complementary");
-  await expect(detail.locator('[data-slot="scroll-area-viewport"]')).toHaveCSS("overflow-y", "scroll");
+  await expect(detail.locator('[data-slot="scroll-area-viewport"]')).toHaveCSS(
+    "overflow-y",
+    "scroll",
+  );
 });

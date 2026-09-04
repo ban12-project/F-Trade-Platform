@@ -24,7 +24,9 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
       {project ? (
         <div className="mx-auto max-w-[96rem] space-y-5 px-4 py-5 sm:px-6">
           <div className="flex min-w-max gap-2 overflow-hidden">
-            {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-14 w-40 rounded-xl" />)}
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-14 w-40 rounded-xl" />
+            ))}
           </div>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)]">
             <div className="space-y-5">
@@ -37,7 +39,9 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
       ) : (
         <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-28 rounded-xl" />)}
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-28 rounded-xl" />
+            ))}
           </div>
           <Skeleton className="h-80 rounded-xl" />
           <div className="grid gap-6 xl:grid-cols-2">
@@ -48,7 +52,9 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
       )}
 
       <div className="fixed bottom-3 left-1/2 flex -translate-x-1/2 gap-2 rounded-xl border bg-background/95 p-2 shadow-lg md:bottom-6">
-        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-9 w-16" />)}
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-9 w-16" />
+        ))}
       </div>
     </main>
   );

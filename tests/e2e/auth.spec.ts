@@ -5,13 +5,15 @@ import { expect, test } from "@playwright/test";
 import { parseAdminSeedArgs } from "../../scripts/seed-admins";
 
 test("requires explicit confirmation and supports multiple administrator emails", () => {
-  expect(parseAdminSeedArgs([
-    "node",
-    "scripts/seed-admins.ts",
-    "--emails",
-    "Admin@example.com,second@example.com,admin@example.com",
-    "--confirm",
-  ])).toEqual({
+  expect(
+    parseAdminSeedArgs([
+      "node",
+      "scripts/seed-admins.ts",
+      "--emails",
+      "Admin@example.com,second@example.com,admin@example.com",
+      "--confirm",
+    ]),
+  ).toEqual({
     emails: ["admin@example.com", "second@example.com"],
     confirm: true,
   });

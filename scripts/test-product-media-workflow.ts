@@ -60,24 +60,28 @@ const browserFields = productMediaRegistrationFieldsSchema.parse({
 });
 assert.equal(browserFields.rightsExpiresAt, new Date(browserLocalExpiry).toISOString());
 
-assert.throws(() => productMediaRegistrationFieldsSchema.parse({
-  projectId,
-  productId,
-  origin: "factory",
-  role: "product_hero",
-  description: "",
-  tags: "",
-  productVisible: true,
-  logoVisible: false,
-  textPresent: false,
-  rightsEvidenceRef: "evidence-rights-601",
-  editingAllowed: false,
-  publicDistributionAllowed: true,
-  paidAdvertisingAllowed: false,
-  imageToVideoAllowed: true,
-  referenceToVideoAllowed: false,
-  rightsExpiresAt: "",
-}), /编辑授权/);
+assert.throws(
+  () =>
+    productMediaRegistrationFieldsSchema.parse({
+      projectId,
+      productId,
+      origin: "factory",
+      role: "product_hero",
+      description: "",
+      tags: "",
+      productVisible: true,
+      logoVisible: false,
+      textPresent: false,
+      rightsEvidenceRef: "evidence-rights-601",
+      editingAllowed: false,
+      publicDistributionAllowed: true,
+      paidAdvertisingAllowed: false,
+      imageToVideoAllowed: true,
+      referenceToVideoAllowed: false,
+      rightsExpiresAt: "",
+    }),
+  /编辑授权/,
+);
 
 const ambiguousExpiry = new FormData();
 for (const [key, value] of registration.entries()) ambiguousExpiry.set(key, value);
@@ -85,7 +89,8 @@ ambiguousExpiry.set("rightsExpiresAt", "2027-09-03T00:00");
 assert.throws(() => parseProductMediaRegistrationFormData(ambiguousExpiry), /包含时区/);
 
 const missingReceipt = new FormData();
-for (const [key, value] of registration.entries()) if (key !== "receiptId") missingReceipt.set(key, value);
+for (const [key, value] of registration.entries())
+  if (key !== "receiptId") missingReceipt.set(key, value);
 assert.throws(() => parseProductMediaRegistrationFormData(missingReceipt), /上传回执/);
 
 const review = new FormData();
