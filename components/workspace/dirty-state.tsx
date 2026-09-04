@@ -69,7 +69,7 @@ function WorkspaceDirtyRoot({ children }: { children: ReactNode }) {
     const action = pendingAction.current;
     pendingAction.current = null;
     setConfirmOpen(false);
-    setDirtyKeys(new Set());
+    // Each form unregisters on reset/unmount; closing one dialog must not clear other drafts.
     setDiscardVersion((version) => version + 1);
     action?.();
   }

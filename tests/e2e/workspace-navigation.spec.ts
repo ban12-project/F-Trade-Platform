@@ -83,3 +83,23 @@ test("discarding a persistent new-project form resets its dirty state and values
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
   await expect(page.getByLabel("项目名称")).toHaveValue("");
 });
+
+test("discarding a dock dialog does not unregister the underlying page draft", async ({ page }) => {
+  await page.goto(root);
+  await page.getByLabel("测试草稿").fill("Keep guarding the underlying draft");
+  await page.getByRole("button", { name: "新建项目", exact: true }).click();
+  await page.getByLabel("项目名称").fill("Discard only this dialog draft");
+  await page
+    .getByRole("dialog", { name: "新建项目" })
+    .getByRole("button", { name: "Close" })
+    .click();
+  const confirmation = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await confirmation.getByRole("button", { name: "放弃修改并离开" }).click();
+  await expect(page.getByLabel("测试草稿")).toHaveValue("Keep guarding the underlying draft");
+  await expect(page).toHaveURL(new RegExp(`${root}$`));
+  await page.getByRole("button", { name: "项目", exact: true }).click();
+  await page.getByRole("link", { name: /Synthetic persistent workspace/ }).click();
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole("button", { name: "继续编辑" }).click();
+  await expect(page).toHaveURL(new RegExp(`${root}$`));
+});
