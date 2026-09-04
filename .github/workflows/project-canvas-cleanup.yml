@@ -33,6 +33,19 @@ jobs:
       - name: Apply source and test cleanup
         run: python3 scripts/apply-project-canvas-cleanup.py
 
+      - name: Normalize generated validator source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("scripts/validate_repository.py")
+          source = path.read_text(encoding="utf-8")
+          broken = 'migration = "' + "\n" + '".join'
+          if broken not in source:
+              raise SystemExit("expected generated newline literal was not found")
+          path.write_text(source.replace(broken, "migration = chr(10).join", 1), encoding="utf-8")
+          PY
+          python3 -m py_compile scripts/validate_repository.py
+
       - name: Remove retired canvas packages
         run: pnpm remove @xyflow/react elkjs
 
