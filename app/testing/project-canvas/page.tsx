@@ -9,6 +9,7 @@ import { ProductReferencePanel, RfqPanel } from "@/components/workspace/sales-pa
 import type { ContentCatalogDetail } from "@/lib/content/store";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import type { ProductCatalogDetail } from "@/lib/products";
+import type { LeadEntry } from "@/lib/sales/closing-store";
 import type { WorkspaceProjectDetail, WorkspaceProjectSummary } from "@/lib/workspace/store";
 import { createWorkspaceTemplate } from "@/lib/workspace/contracts";
 
@@ -30,6 +31,18 @@ const syntheticSalesProject: WorkspaceProjectDetail = {
   document: createWorkspaceTemplate("sales"),
 };
 const syntheticProjects: WorkspaceProjectSummary[] = [syntheticMarketingProject, syntheticSalesProject].map(({ document: _document, revision: _revision, ...project }) => project);
+const syntheticLead: LeadEntry = {
+  id: "00000000-0000-4000-8000-000000000601",
+  state: "FOLLOW_UP",
+  createdAt: new Date("2026-09-04T08:00:00.000Z"),
+  replyAvailable: true,
+  confirmedDelivery: { id: "30000000-0000-4000-8000-000000000010", leadTimeDays: 21, validUntil: "2027-09-11T12:00:00.000Z" },
+  lead: { lead_id: "00000000-0000-4000-8000-000000000601", channel_ref: "synthetic-facebook", conversation_ref: "synthetic-conversation-001", status: "follow_up", follow_up_context: "quote_sent_read_no_reply", score: 35, score_band: "WARM", score_reasons: [{ rule_id: "active_inquiry", points: 20 }, { rule_id: "asks_lead_time", points: 15 }], next_action: "ask_one_specific_question" },
+  timeline: [
+    { id: "synthetic-message-001", direction: "inbound", body: "Synthetic buyer asks for the verified lead time.", receivedAt: new Date("2026-09-04T08:30:00.000Z"), deliveryStatus: "received" },
+    { id: "synthetic-message-002", direction: "outbound", body: "Synthetic acknowledgement pending channel delivery.", receivedAt: new Date("2026-09-04T08:35:00.000Z"), deliveryStatus: "queued" },
+  ],
+};
 
 const syntheticProduct = { id: "00000000-0000-4000-8000-000000000301", productName: "Verified clutch kit", internalSku: "SYN-001", factOptions: [{ path: "product.product_name", label: "product.product_name", value: "Verified clutch kit", evidenceRef: "evidence-product-001" }] };
 const syntheticAgentModels: ProductAgentModelSettings[] = [
@@ -53,7 +66,7 @@ async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ 
     rfq: <RfqPanel projectId={syntheticSalesProject.id} entries={[]} />,
     product: <ProductReferencePanel projectId={syntheticSalesProject.id} available={[syntheticProduct]} linked={[]} />,
     quotation: <QuotationPanel projectId={syntheticSalesProject.id} rfqs={[]} products={[]} entries={[]} canReview />,
-    lead: <LeadPanel projectId={syntheticSalesProject.id} entries={[]} />,
+    lead: <LeadPanel projectId={syntheticSalesProject.id} entries={[syntheticLead]} />,
     delivery: <DeliveryPanel projectId={syntheticSalesProject.id} entries={[]} canReview />,
   }} />;
   const productDetail = state === "product-review" ? syntheticProductDetail : null;

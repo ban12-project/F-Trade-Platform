@@ -1,16 +1,21 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { z } from "zod";
 
 import leadSchema from "@/contracts/sales/lead.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
 import { getDatabase, type Database } from "@/lib/db/client";
-import { aggregateRecord, approval, auditEvent, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
-import { decideDeliveryConfirmation, requestDeliveryConfirmation } from "@/lib/delivery/confirmation";
+import { aggregateRecord, approval, auditEvent, socialBrowserJob, socialChannelControl, socialConversation, socialMessage, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
+import { decideDeliveryConfirmation, requestDeliveryConfirmation, validateDeliveryConfirmation } from "@/lib/delivery/confirmation";
 import { deliveryDecisionFormSchema, deliveryRequestFormSchema, followUpFormSchema, opportunityDecisionFormSchema, quotationDecisionFormSchema, quotationDraftFormSchema, quotationSendFormSchema } from "@/lib/form-schemas";
 import { nextFollowUp } from "@/lib/follow-up/cadence";
+import { buildControlledReply } from "@/lib/follow-up/controlled-reply";
 import { scoreLead } from "@/lib/follow-up/lead-scoring";
+import { assessReplyWindow } from "@/lib/social/inbound-policy";
+import { decryptSocialMessageBody } from "@/lib/social/message-crypto";
+import { createStoredSocialMessageRecord } from "@/lib/social/message-record";
+import { replyResultSchema } from "@/lib/social/reply-result-protocol";
 import { applyHumanQuoteDecision, createManualQuotation, sendManualQuotation, type QuotationHandoff } from "@/lib/quotation/handoff";
 import { assertTransition } from "@/lib/workflow/transitions";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
@@ -35,7 +40,9 @@ type LeadRecord = {
 const validateLead = compileContract<LeadRecord>(leadSchema);
 
 export type QuotationEntry = { id: string; state: string; createdAt: Date; quotation: QuotationHandoff; productId: string; approvalId: string | null; approvalStatus: "pending" | "approved" | "rejected" | null };
-export type LeadEntry = { id: string; state: string; createdAt: Date; lead: LeadRecord };
+export type LeadTimelineMessage = { id: string; direction: "inbound" | "outbound"; body: string; receivedAt: Date; deliveryStatus: "received" | "queued" | "claimed" | "sent" | "failed" | "paused" };
+export type ConfirmedDelivery = { id: string; leadTimeDays: number; validUntil: string };
+export type LeadEntry = { id: string; state: string; createdAt: Date; lead: LeadRecord; timeline: LeadTimelineMessage[]; replyAvailable: boolean; confirmedDelivery: ConfirmedDelivery | null };
 export type DeliveryConfirmationEntry = { id: string; state: string; createdAt: Date; confirmation: Record<string, any>; approvalId: string | null; approvalStatus: "pending" | "approved" | "rejected" | null };
 
 function quoteFromValues(value: QuotationDraftValues) {
@@ -46,6 +53,26 @@ async function assertSalesProject(tx: Parameters<Parameters<Database["transactio
   await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
   const [project] = await tx.select({ kind: workspaceProject.kind }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
   if (!project || project.kind !== "sales") throw new Error("该操作只能在销售机会项目中执行。");
+}
+
+const DELIVERY_CONFIRMATION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1_000;
+async function prepareControlledFollowUp(
+  tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
+  projectId: string,
+  lead: LeadRecord,
+  context: z.infer<typeof followUpFormSchema>["context"],
+  draft: string,
+  now: Date,
+) {
+  if (context !== "asks_lead_time" && context !== "asks_sample") return buildControlledReply({ draft, context, rfqRef: lead.rfq_ref, delivery: null, now });
+  if (!lead.delivery_confirmation_ref) return buildControlledReply({ draft, context, rfqRef: lead.rfq_ref, delivery: null, now });
+  const [row] = await tx.select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
+    .from(aggregateRecord)
+    .innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
+    .where(and(eq(aggregateRecord.id, lead.delivery_confirmation_ref), eq(aggregateRecord.type, "delivery_confirmation"), eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "delivery_confirmation")))
+    .for("update");
+  const confirmation = row && row.state === "DELIVERY_CONFIRMATION_CONFIRMED" ? validateDeliveryConfirmation(row.payload) : null;
+  return buildControlledReply({ draft, context, rfqRef: lead.rfq_ref, delivery: confirmation, now });
 }
 
 export async function createOrReviseQuotation(input: unknown, actorId: string, database: Database = getDatabase()) {
@@ -134,12 +161,63 @@ export async function recordFollowUp(input: unknown, actorId: string, database: 
   return database.transaction(async (tx) => {
     await assertSalesProject(tx, value.projectId, actorId);
     const [record] = await tx.select({ payload: aggregateRecord.payload, state: aggregateRecord.state }).from(aggregateRecord).innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, aggregateRecord.id)).where(and(eq(aggregateRecord.id, value.leadId), eq(aggregateRecord.type, "lead"), eq(workspaceProjectItem.projectId, value.projectId), eq(workspaceProjectItem.role, "sales_lead"))).for("update");
-    if (!record || record.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以记录回复。");
+    if (!record || record.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以发送回复。");
+    const lead = validateLead(record.payload);
+    if (!lead.conversation_ref) throw new Error("该线索没有可发送的渠道会话，请先关联入站消息。");
+    const [conversation] = await tx.select().from(socialConversation).where(and(eq(socialConversation.id, lead.conversation_ref), eq(socialConversation.leadId, value.leadId))).for("update");
+    if (!conversation) throw new Error("该线索未关联授权可见的渠道会话。");
+    const [control] = await tx.select().from(socialChannelControl).where(and(eq(socialChannelControl.channelRef, conversation.channelRef), eq(socialChannelControl.accountRef, conversation.accountRef))).for("update");
+    if (!control?.enabled || control.circuitStatus !== "active") throw new Error("渠道未启用或已暂停，不能发送回复。");
+    const [latestInbound] = await tx.select({ id: socialMessage.id, externalMessageRef: socialMessage.externalMessageRef, receivedAt: socialMessage.receivedAt }).from(socialMessage).where(and(eq(socialMessage.conversationId, conversation.id), eq(socialMessage.direction, "inbound"), isNull(socialMessage.deletedAt), gt(socialMessage.expiresAt, now))).orderBy(desc(socialMessage.receivedAt)).limit(1).for("update");
+    if (!latestInbound) throw new Error("没有仍在保留期内的入站消息，不能发送回复。");
+    const window = assessReplyWindow({ channelRef: conversation.channelRef, accountRef: conversation.accountRef, transport: "camofox_controlled_mvp1", inboundOnly: true, replyWindowMinutes: 60, outsideWindowAction: "block" }, { messageId: latestInbound.externalMessageRef, direction: "inbound", receivedAt: latestInbound.receivedAt.toISOString() }, now.toISOString());
+    if (window.status !== "within_window") throw new Error("已超过渠道回复窗口；当前 MVP 禁止发送，需人工升级处理。");
+    const controlledDraft = await prepareControlledFollowUp(tx, value.projectId, lead, value.context, value.draft, now);
+    const idempotencyKey = `reply:${value.projectId}:${value.leadId}:${value.confirmationRef}`;
+    const existingJob = await tx.query.socialBrowserJob.findFirst({ where: eq(socialBrowserJob.idempotencyKey, idempotencyKey) });
+    if (existingJob) return lead;
+    const jobId = randomUUID(); const messageId = randomUUID();
+    const storedMessage = createStoredSocialMessageRecord({ id: messageId, conversationId: conversation.id, externalMessageRef: `pending-${jobId}`, direction: "outbound", identityQuality: "manual", body: controlledDraft, receivedAt: now });
+    await tx.insert(socialBrowserJob).values({ id: jobId, channelRef: conversation.channelRef, accountRef: conversation.accountRef, kind: "reply", idempotencyKey, payloadRef: messageId, status: "queued" });
+    await tx.insert(socialMessage).values(storedMessage);
     const recommendation = nextFollowUp(value.context); const scoring = scoreLead(value.triggeredRules);
-    const next = validateLead({ ...(record.payload as LeadRecord), status: "follow_up", follow_up_context: value.context, score: scoring.score, score_band: scoring.status, score_reasons: scoring.evidence, next_action: recommendation.action, last_outbound_ref: value.outboundRef, ...(value.nextFollowUpAt ? { next_follow_up_at: new Date(value.nextFollowUpAt).toISOString() } : {}) });
+    const next = validateLead({ ...lead, status: "follow_up", follow_up_context: value.context, score: scoring.score, score_band: scoring.status, score_reasons: scoring.evidence, next_action: recommendation.action, last_outbound_ref: jobId, ...(value.nextFollowUpAt ? { next_follow_up_at: new Date(value.nextFollowUpAt).toISOString() } : {}) });
     await tx.update(aggregateRecord).set({ payload: next, version: sql`${aggregateRecord.version} + 1` }).where(eq(aggregateRecord.id, value.leadId));
-    await tx.insert(auditEvent).values({ id: randomUUID(), action: "lead.follow_up_recorded", actorType: "human", actorId, aggregateId: value.leadId, subjectType: "lead", subjectId: value.leadId, metadata: { context: value.context, score: scoring.score, outbound_ref: value.outboundRef, draft_length: value.draft.length }, occurredAt: now });
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: "lead.follow_up_submitted", actorType: "human", actorId, aggregateId: value.leadId, subjectType: "lead", subjectId: value.leadId, metadata: { context: value.context, score: scoring.score, browser_job_id: jobId, confirmation_ref: value.confirmationRef, reply_window: window.status, draft_length: controlledDraft.length, delivery_confirmation_ref: lead.delivery_confirmation_ref ?? null }, occurredAt: now });
     return next;
+  });
+}
+
+/** Applies one signed Worker result. Any uncertain reply pauses the channel and cannot be retried automatically. */
+export async function recordControlledReplyResult(input: unknown, database: Database = getDatabase()) {
+  const value = replyResultSchema.parse(input); const now = new Date();
+  return database.transaction(async (tx) => {
+    const [job] = await tx.select().from(socialBrowserJob).where(eq(socialBrowserJob.id, value.jobId)).for("update");
+    if (!job || job.kind !== "reply") throw new Error("回复任务不存在。");
+    const [message] = await tx.select().from(socialMessage).where(eq(socialMessage.id, job.payloadRef)).for("update");
+    if (!message || message.direction !== "outbound") throw new Error("回复任务缺少待发送消息。");
+    const [conversation] = await tx.select().from(socialConversation).where(eq(socialConversation.id, message.conversationId)).for("update");
+    if (!conversation?.leadId) throw new Error("回复任务未关联有效线索。");
+    if (["succeeded", "failed", "paused"].includes(job.status)) {
+      if (value.outcome === "sent" && job.status === "succeeded" && job.resultRef === value.externalMessageRef) return job;
+      if (value.outcome !== "sent" && job.status === "paused" && job.failureCode === value.failureCode) return job;
+      throw new Error("回复任务已经终结，不能用不同结果覆盖。");
+    }
+    const [control] = await tx.select().from(socialChannelControl).where(and(eq(socialChannelControl.channelRef, job.channelRef), eq(socialChannelControl.accountRef, job.accountRef))).for("update");
+    if (value.outcome === "sent") {
+      if (!control?.enabled || control.circuitStatus !== "active") throw new Error("渠道已暂停，不能接受成功发送结果。");
+      const [duplicate] = await tx.select({ id: socialMessage.id }).from(socialMessage).where(and(eq(socialMessage.conversationId, message.conversationId), eq(socialMessage.externalMessageRef, value.externalMessageRef!), ne(socialMessage.id, message.id))).limit(1);
+      if (duplicate) throw new Error("平台消息凭证已被其他消息使用。");
+      const [saved] = await tx.update(socialBrowserJob).set({ status: "succeeded", resultRef: value.externalMessageRef, failureCode: null, updatedAt: now }).where(eq(socialBrowserJob.id, job.id)).returning();
+      await tx.update(socialMessage).set({ externalMessageRef: value.externalMessageRef!, receivedAt: now }).where(eq(socialMessage.id, message.id));
+      await tx.update(socialConversation).set({ lastMessageAt: now, updatedAt: now }).where(eq(socialConversation.id, conversation.id));
+      await tx.insert(auditEvent).values({ id: randomUUID(), action: "lead.follow_up_sent", actorType: "system", actorId: "social-worker", aggregateId: conversation.leadId, subjectType: "social_message", subjectId: message.id, metadata: { browser_job_id: job.id, external_message_ref: value.externalMessageRef }, occurredAt: now });
+      return saved;
+    }
+    const [saved] = await tx.update(socialBrowserJob).set({ status: "paused", resultRef: null, failureCode: value.failureCode, updatedAt: now }).where(eq(socialBrowserJob.id, job.id)).returning();
+    if (control) await tx.update(socialChannelControl).set({ circuitStatus: "paused", pauseReason: value.outcome === "unknown" ? "external_result_unknown" : value.failureCode, pauseEvidenceRef: job.id, changedAt: now, updatedAt: now }).where(eq(socialChannelControl.id, control.id));
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: `lead.follow_up_${value.outcome}`, actorType: "system", actorId: "social-worker", aggregateId: conversation.leadId, subjectType: "social_message", subjectId: message.id, metadata: { browser_job_id: job.id, failure_code: value.failureCode, retry_allowed: false }, occurredAt: now });
+    return saved;
   });
 }
 
@@ -166,11 +244,16 @@ export async function createDeliveryRequest(input: unknown, actorId: string, dat
     if (!lead || lead.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以申请交期确认。");
     const leadPayload = validateLead(lead.payload);
     if (!leadPayload.rfq_ref) throw new Error("交期确认必须引用当前线索的 RFQ。");
+    if (leadPayload.delivery_confirmation_ref) {
+      const [existing] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord).where(and(eq(aggregateRecord.id, leadPayload.delivery_confirmation_ref), eq(aggregateRecord.type, "delivery_confirmation"))).for("update");
+      if (existing && ["DELIVERY_CONFIRMATION_PENDING", "DELIVERY_CONFIRMATION_CONFIRMED"].includes(existing.state)) return { id: leadPayload.delivery_confirmation_ref };
+    }
     const id = randomUUID(); const approvalId = randomUUID();
     const confirmation = requestDeliveryConfirmation({ confirmationId: id, relatedEntityType: "rfq", relatedEntityId: leadPayload.rfq_ref, requestedByType: "human", requestedById: actorId, requestedAt: now.toISOString() });
     await tx.insert(aggregateRecord).values({ id, type: "delivery_confirmation", state: "DELIVERY_CONFIRMATION_PENDING", payload: confirmation, createdByType: "human", createdById: actorId });
     await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId: value.projectId, aggregateId: id, role: "delivery_confirmation", relation: "owned" });
     await tx.insert(approval).values({ id: approvalId, aggregateId: id, gate: "gate_03_delivery", status: "pending", requestedByType: "human", requestedById: actorId, requestedAt: now });
+    await tx.update(aggregateRecord).set({ payload: validateLead({ ...leadPayload, delivery_confirmation_ref: id }), version: sql`${aggregateRecord.version} + 1` }).where(eq(aggregateRecord.id, value.leadId));
     await tx.insert(auditEvent).values({ id: randomUUID(), action: "delivery_confirmation.requested", actorType: "human", actorId, aggregateId: id, subjectType: "delivery_confirmation", subjectId: id, metadata: { lead_id: value.leadId, evidence_ref: value.evidenceRef }, occurredAt: now });
     return { id };
   });
@@ -184,7 +267,7 @@ export async function decideDelivery(input: unknown, actorId: string, database: 
     if (!record || record.state !== "DELIVERY_CONFIRMATION_PENDING") throw new Error("该交期确认当前不可审核。");
     const [pending] = await tx.select().from(approval).where(and(eq(approval.aggregateId, value.confirmationId), eq(approval.gate, "gate_03_delivery"), eq(approval.status, "pending"))).for("update");
     if (!pending) throw new Error("未找到 Gate 03 待审核请求。");
-    const next = decideDeliveryConfirmation(record.payload as Record<string, unknown>, { actorType: "human", actorId, status: value.decision, approvalRef: pending.id, evidenceRef: value.evidenceRef, decidedAt: now.toISOString(), ...(value.decision === "confirmed" ? { leadTimeDays: Number(value.leadTimeDays) } : {}) });
+    const next = decideDeliveryConfirmation(validateDeliveryConfirmation(record.payload), { actorType: "human", actorId, status: value.decision, approvalRef: pending.id, evidenceRef: value.evidenceRef, decidedAt: now.toISOString(), ...(value.decision === "confirmed" ? { leadTimeDays: Number(value.leadTimeDays), validUntil: new Date(now.getTime() + DELIVERY_CONFIRMATION_VALIDITY_MS).toISOString() } : {}) });
     const nextState = value.decision === "confirmed" ? "DELIVERY_CONFIRMATION_CONFIRMED" : "DELIVERY_CONFIRMATION_REJECTED";
     await tx.update(approval).set({ status: value.decision === "confirmed" ? "approved" : "rejected", decidedByType: "human", decidedById: actorId, decidedAt: now, evidenceRef: value.evidenceRef, notes: value.notes || null }).where(eq(approval.id, pending.id));
     await tx.update(aggregateRecord).set({ state: nextState, payload: next, version: sql`${aggregateRecord.version} + 1` }).where(eq(aggregateRecord.id, value.confirmationId));
@@ -206,9 +289,37 @@ export async function listProjectQuotations(projectId: string, database: Databas
   return rows.map(({ record }) => { const item = approvals.get(record.id); const payload = record.payload as unknown as QuotationHandoff & { product_id?: string }; return { id: record.id, state: record.state, createdAt: record.createdAt, quotation: payload, productId: payload.product_id ?? "", approvalId: item?.id ?? null, approvalStatus: item?.status ?? null }; });
 }
 
-export async function listProjectLeads(projectId: string, database: Database = getDatabase()): Promise<LeadEntry[]> {
+export async function listProjectLeads(projectId: string, actorId: string, database: Database = getDatabase()): Promise<LeadEntry[]> {
+  await assertWorkspaceProjectAccess(projectId, actorId, "view", database);
   const rows = await database.select({ record: aggregateRecord }).from(workspaceProjectItem).innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId)).where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "sales_lead"), eq(aggregateRecord.type, "lead"))).orderBy(desc(workspaceProjectItem.createdAt));
-  return rows.flatMap(({ record }) => { const parsed = (() => { try { return validateLead(record.payload); } catch { return null; } })(); return parsed ? [{ id: record.id, state: record.state, createdAt: record.createdAt, lead: parsed }] : []; });
+  const parsedRows = rows.flatMap(({ record }) => { const parsed = (() => { try { return validateLead(record.payload); } catch { return null; } })(); return parsed ? [{ record, lead: parsed }] : []; });
+  const conversationIds = parsedRows.flatMap(({ lead }) => lead.conversation_ref ? [lead.conversation_ref] : []);
+  const conversations = conversationIds.length ? await database.select({ id: socialConversation.id, leadId: socialConversation.leadId }).from(socialConversation).where(inArray(socialConversation.id, conversationIds)) : [];
+  const linkedConversations = new Set(conversations.map((conversation) => `${conversation.id}:${conversation.leadId}`));
+  const messages = conversationIds.length ? await database.select({ id: socialMessage.id, conversationId: socialMessage.conversationId, direction: socialMessage.direction, bodyCiphertext: socialMessage.bodyCiphertext, receivedAt: socialMessage.receivedAt }).from(socialMessage).where(and(inArray(socialMessage.conversationId, conversationIds), isNull(socialMessage.deletedAt), gt(socialMessage.expiresAt, new Date()))).orderBy(socialMessage.receivedAt).limit(200) : [];
+  const messageIds = messages.map((message) => message.id);
+  const jobs = messageIds.length ? await database.select({ payloadRef: socialBrowserJob.payloadRef, status: socialBrowserJob.status }).from(socialBrowserJob).where(and(eq(socialBrowserJob.kind, "reply"), inArray(socialBrowserJob.payloadRef, messageIds))) : [];
+  const jobByMessage = new Map(jobs.map((job) => [job.payloadRef, job.status]));
+  const deliveryIds = parsedRows.flatMap(({ lead }) => lead.delivery_confirmation_ref ? [lead.delivery_confirmation_ref] : []);
+  const deliveryRows = deliveryIds.length ? await database.select({ id: aggregateRecord.id, state: aggregateRecord.state, payload: aggregateRecord.payload }).from(aggregateRecord).where(and(inArray(aggregateRecord.id, deliveryIds), eq(aggregateRecord.type, "delivery_confirmation"))) : [];
+  const deliveries = new Map(deliveryRows.flatMap((row) => {
+    try {
+      const confirmation = validateDeliveryConfirmation(row.payload); const validUntil = confirmation.result?.valid_until; const days = confirmation.result?.confirmed_lead_time_days;
+      return row.state === "DELIVERY_CONFIRMATION_CONFIRMED" && validUntil && Date.parse(validUntil) > Date.now() && Number.isInteger(days) ? [[row.id, { id: row.id, leadTimeDays: days!, validUntil }] as const] : [];
+    } catch { return []; }
+  }));
+  return parsedRows.map(({ record, lead }): LeadEntry => ({
+    id: record.id, state: record.state, createdAt: record.createdAt, lead,
+    replyAvailable: Boolean(lead.conversation_ref && linkedConversations.has(`${lead.conversation_ref}:${record.id}`)),
+    confirmedDelivery: lead.delivery_confirmation_ref ? deliveries.get(lead.delivery_confirmation_ref) ?? null : null,
+    timeline: messages.filter((message) => message.conversationId === lead.conversation_ref).map((message) => ({
+      id: message.id,
+      direction: message.direction === "outbound" ? "outbound" : "inbound",
+      body: decryptSocialMessageBody(message.bodyCiphertext),
+      receivedAt: message.receivedAt,
+      deliveryStatus: message.direction === "inbound" ? "received" : ({ queued: "queued", claimed: "claimed", succeeded: "sent", failed: "failed", paused: "paused" } as const)[jobByMessage.get(message.id) as "queued" | "claimed" | "succeeded" | "failed" | "paused"] ?? "sent",
+    })),
+  }));
 }
 
 export async function listProjectDeliveryConfirmations(projectId: string, database: Database = getDatabase()): Promise<DeliveryConfirmationEntry[]> {

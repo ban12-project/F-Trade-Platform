@@ -19,7 +19,7 @@ Quotation: QUOTE_DRAFT → QUOTE_REVIEW_REQUIRED
                ↑                    ├→ QUOTE_APPROVED → QUOTE_SENT
                └ QUOTE_REVISION_REQUIRED ←┘
 
-Lead: LEAD_RECEIVED → FOLLOW_UP → OPPORTUNITY → WON / LOST
+Lead: LEAD_RECEIVED → FOLLOW_UP → OPPORTUNITY
 
 DeliveryConfirmation: DELIVERY_CONFIRMATION_PENDING
                         ├→ DELIVERY_CONFIRMATION_CONFIRMED
@@ -47,7 +47,7 @@ Sales Agent 只收集和整理 RFQ。报价草稿由人工销售创建，价格�
 
 ### Gate 03 - 交期确认
 
-客户出现明确采购意向后，工厂人工确认生产能力和交期。Agent 可以发起确认请求和传递结果，不能作为决策人自行承诺。
+客户询问交期或样品时，业务人员从线索创建与当前 RFQ 绑定的确认请求，工厂管理员人工确认生产能力和交期。批准结果带七天有效期；未批准、已拒绝、已过期或与当前 RFQ 不匹配的结果不能进入客户回复。交期句不接受自由文本录入，而是在发送边界由服务端从有效 Gate 03 结果生成，并在 Worker 领取任务时再次校验。Agent 不能作为决策人自行承诺。
 
 ## 关键安全规则
 
@@ -69,10 +69,10 @@ MVP1 可使用 `official_api` 或经 #155 明确批准的 `camofox_controlled_mv
 创建或更新 Lead；表中不保存 Cookie 或凭据。官方 webhook 通过带平台 ID 的交付可主张 exactly-once；浏览器
 观察只能在身份质量为 `dom_id` 时作同等主张，派生指纹必须在审计记录中标记为 best-effort。
 
-内容发布也必须通过 `ContentPublicationPolicy`：只有人工启用的渠道、已完成 Gate 01 的内容和 system/human
-发布 actor 才能进入传输。CamoFox 发布还需逐帖人工确认。安全检查、登录失效、固定出口 IP 不符、页面结构不确定
-或外部结果不确定时必须熔断；不得自动换号、换代理、求解验证码或重试不确定的发布。
+内容发布也必须通过 `ContentPublicationPolicy`：只有人工启用的渠道、已完成 Gate 01 的内容和逐帖人工确认才能写入持久化队列。应用不会因按钮点击直接声称已发布；单一授权 Worker 使用 API key 原子领取任务，再用绑定载荷摘要的短期签名命令执行。只有经过签名验证的平台回执才能写入 `published`。回复同样先保存加密正文并排队，领取时重新校验项目状态、渠道、消息保留期、60 分钟窗口和 Gate 03。
+
+CamoFox 路径的实际浏览器执行器作为受控部署单元交付，不与应用数据库或凭据存储合并。安全检查、登录失效、固定出口 IP 不符、页面结构不确定或外部结果不确定时必须暂停任务和渠道、追加审计且禁止自动重试；不得自动换号、换代理或求解验证码。
 
 ## Synthetic 端到端演示
 
-执行 `pnpm demo:synthetic` 可验证产品导入、内容审核和发布、RFQ 完整、人工报价审批和发送、跟单到 `OPPORTUNITY` 的演示闭环。该脚本只读取带 `synthetic` 标识的 fixture，并在开始前按各自 JSON Schema 验证输入；它不会连接渠道、读取客户数据或生成真实报价。
+执行 `pnpm demo:synthetic` 可验证产品导入、内容/视频审核、受控发布签名回执、RFQ 完整、人工报价审批和发送、Gate 03 与人工跟单到 `OPPORTUNITY` 的演示闭环。该脚本只读取带 `synthetic` 标识的 fixture，并在开始前按各自 JSON Schema 验证输入；它不会连接渠道、读取客户数据或生成真实报价。`WON/LOST` 明确不在本轮验收范围。

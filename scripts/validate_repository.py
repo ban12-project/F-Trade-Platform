@@ -585,6 +585,18 @@ def check_content_publication_policy() -> None:
         raise AssertionError(f"Content publication policy tests failed: {result.stderr or result.stdout}")
 
 
+def check_controlled_effect_results() -> None:
+    for script, label in (
+        ("test:controlled-publication", "controlled publication command"),
+        ("test:publication-result", "publication result protocol"),
+        ("test:reply-result", "reply result protocol"),
+        ("test:controlled-reply", "Gate 03 controlled reply"),
+    ):
+        result = subprocess.run(["pnpm", script], cwd=ROOT, capture_output=True, text=True)
+        if result.returncode:
+            raise AssertionError(f"{label} tests failed: {result.stderr or result.stdout}")
+
+
 def check_quotation_gate() -> None:
     result = subprocess.run(["pnpm", "test:quotation"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -755,6 +767,7 @@ def main() -> int:
         ("GitHub governance artifacts", check_github_governance),
         ("local main push guard", check_main_push_guard),
         ("content publication policy", check_content_publication_policy),
+        ("controlled publication and reply results", check_controlled_effect_results),
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),

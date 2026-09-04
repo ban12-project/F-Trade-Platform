@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { signSocialWorkerCommand, verifySocialWorkerCommand, type WorkerNonceStore } from "../lib/social/worker-protocol";
+import { digestSocialWorkerPayload, signSocialWorkerCommand, verifySocialWorkerCommand, verifySocialWorkerPayload, type WorkerNonceStore } from "../lib/social/worker-protocol";
 
 process.env.SOCIAL_WORKER_SIGNING_KEY = Buffer.alloc(32, 13).toString("base64");
 
@@ -20,13 +20,17 @@ const command = {
   jobId: "job-001",
   kind: "publish" as const,
   payloadRef: "social-payload-001",
+  payloadDigest: digestSocialWorkerPayload({ text: "Synthetic approved content" }),
   nonce: "0123456789abcdefghijklmn-_",
   issuedAt: new Date("2026-08-30T23:59:00.000Z"),
   expiresAt: new Date("2026-08-31T00:04:00.000Z"),
 };
 async function main() {
   const signed = signSocialWorkerCommand(command);
-  assert.equal((await verifySocialWorkerCommand(signed, command.workerId, nonceStore, now)).jobId, command.jobId);
+  const verified = await verifySocialWorkerCommand(signed, command.workerId, nonceStore, now);
+  assert.equal(verified.jobId, command.jobId);
+  assert.deepEqual(verifySocialWorkerPayload(verified, { text: "Synthetic approved content" }), { text: "Synthetic approved content" });
+  assert.throws(() => verifySocialWorkerPayload(verified, { text: "Tampered content" }), /digest/);
   await assert.rejects(() => verifySocialWorkerCommand(signed, command.workerId, nonceStore, now), /already been used/);
   assert.throws(() => signSocialWorkerCommand({ ...command, nonce: "abcdefghijklmnopqrstuvwxyz012345-_", expiresAt: new Date("2026-08-31T00:06:00.000Z") }), /lifetime/);
   const tampered = signSocialWorkerCommand({ ...command, nonce: "zyxwvutsrqponmlkjihgfedc-_" });

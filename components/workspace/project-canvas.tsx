@@ -6,8 +6,9 @@ import "@xyflow/react/dist/style.css";
 import { ArrowLeftIcon, LayoutDashboardIcon, RotateCcwIcon, SaveIcon, XIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { saveWorkspaceCanvasAction } from "@/lib/actions/workspace";
+import { saveWorkspaceCanvasAction, type WorkspaceActionState } from "@/lib/actions/workspace";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
@@ -64,6 +65,7 @@ function ProjectCanvasInner({ project, projects, tasks, settingsPanel, videoEdit
   const panel = searchParams.get("panel");
   const selectedId = nodes.find((node) => node.data.kind === panel)?.id ?? null;
   const [panelDirty, setPanelDirty] = useState(false); const [revision, setRevision] = useState(project.revision); const [saveState, setSaveState] = useState<"saved" | "saving" | "unsaved" | "conflict" | "error">("saved"); const [notice, setNotice] = useState(""); const [pending, startTransition] = useTransition();
+  const conflictResult = useRef<WorkspaceActionState | null>(null);
   useWorkspaceDirty("canvas-layout", saveState === "unsaved" || saveState === "conflict" || saveState === "error");
   useWorkspaceDirty("active-panel", panelDirty);
   useEffect(() => setInteractive(true), []);
@@ -75,7 +77,7 @@ function ProjectCanvasInner({ project, projects, tasks, settingsPanel, videoEdit
       if (nodeId) triggerRef.current = window.document.querySelector(`.react-flow__node[data-id="${CSS.escape(nodeId)}"] button`);
       const params = new URLSearchParams(searchParams.toString());
       if (kind) params.set("panel", kind); else params.delete("panel");
-      router.replace(params.size ? `${pathname}?${params}` : pathname, { scroll: false });
+      router.push(params.size ? `${pathname}?${params}` : pathname, { scroll: false });
       setPanelDirty(false);
       if (!kind) requestAnimationFrame(() => triggerRef.current?.focus());
     });
@@ -97,13 +99,26 @@ function ProjectCanvasInner({ project, projects, tasks, settingsPanel, videoEdit
   const renderedNodes = useMemo(() => nodes.map((node) => ({ ...node, type: "workflow", draggable: canArrange, data: { ...node.data, arranging: canArrange, onOpen: (id: string, kind: string) => setPanel(kind, id), onMove: moveNode } })) as WorkflowCanvasNode[], [canArrange, moveNode, nodes, setPanel]);
   function onNodesChange(changes: NodeChange[]) { if (!canArrange) return; const material = changes.filter((change) => change.type === "position" && Boolean(change.position) && change.dragging === true); if (!material.length) return; setNodes((current) => applyNodeChanges(material, current) as CanvasNode[]); setSaveState("unsaved"); }
   function cancelArrange() { setNodes(toNodes(document)); setSaveState("saved"); setNotice("已恢复上次保存的布局。"); setArranging(false); }
-  function save() { const next = toDocument(document, nodes); setSaveState("saving"); startTransition(async () => { const result = await saveWorkspaceCanvasAction(project.id, { expectedRevision: revision, document: next }); setNotice(result.message); if (result.status === "success" && result.revision) { setDocument(next); setRevision(result.revision); setSaveState("saved"); setArranging(false); } else setSaveState(result.status === "conflict" ? "conflict" : "error"); }); }
-  return <main id="main-content" className="fixed inset-0 overflow-hidden bg-muted" aria-label={`${project.title} 项目画布`}><ReactFlow className={`bg-background transition-opacity duration-[120ms] ${interactive ? "opacity-100" : "pointer-events-none opacity-0"}`} nodes={renderedNodes} nodeTypes={nodeTypes} edges={document.edges.map((edge) => ({ id: edge.id, source: edge.source, target: edge.target }))} onNodesChange={onNodesChange} onNodeClick={(_event, node) => setPanel(node.data.kind, node.id)} onPaneClick={() => setPanel(null)} minZoom={0.75} maxZoom={1.5} defaultViewport={{ x: 32, y: 200, zoom: 1 }} autoPanOnNodeFocus={false} nodesDraggable={canArrange} nodesFocusable={false} nodesConnectable={false} elementsSelectable><Background /><CanvasControls />{interactive ? <MiniMap className="hidden md:block" nodeColor={() => "#64748b"} position="bottom-left" /> : null}</ReactFlow>
+  function save() { const next = toDocument(document, nodes); setSaveState("saving"); startTransition(async () => { const result = await saveWorkspaceCanvasAction(project.id, { expectedRevision: revision, document: next }); setNotice(result.message); if (result.status === "success" && result.revision) { conflictResult.current = null; setDocument(next); setRevision(result.revision); setSaveState("saved"); setArranging(false); } else { conflictResult.current = result.status === "conflict" ? result : null; setSaveState(result.status === "conflict" ? "conflict" : "error"); } }); }
+  function keepCurrentEdits() { setSaveState("unsaved"); setNotice("已保留当前编辑。请检查其他人的修改后再保存。"); }
+  function loadLatest() {
+    const latest = conflictResult.current;
+    if (!latest?.document || latest.revision === undefined) return;
+    setDocument(latest.document);
+    setNodes(toNodes(latest.document));
+    setRevision(latest.revision);
+    setSaveState("saved");
+    setNotice("已载入最新版本，当前未保存布局已放弃。");
+  }
+  const nextTaskKind = tasks.find((task) => task.projectId === project.id)?.nodeKind;
+  const initialNodeId = nodes.find((node) => node.data.kind === nextTaskKind)?.id ?? nodes[0]?.id;
+  return <main id="main-content" className="fixed inset-0 overflow-hidden bg-muted" aria-label={`${project.title} 项目画布`}><ReactFlow className={`bg-background transition-opacity duration-[120ms] ${interactive ? "opacity-100" : "pointer-events-none opacity-0"}`} nodes={renderedNodes} nodeTypes={nodeTypes} edges={document.edges.map((edge) => ({ id: edge.id, source: edge.source, target: edge.target }))} onNodesChange={onNodesChange} onNodeClick={(_event, node) => setPanel(node.data.kind, node.id)} onPaneClick={() => setPanel(null)} minZoom={0.75} maxZoom={1.5} fitView={Boolean(initialNodeId)} fitViewOptions={{ nodes: initialNodeId ? [{ id: initialNodeId }] : undefined, minZoom: 1, maxZoom: 1, padding: 0.5 }} defaultViewport={{ x: 32, y: 200, zoom: 1 }} autoPanOnNodeFocus={false} nodesDraggable={canArrange} nodesFocusable={false} nodesConnectable={false} elementsSelectable><Background /><CanvasControls />{interactive ? <MiniMap className="hidden md:block" nodeColor={() => "#64748b"} position="bottom-left" /> : null}</ReactFlow>
     {!interactive ? <div className="absolute inset-0 z-30 bg-background" aria-hidden="true" /> : null}
     <header className="absolute left-3 top-3 z-10 flex max-w-[calc(100vw-4.5rem)] flex-wrap items-center gap-2 rounded-xl border bg-background/90 p-2 shadow-sm backdrop-blur-xl md:left-6 md:top-6">{readOnly ? <LinkButton href={`/workspace/${project.id}`} size="sm" variant="ghost"><ArrowLeftIcon data-icon="inline-start" />返回项目工作区</LinkButton> : null}<span className="max-w-56 truncate px-1 text-sm font-semibold">{project.title}</span><Badge variant="secondary">{project.kind === "marketing" ? "产品营销" : "销售机会"}</Badge><Badge variant="outline">{project.status === "active" ? "进行中" : "已归档"}</Badge><Badge variant={saveState === "saved" ? "secondary" : "outline"} aria-live="polite">{readOnly ? "只读流程概览" : statusLabel(saveState)}</Badge><Badge variant="outline">人工审核受控</Badge>{!readOnly ? <Button type="button" size="sm" variant={arranging ? "secondary" : "ghost"} onClick={() => setArranging(true)}><LayoutDashboardIcon data-icon="inline-start" />整理画布</Button> : null}{!readOnly && arranging && saveState !== "saved" ? <><Button type="button" size="sm" variant="ghost" onClick={cancelArrange}><RotateCcwIcon data-icon="inline-start" />取消</Button><Button type="button" size="sm" onClick={save} disabled={pending}><SaveIcon data-icon="inline-start" />{pending ? "保存中" : "保存布局"}</Button></> : null}</header>
     {notice ? <Alert className="absolute bottom-24 left-3 z-10 w-[min(30rem,calc(100vw-1.5rem))] bg-background/95 md:left-6"><AlertTitle>{saveState === "conflict" || saveState === "error" ? "需要处理" : "布局已更新"}</AlertTitle><AlertDescription>{notice}</AlertDescription></Alert> : null}
     <WorkspaceActionDock projects={projects} tasks={tasks} settingsPanel={settingsPanel} activeProjectId={project.id} />
     <Inspector project={project} selected={selected} onClose={() => setPanel(null)} videoEditor={videoEditor} panels={panels} onDirtyChange={setPanelDirty} />
+    <AlertDialog open={saveState === "conflict"} onOpenChange={(open) => { if (!open && saveState === "conflict") keepCurrentEdits(); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>画布已有更新</AlertDialogTitle><AlertDialogDescription>其他成员已经保存了更新版本。请选择保留当前编辑继续核对，或放弃当前布局并载入最新版本；系统不会强制覆盖。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={keepCurrentEdits}>保留当前编辑</AlertDialogCancel><AlertDialogAction onClick={loadLatest}>载入最新版本</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </main>;
 }
 

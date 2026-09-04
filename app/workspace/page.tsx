@@ -17,7 +17,7 @@ async function WorkspaceContent({ searchParams }: { searchParams: Promise<{ view
   const canRouteInbound = hasPermission(session.user.role, "sales:write");
   const [query, projects, tasks, pipeline, inbound, settings] = await Promise.all([searchParams, listWorkspaceProjects(session.user.id), listWorkspaceTasks(session.user.id), listWorkspacePipeline(session.user.id), canRouteInbound ? listUnassignedInboundConversations() : Promise.resolve([]), listStoredProductAgentModelSettings()]);
   const settingsPanel = <WorkspaceSettingsPanel settings={settings} currentUser={session.user} canManage={hasPermission(session.user.role, "settings:manage")} />;
-  return query.view === "flow" ? <WorkspaceHub projects={projects} tasks={tasks} settingsPanel={settingsPanel} /> : <WorkspaceDashboard projects={projects} tasks={tasks} pipeline={pipeline} inbound={inbound} currentTime={Date.now()} settingsPanel={settingsPanel} />;
+  return query.view === "tasks" ? <WorkspaceDashboard projects={projects} tasks={tasks} pipeline={pipeline} inbound={inbound} currentTime={Date.now()} settingsPanel={settingsPanel} /> : <WorkspaceHub projects={projects} tasks={tasks} settingsPanel={settingsPanel} />;
 }
 
 export default function WorkspacePage({ searchParams }: { searchParams: Promise<{ view?: string }> }) { return <Suspense fallback={<WorkspaceCanvasSkeleton />}><WorkspaceContent searchParams={searchParams} /></Suspense>; }

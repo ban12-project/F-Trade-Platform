@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import { z } from "zod";
 
@@ -10,6 +10,7 @@ export const socialWorkerCommandSchema = z.object({
   jobId: z.string().trim().min(1).max(240),
   kind: z.enum(["publish", "observe_inbound", "reply"]),
   payloadRef: z.string().trim().min(1).max(240),
+  payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
   nonce: z.string().regex(/^[A-Za-z0-9_-]{24,128}$/),
   issuedAt: z.coerce.date(),
   expiresAt: z.coerce.date(),
@@ -46,6 +47,7 @@ function canonicalCommand(command: SocialWorkerCommand) {
     jobId: command.jobId,
     kind: command.kind,
     payloadRef: command.payloadRef,
+    payloadDigest: command.payloadDigest,
     nonce: command.nonce,
     issuedAt: command.issuedAt.toISOString(),
     expiresAt: command.expiresAt.toISOString(),
@@ -54,6 +56,22 @@ function canonicalCommand(command: SocialWorkerCommand) {
 
 function sign(command: SocialWorkerCommand) {
   return createHmac("sha256", signingKey()).update(canonicalCommand(command)).digest("base64url");
+}
+
+function canonicalPayload(payload: Record<string, unknown>) {
+  return JSON.stringify(Object.fromEntries(Object.entries(payload).sort(([left], [right]) => left.localeCompare(right))));
+}
+
+export function digestSocialWorkerPayload(payload: Record<string, unknown>) {
+  return createHash("sha256").update(canonicalPayload(payload)).digest("hex");
+}
+
+/** The isolated worker verifies the separately transported payload before using it. */
+export function verifySocialWorkerPayload(command: SocialWorkerCommand, payload: Record<string, unknown>) {
+  const expected = Buffer.from(command.payloadDigest, "hex");
+  const actual = Buffer.from(digestSocialWorkerPayload(payload), "hex");
+  if (!timingSafeEqual(actual, expected)) throw new Error("Worker payload digest is invalid");
+  return payload;
 }
 
 export function signSocialWorkerCommand(input: SocialWorkerCommand): SignedSocialWorkerCommand {

@@ -4,7 +4,7 @@ import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, type DatabaseExecutor } from "@/lib/db/client";
-import { evidence, user, workspaceProject, workspaceProjectEvidence, workspaceProjectMember } from "@/lib/db/schema";
+import { auditEvent, evidence, user, workspaceProject, workspaceProjectEvidence, workspaceProjectMember } from "@/lib/db/schema";
 
 export type WorkspaceMemberRole = "owner" | "editor" | "viewer";
 export type WorkspaceAccess = "view" | "write" | "manage";
@@ -16,6 +16,7 @@ export const workspaceMemberFormSchema = z.object({
   email: z.string().trim().email("请输入有效邮箱地址。"),
   role: z.enum(["owner", "editor", "viewer"]),
 });
+export const workspaceMemberRemovalSchema = z.object({ projectId: z.uuid("项目标识无效。"), userId: z.uuid("成员标识无效。") });
 
 export async function assertWorkspaceProjectAccess(
   projectId: string,
@@ -44,6 +45,7 @@ export async function upsertWorkspaceProjectMember(input: unknown, actorId: stri
   const value = workspaceMemberFormSchema.parse(input);
   await database.transaction(async (tx) => {
     await assertWorkspaceProjectAccess(value.projectId, actorId, "manage", tx);
+    await tx.select({ id: workspaceProject.id }).from(workspaceProject).where(eq(workspaceProject.id, value.projectId)).for("update");
     const [target] = await tx.select({ id: user.id }).from(user).where(eq(user.email, value.email));
     if (!target) throw new Error("该邮箱尚未注册，不能加入项目。");
     const [currentTarget] = await tx.select({ role: workspaceProjectMember.role }).from(workspaceProjectMember).where(and(eq(workspaceProjectMember.projectId, value.projectId), eq(workspaceProjectMember.userId, target.id)));
@@ -51,8 +53,25 @@ export async function upsertWorkspaceProjectMember(input: unknown, actorId: stri
       const owners = await tx.select({ id: workspaceProjectMember.id }).from(workspaceProjectMember).where(and(eq(workspaceProjectMember.projectId, value.projectId), eq(workspaceProjectMember.role, "owner")));
       if (owners.length === 1) throw new Error("项目必须至少保留一名所有者。请先添加另一名所有者。");
     }
-    await tx.insert(workspaceProjectMember).values({ id: randomUUID(), projectId: value.projectId, userId: target.id, role: value.role, createdById: actorId })
-      .onConflictDoUpdate({ target: [workspaceProjectMember.projectId, workspaceProjectMember.userId], set: { role: value.role } });
+    const [saved] = await tx.insert(workspaceProjectMember).values({ id: randomUUID(), projectId: value.projectId, userId: target.id, role: value.role, createdById: actorId })
+      .onConflictDoUpdate({ target: [workspaceProjectMember.projectId, workspaceProjectMember.userId], set: { role: value.role } }).returning({ id: workspaceProjectMember.id });
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: currentTarget ? "workspace.member_role_updated" : "workspace.member_added", actorType: "human", actorId, subjectType: "workspace_project_member", subjectId: saved.id, metadata: { project_id: value.projectId, user_id: target.id, role: value.role }, occurredAt: new Date() });
+  });
+}
+
+export async function removeWorkspaceProjectMember(input: unknown, actorId: string, database: DatabaseExecutor = getDatabase()) {
+  const value = workspaceMemberRemovalSchema.parse(input);
+  await database.transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(value.projectId, actorId, "manage", tx);
+    await tx.select({ id: workspaceProject.id }).from(workspaceProject).where(eq(workspaceProject.id, value.projectId)).for("update");
+    const [target] = await tx.select({ id: workspaceProjectMember.id, role: workspaceProjectMember.role }).from(workspaceProjectMember).where(and(eq(workspaceProjectMember.projectId, value.projectId), eq(workspaceProjectMember.userId, value.userId))).for("update");
+    if (!target) throw new Error("该成员已不在项目中。");
+    if (target.role === "owner") {
+      const owners = await tx.select({ id: workspaceProjectMember.id }).from(workspaceProjectMember).where(and(eq(workspaceProjectMember.projectId, value.projectId), eq(workspaceProjectMember.role, "owner"))).for("update");
+      if (owners.length === 1) throw new Error("不能移除项目最后一名所有者。请先指定另一名所有者。");
+    }
+    await tx.delete(workspaceProjectMember).where(eq(workspaceProjectMember.id, target.id));
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: "workspace.member_removed", actorType: "human", actorId, subjectType: "workspace_project_member", subjectId: target.id, metadata: { project_id: value.projectId, user_id: value.userId, previous_role: target.role }, occurredAt: new Date() });
   });
 }
 

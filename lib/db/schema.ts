@@ -721,6 +721,7 @@ export const socialPublication = pgTable(
   "social_publication",
   {
     id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "restrict" }),
     channelRef: text("channel_ref").notNull(),
     accountRef: text("account_ref").notNull(),
     contentRef: text("content_ref").notNull(),
@@ -734,6 +735,7 @@ export const socialPublication = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
+    index("social_publication_project_created_idx").on(table.projectId, table.createdAt),
     index("social_publication_account_created_idx").on(table.accountRef, table.createdAt),
     uniqueIndex("social_publication_external_uidx").on(table.channelRef, table.accountRef, table.externalPublicationRef),
     check("social_publication_format_valid", sql`${table.format} IN ('text', 'image', 'video')`),

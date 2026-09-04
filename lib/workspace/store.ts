@@ -100,7 +100,9 @@ export async function listWorkspaceTasks(actorId: string, database: Database = g
     .from(workspaceProjectItem).innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId)).innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
     .where(and(inArray(workspaceProject.id, projectIds), inArray(workspaceProjectItem.role, ["marketing_content", "marketing_video"]), inArray(aggregateRecord.state, ["CONTENT_APPROVED", "VIDEO_APPROVED"])))
     .orderBy(desc(aggregateRecord.updatedAt));
-  const publishedRefs = publicationRows.length ? new Set((await database.select({ contentRef: socialPublication.contentRef }).from(socialPublication).where(inArray(socialPublication.contentRef, publicationRows.map((row) => row.id)))).map((row) => row.contentRef)) : new Set<string>();
+  const publicationStates = publicationRows.length ? await database.select({ id: socialPublication.id, contentRef: socialPublication.contentRef, status: socialPublication.status, createdAt: socialPublication.createdAt }).from(socialPublication).where(inArray(socialPublication.contentRef, publicationRows.map((row) => row.id))).orderBy(desc(socialPublication.createdAt)) : [];
+  const latestPublicationByContent = new Map<string, { id: string; status: string }>();
+  for (const publication of publicationStates) if (!latestPublicationByContent.has(publication.contentRef)) latestPublicationByContent.set(publication.contentRef, publication);
   const seenReviewIds = new Set<string>();
   const reviewTasks = reviewRows.flatMap((row): WorkspaceTaskSummary[] => {
     if (seenReviewIds.has(row.id)) return [];
@@ -120,7 +122,12 @@ export async function listWorkspaceTasks(actorId: string, database: Database = g
     const hot = row.payload.score_band === "HOT";
     return { id: row.id, projectId: row.projectId, projectTitle: row.projectTitle, nodeKind: "lead", title: received ? "入站线索等待 RFQ" : taskTitle("lead", row.payload), detail: received ? "消息已归属项目，等待业务人员录入询盘" : hot ? "规则评分已达 HOT，等待人工认定" : due ? `计划跟进：${due.toLocaleString("zh-CN")}` : "等待下一次人工跟进", actionLabel: received ? "录入 RFQ" : hot ? "确认有效商机" : "继续跟进", priority: hot ? "review" : "complete", taskType: received ? "rfq" : hot ? "opportunity" : "follow_up", createdAt: row.createdAt, ...(due ? { dueAt: due } : {}) };
   });
-  const publicationTasks = publicationRows.filter((row) => !publishedRefs.has(row.id)).map((row): WorkspaceTaskSummary => ({ id: row.id, projectId: row.projectId, projectTitle: row.projectTitle, nodeKind: "publication", title: row.type === "video" ? "已批准视频等待发布确认" : taskTitle("content", row.payload), detail: "需要逐帖人工确认和平台凭证", actionLabel: "确认发布结果", priority: "review", taskType: "publication", createdAt: row.createdAt }));
+  const publicationTasks = publicationRows.flatMap((row): WorkspaceTaskSummary[] => {
+    const publication = latestPublicationByContent.get(row.id);
+    if (publication && ["submitted", "published"].includes(publication.status)) return [];
+    const needsResolution = publication && ["unknown", "failed", "paused"].includes(publication.status);
+    return [{ id: publication?.id ?? row.id, projectId: row.projectId, projectTitle: row.projectTitle, nodeKind: "publication", title: needsResolution ? "发布已暂停，等待人工核对" : row.type === "video" ? "已批准视频等待发布确认" : taskTitle("content", row.payload), detail: needsResolution ? "平台结果不确定或执行失败；禁止自动重试" : "需要逐帖人工确认后提交受控发布", actionLabel: needsResolution ? "核对发布状态" : "确认并提交发布", priority: "review", taskType: "publication", createdAt: row.createdAt }];
+  });
   return [...reviewTasks, ...publicationTasks, ...rfqTasks, ...leadTasks].sort((left, right) => left.priority === right.priority ? right.createdAt.getTime() - left.createdAt.getTime() : left.priority === "review" ? -1 : 1);
 }
 
@@ -132,7 +139,7 @@ export async function listWorkspacePipeline(actorId: string, database: Database 
     .where(inArray(workspaceProjectItem.projectId, projects.map((project) => project.id)));
   const published = await database.select({ projectId: workspaceProjectItem.projectId, contentRef: socialPublication.contentRef })
     .from(socialPublication).innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, socialPublication.contentRef))
-    .where(inArray(workspaceProjectItem.projectId, projects.map((project) => project.id)));
+    .where(and(inArray(workspaceProjectItem.projectId, projects.map((project) => project.id)), eq(socialPublication.status, "published")));
   const marketingByPublication = new Map(published.map((item) => [item.contentRef, item.projectId]));
   const projectNames = new Map(projects.map((project) => [project.id, project.title]));
   return projects.map((project) => {

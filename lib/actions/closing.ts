@@ -8,7 +8,7 @@ import { auth } from "@/lib/auth";
 import type { ClosingActionState } from "@/lib/action-states";
 import { hasPermission, type Permission } from "@/lib/authz";
 import { deliveryDecisionFormSchema, deliveryRequestFormSchema, followUpFormSchema, inboundRoutingFormSchema, opportunityDecisionFormSchema, publicationConfirmationFormSchema, quotationDecisionFormSchema, quotationDraftFormSchema, quotationSendFormSchema } from "@/lib/form-schemas";
-import { confirmExternalPublication } from "@/lib/social/publication-store";
+import { submitControlledPublication } from "@/lib/social/publication-store";
 import { routeInboundConversation } from "@/lib/social/inbound-routing-store";
 import { confirmOpportunity, createDeliveryRequest, createOrReviseQuotation, decideDelivery, decideQuotation, recordFollowUp, sendQuotation } from "@/lib/sales/closing-store";
 
@@ -34,7 +34,7 @@ export async function sendQuotationAction(_previous: ClosingActionState, formDat
   try { const actorId = await actor("sales:write"); const parsed = quotationSendFormSchema.safeParse(values(formData)); if (!parsed.success) return resultError(parsed.error); const saved = await sendQuotation(parsed.data, actorId); refresh(parsed.data.projectId); return { status: "success", message: "外部发送凭证已核验，报价进入已发送并创建跟进线索。", id: saved.leadId }; } catch (error) { return resultError(error); }
 }
 export async function recordFollowUpAction(_previous: ClosingActionState, formData: FormData): Promise<ClosingActionState> {
-  try { const actorId = await actor("sales:write"); const parsed = followUpFormSchema.safeParse({ ...values(formData), triggeredRules: formData.getAll("triggeredRules") }); if (!parsed.success) return resultError(parsed.error); await recordFollowUp(parsed.data, actorId); refresh(parsed.data.projectId); return { status: "success", message: "跟进凭证和评分已记录；消息正文未写入明文业务聚合。", id: parsed.data.leadId }; } catch (error) { return resultError(error); }
+  try { const actorId = await actor("sales:write"); const parsed = followUpFormSchema.safeParse({ ...values(formData), triggeredRules: formData.getAll("triggeredRules") }); if (!parsed.success) return resultError(parsed.error); await recordFollowUp(parsed.data, actorId); refresh(parsed.data.projectId); return { status: "success", message: "人工确认的回复已安全提交；发送前已重新校验项目权限、渠道状态和回复窗口。", id: parsed.data.leadId }; } catch (error) { return resultError(error); }
 }
 export async function requestDeliveryAction(_previous: ClosingActionState, formData: FormData): Promise<ClosingActionState> {
   try { const actorId = await actor("sales:write"); const parsed = deliveryRequestFormSchema.safeParse(values(formData)); if (!parsed.success) return resultError(parsed.error); const saved = await createDeliveryRequest(parsed.data, actorId); refresh(parsed.data.projectId); return { status: "success", message: "已创建 Gate 03 交期确认请求。", id: saved.id }; } catch (error) { return resultError(error); }
@@ -46,7 +46,7 @@ export async function confirmOpportunityAction(_previous: ClosingActionState, fo
   try { const actorId = await actor("sales:write"); const parsed = opportunityDecisionFormSchema.safeParse(values(formData)); if (!parsed.success) return resultError(parsed.error); await confirmOpportunity(parsed.data, actorId); refresh(parsed.data.projectId); return { status: "success", message: "已由人工确认有效商机。", id: parsed.data.leadId }; } catch (error) { return resultError(error); }
 }
 export async function confirmPublicationAction(_previous: ClosingActionState, formData: FormData): Promise<ClosingActionState> {
-  try { const actorId = await actor("content:write"); const parsed = publicationConfirmationFormSchema.safeParse(values(formData)); if (!parsed.success) return resultError(parsed.error); const saved = await confirmExternalPublication(parsed.data, actorId); refresh(parsed.data.projectId); return { status: "success", message: "平台发布凭证已登记；该记录可审计且不会自动重试。", id: saved.id }; } catch (error) { return resultError(error); }
+  try { const actorId = await actor("content:write"); const parsed = publicationConfirmationFormSchema.safeParse(values(formData)); if (!parsed.success) return resultError(parsed.error); const saved = await submitControlledPublication(parsed.data, actorId); refresh(parsed.data.projectId); return { status: "success", message: "发布任务已提交；只有平台成功回执才能标记为已发布，未知结果不会自动重试。", id: saved.id }; } catch (error) { return resultError(error); }
 }
 
 export async function routeInboundConversationAction(_previous: ClosingActionState, formData: FormData): Promise<ClosingActionState> {

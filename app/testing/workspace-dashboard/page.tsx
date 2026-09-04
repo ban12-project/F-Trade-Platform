@@ -9,7 +9,7 @@ const projects: WorkspaceProjectSummary[] = [
   { id: "00000000-0000-4000-8000-000000000702", title: "Synthetic distributor", kind: "sales", status: "active", updatedAt: new Date("2026-09-02T00:00:00Z") },
 ];
 const tasks: WorkspaceTaskSummary[] = [
-  { id: "00000000-0000-4000-8000-000000000711", projectId: projects[0]!.id, projectTitle: projects[0]!.title, nodeKind: "publication", title: "批准内容等待发布", detail: "需要平台凭证", priority: "review", taskType: "publication", actionLabel: "确认发布结果", createdAt: new Date("2026-09-03T00:00:00Z") },
+  { id: "00000000-0000-4000-8000-000000000711", projectId: projects[0]!.id, projectTitle: projects[0]!.title, nodeKind: "publication", title: "批准内容等待发布", detail: "需要逐帖人工确认", priority: "review", taskType: "publication", actionLabel: "确认并提交发布", createdAt: new Date("2026-09-03T00:00:00Z") },
   { id: "00000000-0000-4000-8000-000000000712", projectId: projects[1]!.id, projectTitle: projects[1]!.title, nodeKind: "lead", title: "客户跟进到期", detail: "计划跟进已到期", priority: "complete", taskType: "follow_up", actionLabel: "继续跟进", createdAt: new Date("2026-09-03T00:00:00Z"), dueAt: new Date("2026-09-03T01:00:00Z") },
 ];
 const pipeline: WorkspacePipelineSummary[] = [

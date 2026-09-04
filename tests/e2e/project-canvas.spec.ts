@@ -96,6 +96,32 @@ test("sales canvas exposes the complete human-controlled flow", async ({ page })
   await expect(page.getByText("交期确认", { exact: true })).toBeVisible();
 });
 
+test("follow-up shows the authorized encrypted timeline and explicit human send", async ({ page }) => {
+  await page.goto("/testing/project-canvas?kind=sales&panel=lead");
+  const inspector = page.getByRole("complementary");
+  await expect(inspector.getByText("授权消息时间线", { exact: true })).toBeVisible();
+  await expect(inspector.getByText("Synthetic buyer asks for the verified lead time.")).toBeVisible();
+  await expect(inspector.getByText("等待发送", { exact: true })).toBeVisible();
+  await expect(inspector.getByText("禁止自动承诺价格、交期或样品", { exact: false })).toBeVisible();
+  await expect(inspector.getByLabel("本次人工确认凭据")).toBeVisible();
+  await expect(inspector.getByRole("button", { name: "人工确认并发送此回复" })).toBeEnabled();
+  await expect(inspector.getByLabel("外部发送凭证")).toHaveCount(0);
+  await inspector.getByRole("combobox", { name: "当前场景" }).click();
+  await page.getByRole("option", { name: "询问交期" }).click();
+  await expect(inspector.getByText("将插入已确认交期：21 天")).toBeVisible();
+  await expect(inspector.getByText("交期句由服务端插入", { exact: false })).toBeVisible();
+  await expect(inspector.getByRole("button", { name: "人工确认并发送此回复" })).toBeEnabled();
+});
+
+test("publication confirmation submits a controlled job instead of claiming success", async ({ page }) => {
+  await page.goto("/testing/project-canvas?panel=publication");
+  const inspector = page.getByRole("complementary");
+  await expect(inspector.getByText("确认并提交发布", { exact: true })).toBeVisible();
+  await expect(inspector.getByText("平台回执前不会显示为已发布", { exact: false })).toBeVisible();
+  await expect(inspector.getByLabel("平台发布凭证")).toHaveCount(0);
+  await expect(inspector.getByRole("button", { name: "确认并提交此条发布" })).toBeDisabled();
+});
+
 test("desktop control panel is viewport-bound and scrolls internally", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 600 });
   await page.goto("/testing/project-canvas?panel=product");

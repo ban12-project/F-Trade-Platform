@@ -7,10 +7,10 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { createWorkspaceProjectSchema, saveWorkspaceCanvasSchema, type WorkspaceCanvasDocument } from "@/lib/workspace/contracts";
-import { WorkspaceCanvasRevisionConflictError, createWorkspaceProject, linkReadyProductToSalesProject, saveWorkspaceCanvas } from "@/lib/workspace/store";
-import { upsertWorkspaceProjectMember, workspaceMemberFormSchema } from "@/lib/workspace/access";
+import { WorkspaceCanvasRevisionConflictError, createWorkspaceProject, getWorkspaceProject, linkReadyProductToSalesProject, saveWorkspaceCanvas } from "@/lib/workspace/store";
+import { removeWorkspaceProjectMember, upsertWorkspaceProjectMember, workspaceMemberFormSchema, workspaceMemberRemovalSchema } from "@/lib/workspace/access";
 
-export type WorkspaceActionState = { status: "idle" | "success" | "error" | "conflict"; message: string; projectId?: string; revision?: number };
+export type WorkspaceActionState = { status: "idle" | "success" | "error" | "conflict"; message: string; projectId?: string; revision?: number; document?: WorkspaceCanvasDocument };
 
 async function requireWorkspaceUser() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -30,15 +30,22 @@ export async function createWorkspaceProjectAction(_previous: WorkspaceActionSta
 }
 
 export async function saveWorkspaceCanvasAction(projectId: string, input: { expectedRevision: number; document: WorkspaceCanvasDocument }): Promise<WorkspaceActionState> {
+  let actorId: string | undefined;
   try {
     const session = await requireWorkspaceUser();
+    actorId = session.user.id;
     const parsed = saveWorkspaceCanvasSchema.safeParse(input);
     if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "画布数据无效。" };
     const project = await saveWorkspaceCanvas(projectId, parsed.data, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
     return { status: "success", message: "项目画布已保存。", revision: project.revision };
   } catch (error) {
-    if (error instanceof WorkspaceCanvasRevisionConflictError) return { status: "conflict", message: error.message };
+    if (error instanceof WorkspaceCanvasRevisionConflictError && actorId) {
+      const latest = await getWorkspaceProject(projectId, actorId);
+      return latest
+        ? { status: "conflict", message: error.message, revision: latest.revision, document: latest.document }
+        : { status: "error", message: "项目画布已不存在或无权访问。" };
+    }
     return { status: "error", message: error instanceof Error ? error.message : "无法保存项目画布。" };
   }
 }
@@ -66,4 +73,15 @@ export async function upsertWorkspaceProjectMemberAction(_previous: WorkspaceAct
     revalidatePath(`/workspace/${parsed.data.projectId}`);
     return { status: "success", message: "项目成员角色已保存。", projectId: parsed.data.projectId };
   } catch (error) { return { status: "error", message: error instanceof Error ? error.message : "无法保存项目成员。" }; }
+}
+
+export async function removeWorkspaceProjectMemberAction(_previous: WorkspaceActionState, formData: FormData): Promise<WorkspaceActionState> {
+  try {
+    const session = await requireWorkspaceUser();
+    const parsed = workspaceMemberRemovalSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "成员资料无效。" };
+    await removeWorkspaceProjectMember(parsed.data, session.user.id);
+    revalidatePath(`/workspace/${parsed.data.projectId}`);
+    return { status: "success", message: "项目成员已移除。", projectId: parsed.data.projectId };
+  } catch (error) { return { status: "error", message: error instanceof Error ? error.message : "无法移除项目成员。" }; }
 }

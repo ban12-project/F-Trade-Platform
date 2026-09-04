@@ -169,6 +169,13 @@
       "when": 1788506470789,
       "tag": "0023_furry_mimic",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788513179838,
+      "tag": "0024_marvelous_misty_knight",
+      "breakpoints": true
     }
   ]
 }

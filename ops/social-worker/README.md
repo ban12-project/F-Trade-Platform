@@ -7,12 +7,13 @@ This directory is a deployment baseline for the single VPS authorized by #155. I
 - The VPS has one verified, fixed US egress IP. Do not deploy if the egress check differs from the account record.
 - The account owner completes Facebook login, 2FA and any security checkpoint locally over an SSH-tunnelled VNC session; the Worker never receives passwords, 2FA codes or CAPTCHA-solving credentials.
 - The encrypted local volume is restricted to the Worker account. It may contain the browser runtime state, but that state must not be copied to application storage, logs, GitHub, or support messages.
-- Set unique values for `SOCIAL_WORKER_SIGNING_KEY` and `SOCIAL_MESSAGE_ENCRYPTION_KEY` only in the VPS `.env`. Telemetry and tracing remain disabled.
+- Set unique values for `SOCIAL_WORKER_SIGNING_KEY`, `SOCIAL_WORKER_API_KEY` and `SOCIAL_MESSAGE_ENCRYPTION_KEY` in the application and approved VPS secret stores. Use a separate random API key; telemetry and tracing remain disabled.
 
 ## Operating controls
 
 - Run exactly one replica and one account profile. Do not use proxy rotation, account switching, automatic login recovery, or automatic retries after uncertain external effects.
 - The Worker must refuse an unsigned, expired, addressed-to-another-worker, or replayed command.
+- The Worker claims one durable job at a time through the authenticated claim endpoint. A claimed job is never automatically requeued after a lost or uncertain result. On the next poll, a claim without a signed result for ten minutes is marked unknown/paused, pauses its channel and requires human resolution.
 - Stop the container immediately on a security checkpoint, CAPTCHA, 2FA request, login loss, IP mismatch, unknown page structure, or indeterminate publish/reply result. A human account owner must resolve it before a new command is accepted.
 - Publishing stays disabled until the console has a Gate 01 approval and a per-post human confirmation. DM replies stay limited to the approved deterministic RFQ template path.
 

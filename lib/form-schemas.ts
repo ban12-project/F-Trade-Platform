@@ -152,7 +152,7 @@ export const followUpFormSchema = z.object({
   context: z.enum(["quote_sent_unread", "quote_sent_read_no_reply", "price_high", "purchase_later", "asks_sample", "asks_lead_time"]),
   triggeredRules: z.array(z.enum(["active_inquiry", "provides_oe_number", "explicit_quantity", "target_quantity_range", "asks_sample", "asks_lead_time", "asks_payment_terms", "replies_again"])).max(8),
   draft: z.string().trim().min(1, "请填写人工确认后的跟进内容。").max(4_000),
-  outboundRef: z.string().trim().min(1, "请填写外部发送凭证。").max(240),
+  confirmationRef: privateReference,
   nextFollowUpAt: z.string().trim().optional().or(z.literal("")),
 }).superRefine((value, context) => { if (value.nextFollowUpAt && Number.isNaN(Date.parse(value.nextFollowUpAt))) context.addIssue({ code: "custom", path: ["nextFollowUpAt"], message: "下次跟进时间无效。" }); });
 
@@ -178,7 +178,21 @@ export const inboundRoutingFormSchema = z.object({
 export const publicationConfirmationFormSchema = z.object({
   projectId: z.uuid(), contentRef: z.uuid("内容标识无效。"), format: z.enum(["text", "image", "video"]),
   channelRef: z.string().trim().min(1, "请选择已启用渠道。"), accountRef: z.string().trim().min(1, "请选择发布账户。"),
-  confirmationRef: privateReference, externalPublicationRef: z.string().trim().min(1, "请填写平台发布凭证。"),
+  confirmationRef: privateReference,
+});
+
+export const publicationResultSchema = z.object({
+  jobId: z.uuid("发布任务标识无效。"),
+  outcome: z.enum(["published", "unknown", "failed"]),
+  externalPublicationRef: z.string().trim().max(240).optional(),
+  failureCode: z.string().trim().max(120).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.outcome === "published" && !value.externalPublicationRef) {
+    context.addIssue({ code: "custom", path: ["externalPublicationRef"], message: "发布成功必须包含平台结果凭证。" });
+  }
+  if (value.outcome !== "published" && !value.failureCode) {
+    context.addIssue({ code: "custom", path: ["failureCode"], message: "未知或失败结果必须包含失败代码。" });
+  }
 });
 
 export const contentReviewFormSchema = z.object({

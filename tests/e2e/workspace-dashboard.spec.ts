@@ -1,15 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-test("global workspace prioritizes tasks and pipeline instead of the canvas", async ({ page }) => {
+test("global task view prioritizes tasks and pipeline", async ({ page }) => {
   await page.goto("/testing/workspace-dashboard");
-  await expect(page.getByRole("heading", { name: "全局工作台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "全局待办" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "我的待办" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "待审批" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "到期跟进" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "项目 / 线索 Pipeline" })).toBeVisible();
   await expect(page.getByText("来源营销项目：Synthetic launch")).toBeVisible();
   await expect(page.locator(".react-flow")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "流程概览" })).toHaveAttribute("href", "/workspace?view=flow");
+  await expect(page.getByRole("link", { name: "项目画布" })).toHaveAttribute("href", "/workspace");
 });
 
 test("unassigned inbound offers explicit create and link decisions without customer identity", async ({ page }) => {
@@ -41,6 +41,13 @@ test("project workspace exposes stages, records and a right detail region", asyn
   await expect(page.getByText("成员关系独立于项目创建者", { exact: false })).toBeVisible();
   await expect(page.getByText("Synthetic Viewer")).toBeVisible();
   await expect(page.getByLabel("项目角色")).toBeVisible();
+  await page.getByRole("button", { name: "移除成员 Synthetic Viewer" }).click();
+  const removal = page.getByRole("alertdialog", { name: "移除项目成员？" });
+  await expect(removal.getByText("将立即失去该项目的查看和编辑权限", { exact: false })).toBeVisible();
+  await expect(removal.getByRole("button", { name: "保留成员" })).toBeVisible();
+  await expect(removal.getByRole("button", { name: "移除 Synthetic Viewer" })).toBeVisible();
+  await removal.getByRole("button", { name: "保留成员" }).click();
+  await expect(removal).toHaveCount(0);
 });
 
 test("video production has a dedicated editor route", async ({ page }) => {

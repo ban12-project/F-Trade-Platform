@@ -12,7 +12,7 @@ const stages: ProjectStage[] = [
   { id: "product", panelKind: "product", label: "产品事实", description: "导入、核验证据并完成 Gate 01。" },
   { id: "content", panelKind: "content", label: "内容", description: "从已核验事实创建营销内容。" },
   { id: "video", panelKind: "video", label: "视频", description: "在独立编辑器完成视频制作。" },
-  { id: "publication", panelKind: "publication", label: "发布", description: "逐帖确认渠道与外部凭证。" },
+  { id: "publication", panelKind: "publication", label: "发布", description: "逐帖确认渠道与载荷，等待平台回执。" },
 ];
 const tasks: WorkspaceTaskSummary[] = [{ id: "00000000-0000-4000-8000-000000000722", projectId: project.id, projectTitle: project.title, nodeKind: "product", title: "核对产品事实", detail: "等待 Gate 01", priority: "review", taskType: "approval", actionLabel: "完成审核", createdAt: new Date("2026-09-03T00:00:00Z") }];
 
