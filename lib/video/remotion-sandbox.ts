@@ -20,6 +20,16 @@ async function sandboxCommand(sandbox: Awaited<ReturnType<typeof createSandbox>>
   return result.stdout();
 }
 
+async function findSandboxExecutable(sandbox: Awaited<ReturnType<typeof createSandbox>>, name: "ffprobe") {
+  const matches = (await sandboxCommand(sandbox, "find", ["/vercel/sandbox/node_modules", "-type", "f", "-name", name]))
+    .split("\n")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const executable = matches.find((value) => /^\/vercel\/sandbox\/node_modules\/.+\/ffprobe$/.test(value));
+  if (!executable) throw new Error("Remotion Sandbox 缺少 ffprobe，无法执行成片验收。");
+  return executable;
+}
+
 /** Renders the governed ABCD composition inside an ephemeral Vercel Sandbox. */
 export async function renderMarketingTimelineWithRemotion(
   request: VideoRenderRequest,
@@ -47,7 +57,8 @@ export async function renderMarketingTimelineWithRemotion(
       outputFile: "/vercel/sandbox/output.mp4",
       timeoutInMilliseconds: 8 * 60 * 1_000,
     });
-    const probe = parseFfprobeOutput(JSON.parse(await sandboxCommand(sandbox, "ffprobe", [
+    const ffprobe = await findSandboxExecutable(sandbox, "ffprobe");
+    const probe = parseFfprobeOutput(JSON.parse(await sandboxCommand(sandbox, ffprobe, [
       "-v", "error",
       "-show_entries", "format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate",
       "-of", "json",
@@ -58,4 +69,3 @@ export async function renderMarketingTimelineWithRemotion(
     await sandbox.stop().catch(() => undefined);
   }
 }
-

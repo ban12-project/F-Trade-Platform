@@ -56,6 +56,8 @@ async function main() {
         }],
       },
     });
+    const ffprobeSearch = await sandbox.runCommand({ cmd: "find", args: ["/vercel/sandbox/node_modules", "-type", "f", "-name", "ffprobe"] });
+    if (ffprobeSearch.exitCode !== 0 || !(await ffprobeSearch.stdout()).trim()) throw new Error("Remotion Sandbox ffprobe was not found.");
     await writeFile(outputPath, await sandbox.fs.readFile(rendered.sandboxFilePath));
     console.log(`PASS Vercel Sandbox rendered ${uploaded ? "private" : "public"} Remotion source to ${outputPath}`);
   } finally {
