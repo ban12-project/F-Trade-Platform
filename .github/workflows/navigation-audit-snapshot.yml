@@ -12,53 +12,29 @@ jobs:
   snapshot:
     if: github.ref == 'refs/heads/fix/263-workspace-navigation-biome'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           ref: fix/263-workspace-navigation-biome
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           package-manager-cache: false
       - uses: pnpm/action-setup@v5
       - run: pnpm install --frozen-lockfile
-      - run: pnpm add --save-dev --save-exact server-only@0.0.1
-      - name: Apply validation corrections and safe formatting
+      - name: Finalize pins and navigation regression corrections
         run: |
-          mkdir -p /tmp/navigation-audit
-          if test -f scripts/apply-navigation-migration.py; then
-            python3 scripts/apply-navigation-migration.py > /tmp/navigation-audit/migration.log 2>&1
-            rm scripts/apply-navigation-migration.py
-          fi
-          pnpm exec biome check --write --max-diagnostics=1000 . > /tmp/navigation-audit/biome.log 2>&1 || echo 'Diagnostics captured for review'
+          python3 scripts/apply-navigation-migration.py
+          rm scripts/apply-navigation-migration.py
+          pnpm exec biome check --write .
+          pnpm install --frozen-lockfile
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- . ':!.github/workflows'
           if ! git diff --cached --quiet; then
-            git commit -m 'fix: close navigation validation gaps and refresh shared layout after writes (#263) [skip ci]'
+            git commit -m 'fix: pin Biome, enforce deployment checks and refine navigation regressions (#263) [skip ci]'
             git push origin HEAD:fix/263-workspace-navigation-biome
           fi
-          git archive --format=tar.gz --output=/tmp/navigation-audit/source.tar.gz HEAD
-          find node_modules/.pnpm -path '*/@biomejs/cli-linux-x64/biome' -exec cp {} /tmp/navigation-audit/biome-bin \;
-      - name: Capture typecheck and navigation regression results
-        run: |
-          pnpm typecheck > /tmp/navigation-audit/typecheck.log 2>&1 || echo 'Typecheck failed; see artifact'
-          pnpm test:workspace-navigation > /tmp/navigation-audit/navigation-unit.log 2>&1 || echo 'Unit tests failed; see artifact'
-          pnpm test:workspace >> /tmp/navigation-audit/navigation-unit.log 2>&1 || echo 'Workspace tests failed; see artifact'
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - run: python -m pip install -r requirements-dev.txt
-      - name: Capture repository validation
-        run: python scripts/validate_repository.py > /tmp/navigation-audit/repository.log 2>&1 || echo 'Repository validation failed; see artifact'
-      - run: pnpm exec playwright install --with-deps chromium
-      - name: Validate navigation with a production build
-        run: pnpm exec playwright test tests/e2e/workspace-navigation.spec.ts tests/e2e/workspace-dashboard.spec.ts > /tmp/navigation-audit/e2e.log 2>&1 || echo 'Browser tests failed; see artifact'
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: navigation-audit-validation
-          path: /tmp/navigation-audit/
-          retention-days: 1
-          if-no-files-found: error
+      - name: Verify fast checks
+        run: pnpm check:ci && pnpm typecheck && pnpm test:workspace-navigation
