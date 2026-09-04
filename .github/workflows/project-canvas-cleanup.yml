@@ -1,0 +1,69 @@
+name: project-canvas-cleanup
+
+on:
+  push:
+    branches: [cleanup/258-remove-project-canvas]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out cleanup branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply source and test cleanup
+        run: python3 scripts/apply-project-canvas-cleanup.py
+
+      - name: Remove retired canvas packages
+        run: pnpm remove @xyflow/react elkjs
+
+      - name: Generate the destructive Drizzle migration
+        env:
+          CI: "1"
+        run: pnpm exec drizzle-kit generate --name remove_workspace_canvas
+
+      - name: Remove one-shot automation files
+        run: rm scripts/apply-project-canvas-cleanup.py .github/workflows/project-canvas-cleanup.yml
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run type checks
+        run: pnpm typecheck
+
+      - name: Check database migrations
+        run: pnpm db:check
+
+      - name: Validate contracts and repository hygiene
+        run: python3 scripts/validate_repository.py
+
+      - name: Run Playwright tests
+        run: pnpm test:e2e
+
+      - name: Commit generated cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --stat
+          git commit -m "cleanup(workspace): remove retired project canvas"
+          git push origin HEAD:cleanup/258-remove-project-canvas
