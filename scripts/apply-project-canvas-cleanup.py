@@ -622,7 +622,7 @@ write(
           await expect(page.getByRole("button", { name: /生成视频|模型配置|供应商/ })).toHaveCount(0);
 
           await page.goto("/testing/video-workspace?state=review");
-          await expect(page.getByText("私有预览")).toBeVisible();
+          await expect(page.getByText("私有预览", { exact: true })).toBeVisible();
           await expect(page.locator("video")).toHaveAttribute("src", /\/api\/video-preview\/asset-rendered-preview-001$/);
         });
         '''
