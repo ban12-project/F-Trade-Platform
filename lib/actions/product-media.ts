@@ -28,7 +28,7 @@ export type ProductMediaActionState = {
 };
 
 function revalidateProductMedia(projectId: string) {
-  revalidatePath("/workspace");
+  revalidatePath("/workspace", "layout");
   revalidatePath(`/workspace/${projectId}`);
 }
 

@@ -90,7 +90,7 @@ export async function saveVideoProviderModelSettingsAction(
       },
       actorId: session.user.id,
     });
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "视频提供商配置已保存；凭据不会显示或返回到浏览器。" };
   } catch (error) {
     return {

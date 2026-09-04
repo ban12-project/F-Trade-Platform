@@ -98,7 +98,8 @@
     "check": "biome check .",
     "check:ci": "biome ci .",
     "format": "biome format --write .",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "test:workspace-navigation": "tsx scripts/test-workspace-navigation.ts && node --conditions=react-server --import tsx scripts/test-workspace-queries.ts"
   },
   "dependencies": {
     "@ai-sdk/alibaba": "^2.0.37",

@@ -142,18 +142,16 @@ export async function upsertWorkspaceProjectMember(
         set: { role: value.role },
       })
       .returning({ id: workspaceProjectMember.id });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: currentTarget ? "workspace.member_role_updated" : "workspace.member_added",
-        actorType: "human",
-        actorId,
-        subjectType: "workspace_project_member",
-        subjectId: saved.id,
-        metadata: { project_id: value.projectId, user_id: target.id, role: value.role },
-        occurredAt: new Date(),
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: currentTarget ? "workspace.member_role_updated" : "workspace.member_added",
+      actorType: "human",
+      actorId,
+      subjectType: "workspace_project_member",
+      subjectId: saved.id,
+      metadata: { project_id: value.projectId, user_id: target.id, role: value.role },
+      occurredAt: new Date(),
+    });
   });
 }
 
@@ -196,22 +194,20 @@ export async function removeWorkspaceProjectMember(
         throw new Error("不能移除项目最后一名所有者。请先指定另一名所有者。");
     }
     await tx.delete(workspaceProjectMember).where(eq(workspaceProjectMember.id, target.id));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "workspace.member_removed",
-        actorType: "human",
-        actorId,
-        subjectType: "workspace_project_member",
-        subjectId: target.id,
-        metadata: {
-          project_id: value.projectId,
-          user_id: value.userId,
-          previous_role: target.role,
-        },
-        occurredAt: new Date(),
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "workspace.member_removed",
+      actorType: "human",
+      actorId,
+      subjectType: "workspace_project_member",
+      subjectId: target.id,
+      metadata: {
+        project_id: value.projectId,
+        user_id: value.userId,
+        previous_role: target.role,
+      },
+      occurredAt: new Date(),
+    });
   });
 }
 

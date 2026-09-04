@@ -455,6 +455,7 @@ function EditVideo({
           </CardHeader>
           <CardContent>
             <video
+              muted
               className="aspect-video w-full rounded-lg bg-muted"
               controls
               preload="metadata"

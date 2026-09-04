@@ -87,18 +87,16 @@ async function pauseExpiredClaims(
           eq(socialChannelControl.accountRef, stale.accountRef),
         ),
       );
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "social_browser_job.result_timeout",
-        actorType: "system",
-        actorId: workerId,
-        subjectType: "social_browser_job",
-        subjectId: stale.id,
-        metadata: { job_kind: stale.kind, retry_allowed: false },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "social_browser_job.result_timeout",
+      actorType: "system",
+      actorId: workerId,
+      subjectType: "social_browser_job",
+      subjectId: stale.id,
+      metadata: { job_kind: stale.kind, retry_allowed: false },
+      occurredAt: now,
+    });
   }
 }
 
@@ -138,22 +136,20 @@ export async function claimNextSocialWorkerJob(
           .update(socialPublication)
           .set({ status: "paused", updatedAt: now })
           .where(eq(socialPublication.id, job.payloadRef));
-      await tx
-        .insert(auditEvent)
-        .values({
-          id: randomUUID(),
-          action: "social_browser_job.preflight_paused",
-          actorType: "system",
-          actorId: workerId,
-          subjectType: "social_browser_job",
-          subjectId: job.id,
-          metadata: {
-            job_kind: job.kind,
-            failure_code: "channel_not_active",
-            retry_allowed: false,
-          },
-          occurredAt: now,
-        });
+      await tx.insert(auditEvent).values({
+        id: randomUUID(),
+        action: "social_browser_job.preflight_paused",
+        actorType: "system",
+        actorId: workerId,
+        subjectType: "social_browser_job",
+        subjectId: job.id,
+        metadata: {
+          job_kind: job.kind,
+          failure_code: "channel_not_active",
+          retry_allowed: false,
+        },
+        occurredAt: now,
+      });
       return null;
     }
 
@@ -261,31 +257,27 @@ export async function claimNextSocialWorkerJob(
                 version: sql`${aggregateRecord.version} + 1`,
               })
               .where(eq(aggregateRecord.id, delivery.confirmation_id));
-            await tx
-              .insert(workflowEvent)
-              .values({
-                id: randomUUID(),
-                aggregateId: delivery.confirmation_id,
-                fromState: "DELIVERY_CONFIRMATION_CONFIRMED",
-                toState: "DELIVERY_CONFIRMATION_EXPIRED",
-                actorType: "system",
-                actorId: workerId,
-                evidenceRefs: [],
-                occurredAt: now,
-              });
-            await tx
-              .insert(auditEvent)
-              .values({
-                id: randomUUID(),
-                action: "delivery_confirmation.expired_before_reply",
-                actorType: "system",
-                actorId: workerId,
-                aggregateId: delivery.confirmation_id,
-                subjectType: "delivery_confirmation",
-                subjectId: delivery.confirmation_id,
-                metadata: { browser_job_id: job.id },
-                occurredAt: now,
-              });
+            await tx.insert(workflowEvent).values({
+              id: randomUUID(),
+              aggregateId: delivery.confirmation_id,
+              fromState: "DELIVERY_CONFIRMATION_CONFIRMED",
+              toState: "DELIVERY_CONFIRMATION_EXPIRED",
+              actorType: "system",
+              actorId: workerId,
+              evidenceRefs: [],
+              occurredAt: now,
+            });
+            await tx.insert(auditEvent).values({
+              id: randomUUID(),
+              action: "delivery_confirmation.expired_before_reply",
+              actorType: "system",
+              actorId: workerId,
+              aggregateId: delivery.confirmation_id,
+              subjectType: "delivery_confirmation",
+              subjectId: delivery.confirmation_id,
+              metadata: { browser_job_id: job.id },
+              occurredAt: now,
+            });
             throw new PreflightRejection("gate_03_expired", "Gate 03 已过期，不能发送回复。");
           }
         }
@@ -344,18 +336,16 @@ export async function claimNextSocialWorkerJob(
           .update(socialPublication)
           .set({ status: "paused", updatedAt: now })
           .where(eq(socialPublication.id, job.payloadRef));
-      await tx
-        .insert(auditEvent)
-        .values({
-          id: randomUUID(),
-          action: "social_browser_job.preflight_paused",
-          actorType: "system",
-          actorId: workerId,
-          subjectType: "social_browser_job",
-          subjectId: job.id,
-          metadata: { job_kind: job.kind, failure_code: failureCode, retry_allowed: false },
-          occurredAt: now,
-        });
+      await tx.insert(auditEvent).values({
+        id: randomUUID(),
+        action: "social_browser_job.preflight_paused",
+        actorType: "system",
+        actorId: workerId,
+        subjectType: "social_browser_job",
+        subjectId: job.id,
+        metadata: { job_kind: job.kind, failure_code: failureCode, retry_allowed: false },
+        occurredAt: now,
+      });
       return null;
     }
 
@@ -363,18 +353,16 @@ export async function claimNextSocialWorkerJob(
       .update(socialBrowserJob)
       .set({ status: "claimed", updatedAt: now })
       .where(and(eq(socialBrowserJob.id, job.id), eq(socialBrowserJob.status, "queued")));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "social_browser_job.claimed",
-        actorType: "system",
-        actorId: workerId,
-        subjectType: "social_browser_job",
-        subjectId: job.id,
-        metadata: { job_kind: job.kind },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "social_browser_job.claimed",
+      actorType: "system",
+      actorId: workerId,
+      subjectType: "social_browser_job",
+      subjectId: job.id,
+      metadata: { job_kind: job.kind },
+      occurredAt: now,
+    });
     const command = signSocialWorkerCommand({
       commandId: randomUUID(),
       workerId,

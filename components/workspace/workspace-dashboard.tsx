@@ -8,9 +8,7 @@ import {
   InboxIcon,
   ShieldCheckIcon,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +28,7 @@ import type {
 } from "@/lib/workspace/store";
 import { WorkspaceDirtyProvider } from "./dirty-state";
 import { InboundRoutingList } from "./inbound-routing-list";
-import { WorkspaceActionDock } from "./workspace-action-dock";
+import { WorkspaceLink as Link } from "./workspace-link";
 
 function TaskRows({ tasks, empty }: { tasks: WorkspaceTaskSummary[]; empty: string }) {
   if (!tasks.length)
@@ -77,14 +75,12 @@ export function WorkspaceDashboard({
   pipeline,
   inbound = [],
   currentTime,
-  settingsPanel,
 }: {
   projects: WorkspaceProjectSummary[];
   tasks: WorkspaceTaskSummary[];
   pipeline: WorkspacePipelineSummary[];
   inbound?: InboundRoutingSummary[];
   currentTime: number;
-  settingsPanel?: ReactNode;
 }) {
   const approvals = tasks.filter(
     (task) =>
@@ -259,7 +255,6 @@ export function WorkspaceDashboard({
             </section>
           </div>
         </div>
-        <WorkspaceActionDock projects={projects} tasks={tasks} settingsPanel={settingsPanel} />
       </main>
     </WorkspaceDirtyProvider>
   );

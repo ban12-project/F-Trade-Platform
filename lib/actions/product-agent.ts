@@ -86,7 +86,7 @@ export async function runProductAgentAction(
       },
       projectId,
     );
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return {
       status: "success",

@@ -2,12 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckSquareIcon, FolderOpenIcon, PlusIcon, SaveIcon, Settings2Icon } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { type ReactNode, startTransition, useActionState, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +39,7 @@ import { createWorkspaceProjectSchema } from "@/lib/workspace/contracts";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
 import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
+import { WorkspaceLink } from "./workspace-link";
 
 type Values = z.infer<typeof createWorkspaceProjectSchema>;
 type DockPanel = "projects" | "tasks" | "tools" | null;
@@ -91,7 +92,8 @@ export function WorkspaceActionDock({
   projects,
   tasks,
   settingsPanel,
-  activeProjectId,
+  activeProjectId: initialActiveProjectId,
+  basePath = "/workspace",
   onSave,
   saveDisabled,
   savePending,
@@ -100,12 +102,16 @@ export function WorkspaceActionDock({
   tasks: WorkspaceTaskSummary[];
   settingsPanel?: ReactNode;
   activeProjectId?: string;
+  basePath?: string;
   onSave?: () => void;
   saveDisabled?: boolean;
   savePending?: boolean;
 }) {
   const router = useRouter();
-  const { requestNavigation } = useWorkspaceDirtyState();
+  const params = useParams();
+  const activeProjectId =
+    typeof params.projectId === "string" ? params.projectId : initialActiveProjectId;
+  const { requestNavigation, discardVersion } = useWorkspaceDirtyState();
   const [panel, setPanel] = useState<DockPanel>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [state, action, pending] = useActionState(createWorkspaceProjectAction, initialState);
@@ -118,15 +124,15 @@ export function WorkspaceActionDock({
     if (state.status === "success" && state.projectId) {
       form.reset();
       setCreateOpen(false);
-      router.push(`/workspace/${state.projectId}`);
+      router.push(`${basePath}/${state.projectId}`);
     }
-  }, [form, router, state.projectId, state.status]);
-  function navigate(url: string) {
-    requestNavigation(() => {
-      setPanel(null);
-      router.push(url);
-    });
-  }
+  }, [basePath, form, router, state.projectId, state.status]);
+  useEffect(() => {
+    if (!discardVersion) return;
+    form.reset();
+    setCreateOpen(false);
+    setPanel(null);
+  }, [discardVersion, form]);
   function submit(values: Values) {
     const data = new FormData();
     data.set("kind", values.kind);
@@ -147,6 +153,7 @@ export function WorkspaceActionDock({
     <>
       <nav
         aria-label="工作台操作"
+        data-testid="workspace-action-dock"
         className="fixed bottom-[calc(.75rem+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1 rounded-2xl border bg-background/90 p-1.5 shadow-lg backdrop-blur-xl md:bottom-6"
       >
         <Button
@@ -219,19 +226,26 @@ export function WorkspaceActionDock({
       >
         <ScrollArea className="h-full">
           <div className="flex flex-col gap-2 p-4">
-            <Button
-              variant={!activeProjectId ? "secondary" : "outline"}
-              className="justify-start"
-              onClick={() => navigate("/workspace")}
+            <WorkspaceLink
+              className={buttonVariants({
+                variant: !activeProjectId ? "secondary" : "outline",
+                className: "justify-start",
+              })}
+              href={basePath}
+              onFollow={() => setPanel(null)}
             >
               工作台
-            </Button>
+            </WorkspaceLink>
             {projects.map((project) => (
-              <Button
+              <WorkspaceLink
                 key={project.id}
-                variant={project.id === activeProjectId ? "secondary" : "outline"}
-                className="h-auto justify-start py-3 text-left"
-                onClick={() => navigate(`/workspace/${project.id}`)}
+                className={buttonVariants({
+                  variant: project.id === activeProjectId ? "secondary" : "outline",
+                  className: "h-auto justify-start py-3 text-left",
+                })}
+                aria-current={project.id === activeProjectId ? "page" : undefined}
+                href={`${basePath}/${project.id}`}
+                onFollow={() => setPanel(null)}
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="truncate font-medium">{project.title}</span>
@@ -240,7 +254,7 @@ export function WorkspaceActionDock({
                     {project.status === "active" ? "进行中" : "已归档"}
                   </span>
                 </span>
-              </Button>
+              </WorkspaceLink>
             ))}
           </div>
         </ScrollArea>
@@ -255,14 +269,17 @@ export function WorkspaceActionDock({
           <div className="flex flex-col gap-2 p-4">
             {tasks.length ? (
               tasks.map((task) => {
-                const target = workspaceTaskHref(task);
+                const target = workspaceTaskHref(task, `${basePath}/${task.projectId}`);
                 return (
-                  <Button
+                  <WorkspaceLink
                     key={`${task.priority}-${task.id}`}
                     data-target={target}
-                    variant="outline"
-                    className="h-auto justify-start py-3 text-left"
-                    onClick={() => navigate(target)}
+                    className={buttonVariants({
+                      variant: "outline",
+                      className: "h-auto justify-start py-3 text-left",
+                    })}
+                    href={target}
+                    onFollow={() => setPanel(null)}
                   >
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="flex items-center gap-2">
@@ -275,7 +292,7 @@ export function WorkspaceActionDock({
                         {task.projectTitle} · {task.detail}
                       </span>
                     </span>
-                  </Button>
+                  </WorkspaceLink>
                 );
               })
             ) : (

@@ -268,14 +268,17 @@ function ProductAgentForm({
     (item) => item.apiKeyConfigured || item.authTokenConfigured,
   );
   const defaultConfig = usableConfigs.find((item) => item.isDefault) ?? usableConfigs[0];
-  const emptyAgent = {
-    modelConfigId: defaultConfig?.id ?? "",
-    model: defaultConfig?.model ?? "",
-    sourceRef: "",
-    evidenceRef: "",
-    sourceText: "",
-    hasUpload: false,
-  };
+  const emptyAgent = useMemo(
+    () => ({
+      modelConfigId: defaultConfig?.id ?? "",
+      model: defaultConfig?.model ?? "",
+      sourceRef: "",
+      evidenceRef: "",
+      sourceText: "",
+      hasUpload: false,
+    }),
+    [defaultConfig?.id, defaultConfig?.model],
+  );
   const form = useForm<AgentValues>({
     resolver: zodResolver(productAgentRunFormSchema),
     defaultValues: emptyAgent,
@@ -306,7 +309,7 @@ function ProductAgentForm({
       if (fileRef.current) fileRef.current.value = "";
       router.refresh();
     }
-  }, [form, router, state.status]);
+  }, [emptyAgent, initialChoice, form, router, state.status]);
   function submit(values: AgentValues) {
     const data = new FormData();
     data.set("projectId", projectId);

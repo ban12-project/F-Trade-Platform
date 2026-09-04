@@ -132,43 +132,37 @@ export async function createRfq(input: RfqFormInput, actorId: string, projectId?
         if (!lead) throw new Error("只能为当前项目中尚未进入报价流程的入站线索录入 RFQ。");
       }
     }
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "rfq",
-        state: "RFQ_COLLECTING",
-        payload: draft,
-        createdByType: "human",
-        createdById: actorId,
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "rfq",
+      state: "RFQ_COLLECTING",
+      payload: draft,
+      createdByType: "human",
+      createdById: actorId,
+    });
     if (projectId)
-      await tx
-        .insert(workspaceProjectItem)
-        .values({
-          id: randomUUID(),
-          projectId,
-          aggregateId: id,
-          role: "sales_rfq",
-          relation: "owned",
-        });
-    await tx
-      .insert(auditEvent)
-      .values({
+      await tx.insert(workspaceProjectItem).values({
         id: randomUUID(),
-        action: "rfq_collecting_created",
-        actorType: "human",
-        actorId,
+        projectId,
         aggregateId: id,
-        subjectType: "rfq",
-        subjectId: id,
-        metadata: {
-          completeness_score: draft.completeness_score,
-          missing_fields: draft.missing_fields,
-          evidence_ref: input.evidenceRef,
-        },
-        occurredAt: now,
+        role: "sales_rfq",
+        relation: "owned",
       });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "rfq_collecting_created",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "rfq",
+      subjectId: id,
+      metadata: {
+        completeness_score: draft.completeness_score,
+        missing_fields: draft.missing_fields,
+        evidence_ref: input.evidenceRef,
+      },
+      occurredAt: now,
+    });
   });
   return { id, draft };
 }
@@ -239,23 +233,21 @@ export async function reviseRfq(
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.version, record.version)))
       .returning({ id: aggregateRecord.id });
     if (!updated) throw new Error("RFQ 已被其他操作更新，请刷新后重试。");
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "rfq_collecting_revised",
-        actorType: "human",
-        actorId,
-        aggregateId: rfqId,
-        subjectType: "rfq",
-        subjectId: rfqId,
-        metadata: {
-          completeness_score: draft.completeness_score,
-          missing_fields: draft.missing_fields,
-          evidence_ref: input.evidenceRef,
-        },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "rfq_collecting_revised",
+      actorType: "human",
+      actorId,
+      aggregateId: rfqId,
+      subjectType: "rfq",
+      subjectId: rfqId,
+      metadata: {
+        completeness_score: draft.completeness_score,
+        missing_fields: draft.missing_fields,
+        evidence_ref: input.evidenceRef,
+      },
+      occurredAt: now,
+    });
     return { id: rfqId, draft };
   });
 }
@@ -315,31 +307,27 @@ export async function submitRfqReady(
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.version, record.version)))
       .returning({ id: aggregateRecord.id });
     if (!updated) throw new Error("RFQ 已被其他操作更新，请刷新后重试。");
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: rfqId,
-        fromState: "RFQ_COLLECTING",
-        toState: "RFQ_READY",
-        actorType: "human",
-        actorId,
-        evidenceRefs: [evidenceRef],
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "rfq_ready",
-        actorType: "human",
-        actorId,
-        aggregateId: rfqId,
-        subjectType: "rfq",
-        subjectId: rfqId,
-        metadata: { completeness_score: 100 },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: rfqId,
+      fromState: "RFQ_COLLECTING",
+      toState: "RFQ_READY",
+      actorType: "human",
+      actorId,
+      evidenceRefs: [evidenceRef],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "rfq_ready",
+      actorType: "human",
+      actorId,
+      aggregateId: rfqId,
+      subjectType: "rfq",
+      subjectId: rfqId,
+      metadata: { completeness_score: 100 },
+      occurredAt: now,
+    });
     return { state: "RFQ_READY" as const, missingFields: [] };
   });
 }

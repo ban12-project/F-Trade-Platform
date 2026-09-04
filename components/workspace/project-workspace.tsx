@@ -1,10 +1,8 @@
 "use client";
 
 import { ArrowLeftIcon, ArrowRightIcon, FilmIcon } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MouseEvent, ReactNode } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
 import { useWorkspaceDirtyState, WorkspaceDirtyProvider } from "./dirty-state";
-import { WorkspaceActionDock } from "./workspace-action-dock";
+import { WorkspaceLink } from "./workspace-link";
 
 export type ProjectStage = { id: string; panelKind: string; label: string; description: string };
 
@@ -38,22 +36,10 @@ function GuardedLink({
   className: string;
   current?: boolean;
 }) {
-  const router = useRouter();
-  const { requestNavigation } = useWorkspaceDirtyState();
-  function navigate(event: MouseEvent<HTMLAnchorElement>) {
-    if (shouldUseNativeNavigation(event)) return;
-    event.preventDefault();
-    requestNavigation(() => router.push(href));
-  }
   return (
-    <Link
-      href={href}
-      onClick={navigate}
-      aria-current={current ? "step" : undefined}
-      className={className}
-    >
+    <WorkspaceLink href={href} aria-current={current ? "step" : undefined} className={className}>
       {children}
-    </Link>
+    </WorkspaceLink>
   );
 }
 
@@ -95,9 +81,8 @@ export function VideoStageEntry({
 
 type ProjectWorkspaceProps = {
   project: WorkspaceProjectSummary;
-  projects: WorkspaceProjectSummary[];
-  tasks: WorkspaceTaskSummary[];
-  settingsPanel?: ReactNode;
+  tasks?: WorkspaceTaskSummary[];
+  tasksPanel?: ReactNode;
   membersPanel?: ReactNode;
   stages: ProjectStage[];
   activeStage: string;
@@ -107,9 +92,8 @@ type ProjectWorkspaceProps = {
 
 function ProjectWorkspaceInner({
   project,
-  projects,
-  tasks,
-  settingsPanel,
+  tasks = [],
+  tasksPanel,
   membersPanel,
   stages,
   activeStage,
@@ -118,17 +102,7 @@ function ProjectWorkspaceInner({
 }: ProjectWorkspaceProps) {
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
-  const projectTasks = tasks.filter((task) => task.projectId === project.id);
   const stage = stages.find((item) => item.id === activeStage) ?? stages[0]!;
-  const stageTasks = projectTasks.filter(
-    (task) =>
-      task.nodeKind === stage.panelKind &&
-      (stage.id === "opportunity"
-        ? task.taskType === "opportunity"
-        : stage.id === "follow-up"
-          ? task.taskType === "follow_up"
-          : true),
-  );
   function returnToWorkspace(event: MouseEvent<HTMLElement>) {
     if (shouldUseNativeNavigation(event)) return;
     event.preventDefault();
@@ -192,62 +166,14 @@ function ProjectWorkspaceInner({
           aria-label="当前阶段"
           className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)]"
         >
-          <div className="min-w-0 space-y-5">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <CardDescription>当前步骤</CardDescription>
-                    <CardTitle role="heading" aria-level={2} className="mt-1">
-                      {stage.label}
-                    </CardTitle>
-                    <p className="mt-2 text-sm text-muted-foreground">{stage.description}</p>
-                  </div>
-                  <Badge>
-                    {stageTasks.length ? `${stageTasks.length} 项待处理` : "当前无待办"}
-                  </Badge>
-                </div>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle role="heading" aria-level={2}>
-                  待处理事项
-                </CardTitle>
-                <CardDescription>
-                  先处理这里的下一动作；也可以在右侧新建或查看本步骤的业务记录。
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {stageTasks.length ? (
-                  <div className="divide-y">
-                    {stageTasks.map((task) => (
-                      <GuardedLink
-                        key={`${task.taskType}-${task.id}`}
-                        href={workspaceTaskHref(task, basePath)}
-                        className="group flex min-h-16 items-center gap-3 py-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">{task.title}</p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {task.detail}
-                          </p>
-                        </div>
-                        <Badge variant={task.priority === "review" ? "default" : "secondary"}>
-                          {task.actionLabel ?? "打开"}
-                        </Badge>
-                        <ArrowRightIcon className="size-4 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
-                      </GuardedLink>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    本步骤暂无待处理事项，可在右侧创建或查看业务记录。
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {tasksPanel ?? (
+            <ProjectStageTasks
+              projectId={project.id}
+              tasks={tasks}
+              stage={stage}
+              basePath={basePath}
+            />
+          )}
           <aside aria-label={`${stage.label}详情与审批`} className="min-w-0">
             <Card className="overflow-hidden">
               <CardHeader className="border-b">
@@ -265,12 +191,6 @@ function ProjectWorkspaceInner({
           </aside>
         </section>
       </div>
-      <WorkspaceActionDock
-        projects={projects}
-        tasks={tasks}
-        settingsPanel={settingsPanel}
-        activeProjectId={project.id}
-      />
     </main>
   );
 }
@@ -280,5 +200,83 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
     <WorkspaceDirtyProvider>
       <ProjectWorkspaceInner {...props} />
     </WorkspaceDirtyProvider>
+  );
+}
+
+export function ProjectStageTasks({
+  projectId,
+  tasks,
+  stage,
+  basePath = `/workspace/${projectId}`,
+}: {
+  projectId: string;
+  tasks: WorkspaceTaskSummary[];
+  stage: ProjectStage;
+  basePath?: string;
+}) {
+  const projectTasks = tasks.filter((task) => task.projectId === projectId);
+  const stageTasks = projectTasks.filter(
+    (task) =>
+      task.nodeKind === stage.panelKind &&
+      (stage.id === "opportunity"
+        ? task.taskType === "opportunity"
+        : stage.id === "follow-up"
+          ? task.taskType === "follow_up"
+          : true),
+  );
+
+  return (
+    <div className="min-w-0 space-y-5">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardDescription>当前步骤</CardDescription>
+              <CardTitle role="heading" aria-level={2} className="mt-1">
+                {stage.label}
+              </CardTitle>
+              <p className="mt-2 text-sm text-muted-foreground">{stage.description}</p>
+            </div>
+            <Badge>{stageTasks.length ? `${stageTasks.length} 项待处理` : "当前无待办"}</Badge>
+          </div>
+        </CardHeader>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle role="heading" aria-level={2}>
+            待处理事项
+          </CardTitle>
+          <CardDescription>
+            先处理这里的下一动作；也可以在右侧新建或查看本步骤的业务记录。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {stageTasks.length ? (
+            <div className="divide-y">
+              {stageTasks.map((task) => (
+                <GuardedLink
+                  key={`${task.taskType}-${task.id}`}
+                  href={workspaceTaskHref(task, basePath)}
+                  className="group flex min-h-16 items-center gap-3 py-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{task.title}</p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{task.detail}</p>
+                  </div>
+                  <Badge variant={task.priority === "review" ? "default" : "secondary"}>
+                    {task.actionLabel ?? "打开"}
+                  </Badge>
+                  <ArrowRightIcon className="size-4 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
+                </GuardedLink>
+              ))}
+            </div>
+          ) : (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              本步骤暂无待处理事项，可在右侧创建或查看业务记录。
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

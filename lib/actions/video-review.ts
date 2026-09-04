@@ -21,7 +21,7 @@ export async function decideVideoReviewAction(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "视频确认资料无效。" };
   try {
     const result = await decideVideoReview(parsed.data, session.user.id);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     return {
       status: "success",
       message:

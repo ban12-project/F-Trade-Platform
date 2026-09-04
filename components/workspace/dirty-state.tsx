@@ -24,6 +24,7 @@ import {
 
 type DirtyStateContextValue = {
   dirty: boolean;
+  discardVersion: number;
   setDirty: (key: string, value: boolean) => void;
   requestNavigation: (action: () => void) => void;
 };
@@ -31,6 +32,12 @@ type DirtyStateContextValue = {
 const DirtyStateContext = createContext<DirtyStateContextValue | null>(null);
 
 export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
+  const parent = useContext(DirtyStateContext);
+  return parent ? children : <WorkspaceDirtyRoot>{children}</WorkspaceDirtyRoot>;
+}
+
+function WorkspaceDirtyRoot({ children }: { children: ReactNode }) {
+  const [discardVersion, setDiscardVersion] = useState(0);
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(() => new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingAction = useRef<(() => void) | null>(null);
@@ -61,6 +68,8 @@ export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
     const action = pendingAction.current;
     pendingAction.current = null;
     setConfirmOpen(false);
+    setDirtyKeys(new Set());
+    setDiscardVersion((version) => version + 1);
     action?.();
   }
   useEffect(() => {
@@ -86,8 +95,8 @@ export function WorkspaceDirtyProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("popstate", popState);
   }, [dirty, requestNavigation]);
   const value = useMemo(
-    () => ({ dirty, setDirty, requestNavigation }),
-    [dirty, requestNavigation, setDirty],
+    () => ({ dirty, discardVersion, setDirty, requestNavigation }),
+    [dirty, discardVersion, requestNavigation, setDirty],
   );
   return (
     <DirtyStateContext value={value}>

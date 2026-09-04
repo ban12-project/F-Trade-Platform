@@ -36,7 +36,7 @@ export async function createRfqAction(
     const projectId = projectIdFrom(formData);
     if (projectId) await assertWorkspaceProjectKind(projectId, "sales", session.user.id);
     const result = await createRfq(parsed.data, session.user.id, projectId);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return {
       status: "success",
@@ -70,7 +70,7 @@ export async function submitRfqReadyAction(
     if (projectId)
       await assertWorkspaceAggregateLink(projectId, rfqId, "sales", "rfq", session.user.id);
     const result = await submitRfqReady(rfqId, evidenceRef, session.user.id, projectId);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return result.state === "RFQ_READY"
       ? { status: "success", message: "RFQ 已 Ready，可由人工创建报价草稿。", rfqId }
@@ -98,7 +98,7 @@ export async function reviseRfqAction(
     if (projectId)
       await assertWorkspaceAggregateLink(projectId, rfqId, "sales", "rfq", session.user.id);
     const result = await reviseRfq(rfqId, parsed.data, session.user.id, projectId);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return {
       status: "success",

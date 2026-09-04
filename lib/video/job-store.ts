@@ -189,13 +189,11 @@ export async function claimConfiguredVideoJob(
         .where(eq(videoJobTable.id, candidate.id))
         .returning();
       if (!rejected) throw new Error("Video job budget rejection lost");
-      await tx
-        .insert(auditEvent)
-        .values(
-          auditValues("video_job.rejected", rejected, workerId, now, {
-            failure_code: "budget_limit",
-          }),
-        );
+      await tx.insert(auditEvent).values(
+        auditValues("video_job.rejected", rejected, workerId, now, {
+          failure_code: "budget_limit",
+        }),
+      );
       return { kind: "rejected", job: rejected, reason: "budget_limit" };
     }
     if (reserve > 0)
@@ -220,14 +218,12 @@ export async function claimConfiguredVideoJob(
       .where(eq(videoJobTable.id, candidate.id))
       .returning();
     if (!claimed) throw new Error("Video job claim lost");
-    await tx
-      .insert(auditEvent)
-      .values(
-        auditValues("video_job.claimed", claimed, workerId, now, {
-          lease_expires_at: expiresAt.toISOString(),
-          budget_reserved_cents: reserve,
-        }),
-      );
+    await tx.insert(auditEvent).values(
+      auditValues("video_job.claimed", claimed, workerId, now, {
+        lease_expires_at: expiresAt.toISOString(),
+        budget_reserved_cents: reserve,
+      }),
+    );
     return { kind: "claimed", job: claimed };
   });
 }
@@ -280,13 +276,11 @@ export async function claimNextVideoJob(
       .where(eq(videoJobTable.id, candidate.id))
       .returning();
     if (!claimed) throw new Error("Video job claim lost");
-    await tx
-      .insert(auditEvent)
-      .values(
-        auditValues("video_job.claimed", claimed, workerId, now, {
-          lease_expires_at: expiresAt.toISOString(),
-        }),
-      );
+    await tx.insert(auditEvent).values(
+      auditValues("video_job.claimed", claimed, workerId, now, {
+        lease_expires_at: expiresAt.toISOString(),
+      }),
+    );
     return claimed;
   });
 }

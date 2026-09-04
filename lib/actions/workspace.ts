@@ -38,7 +38,7 @@ export async function createWorkspaceProjectAction(
     if (!parsed.success)
       return { status: "error", message: parsed.error.issues[0]?.message ?? "项目资料无效。" };
     const project = await createWorkspaceProject(parsed.data, session.user.id);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "项目已创建。", projectId: project.id };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "无法创建项目。" };
@@ -57,6 +57,7 @@ export async function linkReadyProductToSalesProjectAction(
     const productId = z.uuid("产品记录标识无效。").parse(productIdInput);
     await linkReadyProductToSalesProject(projectId, productId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
+    revalidatePath("/workspace", "layout");
     return {
       status: "success",
       message: "已引用 Product Ready，不会复制或改写产品事实。",

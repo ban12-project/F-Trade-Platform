@@ -84,7 +84,6 @@ async function ProjectWorkspaceFixture({
   return (
     <ProjectWorkspace
       project={project}
-      projects={[project]}
       tasks={tasks}
       membersPanel={membersPanel}
       stages={stages}

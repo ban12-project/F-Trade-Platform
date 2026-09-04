@@ -193,46 +193,40 @@ export async function createMarketingVideoEditProject(
       id,
     );
     const project = videoProjectSchema.parse({ ...creative, status: "draft", editDraft });
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "video",
-        state: "VIDEO_DRAFT",
-        payload: project,
-        createdByType: "human",
-        createdById: actorId,
-      });
-    await tx
-      .insert(workspaceProjectItem)
-      .values({
-        id: randomUUID(),
-        projectId: value.projectId,
-        aggregateId: id,
-        role: "marketing_video",
-        relation: "owned",
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "video",
+      state: "VIDEO_DRAFT",
+      payload: project,
+      createdByType: "human",
+      createdById: actorId,
+    });
+    await tx.insert(workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId: value.projectId,
+      aggregateId: id,
+      role: "marketing_video",
+      relation: "owned",
+    });
     await tx
       .update(workspaceProject)
       .set({ updatedAt: now })
       .where(eq(workspaceProject.id, value.projectId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "marketing_video_edit.created",
-        actorType: "human",
-        actorId,
-        aggregateId: id,
-        subjectType: "video",
-        subjectId: id,
-        metadata: {
-          project_id: value.projectId,
-          platform: value.platform,
-          clip_count: clips.length,
-        },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "marketing_video_edit.created",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "video",
+      subjectId: id,
+      metadata: {
+        project_id: value.projectId,
+        platform: value.platform,
+        clip_count: clips.length,
+      },
+      occurredAt: now,
+    });
     return { id, project };
   });
 }
@@ -416,42 +410,36 @@ export async function copyMarketingVideoDraftToProject(
       renderedAssetRef: undefined,
       exportArtifact: undefined,
     });
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "video",
-        state: "VIDEO_DRAFT",
-        payload: project,
-        createdByType: "human",
-        createdById: actorId,
-      });
-    await tx
-      .insert(workspaceProjectItem)
-      .values({
-        id: randomUUID(),
-        projectId,
-        aggregateId: id,
-        role: "marketing_video",
-        relation: "owned",
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "video",
+      state: "VIDEO_DRAFT",
+      payload: project,
+      createdByType: "human",
+      createdById: actorId,
+    });
+    await tx.insert(workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId,
+      aggregateId: id,
+      role: "marketing_video",
+      relation: "owned",
+    });
     await tx
       .update(workspaceProject)
       .set({ updatedAt: now })
       .where(eq(workspaceProject.id, projectId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "marketing_video_edit.copied_to_project",
-        actorType: "human",
-        actorId,
-        aggregateId: id,
-        subjectType: "video",
-        subjectId: id,
-        metadata: { copied_from: sourceVideoId, project_id: projectId },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "marketing_video_edit.copied_to_project",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "video",
+      subjectId: id,
+      metadata: { copied_from: sourceVideoId, project_id: projectId },
+      occurredAt: now,
+    });
     return { id, project };
   });
 }
@@ -525,22 +513,20 @@ export async function updateMarketingVideoEditDraft(
       .update(aggregateRecord)
       .set({ payload: project, version: sql`${aggregateRecord.version} + 1` })
       .where(eq(aggregateRecord.id, videoId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "marketing_video_edit.saved",
-        actorType: "human",
-        actorId,
-        aggregateId: videoId,
-        subjectType: "video",
-        subjectId: videoId,
-        metadata: {
-          duration_ms: draft.clips.reduce((sum, clip) => sum + clip.durationMs, 0),
-          clip_count: draft.clips.length,
-        },
-        occurredAt: new Date(),
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "marketing_video_edit.saved",
+      actorType: "human",
+      actorId,
+      aggregateId: videoId,
+      subjectType: "video",
+      subjectId: videoId,
+      metadata: {
+        duration_ms: draft.clips.reduce((sum, clip) => sum + clip.durationMs, 0),
+        clip_count: draft.clips.length,
+      },
+      occurredAt: new Date(),
+    });
     return project;
   });
 }
@@ -593,33 +579,29 @@ export async function beginMarketingVideoRender(
         version: sql`${aggregateRecord.version} + 1`,
       })
       .where(eq(aggregateRecord.id, videoId));
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: videoId,
-        fromState: record.state,
-        toState: "VIDEO_RENDERING",
-        actorType: "human",
-        actorId,
-        evidenceRefs,
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "marketing_video_render.started",
-        actorType: "human",
-        actorId,
-        aggregateId: videoId,
-        subjectType: "video",
-        subjectId: videoId,
-        metadata: {
-          duration_ms: project.editDraft.clips.reduce((sum, clip) => sum + clip.durationMs, 0),
-        },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: videoId,
+      fromState: record.state,
+      toState: "VIDEO_RENDERING",
+      actorType: "human",
+      actorId,
+      evidenceRefs,
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "marketing_video_render.started",
+      actorType: "human",
+      actorId,
+      aggregateId: videoId,
+      subjectType: "video",
+      subjectId: videoId,
+      metadata: {
+        duration_ms: project.editDraft.clips.reduce((sum, clip) => sum + clip.durationMs, 0),
+      },
+      occurredAt: now,
+    });
     return renderingProject;
   });
 }
@@ -665,17 +647,15 @@ export async function completeMarketingVideoRender(
       status: "review_required",
       renderedAssetRef: assetRef,
     });
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
-        aggregateId: videoId,
-        gate: "gate_01_truth",
-        status: "pending",
-        requestedByType: "system",
-        requestedById: actorId,
-        requestedAt: now,
-      });
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: videoId,
+      gate: "gate_01_truth",
+      status: "pending",
+      requestedByType: "system",
+      requestedById: actorId,
+      requestedAt: now,
+    });
     await tx
       .update(aggregateRecord)
       .set({
@@ -684,31 +664,27 @@ export async function completeMarketingVideoRender(
         version: sql`${aggregateRecord.version} + 1`,
       })
       .where(eq(aggregateRecord.id, videoId));
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: videoId,
-        fromState: "VIDEO_RENDERING",
-        toState: "VIDEO_REVIEW_REQUIRED",
-        actorType: "system",
-        actorId,
-        evidenceRefs,
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "marketing_video_render.completed",
-        actorType: "system",
-        actorId,
-        aggregateId: videoId,
-        subjectType: "video",
-        subjectId: videoId,
-        metadata: { asset_ref: assetRef, approval_id: approvalId },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: videoId,
+      fromState: "VIDEO_RENDERING",
+      toState: "VIDEO_REVIEW_REQUIRED",
+      actorType: "system",
+      actorId,
+      evidenceRefs,
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "marketing_video_render.completed",
+      actorType: "system",
+      actorId,
+      aggregateId: videoId,
+      subjectType: "video",
+      subjectId: videoId,
+      metadata: { asset_ref: assetRef, approval_id: approvalId },
+      occurredAt: now,
+    });
     return { project: reviewProject, approvalId };
   });
 }
@@ -750,31 +726,27 @@ export async function failMarketingVideoRender(
         version: sql`${aggregateRecord.version} + 1`,
       })
       .where(eq(aggregateRecord.id, videoId));
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: videoId,
-        fromState: "VIDEO_RENDERING",
-        toState: "VIDEO_REVISION_REQUIRED",
-        actorType: "system",
-        actorId,
-        evidenceRefs,
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "marketing_video_render.failed",
-        actorType: "system",
-        actorId,
-        aggregateId: videoId,
-        subjectType: "video",
-        subjectId: videoId,
-        metadata: { reason: reason.slice(0, 500) },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: videoId,
+      fromState: "VIDEO_RENDERING",
+      toState: "VIDEO_REVISION_REQUIRED",
+      actorType: "system",
+      actorId,
+      evidenceRefs,
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "marketing_video_render.failed",
+      actorType: "system",
+      actorId,
+      aggregateId: videoId,
+      subjectType: "video",
+      subjectId: videoId,
+      metadata: { reason: reason.slice(0, 500) },
+      occurredAt: now,
+    });
   });
 }
 
@@ -848,59 +820,51 @@ export async function createVideoProject(
         ...sourceAssets.map((asset) => asset.rightsEvidenceRef),
       ],
     });
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "video",
-        state: "VIDEO_REVIEW_REQUIRED",
-        payload: project,
-        createdByType: "human",
-        createdById: actorId,
-      });
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
-        aggregateId: id,
-        gate: "gate_01_truth",
-        status: "pending",
-        requestedByType: "human",
-        requestedById: actorId,
-        requestedAt: now,
-      });
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: id,
-        fromState: "VIDEO_DRAFT",
-        toState: "VIDEO_REVIEW_REQUIRED",
-        actorType: "human",
-        actorId,
-        evidenceRefs: [
-          ...project.factualClaims.map((claim) => claim.evidenceRef),
-          ...sourceAssets.map((asset) => asset.rightsEvidenceRef),
-        ],
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "video_project.created",
-        actorType: "human",
-        actorId,
-        aggregateId: id,
-        subjectType: "video_project",
-        subjectId: id,
-        metadata: {
-          product_id: product.id,
-          platform_count: project.platforms.length,
-          scene_count: project.scenes.length,
-        },
-        occurredAt: now,
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "video",
+      state: "VIDEO_REVIEW_REQUIRED",
+      payload: project,
+      createdByType: "human",
+      createdById: actorId,
+    });
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: id,
+      gate: "gate_01_truth",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: id,
+      fromState: "VIDEO_DRAFT",
+      toState: "VIDEO_REVIEW_REQUIRED",
+      actorType: "human",
+      actorId,
+      evidenceRefs: [
+        ...project.factualClaims.map((claim) => claim.evidenceRef),
+        ...sourceAssets.map((asset) => asset.rightsEvidenceRef),
+      ],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "video_project.created",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "video_project",
+      subjectId: id,
+      metadata: {
+        product_id: product.id,
+        platform_count: project.platforms.length,
+        scene_count: project.scenes.length,
+      },
+      occurredAt: now,
+    });
     return { id, approvalId, project };
   });
 }
@@ -1002,57 +966,49 @@ export async function createVideoProjectFromCanvas(document: VideoCanvasDocument
       occurredAt: now.toISOString(),
       evidenceRefs,
     });
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "video",
-        state: "VIDEO_REVIEW_REQUIRED",
-        payload: project,
-        createdByType: "human",
-        createdById: actorId,
-      });
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
-        aggregateId: id,
-        gate: "gate_01_truth",
-        status: "pending",
-        requestedByType: "human",
-        requestedById: actorId,
-        requestedAt: now,
-      });
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: id,
-        fromState: "VIDEO_DRAFT",
-        toState: "VIDEO_REVIEW_REQUIRED",
-        actorType: "human",
-        actorId,
-        evidenceRefs,
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "video_project.created_from_canvas",
-        actorType: "human",
-        actorId,
-        aggregateId: id,
-        subjectType: "video_project",
-        subjectId: id,
-        metadata: {
-          product_id: product.id,
-          platform_count: project.platforms.length,
-          scene_count: project.scenes.length,
-          canvas_snapshot_sha256: canvasSnapshotSha256,
-        },
-        occurredAt: now,
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "video",
+      state: "VIDEO_REVIEW_REQUIRED",
+      payload: project,
+      createdByType: "human",
+      createdById: actorId,
+    });
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: id,
+      gate: "gate_01_truth",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: id,
+      fromState: "VIDEO_DRAFT",
+      toState: "VIDEO_REVIEW_REQUIRED",
+      actorType: "human",
+      actorId,
+      evidenceRefs,
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "video_project.created_from_canvas",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "video_project",
+      subjectId: id,
+      metadata: {
+        product_id: product.id,
+        platform_count: project.platforms.length,
+        scene_count: project.scenes.length,
+        canvas_snapshot_sha256: canvasSnapshotSha256,
+      },
+      occurredAt: now,
+    });
     return { id, approvalId, project };
   });
 }
@@ -1138,33 +1094,29 @@ export async function decideVideoReview(input: VideoReviewInput, actorId: string
       )
       .returning({ id: aggregateRecord.id });
     if (!updated) throw new Error("视频确认与另一项操作冲突，请刷新后重试。");
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: aggregate.id,
-        fromState: "VIDEO_REVIEW_REQUIRED",
-        toState: nextState,
-        actorType: "human",
-        actorId,
-        gate: "gate_01_truth",
-        approvalId: pendingApproval.id,
-        evidenceRefs: [input.evidenceRef],
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "video_gate_01_decided",
-        actorType: "human",
-        actorId,
-        aggregateId: aggregate.id,
-        subjectType: "video",
-        subjectId: aggregate.id,
-        metadata: { decision: input.decision, approval_id: pendingApproval.id },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: aggregate.id,
+      fromState: "VIDEO_REVIEW_REQUIRED",
+      toState: nextState,
+      actorType: "human",
+      actorId,
+      gate: "gate_01_truth",
+      approvalId: pendingApproval.id,
+      evidenceRefs: [input.evidenceRef],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "video_gate_01_decided",
+      actorType: "human",
+      actorId,
+      aggregateId: aggregate.id,
+      subjectType: "video",
+      subjectId: aggregate.id,
+      metadata: { decision: input.decision, approval_id: pendingApproval.id },
+      occurredAt: now,
+    });
     return { state: nextState, approvalId: pendingApproval.id };
   });
 }

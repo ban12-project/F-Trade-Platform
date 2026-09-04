@@ -31,7 +31,7 @@ export async function saveSocialChannelControlAction(
     };
   try {
     const result = await saveSocialChannelControl(parsed.data);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     return {
       status: "success",
       message: `渠道已${result.circuitStatus === "active" ? "启用" : "暂停"}；操作已写入审计记录。`,

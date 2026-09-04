@@ -30,7 +30,7 @@ function projectIdFrom(formData: FormData) {
 
 function revalidateProductPaths(projectId: string | undefined, productId?: string) {
   void productId;
-  revalidatePath("/workspace");
+  revalidatePath("/workspace", "layout");
   if (projectId) revalidatePath(`/workspace/${projectId}`);
 }
 

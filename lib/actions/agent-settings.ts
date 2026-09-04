@@ -54,7 +54,7 @@ export async function saveProductAgentModelSettingsAction(
       authToken: parsed.data.authToken || undefined,
       actorId: session.user.id,
     });
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     return {
       status: "success",
       message: "Agent 模型配置已保存。密钥不会显示或返回给浏览器。",

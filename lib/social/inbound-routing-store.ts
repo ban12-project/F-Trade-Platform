@@ -84,35 +84,29 @@ export async function routeInboundConversation(
     if (value.mode === "create") {
       projectId = randomUUID();
       const now = new Date();
-      await tx
-        .insert(workspaceProject)
-        .values({
-          id: projectId,
-          title: `入站线索 ${shortReference(conversation.id)}`,
-          kind: "sales",
-          createdById: actorId,
-        });
-      await tx
-        .insert(workspaceProjectMember)
-        .values({
-          id: randomUUID(),
-          projectId,
-          userId: actorId,
-          role: "owner",
-          createdById: actorId,
-        });
-      await tx
-        .insert(auditEvent)
-        .values({
-          id: randomUUID(),
-          action: "workspace_project.created_from_inbound",
-          actorType: "human",
-          actorId,
-          subjectType: "workspace_project",
-          subjectId: projectId,
-          metadata: { source: "inbound_routing" },
-          occurredAt: now,
-        });
+      await tx.insert(workspaceProject).values({
+        id: projectId,
+        title: `入站线索 ${shortReference(conversation.id)}`,
+        kind: "sales",
+        createdById: actorId,
+      });
+      await tx.insert(workspaceProjectMember).values({
+        id: randomUUID(),
+        projectId,
+        userId: actorId,
+        role: "owner",
+        createdById: actorId,
+      });
+      await tx.insert(auditEvent).values({
+        id: randomUUID(),
+        action: "workspace_project.created_from_inbound",
+        actorType: "human",
+        actorId,
+        subjectType: "workspace_project",
+        subjectId: projectId,
+        metadata: { source: "inbound_routing" },
+        occurredAt: now,
+      });
     } else {
       await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
       const [project] = await tx
@@ -133,25 +127,21 @@ export async function routeInboundConversation(
       score_reasons: [],
       next_action: "collect_rfq",
     });
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id: leadId,
-        type: "lead",
-        state: "LEAD_RECEIVED",
-        payload: lead,
-        createdByType: "human",
-        createdById: actorId,
-      });
-    await tx
-      .insert(workspaceProjectItem)
-      .values({
-        id: randomUUID(),
-        projectId,
-        aggregateId: leadId,
-        role: "sales_lead",
-        relation: "owned",
-      });
+    await tx.insert(aggregateRecord).values({
+      id: leadId,
+      type: "lead",
+      state: "LEAD_RECEIVED",
+      payload: lead,
+      createdByType: "human",
+      createdById: actorId,
+    });
+    await tx.insert(workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId,
+      aggregateId: leadId,
+      role: "sales_lead",
+      relation: "owned",
+    });
     await tx
       .update(socialConversation)
       .set({ leadId, updatedAt: new Date() })
@@ -160,19 +150,17 @@ export async function routeInboundConversation(
       .update(workspaceProject)
       .set({ updatedAt: new Date() })
       .where(eq(workspaceProject.id, projectId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "social_inbound.routed",
-        actorType: "human",
-        actorId,
-        aggregateId: leadId,
-        subjectType: "social_conversation",
-        subjectId: conversation.id,
-        metadata: { project_id: projectId, mode: value.mode, channel_ref: conversation.channelRef },
-        occurredAt: new Date(),
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "social_inbound.routed",
+      actorType: "human",
+      actorId,
+      aggregateId: leadId,
+      subjectType: "social_conversation",
+      subjectId: conversation.id,
+      metadata: { project_id: projectId, mode: value.mode, channel_ref: conversation.channelRef },
+      occurredAt: new Date(),
+    });
     return { projectId, leadId };
   });
 }

@@ -45,7 +45,7 @@ export async function createVideoProjectAction(
       parsed.data.rightsEvidenceRef || "",
     );
     const result = await createVideoProject(parsed.data, session.user.id, uploadedAssets);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     return {
       status: "success",
       message: `视频项目已创建（${result.id.slice(0, 8)}），等待 Gate 01 人工审核。`,
@@ -76,7 +76,7 @@ export async function saveVideoCanvasAction(input: {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "画布数据格式不正确。" };
   try {
     const result = await saveVideoCanvasDocument(parsed.data, session.user.id);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "云端草稿已保存。", revision: result.revision };
   } catch (error) {
     if (error instanceof VideoCanvasRevisionConflictError)
@@ -96,7 +96,7 @@ export async function createVideoProjectFromCanvasAction(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "画布数据格式不正确。" };
   try {
     const result = await createVideoProjectFromCanvas(parsed.data, session.user.id);
-    revalidatePath("/workspace");
+    revalidatePath("/workspace", "layout");
     return {
       status: "success",
       message: `视频项目已创建（${result.id.slice(0, 8)}），等待 Gate 01 人工审核。`,

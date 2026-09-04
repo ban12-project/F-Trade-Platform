@@ -100,14 +100,20 @@ function taskTitle(type: string, payload: Record<string, unknown>) {
 export async function listWorkspaceTasks(
   actorId: string,
   database: Database = getDatabase(),
+  projectId?: string,
 ): Promise<WorkspaceTaskSummary[]> {
   const visibleProjects = await database
     .select({ id: workspaceProjectMember.projectId })
     .from(workspaceProjectMember)
-    .where(eq(workspaceProjectMember.userId, actorId));
+    .where(
+      and(
+        eq(workspaceProjectMember.userId, actorId),
+        projectId ? eq(workspaceProjectMember.projectId, projectId) : undefined,
+      ),
+    );
   const projectIds = visibleProjects.map((project) => project.id);
   if (!projectIds.length) return [];
-  const reviewRows = await database
+  const reviewRowsQuery = database
     .select({
       id: aggregateRecord.id,
       type: aggregateRecord.type,
@@ -141,7 +147,7 @@ export async function listWorkspaceTasks(
       ),
     )
     .orderBy(desc(approval.requestedAt));
-  const rfqRows = await database
+  const rfqRowsQuery = database
     .select({
       id: aggregateRecord.id,
       payload: aggregateRecord.payload,
@@ -161,7 +167,7 @@ export async function listWorkspaceTasks(
       ),
     )
     .orderBy(desc(aggregateRecord.createdAt));
-  const leadRows = await database
+  const leadRowsQuery = database
     .select({
       id: aggregateRecord.id,
       payload: aggregateRecord.payload,
@@ -181,7 +187,7 @@ export async function listWorkspaceTasks(
       ),
     )
     .orderBy(desc(aggregateRecord.updatedAt));
-  const publicationRows = await database
+  const publicationRowsQuery = database
     .select({
       id: aggregateRecord.id,
       type: aggregateRecord.type,
@@ -201,6 +207,12 @@ export async function listWorkspaceTasks(
       ),
     )
     .orderBy(desc(aggregateRecord.updatedAt));
+  const [reviewRows, rfqRows, leadRows, publicationRows] = await Promise.all([
+    reviewRowsQuery,
+    rfqRowsQuery,
+    leadRowsQuery,
+    publicationRowsQuery,
+  ]);
   const publicationStates = publicationRows.length
     ? await database
         .select({
@@ -351,7 +363,7 @@ export async function listWorkspacePipeline(
 ): Promise<WorkspacePipelineSummary[]> {
   const projects = await listWorkspaceProjects(actorId, database);
   if (!projects.length) return [];
-  const rows = await database
+  const rowsQuery = database
     .select({
       projectId: workspaceProjectItem.projectId,
       type: aggregateRecord.type,
@@ -366,7 +378,7 @@ export async function listWorkspacePipeline(
         projects.map((project) => project.id),
       ),
     );
-  const published = await database
+  const publishedQuery = database
     .select({ projectId: workspaceProjectItem.projectId, contentRef: socialPublication.contentRef })
     .from(socialPublication)
     .innerJoin(
@@ -382,6 +394,7 @@ export async function listWorkspacePipeline(
         eq(socialPublication.status, "published"),
       ),
     );
+  const [rows, published] = await Promise.all([rowsQuery, publishedQuery]);
   const marketingByPublication = new Map(
     published.map((item) => [item.contentRef, item.projectId]),
   );
@@ -468,27 +481,23 @@ export async function createWorkspaceProject(
     await tx
       .insert(workspaceProject)
       .values({ id, title: value.title, kind: value.kind, createdById: actorId });
-    await tx
-      .insert(workspaceProjectMember)
-      .values({
-        id: randomUUID(),
-        projectId: id,
-        userId: actorId,
-        role: "owner",
-        createdById: actorId,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "workspace_project.created",
-        actorType: "human",
-        actorId,
-        subjectType: "workspace_project",
-        subjectId: id,
-        metadata: { kind: value.kind },
-        occurredAt: now,
-      });
+    await tx.insert(workspaceProjectMember).values({
+      id: randomUUID(),
+      projectId: id,
+      userId: actorId,
+      role: "owner",
+      createdById: actorId,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "workspace_project.created",
+      actorType: "human",
+      actorId,
+      subjectType: "workspace_project",
+      subjectId: id,
+      metadata: { kind: value.kind },
+      occurredAt: now,
+    });
   });
   return { id, title: value.title, kind: value.kind, status: "active", updatedAt: now };
 }
@@ -637,18 +646,16 @@ export async function linkReadyProductToSalesProject(
       .update(workspaceProject)
       .set({ updatedAt: new Date() })
       .where(eq(workspaceProject.id, projectId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "workspace_project.ready_product_linked",
-        actorType: "human",
-        actorId,
-        subjectType: "workspace_project",
-        subjectId: projectId,
-        metadata: { product_id: productId },
-        occurredAt: new Date(),
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "workspace_project.ready_product_linked",
+      actorType: "human",
+      actorId,
+      subjectType: "workspace_project",
+      subjectId: projectId,
+      metadata: { product_id: productId },
+      occurredAt: new Date(),
+    });
   });
 }
 

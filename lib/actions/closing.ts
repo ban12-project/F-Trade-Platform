@@ -47,7 +47,7 @@ function resultError(error: unknown): ClosingActionState {
   };
 }
 function refresh(projectId: string) {
-  revalidatePath("/workspace");
+  revalidatePath("/workspace", "layout");
   revalidatePath(`/workspace/${projectId}`);
 }
 

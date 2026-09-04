@@ -299,7 +299,6 @@ async function ProjectWorkflowFixture({
     return (
       <ProjectWorkspace
         project={syntheticSalesProject}
-        projects={syntheticProjects}
         tasks={[]}
         stages={salesStages}
         activeStage={active}
@@ -350,7 +349,6 @@ async function ProjectWorkflowFixture({
   return (
     <ProjectWorkspace
       project={syntheticMarketingProject}
-      projects={syntheticProjects}
       tasks={[]}
       stages={marketingStages}
       activeStage={active}

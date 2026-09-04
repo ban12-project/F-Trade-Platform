@@ -200,15 +200,13 @@ export async function createProductCatalogDraft(
     }
     await tx.insert(aggregateRecord).values(aggregateValues);
     if (projectId)
-      await tx
-        .insert(workspaceProjectItem)
-        .values({
-          id: randomUUID(),
-          projectId,
-          aggregateId: id,
-          role: "product_source",
-          relation: "owned",
-        });
+      await tx.insert(workspaceProjectItem).values({
+        id: randomUUID(),
+        projectId,
+        aggregateId: id,
+        role: "product_source",
+        relation: "owned",
+      });
     await tx.insert(approval).values(approvalValues);
     await tx.insert(workflowEvent).values(workflowValues);
     await tx.insert(auditEvent).values(auditValues);
@@ -251,66 +249,56 @@ export async function createProductAgentDraft(
       if (!project || project.kind !== "marketing")
         throw new Error("Product Agent 草稿只能关联到产品营销项目。");
     }
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "product",
-        state: "PRODUCT_REVIEW_REQUIRED",
-        payload: draft as unknown as Record<string, unknown>,
-        createdByType: "agent",
-        createdById: "product_agent",
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "product",
+      state: "PRODUCT_REVIEW_REQUIRED",
+      payload: draft as unknown as Record<string, unknown>,
+      createdByType: "agent",
+      createdById: "product_agent",
+    });
     if (projectId)
-      await tx
-        .insert(workspaceProjectItem)
-        .values({
-          id: randomUUID(),
-          projectId,
-          aggregateId: id,
-          role: "product_source",
-          relation: "owned",
-        });
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
-        aggregateId: id,
-        gate: "gate_01_truth",
-        status: "pending",
-        requestedByType: "human",
-        requestedById: actorId,
-        requestedAt: now,
-      });
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: id,
-        fromState: "PRODUCT_IMPORTED",
-        toState: "PRODUCT_REVIEW_REQUIRED",
-        actorType: "agent",
-        actorId: "product_agent",
-        evidenceRefs: draft.evidence_refs,
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
+      await tx.insert(workspaceProjectItem).values({
         id: randomUUID(),
-        action: "product_agent_draft_created",
-        actorType: "agent",
-        actorId: "product_agent",
+        projectId,
         aggregateId: id,
-        subjectType: "product",
-        subjectId: id,
-        metadata: {
-          ...metadata,
-          requested_by: actorId,
-          blocking_field_count: draft.blocking_missing_fields.length,
-        },
-        occurredAt: now,
+        role: "product_source",
+        relation: "owned",
       });
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: id,
+      gate: "gate_01_truth",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: id,
+      fromState: "PRODUCT_IMPORTED",
+      toState: "PRODUCT_REVIEW_REQUIRED",
+      actorType: "agent",
+      actorId: "product_agent",
+      evidenceRefs: draft.evidence_refs,
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "product_agent_draft_created",
+      actorType: "agent",
+      actorId: "product_agent",
+      aggregateId: id,
+      subjectType: "product",
+      subjectId: id,
+      metadata: {
+        ...metadata,
+        requested_by: actorId,
+        blocking_field_count: draft.blocking_missing_fields.length,
+      },
+      occurredAt: now,
+    });
   });
   return { id, approvalId, draft };
 }

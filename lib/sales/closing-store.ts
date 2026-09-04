@@ -238,18 +238,16 @@ export async function createOrReviseQuotation(
           version: sql`${aggregateRecord.version} + 1`,
         })
         .where(eq(aggregateRecord.id, id));
-      await tx
-        .insert(workflowEvent)
-        .values({
-          id: randomUUID(),
-          aggregateId: id,
-          fromState: "QUOTE_REVISION_REQUIRED",
-          toState: "QUOTE_REVIEW_REQUIRED",
-          actorType: "human",
-          actorId,
-          evidenceRefs: [],
-          occurredAt: now,
-        });
+      await tx.insert(workflowEvent).values({
+        id: randomUUID(),
+        aggregateId: id,
+        fromState: "QUOTE_REVISION_REQUIRED",
+        toState: "QUOTE_REVIEW_REQUIRED",
+        actorType: "human",
+        actorId,
+        evidenceRefs: [],
+        occurredAt: now,
+      });
     } else {
       const quotation = createManualQuotation({
         handoffId: id,
@@ -258,25 +256,21 @@ export async function createOrReviseQuotation(
         actorId,
         quote: quoteFromValues(value),
       });
-      await tx
-        .insert(aggregateRecord)
-        .values({
-          id,
-          type: "quotation",
-          state: "QUOTE_REVIEW_REQUIRED",
-          payload: { ...quotation, product_id: value.productId },
-          createdByType: "human",
-          createdById: actorId,
-        });
-      await tx
-        .insert(workspaceProjectItem)
-        .values({
-          id: randomUUID(),
-          projectId: value.projectId,
-          aggregateId: id,
-          role: "sales_quotation",
-          relation: "owned",
-        });
+      await tx.insert(aggregateRecord).values({
+        id,
+        type: "quotation",
+        state: "QUOTE_REVIEW_REQUIRED",
+        payload: { ...quotation, product_id: value.productId },
+        createdByType: "human",
+        createdById: actorId,
+      });
+      await tx.insert(workspaceProjectItem).values({
+        id: randomUUID(),
+        projectId: value.projectId,
+        aggregateId: id,
+        role: "sales_quotation",
+        relation: "owned",
+      });
       const eventId = randomUUID();
       assertTransition({
         eventId,
@@ -289,47 +283,41 @@ export async function createOrReviseQuotation(
         occurredAt: now.toISOString(),
         evidenceRefs: [],
       });
-      await tx
-        .insert(workflowEvent)
-        .values({
-          id: eventId,
-          aggregateId: id,
-          fromState: "QUOTE_DRAFT",
-          toState: "QUOTE_REVIEW_REQUIRED",
-          actorType: "human",
-          actorId,
-          evidenceRefs: [],
-          occurredAt: now,
-        });
-    }
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
+      await tx.insert(workflowEvent).values({
+        id: eventId,
         aggregateId: id,
-        gate: "gate_02_quote",
-        status: "pending",
-        requestedByType: "human",
-        requestedById: actorId,
-        requestedAt: now,
+        fromState: "QUOTE_DRAFT",
+        toState: "QUOTE_REVIEW_REQUIRED",
+        actorType: "human",
+        actorId,
+        evidenceRefs: [],
+        occurredAt: now,
       });
+    }
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: id,
+      gate: "gate_02_quote",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
     await tx
       .update(workspaceProject)
       .set({ updatedAt: now })
       .where(eq(workspaceProject.id, value.projectId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: value.quotationId ? "quotation.revised" : "quotation.created",
-        actorType: "human",
-        actorId,
-        aggregateId: id,
-        subjectType: "quotation",
-        subjectId: id,
-        metadata: { project_id: value.projectId, rfq_id: value.rfqId, product_id: value.productId },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: value.quotationId ? "quotation.revised" : "quotation.created",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "quotation",
+      subjectId: id,
+      metadata: { project_id: value.projectId, rfq_id: value.rfqId, product_id: value.productId },
+      occurredAt: now,
+    });
     return { id };
   });
 }
@@ -423,33 +411,29 @@ export async function decideQuotation(
       .update(aggregateRecord)
       .set({ state: nextState, payload: next, version: sql`${aggregateRecord.version} + 1` })
       .where(eq(aggregateRecord.id, value.quotationId));
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: value.quotationId,
-        fromState: "QUOTE_REVIEW_REQUIRED",
-        toState: nextState,
-        actorType: "human",
-        actorId,
-        gate: "gate_02_quote",
-        approvalId: pending.id,
-        evidenceRefs: [value.evidenceRef],
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "quotation.gate_02_decided",
-        actorType: "human",
-        actorId,
-        aggregateId: value.quotationId,
-        subjectType: "quotation",
-        subjectId: value.quotationId,
-        metadata: { decision: value.decision },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: value.quotationId,
+      fromState: "QUOTE_REVIEW_REQUIRED",
+      toState: nextState,
+      actorType: "human",
+      actorId,
+      gate: "gate_02_quote",
+      approvalId: pending.id,
+      evidenceRefs: [value.evidenceRef],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "quotation.gate_02_decided",
+      actorType: "human",
+      actorId,
+      aggregateId: value.quotationId,
+      subjectType: "quotation",
+      subjectId: value.quotationId,
+      metadata: { decision: value.decision },
+      occurredAt: now,
+    });
     return { id: value.quotationId, state: nextState };
   });
 }
@@ -489,18 +473,16 @@ export async function sendQuotation(
       .update(aggregateRecord)
       .set({ state: "QUOTE_SENT", payload: sent, version: sql`${aggregateRecord.version} + 1` })
       .where(eq(aggregateRecord.id, value.quotationId));
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: randomUUID(),
-        aggregateId: value.quotationId,
-        fromState: "QUOTE_APPROVED",
-        toState: "QUOTE_SENT",
-        actorType: "human",
-        actorId,
-        evidenceRefs: [value.externalRef],
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: randomUUID(),
+      aggregateId: value.quotationId,
+      fromState: "QUOTE_APPROVED",
+      toState: "QUOTE_SENT",
+      actorType: "human",
+      actorId,
+      evidenceRefs: [value.externalRef],
+      occurredAt: now,
+    });
     const [rfqRecord] = await tx
       .select({ payload: aggregateRecord.payload })
       .from(workspaceProjectItem)
@@ -556,57 +538,49 @@ export async function sendQuotation(
         .set({ state: "FOLLOW_UP", payload: lead, version: sql`${aggregateRecord.version} + 1` })
         .where(eq(aggregateRecord.id, leadId));
     else {
-      await tx
-        .insert(aggregateRecord)
-        .values({
-          id: leadId,
-          type: "lead",
-          state: "FOLLOW_UP",
-          payload: lead,
-          createdByType: "human",
-          createdById: actorId,
-        });
-      await tx
-        .insert(workspaceProjectItem)
-        .values({
-          id: randomUUID(),
-          projectId: value.projectId,
-          aggregateId: leadId,
-          role: "sales_lead",
-          relation: "owned",
-        });
-    }
-    await tx
-      .insert(workflowEvent)
-      .values({
+      await tx.insert(aggregateRecord).values({
+        id: leadId,
+        type: "lead",
+        state: "FOLLOW_UP",
+        payload: lead,
+        createdByType: "human",
+        createdById: actorId,
+      });
+      await tx.insert(workspaceProjectItem).values({
         id: randomUUID(),
+        projectId: value.projectId,
         aggregateId: leadId,
-        fromState: "LEAD_RECEIVED",
-        toState: "FOLLOW_UP",
-        actorType: "human",
-        actorId,
-        evidenceRefs: [value.externalRef],
-        occurredAt: now,
+        role: "sales_lead",
+        relation: "owned",
       });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: receivedLead
-          ? "quotation.sent_and_inbound_follow_up_started"
-          : "quotation.sent_and_follow_up_created",
-        actorType: "human",
-        actorId,
-        aggregateId: value.quotationId,
-        subjectType: "quotation",
-        subjectId: value.quotationId,
-        metadata: {
-          lead_id: leadId,
-          channel_ref: value.channelRef,
-          external_ref: value.externalRef,
-        },
-        occurredAt: now,
-      });
+    }
+    await tx.insert(workflowEvent).values({
+      id: randomUUID(),
+      aggregateId: leadId,
+      fromState: "LEAD_RECEIVED",
+      toState: "FOLLOW_UP",
+      actorType: "human",
+      actorId,
+      evidenceRefs: [value.externalRef],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: receivedLead
+        ? "quotation.sent_and_inbound_follow_up_started"
+        : "quotation.sent_and_follow_up_created",
+      actorType: "human",
+      actorId,
+      aggregateId: value.quotationId,
+      subjectType: "quotation",
+      subjectId: value.quotationId,
+      metadata: {
+        lead_id: leadId,
+        channel_ref: value.channelRef,
+        external_ref: value.externalRef,
+      },
+      occurredAt: now,
+    });
     return { id: value.quotationId, leadId };
   });
 }
@@ -720,17 +694,15 @@ export async function recordFollowUp(
       body: controlledDraft,
       receivedAt: now,
     });
-    await tx
-      .insert(socialBrowserJob)
-      .values({
-        id: jobId,
-        channelRef: conversation.channelRef,
-        accountRef: conversation.accountRef,
-        kind: "reply",
-        idempotencyKey,
-        payloadRef: messageId,
-        status: "queued",
-      });
+    await tx.insert(socialBrowserJob).values({
+      id: jobId,
+      channelRef: conversation.channelRef,
+      accountRef: conversation.accountRef,
+      kind: "reply",
+      idempotencyKey,
+      payloadRef: messageId,
+      status: "queued",
+    });
     await tx.insert(socialMessage).values(storedMessage);
     const recommendation = nextFollowUp(value.context);
     const scoring = scoreLead(value.triggeredRules);
@@ -751,27 +723,25 @@ export async function recordFollowUp(
       .update(aggregateRecord)
       .set({ payload: next, version: sql`${aggregateRecord.version} + 1` })
       .where(eq(aggregateRecord.id, value.leadId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "lead.follow_up_submitted",
-        actorType: "human",
-        actorId,
-        aggregateId: value.leadId,
-        subjectType: "lead",
-        subjectId: value.leadId,
-        metadata: {
-          context: value.context,
-          score: scoring.score,
-          browser_job_id: jobId,
-          confirmation_ref: value.confirmationRef,
-          reply_window: window.status,
-          draft_length: controlledDraft.length,
-          delivery_confirmation_ref: lead.delivery_confirmation_ref ?? null,
-        },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "lead.follow_up_submitted",
+      actorType: "human",
+      actorId,
+      aggregateId: value.leadId,
+      subjectType: "lead",
+      subjectId: value.leadId,
+      metadata: {
+        context: value.context,
+        score: scoring.score,
+        browser_job_id: jobId,
+        confirmation_ref: value.confirmationRef,
+        reply_window: window.status,
+        draft_length: controlledDraft.length,
+        delivery_confirmation_ref: lead.delivery_confirmation_ref ?? null,
+      },
+      occurredAt: now,
+    });
     return next;
   });
 }
@@ -860,19 +830,17 @@ export async function recordControlledReplyResult(
         .update(socialConversation)
         .set({ lastMessageAt: now, updatedAt: now })
         .where(eq(socialConversation.id, conversation.id));
-      await tx
-        .insert(auditEvent)
-        .values({
-          id: randomUUID(),
-          action: "lead.follow_up_sent",
-          actorType: "system",
-          actorId: "social-worker",
-          aggregateId: conversation.leadId,
-          subjectType: "social_message",
-          subjectId: message.id,
-          metadata: { browser_job_id: job.id, external_message_ref: value.externalMessageRef },
-          occurredAt: now,
-        });
+      await tx.insert(auditEvent).values({
+        id: randomUUID(),
+        action: "lead.follow_up_sent",
+        actorType: "system",
+        actorId: "social-worker",
+        aggregateId: conversation.leadId,
+        subjectType: "social_message",
+        subjectId: message.id,
+        metadata: { browser_job_id: job.id, external_message_ref: value.externalMessageRef },
+        occurredAt: now,
+      });
       return saved;
     }
     const [saved] = await tx
@@ -891,19 +859,17 @@ export async function recordControlledReplyResult(
           updatedAt: now,
         })
         .where(eq(socialChannelControl.id, control.id));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: `lead.follow_up_${value.outcome}`,
-        actorType: "system",
-        actorId: "social-worker",
-        aggregateId: conversation.leadId,
-        subjectType: "social_message",
-        subjectId: message.id,
-        metadata: { browser_job_id: job.id, failure_code: value.failureCode, retry_allowed: false },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: `lead.follow_up_${value.outcome}`,
+      actorType: "system",
+      actorId: "social-worker",
+      aggregateId: conversation.leadId,
+      subjectType: "social_message",
+      subjectId: message.id,
+      metadata: { browser_job_id: job.id, failure_code: value.failureCode, retry_allowed: false },
+      occurredAt: now,
+    });
     return saved;
   });
 }
@@ -942,31 +908,27 @@ export async function confirmOpportunity(
       .update(aggregateRecord)
       .set({ state: "OPPORTUNITY", payload: next, version: sql`${aggregateRecord.version} + 1` })
       .where(eq(aggregateRecord.id, value.leadId));
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: randomUUID(),
-        aggregateId: value.leadId,
-        fromState: "FOLLOW_UP",
-        toState: "OPPORTUNITY",
-        actorType: "human",
-        actorId,
-        evidenceRefs: [value.evidenceRef],
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "lead.opportunity_confirmed",
-        actorType: "human",
-        actorId,
-        aggregateId: value.leadId,
-        subjectType: "lead",
-        subjectId: value.leadId,
-        metadata: { evidence_ref: value.evidenceRef },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: randomUUID(),
+      aggregateId: value.leadId,
+      fromState: "FOLLOW_UP",
+      toState: "OPPORTUNITY",
+      actorType: "human",
+      actorId,
+      evidenceRefs: [value.evidenceRef],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "lead.opportunity_confirmed",
+      actorType: "human",
+      actorId,
+      aggregateId: value.leadId,
+      subjectType: "lead",
+      subjectId: value.leadId,
+      metadata: { evidence_ref: value.evidenceRef },
+      occurredAt: now,
+    });
     return next;
   });
 }
@@ -1025,36 +987,30 @@ export async function createDeliveryRequest(
       requestedById: actorId,
       requestedAt: now.toISOString(),
     });
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "delivery_confirmation",
-        state: "DELIVERY_CONFIRMATION_PENDING",
-        payload: confirmation,
-        createdByType: "human",
-        createdById: actorId,
-      });
-    await tx
-      .insert(workspaceProjectItem)
-      .values({
-        id: randomUUID(),
-        projectId: value.projectId,
-        aggregateId: id,
-        role: "delivery_confirmation",
-        relation: "owned",
-      });
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
-        aggregateId: id,
-        gate: "gate_03_delivery",
-        status: "pending",
-        requestedByType: "human",
-        requestedById: actorId,
-        requestedAt: now,
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "delivery_confirmation",
+      state: "DELIVERY_CONFIRMATION_PENDING",
+      payload: confirmation,
+      createdByType: "human",
+      createdById: actorId,
+    });
+    await tx.insert(workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId: value.projectId,
+      aggregateId: id,
+      role: "delivery_confirmation",
+      relation: "owned",
+    });
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: id,
+      gate: "gate_03_delivery",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
     await tx
       .update(aggregateRecord)
       .set({
@@ -1062,19 +1018,17 @@ export async function createDeliveryRequest(
         version: sql`${aggregateRecord.version} + 1`,
       })
       .where(eq(aggregateRecord.id, value.leadId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "delivery_confirmation.requested",
-        actorType: "human",
-        actorId,
-        aggregateId: id,
-        subjectType: "delivery_confirmation",
-        subjectId: id,
-        metadata: { lead_id: value.leadId, evidence_ref: value.evidenceRef },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "delivery_confirmation.requested",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "delivery_confirmation",
+      subjectId: id,
+      metadata: { lead_id: value.leadId, evidence_ref: value.evidenceRef },
+      occurredAt: now,
+    });
     return { id };
   });
 }
@@ -1148,33 +1102,29 @@ export async function decideDelivery(
       .update(aggregateRecord)
       .set({ state: nextState, payload: next, version: sql`${aggregateRecord.version} + 1` })
       .where(eq(aggregateRecord.id, value.confirmationId));
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: randomUUID(),
-        aggregateId: value.confirmationId,
-        fromState: "DELIVERY_CONFIRMATION_PENDING",
-        toState: nextState,
-        actorType: "human",
-        actorId,
-        gate: "gate_03_delivery",
-        approvalId: pending.id,
-        evidenceRefs: [value.evidenceRef],
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "delivery_confirmation.gate_03_decided",
-        actorType: "human",
-        actorId,
-        aggregateId: value.confirmationId,
-        subjectType: "delivery_confirmation",
-        subjectId: value.confirmationId,
-        metadata: { decision: value.decision },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: randomUUID(),
+      aggregateId: value.confirmationId,
+      fromState: "DELIVERY_CONFIRMATION_PENDING",
+      toState: nextState,
+      actorType: "human",
+      actorId,
+      gate: "gate_03_delivery",
+      approvalId: pending.id,
+      evidenceRefs: [value.evidenceRef],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "delivery_confirmation.gate_03_decided",
+      actorType: "human",
+      actorId,
+      aggregateId: value.confirmationId,
+      subjectType: "delivery_confirmation",
+      subjectId: value.confirmationId,
+      metadata: { decision: value.decision },
+      occurredAt: now,
+    });
     return { id: value.confirmationId, state: nextState };
   });
 }

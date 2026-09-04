@@ -267,17 +267,15 @@ export async function submitControlledPublication(
         confirmedBy: "human",
       },
     );
-    await tx
-      .insert(socialBrowserJob)
-      .values({
-        id: jobId,
-        channelRef: value.channelRef,
-        accountRef: value.accountRef,
-        kind: "publish",
-        idempotencyKey,
-        payloadRef: id,
-        status: "queued",
-      });
+    await tx.insert(socialBrowserJob).values({
+      id: jobId,
+      channelRef: value.channelRef,
+      accountRef: value.accountRef,
+      kind: "publish",
+      idempotencyKey,
+      payloadRef: id,
+      status: "queued",
+    });
     const [saved] = await tx
       .insert(socialPublication)
       .values({
@@ -292,26 +290,24 @@ export async function submitControlledPublication(
         status: "submitted",
       })
       .returning();
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "social_publication.submitted",
-        actorType: "human",
-        actorId,
-        aggregateId: value.contentRef,
-        subjectType: "social_publication",
-        subjectId: id,
-        metadata: {
-          project_id: value.projectId,
-          channel_ref: value.channelRef,
-          account_ref: value.accountRef,
-          confirmation_ref: value.confirmationRef,
-          browser_job_id: jobId,
-          gate_01_approval_id: gate.id,
-        },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "social_publication.submitted",
+      actorType: "human",
+      actorId,
+      aggregateId: value.contentRef,
+      subjectType: "social_publication",
+      subjectId: id,
+      metadata: {
+        project_id: value.projectId,
+        channel_ref: value.channelRef,
+        account_ref: value.accountRef,
+        confirmation_ref: value.confirmationRef,
+        browser_job_id: jobId,
+        gate_01_approval_id: gate.id,
+      },
+      occurredAt: now,
+    });
     return saved;
   });
 }
@@ -405,23 +401,21 @@ export async function recordControlledPublicationResult(
             version: sql`${aggregateRecord.version} + 1`,
           })
           .where(eq(aggregateRecord.id, publication.contentRef));
-      await tx
-        .insert(auditEvent)
-        .values({
-          id: randomUUID(),
-          action: "social_publication.published",
-          actorType: "system",
-          actorId: "social-worker",
-          aggregateId: publication.contentRef,
-          subjectType: "social_publication",
-          subjectId: publication.id,
-          metadata: {
-            project_id: publication.projectId,
-            browser_job_id: job.id,
-            external_publication_ref: value.externalPublicationRef,
-          },
-          occurredAt: now,
-        });
+      await tx.insert(auditEvent).values({
+        id: randomUUID(),
+        action: "social_publication.published",
+        actorType: "system",
+        actorId: "social-worker",
+        aggregateId: publication.contentRef,
+        subjectType: "social_publication",
+        subjectId: publication.id,
+        metadata: {
+          project_id: publication.projectId,
+          browser_job_id: job.id,
+          external_publication_ref: value.externalPublicationRef,
+        },
+        occurredAt: now,
+      });
       return saved;
     }
     const status = value.outcome === "unknown" ? "unknown" : "failed";
@@ -449,24 +443,22 @@ export async function recordControlledPublicationResult(
           eq(socialChannelControl.accountRef, publication.accountRef),
         ),
       );
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: `social_publication.${status}`,
-        actorType: "system",
-        actorId: "social-worker",
-        aggregateId: publication.contentRef,
-        subjectType: "social_publication",
-        subjectId: publication.id,
-        metadata: {
-          project_id: publication.projectId,
-          browser_job_id: job.id,
-          failure_code: value.failureCode,
-          retry_allowed: false,
-        },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: `social_publication.${status}`,
+      actorType: "system",
+      actorId: "social-worker",
+      aggregateId: publication.contentRef,
+      subjectType: "social_publication",
+      subjectId: publication.id,
+      metadata: {
+        project_id: publication.projectId,
+        browser_job_id: job.id,
+        failure_code: value.failureCode,
+        retry_allowed: false,
+      },
+      occurredAt: now,
+    });
     return saved;
   });
 }

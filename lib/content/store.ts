@@ -306,62 +306,52 @@ export async function createContentDraft(
       occurredAt: now.toISOString(),
       evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
     });
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "content",
-        state: "CONTENT_REVIEW_REQUIRED",
-        payload: content,
-        createdByType: "human",
-        createdById: actorId,
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "content",
+      state: "CONTENT_REVIEW_REQUIRED",
+      payload: content,
+      createdByType: "human",
+      createdById: actorId,
+    });
     if (projectId)
-      await tx
-        .insert(workspaceProjectItem)
-        .values({
-          id: randomUUID(),
-          projectId,
-          aggregateId: id,
-          role: "marketing_content",
-          relation: "owned",
-        });
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
-        aggregateId: id,
-        gate: "gate_01_truth",
-        status: "pending",
-        requestedByType: "human",
-        requestedById: actorId,
-        requestedAt: now,
-      });
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: id,
-        fromState: "CONTENT_GENERATING",
-        toState: "CONTENT_REVIEW_REQUIRED",
-        actorType: "human",
-        actorId,
-        evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
+      await tx.insert(workspaceProjectItem).values({
         id: randomUUID(),
-        action: "content_draft_created",
-        actorType: "human",
-        actorId,
+        projectId,
         aggregateId: id,
-        subjectType: "content",
-        subjectId: id,
-        metadata: { content_type: content.content_type, product_id: product.id },
-        occurredAt: now,
+        role: "marketing_content",
+        relation: "owned",
       });
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: id,
+      gate: "gate_01_truth",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: id,
+      fromState: "CONTENT_GENERATING",
+      toState: "CONTENT_REVIEW_REQUIRED",
+      actorType: "human",
+      actorId,
+      evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "content_draft_created",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "content",
+      subjectId: id,
+      metadata: { content_type: content.content_type, product_id: product.id },
+      occurredAt: now,
+    });
     return { id, approvalId, content };
   });
 }
@@ -486,65 +476,55 @@ export async function copyContentDraftToProject(
       occurredAt: now.toISOString(),
       evidenceRefs,
     });
-    await tx
-      .insert(aggregateRecord)
-      .values({
-        id,
-        type: "content",
-        state: "CONTENT_REVIEW_REQUIRED",
-        payload: content,
-        createdByType: "human",
-        createdById: actorId,
-      });
-    await tx
-      .insert(workspaceProjectItem)
-      .values({
-        id: randomUUID(),
-        projectId,
-        aggregateId: id,
-        role: "marketing_content",
-        relation: "owned",
-      });
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
-        aggregateId: id,
-        gate: "gate_01_truth",
-        status: "pending",
-        requestedByType: "human",
-        requestedById: actorId,
-        requestedAt: now,
-      });
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: id,
-        fromState: "CONTENT_GENERATING",
-        toState: "CONTENT_REVIEW_REQUIRED",
-        actorType: "human",
-        actorId,
-        evidenceRefs,
-        occurredAt: now,
-      });
+    await tx.insert(aggregateRecord).values({
+      id,
+      type: "content",
+      state: "CONTENT_REVIEW_REQUIRED",
+      payload: content,
+      createdByType: "human",
+      createdById: actorId,
+    });
+    await tx.insert(workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId,
+      aggregateId: id,
+      role: "marketing_content",
+      relation: "owned",
+    });
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: id,
+      gate: "gate_01_truth",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: id,
+      fromState: "CONTENT_GENERATING",
+      toState: "CONTENT_REVIEW_REQUIRED",
+      actorType: "human",
+      actorId,
+      evidenceRefs,
+      occurredAt: now,
+    });
     await tx
       .update(workspaceProject)
       .set({ updatedAt: now })
       .where(eq(workspaceProject.id, projectId));
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "content_draft.copied_to_project",
-        actorType: "human",
-        actorId,
-        aggregateId: id,
-        subjectType: "content",
-        subjectId: id,
-        metadata: { copied_from: sourceContentId, project_id: projectId },
-        occurredAt: now,
-      });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "content_draft.copied_to_project",
+      actorType: "human",
+      actorId,
+      aggregateId: id,
+      subjectType: "content",
+      subjectId: id,
+      metadata: { copied_from: sourceContentId, project_id: projectId },
+      occurredAt: now,
+    });
     return { id, approvalId, content };
   });
 }
@@ -764,33 +744,29 @@ export async function decideContentReview(input: ContentReviewInput, actorId: st
       )
       .returning({ id: aggregateRecord.id });
     if (!updated) throw new Error("内容审核与另一项操作冲突，请刷新后重试。");
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: aggregate.id,
-        fromState: "CONTENT_REVIEW_REQUIRED",
-        toState: nextState,
-        actorType: "human",
-        actorId,
-        gate: "gate_01_truth",
-        approvalId: pendingApproval.id,
-        evidenceRefs: [input.evidenceRef],
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "content_gate_01_decided",
-        actorType: "human",
-        actorId,
-        aggregateId: aggregate.id,
-        subjectType: "content",
-        subjectId: aggregate.id,
-        metadata: { decision: input.decision, approval_id: pendingApproval.id },
-        occurredAt: now,
-      });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: aggregate.id,
+      fromState: "CONTENT_REVIEW_REQUIRED",
+      toState: nextState,
+      actorType: "human",
+      actorId,
+      gate: "gate_01_truth",
+      approvalId: pendingApproval.id,
+      evidenceRefs: [input.evidenceRef],
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "content_gate_01_decided",
+      actorType: "human",
+      actorId,
+      aggregateId: aggregate.id,
+      subjectType: "content",
+      subjectId: aggregate.id,
+      metadata: { decision: input.decision, approval_id: pendingApproval.id },
+      occurredAt: now,
+    });
     return { state: nextState, approvalId: pendingApproval.id };
   });
 }
@@ -850,42 +826,36 @@ export async function reviseContentDraft(
       )
       .returning({ id: aggregateRecord.id });
     if (!updated) throw new Error("内容修订与另一项操作冲突，请刷新后重试。");
-    await tx
-      .insert(approval)
-      .values({
-        id: approvalId,
-        aggregateId: contentId,
-        gate: "gate_01_truth",
-        status: "pending",
-        requestedByType: "human",
-        requestedById: actorId,
-        requestedAt: now,
-      });
-    await tx
-      .insert(workflowEvent)
-      .values({
-        id: eventId,
-        aggregateId: contentId,
-        fromState: "CONTENT_REVISION_REQUIRED",
-        toState: "CONTENT_REVIEW_REQUIRED",
-        actorType: "human",
-        actorId,
-        evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
-        occurredAt: now,
-      });
-    await tx
-      .insert(auditEvent)
-      .values({
-        id: randomUUID(),
-        action: "content_draft_revised",
-        actorType: "human",
-        actorId,
-        aggregateId: contentId,
-        subjectType: "content",
-        subjectId: contentId,
-        metadata: { approval_id: approvalId, content_type: content.content_type },
-        occurredAt: now,
-      });
+    await tx.insert(approval).values({
+      id: approvalId,
+      aggregateId: contentId,
+      gate: "gate_01_truth",
+      status: "pending",
+      requestedByType: "human",
+      requestedById: actorId,
+      requestedAt: now,
+    });
+    await tx.insert(workflowEvent).values({
+      id: eventId,
+      aggregateId: contentId,
+      fromState: "CONTENT_REVISION_REQUIRED",
+      toState: "CONTENT_REVIEW_REQUIRED",
+      actorType: "human",
+      actorId,
+      evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
+      occurredAt: now,
+    });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "content_draft_revised",
+      actorType: "human",
+      actorId,
+      aggregateId: contentId,
+      subjectType: "content",
+      subjectId: contentId,
+      metadata: { approval_id: approvalId, content_type: content.content_type },
+      occurredAt: now,
+    });
     return { approvalId, content };
   });
 }
