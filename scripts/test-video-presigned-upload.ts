@@ -16,7 +16,7 @@ assert.equal(pathname, "video/uploads/22222222-2222-4222-8222-222222222222/11111
 assert.equal(mediaTypeForVideoUpload(payload.contentType), "video");
 assert.equal(shouldUseMultipartVideoUpload(videoUploadMultipartThresholdBytes), false);
 assert.equal(shouldUseMultipartVideoUpload(videoUploadMultipartThresholdBytes + 1), true);
-assert.equal(maximumMarketingSourceDurationSeconds, 120);
+assert.equal(maximumMarketingSourceDurationSeconds, 900);
 assert.equal(completedVideoUploadTokenSchema.parse({ ...payload, actorId: "user-1", blobPath: pathname }).blobPath, pathname);
 assert.throws(() => videoPresignedUploadPayloadSchema.parse({ ...payload, contentType: "image/jpeg", sizeBytes: maximumVideoUploadImageBytes + 1 }));
 assert.equal(videoPresignedUploadPayloadSchema.parse({ ...payload, sizeBytes: maximumVideoUploadVideoBytes }).sizeBytes, maximumVideoUploadVideoBytes);

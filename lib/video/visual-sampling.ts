@@ -5,7 +5,7 @@ import { extname, join } from "node:path";
 import { promisify } from "node:util";
 
 import type { VideoProject } from "./contracts";
-import { createMarketingShotCandidate, videoShotCandidateStarts, type MarketingShotCandidate } from "./shot-candidates";
+import { createMarketingShotCandidate, maximumMarketingVisualCandidates, videoShotCandidateStarts, type MarketingShotCandidate } from "./shot-candidates";
 
 const execFileAsync = promisify(execFile);
 
@@ -31,7 +31,9 @@ export async function extractMarketingVisualSamples(
   try {
     const samples: MarketingVisualSample[] = [];
     const candidates: MarketingShotCandidate[] = [];
-    for (const [sourceIndex, source] of sourceAssets.slice(0, 3).entries()) {
+    const boundedSources = sourceAssets.slice(0, 3);
+    const candidatesPerSource = Math.max(1, Math.floor(maximumMarketingVisualCandidates / Math.max(1, boundedSources.length)));
+    for (const [sourceIndex, source] of boundedSources.entries()) {
       const filePath = paths.get(source.assetRef);
       if (!filePath) throw new Error("无法读取 AI 初稿所需的私有素材。");
       if (source.mediaType === "image") {
@@ -45,7 +47,7 @@ export async function extractMarketingVisualSamples(
       if (source.mediaType !== "video") continue;
       const duration = await videoDuration(filePath, ffprobeBin);
       const durationMs = Math.round(duration * 1_000);
-      for (const [index, trimStartMs] of videoShotCandidateStarts(durationMs).entries()) {
+      for (const [index, trimStartMs] of videoShotCandidateStarts(durationMs, candidatesPerSource).entries()) {
         const timestamp = trimStartMs / 1_000;
         const output = join(/* turbopackIgnore: true */ directory, `${source.assetRef}-${index}.jpg`);
         await execFileAsync(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(timestamp), "-i", filePath, "-frames:v", "1", "-vf", "scale=640:-2", output]);
