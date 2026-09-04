@@ -32,6 +32,8 @@ void (async () => {
       { id: "shot-001-003", trimStartMs: 4_000, maximumDurationMs: 1_000 },
     ]);
     assert.ok(sampling.visualSamples.every((sample, index) => sample.label.includes(sampling.candidates[index]!.id)));
+    assert.ok(sampling.visualSamples.every((sample) => sample.label.includes("action 0/100")));
+    assert.ok(sampling.candidates.every((candidate) => candidate.sourceAnalysis?.actionScore === 0));
     const longFormStarts = videoShotCandidateStarts(661_361, maximumMarketingVisualCandidates);
     assert.equal(longFormStarts.length, 12);
     assert.equal(new Set(longFormStarts).size, longFormStarts.length);

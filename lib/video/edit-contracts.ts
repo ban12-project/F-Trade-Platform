@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { shotSourceAnalysisSchema } from "./shot-analysis";
+
 const privateAssetRef = z.string().trim().regex(/^(?:asset|evidence)-[a-z0-9][a-z0-9_-]{2,120}$/i, "素材引用无效。");
 const claimRef = z.string().trim().regex(/^(?:product|specifications|commercial)\.[a-z_]+$/, "产品事实引用无效。");
 const editingPlatformSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
@@ -193,6 +195,7 @@ export const marketingVideoClipSchema = z.object({
   ...marketingVideoClipV2Schema.shape,
   abcdRoles: z.array(marketingVideoAbcdRoleSchema).min(1, "每个片段至少承担一个 ABCD 节拍。").max(4),
   motionPreset: marketingVideoMotionPresetSchema,
+  sourceAnalysis: shotSourceAnalysisSchema.optional(),
 }).strict().superRefine((clip, context) => {
   if (new Set(clip.abcdRoles).size !== clip.abcdRoles.length) {
     context.addIssue({ code: "custom", path: ["abcdRoles"], message: "同一片段的 ABCD 节拍不能重复。" });
@@ -202,6 +205,12 @@ export const marketingVideoClipSchema = z.object({
   }
   if (clip.mediaType === "image" && clip.audioMode !== "muted") {
     context.addIssue({ code: "custom", path: ["audioMode"], message: "图片素材没有可保留的原声。" });
+  }
+  if (clip.mediaType === "image" && clip.sourceAnalysis) {
+    context.addIssue({ code: "custom", path: ["sourceAnalysis"], message: "图片素材不能携带视频镜头分析。" });
+  }
+  if (clip.sourceAnalysis && (clip.trimStartMs < clip.sourceAnalysis.intervalStartMs || clip.trimStartMs + clip.durationMs > clip.sourceAnalysis.intervalEndMs)) {
+    context.addIssue({ code: "custom", path: ["sourceAnalysis"], message: "片段必须位于检测到的镜头区间内。" });
   }
 });
 
