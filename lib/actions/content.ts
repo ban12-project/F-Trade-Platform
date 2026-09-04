@@ -38,7 +38,7 @@ export async function createContentDraftAction(
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "内容资料格式不正确。" };
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
+    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
     const result = await createContentDraft(parsed.data, session.user.id, projectId);
     revalidateContentPaths(projectId, result.id);
     return { status: "success", message: `内容草稿已创建（${result.id.slice(0, 8)}），仍需 Gate 01 人工审核。`, contentId: result.id };
@@ -57,7 +57,7 @@ export async function decideContentReviewAction(
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "审核资料格式不正确。" };
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceAggregateLink(projectId, parsed.data.contentId, "marketing", "content");
+    if (projectId) await assertWorkspaceAggregateLink(projectId, parsed.data.contentId, "marketing", "content", session.user.id);
     const result = await decideContentReview(parsed.data, session.user.id);
     revalidateContentPaths(projectId, parsed.data.contentId);
     return { status: "success", message: result.state === "CONTENT_APPROVED" ? "Gate 01 已批准，内容等待官方渠道发布。" : "Gate 01 已退回，内容需要修订。" };
@@ -79,7 +79,7 @@ export async function reviseContentDraftAction(
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "内容资料格式不正确。" };
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceAggregateLink(projectId, parsedContentId.data.contentId, "marketing", "content");
+    if (projectId) await assertWorkspaceAggregateLink(projectId, parsedContentId.data.contentId, "marketing", "content", session.user.id);
     await reviseContentDraft(parsedContentId.data.contentId, parsed.data, session.user.id);
     revalidateContentPaths(projectId, parsedContentId.data.contentId);
     return { status: "success", message: "内容修订已保存，并已重新提交 Gate 01 审核。", contentId: parsedContentId.data.contentId };
@@ -97,6 +97,7 @@ export async function copyContentDraftToProjectAction(
   const parsed = z.object({ projectId: z.uuid(), sourceContentId: z.uuid() }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "复制参数无效。" };
   try {
+    await assertWorkspaceProjectKind(parsed.data.projectId, "marketing", session.user.id);
     const result = await copyContentDraftToProject(parsed.data.sourceContentId, parsed.data.projectId, session.user.id);
     revalidateContentPaths(parsed.data.projectId, result.id);
     return { status: "success", message: "已复制为当前项目的新待审草稿，原记录不会共享修改。", contentId: result.id };

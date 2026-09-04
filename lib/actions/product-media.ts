@@ -43,7 +43,7 @@ export async function registerProductMediaAction(
 
   try {
     const value = parseProductMediaRegistrationFormData(formData);
-    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product");
+    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product", session.user.id);
 
     const [uploaded] = await claimCompletedVideoUploads(
       [value.receiptId],
@@ -86,7 +86,7 @@ export async function reviewProductMediaAction(
 
   try {
     const value = parseProductMediaReviewFormData(formData);
-    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product");
+    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product", session.user.id);
     const current = await listProductMediaAssets(value.productId);
     if (!current.some((asset) => asset.id === value.input.assetId)) {
       throw new Error("该产品媒体不属于当前项目中的产品。");

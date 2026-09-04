@@ -5,7 +5,8 @@ import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import contentSchema from "@/contracts/content/content.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
 import { getDatabase } from "@/lib/db/client";
-import { aggregateRecord, approval, auditEvent, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
+import { aggregateRecord, approval, auditEvent, workflowEvent, workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
+import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import type { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
@@ -218,11 +219,12 @@ export async function createContentDraft(input: ContentDraftInput, actorId: stri
   });
 }
 
-export async function listCrossProjectContentCandidates(projectId: string): Promise<ContentCopyCandidate[]> {
+export async function listCrossProjectContentCandidates(projectId: string, actorId: string): Promise<ContentCopyCandidate[]> {
   const rows = await getDatabase().select({ id: aggregateRecord.id, payload: aggregateRecord.payload, projectTitle: workspaceProject.title })
     .from(workspaceProjectItem)
     .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
     .innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
+    .innerJoin(workspaceProjectMember, and(eq(workspaceProjectMember.projectId, workspaceProject.id), eq(workspaceProjectMember.userId, actorId)))
     .where(and(ne(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "marketing_content"), eq(workspaceProjectItem.relation, "owned"), eq(aggregateRecord.type, "content")))
     .orderBy(desc(workspaceProjectItem.createdAt));
   return rows.flatMap((row) => {
@@ -241,6 +243,7 @@ export async function copyContentDraftToProject(sourceContentId: string, project
       .innerJoin(workspaceProjectItem, and(eq(workspaceProjectItem.aggregateId, aggregateRecord.id), eq(workspaceProjectItem.role, "marketing_content"), eq(workspaceProjectItem.relation, "owned")))
       .where(and(eq(aggregateRecord.id, sourceContentId), eq(aggregateRecord.type, "content"))).for("update");
     if (!source || source.ownerProjectId === projectId) throw new Error(source ? "该内容已经属于当前项目。" : "源内容不存在或没有明确归属。");
+    await assertWorkspaceProjectAccess(source.ownerProjectId, actorId, "view", tx);
     const current = parseContent(source.payload);
     const [product] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord).where(and(eq(aggregateRecord.id, current.product_id), eq(aggregateRecord.type, "product"))).for("update");
     if (!product || product.state !== "PRODUCT_READY") throw new Error("源内容引用的产品已不再可用于新草稿。");

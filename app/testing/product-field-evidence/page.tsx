@@ -16,6 +16,10 @@ export default function ProductFieldEvidenceTestingPage() {
           detail={null}
           canReview={false}
           agentModelConfigs={[]}
+          evidenceOptions={[
+            { id: "evidence-synthetic-catalog-001", sourceLabel: "合成产品目录.pdf", contentType: "application/pdf", classification: "confidential", createdAt: new Date("2026-09-01T00:00:00Z") },
+            { id: "evidence-synthetic-spec-002", sourceLabel: "合成规格表.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", classification: "internal", createdAt: new Date("2026-09-02T00:00:00Z") },
+          ]}
         />
       </WorkspaceDirtyProvider>
     </Suspense>

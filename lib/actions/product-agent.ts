@@ -14,6 +14,7 @@ import { EvidenceLocatedProductAgent } from "@/lib/product/evidence-located-agen
 import { createProductAgentDraft } from "@/lib/products";
 import { prepareUploadedProductAgentDocument } from "@/lib/product/uploaded-document";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
+import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
 
 export type ProductAgentActionState = { status: "idle" | "success" | "error"; message: string; productId?: string };
 export async function runProductAgentAction(_previous: ProductAgentActionState, formData: FormData): Promise<ProductAgentActionState> {
@@ -24,7 +25,7 @@ export async function runProductAgentAction(_previous: ProductAgentActionState, 
     const selectedModel = z.string().trim().min(1, "请选择模型。").max(240, "模型名称无效。").parse(formData.get("model"));
     const rawProjectId = formData.get("projectId");
     const projectId = rawProjectId === null || rawProjectId === "" ? undefined : z.uuid("项目标识无效。").parse(rawProjectId);
-    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
+    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
     const uploaded = formData.get("document");
     const source = uploaded instanceof File && uploaded.size > 0
       ? (await prepareUploadedProductAgentDocument(uploaded, session.user.id)).source
@@ -33,6 +34,7 @@ export async function runProductAgentAction(_previous: ProductAgentActionState, 
           if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "资料格式不正确。");
           return { record_id: randomUUID(), source_ref: parsed.data.sourceRef!, evidence_refs: [parsed.data.evidenceRef!], source_text: parsed.data.sourceText, image_availability: "none" as const, image_refs: [] };
         })();
+    if (projectId) await assertAndLinkProjectEvidence(projectId, source.evidence_refs, session.user.id);
     const result = await new EvidenceLocatedProductAgent().run({ model: createProductAgentModel(await resolveProductAgentModelConfig(modelConfigId, selectedModel)), source, timeout_ms: 75_000 });
     const saved = await createProductAgentDraft(result.draft, session.user.id, { prompt_version: result.metadata.prompt_version, prompt_hash: result.metadata.prompt_hash, evidence_mode: "bounded_location" }, projectId);
     revalidatePath("/workspace");

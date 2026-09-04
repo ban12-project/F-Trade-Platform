@@ -406,9 +406,11 @@ def check_database_baseline() -> None:
         if required not in content_actions:
             raise AssertionError(f"Content Server Action contract is missing: {required}")
     workspace_canvas = (ROOT / "components/workspace/project-canvas.tsx").read_text(encoding="utf-8")
-    for required in ("saveWorkspaceCanvasAction", "100dvh", "Drawer", "ScrollArea", "ProjectCanvasPanels"):
+    for required in ("saveWorkspaceCanvasAction", "Drawer", "ScrollArea", "ProjectCanvasPanels"):
         if required not in workspace_canvas:
             raise AssertionError(f"Workspace canvas contract is missing: {required}")
+    if not any(full_viewport in workspace_canvas for full_viewport in ("100dvh", "fixed inset-0")):
+        raise AssertionError("Workspace canvas contract is missing a full-viewport layout")
 
     migrations = sorted((ROOT / "drizzle").glob("*.sql"))
     if not migrations:
@@ -583,6 +585,18 @@ def check_content_publication_policy() -> None:
         raise AssertionError(f"Content publication policy tests failed: {result.stderr or result.stdout}")
 
 
+def check_controlled_effect_results() -> None:
+    for script, label in (
+        ("test:controlled-publication", "controlled publication command"),
+        ("test:publication-result", "publication result protocol"),
+        ("test:reply-result", "reply result protocol"),
+        ("test:controlled-reply", "Gate 03 controlled reply"),
+    ):
+        result = subprocess.run(["pnpm", script], cwd=ROOT, capture_output=True, text=True)
+        if result.returncode:
+            raise AssertionError(f"{label} tests failed: {result.stderr or result.stdout}")
+
+
 def check_quotation_gate() -> None:
     result = subprocess.run(["pnpm", "test:quotation"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
@@ -753,6 +767,7 @@ def main() -> int:
         ("GitHub governance artifacts", check_github_governance),
         ("local main push guard", check_main_push_guard),
         ("content publication policy", check_content_publication_policy),
+        ("controlled publication and reply results", check_controlled_effect_results),
         ("quotation Gate 02", check_quotation_gate),
         ("delivery Gate 03", check_delivery_gate),
         ("RFQ completeness", check_rfq_completeness),

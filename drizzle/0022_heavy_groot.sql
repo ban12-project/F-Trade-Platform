@@ -1,0 +1,2 @@
+ALTER TABLE "workspace_project_item" DROP CONSTRAINT "workspace_project_item_role_allowed";--> statement-breakpoint
+ALTER TABLE "workspace_project_item" ADD CONSTRAINT "workspace_project_item_role_allowed" CHECK ("workspace_project_item"."role" in ('product_source', 'product_reference', 'marketing_content', 'marketing_video', 'sales_rfq', 'sales_quotation', 'sales_lead', 'delivery_confirmation'));

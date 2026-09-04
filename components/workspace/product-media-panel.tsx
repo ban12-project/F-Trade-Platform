@@ -109,8 +109,8 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
       logoVisible: false,
       textPresent: false,
       rightsEvidenceRef: "",
-      editingAllowed: true,
-      publicDistributionAllowed: true,
+      editingAllowed: false,
+      publicDistributionAllowed: false,
       paidAdvertisingAllowed: false,
       imageToVideoAllowed: false,
       referenceToVideoAllowed: false,
@@ -250,7 +250,7 @@ function ReviewForm({ projectId, productId, asset }: { projectId: string; produc
       projectId,
       productId,
       assetId: asset.id,
-      decision: revoking ? "rejected" : "approved",
+      ...(revoking ? { decision: "rejected" as const } : {}),
       evidenceRef: "",
       notes: "",
     },
@@ -264,10 +264,10 @@ function ReviewForm({ projectId, productId, asset }: { projectId: string; produc
 
   return <form className="mt-4" onSubmit={form.handleSubmit(submit)}>
     <FieldGroup>
-      {!revoking ? <Field><FieldLabel>审核决定</FieldLabel><Controller control={form.control} name="decision" render={({ field }) => <Select items={{ approved: "批准素材", rejected: "拒绝素材" }} value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="approved">批准素材</SelectItem><SelectItem value="rejected">拒绝素材</SelectItem></SelectGroup></SelectContent></Select>} /></Field> : <Alert variant="destructive"><CircleAlertIcon /><AlertTitle>撤销已批准素材</AlertTitle><AlertDescription>撤销后该素材会立即退出 VideoReady。必须填写新证据和原因。</AlertDescription></Alert>}
+      {!revoking ? <Field data-invalid={Boolean(form.formState.errors.decision)}><FieldLabel>审核决定</FieldLabel><Controller control={form.control} name="decision" render={({ field }) => <Select items={{ approved: "批准素材", rejected: "拒绝素材" }} value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full" aria-invalid={Boolean(form.formState.errors.decision)}><SelectValue placeholder="请选择审核决定" /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="approved">批准素材</SelectItem><SelectItem value="rejected">拒绝素材</SelectItem></SelectGroup></SelectContent></Select>} /><FieldError errors={[form.formState.errors.decision]} /></Field> : <Alert variant="destructive"><CircleAlertIcon /><AlertTitle>撤销已批准素材</AlertTitle><AlertDescription>撤销后该素材会立即退出 VideoReady。必须填写新证据和原因。</AlertDescription></Alert>}
       <Field data-invalid={Boolean(form.formState.errors.evidenceRef)}><FieldLabel htmlFor={`media-review-evidence-${asset.id}`}>审核证据</FieldLabel><Input id={`media-review-evidence-${asset.id}`} placeholder="evidence-media-review-001" {...form.register("evidenceRef")} /><FieldError errors={[form.formState.errors.evidenceRef]} /></Field>
       <Field data-invalid={Boolean(form.formState.errors.notes)}><FieldLabel htmlFor={`media-review-notes-${asset.id}`}>审核备注</FieldLabel><Textarea id={`media-review-notes-${asset.id}`} rows={3} {...form.register("notes")} /><FieldError errors={[form.formState.errors.notes]} /></Field>
-      <Button type="submit" variant={revoking || form.watch("decision") === "rejected" ? "destructive" : "default"} disabled={pending}>{pending ? <Spinner data-icon="inline-start" /> : revoking || form.watch("decision") === "rejected" ? <XCircleIcon data-icon="inline-start" /> : <CheckCircle2Icon data-icon="inline-start" />}{revoking ? "撤销素材授权" : "提交媒体审核"}</Button>
+      <Button type="submit" variant={revoking || form.watch("decision") === "rejected" ? "destructive" : "default"} disabled={pending || (!revoking && !form.watch("decision"))}>{pending ? <Spinner data-icon="inline-start" /> : revoking || form.watch("decision") === "rejected" ? <XCircleIcon data-icon="inline-start" /> : <CheckCircle2Icon data-icon="inline-start" />}{revoking ? "撤销素材授权" : form.watch("decision") === "approved" ? "批准产品素材" : form.watch("decision") === "rejected" ? "拒绝产品素材" : "请先选择决定"}</Button>
       {state.message ? <p className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} aria-live="polite">{state.message}</p> : null}
     </FieldGroup>
   </form>;

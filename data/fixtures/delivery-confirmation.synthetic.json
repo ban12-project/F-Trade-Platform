@@ -11,7 +11,8 @@
     "decided_by": "synthetic-factory-user",
     "decided_at": "2026-08-23T12:00:00Z",
     "evidence_ref": "synthetic-capacity-check-001",
-    "confirmed_lead_time_days": 30
+    "confirmed_lead_time_days": 30,
+    "valid_until": "2026-08-30T12:00:00Z"
   },
   "approval_ref": "synthetic-delivery-approval-001"
 }

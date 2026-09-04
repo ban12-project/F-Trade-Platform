@@ -3,7 +3,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { getDatabase, type Database } from "@/lib/db/client";
-import { aggregateRecord, approval, auditEvent, videoJob, workflowEvent, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
+import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { aggregateRecord, approval, auditEvent, videoJob, workflowEvent, workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
 import { isPrivateTestOnlyVideo, videoProjectSchema, type VideoProject } from "./contracts";
 import { buildVideoCreative } from "./creative";
 import type { ProductReady } from "@/lib/product/verification";
@@ -130,9 +131,9 @@ export async function listProjectMarketingVideoEntries(projectId: string, databa
   });
 }
 
-export async function listCrossProjectMarketingVideoCandidates(projectId: string, database: Database = getDatabase()): Promise<MarketingVideoCopyCandidate[]> {
+export async function listCrossProjectMarketingVideoCandidates(projectId: string, actorId: string, database: Database = getDatabase()): Promise<MarketingVideoCopyCandidate[]> {
   const rows = await database.select({ id: aggregateRecord.id, payload: aggregateRecord.payload, projectTitle: workspaceProject.title })
-    .from(workspaceProjectItem).innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId)).innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
+    .from(workspaceProjectItem).innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId)).innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId)).innerJoin(workspaceProjectMember, and(eq(workspaceProjectMember.projectId, workspaceProject.id), eq(workspaceProjectMember.userId, actorId)))
     .where(and(ne(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.role, "marketing_video"), eq(workspaceProjectItem.relation, "owned"), eq(aggregateRecord.type, "video")))
     .orderBy(desc(workspaceProjectItem.createdAt));
   return rows.flatMap((row) => {
@@ -145,12 +146,14 @@ export async function listCrossProjectMarketingVideoCandidates(projectId: string
 export async function copyMarketingVideoDraftToProject(sourceVideoId: string, projectId: string, actorId: string, database: Database = getDatabase()) {
   const id = randomUUID(); const now = new Date();
   return database.transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
     const [workspace] = await tx.select({ kind: workspaceProject.kind }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
     if (!workspace || workspace.kind !== "marketing") throw new Error("视频只能复制到产品营销项目。");
     const [source] = await tx.select({ payload: aggregateRecord.payload, ownerProjectId: workspaceProjectItem.projectId }).from(aggregateRecord)
       .innerJoin(workspaceProjectItem, and(eq(workspaceProjectItem.aggregateId, aggregateRecord.id), eq(workspaceProjectItem.role, "marketing_video"), eq(workspaceProjectItem.relation, "owned")))
       .where(and(eq(aggregateRecord.id, sourceVideoId), eq(aggregateRecord.type, "video"))).for("update");
     if (!source || source.ownerProjectId === projectId) throw new Error(source ? "该视频已经属于当前项目。" : "源视频不存在或没有明确归属。");
+    await assertWorkspaceProjectAccess(source.ownerProjectId, actorId, "view", tx);
     const current = videoProjectSchema.parse(source.payload);
     if (!current.editDraft) throw new Error("只能复制 MVP1 营销剪辑项目。");
     const [product] = await tx.select({ state: aggregateRecord.state }).from(aggregateRecord).where(and(eq(aggregateRecord.id, current.productId), eq(aggregateRecord.type, "product"))).for("update");
@@ -174,7 +177,8 @@ export async function getMarketingVideoEditProject(videoId: string, database: Da
   return { state: record.state, project };
 }
 
-export async function assertMarketingVideoProjectLink(projectId: string, videoId: string, database: Database = getDatabase()) {
+export async function assertMarketingVideoProjectLink(projectId: string, videoId: string, actorId: string, database: Database = getDatabase()) {
+  await assertWorkspaceProjectAccess(projectId, actorId, "write", database);
   const [link] = await database.select({ id: workspaceProjectItem.id }).from(workspaceProjectItem)
     .where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.aggregateId, videoId), eq(workspaceProjectItem.role, "marketing_video"), eq(workspaceProjectItem.relation, "owned")));
   if (!link) throw new Error("该营销视频不属于当前项目。");

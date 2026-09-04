@@ -1,15 +1,44 @@
-import type { ReactNode } from "react";
-import { Controller, type UseFormReturn } from "react-hook-form";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Controller, useFormState, type UseFormReturn } from "react-hook-form";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ProductCatalogDetail } from "@/lib/products";
+import type { EvidenceOption } from "@/lib/workspace/access";
 import { kitContentValues, type ProductCatalogForm } from "@/lib/product/catalog-form-schema";
 
 export type ProductValues = ProductCatalogForm;
 type EvidenceFieldName = Extract<keyof ProductValues, `${string}EvidenceRef`>;
+const EvidenceOptionsContext = createContext<EvidenceOption[]>([]);
+
+const productEvidenceBindings = [
+  ["productName", "productNameEvidenceRef", "产品名称"],
+  ["productType", "productTypeEvidenceRef", "产品类型"],
+  ["internalSku", "internalSkuEvidenceRef", "内部编号"],
+  ["oeNumbers", "oeNumbersEvidenceRef", "OE / OEM 编号"],
+  ["application", "applicationEvidenceRef", "适配说明"],
+  ["vehicleBrand", "vehicleBrandEvidenceRef", "车辆品牌"],
+  ["vehicleModel", "vehicleModelEvidenceRef", "车型"],
+  ["clutchDiameterMm", "clutchDiameterMmEvidenceRef", "离合器直径"],
+  ["splineCount", "splineCountEvidenceRef", "花键齿数"],
+  ["splineSize", "splineSizeEvidenceRef", "花键尺寸"],
+  ["frictionMaterial", "frictionMaterialEvidenceRef", "摩擦材料"],
+  ["kitContents", "kitContentsEvidenceRef", "套件组成"],
+  ["grossWeightKg", "grossWeightKgEvidenceRef", "毛重"],
+  ["netWeightKg", "netWeightKgEvidenceRef", "净重"],
+  ["packageSize", "packageSizeEvidenceRef", "包装尺寸"],
+  ["moq", "moqEvidenceRef", "MOQ"],
+  ["estimatedLeadTimeDays", "estimatedLeadTimeDaysEvidenceRef", "预计交期"],
+  ["packaging", "packagingEvidenceRef", "包装方式"],
+  ["supportedCustomization", "supportedCustomizationEvidenceRef", "定制能力"],
+  ["sampleAvailable", "sampleAvailableEvidenceRef", "样品可用性"],
+] as const satisfies ReadonlyArray<readonly [keyof ProductValues, EvidenceFieldName, string]>;
 
 const productTypes = [
   ["clutch_disc", "离合器片"],
@@ -147,16 +176,14 @@ function EvidenceInput({
   disabled?: boolean;
 }) {
   const error = form.formState.errors[name];
+  const options = useContext(EvidenceOptionsContext);
   return <Field data-invalid={Boolean(error)}>
     <FieldLabel htmlFor={id}>{label}</FieldLabel>
-    <Input
-      id={id}
-      placeholder="evidence-product-001"
-      aria-invalid={Boolean(error)}
-      required={required}
-      disabled={disabled}
-      {...form.register(name)}
-    />
+    <Controller control={form.control} name={name} render={({ field }) => <Select value={field.value} onValueChange={(value) => field.onChange(value ?? "")} disabled={disabled || !options.length}>
+      <SelectTrigger id={id} className="min-h-11 w-full" aria-invalid={Boolean(error)} aria-required={required}><SelectValue>{options.find((option) => option.id === field.value) ? `${options.find((option) => option.id === field.value)!.sourceLabel} · ${field.value.slice(-8)}` : "选择已上传证据"}</SelectValue></SelectTrigger>
+      <SelectContent><SelectGroup>{options.map((option) => <SelectItem key={option.id} value={option.id}>{option.sourceLabel} · {option.classification} · {option.id.slice(-8)}</SelectItem>)}</SelectGroup></SelectContent>
+    </Select>} />
+    {!options.length ? <FieldDescription>先通过智能导入上传资料，系统持久化后才能选择。</FieldDescription> : null}
     <FieldError errors={[error]} />
   </Field>;
 }
@@ -165,10 +192,44 @@ function FactPair({ children }: { children: ReactNode }) {
   return <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">{children}</div>;
 }
 
-export function ProductFields({ form }: { form: UseFormReturn<ProductValues> }) {
+export function ProductFields({ form, evidenceOptions }: { form: UseFormReturn<ProductValues>; evidenceOptions: EvidenceOption[] }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { errors, submitCount } = useFormState({ control: form.control });
+  const [batchEvidence, setBatchEvidence] = useState("");
+  const [batchTargets, setBatchTargets] = useState<Set<EvidenceFieldName>>(() => new Set());
   const productType = form.watch("productType");
   const kitDisabled = productType !== "clutch_kit";
-  return <FieldGroup>
+  const values = form.watch();
+  const visibleBindings = useMemo(() => productEvidenceBindings.filter(([valueName]) => valueName !== "kitContents" || !kitDisabled), [kitDisabled]);
+  const completed = visibleBindings.filter(([valueName, evidenceName]) => String(values[valueName] ?? "").trim() && String(values[evidenceName] ?? "").trim()).length;
+  const completion = Math.round((completed / visibleBindings.length) * 100);
+  const errorEntries = Object.entries(errors).filter(([, error]) => Boolean(error));
+  useEffect(() => {
+    if (!submitCount || !errorEntries.length) return;
+    requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus());
+  }, [errorEntries.length, submitCount]);
+  const eligibleBatchTargets = visibleBindings.filter(([valueName]) => String(values[valueName] ?? "").trim());
+  function toggleBatchTarget(name: EvidenceFieldName, checked: boolean) {
+    setBatchTargets((current) => { const next = new Set(current); if (checked) next.add(name); else next.delete(name); return next; });
+  }
+  function applyBatchEvidence() {
+    if (!batchEvidence || !batchTargets.size) return;
+    for (const name of batchTargets) form.setValue(name, batchEvidence, { shouldDirty: true, shouldValidate: true });
+    setBatchTargets(new Set());
+  }
+  return <EvidenceOptionsContext.Provider value={evidenceOptions}><div ref={rootRef} className="flex flex-col gap-5">
+    <Progress value={completion}><ProgressLabel>事实与证据完成度</ProgressLabel><ProgressValue /></Progress>
+    {submitCount > 0 && errorEntries.length ? <Alert variant="destructive" role="alert"><AlertTitle>还有 {errorEntries.length} 项需要处理</AlertTitle><AlertDescription>已定位到第一个错误。请逐项补全字段和对应证据后再次提交。</AlertDescription></Alert> : null}
+    <FieldSet>
+      <FieldLegend>批量应用同一证据</FieldLegend>
+      <FieldDescription>先选择证据，再明确勾选目标字段。系统仍逐字段保存绑定，不会覆盖未选择字段。</FieldDescription>
+      <FieldGroup>
+        <Field><FieldLabel>证据</FieldLabel><Select value={batchEvidence} onValueChange={(value) => setBatchEvidence(value ?? "")}><SelectTrigger className="min-h-11 w-full"><SelectValue placeholder="选择已上传证据" /></SelectTrigger><SelectContent><SelectGroup>{evidenceOptions.map((option) => <SelectItem key={option.id} value={option.id}>{option.sourceLabel} · {option.id.slice(-8)}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
+        <FieldSet><FieldLegend>目标字段</FieldLegend><FieldGroup>{eligibleBatchTargets.map(([, evidenceName, label]) => <Field key={evidenceName} orientation="horizontal"><Checkbox id={`batch-${evidenceName}`} checked={batchTargets.has(evidenceName)} onCheckedChange={(checked) => toggleBatchTarget(evidenceName, checked === true)} /><FieldLabel htmlFor={`batch-${evidenceName}`}>{label}</FieldLabel></Field>)}</FieldGroup></FieldSet>
+        <Button type="button" variant="outline" disabled={!batchEvidence || !batchTargets.size} onClick={applyBatchEvidence}>应用到 {batchTargets.size} 个目标字段</Button>
+      </FieldGroup>
+    </FieldSet>
+    <FieldGroup>
     <FieldSet>
       <FieldLegend>核心产品身份</FieldLegend>
       <FieldDescription>每个事实必须绑定自己的私有证据；相同来源可以重复填写同一 evidence 引用，但系统不会自动复制。</FieldDescription>
@@ -230,15 +291,15 @@ export function ProductFields({ form }: { form: UseFormReturn<ProductValues> }) 
       <FieldDescription>OE 缺失时，应用说明、车辆品牌和车型必须全部有值并分别绑定证据，才能通过 Gate 01。</FieldDescription>
       <FieldGroup>
         <FactPair>
-          <Field><FieldLabel htmlFor="application">适配说明</FieldLabel><Input id="application" {...form.register("application")} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.application)}><FieldLabel htmlFor="application">适配说明</FieldLabel><Input id="application" aria-invalid={Boolean(form.formState.errors.application)} {...form.register("application")} /><FieldError errors={[form.formState.errors.application]} /></Field>
           <EvidenceInput form={form} name="applicationEvidenceRef" label="适配说明证据" id="application-evidence" />
         </FactPair>
         <FactPair>
-          <Field><FieldLabel htmlFor="vehicle-brand">车辆品牌</FieldLabel><Input id="vehicle-brand" {...form.register("vehicleBrand")} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.vehicleBrand)}><FieldLabel htmlFor="vehicle-brand">车辆品牌</FieldLabel><Input id="vehicle-brand" aria-invalid={Boolean(form.formState.errors.vehicleBrand)} {...form.register("vehicleBrand")} /><FieldError errors={[form.formState.errors.vehicleBrand]} /></Field>
           <EvidenceInput form={form} name="vehicleBrandEvidenceRef" label="车辆品牌证据" id="vehicle-brand-evidence" />
         </FactPair>
         <FactPair>
-          <Field><FieldLabel htmlFor="vehicle-model">车型</FieldLabel><Input id="vehicle-model" {...form.register("vehicleModel")} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.vehicleModel)}><FieldLabel htmlFor="vehicle-model">车型</FieldLabel><Input id="vehicle-model" aria-invalid={Boolean(form.formState.errors.vehicleModel)} {...form.register("vehicleModel")} /><FieldError errors={[form.formState.errors.vehicleModel]} /></Field>
           <EvidenceInput form={form} name="vehicleModelEvidenceRef" label="车型证据" id="vehicle-model-evidence" />
         </FactPair>
       </FieldGroup>
@@ -265,11 +326,11 @@ export function ProductFields({ form }: { form: UseFormReturn<ProductValues> }) 
           <EvidenceInput form={form} name="splineCountEvidenceRef" label="花键数证据" id="spline-count-evidence" />
         </FactPair>
         <FactPair>
-          <Field><FieldLabel htmlFor="spline-size">花键尺寸</FieldLabel><Input id="spline-size" {...form.register("splineSize")} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.splineSize)}><FieldLabel htmlFor="spline-size">花键尺寸</FieldLabel><Input id="spline-size" aria-invalid={Boolean(form.formState.errors.splineSize)} {...form.register("splineSize")} /><FieldError errors={[form.formState.errors.splineSize]} /></Field>
           <EvidenceInput form={form} name="splineSizeEvidenceRef" label="花键尺寸证据" id="spline-size-evidence" />
         </FactPair>
         <FactPair>
-          <Field><FieldLabel htmlFor="friction-material">摩擦材料</FieldLabel><Input id="friction-material" {...form.register("frictionMaterial")} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.frictionMaterial)}><FieldLabel htmlFor="friction-material">摩擦材料</FieldLabel><Input id="friction-material" aria-invalid={Boolean(form.formState.errors.frictionMaterial)} {...form.register("frictionMaterial")} /><FieldError errors={[form.formState.errors.frictionMaterial]} /></Field>
           <EvidenceInput form={form} name="frictionMaterialEvidenceRef" label="摩擦材料证据" id="friction-material-evidence" />
         </FactPair>
       </FieldGroup>
@@ -297,15 +358,15 @@ export function ProductFields({ form }: { form: UseFormReturn<ProductValues> }) 
           <EvidenceInput form={form} name="kitContentsEvidenceRef" label="套件组成证据" id="kit-contents-evidence" disabled={kitDisabled} />
         </FactPair>
         <FactPair>
-          <Field data-invalid={Boolean(form.formState.errors.grossWeightKg)}><FieldLabel htmlFor="gross-weight">毛重（kg）</FieldLabel><Input id="gross-weight" inputMode="decimal" {...form.register("grossWeightKg")} /><FieldError errors={[form.formState.errors.grossWeightKg]} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.grossWeightKg)}><FieldLabel htmlFor="gross-weight">毛重（kg）</FieldLabel><Input id="gross-weight" inputMode="decimal" aria-invalid={Boolean(form.formState.errors.grossWeightKg)} {...form.register("grossWeightKg")} /><FieldError errors={[form.formState.errors.grossWeightKg]} /></Field>
           <EvidenceInput form={form} name="grossWeightKgEvidenceRef" label="毛重证据" id="gross-weight-evidence" />
         </FactPair>
         <FactPair>
-          <Field data-invalid={Boolean(form.formState.errors.netWeightKg)}><FieldLabel htmlFor="net-weight">净重（kg）</FieldLabel><Input id="net-weight" inputMode="decimal" {...form.register("netWeightKg")} /><FieldError errors={[form.formState.errors.netWeightKg]} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.netWeightKg)}><FieldLabel htmlFor="net-weight">净重（kg）</FieldLabel><Input id="net-weight" inputMode="decimal" aria-invalid={Boolean(form.formState.errors.netWeightKg)} {...form.register("netWeightKg")} /><FieldError errors={[form.formState.errors.netWeightKg]} /></Field>
           <EvidenceInput form={form} name="netWeightKgEvidenceRef" label="净重证据" id="net-weight-evidence" />
         </FactPair>
         <FactPair>
-          <Field><FieldLabel htmlFor="package-size">包装尺寸</FieldLabel><Input id="package-size" placeholder="40 × 40 × 12 cm" {...form.register("packageSize")} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.packageSize)}><FieldLabel htmlFor="package-size">包装尺寸</FieldLabel><Input id="package-size" placeholder="40 × 40 × 12 cm" aria-invalid={Boolean(form.formState.errors.packageSize)} {...form.register("packageSize")} /><FieldError errors={[form.formState.errors.packageSize]} /></Field>
           <EvidenceInput form={form} name="packageSizeEvidenceRef" label="包装尺寸证据" id="package-size-evidence" />
         </FactPair>
       </FieldGroup>
@@ -316,19 +377,19 @@ export function ProductFields({ form }: { form: UseFormReturn<ProductValues> }) 
       <FieldDescription>MOQ、交期、包装、定制和样品状态都会进入 ProductReady；不得根据经验或图片推断。</FieldDescription>
       <FieldGroup>
         <FactPair>
-          <Field data-invalid={Boolean(form.formState.errors.moq)}><FieldLabel htmlFor="product-moq">最小起订量（MOQ）</FieldLabel><Input id="product-moq" inputMode="numeric" {...form.register("moq")} /><FieldError errors={[form.formState.errors.moq]} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.moq)}><FieldLabel htmlFor="product-moq">最小起订量（MOQ）</FieldLabel><Input id="product-moq" inputMode="numeric" aria-invalid={Boolean(form.formState.errors.moq)} {...form.register("moq")} /><FieldError errors={[form.formState.errors.moq]} /></Field>
           <EvidenceInput form={form} name="moqEvidenceRef" label="最小起订量证据" id="moq-evidence" />
         </FactPair>
         <FactPair>
-          <Field data-invalid={Boolean(form.formState.errors.estimatedLeadTimeDays)}><FieldLabel htmlFor="lead-time-days">预计交期（天）</FieldLabel><Input id="lead-time-days" inputMode="numeric" {...form.register("estimatedLeadTimeDays")} /><FieldError errors={[form.formState.errors.estimatedLeadTimeDays]} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.estimatedLeadTimeDays)}><FieldLabel htmlFor="lead-time-days">预计交期（天）</FieldLabel><Input id="lead-time-days" inputMode="numeric" aria-invalid={Boolean(form.formState.errors.estimatedLeadTimeDays)} {...form.register("estimatedLeadTimeDays")} /><FieldError errors={[form.formState.errors.estimatedLeadTimeDays]} /></Field>
           <EvidenceInput form={form} name="estimatedLeadTimeDaysEvidenceRef" label="预计交期证据" id="lead-time-evidence" />
         </FactPair>
         <FactPair>
-          <Field><FieldLabel htmlFor="packaging">包装方式</FieldLabel><Input id="packaging" {...form.register("packaging")} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.packaging)}><FieldLabel htmlFor="packaging">包装方式</FieldLabel><Input id="packaging" aria-invalid={Boolean(form.formState.errors.packaging)} {...form.register("packaging")} /><FieldError errors={[form.formState.errors.packaging]} /></Field>
           <EvidenceInput form={form} name="packagingEvidenceRef" label="包装方式证据" id="packaging-evidence" />
         </FactPair>
         <FactPair>
-          <Field><FieldLabel htmlFor="supported-customization">支持定制</FieldLabel><Input id="supported-customization" placeholder="Logo, color box" {...form.register("supportedCustomization")} /></Field>
+          <Field data-invalid={Boolean(form.formState.errors.supportedCustomization)}><FieldLabel htmlFor="supported-customization">支持定制</FieldLabel><Input id="supported-customization" placeholder="Logo, color box" aria-invalid={Boolean(form.formState.errors.supportedCustomization)} {...form.register("supportedCustomization")} /><FieldError errors={[form.formState.errors.supportedCustomization]} /></Field>
           <EvidenceInput form={form} name="supportedCustomizationEvidenceRef" label="支持定制证据" id="supported-customization-evidence" />
         </FactPair>
         <FactPair>
@@ -359,5 +420,5 @@ export function ProductFields({ form }: { form: UseFormReturn<ProductValues> }) 
         <FieldError errors={[form.formState.errors.sourceRef]} />
       </Field>
     </FieldSet>
-  </FieldGroup>;
+  </FieldGroup></div></EvidenceOptionsContext.Provider>;
 }

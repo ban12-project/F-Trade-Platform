@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://f-trade.example/contracts/lead.schema.json",
+  "title": "SalesLead",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lead_id", "status", "score", "score_reasons", "next_action"],
+  "properties": {
+    "lead_id": {"type": "string", "minLength": 1},
+    "channel_ref": {"type": "string", "minLength": 1},
+    "conversation_ref": {"type": "string", "minLength": 1},
+    "rfq_ref": {"type": "string", "minLength": 1},
+    "quotation_ref": {"type": "string", "minLength": 1},
+    "delivery_confirmation_ref": {"type": "string", "minLength": 1},
+    "status": {"enum": ["received", "follow_up", "opportunity"]},
+    "follow_up_context": {"enum": ["quote_sent_unread", "quote_sent_read_no_reply", "price_high", "purchase_later", "asks_sample", "asks_lead_time"]},
+    "score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "score_band": {"enum": ["COLD", "WARM", "HOT"]},
+    "score_reasons": {"type": "array", "items": {"type": "object", "required": ["rule_id", "points"], "properties": {"rule_id": {"type": "string"}, "points": {"type": "integer"}}, "additionalProperties": false}},
+    "next_action": {"type": "string", "minLength": 1},
+    "next_follow_up_at": {"type": "string", "format": "date-time"},
+    "last_outbound_ref": {"type": "string", "minLength": 1},
+    "last_outbound_preview": {"type": "string", "minLength": 1}
+  }
+}

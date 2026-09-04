@@ -22,13 +22,14 @@ assert.equal("aggregateId" in legacyAggregateDocument.nodes[0]!, false);
 assert.equal("aggregateType" in legacyAggregateDocument.nodes[0]!, false);
 
 const marketing = createWorkspaceTemplate("marketing");
-assert.deepEqual(marketing.nodes.map((node) => node.kind), ["product", "content", "video"]);
-assert.deepEqual(marketing.nodes.map((node) => node.label), ["产品资料", "营销内容", "营销视频"]);
+assert.equal(marketing.version, 2);
+assert.deepEqual(marketing.nodes.map((node) => node.kind), ["product", "content", "video", "publication"]);
+assert.deepEqual(marketing.nodes.map((node) => node.label), ["产品事实", "营销内容", "营销视频", "受控发布"]);
 assert.equal(marketing.nodes.some((node) => node.kind === "approval"), false);
 
 const sales = createWorkspaceTemplate("sales");
-assert.deepEqual(sales.nodes.map((node) => node.kind), ["rfq", "product", "quotation"]);
-assert.deepEqual(sales.nodes.map((node) => node.label), ["客户询盘", "产品引用", "报价交接"]);
+assert.deepEqual(sales.nodes.map((node) => node.kind), ["rfq", "product", "quotation", "lead", "delivery"]);
+assert.deepEqual(sales.nodes.map((node) => node.label), ["客户询盘", "产品引用", "人工报价", "跟进与商机", "交期确认"]);
 assert.equal(sales.nodes.some((node) => node.kind === "approval"), false);
 
 const legacyMarketing = workspaceCanvasDocumentSchema.parse({ version: 1, nodes: [
@@ -38,10 +39,14 @@ const legacyMarketing = workspaceCanvasDocumentSchema.parse({ version: 1, nodes:
   { id: "video", kind: "video", label: "营销视频", locked: true, position: { x: 780, y: 140 } },
 ], edges: [] });
 const normalized = normalizeLegacyWorkspaceTemplate("marketing", legacyMarketing);
-assert.deepEqual(normalized.nodes.map((node) => node.kind), ["product", "content", "video"]);
+assert.equal(normalized.version, 2);
+assert.deepEqual(normalized.nodes.map((node) => node.kind), ["product", "content", "video", "publication"]);
 assert.deepEqual(normalized.nodes[0]?.position, { x: 12, y: 24 });
+assert.deepEqual(normalized.edges, marketing.edges);
 
 const customized = workspaceCanvasDocumentSchema.parse({ ...legacyMarketing, nodes: [...legacyMarketing.nodes, { id: "note", kind: "note", label: "说明", locked: false, position: { x: 900, y: 100 } }] });
-assert.equal(normalizeLegacyWorkspaceTemplate("marketing", customized), customized);
+const normalizedCustomized = normalizeLegacyWorkspaceTemplate("marketing", customized);
+assert.equal(normalizedCustomized.nodes.at(-1)?.kind, "note");
+assert.deepEqual(normalizedCustomized.edges, marketing.edges);
 
 console.log("PASS workspace project canvas contracts");

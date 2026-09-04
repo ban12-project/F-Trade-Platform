@@ -8,6 +8,7 @@
   "properties": {
     "handoff_id": {"type": "string", "minLength": 1},
     "rfq_id": {"type": "string", "minLength": 1},
+    "product_id": {"type": "string", "minLength": 1},
     "created_by_actor_type": {"const": "human"},
     "created_by_actor_id": {"type": "string", "minLength": 1},
     "status": {"enum": ["draft", "review_required", "revision_required", "approved", "sent"]},
@@ -25,7 +26,9 @@
       }
     },
     "approval_ref": {"type": "string", "minLength": 1},
-    "sent_at": {"type": "string", "format": "date-time"}
+    "sent_at": {"type": "string", "format": "date-time"},
+    "sent_channel": {"type": "string", "minLength": 1},
+    "sent_ref": {"type": "string", "minLength": 1}
   },
   "allOf": [
     {
@@ -34,7 +37,7 @@
     },
     {
       "if": {"properties": {"status": {"const": "sent"}}, "required": ["status"]},
-      "then": {"properties": {"sent_at": {}}, "required": ["sent_at"]}
+      "then": {"properties": {"sent_at": {}, "sent_channel": {}, "sent_ref": {}}, "required": ["sent_at", "sent_channel", "sent_ref"]}
     }
   ]
 }

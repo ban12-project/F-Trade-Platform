@@ -14,6 +14,7 @@ import {
 import { productReviewFormSchema } from "@/lib/form-schemas";
 import { decideProductCatalogReview } from "@/lib/products";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
+import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
 
 export type ProductActionState = {
   status: "idle" | "success" | "error";
@@ -49,7 +50,7 @@ export async function createProductCatalogDraftAction(
 
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
+    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
     const result = await createProductCatalogDraft(parsed.data, session.user.id, projectId);
     revalidateProductPaths(projectId, result.id);
     return {
@@ -79,7 +80,10 @@ export async function decideProductCatalogReviewAction(
   }
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceAggregateLink(projectId, parsed.data.productId, "marketing", "product");
+    if (projectId) {
+      await assertWorkspaceAggregateLink(projectId, parsed.data.productId, "marketing", "product", session.user.id);
+      await assertAndLinkProjectEvidence(projectId, [parsed.data.evidenceRef], session.user.id);
+    }
     const result = await decideProductCatalogReview(parsed.data, session.user.id);
     revalidateProductPaths(projectId, parsed.data.productId);
     return {
@@ -108,8 +112,9 @@ export async function reviseProductCatalogDraftAction(
   }
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceAggregateLink(projectId, parsedProductId.data.productId, "marketing", "product");
-    await reviseProductCatalogDraft(parsedProductId.data.productId, parsed.data, session.user.id);
+    if (projectId) await assertWorkspaceAggregateLink(projectId, parsedProductId.data.productId, "marketing", "product", session.user.id);
+    if (!projectId) throw new Error("产品修订必须在所属项目中进行。");
+    await reviseProductCatalogDraft(parsedProductId.data.productId, parsed.data, session.user.id, projectId);
     revalidateProductPaths(projectId, parsedProductId.data.productId);
     return { status: "success", message: "修订及逐字段证据已保存，并重新提交 Gate 01 审核。", productId: parsedProductId.data.productId };
   } catch (error) {

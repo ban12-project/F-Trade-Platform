@@ -100,10 +100,6 @@ export function AuthPanel() {
     if (signedIn) enterWorkspace();
   }
 
-  async function addPasskey() {
-    await run(() => authClient.passkey.addPasskey({ name: "F-Trade Passkey" }), "Passkey 已注册。");
-  }
-
   return (
     <main id="main-content" className="flex min-h-svh items-center justify-center bg-muted/30 p-4 md:p-8">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-2xl border bg-background shadow-sm md:grid-cols-[0.9fr_1.1fr]">
@@ -188,9 +184,7 @@ export function AuthPanel() {
               {busy || provisioning ? <Spinner aria-hidden="true" data-icon="inline-start" /> : <KeyRoundIcon data-icon="inline-start" />}
               使用 Passkey 登录
             </Button>
-            <Button type="button" variant="ghost" disabled={busy || provisioning} onClick={addPasskey}>
-              注册当前设备 Passkey
-            </Button>
+            <p className="text-xs leading-5 text-muted-foreground">新的 Passkey 需要登录后在“账号与工具”中添加。</p>
           </div>
           <p className="min-h-5 text-sm text-muted-foreground" aria-live="polite">{message}</p>
         </section>

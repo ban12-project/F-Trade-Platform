@@ -43,6 +43,8 @@ export const productReviewFormSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
   evidenceRef: privateReference,
   notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
+}).superRefine((value, context) => {
+  if (value.decision === "rejected" && !value.notes) context.addIssue({ code: "custom", path: ["notes"], message: "退回产品事实时必须填写原因。" });
 });
 
 /** Deliberately accepts pre-authorized, sanitized text only; raw factory files stay in private evidence storage. */
@@ -104,6 +106,7 @@ export const contentAgentRequestSchema = contentDraftFormSchema.pick({
 
 const optionalRfqText = z.string().trim().max(240, "字段不能超过 240 个字符。");
 export const rfqFormSchema = z.object({
+  leadId: z.uuid("入站线索标识无效。").optional().or(z.literal("")),
   customerName: optionalRfqText,
   customerCompany: optionalRfqText,
   customerCountry: optionalRfqText,
@@ -116,11 +119,89 @@ export const rfqFormSchema = z.object({
   evidenceRef: privateReference,
 });
 
+const positiveMoney = z.string().trim().regex(/^\d+(?:\.\d{1,4})?$/, "单价必须是正数，最多四位小数。").refine((value) => Number(value) > 0, "单价必须大于 0。");
+const positiveIntegerText = z.string().trim().regex(/^[1-9]\d*$/, "必须填写正整数。");
+
+export const quotationDraftFormSchema = z.object({
+  projectId: z.uuid("项目标识无效。"),
+  quotationId: z.uuid("报价标识无效。").optional().or(z.literal("")),
+  rfqId: z.uuid("请选择 RFQ Ready。"),
+  productId: z.uuid("请选择 Product Ready 引用。"),
+  unitPrice: positiveMoney,
+  currency: z.string().trim().regex(/^[A-Z]{3}$/, "币种必须是三位大写 ISO 代码。"),
+  moq: positiveIntegerText,
+  leadTimeDays: z.string().trim().regex(/^\d+$/, "交期天数必须是非负整数。"),
+  paymentTerms: z.string().trim().min(1, "请填写付款条件。").max(500),
+  validityDays: positiveIntegerText,
+});
+
+export const quotationDecisionFormSchema = z.object({
+  projectId: z.uuid("项目标识无效。"), quotationId: z.uuid("报价标识无效。"),
+  decision: z.enum(["approved", "rejected"]), evidenceRef: privateReference,
+  notes: z.string().trim().max(2_000),
+}).superRefine((value, context) => { if (value.decision === "rejected" && !value.notes) context.addIssue({ code: "custom", path: ["notes"], message: "退回报价时必须填写原因。" }); });
+
+export const quotationSendFormSchema = z.object({
+  projectId: z.uuid("项目标识无效。"), quotationId: z.uuid("报价标识无效。"),
+  channelRef: z.string().trim().min(1, "请填写发送渠道。").max(240),
+  externalRef: z.string().trim().min(1, "请填写外部发送凭证。").max(240),
+});
+
+export const followUpFormSchema = z.object({
+  projectId: z.uuid("项目标识无效。"), leadId: z.uuid("线索标识无效。"),
+  context: z.enum(["quote_sent_unread", "quote_sent_read_no_reply", "price_high", "purchase_later", "asks_sample", "asks_lead_time"]),
+  triggeredRules: z.array(z.enum(["active_inquiry", "provides_oe_number", "explicit_quantity", "target_quantity_range", "asks_sample", "asks_lead_time", "asks_payment_terms", "replies_again"])).max(8),
+  draft: z.string().trim().min(1, "请填写人工确认后的跟进内容。").max(4_000),
+  confirmationRef: privateReference,
+  nextFollowUpAt: z.string().trim().optional().or(z.literal("")),
+}).superRefine((value, context) => { if (value.nextFollowUpAt && Number.isNaN(Date.parse(value.nextFollowUpAt))) context.addIssue({ code: "custom", path: ["nextFollowUpAt"], message: "下次跟进时间无效。" }); });
+
+export const deliveryRequestFormSchema = z.object({ projectId: z.uuid(), leadId: z.uuid(), evidenceRef: privateReference });
+export const deliveryDecisionFormSchema = z.object({
+  projectId: z.uuid(), confirmationId: z.uuid(), decision: z.enum(["confirmed", "rejected"]), evidenceRef: privateReference,
+  leadTimeDays: z.string().trim(), notes: z.string().trim().max(2_000),
+}).superRefine((value, context) => {
+  if (value.decision === "confirmed" && !/^\d+$/.test(value.leadTimeDays)) context.addIssue({ code: "custom", path: ["leadTimeDays"], message: "批准交期时必须填写非负整数天数。" });
+  if (value.decision === "rejected" && !value.notes) context.addIssue({ code: "custom", path: ["notes"], message: "拒绝交期确认时必须填写原因。" });
+});
+
+export const opportunityDecisionFormSchema = z.object({ projectId: z.uuid(), leadId: z.uuid(), evidenceRef: privateReference });
+
+export const inboundRoutingFormSchema = z.object({
+  conversationId: z.string().trim().min(1, "入站会话标识无效。").max(160),
+  mode: z.enum(["create", "link"]),
+  projectId: z.uuid("请选择要关联的销售项目。").optional().or(z.literal("")),
+}).superRefine((value, context) => {
+  if (value.mode === "link" && !value.projectId) context.addIssue({ code: "custom", path: ["projectId"], message: "请选择要关联的销售项目。" });
+});
+
+export const publicationConfirmationFormSchema = z.object({
+  projectId: z.uuid(), contentRef: z.uuid("内容标识无效。"), format: z.enum(["text", "image", "video"]),
+  channelRef: z.string().trim().min(1, "请选择已启用渠道。"), accountRef: z.string().trim().min(1, "请选择发布账户。"),
+  confirmationRef: privateReference,
+});
+
+export const publicationResultSchema = z.object({
+  jobId: z.uuid("发布任务标识无效。"),
+  outcome: z.enum(["published", "unknown", "failed"]),
+  externalPublicationRef: z.string().trim().max(240).optional(),
+  failureCode: z.string().trim().max(120).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.outcome === "published" && !value.externalPublicationRef) {
+    context.addIssue({ code: "custom", path: ["externalPublicationRef"], message: "发布成功必须包含平台结果凭证。" });
+  }
+  if (value.outcome !== "published" && !value.failureCode) {
+    context.addIssue({ code: "custom", path: ["failureCode"], message: "未知或失败结果必须包含失败代码。" });
+  }
+});
+
 export const contentReviewFormSchema = z.object({
   contentId: z.uuid("内容记录标识无效。"),
   decision: z.enum(["approved", "rejected"]),
   evidenceRef: privateReference,
   notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
+}).superRefine((value, context) => {
+  if (value.decision === "rejected" && !value.notes) context.addIssue({ code: "custom", path: ["notes"], message: "退回营销内容时必须填写原因。" });
 });
 
 const videoText = z.string().trim().min(1, "此字段不能为空。").max(2_000, "此字段不能超过 2000 个字符。");
@@ -140,6 +221,8 @@ export const videoReviewFormSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
   evidenceRef: privateReference,
   notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
+}).superRefine((value, context) => {
+  if (value.decision === "rejected" && !value.notes) context.addIssue({ code: "custom", path: ["notes"], message: "退回视频时必须填写原因。" });
 });
 
 const modelProvider = z.enum(["openai", "anthropic", "google", "openai-compatible"]);

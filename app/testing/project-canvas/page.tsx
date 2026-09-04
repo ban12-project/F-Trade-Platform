@@ -2,13 +2,16 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { ContentPanel } from "@/components/workspace/content-panel";
+import { DeliveryPanel, LeadPanel, PublicationPanel, QuotationPanel } from "@/components/workspace/closing-panels";
 import { ProjectCanvas } from "@/components/workspace/project-canvas";
 import { ProductPanel } from "@/components/workspace/product-panel";
-import { ProductReferencePanel, QuotationHandoffPanel, RfqPanel } from "@/components/workspace/sales-panels";
+import { ProductReferencePanel, RfqPanel } from "@/components/workspace/sales-panels";
 import type { ContentCatalogDetail } from "@/lib/content/store";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import type { ProductCatalogDetail } from "@/lib/products";
+import type { LeadEntry } from "@/lib/sales/closing-store";
 import type { WorkspaceProjectDetail, WorkspaceProjectSummary } from "@/lib/workspace/store";
+import { createWorkspaceTemplate } from "@/lib/workspace/contracts";
 
 const syntheticMarketingProject: WorkspaceProjectDetail = {
   id: "00000000-0000-4000-8000-000000000202",
@@ -17,15 +20,7 @@ const syntheticMarketingProject: WorkspaceProjectDetail = {
   status: "active",
   updatedAt: new Date("2026-09-01T00:00:00.000Z"),
   revision: 1,
-  document: {
-    version: 1,
-    nodes: [
-      { id: "product", kind: "product", position: { x: 0, y: 0 }, locked: true, label: "产品资料" },
-      { id: "content", kind: "content", position: { x: 280, y: 120 }, locked: true, label: "营销内容" },
-      { id: "video", kind: "video", position: { x: 560, y: 0 }, locked: true, label: "营销视频" },
-    ],
-    edges: [],
-  },
+  document: createWorkspaceTemplate("marketing"),
 };
 
 const syntheticSalesProject: WorkspaceProjectDetail = {
@@ -33,13 +28,21 @@ const syntheticSalesProject: WorkspaceProjectDetail = {
   id: "00000000-0000-4000-8000-000000000203",
   title: "Synthetic sales canvas",
   kind: "sales",
-  document: { version: 1, nodes: [
-    { id: "rfq", kind: "rfq", position: { x: 0, y: 0 }, locked: true, label: "客户询盘" },
-    { id: "product", kind: "product", position: { x: 280, y: 120 }, locked: true, label: "产品引用" },
-    { id: "quotation", kind: "quotation", position: { x: 560, y: 0 }, locked: true, label: "报价交接" },
-  ], edges: [] },
+  document: createWorkspaceTemplate("sales"),
 };
 const syntheticProjects: WorkspaceProjectSummary[] = [syntheticMarketingProject, syntheticSalesProject].map(({ document: _document, revision: _revision, ...project }) => project);
+const syntheticLead: LeadEntry = {
+  id: "00000000-0000-4000-8000-000000000601",
+  state: "FOLLOW_UP",
+  createdAt: new Date("2026-09-04T08:00:00.000Z"),
+  replyAvailable: true,
+  confirmedDelivery: { id: "30000000-0000-4000-8000-000000000010", leadTimeDays: 21, validUntil: "2027-09-11T12:00:00.000Z" },
+  lead: { lead_id: "00000000-0000-4000-8000-000000000601", channel_ref: "synthetic-facebook", conversation_ref: "synthetic-conversation-001", status: "follow_up", follow_up_context: "quote_sent_read_no_reply", score: 35, score_band: "WARM", score_reasons: [{ rule_id: "active_inquiry", points: 20 }, { rule_id: "asks_lead_time", points: 15 }], next_action: "ask_one_specific_question" },
+  timeline: [
+    { id: "synthetic-message-001", direction: "inbound", body: "Synthetic buyer asks for the verified lead time.", receivedAt: new Date("2026-09-04T08:30:00.000Z"), deliveryStatus: "received" },
+    { id: "synthetic-message-002", direction: "outbound", body: "Synthetic acknowledgement pending channel delivery.", receivedAt: new Date("2026-09-04T08:35:00.000Z"), deliveryStatus: "queued" },
+  ],
+};
 
 const syntheticProduct = { id: "00000000-0000-4000-8000-000000000301", productName: "Verified clutch kit", internalSku: "SYN-001", factOptions: [{ path: "product.product_name", label: "product.product_name", value: "Verified clutch kit", evidenceRef: "evidence-product-001" }] };
 const syntheticAgentModels: ProductAgentModelSettings[] = [
@@ -55,20 +58,23 @@ const syntheticContentDetail: ContentCatalogDetail = {
   content: { content_id: "00000000-0000-4000-8000-000000000303", product_id: syntheticProduct.id, content_type: "product", objective: "Generate qualified distributor inquiries", target_customer: "Overseas automotive parts distributors", platform: "pending-channel-decision", hook: "Ask about this verified clutch kit", body: "A concise, evidence-grounded product introduction.", product_facts: [{ field: "product.product_name", value: syntheticProduct.productName, evidence_ref: "evidence-product-001" }], call_to_action: "Contact our sales team", hashtags: ["#clutch"], visual_instruction: "Show only the supplied product image.", status: "revision_required" },
 };
 
-async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string }> }) {
-  const { state, kind } = await searchParams;
+async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string; view?: string }> }) {
+  const { state, kind, view } = await searchParams;
   const reviewState = state === "review";
   const approvedState = state === "approved";
-  if (kind === "sales") return <ProjectCanvas project={syntheticSalesProject} projects={syntheticProjects} tasks={[]} panels={{
+  if (kind === "sales") return <ProjectCanvas readOnly={view === "flow"} project={syntheticSalesProject} projects={syntheticProjects} tasks={[]} panels={{
     rfq: <RfqPanel projectId={syntheticSalesProject.id} entries={[]} />,
     product: <ProductReferencePanel projectId={syntheticSalesProject.id} available={[syntheticProduct]} linked={[]} />,
-    quotation: <QuotationHandoffPanel rfqs={[]} products={[]} />,
+    quotation: <QuotationPanel projectId={syntheticSalesProject.id} rfqs={[]} products={[]} entries={[]} canReview />,
+    lead: <LeadPanel projectId={syntheticSalesProject.id} entries={[syntheticLead]} />,
+    delivery: <DeliveryPanel projectId={syntheticSalesProject.id} entries={[]} canReview />,
   }} />;
   const productDetail = state === "product-review" ? syntheticProductDetail : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
-  return <ProjectCanvas project={syntheticMarketingProject} projects={syntheticProjects} tasks={[]} panels={{
+  return <ProjectCanvas readOnly={view === "flow"} project={syntheticMarketingProject} projects={syntheticProjects} tasks={[]} panels={{
     product: <ProductPanel projectId={syntheticMarketingProject.id} entries={productDetail ? [productDetail] : []} detail={productDetail} canReview agentModelConfigs={syntheticAgentModels} />,
     content: <ContentPanel projectId={syntheticMarketingProject.id} products={[syntheticProduct]} entries={contentDetail ? [contentDetail] : []} copyCandidates={[]} detail={contentDetail} canReview />,
+    publication: <PublicationPanel projectId={syntheticMarketingProject.id} candidates={[]} channels={[]} publications={[]} />,
   }} videoEditor={{
     canReview: true,
     copyCandidates: [],
@@ -100,7 +106,7 @@ async function ProjectCanvasFixture({ searchParams }: { searchParams: Promise<{ 
 }
 
 /** Test-only fixture: production project canvas access remains permission protected. */
-export default function ProjectCanvasTestingPage({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string }> }) {
+export default function ProjectCanvasTestingPage({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string; view?: string }> }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return <Suspense fallback={null}><ProjectCanvasFixture searchParams={searchParams} /></Suspense>;
 }

@@ -22,12 +22,14 @@ python3 scripts/validate_repository.py
   "finalStates": {
     "product": "PRODUCT_READY",
     "content": "CONTENT_PUBLISHED",
+    "video": "VIDEO_APPROVED",
     "rfq": "RFQ_READY",
     "quotation": "QUOTE_SENT",
-    "lead": "OPPORTUNITY"
+    "lead": "OPPORTUNITY",
+    "delivery": "DELIVERY_CONFIRMATION_CONFIRMED"
   },
-  "transitionCount": 11,
-  "approvedGates": ["gate_01_truth", "gate_02_quote"],
+  "transitionCount": 14,
+  "approvedGates": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"],
   "inboundMessaging": {
     "deliveryStatus": "accepted",
     "duplicateStatus": "duplicate",
@@ -36,7 +38,13 @@ python3 scripts/validate_repository.py
   },
   "publicationTransport": {
     "status": "published",
-    "transport": "camofox_controlled_mvp1"
+    "transport": "camofox_controlled_mvp1",
+    "jobStatus": "succeeded",
+    "signedResultVerified": true
+  },
+  "followUp": {
+    "actorType": "human",
+    "replyWindowRevalidated": true
   }
 }
 ```
@@ -46,16 +54,18 @@ python3 scripts/validate_repository.py
 | #26 验收项 | 技术证据 | 当前结论 |
 | --- | --- | --- |
 | 识别产品 | `product-ready.synthetic.json` 经 ProductReady 契约校验，并从 `PRODUCT_IMPORTED` 通过人工 Gate 01 到 `PRODUCT_READY` | 仅合成 fixture 已验证 |
-| 生成内容并人工批准 | 内容契约校验；Gate 01 human 批准后，才通过 synthetic official API 发布策略将内容置为 `published`；状态机回放为 `CONTENT_GENERATING → CONTENT_REVIEW_REQUIRED → CONTENT_APPROVED → CONTENT_PUBLISHED` | 已验证 |
+| 生成内容/视频并人工批准 | 内容和视频契约校验；Gate 01 human 批准、逐帖确认及签名 Worker 回执后，才将内容置为 `published`；视频独立到 `VIDEO_APPROVED` | 已验证 |
 | 模拟询盘并补全 RFQ | synthetic 官方 API/inbound-only 策略接受首条消息、去重重复投递、执行显式回复窗口；随后 RFQ Ready 契约校验并以 `RFQ_COLLECTING → RFQ_READY` 回放 | 已验证 |
-| 人工报价、跟单并进入 Opportunity | Quote Gate 02 的 human 批准后才发送；跟单从 `LEAD_RECEIVED` 到 `FOLLOW_UP` 再到 `OPPORTUNITY` | 已验证 |
+| 人工报价、交期、跟单并进入 Opportunity | Quote Gate 02 的 human 批准后才发送；Gate 03 记录确认交期；跟单 actor 为 human，并在回复前重新验证窗口，最后显式进入 `OPPORTUNITY` | 已验证 |
 | 形成验收报告和 Go/No-Go 决策 | 本文提供技术报告；Go/No-Go 是业务负责人决策 | 报告完成；决策待人工 |
 
 ## Gate 与安全断言
 
 - 产品就绪需要 Gate 01 的人工批准；Agent 批准会被运行时拒绝。
-- 内容发布先执行 Gate 01 的 human 批准，再经 `camofox_controlled_mvp1` 发布策略；Agent 不能调用发布传输层。
+- 内容发布先执行 Gate 01 的 human 批准和逐帖确认，再验证签名 Worker 回执；按钮点击本身不能产生已发布状态。
 - 报价必须先由人工通过 Gate 02；Agent 不生成正式价格或交期。
+- Gate 03 由人工确认且带有效期；交期自由文本、未批准、过期或 RFQ 不匹配的结果均由服务端拒绝。
+- 跟进由人确认并进入持久化队列；真正发送前再次验证渠道、窗口和 Gate 03。
 - 演示会拒绝非 `synthetic-` 标识符，防止把真实业务记录带入版本库。
 - `repository-validate` 额外覆盖非法状态转换、无来源工程事实、RFQ 完整性、内容安全和跟进规则。
 

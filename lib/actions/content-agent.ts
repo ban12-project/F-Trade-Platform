@@ -29,7 +29,7 @@ export async function generateContentDraftAction(_previous: ContentAgentActionSt
   try {
     const rawProjectId = formData.get("projectId");
     const projectId = rawProjectId === null || rawProjectId === "" ? undefined : z.uuid("项目标识无效。").parse(rawProjectId);
-    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing");
+    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
     const product = (await listReadyProductContentSources(projectId)).find((candidate) => candidate.id === parsed.data.productId);
     const selected = product?.factOptions.find((fact) => fact.path === parsed.data.factPath);
     const productName = product?.factOptions.find((fact) => fact.path === "product.product_name");

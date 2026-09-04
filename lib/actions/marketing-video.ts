@@ -112,7 +112,7 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
         productMediaIds: jsonValue(formData, "productMediaIds", []),
         rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
       });
-      await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product");
+      await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product", session.user.id);
       const result = await createMarketingVideoEditProjectFromProductMedia(request, session.user.id);
       return finishVideoCreation(
         result,
@@ -130,7 +130,7 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
         internetMediaIds: jsonValue(formData, "internetMediaIds", []),
         rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
       });
-      await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product");
+      await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product", session.user.id);
       const importedAssets = await importInternetVideoMedia({
         projectId: request.projectId,
         productId: request.productId,
@@ -153,7 +153,7 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
       ...fields,
       rightsEvidenceRef: text(formData, "rightsEvidenceRef"),
     });
-    await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product");
+    await assertWorkspaceAggregateLink(request.projectId, request.productId, "marketing", "product", session.user.id);
     const receiptIds = jsonValue(formData, "receiptIds", []);
     const uploadedAssets = await claimCompletedVideoUploads(
       receiptIds,
@@ -170,9 +170,9 @@ export async function createMarketingVideoDraftAction(_previous: MarketingVideoA
 
 export async function searchInternetVideoMediaAction(input: unknown): Promise<InternetMediaSearchActionState> {
   try {
-    await requireVideoWriter();
+    const session = await requireVideoWriter();
     const value = internetMediaSearchInputSchema.parse(input);
-    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product");
+    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product", session.user.id);
     const results = await searchInternetVideoMedia(value.query);
     return {
       status: "success",
@@ -187,7 +187,7 @@ export async function searchInternetVideoMediaAction(input: unknown): Promise<In
 export async function generateMarketingVideoAiDraftAction(projectId: string, videoId: string): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
-    await assertMarketingVideoProjectLink(projectId, videoId);
+    await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await startVideoJob("ai_draft", videoId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
     return { status: "success", message: "AI 初稿已进入后台队列，完成后会自动刷新。", videoId };
@@ -199,7 +199,7 @@ export async function generateMarketingVideoAiDraftAction(projectId: string, vid
 export async function saveMarketingVideoDraftAction(projectId: string, videoId: string, draft: MarketingVideoDraft): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
-    await assertMarketingVideoProjectLink(projectId, videoId);
+    await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await updateMarketingVideoEditDraft(videoId, draft, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
     return { status: "success", message: "剪辑稿已保存。", videoId };
@@ -211,7 +211,7 @@ export async function saveMarketingVideoDraftAction(projectId: string, videoId: 
 export async function renderMarketingVideoDraftAction(projectId: string, videoId: string, draft: MarketingVideoDraft): Promise<MarketingVideoActionState> {
   try {
     const session = await requireVideoWriter();
-    await assertMarketingVideoProjectLink(projectId, videoId);
+    await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await updateMarketingVideoEditDraft(videoId, draft, session.user.id);
     await startVideoJob("render", videoId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
@@ -225,7 +225,7 @@ export async function reviewMarketingVideoAction(projectId: string, videoId: str
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session || !hasPermission(session.user.role, "content:review")) throw new Error("只有管理员可以审核营销视频成片。");
-    await assertMarketingVideoProjectLink(projectId, videoId);
+    await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await decideGuardedVideoReview({ videoId, decision, evidenceRef, notes }, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
     return { status: "success", message: decision === "approved" ? "成片已通过人工审核；不会自动发布。" : "成片已退回修改。", videoId };

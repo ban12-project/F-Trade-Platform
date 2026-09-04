@@ -71,7 +71,7 @@ const rules: readonly TransitionRule[] = [
   { entityType: "quotation", fromState: "QUOTE_REVISION_REQUIRED", toState: "QUOTE_REVIEW_REQUIRED", actors: ["human"] },
   { entityType: "quotation", fromState: "QUOTE_APPROVED", toState: "QUOTE_SENT", actors: ["human", "system"] },
   { entityType: "lead", fromState: "LEAD_RECEIVED", toState: "FOLLOW_UP", actors: ["agent", "human", "system"] },
-  { entityType: "lead", fromState: "FOLLOW_UP", toState: "OPPORTUNITY", actors: ["agent", "human"] },
+  { entityType: "lead", fromState: "FOLLOW_UP", toState: "OPPORTUNITY", actors: ["human"] },
   { entityType: "lead", fromState: "OPPORTUNITY", toState: "WON", actors: ["human"] },
   { entityType: "lead", fromState: "OPPORTUNITY", toState: "LOST", actors: ["human"] },
   { entityType: "delivery_confirmation", fromState: "DELIVERY_CONFIRMATION_PENDING", toState: "DELIVERY_CONFIRMATION_CONFIRMED", actors: ["human"], gate: "gate_03_delivery", approvalStatus: "approved" },

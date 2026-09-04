@@ -8,3 +8,19 @@ export const initialProductAgentActionState = { status: "idle", message: "" } as
 export const initialProductActionState = { status: "idle", message: "" } as const;
 export const initialSalesActionState = { status: "idle", message: "" } as const;
 export const initialSocialControlActionState = { status: "idle", message: "" } as const;
+
+export type ClosingActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  id?: string;
+  projectId?: string;
+};
+
+export const initialClosingActionState: ClosingActionState = { status: "idle", message: "" };
+
+export type ProductEvidenceActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+export const initialProductEvidenceActionState: ProductEvidenceActionState = { status: "idle", message: "" };

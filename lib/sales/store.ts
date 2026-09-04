@@ -15,7 +15,7 @@ export type RfqEntry = { id: string; state: string; createdAt: Date; productType
 function rfqFromInput(input: RfqFormInput, id: string) {
   const product = { product_type: input.productType, ...(input.oeNumber ? { oe_number: input.oeNumber } : {}), ...(input.vehicleBrand ? { vehicle_brand: input.vehicleBrand } : {}), ...(input.vehicleModel ? { vehicle_model: input.vehicleModel } : {}) };
   const commercial = { ...(input.quantity ? { quantity: Number(input.quantity) } : {}), ...(input.destination ? { destination: input.destination } : {}) };
-  return updateRfqDraft({ rfq_id: id, customer: { ...(input.customerName ? { name: input.customerName } : {}), ...(input.customerCompany ? { company: input.customerCompany } : {}), ...(input.customerCountry ? { country: input.customerCountry } : {}) }, product, commercial, status: "collecting" }, {});
+  return updateRfqDraft({ rfq_id: id, ...(input.leadId ? { lead_ref: input.leadId } : {}), customer: { ...(input.customerName ? { name: input.customerName } : {}), ...(input.customerCompany ? { company: input.customerCompany } : {}), ...(input.customerCountry ? { country: input.customerCountry } : {}) }, product, commercial, status: "collecting" }, {});
 }
 
 function entryFromRecord(row: typeof aggregateRecord.$inferSelect): RfqEntry | null {
@@ -26,7 +26,7 @@ function entryFromRecord(row: typeof aggregateRecord.$inferSelect): RfqEntry | n
   if (typeof product?.product_type !== "string" || !productTypes.has(product.product_type as RfqFormInput["productType"])) return null;
   const quantity = typeof commercial?.quantity === "number" ? commercial.quantity : null;
   const destination = typeof commercial?.destination === "string" ? commercial.destination : null;
-  return { id: row.id, state: row.state, createdAt: row.createdAt, productType: product.product_type, quantity, destination, missingFields: Array.isArray(payload.missing_fields) ? payload.missing_fields.filter((field): field is string => typeof field === "string") : [], completenessScore: typeof payload.completeness_score === "number" ? payload.completeness_score : 0, formValues: { customerName: typeof customer?.name === "string" ? customer.name : "", customerCompany: typeof customer?.company === "string" ? customer.company : "", customerCountry: typeof customer?.country === "string" ? customer.country : "", productType: product.product_type as RfqFormInput["productType"], oeNumber: typeof product.oe_number === "string" ? product.oe_number : "", vehicleBrand: typeof product.vehicle_brand === "string" ? product.vehicle_brand : "", vehicleModel: typeof product.vehicle_model === "string" ? product.vehicle_model : "", quantity: quantity === null ? "" : String(quantity), destination: destination ?? "" } };
+  return { id: row.id, state: row.state, createdAt: row.createdAt, productType: product.product_type, quantity, destination, missingFields: Array.isArray(payload.missing_fields) ? payload.missing_fields.filter((field): field is string => typeof field === "string") : [], completenessScore: typeof payload.completeness_score === "number" ? payload.completeness_score : 0, formValues: { leadId: typeof payload.lead_ref === "string" ? payload.lead_ref : "", customerName: typeof customer?.name === "string" ? customer.name : "", customerCompany: typeof customer?.company === "string" ? customer.company : "", customerCountry: typeof customer?.country === "string" ? customer.country : "", productType: product.product_type as RfqFormInput["productType"], oeNumber: typeof product.oe_number === "string" ? product.oe_number : "", vehicleBrand: typeof product.vehicle_brand === "string" ? product.vehicle_brand : "", vehicleModel: typeof product.vehicle_model === "string" ? product.vehicle_model : "", quantity: quantity === null ? "" : String(quantity), destination: destination ?? "" } };
 }
 
 const productTypes = new Set<RfqFormInput["productType"]>(["clutch_disc", "clutch_cover", "release_bearing", "clutch_kit"]);
@@ -40,6 +40,10 @@ export async function createRfq(input: RfqFormInput, actorId: string, projectId?
     if (projectId) {
       const [project] = await tx.select({ kind: workspaceProject.kind }).from(workspaceProject).where(eq(workspaceProject.id, projectId)).for("update");
       if (!project || project.kind !== "sales") throw new Error("询盘只能关联到销售机会项目。");
+      if (input.leadId) {
+        const [lead] = await tx.select({ id: aggregateRecord.id }).from(workspaceProjectItem).innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId)).where(and(eq(workspaceProjectItem.projectId, projectId), eq(workspaceProjectItem.aggregateId, input.leadId), eq(workspaceProjectItem.role, "sales_lead"), eq(aggregateRecord.state, "LEAD_RECEIVED"))).for("update");
+        if (!lead) throw new Error("只能为当前项目中尚未进入报价流程的入站线索录入 RFQ。");
+      }
     }
     await tx.insert(aggregateRecord).values({ id, type: "rfq", state: "RFQ_COLLECTING", payload: draft, createdByType: "human", createdById: actorId });
     if (projectId) await tx.insert(workspaceProjectItem).values({ id: randomUUID(), projectId, aggregateId: id, role: "sales_rfq", relation: "owned" });

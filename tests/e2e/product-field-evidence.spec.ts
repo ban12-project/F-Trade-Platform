@@ -11,10 +11,10 @@ test("manual product intake exposes evidence-bound specification and commercial 
 
   const form = page.locator("form#create-product");
   await expect(form.getByText("每个事实必须绑定自己的私有证据", { exact: false })).toBeVisible();
-  await expect(form.locator('input[id$="-evidence"]')).toHaveCount(20);
+  await expect(form.locator('[data-slot="select-trigger"][id$="-evidence"]')).toHaveCount(20);
 
   for (const label of ["产品名称证据", "产品类型证据", "内部编号证据"] as const) {
-    await expect(form.getByLabel(label, { exact: true })).toHaveAttribute("required", "");
+    await expect(form.getByLabel(label, { exact: true })).toHaveAttribute("aria-required", "true");
   }
   for (const label of [
     "OE / OEM 编号证据",
@@ -46,5 +46,20 @@ test("manual product intake exposes evidence-bound specification and commercial 
   await expect(form.locator("#evidence-ref")).toHaveCount(0);
   await expect(form.getByText("系统不会自动复制", { exact: false })).toBeVisible();
   await expect(form.getByText("不得根据经验或图片推断", { exact: false })).toBeVisible();
+  await expect(form.getByRole("progressbar", { name: "事实与证据完成度" })).toBeVisible();
+  await expect(form.getByText("批量应用同一证据", { exact: true })).toBeVisible();
+  await expect(form.getByRole("button", { name: "应用到 0 个目标字段" })).toBeDisabled();
+  await form.getByLabel("产品名称证据", { exact: true }).click();
+  await expect(page.getByRole("option", { name: /合成产品目录/ })).toBeVisible();
+  await page.getByRole("option", { name: /合成产品目录/ }).click();
+  await expect(form.getByLabel("产品名称证据", { exact: true })).toContainText("合成产品目录.pdf");
   expect(runtimeErrors).toEqual([]);
+});
+
+test("product error summary focuses the first invalid fact", async ({ page }) => {
+  await page.goto("/testing/product-field-evidence");
+  await page.getByRole("tab", { name: "手动录入" }).click();
+  await page.getByRole("button", { name: "创建待审核草稿" }).click();
+  await expect(page.getByRole("alert").getByText(/还有 \d+ 项需要处理/)).toBeVisible();
+  await expect(page.getByLabel("产品名称", { exact: true })).toBeFocused();
 });
