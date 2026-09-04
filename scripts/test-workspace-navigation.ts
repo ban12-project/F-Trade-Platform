@@ -89,3 +89,13 @@ assert.match(source("lib/actions/workspace.ts"), /revalidatePath\("\/workspace",
 console.log(
   "PASS workspace stage defaults, legacy task links, persistent shell, and scoped loading contracts",
 );
+
+const packageConfig = JSON.parse(source("package.json"));
+const biomeConfig = JSON.parse(source("biome.json"));
+assert.match(packageConfig.devDependencies["@biomejs/biome"], /^\d+\.\d+\.\d+$/);
+assert.equal(
+  biomeConfig.$schema,
+  `https://biomejs.dev/schemas/${packageConfig.devDependencies["@biomejs/biome"]}/schema.json`,
+);
+assert.match(packageConfig.scripts.build, /^pnpm check &&/);
+console.log("PASS pinned Biome schema and deployment build quality gate");

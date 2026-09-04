@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm build:remotion && next build",
+    "build": "pnpm check && pnpm build:remotion && next build",
     "build:remotion": "remotion bundle remotion/index.ts --out-dir .remotion",
     "build:test": "NEXT_ENABLE_TESTING_API=1 next build",
     "db:generate": "drizzle-kit generate",
@@ -144,7 +144,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.12",
+    "@biomejs/biome": "2.5.12",
     "@next/playwright": "16.3.2",
     "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "^4.3.3",

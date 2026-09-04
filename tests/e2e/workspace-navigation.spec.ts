@@ -51,6 +51,9 @@ test("page and dock share one unsaved-changes guard across navigation", async ({
   await expect(confirmation).toHaveCount(1);
   await confirmation.getByRole("button", { name: "继续编辑" }).click();
   await expect(page.getByLabel("测试草稿")).toHaveValue("Do not lose this draft");
+  await expect(page).toHaveURL(new RegExp(`${root}$`));
+  // The non-modal sheet closes when focus moves to the confirmation dialog.
+  await page.getByRole("button", { name: "项目", exact: true }).click();
   await page.getByRole("link", { name: /Synthetic persistent workspace/ }).click();
   await confirmation.getByRole("button", { name: "放弃修改并离开" }).click();
   await expect(page).toHaveURL(new RegExp(`${projectId}$`));
