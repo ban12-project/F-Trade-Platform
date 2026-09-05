@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { buildContentDraft } from "../lib/content/store";
 
 import { finalizeProductAgentDraft } from "../lib/product/agent";
 import { prepareProductAgentEvidenceSource } from "../lib/product/evidence-locations";
@@ -81,6 +83,56 @@ async function main() {
   assert.equal(mockRun.downstream.inputLinks.rfqOe, "MOCK-OE-SLOT-20");
   assert.equal(mockRun.downstream.finalStates.lead, "OPPORTUNITY");
   assert.equal(mockRun.business_database_writes, false);
+  const generatedContent = buildContentDraft(
+    {
+      productId: mockRun.ready.record_id,
+      contentType: "product",
+      factPath: "product.vehicle_model",
+      objective: "MOCK inquiry workflow",
+      targetCustomer: "Synthetic buyer",
+      hook: "MOCK generated content",
+      body: "Distinct generated copy for SYN Model 20.",
+      callToAction: "Discuss the test",
+      hashtags: "#MockTest",
+      visualInstruction: "Abstract text cards",
+    },
+    mockRun.ready,
+    "synthetic-generated-content-20",
+  );
+  const contentBefore = JSON.stringify(generatedContent);
+  const generatedReport = await runSyntheticDemo(mockRun.ready, generatedContent);
+  assert.equal(JSON.stringify(generatedContent), contentBefore);
+  assert.equal(generatedReport.contentInput.kind, "provided");
+  assert.equal(generatedReport.contentInput.contentId, generatedContent.content_id);
+  assert.equal(
+    generatedReport.contentInput.draftSha256,
+    createHash("sha256").update(contentBefore).digest("hex"),
+  );
+  const bodyHash = createHash("sha256").update(generatedContent.body).digest("hex");
+  assert.equal(generatedReport.contentInput.bodySha256, bodyHash);
+  assert.equal(generatedReport.contentInput.approvedBodySha256, bodyHash);
+  assert.equal(generatedReport.contentInput.publishedBodySha256, bodyHash);
+  assert.equal(generatedReport.finalStates.lead, "OPPORTUNITY");
+  await assert.rejects(() => runSyntheticDemo(undefined, generatedContent), /match the selected/);
+  await assert.rejects(
+    () => runSyntheticDemo(mockRun.ready, { ...generatedContent, product_id: "synthetic-other" }),
+    /match the selected/,
+  );
+  await assert.rejects(
+    () => runSyntheticDemo(mockRun.ready, { ...generatedContent, status: "approved" }),
+    /without prior approval/,
+  );
+  await assert.rejects(
+    () =>
+      runSyntheticDemo(mockRun.ready, {
+        ...generatedContent,
+        product_facts: generatedContent.product_facts.map((fact) => ({
+          ...fact,
+          value: "Invented",
+        })),
+      }),
+    /does not match/,
+  );
   await assert.rejects(
     () =>
       runReferenceMockWorkflow(
