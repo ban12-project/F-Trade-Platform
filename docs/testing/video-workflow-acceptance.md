@@ -62,3 +62,12 @@ pnpm test:e2e tests/e2e/project-workflow.spec.ts tests/e2e/video-workspace.spec.
 - Facebook／Instagram 的已记录官方链接本次读取失败，不能据此声称重新核验通过。
 
 后续需分离项目输出选择与平台版本化约束，并补齐 Meta 来源证据、账号相关限制及尚未测量的编码属性。当前清单的 `project_export_preset` 仅说明记录的测量值是否符合可识别项目预设，不承诺平台接受或发布成功。上述来源复核不修改现有预设数值，也不授予真实资料或发布权限。
+
+### 来源复核补充与语义修正
+
+Meta 官方示例仓库的固定版本 `6c9706651c2ca0d21351764bb9e35a2fca0988a3` 提供了可读取的补充证据：
+
+- [Instagram 官方示例要求](https://github.com/fbsamples/reels_publishing_apis/blob/6c9706651c2ca0d21351764bb9e35a2fca0988a3/insta_reels_publishing_api_sample/README.md#reels-requirements-for-publishing)：23–60 FPS、3–900 秒、AAC（不超过 48 kHz、1 或 2 声道）；还规定 progressive、closed GOP、4:2:0、文件大小等当前项目测量值未覆盖的属性。
+- [Facebook 官方示例要求](https://github.com/fbsamples/reels_publishing_apis/blob/6c9706651c2ca0d21351764bb9e35a2fca0988a3/fb_reels_publishing_api_sample/README.md#video-requirements-for-publishing)：时长列为 4–60 秒，与项目 3–90 秒不一致。主文档本次无法读取，因此记录为未解决的来源冲突；没有把示例自动当作最新平台契约。
+
+预设中的 `availability` 只控制项目私有渲染是否启用，取代含义过强的 `verification`。该语义修正不改变已保存预设版本和输出数值，不替代人工审核。导出清单升级为 1.1.0，在 `validation.scope = project_export_preset` 之外新增 `platformAcceptance.status = not_evaluated`，即使项目预设校验通过，也不声称平台或账号接受。平台规格、账号资格和发布结果仍需独立验证。

@@ -5,7 +5,8 @@ export type VideoExportPreset = {
   platform: VideoPlatform;
   surface: "video" | "reels";
   version: string;
-  verification: "verified" | "pending";
+  /** Availability for private project rendering, not platform acceptance. */
+  availability: "enabled" | "disabled";
   sourceUrl: string;
   container: "mp4";
   videoCodec: "h264";
@@ -18,12 +19,13 @@ export type VideoExportPreset = {
   subtitlePolicy: "optional";
 };
 
+/** Exact project output choices. Source URLs are references, not complete platform certification. */
 export const videoExportPresets: readonly VideoExportPreset[] = [
   {
     platform: "youtube",
     surface: "video",
     version: "2026-08",
-    verification: "verified",
+    availability: "enabled",
     sourceUrl: "https://support.google.com/youtube/answer/1722171",
     container: "mp4",
     videoCodec: "h264",
@@ -39,7 +41,7 @@ export const videoExportPresets: readonly VideoExportPreset[] = [
     platform: "tiktok",
     surface: "video",
     version: "2026-08",
-    verification: "verified",
+    availability: "enabled",
     sourceUrl: "https://developers.tiktok.com/docs/en/content-posting-api-media-transfer-guide",
     container: "mp4",
     videoCodec: "h264",
@@ -55,7 +57,7 @@ export const videoExportPresets: readonly VideoExportPreset[] = [
     platform: "facebook",
     surface: "reels",
     version: "2026-08",
-    verification: "verified",
+    availability: "enabled",
     sourceUrl: "https://developers.facebook.com/documentation/video-api/guides/reels-publishing",
     container: "mp4",
     videoCodec: "h264",
@@ -71,7 +73,7 @@ export const videoExportPresets: readonly VideoExportPreset[] = [
     platform: "instagram",
     surface: "reels",
     version: "2026-08",
-    verification: "verified",
+    availability: "enabled",
     sourceUrl:
       "https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media",
     container: "mp4",
@@ -88,7 +90,7 @@ export const videoExportPresets: readonly VideoExportPreset[] = [
     platform: "x",
     surface: "video",
     version: "2026-08",
-    verification: "verified",
+    availability: "enabled",
     sourceUrl: "https://docs.x.com/x-api/media/quickstart/best-practices",
     container: "mp4",
     videoCodec: "h264",
@@ -142,8 +144,7 @@ export class VideoExportValidationError extends Error {
 export function validateVideoExport(media: z.infer<typeof mediaSchema>) {
   const value = mediaSchema.parse(media);
   const preset = videoExportPresets.find((item) => item.platform === value.platform)!;
-  if (preset.verification !== "verified")
-    throw new Error(`${value.platform} 导出预设尚未经官方规格核验。`);
+  if (preset.availability !== "enabled") throw new Error(`${value.platform} 项目导出预设未启用。`);
   const violations: VideoExportViolation[] = [];
   for (const field of [
     "container",

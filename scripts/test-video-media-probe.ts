@@ -93,6 +93,8 @@ console.log("PASS measured frame rates are neither rounded nor malformed");
 const manifest = createVideoExportManifest(receipt);
 assert.equal(manifest.validation.status, "passed");
 assert.equal(manifest.validation.scope, "project_export_preset");
+assert.equal(manifest.schemaVersion, "1.1.0");
+assert.equal(manifest.platformAcceptance.status, "not_evaluated");
 assert.equal(manifest.reviewStatus, "review_required");
 assert.deepEqual(manifest.measured, receipt.measured);
 assert.equal("sourceAssetRef" in manifest, false);

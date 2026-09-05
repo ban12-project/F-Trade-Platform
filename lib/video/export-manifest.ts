@@ -22,7 +22,7 @@ export function createVideoExportManifest(input: VideoExportArtifact) {
       item.surface === artifact.surface &&
       item.version === artifact.presetVersion &&
       item.sourceUrl === artifact.presetSourceUrl &&
-      item.verification === "verified",
+      item.availability === "enabled",
   );
   let validation: ManifestValidation = {
     scope: "project_export_preset",
@@ -50,7 +50,7 @@ export function createVideoExportManifest(input: VideoExportArtifact) {
     }
   }
   return {
-    schemaVersion: "1.0.0",
+    schemaVersion: "1.1.0",
     exportId: artifact.id,
     videoId: artifact.videoId,
     platform: artifact.platform,
@@ -61,6 +61,11 @@ export function createVideoExportManifest(input: VideoExportArtifact) {
     reviewStatus: artifact.status,
     renderedAt: artifact.createdAt,
     validation,
+    platformAcceptance: {
+      status: "not_evaluated" as const,
+      reason:
+        "Project preset checks do not establish current platform or account-specific acceptance.",
+    },
   };
 }
 
