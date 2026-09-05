@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { z } from "zod";
 import contentSchema from "@/contracts/content/content.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
-import { getDatabase } from "@/lib/db/client";
+import { type Database, getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
   approval,
@@ -60,6 +60,7 @@ export type ContentCatalogEntry = {
 };
 
 export type ContentCatalogDetail = ContentCatalogEntry & {
+  version: number;
   content: ContentRecord;
   approvalId: string | null;
 };
@@ -651,7 +652,12 @@ export async function getContentCatalogDetail(
     .limit(1);
   const entry = contentEntry(row, approvalRow);
   return entry
-    ? { ...entry, content: row.payload as ContentRecord, approvalId: approvalRow?.id ?? null }
+    ? {
+        ...entry,
+        version: row.version,
+        content: row.payload as ContentRecord,
+        approvalId: approvalRow?.id ?? null,
+      }
     : null;
 }
 
@@ -671,10 +677,14 @@ export async function getProjectContentCatalogDetail(
   return link ? getContentCatalogDetail(contentId) : null;
 }
 
-export async function decideContentReview(input: ContentReviewInput, actorId: string) {
+export async function decideContentReview(
+  input: ContentReviewInput,
+  actorId: string,
+  database: Database = getDatabase(),
+) {
   const now = new Date();
   const eventId = randomUUID();
-  return getDatabase().transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,
@@ -685,6 +695,8 @@ export async function decideContentReview(input: ContentReviewInput, actorId: st
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, input.contentId), eq(aggregateRecord.type, "content")))
       .for("update");
+    if (aggregate && String(aggregate.version) !== input.reviewedVersion)
+      throw new Error("内容已更新，请刷新后重新审核当前版本。");
     if (!aggregate || aggregate.state !== "CONTENT_REVIEW_REQUIRED")
       throw new Error("该内容当前不处于待审核状态。");
     const [pendingApproval] = await tx
@@ -699,6 +711,8 @@ export async function decideContentReview(input: ContentReviewInput, actorId: st
       )
       .for("update");
     if (!pendingApproval) throw new Error("未找到待处理的 Gate 01 内容审核请求。");
+    if (pendingApproval.id !== input.approvalId)
+      throw new Error("审核请求已更新，请刷新后重新审核。");
     const nextState =
       input.decision === "approved" ? "CONTENT_APPROVED" : "CONTENT_REVISION_REQUIRED";
     const content = parseContent({

@@ -419,7 +419,13 @@ function ContentReview({
   );
   const form = useForm<ReviewValues>({
     resolver: zodResolver(contentReviewFormSchema),
-    defaultValues: { contentId: detail.id, evidenceRef: "", notes: "" },
+    defaultValues: {
+      contentId: detail.id,
+      reviewedVersion: String(detail.version),
+      approvalId: detail.approvalId ?? "",
+      evidenceRef: "",
+      notes: "",
+    },
   });
   useWorkspaceDirty(`content-review-${detail.id}`, form.formState.isDirty);
   useEffect(() => {
@@ -484,7 +490,9 @@ function ContentReview({
         <Card>
           <CardHeader>
             <CardTitle>Gate 01 内容审核</CardTitle>
-            <CardDescription>批准不等于发布；请先明确选择。</CardDescription>
+            <CardDescription>
+              审核版本 {detail.version}。批准不等于发布；请先明确选择。
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form id="content-review" onSubmit={form.handleSubmit(submit)}>
@@ -746,6 +754,7 @@ export function ContentPanel({
             )}
             {detail ? (
               <ContentReview
+                key={`${detail.id}:${detail.version}:${detail.approvalId}`}
                 projectId={projectId}
                 detail={detail}
                 product={products.find((item) => item.id === detail.productId)}
