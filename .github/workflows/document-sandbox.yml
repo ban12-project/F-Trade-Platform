@@ -1,0 +1,43 @@
+name: document-sandbox
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/document-sandbox.yml'
+      - 'ops/video-sandbox/Dockerfile'
+      - 'scripts/markitdown_preprocess.py'
+      - 'scripts/pdf_catalog_layout.py'
+      - 'scripts/synthetic_pdf_fixture.py'
+      - 'scripts/test-document-sandbox.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/document-sandbox.yml'
+      - 'ops/video-sandbox/Dockerfile'
+      - 'scripts/markitdown_preprocess.py'
+      - 'scripts/pdf_catalog_layout.py'
+      - 'scripts/synthetic_pdf_fixture.py'
+      - 'scripts/test-document-sandbox.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  document-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the runtime with only required source files
+        run: |
+          mkdir -p /tmp/document-image/scripts
+          cp scripts/markitdown_preprocess.py scripts/pdf_catalog_layout.py /tmp/document-image/scripts/
+          docker build -f ops/video-sandbox/Dockerfile -t f-trade-document-smoke /tmp/document-image
+      - name: Verify the actual image without network access
+        run: |
+          docker run --rm --network none -v "$PWD/scripts:/test:ro" f-trade-document-smoke /opt/markitdown/bin/python3 /test/test-document-sandbox.py

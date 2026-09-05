@@ -55,6 +55,6 @@ python scripts/test-local-ocr-preprocess.py --native-pdf --local-ocr
 node --import tsx scripts/test-pdf-catalog-preflight.ts
 ```
 
-前两项分别包含真实合成 PDF 解析，以及真实 Poppler/Tesseract 对四页原生/扫描/空白混合 PDF 的处理。第三项从合成 PDF 文件运行到 CLI 报告，证明重复记录、物理页和版式人工复核提示保留。CI 安装所需的 Poppler/Tesseract。运行镜像固定 `pdfplumber==0.11.10` 并包含表格恢复模块；已部署的不可变 Sandbox 镜像需要重建后才能使用此能力。镜像包含 Poppler/Tesseract；Sandbox 保持 deny-all 网络，并仅在服务端 `F_TRADE_LOCAL_OCR_ENABLED=1` 时启用本地 OCR，语言配置仍由 Python 校验。
+前两项分别包含真实合成 PDF 解析，以及真实 Poppler/Tesseract 对四页原生/扫描/空白混合 PDF 的处理。第三项从合成 PDF 文件运行到 CLI 报告，证明重复记录、物理页和版式人工复核提示保留。CI 安装所需的 Poppler/Tesseract。文档运行时相关文件变化还会触发 `document-sandbox`：实际构建镜像，再以禁用网络的容器验证表格、重复记录、扫描页和空白页。运行镜像固定 `pdfplumber==0.11.10` 并包含表格恢复模块；已部署的不可变 Sandbox 镜像需要重建后才能使用此能力。镜像包含 Poppler/Tesseract；Sandbox 保持 deny-all 网络，并仅在服务端 `F_TRADE_LOCAL_OCR_ENABLED=1` 时启用本地 OCR，语言配置仍由 Python 校验。
 
 仍未执行商业模型、数据库导入、20-slot 正式验收和人工 Gate 01；#268、#5、#6 的这些条件没有被本轮代码测试替代。
