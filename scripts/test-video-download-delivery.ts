@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { videoProjectSchema } from "../lib/video/contracts";
 import {
   approvedVideoDownloadHeaders,
+  resolveApprovedVideoAccess,
   resolveApprovedVideoDownload,
 } from "../lib/video/download-policy";
 
@@ -86,6 +87,41 @@ const store = {
 const findApproved = async () => ({ state: "VIDEO_APPROVED", payload: approvedProject });
 
 void (async () => {
+  const manifestAccess = await resolveApprovedVideoAccess(
+    { user: { role: "user" } },
+    videoId,
+    findApproved,
+    async () => undefined,
+  );
+  assert.equal(manifestAccess.kind, "ready");
+  if (manifestAccess.kind !== "ready") throw new Error("Expected manifest access");
+  assert.equal(manifestAccess.artifact.id, approvedProject.exportArtifact?.id);
+  assert.equal(
+    (
+      await resolveApprovedVideoAccess(
+        null,
+        videoId,
+        async () => {
+          throw new Error("unauthorized database access");
+        },
+        async () => undefined,
+      )
+    ).kind,
+    "forbidden",
+  );
+  assert.equal(
+    (
+      await resolveApprovedVideoAccess(
+        { user: { role: "user" } },
+        videoId,
+        findApproved,
+        async () => {
+          throw new Error("rights revoked");
+        },
+      )
+    ).kind,
+    "unavailable",
+  );
   let revalidated = 0;
   const result = await resolveApprovedVideoDownload(
     { user: { role: "user" } },

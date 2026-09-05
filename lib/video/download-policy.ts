@@ -2,7 +2,12 @@ import { z } from "zod";
 
 import { hasPermission } from "@/lib/authz";
 
-import { isPrivateTestOnlyVideo, type VideoProject, videoProjectSchema } from "./contracts";
+import {
+  isPrivateTestOnlyVideo,
+  type VideoExportArtifact,
+  type VideoProject,
+  videoProjectSchema,
+} from "./contracts";
 import type { PrivateGeneratedVideoRead } from "./private-asset-store";
 
 export type DownloadSession = { user?: { role?: string | null } | null } | null;
@@ -22,14 +27,16 @@ export type ApprovedVideoDownloadResolution =
   | { kind: "unavailable" }
   | { kind: "ready"; asset: PrivateGeneratedVideoRead; filename: string };
 
-export async function resolveApprovedVideoDownload(
+type ApprovedVideoAccess =
+  | { kind: "forbidden" | "not_found" | "unavailable" }
+  | { kind: "ready"; artifact: VideoExportArtifact; assetRef: string; filename: string };
+
+export async function resolveApprovedVideoAccess(
   session: DownloadSession,
   videoIdInput: string,
-  range: string | null | undefined,
-  store: DownloadStore,
   findVideo: LoadVideo,
   assertCurrent: RevalidateVideo,
-): Promise<ApprovedVideoDownloadResolution> {
+): Promise<ApprovedVideoAccess> {
   if (!hasPermission(session?.user?.role, "workspace:view")) return { kind: "forbidden" };
   const videoId = z.uuid().safeParse(videoIdInput);
   if (!videoId.success) return { kind: "not_found" };
@@ -51,13 +58,27 @@ export async function resolveApprovedVideoDownload(
   } catch {
     return { kind: "unavailable" };
   }
-  const asset = await store.getGeneratedVideo(project.renderedAssetRef, range);
-  if (!asset) return { kind: "not_found" };
   return {
     kind: "ready",
-    asset,
+    artifact: project.exportArtifact,
+    assetRef: project.renderedAssetRef,
     filename: `f-trade-${project.exportArtifact.platform}-${videoId.data.slice(0, 8)}.mp4`,
   };
+}
+
+export async function resolveApprovedVideoDownload(
+  session: DownloadSession,
+  videoIdInput: string,
+  range: string | null | undefined,
+  store: DownloadStore,
+  findVideo: LoadVideo,
+  assertCurrent: RevalidateVideo,
+): Promise<ApprovedVideoDownloadResolution> {
+  const access = await resolveApprovedVideoAccess(session, videoIdInput, findVideo, assertCurrent);
+  if (access.kind !== "ready") return { kind: access.kind };
+  const asset = await store.getGeneratedVideo(access.assetRef, range);
+  if (!asset) return { kind: "not_found" };
+  return { kind: "ready", asset, filename: access.filename };
 }
 
 export function approvedVideoDownloadHeaders(asset: PrivateGeneratedVideoRead, filename: string) {

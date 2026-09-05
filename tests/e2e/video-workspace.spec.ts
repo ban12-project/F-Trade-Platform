@@ -57,3 +57,20 @@ test("video workspace exposes upload and post-render review without generation c
     /\/api\/video-preview\/asset-rendered-preview-001$/,
   );
 });
+
+test("approved video offers a private manifest download while review drafts do not", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/testing/video-workspace?state=approved");
+  const manifest = page.getByRole("link", { name: "下载导出清单" });
+  await expect(manifest).toBeVisible();
+  await expect(manifest).toHaveAttribute("download", "");
+  const href = await manifest.getAttribute("href");
+  expect(href).toBe("/api/video-download/00000000-0000-4000-8000-000000000401/manifest");
+  const denied = await request.get(href!);
+  expect(denied.status()).toBe(403);
+  expect(denied.headers()["cache-control"]).toBe("no-store");
+  await page.goto("/testing/video-workspace?state=review");
+  await expect(page.getByRole("link", { name: "下载导出清单" })).toHaveCount(0);
+});
