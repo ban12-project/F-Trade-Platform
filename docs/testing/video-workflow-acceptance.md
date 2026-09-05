@@ -48,7 +48,7 @@ pnpm test:e2e tests/e2e/project-workflow.spec.ts tests/e2e/video-workspace.spec.
 
 ## Issue #126：多平台真实媒体回归（2026-09-05）
 
-`pnpm test:ffmpeg-renderer` 使用同一个全黑合成 master（320×240、25 FPS、44.1 kHz 单声道测试音），生成五个平台的项目预设版本。两个 1.5 秒片段分别保留原声和静音，并使用 cover／contain；成片通过 ffprobe 校验 H.264、AAC、尺寸、帧率和时间线时长。解码后的像素检查分别验证字幕和 CTA，PCM 能量检查验证原声与静音，生成的导出清单仍为 `review_required`。原始 master 的摘要在拒绝校验和渲染前后保持一致。
+`pnpm test:ffmpeg-renderer` 使用同一个黑底合成 master（320×240、25 FPS、44.1 kHz 单声道测试音），生成五个平台的项目预设版本。两个 1.5 秒片段分别保留原声和静音，并使用 cover／contain；成片通过 ffprobe 校验 H.264、AAC、尺寸、帧率和时间线时长。解码后的像素检查分别验证字幕和 CTA，PCM 能量检查验证原声与静音，生成的导出清单仍为 `review_required`。原始 master 的摘要在拒绝校验和渲染前后保持一致。
 
 该测试已加入 repository-validate CI；它实际执行本地 FFmpeg 后端，不等同于已验证 Vercel Sandbox 镜像、真实资料权利、人工批准或平台接收。生产 Sandbox 的同一拼接步骤也统一输出 48 kHz 双声道 AAC，以避免混合原声与静音片段时采样率／声道不同造成漂移。修复前 3 秒时间线实测为 3.288526 秒，超出导出契约允许的 0.1 秒偏差。
 
@@ -71,3 +71,11 @@ Meta 官方示例仓库的固定版本 `6c9706651c2ca0d21351764bb9e35a2fca0988a3
 - [Facebook 官方示例要求](https://github.com/fbsamples/reels_publishing_apis/blob/6c9706651c2ca0d21351764bb9e35a2fca0988a3/fb_reels_publishing_api_sample/README.md#video-requirements-for-publishing)：时长列为 4–60 秒，与项目 3–90 秒不一致。主文档本次无法读取，因此记录为未解决的来源冲突；没有把示例自动当作最新平台契约。
 
 预设中的 `availability` 只控制项目私有渲染是否启用，取代含义过强的 `verification`。该语义修正不改变已保存预设版本和输出数值，不替代人工审核。导出清单升级为 1.1.0，在 `validation.scope = project_export_preset` 之外新增 `platformAcceptance.status = not_evaluated`，即使项目预设校验通过，也不声称平台或账号接受。平台规格、账号资格和发布结果仍需独立验证。
+
+### 新成片编码证据
+
+清单 schema 1.2.0 记录 encoding contract 1.0.0。新生成导出物除尺寸、帧率、时长和编码名称外，还必须从 ffprobe 获得 `pix_fmt`、`sample_aspect_ratio`、`sample_rate` 和 `channels`，并将它们保存在导出物及清单中。项目输出要求为 yuv420p、1:1 方形像素、音频采样率不超过 48 kHz、单声道或双声道；其中音频范围依据上面的固定版本 Instagram 官方示例，像素格式及方形像素也与上面的 X 官方建议一致。这是项目选定的输出范围，不是所有平台可接受格式的穷举。
+
+本地 FFmpeg、Sandbox FFmpeg 和 Remotion Sandbox 使用相同的字段查询清单。未返回的字段保留 null；新导出校验报告具体缺失／不合格字段。旧记录缺少 encoding 时仍可读取，清单返回 unverified 并要求重新测量，不将旧记录补写成已核验。FFmpeg 两条渲染路径先按输入像素比例展开为方形像素，再缩放裁切，避免仅改像素比例标记导致画面变形。真实媒体矩阵使用 2:1 非方形像素源作为负向输入，验证五个平台成片均被归一化且保留完整编码测量。
+
+本检查尚不覆盖 closed GOP、progressive 标志、容器 atom 顺序和全部账号限制，不能替代平台接受性判定。

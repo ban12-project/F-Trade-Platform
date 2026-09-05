@@ -16,6 +16,12 @@ const measured = {
   fps: 30,
   durationSeconds: 5,
   subtitleStreamCount: 0,
+  encoding: {
+    pixelFormat: "yuv420p",
+    sampleAspectRatio: "1:1",
+    audioSampleRate: 48000,
+    audioChannels: 2,
+  },
 };
 const review = createReviewVideoExport({
   videoId: "00000000-0000-4000-8000-000000000701",

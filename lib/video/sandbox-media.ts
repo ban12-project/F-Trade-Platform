@@ -1,6 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
 
 import type { VideoProject } from "./contracts";
+import { videoProbeEntries } from "./encoding-contract";
 import { parseFfprobeOutput } from "./media-probe";
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
@@ -300,7 +301,7 @@ export async function renderMarketingTimelineInSandbox(
         "-t",
         String(scene.durationSeconds),
         "-vf",
-        `${framing},fps=${request.fps}`,
+        `scale=trunc(iw*sar/2)*2:ih,setsar=1,${framing},setsar=1,fps=${request.fps}`,
         "-c:v",
         "libx264",
         "-pix_fmt",
@@ -366,7 +367,7 @@ export async function renderMarketingTimelineInSandbox(
           "-v",
           "error",
           "-show_entries",
-          "format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate",
+          videoProbeEntries,
           "-of",
           "json",
           output,

@@ -1,6 +1,6 @@
 import { z } from "zod";
-
 import { marketingVideoDraftSchema } from "./edit-contracts";
+import { videoEncodingSchema } from "./encoding-contract";
 
 const privateRef = z
   .string()
@@ -40,6 +40,7 @@ export const videoExportArtifactSchema = z
         fps: z.number().positive(),
         durationSeconds: z.number().positive(),
         subtitleStreamCount: z.number().int().min(0),
+        encoding: videoEncodingSchema.optional(),
       })
       .strict(),
     createdAt: z.iso.datetime(),

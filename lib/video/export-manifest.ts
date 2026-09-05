@@ -30,7 +30,10 @@ export function createVideoExportManifest(input: VideoExportArtifact) {
     reason: "Recorded preset is not available for verification.",
     violations: [],
   };
-  if (preset) {
+  if (preset && !artifact.measured.encoding) {
+    validation.reason = "Historical export has no encoding measurements; re-probe is required.";
+  }
+  if (preset && artifact.measured.encoding) {
     try {
       validateProbedVideoExport(artifact.platform, artifact.measured);
       validation = {
@@ -50,7 +53,8 @@ export function createVideoExportManifest(input: VideoExportArtifact) {
     }
   }
   return {
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.2.0",
+    encodingContractVersion: "1.0.0",
     exportId: artifact.id,
     videoId: artifact.videoId,
     platform: artifact.platform,
