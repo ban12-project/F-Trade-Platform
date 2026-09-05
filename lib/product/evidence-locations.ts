@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 
+import { containsFitmentLabel } from "./source-labels";
+
 import type { ProductDraft } from "./verification";
 
 const MAX_EVIDENCE_LOCATIONS = 512;
 const MARKDOWN_SEPARATOR = /^:?-{3,}:?$/;
 const SUPPORTED_LABEL =
-  /\b(?:product\s+name|product\s+type|internal\s+sku|kit\s+no\.?|part\s+no\.?|type\s+no\.?|oe(?:m)?(?:\s+no\.?)?|application|vehicle\s+brand|vehicle\s+model|clutch\s+diameter|spline\s+count|spline\s+size|friction\s+material|kit\s+contents|gross\s+weight|net\s+weight|package\s+size|moq|estimated\s+lead\s+time|lead\s+time|packaging|supported\s+customization|customization|sample\s+available)\b|编号/i;
+  /\b(?:product\s+name|product\s+type|internal\s+sku|kit\s+no\.?|part\s+no\.?|type\s+no\.?|oe(?:m)?(?:\s+no\.?)?|clutch\s+diameter|spline\s+count|spline\s+size|friction\s+material|kit\s+contents|gross\s+weight|net\s+weight|package\s+size|moq|estimated\s+lead\s+time|lead\s+time|packaging|supported\s+customization|customization|sample\s+available)\b|编号/i;
 
 export type ProductAgentEvidenceLocation = {
   ref: string;
@@ -102,7 +104,7 @@ export function buildProductAgentEvidenceLocations(
       !separator.every((cell) => MARKDOWN_SEPARATOR.test(cell))
     )
       continue;
-    if (!header.some((cell) => SUPPORTED_LABEL.test(cell))) continue;
+    if (!header.some((cell) => SUPPORTED_LABEL.test(cell) || containsFitmentLabel(cell))) continue;
 
     tableLines.add(index);
     tableLines.add(index + 1);
@@ -130,7 +132,12 @@ export function buildProductAgentEvidenceLocations(
   }
 
   for (const [index, line] of lines.entries()) {
-    if (tableLines.has(index) || !line.trim() || !SUPPORTED_LABEL.test(line)) continue;
+    if (
+      tableLines.has(index) ||
+      !line.trim() ||
+      !(SUPPORTED_LABEL.test(line) || containsFitmentLabel(line))
+    )
+      continue;
     const text = line.trim();
     const lineNumber = index + 1;
     locations.push({
