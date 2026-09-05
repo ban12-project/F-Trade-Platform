@@ -57,7 +57,9 @@ function locationRef(
     .digest("hex")
     .slice(0, 32);
   const kindToken = kind === "table_row" ? "row" : "line";
-  return `evidence-loc-${kindToken}-${String(startLine).padStart(6, "0")}-${String(endLine).padStart(6, "0")}-${digest}`;
+  const physicalPage = /(?:#|&)pdf-page=(\d+)/.exec(baseEvidenceRef)?.[1];
+  const pageToken = physicalPage ? `page-${physicalPage}-` : "";
+  return `evidence-loc-${kindToken}-${pageToken}${String(startLine).padStart(6, "0")}-${String(endLine).padStart(6, "0")}-${digest}`;
 }
 
 function assertLocationLimit(locations: ProductAgentEvidenceLocation[]) {
