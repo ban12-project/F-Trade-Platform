@@ -104,26 +104,81 @@ export const videoExportPresets: readonly VideoExportPreset[] = [
 
 const mediaSchema = z.object({
   platform: videoPlatformSchema,
-  container: z.literal("mp4"),
-  videoCodec: z.literal("h264"),
-  audioCodec: z.literal("aac"),
+  container: z.string().min(1),
+  videoCodec: z.string().min(1),
+  audioCodec: z.string().min(1).nullable(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
-  fps: z.number().int().positive(),
+  fps: z.number().positive(),
   durationSeconds: z.number().positive(),
 });
+
+export type VideoExportViolation = {
+  field: Exclude<keyof z.infer<typeof mediaSchema>, "platform">;
+  actual: string | number | null;
+  expected: string | number;
+  remediation: "reencode" | "resize_or_crop" | "trim_or_review" | "add_audio";
+};
+
+/** Rejects media without modifying it; callers can display every failed field. */
+export class VideoExportValidationError extends Error {
+  constructor(
+    public readonly platform: VideoPlatform,
+    public readonly presetVersion: string,
+    public readonly violations: readonly VideoExportViolation[],
+  ) {
+    super(
+      `导出媒体不满足预设 ${platform}@${presetVersion}：${violations
+        .map(
+          (item) =>
+            `${item.field}=${item.actual ?? "missing"}，要求 ${item.expected}（${item.remediation}）`,
+        )
+        .join("；")}`,
+    );
+    this.name = "VideoExportValidationError";
+  }
+}
+
 export function validateVideoExport(media: z.infer<typeof mediaSchema>) {
   const value = mediaSchema.parse(media);
   const preset = videoExportPresets.find((item) => item.platform === value.platform)!;
   if (preset.verification !== "verified")
     throw new Error(`${value.platform} 导出预设尚未经官方规格核验。`);
+  const violations: VideoExportViolation[] = [];
+  for (const field of [
+    "container",
+    "videoCodec",
+    "audioCodec",
+    "width",
+    "height",
+    "fps",
+  ] as const) {
+    if (value[field] !== preset[field]) {
+      violations.push({
+        field,
+        actual: value[field],
+        expected: preset[field],
+        remediation:
+          field === "width" || field === "height"
+            ? "resize_or_crop"
+            : field === "audioCodec" && value.audioCodec === null
+              ? "add_audio"
+              : "reencode",
+      });
+    }
+  }
   if (
-    value.width !== preset.width ||
-    value.height !== preset.height ||
-    value.fps !== preset.fps ||
     value.durationSeconds < preset.minDurationSeconds ||
     value.durationSeconds > preset.maxDurationSeconds
-  )
-    throw new Error("导出媒体不满足已核验平台预设。");
+  ) {
+    violations.push({
+      field: "durationSeconds",
+      actual: value.durationSeconds,
+      expected: `${preset.minDurationSeconds}..${preset.maxDurationSeconds}`,
+      remediation: "trim_or_review",
+    });
+  }
+  if (violations.length)
+    throw new VideoExportValidationError(value.platform, preset.version, violations);
   return preset;
 }

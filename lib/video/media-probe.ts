@@ -32,8 +32,10 @@ export type ProbedVideo = {
 
 function parseRate(value: string | undefined) {
   if (!value) throw new Error("ffprobe output is missing video frame rate");
-  const [numerator, denominator] = value.split("/").map(Number);
-  const fps = denominator ? numerator / denominator : numerator;
+  if (!/^\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?$/.test(value))
+    throw new Error("ffprobe returned an invalid video frame rate");
+  const [numerator, denominator = 1] = value.split("/").map(Number);
+  const fps = numerator / denominator;
   if (!Number.isFinite(fps) || fps <= 0)
     throw new Error("ffprobe returned an invalid video frame rate");
   return fps;
@@ -87,15 +89,14 @@ export async function inspectVideoFile(
 /** Validates measured media rather than trusting metadata supplied by a caller. */
 export function validateProbedVideoExport(platform: VideoPlatform, media: ProbedVideo) {
   const parsedPlatform = videoPlatformSchema.parse(platform);
-  if (media.audioCodec === null) throw new Error("导出媒体缺少音频流，无法验证 AAC 编码。 ");
   return validateVideoExport({
     platform: parsedPlatform,
     container: media.container,
-    videoCodec: media.videoCodec as "h264",
-    audioCodec: media.audioCodec as "aac",
+    videoCodec: media.videoCodec,
+    audioCodec: media.audioCodec,
     width: media.width,
     height: media.height,
-    fps: Math.round(media.fps),
+    fps: media.fps,
     durationSeconds: media.durationSeconds,
   });
 }
