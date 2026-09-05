@@ -6,15 +6,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { videoProjectDraftFormSchema } from "@/lib/form-schemas";
-import {
-  saveVideoCanvasSchema,
-  type VideoCanvasDocument,
-  videoCanvasDocumentSchema,
-} from "@/lib/video/canvas-contracts";
-import {
-  saveVideoCanvasDocument,
-  VideoCanvasRevisionConflictError,
-} from "@/lib/video/canvas-store";
+import { type VideoCanvasDocument, videoCanvasDocumentSchema } from "@/lib/video/canvas-contracts";
 import { createVideoProject, createVideoProjectFromCanvas } from "@/lib/video/store";
 import { prepareUploadedVideoAssets } from "@/lib/video/uploaded-assets";
 
@@ -55,33 +47,6 @@ export async function createVideoProjectAction(
       status: "error",
       message: error instanceof Error ? error.message : "无法创建视频项目。",
     };
-  }
-}
-
-export type SaveVideoCanvasActionState = {
-  status: "success" | "error" | "conflict";
-  message: string;
-  revision?: number;
-};
-
-export async function saveVideoCanvasAction(input: {
-  expectedRevision: number;
-  document: VideoCanvasDocument;
-}): Promise<SaveVideoCanvasActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "video:write"))
-    return { status: "error", message: "无权保存画布。" };
-  const parsed = saveVideoCanvasSchema.safeParse(input);
-  if (!parsed.success)
-    return { status: "error", message: parsed.error.issues[0]?.message ?? "画布数据格式不正确。" };
-  try {
-    const result = await saveVideoCanvasDocument(parsed.data, session.user.id);
-    revalidatePath("/workspace", "layout");
-    return { status: "success", message: "云端草稿已保存。", revision: result.revision };
-  } catch (error) {
-    if (error instanceof VideoCanvasRevisionConflictError)
-      return { status: "conflict", message: error.message };
-    return { status: "error", message: error instanceof Error ? error.message : "无法保存画布。" };
   }
 }
 

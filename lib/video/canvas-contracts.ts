@@ -215,12 +215,3 @@ export const videoCanvasDocumentSchema = z
   });
 
 export type VideoCanvasDocument = z.infer<typeof videoCanvasDocumentSchema>;
-
-export const saveVideoCanvasSchema = z
-  .object({
-    expectedRevision: z.number().int().min(0).max(2_147_483_646),
-    document: videoCanvasDocumentSchema,
-  })
-  .strict();
-
-export type SaveVideoCanvasInput = z.infer<typeof saveVideoCanvasSchema>;
