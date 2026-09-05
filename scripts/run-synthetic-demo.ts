@@ -13,6 +13,7 @@ import {
   decideDeliveryConfirmation,
   requestDeliveryConfirmation,
 } from "../lib/delivery/confirmation";
+import type { ProductReady } from "../lib/product/verification";
 import {
   acceptInboundChannelEvent,
   assessInboundDelivery,
@@ -33,6 +34,7 @@ type JsonObject = Record<string, unknown>;
 
 export interface SyntheticDemoReport {
   classification: "synthetic";
+  inputLinks: { productId: string; contentProductId: string; rfqOe: string };
   finalStates: Record<string, string>;
   transitionCount: number;
   approvedGates: string[];
@@ -102,7 +104,32 @@ function assertSyntheticIdentifier(value: unknown, label: string): asserts value
   }
 }
 
-export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
+export async function runSyntheticDemo(testProduct?: ProductReady): Promise<SyntheticDemoReport> {
+  const selectedProduct = structuredClone(testProduct ?? productFixture);
+  const selectedContent = structuredClone(contentFixture);
+  const selectedRfq = structuredClone(rfqFixture);
+  const selectedQuotation = structuredClone(quotationFixture);
+  if (testProduct) {
+    assertSyntheticIdentifier(testProduct.record_id, "testProduct.record_id");
+    const oe = testProduct.product.oe_numbers;
+    if (!Array.isArray(oe) || typeof oe[0] !== "string")
+      throw new Error("Synthetic downstream fixture requires an explicit test OE");
+    selectedContent.product_id = testProduct.record_id;
+    selectedContent.content_id = `synthetic-content-${testProduct.record_id}`;
+    selectedRfq.rfq_id = `synthetic-rfq-${testProduct.record_id}`;
+    selectedQuotation.handoff_id = `synthetic-quotation-${testProduct.record_id}`;
+    selectedQuotation.rfq_id = selectedRfq.rfq_id;
+    selectedContent.product_facts = [
+      {
+        field: "product_type",
+        value: String(testProduct.product.product_type),
+        evidence_ref: testProduct.field_evidence["product.product_type"] ?? "",
+      },
+    ];
+    selectedRfq.product.product_type = String(testProduct.product.product_type);
+    selectedRfq.product.oe_number = oe[0];
+    selectedRfq.product.vehicle_model = String(testProduct.product.vehicle_model ?? "Mock model");
+  }
   const [
     productSchema,
     contentSchema,
@@ -117,10 +144,10 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
     contentSchemaJson,
     rfqSchemaJson,
     quotationSchemaJson,
-    productFixture,
-    contentFixture,
-    rfqFixture,
-    quotationFixture,
+    selectedProduct,
+    selectedContent,
+    selectedRfq,
+    selectedQuotation,
   ] as unknown as [
     JsonObject,
     JsonObject,
@@ -146,7 +173,7 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
   const contentId = content.content_id;
   const rfqId = rfq.rfq_id;
   const quotationId = quotation.handoff_id;
-  const leadId = "synthetic-lead-demo-001";
+  const leadId = testProduct ? `${testProduct.record_id}-lead` : "synthetic-lead-demo-001";
   const deliveryConfirmationId = "synthetic-delivery-confirmation-001";
   const socialPolicy = {
     channelRef: "synthetic-facebook-channel",
@@ -522,6 +549,11 @@ export async function runSyntheticDemo(): Promise<SyntheticDemoReport> {
 
   return {
     classification: "synthetic",
+    inputLinks: {
+      productId: String(productId),
+      contentProductId: String(content.product_id),
+      rfqOe: String((rfq.product as JsonObject).oe_number),
+    },
     finalStates,
     transitionCount,
     approvedGates: ["gate_01_truth", "gate_02_quote", "gate_03_delivery"],
