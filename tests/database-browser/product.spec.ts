@@ -123,7 +123,7 @@ test("authenticated browser creates and reviews a mock product through real Serv
   expect(pending.status).toBe("pending");
   // Navigate using the actual record link after the action refreshes the page.
   await page.getByRole("tab", { name: "记录 1", exact: true }).click();
-  await page.getByRole("link", { name: new RegExp(sku) }).click();
+  await page.getByRole("button", { name: new RegExp(sku) }).click();
   await expect(page).toHaveURL(new RegExp(`item=${created.id}`));
   const review = page.locator("form#product-review");
   await review.getByRole("combobox").first().click();
@@ -152,7 +152,7 @@ test("authenticated browser creates and reviews a mock product through real Serv
     )
     .toBe("PRODUCT_READY");
   await page.reload();
-  await expect(page.getByRole("link", { name: new RegExp(sku) })).toContainText("已核验");
+  await expect(page.getByRole("button", { name: new RegExp(sku) })).toContainText("已核验");
   await expect(page.locator("form#product-review")).toHaveCount(0);
 
   const [ready] = await db
