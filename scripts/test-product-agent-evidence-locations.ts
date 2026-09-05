@@ -328,3 +328,29 @@ assert.throws(
     finalizeProductAgentDraft(chineseDraft, { ...chineseSource, source_text: "OE: 999999XD99999" }),
   /explicitly labelled source value/,
 );
+
+// A component's OE in a different column is not the main record's OE.
+const componentSource = {
+  ...source,
+  source_text:
+    "| Part No. | OEM No. | Disc PTO |\n| --- | --- | --- |\n| RYC-SYN001 | SYN-PRIMARY | OEM: SYN-COMPONENT |",
+};
+const componentDraft = {
+  record_id: source.record_id,
+  source_ref: source.source_ref,
+  evidence_refs: source.evidence_refs,
+  field_evidence: { "product.oe_numbers": source.evidence_refs[0] },
+  verification_status: "review_required",
+  blocking_missing_fields: [],
+  optional_missing_fields: [],
+  product: { oe_numbers: ["SYN-PRIMARY"] },
+};
+assert.doesNotThrow(() => finalizeProductAgentDraft(componentDraft, componentSource));
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      { ...componentDraft, product: { oe_numbers: ["SYN-COMPONENT"] } },
+      componentSource,
+    ),
+  /explicitly listed under an OE/,
+);
