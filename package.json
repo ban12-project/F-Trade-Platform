@@ -18,7 +18,7 @@
     "start": "next start",
     "product-agent": "tsx scripts/run-product-agent.ts",
     "product-agent:catalog": "tsx scripts/run-product-agent-catalog.ts",
-    "test:product-stream": "tsx scripts/test-product-stream.ts && tsx scripts/test-product-stream-store.ts && tsx scripts/test-product-stream-transport.ts && tsx scripts/test-product-stream-model.ts",
+    "test:product-stream": "tsx scripts/test-product-stream.ts && tsx scripts/test-product-stream-store.ts && tsx scripts/test-product-stream-transport.ts && tsx scripts/test-product-stream-model.ts && tsx scripts/test-product-source-images.ts",
     "test:product-agent-evidence": "tsx scripts/test-product-agent-evidence-locations.ts",
     "test:catalog-preflight": "tsx scripts/test-product-catalog-preflight.ts",
     "test:product-catalog-entry": "tsx scripts/test-product-catalog-entry.ts",
