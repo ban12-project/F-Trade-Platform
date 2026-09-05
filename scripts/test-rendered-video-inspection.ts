@@ -15,10 +15,27 @@ async function main() {
   try {
     const filePath = join(workspace, "synthetic.mp4");
     await execFileAsync(process.env.FFMPEG_BIN ?? "ffmpeg", [
-      "-hide_banner", "-loglevel", "error", "-y",
-      "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=30:d=1",
-      "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-      "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=1080x1920:r=30:d=1",
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc=channel_layout=stereo:sample_rate=48000",
+      "-t",
+      "1",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-shortest",
       filePath,
     ]);
 

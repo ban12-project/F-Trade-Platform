@@ -23,20 +23,20 @@ jobs:
     environment: ${{ inputs.provider }}-product-agent-eval
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          version: "11.22.0"
-      - uses: actions/setup-node@v4
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v5
         with:
-          node-version: "24"
-          cache: pnpm
+          cache: true
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
       - name: Run deterministic Product Agent safety tests
         run: pnpm exec playwright test tests/e2e/product-agent.spec.ts
       - name: Set up Harbor
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - name: Install Harbor
         run: uv tool install harbor
       - name: Build Product Agent evaluation image
@@ -94,7 +94,7 @@ jobs:
         run: python scripts/validate-harbor-product-agent-results.py
       - name: Upload sanitized Harbor summary
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: harbor-product-agent-results
           path: harbor-artifacts/product-agent-summary.json

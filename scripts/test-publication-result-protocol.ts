@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
-import { signPublicationWorkerResult, verifyPublicationWorkerResult } from "../lib/social/publication-result-protocol";
+import {
+  signPublicationWorkerResult,
+  verifyPublicationWorkerResult,
+} from "../lib/social/publication-result-protocol";
 
 process.env.SOCIAL_WORKER_SIGNING_KEY = Buffer.alloc(32, 7).toString("base64");
 const now = new Date("2026-09-04T08:00:00.000Z");
@@ -13,8 +16,35 @@ const result = {
 };
 const signed = signPublicationWorkerResult(result);
 assert.deepEqual(verifyPublicationWorkerResult(signed, result.workerId, now), result);
-assert.throws(() => verifyPublicationWorkerResult({ ...signed, signature: `${signed.signature.slice(0, -1)}x` }, result.workerId, now), /signature/);
-assert.throws(() => verifyPublicationWorkerResult(signed, "other-worker", now), /unexpected worker/);
-assert.throws(() => verifyPublicationWorkerResult(signed, result.workerId, new Date(now.getTime() + 5 * 60_000 + 1)), /expired/);
-assert.throws(() => signPublicationWorkerResult({ ...result, outcome: "unknown", externalPublicationRef: undefined }), /failure code/);
+assert.throws(
+  () =>
+    verifyPublicationWorkerResult(
+      { ...signed, signature: `${signed.signature.slice(0, -1)}x` },
+      result.workerId,
+      now,
+    ),
+  /signature/,
+);
+assert.throws(
+  () => verifyPublicationWorkerResult(signed, "other-worker", now),
+  /unexpected worker/,
+);
+assert.throws(
+  () =>
+    verifyPublicationWorkerResult(
+      signed,
+      result.workerId,
+      new Date(now.getTime() + 5 * 60_000 + 1),
+    ),
+  /expired/,
+);
+assert.throws(
+  () =>
+    signPublicationWorkerResult({
+      ...result,
+      outcome: "unknown",
+      externalPublicationRef: undefined,
+    }),
+  /failure code/,
+);
 console.log("PASS signed publication result protocol");

@@ -1,5 +1,5 @@
-import { contentDraftFormSchema, contentReviewFormSchema } from "../lib/form-schemas";
 import { assertContentVisualInstruction, buildContentDraft } from "../lib/content/store";
+import { contentDraftFormSchema, contentReviewFormSchema } from "../lib/form-schemas";
 import type { ProductReady } from "../lib/product/verification";
 import { assertTransition } from "../lib/workflow/transitions";
 
@@ -14,7 +14,8 @@ const input = contentDraftFormSchema.parse({
   body: "This copy is synthetic and must be reviewed before publication.",
   callToAction: "Share application details for human review.",
   hashtags: "#SyntheticDemo, #Clutch",
-  visualInstruction: "Use a clearly labelled synthetic product mockup without engineering callouts.",
+  visualInstruction:
+    "Use a clearly labelled synthetic product mockup without engineering callouts.",
 });
 const product: ProductReady = {
   record_id: productId,
@@ -29,14 +30,31 @@ const product: ProductReady = {
   verification_status: "verified",
   blocking_missing_fields: [],
   optional_missing_fields: [],
-  product: { product_name: "Synthetic clutch", product_type: "clutch_disc", internal_sku: "SYN-001", oe_numbers: ["SYN-OE-001"] },
+  product: {
+    product_name: "Synthetic clutch",
+    product_type: "clutch_disc",
+    internal_sku: "SYN-001",
+    oe_numbers: ["SYN-OE-001"],
+  },
   approval_ref: "synthetic-approval-001",
 };
 const content = buildContentDraft(input, product, "00000000-0000-4000-8000-000000000002");
-if (content.status !== "review_required" || content.product_facts[1]?.value !== "clutch_disc" || content.product_facts[1]?.evidence_ref !== "evidence-product-001" || content.product_facts[0]?.field !== "product.product_name") {
+if (
+  content.status !== "review_required" ||
+  content.product_facts[1]?.value !== "clutch_disc" ||
+  content.product_facts[1]?.evidence_ref !== "evidence-product-001" ||
+  content.product_facts[0]?.field !== "product.product_name"
+) {
   throw new Error("Content draft must derive its product fact and evidence from ProductReady");
 }
-if (contentReviewFormSchema.safeParse({ contentId: "invalid", decision: "approved", evidenceRef: "evidence-review-001", notes: "" }).success) {
+if (
+  contentReviewFormSchema.safeParse({
+    contentId: "invalid",
+    decision: "approved",
+    evidenceRef: "evidence-review-001",
+    notes: "",
+  }).success
+) {
   throw new Error("Content review must reject invalid identifiers");
 }
 try {

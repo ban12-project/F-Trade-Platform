@@ -41,8 +41,11 @@ function markItDownPython() {
 }
 
 function productDocumentSandboxImage() {
-  const image = (process.env.PRODUCT_DOCUMENT_SANDBOX_IMAGE ?? process.env.VIDEO_SANDBOX_IMAGE)?.trim();
-  if (!image) throw new Error("Product Agent document preprocessing requires a pinned Sandbox image");
+  const image = (
+    process.env.PRODUCT_DOCUMENT_SANDBOX_IMAGE ?? process.env.VIDEO_SANDBOX_IMAGE
+  )?.trim();
+  if (!image)
+    throw new Error("Product Agent document preprocessing requires a pinned Sandbox image");
   return image;
 }
 
@@ -69,7 +72,9 @@ async function preprocessInSandbox(documentPath: string, allowEmptySource: boole
       env: { F_TRADE_METADATA_PREFLIGHT: allowEmptySource ? "1" : "0" },
     });
     if (result.exitCode !== 0) {
-      throw new Error((await result.stderr()).trim().slice(0, 1_000) || "MarkItDown Sandbox preprocessing failed");
+      throw new Error(
+        (await result.stderr()).trim().slice(0, 1_000) || "MarkItDown Sandbox preprocessing failed",
+      );
     }
     return result.stdout();
   } finally {
@@ -80,10 +85,7 @@ async function preprocessInSandbox(documentPath: string, allowEmptySource: boole
 export async function preprocessProductAgentDocument(
   request: ProductAgentDocumentRequest,
 ): Promise<ProductAgentDocumentSource> {
-  if (
-    request.imageAvailability !== "none" &&
-    request.imageAvailability !== "real_product_image"
-  ) {
+  if (request.imageAvailability !== "none" && request.imageAvailability !== "real_product_image") {
     throw new Error("Product Agent document image availability is invalid");
   }
   if (request.imageAvailability === "none" && request.imageRefs.length > 0) {
@@ -95,26 +97,30 @@ export async function preprocessProductAgentDocument(
   const documentPath = resolve(request.documentPath);
   const info = await stat(documentPath);
   if (!info.isFile()) throw new Error("Product Agent document input must be a regular local file");
-  if (info.size > maximumDocumentBytes) throw new Error(`Product Agent document exceeds ${maximumDocumentBytes} byte limit`);
+  if (info.size > maximumDocumentBytes)
+    throw new Error(`Product Agent document exceeds ${maximumDocumentBytes} byte limit`);
 
   const stdout = shouldUseProductDocumentSandbox()
     ? await preprocessInSandbox(documentPath, request.allowEmptySource === true)
-    : (await execFileAsync(markItDownPython(), [
-      resolve("scripts/markitdown_preprocess.py"),
-      documentPath,
-    ], {
-      maxBuffer: 32 * 1024 * 1024,
-      env: {
-        ...process.env,
-        F_TRADE_METADATA_PREFLIGHT: request.allowEmptySource ? "1" : "0",
-      },
-    })).stdout;
+    : (
+        await execFileAsync(
+          markItDownPython(),
+          [resolve("scripts/markitdown_preprocess.py"), documentPath],
+          {
+            maxBuffer: 32 * 1024 * 1024,
+            env: {
+              ...process.env,
+              F_TRADE_METADATA_PREFLIGHT: request.allowEmptySource ? "1" : "0",
+            },
+          },
+        )
+      ).stdout;
   const converted = JSON.parse(stdout) as MarkItDownResult;
   const conversionStatus = converted.conversion_status ?? "converted";
   if (
-    !/^[a-f0-9]{64}$/.test(converted.document_sha256)
-    || (conversionStatus !== "converted" && conversionStatus !== "no_text")
-    || (!converted.source_text && (!request.allowEmptySource || conversionStatus !== "no_text"))
+    !/^[a-f0-9]{64}$/.test(converted.document_sha256) ||
+    (conversionStatus !== "converted" && conversionStatus !== "no_text") ||
+    (!converted.source_text && (!request.allowEmptySource || conversionStatus !== "no_text"))
   ) {
     throw new Error("MarkItDown preprocessing returned an invalid conversion result");
   }

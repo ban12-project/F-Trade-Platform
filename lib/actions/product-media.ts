@@ -28,7 +28,7 @@ export type ProductMediaActionState = {
 };
 
 function revalidateProductMedia(projectId: string) {
-  revalidatePath("/workspace");
+  revalidatePath("/workspace", "layout");
   revalidatePath(`/workspace/${projectId}`);
 }
 
@@ -43,7 +43,13 @@ export async function registerProductMediaAction(
 
   try {
     const value = parseProductMediaRegistrationFormData(formData);
-    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product", session.user.id);
+    await assertWorkspaceAggregateLink(
+      value.projectId,
+      value.productId,
+      "marketing",
+      "product",
+      session.user.id,
+    );
 
     const [uploaded] = await claimCompletedVideoUploads(
       [value.receiptId],
@@ -86,7 +92,13 @@ export async function reviewProductMediaAction(
 
   try {
     const value = parseProductMediaReviewFormData(formData);
-    await assertWorkspaceAggregateLink(value.projectId, value.productId, "marketing", "product", session.user.id);
+    await assertWorkspaceAggregateLink(
+      value.projectId,
+      value.productId,
+      "marketing",
+      "product",
+      session.user.id,
+    );
     const current = await listProductMediaAssets(value.productId);
     if (!current.some((asset) => asset.id === value.input.assetId)) {
       throw new Error("该产品媒体不属于当前项目中的产品。");
@@ -96,9 +108,10 @@ export async function reviewProductMediaAction(
     revalidateProductMedia(value.projectId);
     return {
       status: "success",
-      message: asset.review.status === "approved"
-        ? "产品媒体已批准，可按其授权范围进入营销视频。"
-        : "产品媒体已拒绝或撤销，不再进入 VideoReady。",
+      message:
+        asset.review.status === "approved"
+          ? "产品媒体已批准，可按其授权范围进入营销视频。"
+          : "产品媒体已拒绝或撤销，不再进入 VideoReady。",
       productId: value.productId,
       assetId: asset.id,
     };

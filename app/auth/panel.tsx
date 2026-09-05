@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { KeyRoundIcon, MailCheckIcon, ShieldCheckIcon } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-
-import { Button } from "@/components/ui/button";
+import type { z } from "zod";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -41,7 +40,10 @@ export function AuthPanel() {
     window.location.assign("/workspace");
   }
 
-  async function run(action: () => Promise<{ error?: { message?: string } | null }>, success: string) {
+  async function run(
+    action: () => Promise<{ error?: { message?: string } | null }>,
+    success: string,
+  ) {
     setBusy(true);
     try {
       const { error } = await action();
@@ -85,11 +87,12 @@ export function AuthPanel() {
 
   async function verifyOtp(values: z.infer<typeof authFormSchema>) {
     const signedIn = await run(
-      () => authClient.signIn.emailOtp({
-        email: values.email,
-        otp: values.otp,
-        name: values.email.split("@")[0] || "F-Trade User",
-      }),
+      () =>
+        authClient.signIn.emailOtp({
+          email: values.email,
+          otp: values.otp,
+          name: values.email.split("@")[0] || "F-Trade User",
+        }),
       "登录成功。你现在可以注册 Passkey。",
     );
     if (signedIn) enterWorkspace();
@@ -101,18 +104,35 @@ export function AuthPanel() {
   }
 
   return (
-    <main id="main-content" className="flex min-h-svh items-center justify-center bg-muted/30 p-4 md:p-8">
+    <main
+      id="main-content"
+      className="flex min-h-svh items-center justify-center bg-muted/30 p-4 md:p-8"
+    >
       <div className="grid w-full max-w-5xl overflow-hidden rounded-2xl border bg-background shadow-sm md:grid-cols-[0.9fr_1.1fr]">
         <section className="hidden flex-col justify-between bg-primary p-8 text-primary-foreground md:flex lg:p-10">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary-foreground/15 text-lg font-semibold" aria-hidden="true">F</span>
+            <span
+              className="flex size-10 items-center justify-center rounded-xl bg-primary-foreground/15 text-lg font-semibold"
+              aria-hidden="true"
+            >
+              F
+            </span>
             <span className="font-semibold tracking-tight">F-Trade</span>
           </div>
           <div className="flex flex-col gap-5">
-            <Badge variant="outline" className="w-fit border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground">内部工作台</Badge>
+            <Badge
+              variant="outline"
+              className="w-fit border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground"
+            >
+              内部工作台
+            </Badge>
             <div className="flex flex-col gap-3">
-              <p className="text-3xl font-semibold tracking-tight text-balance">让证据成为工作流的起点。</p>
-              <p className="text-sm leading-6 text-primary-foreground/70">产品事实需要来源，内容需要审核，报价与交期需要人工确认。</p>
+              <p className="text-3xl font-semibold tracking-tight text-balance">
+                让证据成为工作流的起点。
+              </p>
+              <p className="text-sm leading-6 text-primary-foreground/70">
+                产品事实需要来源，内容需要审核，报价与交期需要人工确认。
+              </p>
             </div>
           </div>
           <p className="text-xs text-primary-foreground/55">离合器外贸工作流 · MVP</p>
@@ -121,7 +141,12 @@ export function AuthPanel() {
         <section className="flex flex-col gap-7 p-6 sm:p-8 lg:p-10">
           <header className="flex flex-col gap-3">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground md:hidden">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-xs text-primary-foreground" aria-hidden="true">F</span>
+              <span
+                className="flex size-7 items-center justify-center rounded-lg bg-primary text-xs text-primary-foreground"
+                aria-hidden="true"
+              >
+                F
+              </span>
               F-Trade
             </div>
             <div className="flex items-center gap-2">
@@ -130,7 +155,9 @@ export function AuthPanel() {
             </div>
             <div className="flex flex-col gap-2">
               <h1 className="text-2xl font-semibold tracking-tight">登录工作台</h1>
-              <p className="text-sm leading-6 text-muted-foreground">使用受邀邮箱验证码或设备密钥（Passkey）登录。平台不启用密码登录，也不开放公开注册。</p>
+              <p className="text-sm leading-6 text-muted-foreground">
+                使用受邀邮箱验证码或设备密钥（Passkey）登录。平台不启用密码登录，也不开放公开注册。
+              </p>
             </div>
           </header>
 
@@ -149,8 +176,17 @@ export function AuthPanel() {
                 />
                 <FieldError errors={[form.formState.errors.email]} />
               </Field>
-              <Button type="button" variant="outline" disabled={busy || provisioning} onClick={sendOtp}>
-                {busy || provisioning ? <Spinner aria-hidden="true" data-icon="inline-start" /> : <MailCheckIcon data-icon="inline-start" />}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || provisioning}
+                onClick={sendOtp}
+              >
+                {busy || provisioning ? (
+                  <Spinner aria-hidden="true" data-icon="inline-start" />
+                ) : (
+                  <MailCheckIcon data-icon="inline-start" />
+                )}
                 发送验证码
               </Button>
               <Field data-invalid={!!form.formState.errors.otp}>
@@ -168,7 +204,11 @@ export function AuthPanel() {
                 <FieldError errors={[form.formState.errors.otp]} />
               </Field>
               <Button type="submit" disabled={busy || provisioning}>
-                {busy || provisioning ? <Spinner aria-hidden="true" data-icon="inline-start" /> : <KeyRoundIcon data-icon="inline-start" />}
+                {busy || provisioning ? (
+                  <Spinner aria-hidden="true" data-icon="inline-start" />
+                ) : (
+                  <KeyRoundIcon data-icon="inline-start" />
+                )}
                 验证并登录
               </Button>
             </FieldGroup>
@@ -180,13 +220,26 @@ export function AuthPanel() {
             <Separator className="flex-1" />
           </div>
           <div className="flex flex-col gap-2">
-            <Button type="button" variant="outline" disabled={busy || provisioning} onClick={signInPasskey}>
-              {busy || provisioning ? <Spinner aria-hidden="true" data-icon="inline-start" /> : <KeyRoundIcon data-icon="inline-start" />}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy || provisioning}
+              onClick={signInPasskey}
+            >
+              {busy || provisioning ? (
+                <Spinner aria-hidden="true" data-icon="inline-start" />
+              ) : (
+                <KeyRoundIcon data-icon="inline-start" />
+              )}
               使用 Passkey 登录
             </Button>
-            <p className="text-xs leading-5 text-muted-foreground">新的 Passkey 需要登录后在“账号与工具”中添加。</p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              新的 Passkey 需要登录后在“账号与工具”中添加。
+            </p>
           </div>
-          <p className="min-h-5 text-sm text-muted-foreground" aria-live="polite">{message}</p>
+          <p className="min-h-5 text-sm text-muted-foreground" aria-live="polite">
+            {message}
+          </p>
         </section>
       </div>
     </main>

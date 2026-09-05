@@ -1,4 +1,4 @@
-import { productMediaProbeSchema, type ProductMediaProbe } from "./media-service";
+import { type ProductMediaProbe, productMediaProbeSchema } from "./media-service";
 
 export const maximumProductMediaDurationSeconds = 120;
 
@@ -18,7 +18,13 @@ function frameRate(value: string | undefined) {
   const [numeratorText, denominatorText = "1"] = value.split("/");
   const numerator = Number(numeratorText);
   const denominator = Number(denominatorText);
-  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator <= 0 || denominator <= 0) return null;
+  if (
+    !Number.isFinite(numerator) ||
+    !Number.isFinite(denominator) ||
+    numerator <= 0 ||
+    denominator <= 0
+  )
+    return null;
   const rate = numerator / denominator;
   return Number.isFinite(rate) && rate > 0 ? rate : null;
 }
@@ -52,7 +58,11 @@ export function parseProductMediaProbeOutput(
 
   const durationSeconds = Number(raw.format?.duration);
   const fps = frameRate(visual?.avg_frame_rate) ?? frameRate(visual?.r_frame_rate);
-  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > maximumProductMediaDurationSeconds) {
+  if (
+    !Number.isFinite(durationSeconds) ||
+    durationSeconds <= 0 ||
+    durationSeconds > maximumProductMediaDurationSeconds
+  ) {
     throw new Error(`产品视频时长必须介于 0 和 ${maximumProductMediaDurationSeconds} 秒之间。`);
   }
   if (fps === null) throw new Error("无法从产品视频读取有效帧率。");

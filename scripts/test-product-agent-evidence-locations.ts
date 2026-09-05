@@ -10,8 +10,8 @@ import {
   assertProductAgentEvidenceLocations,
   buildProductAgentEvidenceLocations,
   compactProductAgentEvidenceRefs,
-  prepareProductAgentEvidenceSource,
   type ProductAgentEvidenceLocatedSource,
+  prepareProductAgentEvidenceSource,
 } from "../lib/product/evidence-locations";
 import type { ProductDraft } from "../lib/product/verification";
 import { videoFactClaimSchema } from "../lib/video/contracts";
@@ -33,39 +33,61 @@ const source: ProductAgentSource = {
   image_refs: [],
 };
 
-function locationContaining(
-  prepared: ProductAgentEvidenceLocatedSource,
-  text: string,
-) {
+function locationContaining(prepared: ProductAgentEvidenceLocatedSource, text: string) {
   const location = prepared.evidence_locations.find((candidate) => candidate.text.includes(text));
   assert.ok(location, `Missing evidence location containing ${text}`);
   return location;
 }
 
-const firstLocations = buildProductAgentEvidenceLocations(source.evidence_refs[0]!, source.source_text);
-const secondLocations = buildProductAgentEvidenceLocations(source.evidence_refs[0]!, source.source_text);
+const firstLocations = buildProductAgentEvidenceLocations(
+  source.evidence_refs[0]!,
+  source.source_text,
+);
+const secondLocations = buildProductAgentEvidenceLocations(
+  source.evidence_refs[0]!,
+  source.source_text,
+);
 assert.deepEqual(firstLocations, secondLocations, "Evidence location refs must be deterministic");
 assert.equal(firstLocations.length, 5);
-assert.deepEqual(firstLocations.map((location) => location.start_line), [2, 3, 4, 5, 6]);
-assert.equal(firstLocations.every((location) => location.kind === "line"), true);
-assert.equal(firstLocations.every((location) => location.ref.startsWith("evidence-loc-line-")), true);
-assert.equal(firstLocations.every((location) => location.ref.length <= 130), true);
-assert.equal(firstLocations.some((location) => location.text.includes("marketing narrative")), false);
+assert.deepEqual(
+  firstLocations.map((location) => location.start_line),
+  [2, 3, 4, 5, 6],
+);
+assert.equal(
+  firstLocations.every((location) => location.kind === "line"),
+  true,
+);
+assert.equal(
+  firstLocations.every((location) => location.ref.startsWith("evidence-loc-line-")),
+  true,
+);
+assert.equal(
+  firstLocations.every((location) => location.ref.length <= 130),
+  true,
+);
+assert.equal(
+  firstLocations.some((location) => location.text.includes("marketing narrative")),
+  false,
+);
 
 const prepared = prepareProductAgentEvidenceSource(source);
 assert.equal(prepared.record_id, source.record_id);
 assert.equal(prepared.source_ref, source.source_ref);
 assert.equal(prepared.image_availability, "none");
 assert.deepEqual(prepared.image_refs, []);
-assert.deepEqual(prepared.evidence_refs, prepared.evidence_locations.map((location) => location.ref));
+assert.deepEqual(
+  prepared.evidence_refs,
+  prepared.evidence_locations.map((location) => location.ref),
+);
 assert.match(prepared.source_text, /<evidence-location ref=/);
 assert.match(prepared.source_text, /lines="2-2"/);
 assert.doesNotMatch(prepared.source_text, /marketing narrative/);
 assert.throws(
-  () => prepareProductAgentEvidenceSource({
-    ...source,
-    evidence_refs: ["evidence-document-001", "evidence-document-002"],
-  }),
+  () =>
+    prepareProductAgentEvidenceSource({
+      ...source,
+      evidence_refs: ["evidence-document-001", "evidence-document-002"],
+    }),
   /exactly one base evidence reference/,
 );
 
@@ -74,11 +96,13 @@ const productTypeRef = locationContaining(prepared, "Product type:").ref;
 const skuRef = locationContaining(prepared, "Internal SKU:").ref;
 const oeRef = locationContaining(prepared, "OEM No.:").ref;
 const moqRef = locationContaining(prepared, "MOQ:").ref;
-assert.doesNotThrow(() => videoFactClaimSchema.parse({
-  field: "product.product_name",
-  value: "Synthetic Clutch Kit",
-  evidenceRef: productNameRef,
-}));
+assert.doesNotThrow(() =>
+  videoFactClaimSchema.parse({
+    field: "product.product_name",
+    value: "Synthetic Clutch Kit",
+    evidenceRef: productNameRef,
+  }),
+);
 
 const locatedDraftInput = {
   record_id: prepared.record_id,
@@ -115,17 +139,24 @@ const wrongLocationDraft: ProductDraft = {
   },
 };
 assert.throws(
-  () => assertProductAgentEvidenceLocations(wrongLocationDraft, prepared, finalizeProductAgentDraft),
+  () =>
+    assertProductAgentEvidenceLocations(wrongLocationDraft, prepared, finalizeProductAgentDraft),
   /product\.product_name must match an explicitly labelled source value/,
 );
 assert.throws(
-  () => assertProductAgentEvidenceLocations({
-    ...locatedDraft,
-    field_evidence: {
-      ...locatedDraft.field_evidence,
-      "product.product_name": "evidence-loc-line-999999-999999-00000000000000000000000000000000",
-    },
-  }, prepared, finalizeProductAgentDraft),
+  () =>
+    assertProductAgentEvidenceLocations(
+      {
+        ...locatedDraft,
+        field_evidence: {
+          ...locatedDraft.field_evidence,
+          "product.product_name":
+            "evidence-loc-line-999999-999999-00000000000000000000000000000000",
+        },
+      },
+      prepared,
+      finalizeProductAgentDraft,
+    ),
   /cites an unknown evidence location/,
 );
 
@@ -142,7 +173,10 @@ const tableSource: ProductAgentSource = {
 };
 const tablePrepared = prepareProductAgentEvidenceSource(tableSource);
 assert.equal(tablePrepared.evidence_locations.length, 2);
-assert.deepEqual(tablePrepared.evidence_locations.map((location) => location.start_line), [3, 4]);
+assert.deepEqual(
+  tablePrepared.evidence_locations.map((location) => location.start_line),
+  [3, 4],
+);
 for (const location of tablePrepared.evidence_locations) {
   assert.equal(location.kind, "table_row");
   assert.match(location.ref, /^evidence-loc-row-/);
@@ -156,90 +190,110 @@ assert.doesNotMatch(tablePrepared.evidence_locations[1]!.text, /RYC251/);
 
 const row251Ref = tablePrepared.evidence_locations[0]!.ref;
 const row302Ref = tablePrepared.evidence_locations[1]!.ref;
-const row251Draft = finalizeProductAgentDraft({
-  record_id: tablePrepared.record_id,
-  source_ref: tablePrepared.source_ref,
-  evidence_refs: tablePrepared.evidence_refs,
-  field_evidence: {
-    "product.product_name": row251Ref,
-    "product.product_type": row251Ref,
-    "product.internal_sku": row251Ref,
-    "product.oe_numbers": row251Ref,
-    "commercial.moq": row251Ref,
+const row251Draft = finalizeProductAgentDraft(
+  {
+    record_id: tablePrepared.record_id,
+    source_ref: tablePrepared.source_ref,
+    evidence_refs: tablePrepared.evidence_refs,
+    field_evidence: {
+      "product.product_name": row251Ref,
+      "product.product_type": row251Ref,
+      "product.internal_sku": row251Ref,
+      "product.oe_numbers": row251Ref,
+      "commercial.moq": row251Ref,
+    },
+    verification_status: "review_required",
+    blocking_missing_fields: [],
+    optional_missing_fields: [],
+    product: {
+      product_name: "Synthetic Kit 251",
+      product_type: "clutch_kit",
+      internal_sku: "RYC251",
+      oe_numbers: ["OE-251"],
+    },
+    commercial: { moq: 25 },
   },
-  verification_status: "review_required",
-  blocking_missing_fields: [],
-  optional_missing_fields: [],
-  product: {
-    product_name: "Synthetic Kit 251",
-    product_type: "clutch_kit",
-    internal_sku: "RYC251",
-    oe_numbers: ["OE-251"],
-  },
-  commercial: { moq: 25 },
-}, tablePrepared);
+  tablePrepared,
+);
 assertProductAgentEvidenceLocations(row251Draft, tablePrepared, finalizeProductAgentDraft);
 assert.throws(
-  () => assertProductAgentEvidenceLocations({
-    ...row251Draft,
-    field_evidence: {
-      ...row251Draft.field_evidence,
-      "product.product_name": row302Ref,
-    },
-  }, tablePrepared, finalizeProductAgentDraft),
+  () =>
+    assertProductAgentEvidenceLocations(
+      {
+        ...row251Draft,
+        field_evidence: {
+          ...row251Draft.field_evidence,
+          "product.product_name": row302Ref,
+        },
+      },
+      tablePrepared,
+      finalizeProductAgentDraft,
+    ),
   /product\.product_name must match an explicitly labelled source value/,
 );
 
 assert.throws(
-  () => buildProductAgentEvidenceLocations("evidence-document-001", "General clutch catalog narrative only."),
+  () =>
+    buildProductAgentEvidenceLocations(
+      "evidence-document-001",
+      "General clutch catalog narrative only.",
+    ),
   /no explicitly labelled evidence locations/,
 );
 assert.throws(
-  () => buildProductAgentEvidenceLocations(
-    "evidence-document-001",
-    Array.from({ length: 513 }, (_, index) => `MOQ: ${index + 1}`).join("\n"),
-  ),
+  () =>
+    buildProductAgentEvidenceLocations(
+      "evidence-document-001",
+      Array.from({ length: 513 }, (_, index) => `MOQ: ${index + 1}`).join("\n"),
+    ),
   /more than 512 labelled evidence locations/,
 );
 
 const delegate: ProductAgent = {
   async run({ source: locatedSource }) {
-    const sourceWithLocations = locatedSource as ProductAgentSource & ProductAgentEvidenceLocatedSource;
+    const sourceWithLocations = locatedSource as ProductAgentSource &
+      ProductAgentEvidenceLocatedSource;
     const name = locationContaining(sourceWithLocations, "Product name:").ref;
     const type = locationContaining(sourceWithLocations, "Product type:").ref;
     const sku = locationContaining(sourceWithLocations, "Internal SKU:").ref;
     return {
-      draft: finalizeProductAgentDraft({
-        record_id: locatedSource.record_id,
-        source_ref: locatedSource.source_ref,
-        evidence_refs: locatedSource.evidence_refs,
-        field_evidence: {
-          "product.product_name": name,
-          "product.product_type": type,
-          "product.internal_sku": sku,
+      draft: finalizeProductAgentDraft(
+        {
+          record_id: locatedSource.record_id,
+          source_ref: locatedSource.source_ref,
+          evidence_refs: locatedSource.evidence_refs,
+          field_evidence: {
+            "product.product_name": name,
+            "product.product_type": type,
+            "product.internal_sku": sku,
+          },
+          verification_status: "review_required",
+          blocking_missing_fields: [],
+          optional_missing_fields: [],
+          product: {
+            product_name: "Synthetic Clutch Kit",
+            product_type: "clutch_kit",
+            internal_sku: "SYN-KIT-001",
+          },
         },
-        verification_status: "review_required",
-        blocking_missing_fields: [],
-        optional_missing_fields: [],
-        product: {
-          product_name: "Synthetic Clutch Kit",
-          product_type: "clutch_kit",
-          internal_sku: "SYN-KIT-001",
-        },
-      }, locatedSource),
+        locatedSource,
+      ),
       metadata: { prompt_version: "synthetic", prompt_hash: "synthetic" },
     };
   },
 };
 
-new EvidenceLocatedProductAgent(delegate).run({
-  model: {} as never,
-  source,
-}).then((wrappedResult) => {
-  assert.deepEqual(wrappedResult.draft.evidence_refs, [productNameRef, productTypeRef, skuRef]);
-  assert.equal(wrappedResult.metadata.prompt_version, "synthetic");
-  console.log("PASS Product Agent facts cite deterministic, bounded line or table-row evidence");
-}).catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+new EvidenceLocatedProductAgent(delegate)
+  .run({
+    model: {} as never,
+    source,
+  })
+  .then((wrappedResult) => {
+    assert.deepEqual(wrappedResult.draft.evidence_refs, [productNameRef, productTypeRef, skuRef]);
+    assert.equal(wrappedResult.metadata.prompt_version, "synthetic");
+    console.log("PASS Product Agent facts cite deterministic, bounded line or table-row evidence");
+  })
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });

@@ -1,21 +1,24 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
-import { z } from "zod";
+import type { z } from "zod";
 
-import { getDatabase, type Database } from "@/lib/db/client";
+import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord } from "@/lib/db/schema";
 import { videoJobSubmissionFormSchema } from "@/lib/form-schemas";
 
 import { videoProjectSchema } from "./contracts";
 import { enqueueVideoJob } from "./job-store";
-import { loadVideoExecutionConfiguration } from "./provider-config-store";
 import { selectVerifiedVideoModel } from "./provider-capabilities";
+import { loadVideoExecutionConfiguration } from "./provider-config-store";
 
 export const videoJobSubmissionSchema = videoJobSubmissionFormSchema;
 export type VideoJobSubmission = z.infer<typeof videoJobSubmissionSchema>;
 
-export type SubmittedVideoJob = { id: string; status: "queued" | "running" | "succeeded" | "failed" | "cancelled" };
+export type SubmittedVideoJob = {
+  id: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+};
 
 /** Stable opaque identity for exactly-once submission of the same prepared plan. */
 export function videoJobIdempotencyKey(submission: VideoJobSubmission) {
@@ -44,7 +47,8 @@ export async function submitApprovedVideoJob(
 ): Promise<SubmittedVideoJob> {
   const submission = videoJobSubmissionSchema.parse(input);
   if (!actorId.trim()) throw new Error("提交人标识不能为空。");
-  const [record] = await database.select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
+  const [record] = await database
+    .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, submission.videoId), eq(aggregateRecord.type, "video")));
   if (!record) throw new Error("未找到视频计划。");
@@ -54,18 +58,21 @@ export async function submitApprovedVideoJob(
   }
   const configuration = await loadVideoExecutionConfiguration(database);
   selectVerifiedVideoModel(configuration.catalog, submission);
-  const job = await enqueueVideoJob({
-    id: randomUUID(),
-    videoProjectId: submission.videoId,
-    provider: submission.provider,
-    modelId: submission.modelId,
-    requiredCapabilities: submission.requiredCapabilities,
-    aspectRatio: submission.aspectRatio,
-    durationSeconds: submission.durationSeconds,
-    resolution: submission.resolution,
-    expectedCostCents: submission.expectedCostCents,
-    idempotencyKey: videoJobIdempotencyKey(submission),
-    actorId,
-  }, database);
+  const job = await enqueueVideoJob(
+    {
+      id: randomUUID(),
+      videoProjectId: submission.videoId,
+      provider: submission.provider,
+      modelId: submission.modelId,
+      requiredCapabilities: submission.requiredCapabilities,
+      aspectRatio: submission.aspectRatio,
+      durationSeconds: submission.durationSeconds,
+      resolution: submission.resolution,
+      expectedCostCents: submission.expectedCostCents,
+      idempotencyKey: videoJobIdempotencyKey(submission),
+      actorId,
+    },
+    database,
+  );
   return { id: job.id, status: job.status };
 }

@@ -30,7 +30,10 @@ export async function createInvitationAction(
 
   const parsed = invitationFormSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) {
-    return { status: "error", message: parsed.error.issues[0]?.message ?? "请输入有效的邮箱地址。" };
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "请输入有效的邮箱地址。",
+    };
   }
 
   try {
@@ -41,7 +44,10 @@ export async function createInvitationAction(
   }
 }
 
-export async function provisionInvitedUserAction(input: { email: string; token: string }): Promise<InvitationActionState> {
+export async function provisionInvitedUserAction(input: {
+  email: string;
+  token: string;
+}): Promise<InvitationActionState> {
   const parsed = invitationFormSchema.safeParse({ email: input.email });
   if (!parsed.success || typeof input.token !== "string" || input.token.length < 32) {
     return { status: "error", message: "邀请无效。" };

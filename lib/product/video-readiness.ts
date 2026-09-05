@@ -2,15 +2,15 @@ import { z } from "zod";
 
 import type { ProductDraft, ProductReady } from "./verification";
 
-const evidenceReferenceSchema = z.string().trim().regex(
-  /^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i,
-  "必须引用私有证据记录。",
-);
+const evidenceReferenceSchema = z
+  .string()
+  .trim()
+  .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "必须引用私有证据记录。");
 
-const productFactPathSchema = z.string().trim().regex(
-  /^(?:product|specifications|commercial)\.[a-z_]+$/,
-  "产品事实路径无效。",
-);
+const productFactPathSchema = z
+  .string()
+  .trim()
+  .regex(/^(?:product|specifications|commercial)\.[a-z_]+$/, "产品事实路径无效。");
 
 export const productMediaRoleSchema = z.enum([
   "product_hero",
@@ -22,108 +22,132 @@ export const productMediaRoleSchema = z.enum([
   "other",
 ]);
 
-export const productMediaTechnicalSchema = z.object({
-  contentType: z.string().trim().regex(/^(?:image|video)\/[a-z0-9.+-]+$/i, "媒体类型无效。"),
-  width: z.number().int().positive().max(32_768),
-  height: z.number().int().positive().max(32_768),
-  durationMs: z.number().int().positive().max(120_000).nullable(),
-  fps: z.number().positive().max(240).nullable(),
-  hasAudio: z.boolean(),
-}).strict();
+export const productMediaTechnicalSchema = z
+  .object({
+    contentType: z
+      .string()
+      .trim()
+      .regex(/^(?:image|video)\/[a-z0-9.+-]+$/i, "媒体类型无效。"),
+    width: z.number().int().positive().max(32_768),
+    height: z.number().int().positive().max(32_768),
+    durationMs: z.number().int().positive().max(120_000).nullable(),
+    fps: z.number().positive().max(240).nullable(),
+    hasAudio: z.boolean(),
+  })
+  .strict();
 
-export const productMediaSemanticSchema = z.object({
-  role: productMediaRoleSchema,
-  description: z.string().trim().max(500),
-  tags: z.array(z.string().trim().min(1).max(64)).max(20),
-  productVisible: z.boolean(),
-  logoVisible: z.boolean(),
-  textPresent: z.boolean(),
-}).strict();
+export const productMediaSemanticSchema = z
+  .object({
+    role: productMediaRoleSchema,
+    description: z.string().trim().max(500),
+    tags: z.array(z.string().trim().min(1).max(64)).max(20),
+    productVisible: z.boolean(),
+    logoVisible: z.boolean(),
+    textPresent: z.boolean(),
+  })
+  .strict();
 
-export const productMediaRightsSchema = z.object({
-  rightsEvidenceRef: evidenceReferenceSchema,
-  editingAllowed: z.boolean(),
-  publicDistributionAllowed: z.boolean(),
-  paidAdvertisingAllowed: z.boolean(),
-  imageToVideoAllowed: z.boolean(),
-  referenceToVideoAllowed: z.boolean(),
-  expiresAt: z.string().datetime({ offset: true }).nullable(),
-}).strict().superRefine((rights, context) => {
-  if ((rights.imageToVideoAllowed || rights.referenceToVideoAllowed) && !rights.editingAllowed) {
-    context.addIssue({
-      code: "custom",
-      path: ["editingAllowed"],
-      message: "允许生成式使用前必须先取得编辑授权。",
-    });
-  }
-});
+export const productMediaRightsSchema = z
+  .object({
+    rightsEvidenceRef: evidenceReferenceSchema,
+    editingAllowed: z.boolean(),
+    publicDistributionAllowed: z.boolean(),
+    paidAdvertisingAllowed: z.boolean(),
+    imageToVideoAllowed: z.boolean(),
+    referenceToVideoAllowed: z.boolean(),
+    expiresAt: z.string().datetime({ offset: true }).nullable(),
+  })
+  .strict()
+  .superRefine((rights, context) => {
+    if ((rights.imageToVideoAllowed || rights.referenceToVideoAllowed) && !rights.editingAllowed) {
+      context.addIssue({
+        code: "custom",
+        path: ["editingAllowed"],
+        message: "允许生成式使用前必须先取得编辑授权。",
+      });
+    }
+  });
 
-export const productMediaReviewSchema = z.object({
-  status: z.enum(["pending", "approved", "rejected"]),
-  reviewedBy: z.string().trim().min(1).max(240).nullable(),
-  reviewedAt: z.string().datetime({ offset: true }).nullable(),
-  evidenceRef: evidenceReferenceSchema.nullable(),
-  notes: z.string().trim().max(1_000),
-}).strict().superRefine((review, context) => {
-  const hasDecision = review.reviewedBy !== null || review.reviewedAt !== null || review.evidenceRef !== null;
-  if (review.status === "pending" && hasDecision) {
-    context.addIssue({
-      code: "custom",
-      path: ["status"],
-      message: "待审核素材不能携带审核决定。",
-    });
-  }
-  if (review.status !== "pending" && (!review.reviewedBy || !review.reviewedAt || !review.evidenceRef)) {
-    context.addIssue({
-      code: "custom",
-      path: ["status"],
-      message: "已决定的素材审核必须记录人员、时间和证据。",
-    });
-  }
-});
+export const productMediaReviewSchema = z
+  .object({
+    status: z.enum(["pending", "approved", "rejected"]),
+    reviewedBy: z.string().trim().min(1).max(240).nullable(),
+    reviewedAt: z.string().datetime({ offset: true }).nullable(),
+    evidenceRef: evidenceReferenceSchema.nullable(),
+    notes: z.string().trim().max(1_000),
+  })
+  .strict()
+  .superRefine((review, context) => {
+    const hasDecision =
+      review.reviewedBy !== null || review.reviewedAt !== null || review.evidenceRef !== null;
+    if (review.status === "pending" && hasDecision) {
+      context.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "待审核素材不能携带审核决定。",
+      });
+    }
+    if (
+      review.status !== "pending" &&
+      (!review.reviewedBy || !review.reviewedAt || !review.evidenceRef)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "已决定的素材审核必须记录人员、时间和证据。",
+      });
+    }
+  });
 
-export const productMediaAssetSchema = z.object({
-  id: z.uuid(),
-  productId: z.uuid(),
-  evidenceRef: evidenceReferenceSchema,
-  mediaType: z.enum(["image", "video"]),
-  origin: z.enum(["factory", "user_upload", "licensed"]),
-  technical: productMediaTechnicalSchema,
-  semantic: productMediaSemanticSchema,
-  rights: productMediaRightsSchema,
-  review: productMediaReviewSchema,
-  createdAt: z.string().datetime({ offset: true }),
-}).strict().superRefine((asset, context) => {
-  if (!asset.technical.contentType.startsWith(`${asset.mediaType}/`)) {
-    context.addIssue({
-      code: "custom",
-      path: ["technical", "contentType"],
-      message: "媒体类别与 Content-Type 不一致。",
-    });
-  }
-  if (asset.mediaType === "image") {
-    if (asset.technical.durationMs !== null || asset.technical.fps !== null || asset.technical.hasAudio) {
+export const productMediaAssetSchema = z
+  .object({
+    id: z.uuid(),
+    productId: z.uuid(),
+    evidenceRef: evidenceReferenceSchema,
+    mediaType: z.enum(["image", "video"]),
+    origin: z.enum(["factory", "user_upload", "licensed"]),
+    technical: productMediaTechnicalSchema,
+    semantic: productMediaSemanticSchema,
+    rights: productMediaRightsSchema,
+    review: productMediaReviewSchema,
+    createdAt: z.string().datetime({ offset: true }),
+  })
+  .strict()
+  .superRefine((asset, context) => {
+    if (!asset.technical.contentType.startsWith(`${asset.mediaType}/`)) {
+      context.addIssue({
+        code: "custom",
+        path: ["technical", "contentType"],
+        message: "媒体类别与 Content-Type 不一致。",
+      });
+    }
+    if (asset.mediaType === "image") {
+      if (
+        asset.technical.durationMs !== null ||
+        asset.technical.fps !== null ||
+        asset.technical.hasAudio
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["technical"],
+          message: "图片不能包含时长、帧率或音轨元数据。",
+        });
+      }
+    } else if (asset.technical.durationMs === null || asset.technical.fps === null) {
       context.addIssue({
         code: "custom",
         path: ["technical"],
-        message: "图片不能包含时长、帧率或音轨元数据。",
+        message: "视频必须记录时长和帧率。",
       });
     }
-  } else if (asset.technical.durationMs === null || asset.technical.fps === null) {
-    context.addIssue({
-      code: "custom",
-      path: ["technical"],
-      message: "视频必须记录时长和帧率。",
-    });
-  }
-  if (asset.mediaType !== "image" && asset.rights.imageToVideoAllowed) {
-    context.addIssue({
-      code: "custom",
-      path: ["rights", "imageToVideoAllowed"],
-      message: "只有图片素材可以授予 image-to-video 使用权。",
-    });
-  }
-});
+    if (asset.mediaType !== "image" && asset.rights.imageToVideoAllowed) {
+      context.addIssue({
+        code: "custom",
+        path: ["rights", "imageToVideoAllowed"],
+        message: "只有图片素材可以授予 image-to-video 使用权。",
+      });
+    }
+  });
 
 export type ProductMediaAsset = z.infer<typeof productMediaAssetSchema>;
 
@@ -142,31 +166,42 @@ export const videoReadyIssueCodeSchema = z.enum([
   "no_generation_eligible_media",
 ]);
 
-export const videoReadyIssueSchema = z.object({
-  code: videoReadyIssueCodeSchema,
-  message: z.string().trim().min(1).max(500),
-  assetId: z.uuid().optional(),
-}).strict();
+export const videoReadyIssueSchema = z
+  .object({
+    code: videoReadyIssueCodeSchema,
+    message: z.string().trim().min(1).max(500),
+    assetId: z.uuid().optional(),
+  })
+  .strict();
 
-export const videoReadyAssessmentSchema = z.object({
-  version: z.literal(1),
-  productId: z.uuid(),
-  status: z.enum(["ready", "review_required", "not_ready"]),
-  evaluatedAt: z.string().datetime({ offset: true }),
-  verifiedFactPaths: z.array(productFactPathSchema),
-  editingEligibleAssetIds: z.array(z.uuid()),
-  generativeUse: z.object({
-    imageToVideoAssetIds: z.array(z.uuid()),
-    referenceToVideoAssetIds: z.array(z.uuid()),
-  }).strict(),
-  blockers: z.array(videoReadyIssueSchema),
-  warnings: z.array(videoReadyIssueSchema),
-}).strict();
+export const videoReadyAssessmentSchema = z
+  .object({
+    version: z.literal(1),
+    productId: z.uuid(),
+    status: z.enum(["ready", "review_required", "not_ready"]),
+    evaluatedAt: z.string().datetime({ offset: true }),
+    verifiedFactPaths: z.array(productFactPathSchema),
+    editingEligibleAssetIds: z.array(z.uuid()),
+    generativeUse: z
+      .object({
+        imageToVideoAssetIds: z.array(z.uuid()),
+        referenceToVideoAssetIds: z.array(z.uuid()),
+      })
+      .strict(),
+    blockers: z.array(videoReadyIssueSchema),
+    warnings: z.array(videoReadyIssueSchema),
+  })
+  .strict();
 
 export type VideoReadyAssessment = z.infer<typeof videoReadyAssessmentSchema>;
 
 function hasValue(value: unknown) {
-  return value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length > 0);
+  return (
+    value !== undefined &&
+    value !== null &&
+    value !== "" &&
+    (!Array.isArray(value) || value.length > 0)
+  );
 }
 
 function valueAt(product: ProductDraft | ProductReady, path: string) {
@@ -175,17 +210,23 @@ function valueAt(product: ProductDraft | ProductReady, path: string) {
 }
 
 function verifiedFactPaths(product: ProductDraft | ProductReady) {
-  return (["product", "specifications", "commercial"] as const).flatMap((section) =>
-    Object.entries(product[section] ?? {}).flatMap(([field, value]) => {
-      const path = `${section}.${field}`;
-      const evidenceRef = product.field_evidence[path];
-      return hasValue(value) && evidenceRef && product.evidence_refs.includes(evidenceRef) ? [path] : [];
-    }),
-  ).sort();
+  return (["product", "specifications", "commercial"] as const)
+    .flatMap((section) =>
+      Object.entries(product[section] ?? {}).flatMap(([field, value]) => {
+        const path = `${section}.${field}`;
+        const evidenceRef = product.field_evidence[path];
+        return hasValue(value) && evidenceRef && product.evidence_refs.includes(evidenceRef)
+          ? [path]
+          : [];
+      }),
+    )
+    .sort();
 }
 
 function isExpired(asset: ProductMediaAsset, evaluatedAt: Date) {
-  return asset.rights.expiresAt !== null && Date.parse(asset.rights.expiresAt) <= evaluatedAt.getTime();
+  return (
+    asset.rights.expiresAt !== null && Date.parse(asset.rights.expiresAt) <= evaluatedAt.getTime()
+  );
 }
 
 /**
@@ -214,12 +255,19 @@ export function assessProductVideoReadiness(
   const warnings: z.infer<typeof videoReadyIssueSchema>[] = [];
 
   if (product.verification_status !== "verified") {
-    blockers.push({ code: "product_not_ready", message: "产品尚未通过 Gate 01，不能进入 VideoReady。" });
+    blockers.push({
+      code: "product_not_ready",
+      message: "产品尚未通过 Gate 01，不能进入 VideoReady。",
+    });
   }
   if (!factSet.has("product.product_name")) {
-    blockers.push({ code: "missing_verified_product_name", message: "产品名称缺少有效字段级证据。" });
+    blockers.push({
+      code: "missing_verified_product_name",
+      message: "产品名称缺少有效字段级证据。",
+    });
   }
-  const hasOeIdentity = factSet.has("product.oe_numbers") && hasValue(valueAt(product, "product.oe_numbers"));
+  const hasOeIdentity =
+    factSet.has("product.oe_numbers") && hasValue(valueAt(product, "product.oe_numbers"));
   const hasApplicationIdentity = [
     "product.application",
     "product.vehicle_brand",
@@ -253,36 +301,59 @@ export function assessProductVideoReadiness(
   for (const asset of matching) {
     if (asset.review.status === "pending") {
       hasPendingReview = true;
-      warnings.push({ code: "media_pending_review", assetId: asset.id, message: "素材尚未完成人工权利与内容审核。" });
+      warnings.push({
+        code: "media_pending_review",
+        assetId: asset.id,
+        message: "素材尚未完成人工权利与内容审核。",
+      });
       continue;
     }
     if (asset.review.status === "rejected") {
-      warnings.push({ code: "media_rejected", assetId: asset.id, message: "素材审核已拒绝，不能用于营销视频。" });
+      warnings.push({
+        code: "media_rejected",
+        assetId: asset.id,
+        message: "素材审核已拒绝，不能用于营销视频。",
+      });
       continue;
     }
     if (isExpired(asset, evaluatedAt)) {
-      warnings.push({ code: "media_rights_expired", assetId: asset.id, message: "素材授权已经过期。" });
+      warnings.push({
+        code: "media_rights_expired",
+        assetId: asset.id,
+        message: "素材授权已经过期。",
+      });
       continue;
     }
     if (!asset.rights.editingAllowed) {
-      warnings.push({ code: "media_editing_not_allowed", assetId: asset.id, message: "素材没有编辑授权。" });
+      warnings.push({
+        code: "media_editing_not_allowed",
+        assetId: asset.id,
+        message: "素材没有编辑授权。",
+      });
       continue;
     }
     if (!asset.rights.publicDistributionAllowed) {
-      warnings.push({ code: "media_publication_not_allowed", assetId: asset.id, message: "素材没有公开发布授权。" });
+      warnings.push({
+        code: "media_publication_not_allowed",
+        assetId: asset.id,
+        message: "素材没有公开发布授权。",
+      });
       continue;
     }
 
     eligible.push(asset.id);
-    if (asset.mediaType === "image" && asset.rights.imageToVideoAllowed) imageToVideo.push(asset.id);
+    if (asset.mediaType === "image" && asset.rights.imageToVideoAllowed)
+      imageToVideo.push(asset.id);
     if (asset.rights.referenceToVideoAllowed) referenceToVideo.push(asset.id);
   }
 
-  const productFactsBlocked = blockers.some((issue) => [
-    "product_not_ready",
-    "missing_verified_product_name",
-    "missing_verified_market_identity",
-  ].includes(issue.code));
+  const productFactsBlocked = blockers.some((issue) =>
+    [
+      "product_not_ready",
+      "missing_verified_product_name",
+      "missing_verified_market_identity",
+    ].includes(issue.code),
+  );
 
   if (!eligible.length && matching.length) {
     blockers.push({
@@ -299,11 +370,12 @@ export function assessProductVideoReadiness(
     });
   }
 
-  const status = productFactsBlocked || (!eligible.length && !hasPendingReview)
-    ? "not_ready"
-    : !eligible.length && hasPendingReview
-      ? "review_required"
-      : "ready";
+  const status =
+    productFactsBlocked || (!eligible.length && !hasPendingReview)
+      ? "not_ready"
+      : !eligible.length && hasPendingReview
+        ? "review_required"
+        : "ready";
 
   return videoReadyAssessmentSchema.parse({
     version: 1,

@@ -15,9 +15,24 @@ void (async () => {
   try {
     const ffmpegBin = process.env.FFMPEG_BIN ?? "ffmpeg";
     const source = join(workspace, "source.mp4");
-    await execFileAsync(ffmpegBin, ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", source]);
+    await execFileAsync(ffmpegBin, [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=320x240:d=2",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      source,
+    ]);
     let stored = false;
-    const renderer = createFfmpegTimelineRenderer({ ffmpegBin,
+    const renderer = createFfmpegTimelineRenderer({
+      ffmpegBin,
       resolvePrivateAssetPath: async () => source,
       storeRenderedVideo: async ({ filePath }) => {
         assert.ok((await stat(filePath)).size > 0);
@@ -31,10 +46,38 @@ void (async () => {
         return "asset-rendered-ffmpeg-001";
       },
     });
-    const timeline = { durationSeconds: 1, scenes: [{ sceneId: "scene-001", assetRef: "asset-source-ffmpeg-001", mediaType: "video" as const, trimStartSeconds: 0.5, fitMode: "cover" as const, audioMode: "muted" as const, startSeconds: 0, durationSeconds: 1, prompt: "真实产品素材", claimRefs: [], subtitles: [{ text: "Verified product", startSeconds: 0, endSeconds: 1, claimRefs: [] }] }], cta: { text: "Contact us", startSeconds: 0, endSeconds: 1 } };
-    const result = await renderer.render({ platform: "tiktok", width: 1080, height: 1920, fps: 30, timeline });
+    const timeline = {
+      durationSeconds: 1,
+      scenes: [
+        {
+          sceneId: "scene-001",
+          assetRef: "asset-source-ffmpeg-001",
+          mediaType: "video" as const,
+          trimStartSeconds: 0.5,
+          fitMode: "cover" as const,
+          audioMode: "muted" as const,
+          startSeconds: 0,
+          durationSeconds: 1,
+          prompt: "真实产品素材",
+          claimRefs: [],
+          subtitles: [{ text: "Verified product", startSeconds: 0, endSeconds: 1, claimRefs: [] }],
+        },
+      ],
+      cta: { text: "Contact us", startSeconds: 0, endSeconds: 1 },
+    };
+    const result = await renderer.render({
+      platform: "tiktok",
+      width: 1080,
+      height: 1920,
+      fps: 30,
+      timeline,
+    });
     assert.equal(result.assetRef, "asset-rendered-ffmpeg-001");
     assert.equal(stored, true);
-    console.log("PASS backend FFmpeg renderer normalizes, joins, and burns subtitles into a private asset");
-  } finally { await rm(workspace, { recursive: true, force: true }); }
+    console.log(
+      "PASS backend FFmpeg renderer normalizes, joins, and burns subtitles into a private asset",
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 })();

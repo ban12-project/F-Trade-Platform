@@ -1,11 +1,10 @@
-import { betterAuth, type BetterAuthPlugin } from "better-auth";
+import { passkey } from "@better-auth/passkey";
+import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, emailOTP } from "better-auth/plugins";
-import { passkey } from "@better-auth/passkey";
-
+import { sendEmailOtp } from "./auth-email";
 import { getDatabase } from "./db/client";
 import { authSchema } from "./db/schema";
-import { sendEmailOtp } from "./auth-email";
 import { activateInvitationAfterEmailProof } from "./invitations";
 
 function invitationActivationPlugin(): BetterAuthPlugin {

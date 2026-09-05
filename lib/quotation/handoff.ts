@@ -1,5 +1,5 @@
-import { compileContract } from "../contracts/validator";
 import quotationHandoffSchema from "../../contracts/sales/quotation-handoff.schema.json";
+import { compileContract } from "../contracts/validator";
 
 export type Quote = {
   unit_price: number;
@@ -109,6 +109,13 @@ export function sendManualQuotation(
   assertNonEmpty(actorId, "actorId");
   assertNonEmpty(sentChannel, "sentChannel");
   assertNonEmpty(sentRef, "sentRef");
-  if (Number.isNaN(Date.parse(sentAt))) throw new Error("Quotation send time must be an ISO date-time");
-  return validateQuotation({ ...quotation, status: "sent", sent_at: sentAt, sent_channel: sentChannel, sent_ref: sentRef });
+  if (Number.isNaN(Date.parse(sentAt)))
+    throw new Error("Quotation send time must be an ISO date-time");
+  return validateQuotation({
+    ...quotation,
+    status: "sent",
+    sent_at: sentAt,
+    sent_channel: sentChannel,
+    sent_ref: sentRef,
+  });
 }

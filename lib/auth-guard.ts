@@ -2,9 +2,12 @@ import "server-only";
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { auth } from "@/lib/auth";
 import { hasPermission, type Permission } from "@/lib/authz";
+
+const getRequestSession = cache(async () => auth.api.getSession({ headers: await headers() }));
 
 /**
  * Performs the database-backed role check required before protected pages load
@@ -14,9 +17,10 @@ export async function requireRole(...allowedRoles: readonly string[]) {
   if (allowedRoles.length === 0) {
     throw new Error("requireRole needs at least one allowed role");
   }
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getRequestSession();
   if (!session) redirect("/auth");
-  if (!session.user.role || !allowedRoles.includes(session.user.role)) redirect("/auth?error=access-denied");
+  if (!session.user.role || !allowedRoles.includes(session.user.role))
+    redirect("/auth?error=access-denied");
   return session;
 }
 
@@ -24,7 +28,7 @@ export async function requireRole(...allowedRoles: readonly string[]) {
  * Page-level authorization. Server Actions must perform the same check again.
  */
 export async function requirePermission(permission: Permission) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getRequestSession();
   if (!session) redirect("/auth");
   if (!hasPermission(session.user.role, permission)) redirect("/auth?error=access-denied");
   return session;

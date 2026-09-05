@@ -1,69 +1,656 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2Icon, FileSearchIcon, HandCoinsIcon, LinkIcon, MessageSquareTextIcon, PlusIcon, RotateCcwIcon, ShieldCheckIcon } from "lucide-react";
-import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import {
+  CheckCircle2Icon,
+  FileSearchIcon,
+  HandCoinsIcon,
+  LinkIcon,
+  MessageSquareTextIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  ShieldCheckIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
+import { startTransition, useActionState, useEffect, useState, useTransition } from "react";
+import { Controller, useForm } from "react-hook-form";
+import type { z } from "zod";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { initialSalesActionState } from "@/lib/action-states";
 import { createRfqAction, reviseRfqAction, submitRfqReadyAction } from "@/lib/actions/sales";
 import { linkReadyProductToSalesProjectAction } from "@/lib/actions/workspace";
-import { initialSalesActionState } from "@/lib/action-states";
-import { rfqFormSchema } from "@/lib/form-schemas";
 import type { ReadyProductContentSource } from "@/lib/content/store";
-import type { RfqEntry } from "@/lib/sales/store";
+import { rfqFormSchema } from "@/lib/form-schemas";
 import type { LeadEntry } from "@/lib/sales/closing-store";
+import type { RfqEntry } from "@/lib/sales/store";
 import type { WorkspaceProductReference } from "@/lib/workspace/store";
 import { useWorkspaceDirty } from "./dirty-state";
 
-const types = [["clutch_disc", "离合器片"], ["clutch_cover", "离合器盖 / 压盘"], ["release_bearing", "分离轴承"], ["clutch_kit", "离合器套件"]] as const;
+const types = [
+  ["clutch_disc", "离合器片"],
+  ["clutch_cover", "离合器盖 / 压盘"],
+  ["release_bearing", "分离轴承"],
+  ["clutch_kit", "离合器套件"],
+] as const;
 type RfqValues = z.infer<typeof rfqFormSchema>;
-const emptyRfq: RfqValues = { leadId: "", customerName: "", customerCompany: "", customerCountry: "", productType: "clutch_kit", oeNumber: "", vehicleBrand: "", vehicleModel: "", quantity: "", destination: "", evidenceRef: "" };
+const emptyRfq: RfqValues = {
+  leadId: "",
+  customerName: "",
+  customerCompany: "",
+  customerCountry: "",
+  productType: "clutch_kit",
+  oeNumber: "",
+  vehicleBrand: "",
+  vehicleModel: "",
+  quantity: "",
+  destination: "",
+  evidenceRef: "",
+};
 
-function RfqForm({ projectId, entry, leads }: { projectId: string; entry?: RfqEntry; leads: LeadEntry[] }) {
-  const router = useRouter(); const revising = Boolean(entry); const [state, action, pending] = useActionState(revising ? reviseRfqAction : createRfqAction, initialSalesActionState);
-  const form = useForm<RfqValues>({ resolver: zodResolver(rfqFormSchema), defaultValues: entry ? { ...entry.formValues, evidenceRef: "" } : emptyRfq });
+function RfqForm({
+  projectId,
+  entry,
+  leads,
+}: {
+  projectId: string;
+  entry?: RfqEntry;
+  leads: LeadEntry[];
+}) {
+  const router = useRouter();
+  const revising = Boolean(entry);
+  const [state, action, pending] = useActionState(
+    revising ? reviseRfqAction : createRfqAction,
+    initialSalesActionState,
+  );
+  const form = useForm<RfqValues>({
+    resolver: zodResolver(rfqFormSchema),
+    defaultValues: entry ? { ...entry.formValues, evidenceRef: "" } : emptyRfq,
+  });
   useWorkspaceDirty(`rfq-${entry?.id ?? "new"}`, form.formState.isDirty);
-  useEffect(() => { if (state.status === "success") { form.reset(revising ? form.getValues() : emptyRfq); router.refresh(); } }, [form, revising, router, state.status]);
-  function submit(values: RfqValues) { const data = new FormData(); data.set("projectId", projectId); if (entry) data.set("rfqId", entry.id); for (const [key, value] of Object.entries(values)) data.set(key, value); startTransition(() => action(data)); }
-  return <Card><CardHeader><CardTitle>{revising ? "补充询盘" : "录入询盘"}</CardTitle><CardDescription>先收齐产品身份、数量和目的地；本表单不接受价格、MOQ、交期或付款承诺。</CardDescription></CardHeader><CardContent><form id={revising ? `revise-rfq-${entry!.id}` : "create-rfq"} onSubmit={form.handleSubmit(submit)}><FieldGroup>{!revising && leads.some((lead) => lead.state === "LEAD_RECEIVED") ? <Field><FieldLabel htmlFor="rfq-lead">来源入站线索（可选）</FieldLabel><Controller control={form.control} name="leadId" render={({ field }) => <Select value={field.value || "none"} onValueChange={(value) => field.onChange(value === "none" ? "" : value)}><SelectTrigger id="rfq-lead" className="min-h-11 w-full"><SelectValue>{field.value ? "已选择入站线索" : "不关联入站线索"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="none">不关联入站线索</SelectItem>{leads.filter((lead) => lead.state === "LEAD_RECEIVED").map((lead) => <SelectItem key={lead.id} value={lead.id}>{"入站线索 "}{lead.id.slice(0, 8)}</SelectItem>)}</SelectGroup></SelectContent></Select>} /><FieldDescription>明确选择后，报价发送会继续同一条线索，不会创建重复线索。</FieldDescription></Field> : null}<FieldSet><FieldLegend>客户与需求</FieldLegend><FieldGroup><Field><FieldLabel htmlFor={`${entry?.id ?? "new"}-customer-name`}>客户名称</FieldLabel><Input id={`${entry?.id ?? "new"}-customer-name`} {...form.register("customerName")} /></Field><Field><FieldLabel htmlFor={`${entry?.id ?? "new"}-company`}>公司</FieldLabel><Input id={`${entry?.id ?? "new"}-company`} {...form.register("customerCompany")} /></Field><Field><FieldLabel htmlFor={`${entry?.id ?? "new"}-country`}>国家</FieldLabel><Input id={`${entry?.id ?? "new"}-country`} {...form.register("customerCountry")} /></Field></FieldGroup></FieldSet><FieldSet><FieldLegend>产品与交付信息</FieldLegend><FieldGroup><Field><FieldLabel>产品类型</FieldLabel><Controller control={form.control} name="productType" render={({ field }) => <Select items={Object.fromEntries(types)} value={field.value} onValueChange={field.onChange}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{types.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent></Select>} /></Field><Field><FieldLabel htmlFor={`${entry?.id ?? "new"}-oe`}>OE / OEM 编号</FieldLabel><Input id={`${entry?.id ?? "new"}-oe`} {...form.register("oeNumber")} /></Field><Field><FieldLabel htmlFor={`${entry?.id ?? "new"}-brand`}>车辆品牌</FieldLabel><Input id={`${entry?.id ?? "new"}-brand`} {...form.register("vehicleBrand")} /></Field><Field><FieldLabel htmlFor={`${entry?.id ?? "new"}-model`}>车型</FieldLabel><Input id={`${entry?.id ?? "new"}-model`} {...form.register("vehicleModel")} /></Field><Field data-invalid={!!form.formState.errors.quantity}><FieldLabel htmlFor={`${entry?.id ?? "new"}-quantity`}>数量</FieldLabel><Input id={`${entry?.id ?? "new"}-quantity`} inputMode="numeric" {...form.register("quantity")} /><FieldError errors={[form.formState.errors.quantity]} /></Field><Field><FieldLabel htmlFor={`${entry?.id ?? "new"}-destination`}>目的地国家或港口</FieldLabel><Input id={`${entry?.id ?? "new"}-destination`} {...form.register("destination")} /></Field></FieldGroup></FieldSet><Field data-invalid={!!form.formState.errors.evidenceRef}><FieldLabel htmlFor={`${entry?.id ?? "new"}-evidence`}>录入证据</FieldLabel><Input id={`${entry?.id ?? "new"}-evidence`} placeholder="evidence-rfq-001" {...form.register("evidenceRef")} /><FieldError errors={[form.formState.errors.evidenceRef]} /></Field></FieldGroup></form></CardContent><CardFooter className="flex-col items-stretch gap-3"><Button form={revising ? `revise-rfq-${entry!.id}` : "create-rfq"} type="submit" disabled={pending}>{pending ? <Spinner data-icon="inline-start" /> : revising ? <RotateCcwIcon data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}{revising ? "保存补充资料" : "保存询盘"}</Button>{state.message ? <p className={state.status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"} aria-live="polite">{state.message}</p> : null}</CardFooter></Card>;
+  useEffect(() => {
+    if (state.status === "success") {
+      form.reset(revising ? form.getValues() : emptyRfq);
+      router.refresh();
+    }
+  }, [form, revising, router, state.status]);
+  function submit(values: RfqValues) {
+    const data = new FormData();
+    data.set("projectId", projectId);
+    if (entry) data.set("rfqId", entry.id);
+    for (const [key, value] of Object.entries(values)) data.set(key, value);
+    startTransition(() => action(data));
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{revising ? "补充询盘" : "录入询盘"}</CardTitle>
+        <CardDescription>
+          先收齐产品身份、数量和目的地；本表单不接受价格、MOQ、交期或付款承诺。
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form
+          id={revising ? `revise-rfq-${entry!.id}` : "create-rfq"}
+          onSubmit={form.handleSubmit(submit)}
+        >
+          <FieldGroup>
+            {!revising && leads.some((lead) => lead.state === "LEAD_RECEIVED") ? (
+              <Field>
+                <FieldLabel htmlFor="rfq-lead">来源入站线索（可选）</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="leadId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
+                    >
+                      <SelectTrigger id="rfq-lead" className="min-h-11 w-full">
+                        <SelectValue>
+                          {field.value ? "已选择入站线索" : "不关联入站线索"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="none">不关联入站线索</SelectItem>
+                          {leads
+                            .filter((lead) => lead.state === "LEAD_RECEIVED")
+                            .map((lead) => (
+                              <SelectItem key={lead.id} value={lead.id}>
+                                {"入站线索 "}
+                                {lead.id.slice(0, 8)}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldDescription>
+                  明确选择后，报价发送会继续同一条线索，不会创建重复线索。
+                </FieldDescription>
+              </Field>
+            ) : null}
+            <FieldSet>
+              <FieldLegend>客户与需求</FieldLegend>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor={`${entry?.id ?? "new"}-customer-name`}>客户名称</FieldLabel>
+                  <Input
+                    id={`${entry?.id ?? "new"}-customer-name`}
+                    {...form.register("customerName")}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${entry?.id ?? "new"}-company`}>公司</FieldLabel>
+                  <Input
+                    id={`${entry?.id ?? "new"}-company`}
+                    {...form.register("customerCompany")}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${entry?.id ?? "new"}-country`}>国家</FieldLabel>
+                  <Input
+                    id={`${entry?.id ?? "new"}-country`}
+                    {...form.register("customerCountry")}
+                  />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+            <FieldSet>
+              <FieldLegend>产品与交付信息</FieldLegend>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel>产品类型</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name="productType"
+                    render={({ field }) => (
+                      <Select
+                        items={Object.fromEntries(types)}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {types.map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${entry?.id ?? "new"}-oe`}>OE / OEM 编号</FieldLabel>
+                  <Input id={`${entry?.id ?? "new"}-oe`} {...form.register("oeNumber")} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${entry?.id ?? "new"}-brand`}>车辆品牌</FieldLabel>
+                  <Input id={`${entry?.id ?? "new"}-brand`} {...form.register("vehicleBrand")} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${entry?.id ?? "new"}-model`}>车型</FieldLabel>
+                  <Input id={`${entry?.id ?? "new"}-model`} {...form.register("vehicleModel")} />
+                </Field>
+                <Field data-invalid={!!form.formState.errors.quantity}>
+                  <FieldLabel htmlFor={`${entry?.id ?? "new"}-quantity`}>数量</FieldLabel>
+                  <Input
+                    id={`${entry?.id ?? "new"}-quantity`}
+                    inputMode="numeric"
+                    {...form.register("quantity")}
+                  />
+                  <FieldError errors={[form.formState.errors.quantity]} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${entry?.id ?? "new"}-destination`}>
+                    目的地国家或港口
+                  </FieldLabel>
+                  <Input
+                    id={`${entry?.id ?? "new"}-destination`}
+                    {...form.register("destination")}
+                  />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+            <Field data-invalid={!!form.formState.errors.evidenceRef}>
+              <FieldLabel htmlFor={`${entry?.id ?? "new"}-evidence`}>录入证据</FieldLabel>
+              <Input
+                id={`${entry?.id ?? "new"}-evidence`}
+                placeholder="evidence-rfq-001"
+                {...form.register("evidenceRef")}
+              />
+              <FieldError errors={[form.formState.errors.evidenceRef]} />
+            </Field>
+          </FieldGroup>
+        </form>
+      </CardContent>
+      <CardFooter className="flex-col items-stretch gap-3">
+        <Button
+          form={revising ? `revise-rfq-${entry!.id}` : "create-rfq"}
+          type="submit"
+          disabled={pending}
+        >
+          {pending ? (
+            <Spinner data-icon="inline-start" />
+          ) : revising ? (
+            <RotateCcwIcon data-icon="inline-start" />
+          ) : (
+            <PlusIcon data-icon="inline-start" />
+          )}
+          {revising ? "保存补充资料" : "保存询盘"}
+        </Button>
+        {state.message ? (
+          <p
+            className={
+              state.status === "error"
+                ? "text-sm text-destructive"
+                : "text-sm text-muted-foreground"
+            }
+            aria-live="polite"
+          >
+            {state.message}
+          </p>
+        ) : null}
+      </CardFooter>
+    </Card>
+  );
 }
 
 function ReadyBoundary({ projectId, entry }: { projectId: string; entry: RfqEntry }) {
-  const router = useRouter(); const [evidenceRef, setEvidenceRef] = useState(""); const [state, action, pending] = useActionState(submitRfqReadyAction, initialSalesActionState);
+  const router = useRouter();
+  const [evidenceRef, setEvidenceRef] = useState("");
+  const [state, action, pending] = useActionState(submitRfqReadyAction, initialSalesActionState);
   useWorkspaceDirty(`rfq-ready-${entry.id}`, Boolean(evidenceRef));
-  useEffect(() => { if (state.status === "success") { setEvidenceRef(""); router.refresh(); } }, [router, state.status]);
-  function submit() { const data = new FormData(); data.set("projectId", projectId); data.set("rfqId", entry.id); data.set("evidenceRef", evidenceRef); startTransition(() => action(data)); }
-  if (entry.state === "RFQ_READY") return <Alert><CheckCircle2Icon /><AlertTitle>RFQ Ready</AlertTitle><AlertDescription>信息可交接给人工销售；尚未创建、批准或发送报价。</AlertDescription></Alert>;
-  return <Card><CardHeader><CardTitle>提交报价交接</CardTitle><CardDescription>{entry.missingFields.length ? `还需补充：${entry.missingFields.join("、")}` : "资料完整后，由人工确认进入 RFQ Ready。"}</CardDescription></CardHeader><CardContent><Field><FieldLabel htmlFor={`ready-${entry.id}`}>完整性确认凭据</FieldLabel><Input id={`ready-${entry.id}`} placeholder="evidence-rfq-ready-001" value={evidenceRef} onChange={(event) => setEvidenceRef(event.target.value)} /></Field></CardContent><CardFooter className="flex-col items-stretch gap-3"><Button disabled={pending || entry.missingFields.length > 0 || !evidenceRef} onClick={submit}><ShieldCheckIcon data-icon="inline-start" />确认 RFQ Ready</Button>{state.message ? <p className="text-sm text-muted-foreground" aria-live="polite">{state.message}</p> : null}</CardFooter></Card>;
+  useEffect(() => {
+    if (state.status === "success") {
+      setEvidenceRef("");
+      router.refresh();
+    }
+  }, [router, state.status]);
+  function submit() {
+    const data = new FormData();
+    data.set("projectId", projectId);
+    data.set("rfqId", entry.id);
+    data.set("evidenceRef", evidenceRef);
+    startTransition(() => action(data));
+  }
+  if (entry.state === "RFQ_READY")
+    return (
+      <Alert>
+        <CheckCircle2Icon />
+        <AlertTitle>RFQ Ready</AlertTitle>
+        <AlertDescription>信息可交接给人工销售；尚未创建、批准或发送报价。</AlertDescription>
+      </Alert>
+    );
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>提交报价交接</CardTitle>
+        <CardDescription>
+          {entry.missingFields.length
+            ? `还需补充：${entry.missingFields.join("、")}`
+            : "资料完整后，由人工确认进入 RFQ Ready。"}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Field>
+          <FieldLabel htmlFor={`ready-${entry.id}`}>完整性确认凭据</FieldLabel>
+          <Input
+            id={`ready-${entry.id}`}
+            placeholder="evidence-rfq-ready-001"
+            value={evidenceRef}
+            onChange={(event) => setEvidenceRef(event.target.value)}
+          />
+        </Field>
+      </CardContent>
+      <CardFooter className="flex-col items-stretch gap-3">
+        <Button
+          disabled={pending || entry.missingFields.length > 0 || !evidenceRef}
+          onClick={submit}
+        >
+          <ShieldCheckIcon data-icon="inline-start" />
+          确认 RFQ Ready
+        </Button>
+        {state.message ? (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {state.message}
+          </p>
+        ) : null}
+      </CardFooter>
+    </Card>
+  );
 }
 
-export function RfqPanel({ projectId, entries, selectedId, leads = [] }: { projectId: string; entries: RfqEntry[]; selectedId?: string; leads?: LeadEntry[] }) {
-  const [activeId, setActiveId] = useState(selectedId && entries.some((entry) => entry.id === selectedId) ? selectedId : entries[0]?.id ?? "new"); const active = entries.find((entry) => entry.id === activeId);
-  return <div className="flex flex-col gap-4"><div><div className="flex flex-wrap gap-2"><Badge variant="secondary">客户询盘</Badge><Badge variant="outline">不含报价字段</Badge></div><p className="mt-2 text-sm text-muted-foreground">收集并补齐 RFQ，再交给人工报价流程。</p></div><Tabs value={active ? "records" : "new"} onValueChange={(value) => { if (value === "new") setActiveId("new"); else setActiveId(entries[0]?.id ?? "new"); }}><TabsList className="w-full"><TabsTrigger value="new"><PlusIcon />新建</TabsTrigger><TabsTrigger value="records">询盘 {entries.length}</TabsTrigger></TabsList><TabsContent value="new"><RfqForm projectId={projectId} leads={leads} /></TabsContent><TabsContent value="records"><div className="flex flex-col gap-3">{entries.length ? entries.map((entry) => <Button key={entry.id} variant={activeId === entry.id ? "secondary" : "outline"} className="h-auto justify-start py-3 text-left" onClick={() => setActiveId(entry.id)}><span className="flex min-w-0 flex-1 flex-col gap-1"><span className="font-medium">{types.find(([value]) => value === entry.productType)?.[1] ?? entry.productType} · {entry.quantity ?? "数量待补"}</span><span className="text-xs text-muted-foreground">{entry.destination ?? "目的地待补"} · 完整度 {entry.completenessScore}%</span></span></Button>) : <Empty><EmptyHeader><EmptyMedia variant="icon"><MessageSquareTextIcon /></EmptyMedia><EmptyTitle>当前项目还没有询盘</EmptyTitle><EmptyDescription>先录入客户主动提出的需求。</EmptyDescription></EmptyHeader></Empty>}{active ? <><Progress aria-label="RFQ 完整度" value={active.completenessScore}><ProgressLabel>RFQ 完整度</ProgressLabel><ProgressValue>{() => `${active.completenessScore}%`}</ProgressValue></Progress>{active.state === "RFQ_COLLECTING" ? <RfqForm projectId={projectId} entry={active} leads={leads} /> : null}<ReadyBoundary projectId={projectId} entry={active} /></> : null}</div></TabsContent></Tabs></div>;
+export function RfqPanel({
+  projectId,
+  entries,
+  selectedId,
+  leads = [],
+}: {
+  projectId: string;
+  entries: RfqEntry[];
+  selectedId?: string;
+  leads?: LeadEntry[];
+}) {
+  const [activeId, setActiveId] = useState(
+    selectedId && entries.some((entry) => entry.id === selectedId)
+      ? selectedId
+      : (entries[0]?.id ?? "new"),
+  );
+  const active = entries.find((entry) => entry.id === activeId);
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">客户询盘</Badge>
+          <Badge variant="outline">不含报价字段</Badge>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">收集并补齐 RFQ，再交给人工报价流程。</p>
+      </div>
+      <Tabs
+        value={active ? "records" : "new"}
+        onValueChange={(value) => {
+          if (value === "new") setActiveId("new");
+          else setActiveId(entries[0]?.id ?? "new");
+        }}
+      >
+        <TabsList className="w-full">
+          <TabsTrigger value="new">
+            <PlusIcon />
+            新建
+          </TabsTrigger>
+          <TabsTrigger value="records">询盘 {entries.length}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="new">
+          <RfqForm projectId={projectId} leads={leads} />
+        </TabsContent>
+        <TabsContent value="records">
+          <div className="flex flex-col gap-3">
+            {entries.length ? (
+              entries.map((entry) => (
+                <Button
+                  key={entry.id}
+                  variant={activeId === entry.id ? "secondary" : "outline"}
+                  className="h-auto justify-start py-3 text-left"
+                  onClick={() => setActiveId(entry.id)}
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="font-medium">
+                      {types.find(([value]) => value === entry.productType)?.[1] ??
+                        entry.productType}{" "}
+                      · {entry.quantity ?? "数量待补"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {entry.destination ?? "目的地待补"} · 完整度 {entry.completenessScore}%
+                    </span>
+                  </span>
+                </Button>
+              ))
+            ) : (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <MessageSquareTextIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>当前项目还没有询盘</EmptyTitle>
+                  <EmptyDescription>先录入客户主动提出的需求。</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+            {active ? (
+              <>
+                <Progress aria-label="RFQ 完整度" value={active.completenessScore}>
+                  <ProgressLabel>RFQ 完整度</ProgressLabel>
+                  <ProgressValue>{() => `${active.completenessScore}%`}</ProgressValue>
+                </Progress>
+                {active.state === "RFQ_COLLECTING" ? (
+                  <RfqForm projectId={projectId} entry={active} leads={leads} />
+                ) : null}
+                <ReadyBoundary projectId={projectId} entry={active} />
+              </>
+            ) : null}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
 }
 
-export function ProductReferencePanel({ projectId, available, linked }: { projectId: string; available: ReadyProductContentSource[]; linked: WorkspaceProductReference[] }) {
-  const router = useRouter(); const [selectedId, setSelectedId] = useState(available.find((item) => !linked.some((reference) => reference.id === item.id))?.id ?? ""); const [message, setMessage] = useState(""); const [pending, startLink] = useTransition();
-  const candidates = available.filter((item) => !linked.some((reference) => reference.id === item.id));
-  const effectiveSelectedId = candidates.some((item) => item.id === selectedId) ? selectedId : candidates[0]?.id ?? "";
-  function link() { if (!effectiveSelectedId) return; startLink(async () => { const result = await linkReadyProductToSalesProjectAction(projectId, effectiveSelectedId); setMessage(result.message); if (result.status === "success") router.refresh(); }); }
-  return <div className="flex flex-col gap-4"><div><div className="flex flex-wrap gap-2"><Badge variant="secondary">产品引用</Badge><Badge variant="outline">只引用 Product Ready</Badge></div><p className="mt-2 text-sm text-muted-foreground">引用受控产品记录，不复制、不改写产品事实。</p></div><Card><CardHeader><CardTitle>添加产品引用</CardTitle><CardDescription>仅显示已通过 Gate 01 且尚未关联的产品。</CardDescription></CardHeader><CardContent>{candidates.length ? <Field><FieldLabel>Product Ready</FieldLabel><Select items={Object.fromEntries(candidates.map((item) => [item.id, item.internalSku + " · " + item.productName]))} value={effectiveSelectedId} onValueChange={(value) => value && setSelectedId(value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{candidates.map((item) => <SelectItem key={item.id} value={item.id}>{item.internalSku} · {item.productName}</SelectItem>)}</SelectGroup></SelectContent></Select></Field> : <p className="text-sm text-muted-foreground">没有可添加的 Product Ready。</p>}</CardContent><CardFooter className="flex-col items-stretch gap-3"><Button disabled={pending || !effectiveSelectedId} onClick={link}><LinkIcon data-icon="inline-start" />引用到当前项目</Button>{message ? <p className="text-sm text-muted-foreground" aria-live="polite">{message}</p> : null}</CardFooter></Card><Card><CardHeader><CardTitle>已引用产品</CardTitle></CardHeader><CardContent>{linked.length ? <div className="flex flex-col gap-2">{linked.map((item) => <Card key={item.id} size="sm"><CardHeader><CardTitle>{item.internalSku}</CardTitle><CardDescription>{item.productName}</CardDescription></CardHeader></Card>)}</div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><FileSearchIcon /></EmptyMedia><EmptyTitle>尚未引用产品</EmptyTitle><EmptyDescription>RFQ 可先收集，但正式报价前必须由人工核对产品身份。</EmptyDescription></EmptyHeader></Empty>}</CardContent></Card></div>;
+export function ProductReferencePanel({
+  projectId,
+  available,
+  linked,
+}: {
+  projectId: string;
+  available: ReadyProductContentSource[];
+  linked: WorkspaceProductReference[];
+}) {
+  const router = useRouter();
+  const [selectedId, setSelectedId] = useState(
+    available.find((item) => !linked.some((reference) => reference.id === item.id))?.id ?? "",
+  );
+  const [message, setMessage] = useState("");
+  const [pending, startLink] = useTransition();
+  const candidates = available.filter(
+    (item) => !linked.some((reference) => reference.id === item.id),
+  );
+  const effectiveSelectedId = candidates.some((item) => item.id === selectedId)
+    ? selectedId
+    : (candidates[0]?.id ?? "");
+  function link() {
+    if (!effectiveSelectedId) return;
+    startLink(async () => {
+      const result = await linkReadyProductToSalesProjectAction(projectId, effectiveSelectedId);
+      setMessage(result.message);
+      if (result.status === "success") router.refresh();
+    });
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">产品引用</Badge>
+          <Badge variant="outline">只引用 Product Ready</Badge>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          引用受控产品记录，不复制、不改写产品事实。
+        </p>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>添加产品引用</CardTitle>
+          <CardDescription>仅显示已通过 Gate 01 且尚未关联的产品。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {candidates.length ? (
+            <Field>
+              <FieldLabel>Product Ready</FieldLabel>
+              <Select
+                items={Object.fromEntries(
+                  candidates.map((item) => [item.id, item.internalSku + " · " + item.productName]),
+                )}
+                value={effectiveSelectedId}
+                onValueChange={(value) => value && setSelectedId(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {candidates.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.internalSku} · {item.productName}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : (
+            <p className="text-sm text-muted-foreground">没有可添加的 Product Ready。</p>
+          )}
+        </CardContent>
+        <CardFooter className="flex-col items-stretch gap-3">
+          <Button disabled={pending || !effectiveSelectedId} onClick={link}>
+            <LinkIcon data-icon="inline-start" />
+            引用到当前项目
+          </Button>
+          {message ? (
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {message}
+            </p>
+          ) : null}
+        </CardFooter>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>已引用产品</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {linked.length ? (
+            <div className="flex flex-col gap-2">
+              {linked.map((item) => (
+                <Card key={item.id} size="sm">
+                  <CardHeader>
+                    <CardTitle>{item.internalSku}</CardTitle>
+                    <CardDescription>{item.productName}</CardDescription>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <FileSearchIcon />
+                </EmptyMedia>
+                <EmptyTitle>尚未引用产品</EmptyTitle>
+                <EmptyDescription>
+                  RFQ 可先收集，但正式报价前必须由人工核对产品身份。
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
-export function QuotationHandoffPanel({ rfqs, products }: { rfqs: RfqEntry[]; products: WorkspaceProductReference[] }) {
+export function QuotationHandoffPanel({
+  rfqs,
+  products,
+}: {
+  rfqs: RfqEntry[];
+  products: WorkspaceProductReference[];
+}) {
   const ready = rfqs.filter((entry) => entry.state === "RFQ_READY");
-  return <div className="flex flex-col gap-4"><div><div className="flex flex-wrap gap-2"><Badge variant="secondary">报价交接</Badge><Badge variant="outline">Gate 02 人工受控</Badge></div><p className="mt-2 text-sm text-muted-foreground">这里只确认交接条件，不生成价格、MOQ、交期或正式报价。</p></div><Alert><ShieldCheckIcon /><AlertTitle>没有自动报价</AlertTitle><AlertDescription>RFQ Ready 与产品引用齐备后，人工销售在受控报价流程中创建并审批报价；当前仓库尚无可恢复的正式报价编辑 UI。</AlertDescription></Alert><Card><CardHeader><CardTitle>可交接询盘</CardTitle><CardDescription>{products.length} 个 Product Ready 引用 · {ready.length} 个 RFQ Ready</CardDescription></CardHeader><CardContent>{ready.length ? <div className="flex flex-col gap-3">{ready.map((entry) => <Card key={entry.id} size="sm"><CardHeader><div className="flex items-center justify-between gap-3"><CardTitle>{types.find(([value]) => value === entry.productType)?.[1] ?? entry.productType}</CardTitle><Badge variant="secondary">RFQ Ready</Badge></div><CardDescription>数量 {entry.quantity} · {entry.destination}</CardDescription></CardHeader></Card>)}</div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><HandCoinsIcon /></EmptyMedia><EmptyTitle>尚无可交接询盘</EmptyTitle><EmptyDescription>在“客户询盘”节点补齐并确认 RFQ Ready。</EmptyDescription></EmptyHeader></Empty>}</CardContent></Card></div>;
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">报价交接</Badge>
+          <Badge variant="outline">Gate 02 人工受控</Badge>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          这里只确认交接条件，不生成价格、MOQ、交期或正式报价。
+        </p>
+      </div>
+      <Alert>
+        <ShieldCheckIcon />
+        <AlertTitle>没有自动报价</AlertTitle>
+        <AlertDescription>
+          RFQ Ready
+          与产品引用齐备后，人工销售在受控报价流程中创建并审批报价；当前仓库尚无可恢复的正式报价编辑
+          UI。
+        </AlertDescription>
+      </Alert>
+      <Card>
+        <CardHeader>
+          <CardTitle>可交接询盘</CardTitle>
+          <CardDescription>
+            {products.length} 个 Product Ready 引用 · {ready.length} 个 RFQ Ready
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {ready.length ? (
+            <div className="flex flex-col gap-3">
+              {ready.map((entry) => (
+                <Card key={entry.id} size="sm">
+                  <CardHeader>
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle>
+                        {types.find(([value]) => value === entry.productType)?.[1] ??
+                          entry.productType}
+                      </CardTitle>
+                      <Badge variant="secondary">RFQ Ready</Badge>
+                    </div>
+                    <CardDescription>
+                      数量 {entry.quantity} · {entry.destination}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <HandCoinsIcon />
+                </EmptyMedia>
+                <EmptyTitle>尚无可交接询盘</EmptyTitle>
+                <EmptyDescription>在“客户询盘”节点补齐并确认 RFQ Ready。</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

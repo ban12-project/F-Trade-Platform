@@ -1,8 +1,21 @@
 {
   "rfq_id": "synthetic-rfq-ready-001",
-  "customer": {"name": "Synthetic Buyer", "company": "Synthetic Auto Parts", "country": "Synthetic Country"},
-  "product": {"product_type": "clutch_kit", "oe_number": "SYN-OE-001", "vehicle_brand": "Synthetic", "vehicle_model": "Demo Model"},
-  "commercial": {"quantity": 500, "destination": "Synthetic Port", "packaging_requirement": "Neutral Packaging"},
+  "customer": {
+    "name": "Synthetic Buyer",
+    "company": "Synthetic Auto Parts",
+    "country": "Synthetic Country"
+  },
+  "product": {
+    "product_type": "clutch_kit",
+    "oe_number": "SYN-OE-001",
+    "vehicle_brand": "Synthetic",
+    "vehicle_model": "Demo Model"
+  },
+  "commercial": {
+    "quantity": 500,
+    "destination": "Synthetic Port",
+    "packaging_requirement": "Neutral Packaging"
+  },
   "status": "ready",
   "completeness_score": 95,
   "missing_fields": []

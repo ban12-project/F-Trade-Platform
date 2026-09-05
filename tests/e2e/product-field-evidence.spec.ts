@@ -1,9 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-test("manual product intake exposes evidence-bound specification and commercial facts", async ({ page }) => {
+test("manual product intake exposes evidence-bound specification and commercial facts", async ({
+  page,
+}) => {
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
-  page.on("console", (message) => { if (message.type() === "error") runtimeErrors.push(message.text()); });
+  page.on("console", (message) => {
+    if (message.type() === "error") runtimeErrors.push(message.text());
+  });
 
   await page.goto("/testing/product-field-evidence");
   await page.waitForLoadState("networkidle");

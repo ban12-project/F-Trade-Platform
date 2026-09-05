@@ -1,7 +1,13 @@
-import { CamofoxWorkerClient } from "./camofox-client";
-import { type SignedSocialWorkerCommand, type WorkerNonceStore, verifySocialWorkerCommand } from "./worker-protocol";
+import type { CamofoxWorkerClient } from "./camofox-client";
+import {
+  type SignedSocialWorkerCommand,
+  verifySocialWorkerCommand,
+  type WorkerNonceStore,
+} from "./worker-protocol";
 
-export interface FixedEgressVerifier { currentIp(): Promise<string>; }
+export interface FixedEgressVerifier {
+  currentIp(): Promise<string>;
+}
 
 /** Executes only verified observation jobs; every mismatch or browser failure fails closed for the caller to pause the channel. */
 export async function executeControlledObservation(
@@ -13,7 +19,8 @@ export async function executeControlledObservation(
   camofox: CamofoxWorkerClient,
 ) {
   const command = await verifySocialWorkerCommand(signed, workerId, nonces);
-  if (command.kind !== "observe_inbound") throw new Error("Worker executor only accepts passive inbound observation jobs");
+  if (command.kind !== "observe_inbound")
+    throw new Error("Worker executor only accepts passive inbound observation jobs");
   if ((await egress.currentIp()) !== expectedEgressIp) throw new Error("egress_ip_mismatch");
   try {
     await camofox.healthcheck();

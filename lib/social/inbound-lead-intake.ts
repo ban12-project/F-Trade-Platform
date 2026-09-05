@@ -1,15 +1,21 @@
 import { z } from "zod";
 
-import { validateInboundChannelEvent, type ChannelInboundPolicy, type InboundChannelEvent } from "./inbound-policy";
+import {
+  type ChannelInboundPolicy,
+  type InboundChannelEvent,
+  validateInboundChannelEvent,
+} from "./inbound-policy";
 
-export const inboundLeadIntakeInputSchema = z.object({
-  conversationRef: z.string().trim().min(1).max(240),
-  leadRef: z.string().trim().min(1).max(240),
-  messageRecordRef: z.string().trim().min(1).max(240),
-  requestedProductType: z.string().trim().min(1).max(160).optional(),
-  requestedQuantity: z.number().int().positive().max(10_000_000).optional(),
-  destinationCountry: z.string().trim().min(2).max(100).optional(),
-}).strict();
+export const inboundLeadIntakeInputSchema = z
+  .object({
+    conversationRef: z.string().trim().min(1).max(240),
+    leadRef: z.string().trim().min(1).max(240),
+    messageRecordRef: z.string().trim().min(1).max(240),
+    requestedProductType: z.string().trim().min(1).max(160).optional(),
+    requestedQuantity: z.number().int().positive().max(10_000_000).optional(),
+    destinationCountry: z.string().trim().min(2).max(100).optional(),
+  })
+  .strict();
 export type InboundLeadIntakeInput = z.infer<typeof inboundLeadIntakeInputSchema>;
 
 /**
@@ -33,8 +39,12 @@ export function createInboundLeadIntake(
     source: "passive_social_inbound" as const,
     messageId: message.messageId,
     receivedAt: message.receivedAt,
-    observationRef: event.transport === "controlled_browser_observation" ? event.observationRef : undefined,
-    identityQuality: event.transport === "controlled_browser_observation" ? event.messageIdentityQuality : "dom_id" as const,
+    observationRef:
+      event.transport === "controlled_browser_observation" ? event.observationRef : undefined,
+    identityQuality:
+      event.transport === "controlled_browser_observation"
+        ? event.messageIdentityQuality
+        : ("dom_id" as const),
     rfqCollection: {
       productType: parsed.requestedProductType ?? null,
       quantity: parsed.requestedQuantity ?? null,

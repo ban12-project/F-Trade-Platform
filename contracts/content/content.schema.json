@@ -4,16 +4,30 @@
   "title": "Content",
   "type": "object",
   "additionalProperties": false,
-  "required": ["content_id", "product_id", "content_type", "objective", "target_customer", "platform", "hook", "body", "product_facts", "call_to_action", "hashtags", "visual_instruction", "status"],
+  "required": [
+    "content_id",
+    "product_id",
+    "content_type",
+    "objective",
+    "target_customer",
+    "platform",
+    "hook",
+    "body",
+    "product_facts",
+    "call_to_action",
+    "hashtags",
+    "visual_instruction",
+    "status"
+  ],
   "properties": {
-    "content_id": {"type": "string", "minLength": 1},
-    "product_id": {"type": "string", "minLength": 1},
-    "content_type": {"enum": ["product", "factory_capability", "industry_knowledge"]},
-    "objective": {"type": "string", "minLength": 1},
-    "target_customer": {"type": "string", "minLength": 1},
-    "platform": {"type": "string", "minLength": 1},
-    "hook": {"type": "string", "minLength": 1},
-    "body": {"type": "string", "minLength": 1},
+    "content_id": { "type": "string", "minLength": 1 },
+    "product_id": { "type": "string", "minLength": 1 },
+    "content_type": { "enum": ["product", "factory_capability", "industry_knowledge"] },
+    "objective": { "type": "string", "minLength": 1 },
+    "target_customer": { "type": "string", "minLength": 1 },
+    "platform": { "type": "string", "minLength": 1 },
+    "hook": { "type": "string", "minLength": 1 },
+    "body": { "type": "string", "minLength": 1 },
     "product_facts": {
       "type": "array",
       "items": {
@@ -21,27 +35,30 @@
         "additionalProperties": false,
         "required": ["field", "value", "evidence_ref"],
         "properties": {
-          "field": {"type": "string", "minLength": 1},
-          "value": {"type": "string", "minLength": 1},
-          "evidence_ref": {"type": "string", "minLength": 1}
+          "field": { "type": "string", "minLength": 1 },
+          "value": { "type": "string", "minLength": 1 },
+          "evidence_ref": { "type": "string", "minLength": 1 }
         }
       }
     },
-    "call_to_action": {"type": "string", "minLength": 1},
-    "hashtags": {"type": "array", "items": {"type": "string", "minLength": 1}},
-    "visual_instruction": {"type": "string", "minLength": 1},
-    "status": {"enum": ["review_required", "revision_required", "approved", "published"]},
-    "approval_ref": {"type": "string", "minLength": 1},
-    "published_ref": {"type": "string", "minLength": 1}
+    "call_to_action": { "type": "string", "minLength": 1 },
+    "hashtags": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "visual_instruction": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["review_required", "revision_required", "approved", "published"] },
+    "approval_ref": { "type": "string", "minLength": 1 },
+    "published_ref": { "type": "string", "minLength": 1 }
   },
   "allOf": [
     {
-      "if": {"properties": {"status": {"enum": ["approved", "published"]}}, "required": ["status"]},
-      "then": {"properties": {"approval_ref": {}}, "required": ["approval_ref"]}
+      "if": {
+        "properties": { "status": { "enum": ["approved", "published"] } },
+        "required": ["status"]
+      },
+      "then": { "properties": { "approval_ref": {} }, "required": ["approval_ref"] }
     },
     {
-      "if": {"properties": {"status": {"const": "published"}}, "required": ["status"]},
-      "then": {"properties": {"published_ref": {}}, "required": ["published_ref"]}
+      "if": { "properties": { "status": { "const": "published" } }, "required": ["status"] },
+      "then": { "properties": { "published_ref": {} }, "required": ["published_ref"] }
     }
   ]
 }

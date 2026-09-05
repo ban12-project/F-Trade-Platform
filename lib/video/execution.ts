@@ -1,31 +1,45 @@
 import { z } from "zod";
 
-import { videoProjectSchema, type VideoProject } from "./contracts";
+import { type VideoProject, videoProjectSchema } from "./contracts";
 import {
   selectVerifiedVideoModel,
-  videoGenerationRequestSchema,
   type VideoModelCapability,
   type VideoProviderId,
+  type videoGenerationRequestSchema,
 } from "./provider-capabilities";
 
-const privateRef = z.string().trim().regex(/^(?:asset|provider-job)-[a-z0-9][a-z0-9_-]{2,120}$/i);
+const privateRef = z
+  .string()
+  .trim()
+  .regex(/^(?:asset|provider-job)-[a-z0-9][a-z0-9_-]{2,120}$/i);
 
-export const videoProviderExecutionPolicySchema = z.object({
-  provider: z.string().trim().min(1),
-  enabled: z.boolean(),
-  credentialRef: z.string().trim().min(1).nullable(),
-  maximumConcurrentJobs: z.number().int().min(1).max(100),
-  maximumAttempts: z.number().int().min(1).max(10),
-  budgetLimitCents: z.number().int().positive(),
-  budgetCommittedCents: z.number().int().min(0),
-}).strict().superRefine((policy, context) => {
-  if (policy.enabled && !policy.credentialRef) {
-    context.addIssue({ code: "custom", path: ["credentialRef"], message: "启用视频提供商前必须配置私有凭据引用。" });
-  }
-  if (policy.budgetCommittedCents > policy.budgetLimitCents) {
-    context.addIssue({ code: "custom", path: ["budgetCommittedCents"], message: "已承诺预算不能超过提供商预算上限。" });
-  }
-});
+export const videoProviderExecutionPolicySchema = z
+  .object({
+    provider: z.string().trim().min(1),
+    enabled: z.boolean(),
+    credentialRef: z.string().trim().min(1).nullable(),
+    maximumConcurrentJobs: z.number().int().min(1).max(100),
+    maximumAttempts: z.number().int().min(1).max(10),
+    budgetLimitCents: z.number().int().positive(),
+    budgetCommittedCents: z.number().int().min(0),
+  })
+  .strict()
+  .superRefine((policy, context) => {
+    if (policy.enabled && !policy.credentialRef) {
+      context.addIssue({
+        code: "custom",
+        path: ["credentialRef"],
+        message: "启用视频提供商前必须配置私有凭据引用。",
+      });
+    }
+    if (policy.budgetCommittedCents > policy.budgetLimitCents) {
+      context.addIssue({
+        code: "custom",
+        path: ["budgetCommittedCents"],
+        message: "已承诺预算不能超过提供商预算上限。",
+      });
+    }
+  });
 export type VideoProviderExecutionPolicy = z.infer<typeof videoProviderExecutionPolicySchema>;
 
 export type VideoGenerationAdapterRequest = {
@@ -76,7 +90,11 @@ export async function submitVideoGeneration(
   dependencies: VideoExecutionDependencies,
 ): Promise<VideoGenerationAdapterResult> {
   const project = videoProjectSchema.parse(request.project);
-  if (project.status !== "ready_for_generation" && project.status !== "review_required" && project.status !== "approved") {
+  if (
+    project.status !== "ready_for_generation" &&
+    project.status !== "review_required" &&
+    project.status !== "approved"
+  ) {
     throw new Error("视频创意尚未准备好生成。");
   }
   if (!Number.isSafeInteger(request.expectedCostCents) || request.expectedCostCents < 1) {
@@ -86,11 +104,17 @@ export async function submitVideoGeneration(
   const policy = dependencies.policies.find((candidate) => candidate.provider === model.provider);
   if (!policy) throw new Error("视频提供商没有执行策略，已拒绝提交。");
   const parsedPolicy = videoProviderExecutionPolicySchema.parse(policy);
-  if (!parsedPolicy.enabled || !parsedPolicy.credentialRef) throw new Error("视频提供商未启用或未配置凭据。 ");
-  if ((dependencies.activeJobsByProvider[model.provider] ?? 0) >= parsedPolicy.maximumConcurrentJobs) {
+  if (!parsedPolicy.enabled || !parsedPolicy.credentialRef)
+    throw new Error("视频提供商未启用或未配置凭据。 ");
+  if (
+    (dependencies.activeJobsByProvider[model.provider] ?? 0) >= parsedPolicy.maximumConcurrentJobs
+  ) {
     throw new Error("视频提供商并发配额已满。 ");
   }
-  if (parsedPolicy.budgetCommittedCents + request.expectedCostCents > parsedPolicy.budgetLimitCents) {
+  if (
+    parsedPolicy.budgetCommittedCents + request.expectedCostCents >
+    parsedPolicy.budgetLimitCents
+  ) {
     throw new Error("视频生成会超过提供商预算上限。 ");
   }
   const adapter = dependencies.adapters.find((candidate) => candidate.provider === model.provider);
@@ -106,5 +130,7 @@ export async function submitVideoGeneration(
     resolution: request.generation.resolution,
     credential,
   });
-  return z.object({ providerJobRef: privateRef.optional(), resultAssetRef: privateRef }).parse(result);
+  return z
+    .object({ providerJobRef: privateRef.optional(), resultAssetRef: privateRef })
+    .parse(result);
 }

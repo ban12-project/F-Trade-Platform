@@ -28,7 +28,11 @@ function inviteUrl(token: string) {
 export async function issueInvitation(input: { email: string; invitedBy: string }) {
   const email = normalizeEmail(input.email);
   const database = getDatabase();
-  const [existing] = await database.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1);
+  const [existing] = await database
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, email))
+    .limit(1);
   if (existing) throw new Error("This email already has an account");
 
   const token = randomBytes(32).toString("base64url");
@@ -47,7 +51,10 @@ export async function issueInvitation(input: { email: string; invitedBy: string 
   try {
     await sendInvitationEmail({ email, inviteUrl: inviteUrl(token), expiresAt });
   } catch (error) {
-    await database.update(invitation).set({ status: "revoked", revokedAt: new Date() }).where(eq(invitation.id, id));
+    await database
+      .update(invitation)
+      .set({ status: "revoked", revokedAt: new Date() })
+      .where(eq(invitation.id, id));
     throw error;
   }
 
@@ -64,11 +71,22 @@ export async function provisionInvitedUser(input: { email: string; token: string
     const [matched] = await tx
       .select()
       .from(invitation)
-      .where(and(eq(invitation.email, email), eq(invitation.tokenHash, hashToken(input.token)), eq(invitation.status, "pending"), gt(invitation.expiresAt, now)))
+      .where(
+        and(
+          eq(invitation.email, email),
+          eq(invitation.tokenHash, hashToken(input.token)),
+          eq(invitation.status, "pending"),
+          gt(invitation.expiresAt, now),
+        ),
+      )
       .limit(1);
     if (!matched) throw new Error("Invitation is invalid, expired, or already used");
 
-    const [existing] = await tx.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1);
+    const [existing] = await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, email))
+      .limit(1);
     if (existing) throw new Error("Invitation has already been activated");
 
     await tx.insert(user).values({
@@ -80,7 +98,10 @@ export async function provisionInvitedUser(input: { email: string; token: string
       banned: true,
       banReason: PENDING_INVITATION_BAN_REASON,
     });
-    await tx.update(invitation).set({ tokenHash: hashToken(randomBytes(32).toString("base64url")) }).where(eq(invitation.id, matched.id));
+    await tx
+      .update(invitation)
+      .set({ tokenHash: hashToken(randomBytes(32).toString("base64url")) })
+      .where(eq(invitation.id, matched.id));
   });
 }
 
@@ -89,14 +110,31 @@ export async function activateInvitationAfterEmailProof(userId: string) {
   const now = new Date();
   await database.transaction(async (tx) => {
     const [invitedUser] = await tx.select().from(user).where(eq(user.id, userId)).limit(1);
-    if (!invitedUser || !invitedUser.emailVerified || invitedUser.banReason !== PENDING_INVITATION_BAN_REASON) return;
+    if (
+      !invitedUser ||
+      !invitedUser.emailVerified ||
+      invitedUser.banReason !== PENDING_INVITATION_BAN_REASON
+    )
+      return;
     const [matched] = await tx
       .select({ id: invitation.id })
       .from(invitation)
-      .where(and(eq(invitation.email, invitedUser.email), eq(invitation.status, "pending"), gt(invitation.expiresAt, now)))
+      .where(
+        and(
+          eq(invitation.email, invitedUser.email),
+          eq(invitation.status, "pending"),
+          gt(invitation.expiresAt, now),
+        ),
+      )
       .limit(1);
     if (!matched) return;
-    await tx.update(user).set({ banned: false, banReason: null }).where(eq(user.id, invitedUser.id));
-    await tx.update(invitation).set({ status: "accepted", acceptedBy: invitedUser.id, acceptedAt: now }).where(eq(invitation.id, matched.id));
+    await tx
+      .update(user)
+      .set({ banned: false, banReason: null })
+      .where(eq(user.id, invitedUser.id));
+    await tx
+      .update(invitation)
+      .set({ status: "accepted", acceptedBy: invitedUser.id, acceptedAt: now })
+      .where(eq(invitation.id, matched.id));
   });
 }

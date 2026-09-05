@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import type { ProductDraft, ProductReady } from "../lib/product/verification";
 import {
   assessProductVideoReadiness,
-  productMediaAssetSchema,
   type ProductMediaAsset,
+  productMediaAssetSchema,
 } from "../lib/product/video-readiness";
 
 const evaluatedAt = new Date("2026-09-02T00:00:00.000Z");
@@ -146,30 +146,42 @@ const unverified = assessProductVideoReadiness(unverifiedProduct, [baseAsset], e
 assert.equal(unverified.status, "not_ready");
 assert.ok(unverified.blockers.some((issue) => issue.code === "product_not_ready"));
 
-assert.throws(() => productMediaAssetSchema.parse({
-  ...baseAsset,
-  technical: { ...baseAsset.technical, durationMs: 1_000 },
-}), /图片不能包含/);
+assert.throws(
+  () =>
+    productMediaAssetSchema.parse({
+      ...baseAsset,
+      technical: { ...baseAsset.technical, durationMs: 1_000 },
+    }),
+  /图片不能包含/,
+);
 
-assert.throws(() => productMediaAssetSchema.parse({
-  ...baseAsset,
-  review: {
-    status: "approved",
-    reviewedBy: null,
-    reviewedAt: null,
-    evidenceRef: null,
-    notes: "",
-  },
-}), /审核必须记录/);
+assert.throws(
+  () =>
+    productMediaAssetSchema.parse({
+      ...baseAsset,
+      review: {
+        status: "approved",
+        reviewedBy: null,
+        reviewedAt: null,
+        evidenceRef: null,
+        notes: "",
+      },
+    }),
+  /审核必须记录/,
+);
 
-assert.throws(() => productMediaAssetSchema.parse({
-  ...baseAsset,
-  rights: {
-    ...baseAsset.rights,
-    editingAllowed: false,
-    imageToVideoAllowed: true,
-  },
-}), /编辑授权/);
+assert.throws(
+  () =>
+    productMediaAssetSchema.parse({
+      ...baseAsset,
+      rights: {
+        ...baseAsset.rights,
+        editingAllowed: false,
+        imageToVideoAllowed: true,
+      },
+    }),
+  /编辑授权/,
+);
 
 assert.throws(
   () => assessProductVideoReadiness(product, [baseAsset, baseAsset], evaluatedAt),

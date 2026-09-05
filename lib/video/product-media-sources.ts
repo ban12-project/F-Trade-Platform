@@ -7,7 +7,14 @@ import { listReadyVideoProductSources, type ReadyVideoProductSource } from "./st
 export type ReadyVideoProductMediaOption = {
   id: string;
   mediaType: "image" | "video";
-  role: "product_hero" | "product_detail" | "packaging" | "factory" | "inspection" | "application" | "other";
+  role:
+    | "product_hero"
+    | "product_detail"
+    | "packaging"
+    | "factory"
+    | "inspection"
+    | "application"
+    | "other";
   description: string;
   width: number;
   height: number;
@@ -29,9 +36,9 @@ export async function listReadyVideoProductSourcesWithMedia(
   evaluatedAt = new Date(),
 ): Promise<ReadyVideoProductSourceWithMedia[]> {
   const products = await listReadyVideoProductSources(projectId);
-  const media = await Promise.all(products.map((product) =>
-    listEditingEligibleProductMedia(product.id, evaluatedAt),
-  ));
+  const media = await Promise.all(
+    products.map((product) => listEditingEligibleProductMedia(product.id, evaluatedAt)),
+  );
 
   return products.map((product, index) => ({
     ...product,

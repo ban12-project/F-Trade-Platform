@@ -1,0 +1,38 @@
+name: production-build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_ENABLE_TESTING_API: '0'
+      BETTER_AUTH_SECRET: synthetic-production-build-secret-1234567890
+      BETTER_AUTH_URL: http://127.0.0.1:3119
+      DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:9/f_trade
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v5
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Build with the deployment command and testing APIs disabled
+        run: pnpm build
+      - name: Verify synthetic fixtures stay private to test builds
+        run: node scripts/test-production-route-boundaries.mjs

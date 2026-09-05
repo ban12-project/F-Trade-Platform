@@ -35,16 +35,20 @@ async function main() {
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(
     outputPath,
-    `${JSON.stringify({
-      draft: result.draft,
-      _evaluation: { ...result.metadata, evidence_mode: "bounded_location" },
-      document: preparedDocument && {
-        document_sha256: preparedDocument.document_sha256,
-        filename: preparedDocument.filename,
-        media_type: preparedDocument.media_type,
-        ocr_enabled: preparedDocument.ocr_enabled,
+    `${JSON.stringify(
+      {
+        draft: result.draft,
+        _evaluation: { ...result.metadata, evidence_mode: "bounded_location" },
+        document: preparedDocument && {
+          document_sha256: preparedDocument.document_sha256,
+          filename: preparedDocument.filename,
+          media_type: preparedDocument.media_type,
+          ocr_enabled: preparedDocument.ocr_enabled,
+        },
       },
-    }, null, 2)}\n`,
+      null,
+      2,
+    )}\n`,
   );
 }
 

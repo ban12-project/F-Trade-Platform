@@ -3,9 +3,9 @@ import { expect, test } from "@playwright/test";
 import productDraftFixture from "../../data/fixtures/product-draft.synthetic.json";
 import {
   approveProductDraft,
+  type ProductApproval,
   rejectProductDraft,
   reviewProductDraft,
-  type ProductApproval,
 } from "../../lib/product/verification";
 
 const approved: ProductApproval = {
@@ -25,17 +25,13 @@ const approved: ProductApproval = {
 test("keeps an unverified application identity in review", () => {
   const draft = reviewProductDraft(productDraftFixture);
   expect(draft.verification_status).toBe("review_required");
-  expect(draft.blocking_missing_fields).toContain(
-    "oe_numbers_or_verified_application",
-  );
+  expect(draft.blocking_missing_fields).toContain("oe_numbers_or_verified_application");
 });
 
 test("keeps a draft with a missing core field in review", () => {
   const incomplete = structuredClone(productDraftFixture);
   delete (incomplete.product as Record<string, unknown>).internal_sku;
-  delete (incomplete.field_evidence as Record<string, string>)[
-    "product.internal_sku"
-  ];
+  delete (incomplete.field_evidence as Record<string, string>)["product.internal_sku"];
 
   const draft = reviewProductDraft(incomplete);
   expect(draft.verification_status).toBe("review_required");
@@ -52,9 +48,7 @@ test("allows a human to verify a sourced application identity", () => {
 
 test("rejects a supplied engineering field without field evidence", () => {
   const draft = structuredClone(productDraftFixture);
-  delete (draft.field_evidence as Record<string, string>)[
-    "specifications.kit_contents"
-  ];
+  delete (draft.field_evidence as Record<string, string>)["specifications.kit_contents"];
 
   expect(() => approveProductDraft(draft, approved)).toThrow(
     "field_evidence.specifications.kit_contents",
@@ -65,9 +59,7 @@ test("rejects an OE identity without field evidence", () => {
   const draft = structuredClone(productDraftFixture);
   (draft.product as Record<string, unknown>).oe_numbers = ["SYN-OE-UNSOURCED"];
 
-  expect(() => approveProductDraft(draft, approved)).toThrow(
-    "field_evidence.product.oe_numbers",
-  );
+  expect(() => approveProductDraft(draft, approved)).toThrow("field_evidence.product.oe_numbers");
 });
 
 test("routes a rejected human decision to revision", () => {

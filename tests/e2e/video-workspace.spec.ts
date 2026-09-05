@@ -1,4 +1,3 @@
-
 import { expect, test } from "@playwright/test";
 
 test("video editor opens the selected draft in a dedicated workspace", async ({ page }) => {
@@ -22,9 +21,13 @@ test("verified captions remain server controlled", async ({ page }) => {
   await page.getByLabel("字幕类型").first().selectOption("creative");
   await page.getByLabel("创意字幕").fill("OE 99999");
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByText("创意文案不能包含工程或商业事实；请改用核验事实字段。")).toBeVisible();
+  await expect(
+    page.getByText("创意文案不能包含工程或商业事实；请改用核验事实字段。"),
+  ).toBeVisible();
   await page.getByLabel("字幕类型").first().selectOption("verified_fact");
-  await expect(page.getByLabel("事实字段")).toContainText("product.product_name · Verified clutch kit");
+  await expect(page.getByLabel("事实字段")).toContainText(
+    "product.product_name · Verified clutch kit",
+  );
 });
 
 test("returning to the project protects an unsaved video draft", async ({ page }) => {
@@ -37,7 +40,9 @@ test("returning to the project protects an unsaved video draft", async ({ page }
   await expect(page).toHaveURL(/\/testing\/video-workspace/);
 });
 
-test("video workspace exposes upload and post-render review without generation controls", async ({ page }) => {
+test("video workspace exposes upload and post-render review without generation controls", async ({
+  page,
+}) => {
   await page.goto("/testing/video-workspace");
   await page.getByRole("button", { name: "新建" }).click();
   await expect(page.getByLabel("素材（1–3 个）")).toHaveAttribute("accept", /video\/mp4/);
@@ -47,5 +52,8 @@ test("video workspace exposes upload and post-render review without generation c
 
   await page.goto("/testing/video-workspace?state=review");
   await expect(page.getByText("私有预览", { exact: true })).toBeVisible();
-  await expect(page.locator("video")).toHaveAttribute("src", /\/api\/video-preview\/asset-rendered-preview-001$/);
+  await expect(page.locator("video")).toHaveAttribute(
+    "src",
+    /\/api\/video-preview\/asset-rendered-preview-001$/,
+  );
 });

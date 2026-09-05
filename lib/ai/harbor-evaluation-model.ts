@@ -33,9 +33,17 @@ export function getHarborEvaluationModelConfig(
   const model = match[2];
   switch (provider) {
     case "openai":
-      return { provider, model, providerOptions: { apiKey: required(environment, "HARBOR_OPENAI_API_KEY") } };
+      return {
+        provider,
+        model,
+        providerOptions: { apiKey: required(environment, "HARBOR_OPENAI_API_KEY") },
+      };
     case "anthropic":
-      return { provider, model, providerOptions: { apiKey: required(environment, "HARBOR_ANTHROPIC_API_KEY") } };
+      return {
+        provider,
+        model,
+        providerOptions: { apiKey: required(environment, "HARBOR_ANTHROPIC_API_KEY") },
+      };
     case "google":
       return {
         provider,

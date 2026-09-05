@@ -3,29 +3,221 @@
   "manifest_status": "authorized",
   "authorization_ref": "synthetic-factory-authorization-001",
   "source_documents": [
-    {"document_ref":"synthetic-catalog-a","media_type":"pdf","use_authorization":"approved","conversion_status":"approved_for_extraction","contains_real_product_images":true},
-    {"document_ref":"synthetic-catalog-b","media_type":"xlsx","use_authorization":"approved","conversion_status":"approved_for_extraction","contains_real_product_images":false}
+    {
+      "document_ref": "synthetic-catalog-a",
+      "media_type": "pdf",
+      "use_authorization": "approved",
+      "conversion_status": "approved_for_extraction",
+      "contains_real_product_images": true
+    },
+    {
+      "document_ref": "synthetic-catalog-b",
+      "media_type": "xlsx",
+      "use_authorization": "approved",
+      "conversion_status": "approved_for_extraction",
+      "contains_real_product_images": false
+    }
   ],
   "slots": [
-    {"slot_id":"pilot-slot-01","cohort":"A","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-01","data_completeness":"complete","image_availability":"real_product_image","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-02","cohort":"A","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-02","data_completeness":"complete","image_availability":"real_product_image","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-03","cohort":"A","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-03","data_completeness":"complete","image_availability":"real_product_image","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-04","cohort":"A","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-04","data_completeness":"complete","image_availability":"real_product_image","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-05","cohort":"A","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-05","data_completeness":"complete","image_availability":"real_product_image","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-06","cohort":"B","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-06","data_completeness":"complete","image_availability":"none","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-07","cohort":"B","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-07","data_completeness":"complete","image_availability":"none","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-08","cohort":"B","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-08","data_completeness":"complete","image_availability":"none","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-09","cohort":"B","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-09","data_completeness":"complete","image_availability":"none","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-10","cohort":"B","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-10","data_completeness":"complete","image_availability":"none","intake_status":"ready_for_preflight","blocker_codes":[]},
-    {"slot_id":"pilot-slot-11","cohort":"C","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-11","data_completeness":"incomplete","image_availability":"real_product_image","intake_status":"blocked","blocker_codes":["source_field_review_required"]},
-    {"slot_id":"pilot-slot-12","cohort":"C","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-12","data_completeness":"incomplete","image_availability":"real_product_image","intake_status":"blocked","blocker_codes":["source_field_review_required"]},
-    {"slot_id":"pilot-slot-13","cohort":"C","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-13","data_completeness":"incomplete","image_availability":"real_product_image","intake_status":"blocked","blocker_codes":["source_field_review_required"]},
-    {"slot_id":"pilot-slot-14","cohort":"C","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-14","data_completeness":"incomplete","image_availability":"real_product_image","intake_status":"blocked","blocker_codes":["source_field_review_required"]},
-    {"slot_id":"pilot-slot-15","cohort":"C","source_document_ref":"synthetic-catalog-a","source_ref":"synthetic-source-15","data_completeness":"incomplete","image_availability":"real_product_image","intake_status":"blocked","blocker_codes":["source_field_review_required"]},
-    {"slot_id":"pilot-slot-16","cohort":"D","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-16","data_completeness":"incomplete","image_availability":"none","intake_status":"blocked","blocker_codes":["source_field_review_required","image_review_required"]},
-    {"slot_id":"pilot-slot-17","cohort":"D","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-17","data_completeness":"incomplete","image_availability":"none","intake_status":"blocked","blocker_codes":["source_field_review_required","image_review_required"]},
-    {"slot_id":"pilot-slot-18","cohort":"D","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-18","data_completeness":"incomplete","image_availability":"none","intake_status":"blocked","blocker_codes":["source_field_review_required","image_review_required"]},
-    {"slot_id":"pilot-slot-19","cohort":"D","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-19","data_completeness":"incomplete","image_availability":"none","intake_status":"blocked","blocker_codes":["source_field_review_required","image_review_required"]},
-    {"slot_id":"pilot-slot-20","cohort":"D","source_document_ref":"synthetic-catalog-b","source_ref":"synthetic-source-20","data_completeness":"incomplete","image_availability":"none","intake_status":"blocked","blocker_codes":["source_field_review_required","image_review_required"]}
+    {
+      "slot_id": "pilot-slot-01",
+      "cohort": "A",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-01",
+      "data_completeness": "complete",
+      "image_availability": "real_product_image",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-02",
+      "cohort": "A",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-02",
+      "data_completeness": "complete",
+      "image_availability": "real_product_image",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-03",
+      "cohort": "A",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-03",
+      "data_completeness": "complete",
+      "image_availability": "real_product_image",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-04",
+      "cohort": "A",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-04",
+      "data_completeness": "complete",
+      "image_availability": "real_product_image",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-05",
+      "cohort": "A",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-05",
+      "data_completeness": "complete",
+      "image_availability": "real_product_image",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-06",
+      "cohort": "B",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-06",
+      "data_completeness": "complete",
+      "image_availability": "none",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-07",
+      "cohort": "B",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-07",
+      "data_completeness": "complete",
+      "image_availability": "none",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-08",
+      "cohort": "B",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-08",
+      "data_completeness": "complete",
+      "image_availability": "none",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-09",
+      "cohort": "B",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-09",
+      "data_completeness": "complete",
+      "image_availability": "none",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-10",
+      "cohort": "B",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-10",
+      "data_completeness": "complete",
+      "image_availability": "none",
+      "intake_status": "ready_for_preflight",
+      "blocker_codes": []
+    },
+    {
+      "slot_id": "pilot-slot-11",
+      "cohort": "C",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-11",
+      "data_completeness": "incomplete",
+      "image_availability": "real_product_image",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-12",
+      "cohort": "C",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-12",
+      "data_completeness": "incomplete",
+      "image_availability": "real_product_image",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-13",
+      "cohort": "C",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-13",
+      "data_completeness": "incomplete",
+      "image_availability": "real_product_image",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-14",
+      "cohort": "C",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-14",
+      "data_completeness": "incomplete",
+      "image_availability": "real_product_image",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-15",
+      "cohort": "C",
+      "source_document_ref": "synthetic-catalog-a",
+      "source_ref": "synthetic-source-15",
+      "data_completeness": "incomplete",
+      "image_availability": "real_product_image",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-16",
+      "cohort": "D",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-16",
+      "data_completeness": "incomplete",
+      "image_availability": "none",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required", "image_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-17",
+      "cohort": "D",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-17",
+      "data_completeness": "incomplete",
+      "image_availability": "none",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required", "image_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-18",
+      "cohort": "D",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-18",
+      "data_completeness": "incomplete",
+      "image_availability": "none",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required", "image_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-19",
+      "cohort": "D",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-19",
+      "data_completeness": "incomplete",
+      "image_availability": "none",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required", "image_review_required"]
+    },
+    {
+      "slot_id": "pilot-slot-20",
+      "cohort": "D",
+      "source_document_ref": "synthetic-catalog-b",
+      "source_ref": "synthetic-source-20",
+      "data_completeness": "incomplete",
+      "image_availability": "none",
+      "intake_status": "blocked",
+      "blocker_codes": ["source_field_review_required", "image_review_required"]
+    }
   ]
 }

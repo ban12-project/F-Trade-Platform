@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-
-import { MarketingVideoCreateForm } from "@/components/workspace/marketing-video-create-form";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
+import { MarketingVideoCreateForm } from "@/components/workspace/marketing-video-create-form";
 import type { ReadyVideoProductSourceWithMedia } from "@/lib/video/product-media-sources";
 
 const products: ReadyVideoProductSourceWithMedia[] = [
@@ -48,9 +47,14 @@ const products: ReadyVideoProductSourceWithMedia[] = [
 /** Test-only fixture; production product and media access remains server-authorized. */
 export default function VideoProductMediaCreateTestingPage() {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
-  return <main className="mx-auto min-h-screen max-w-3xl p-6">
-    <WorkspaceDirtyProvider>
-      <MarketingVideoCreateForm projectId="00000000-0000-4000-8000-000000000900" products={products} />
-    </WorkspaceDirtyProvider>
-  </main>;
+  return (
+    <main className="mx-auto min-h-screen max-w-3xl p-6">
+      <WorkspaceDirtyProvider>
+        <MarketingVideoCreateForm
+          projectId="00000000-0000-4000-8000-000000000900"
+          products={products}
+        />
+      </WorkspaceDirtyProvider>
+    </main>
+  );
 }

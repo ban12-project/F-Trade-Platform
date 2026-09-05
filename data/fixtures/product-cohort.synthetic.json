@@ -9,7 +9,11 @@
       "product_fixture": "data/fixtures/product-draft-complete.synthetic.json",
       "image_refs": ["synthetic-private-evidence/product-a/front.png"],
       "expected_blocking_fields": [],
-      "required_human_actions": ["confirm_product_facts", "confirm_image_matches_product", "record_gate_01_decision"],
+      "required_human_actions": [
+        "confirm_product_facts",
+        "confirm_image_matches_product",
+        "record_gate_01_decision"
+      ],
       "visual_policy": {
         "generated_image_is_structural_evidence": false,
         "allowed_uses": ["background", "layout"],
@@ -23,7 +27,11 @@
       "product_fixture": "data/fixtures/product-draft-complete.synthetic.json",
       "image_refs": [],
       "expected_blocking_fields": [],
-      "required_human_actions": ["confirm_product_facts", "choose_real_image_or_labeled_text_only_content", "record_gate_01_decision"],
+      "required_human_actions": [
+        "confirm_product_facts",
+        "choose_real_image_or_labeled_text_only_content",
+        "record_gate_01_decision"
+      ],
       "visual_policy": {
         "generated_image_is_structural_evidence": false,
         "allowed_uses": ["background", "layout", "clearly_labeled_illustration"],
@@ -37,7 +45,11 @@
       "product_fixture": "data/fixtures/product-draft.synthetic.json",
       "image_refs": ["synthetic-private-evidence/product-c/front.png"],
       "expected_blocking_fields": ["oe_numbers_or_verified_application"],
-      "required_human_actions": ["confirm_application_identity", "confirm_image_matches_product", "record_gate_01_decision"],
+      "required_human_actions": [
+        "confirm_application_identity",
+        "confirm_image_matches_product",
+        "record_gate_01_decision"
+      ],
       "visual_policy": {
         "generated_image_is_structural_evidence": false,
         "allowed_uses": ["background", "layout"],
@@ -51,7 +63,11 @@
       "product_fixture": "data/fixtures/product-draft.synthetic.json",
       "image_refs": [],
       "expected_blocking_fields": ["oe_numbers_or_verified_application"],
-      "required_human_actions": ["confirm_application_identity", "choose_real_image_or_labeled_text_only_content", "record_gate_01_decision"],
+      "required_human_actions": [
+        "confirm_application_identity",
+        "choose_real_image_or_labeled_text_only_content",
+        "record_gate_01_decision"
+      ],
       "visual_policy": {
         "generated_image_is_structural_evidence": false,
         "allowed_uses": ["background", "layout", "clearly_labeled_illustration"],

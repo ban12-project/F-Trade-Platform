@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 
-import { getDatabase, type Database } from "@/lib/db/client";
+import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord } from "@/lib/db/schema";
 
 import type { VideoProject } from "./contracts";
@@ -12,7 +12,8 @@ export async function assertCurrentProductFactsForVideo(
   project: VideoProject,
   database: Database = getDatabase(),
 ) {
-  const [product] = await database.select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
+  const [product] = await database
+    .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, project.productId), eq(aggregateRecord.type, "product")))
     .limit(1);

@@ -4,23 +4,37 @@ export const shotAnalysisVersion = "ffmpeg-scdet-frame-diff-v1";
 export const shotDetectionFramesPerSecond = 4;
 export const maximumDetectedShotIntervalMs = 12_000;
 
-export const shotSourceAnalysisSchema = z.object({
-  version: z.literal(shotAnalysisVersion),
-  intervalStartMs: z.number().int().min(0),
-  intervalEndMs: z.number().int().min(1_000),
-  representativeMs: z.number().int().min(0),
-  actionScore: z.number().int().min(0).max(100),
-  actionLevel: z.enum(["low", "medium", "high"]),
-  startBoundary: z.enum(["source", "scene", "window"]),
-  endBoundary: z.enum(["scene", "window", "source"]),
-}).strict().superRefine((value, context) => {
-  if (value.intervalEndMs - value.intervalStartMs < 1_000) {
-    context.addIssue({ code: "custom", path: ["intervalEndMs"], message: "检测镜头区间至少需要 1 秒。" });
-  }
-  if (value.representativeMs < value.intervalStartMs || value.representativeMs >= value.intervalEndMs) {
-    context.addIssue({ code: "custom", path: ["representativeMs"], message: "代表帧必须位于检测镜头区间内。" });
-  }
-});
+export const shotSourceAnalysisSchema = z
+  .object({
+    version: z.literal(shotAnalysisVersion),
+    intervalStartMs: z.number().int().min(0),
+    intervalEndMs: z.number().int().min(1_000),
+    representativeMs: z.number().int().min(0),
+    actionScore: z.number().int().min(0).max(100),
+    actionLevel: z.enum(["low", "medium", "high"]),
+    startBoundary: z.enum(["source", "scene", "window"]),
+    endBoundary: z.enum(["scene", "window", "source"]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.intervalEndMs - value.intervalStartMs < 1_000) {
+      context.addIssue({
+        code: "custom",
+        path: ["intervalEndMs"],
+        message: "检测镜头区间至少需要 1 秒。",
+      });
+    }
+    if (
+      value.representativeMs < value.intervalStartMs ||
+      value.representativeMs >= value.intervalEndMs
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["representativeMs"],
+        message: "代表帧必须位于检测镜头区间内。",
+      });
+    }
+  });
 
 export type ShotSourceAnalysis = z.infer<typeof shotSourceAnalysisSchema>;
 type MotionSample = { timeMs: number; difference: number };
@@ -63,7 +77,7 @@ function percentile(values: number[], proportion: number) {
 }
 
 function actionScore(value: number) {
-  return Math.max(0, Math.min(100, Math.round(value / 32 * 100)));
+  return Math.max(0, Math.min(100, Math.round((value / 32) * 100)));
 }
 
 function actionLevel(score: number): ShotSourceAnalysis["actionLevel"] {
@@ -74,58 +88,97 @@ function actionLevel(score: number): ShotSourceAnalysis["actionLevel"] {
 
 function splitBoundaries(durationMs: number, sceneCutsMs: number[]) {
   const scenes = [0, ...sceneCutsMs, durationMs];
-  const boundaries: Array<{ timeMs: number; kind: "source" | "scene" | "window" }> = [{ timeMs: 0, kind: "source" }];
+  const boundaries: Array<{ timeMs: number; kind: "source" | "scene" | "window" }> = [
+    { timeMs: 0, kind: "source" },
+  ];
   for (let index = 0; index < scenes.length - 1; index += 1) {
     const startMs = scenes[index]!;
     const endMs = scenes[index + 1]!;
     const parts = Math.max(1, Math.ceil((endMs - startMs) / maximumDetectedShotIntervalMs));
     for (let part = 1; part <= parts; part += 1) {
-      const timeMs = part === parts ? endMs : Math.round(startMs + (endMs - startMs) * part / parts);
-      boundaries.push({ timeMs, kind: timeMs === durationMs ? "source" : part === parts ? "scene" : "window" });
+      const timeMs =
+        part === parts ? endMs : Math.round(startMs + ((endMs - startMs) * part) / parts);
+      boundaries.push({
+        timeMs,
+        kind: timeMs === durationMs ? "source" : part === parts ? "scene" : "window",
+      });
     }
   }
   return boundaries;
 }
 
-export function detectShotIntervals(input: { durationMs: number; sceneMetadata: string; motionMetadata: string }) {
-  if (!Number.isInteger(input.durationMs) || input.durationMs < 1_000) throw new Error("源视频不足 1 秒，不能检测镜头区间。");
+export function detectShotIntervals(input: {
+  durationMs: number;
+  sceneMetadata: string;
+  motionMetadata: string;
+}) {
+  if (!Number.isInteger(input.durationMs) || input.durationMs < 1_000)
+    throw new Error("源视频不足 1 秒，不能检测镜头区间。");
   const sceneCuts = parseSceneCutMetadata(input.sceneMetadata, input.durationMs);
   const samples = parseFrameDifferenceMetadata(input.motionMetadata);
   const boundaries = splitBoundaries(input.durationMs, sceneCuts);
   return boundaries.slice(0, -1).flatMap((start, index) => {
     const end = boundaries[index + 1]!;
     if (end.timeMs - start.timeMs < 1_000) return [];
-    const inside = samples.filter((sample) => sample.timeMs >= start.timeMs + 250 && sample.timeMs < end.timeMs - 250);
-    const usable = inside.length ? inside : samples.filter((sample) => sample.timeMs >= start.timeMs && sample.timeMs < end.timeMs);
-    const typicalDifference = percentile(usable.map((sample) => sample.difference), .75);
+    const inside = samples.filter(
+      (sample) => sample.timeMs >= start.timeMs + 250 && sample.timeMs < end.timeMs - 250,
+    );
+    const usable = inside.length
+      ? inside
+      : samples.filter((sample) => sample.timeMs >= start.timeMs && sample.timeMs < end.timeMs);
+    const typicalDifference = percentile(
+      usable.map((sample) => sample.difference),
+      0.75,
+    );
     const score = actionScore(typicalDifference);
-    const representativeTarget = percentile(usable.map((sample) => sample.difference), .85);
+    const representativeTarget = percentile(
+      usable.map((sample) => sample.difference),
+      0.85,
+    );
     const representative = usable.reduce<MotionSample | null>((best, sample) => {
       if (!best) return sample;
-      return Math.abs(sample.difference - representativeTarget) < Math.abs(best.difference - representativeTarget) ? sample : best;
+      return Math.abs(sample.difference - representativeTarget) <
+        Math.abs(best.difference - representativeTarget)
+        ? sample
+        : best;
     }, null);
-    return [shotSourceAnalysisSchema.parse({
-      version: shotAnalysisVersion,
-      intervalStartMs: start.timeMs,
-      intervalEndMs: end.timeMs,
-      representativeMs: representative?.timeMs ?? Math.floor((start.timeMs + end.timeMs) / 2),
-      actionScore: score,
-      actionLevel: actionLevel(score),
-      startBoundary: start.kind,
-      endBoundary: end.kind,
-    })];
+    return [
+      shotSourceAnalysisSchema.parse({
+        version: shotAnalysisVersion,
+        intervalStartMs: start.timeMs,
+        intervalEndMs: end.timeMs,
+        representativeMs: representative?.timeMs ?? Math.floor((start.timeMs + end.timeMs) / 2),
+        actionScore: score,
+        actionLevel: actionLevel(score),
+        startBoundary: start.kind,
+        endBoundary: end.kind,
+      }),
+    ];
   });
 }
 
-export function selectDiverseActionIntervals(intervals: ShotSourceAnalysis[], maximumIntervals: number) {
-  if (!Number.isInteger(maximumIntervals) || maximumIntervals < 1) throw new Error("候选镜头数量必须是正整数。");
+export function selectDiverseActionIntervals(
+  intervals: ShotSourceAnalysis[],
+  maximumIntervals: number,
+) {
+  if (!Number.isInteger(maximumIntervals) || maximumIntervals < 1)
+    throw new Error("候选镜头数量必须是正整数。");
   if (intervals.length <= maximumIntervals) return [...intervals];
-  const ordered = [...intervals].sort((left, right) => right.actionScore - left.actionScore || left.intervalStartMs - right.intervalStartMs);
+  const ordered = [...intervals].sort(
+    (left, right) =>
+      right.actionScore - left.actionScore || left.intervalStartMs - right.intervalStartMs,
+  );
   const totalDurationMs = Math.max(...intervals.map((interval) => interval.intervalEndMs));
   const minimumSeparationMs = Math.max(2_000, Math.floor(totalDurationMs / (maximumIntervals * 2)));
   const selected: ShotSourceAnalysis[] = [];
   for (const interval of ordered) {
-    if (selected.every((current) => Math.abs(current.representativeMs - interval.representativeMs) >= minimumSeparationMs)) selected.push(interval);
+    if (
+      selected.every(
+        (current) =>
+          Math.abs(current.representativeMs - interval.representativeMs) >= minimumSeparationMs,
+      )
+    )
+      selected.push(interval);
     if (selected.length === maximumIntervals) break;
   }
   for (const interval of ordered) {

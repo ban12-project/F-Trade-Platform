@@ -4,65 +4,76 @@ import { z } from "zod";
 
 import type { ProductReady } from "./verification";
 import {
+  type ProductMediaAsset,
   productMediaAssetSchema,
   productMediaRightsSchema,
   productMediaSemanticSchema,
   productMediaTechnicalSchema,
-  type ProductMediaAsset,
 } from "./video-readiness";
 
-const evidenceReferenceSchema = z.string().trim().regex(
-  /^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i,
-  "必须引用私有证据记录。",
-);
+const evidenceReferenceSchema = z
+  .string()
+  .trim()
+  .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "必须引用私有证据记录。");
 
-export const registerProductMediaInputSchema = z.object({
-  productId: z.uuid(),
-  evidenceRef: evidenceReferenceSchema,
-  origin: z.enum(["factory", "user_upload", "licensed"]),
-  semantic: productMediaSemanticSchema,
-  rights: productMediaRightsSchema,
-}).strict();
+export const registerProductMediaInputSchema = z
+  .object({
+    productId: z.uuid(),
+    evidenceRef: evidenceReferenceSchema,
+    origin: z.enum(["factory", "user_upload", "licensed"]),
+    semantic: productMediaSemanticSchema,
+    rights: productMediaRightsSchema,
+  })
+  .strict();
 
 export type RegisterProductMediaInput = z.infer<typeof registerProductMediaInputSchema>;
 
 /** Server-derived media facts. Never populate this object from form fields. */
-export const productMediaProbeSchema = z.object({
-  mediaType: z.enum(["image", "video"]),
-  technical: productMediaTechnicalSchema,
-}).strict().superRefine((probe, context) => {
-  if (!probe.technical.contentType.startsWith(`${probe.mediaType}/`)) {
-    context.addIssue({
-      code: "custom",
-      path: ["technical", "contentType"],
-      message: "媒体探测类型与 Content-Type 不一致。",
-    });
-  }
-  if (probe.mediaType === "image") {
-    if (probe.technical.durationMs !== null || probe.technical.fps !== null || probe.technical.hasAudio) {
+export const productMediaProbeSchema = z
+  .object({
+    mediaType: z.enum(["image", "video"]),
+    technical: productMediaTechnicalSchema,
+  })
+  .strict()
+  .superRefine((probe, context) => {
+    if (!probe.technical.contentType.startsWith(`${probe.mediaType}/`)) {
+      context.addIssue({
+        code: "custom",
+        path: ["technical", "contentType"],
+        message: "媒体探测类型与 Content-Type 不一致。",
+      });
+    }
+    if (probe.mediaType === "image") {
+      if (
+        probe.technical.durationMs !== null ||
+        probe.technical.fps !== null ||
+        probe.technical.hasAudio
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["technical"],
+          message: "图片探测结果不能包含时长、帧率或音轨。",
+        });
+      }
+    } else if (probe.technical.durationMs === null || probe.technical.fps === null) {
       context.addIssue({
         code: "custom",
         path: ["technical"],
-        message: "图片探测结果不能包含时长、帧率或音轨。",
+        message: "视频探测结果必须包含时长和帧率。",
       });
     }
-  } else if (probe.technical.durationMs === null || probe.technical.fps === null) {
-    context.addIssue({
-      code: "custom",
-      path: ["technical"],
-      message: "视频探测结果必须包含时长和帧率。",
-    });
-  }
-});
+  });
 
 export type ProductMediaProbe = z.infer<typeof productMediaProbeSchema>;
 
-export const reviewProductMediaInputSchema = z.object({
-  assetId: z.uuid(),
-  decision: z.enum(["approved", "rejected"]),
-  evidenceRef: evidenceReferenceSchema,
-  notes: z.string().trim().max(1_000),
-}).strict();
+export const reviewProductMediaInputSchema = z
+  .object({
+    assetId: z.uuid(),
+    decision: z.enum(["approved", "rejected"]),
+    evidenceRef: evidenceReferenceSchema,
+    notes: z.string().trim().max(1_000),
+  })
+  .strict();
 
 export type ReviewProductMediaInput = z.infer<typeof reviewProductMediaInputSchema>;
 

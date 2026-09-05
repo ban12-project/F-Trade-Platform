@@ -4,44 +4,54 @@
   "title": "RFQDraft",
   "type": "object",
   "additionalProperties": false,
-  "required": ["rfq_id", "customer", "product", "commercial", "status", "completeness_score", "missing_fields"],
+  "required": [
+    "rfq_id",
+    "customer",
+    "product",
+    "commercial",
+    "status",
+    "completeness_score",
+    "missing_fields"
+  ],
   "properties": {
-    "rfq_id": {"type": "string", "minLength": 1},
+    "rfq_id": { "type": "string", "minLength": 1 },
     "customer": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "name": {"type": "string"},
-        "company": {"type": "string"},
-        "country": {"type": "string"}
+        "name": { "type": "string" },
+        "company": { "type": "string" },
+        "country": { "type": "string" }
       }
     },
     "product": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "product_type": {"enum": ["clutch_disc", "clutch_cover", "release_bearing", "clutch_kit"]},
-        "oe_number": {"type": "string"},
-        "vehicle_brand": {"type": "string"},
-        "vehicle_model": {"type": "string"},
-        "vehicle_year": {"type": "string"},
-        "engine": {"type": "string"},
-        "required_specification": {"type": "string"}
+        "product_type": {
+          "enum": ["clutch_disc", "clutch_cover", "release_bearing", "clutch_kit"]
+        },
+        "oe_number": { "type": "string" },
+        "vehicle_brand": { "type": "string" },
+        "vehicle_model": { "type": "string" },
+        "vehicle_year": { "type": "string" },
+        "engine": { "type": "string" },
+        "required_specification": { "type": "string" }
       }
     },
     "commercial": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "quantity": {"type": "integer", "minimum": 1},
-        "destination": {"type": "string"},
-        "packaging_requirement": {"type": "string"},
-        "expected_delivery": {"type": "string"},
-        "customization": {"type": "string"}
+        "quantity": { "type": "integer", "minimum": 1 },
+        "destination": { "type": "string" },
+        "packaging_requirement": { "type": "string" },
+        "expected_delivery": { "type": "string" },
+        "customization": { "type": "string" }
       }
     },
-    "status": {"const": "collecting"},
-    "completeness_score": {"type": "number", "minimum": 0, "maximum": 100},
-    "missing_fields": {"type": "array", "items": {"type": "string"}}
+    "status": { "const": "collecting" },
+    "completeness_score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "missing_fields": { "type": "array", "items": { "type": "string" } }
   }
 }

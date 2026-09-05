@@ -17,13 +17,17 @@ const record = createStoredSocialMessageRecord({
 assert.equal("body" in record, false);
 assert.equal(decryptSocialMessageBody(record.bodyCiphertext), "Synthetic RFQ body");
 assert.equal(record.expiresAt.toISOString(), "2026-09-30T00:00:00.000Z");
-assert.throws(() => createStoredSocialMessageRecord({
-  id: record.id,
-  conversationId: record.conversationId,
-  externalMessageRef: record.externalMessageRef,
-  direction: record.direction,
-  identityQuality: record.identityQuality,
-  body: "",
-  receivedAt: record.receivedAt,
-}), /Too small/);
+assert.throws(
+  () =>
+    createStoredSocialMessageRecord({
+      id: record.id,
+      conversationId: record.conversationId,
+      externalMessageRef: record.externalMessageRef,
+      direction: record.direction,
+      identityQuality: record.identityQuality,
+      body: "",
+      receivedAt: record.receivedAt,
+    }),
+  /Too small/,
+);
 console.log("PASS social message encryption and 30-day retention boundary");

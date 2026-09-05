@@ -1,5 +1,5 @@
-import { jsonSchema } from "ai";
 import { expect, test } from "@playwright/test";
+import { jsonSchema } from "ai";
 
 import { validateSyntheticOutput } from "../../lib/ai/structured-generator";
 import { MemoryEvidenceStore } from "../../lib/evidence/memory-store";
@@ -14,7 +14,9 @@ test("validates synthetic structured model output at runtime", async () => {
     },
     {
       validate: (value) =>
-        value && typeof value === "object" && typeof (value as { message?: unknown }).message === "string"
+        value &&
+        typeof value === "object" &&
+        typeof (value as { message?: unknown }).message === "string"
           ? { success: true, value: value as { message: string } }
           : { success: false, error: new Error("Invalid synthetic output") },
     },
@@ -37,9 +39,7 @@ test("stores synthetic evidence behind an internal pathname", async () => {
     body: "synthetic-only",
   });
 
-  expect(stored.pathname).toBe(
-    "synthetic/synthetic-evidence-001/factory-sheet.txt",
-  );
+  expect(stored.pathname).toBe("synthetic/synthetic-evidence-001/factory-sheet.txt");
   expect(stored.pathname).not.toContain("http");
   const loaded = await store.get(stored.pathname);
   expect(loaded?.contentType).toBe("text/plain");

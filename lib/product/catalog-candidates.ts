@@ -14,7 +14,10 @@ function identifiersIn(text: string) {
 function markdownRow(line: string) {
   const trimmed = line.trim();
   if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return undefined;
-  return trimmed.slice(1, -1).split("|").map((cell) => cell.trim());
+  return trimmed
+    .slice(1, -1)
+    .split("|")
+    .map((cell) => cell.trim());
 }
 
 function candidateRecords(sourceText: string) {
@@ -25,7 +28,9 @@ function candidateRecords(sourceText: string) {
     const header = markdownRow(lines[index]!);
     const separator = markdownRow(lines[index + 1]!);
     if (
-      !header || !separator || header.length !== separator.length ||
+      !header ||
+      !separator ||
+      header.length !== separator.length ||
       !separator.every((cell) => /^:?-{3,}:?$/.test(cell))
     ) {
       continue;
@@ -51,7 +56,7 @@ function candidateRecords(sourceText: string) {
     index -= 1;
   }
 
-  const nonTableText = lines.map((line, index) => tableLines.has(index) ? "" : line).join("\n");
+  const nonTableText = lines.map((line, index) => (tableLines.has(index) ? "" : line)).join("\n");
   for (const block of nonTableText.split(/\n\s*\n+/)) {
     const identifiers = [...new Set(identifiersIn(block))];
     if (identifiers.length === 1) {
@@ -70,14 +75,16 @@ export function discoverCatalogCandidates(source: ProductAgentSource): CatalogCa
   return candidateRecords(source.source_text).flatMap(({ identifier, text }) => {
     if (seen.has(identifier)) return [];
     seen.add(identifier);
-    return [{
-      identifier,
-      source: {
-        ...source,
-        record_id: `${source.record_id}-${identifier.toLowerCase()}`,
-        source_text: text,
-        candidate_identifier: identifier,
+    return [
+      {
+        identifier,
+        source: {
+          ...source,
+          record_id: `${source.record_id}-${identifier.toLowerCase()}`,
+          source_text: text,
+          candidate_identifier: identifier,
+        },
       },
-    }];
+    ];
   });
 }

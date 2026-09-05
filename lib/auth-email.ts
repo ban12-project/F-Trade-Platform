@@ -12,13 +12,18 @@ export async function sendEmailOtp(input: { email: string; otp: string; type: st
   const { error } = await resend.emails.send({
     from,
     to: [input.email],
-    subject: input.type === "sign-in" ? "Your F-Trade sign-in code" : "Your F-Trade verification code",
+    subject:
+      input.type === "sign-in" ? "Your F-Trade sign-in code" : "Your F-Trade verification code",
     text: `Your verification code is ${input.otp}. It expires in 10 minutes.`,
   });
   if (error) throw new Error(`Resend OTP delivery failed: ${error.message}`);
 }
 
-export async function sendInvitationEmail(input: { email: string; inviteUrl: string; expiresAt: Date }) {
+export async function sendInvitationEmail(input: {
+  email: string;
+  inviteUrl: string;
+  expiresAt: Date;
+}) {
   const resend = new Resend(required("RESEND_API_KEY"));
   const { error } = await resend.emails.send({
     from: required("AUTH_EMAIL_FROM"),

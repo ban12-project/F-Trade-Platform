@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { selectVerifiedVideoModel, videoModelCapabilitySchema, type VideoModelCapability } from "../lib/video/provider-capabilities";
+import {
+  selectVerifiedVideoModel,
+  type VideoModelCapability,
+  videoModelCapabilitySchema,
+} from "../lib/video/provider-capabilities";
 
 const model: VideoModelCapability = {
   provider: "fal",
@@ -14,9 +18,44 @@ const model: VideoModelCapability = {
   enabled: true,
 };
 
-assert.equal(selectVerifiedVideoModel([model], { provider: "fal", modelId: model.modelId, requiredCapabilities: ["text-to-video"], aspectRatio: "9:16", durationSeconds: 5, resolution: "720x1280" }).modelId, model.modelId);
-assert.throws(() => selectVerifiedVideoModel([{ ...model, enabled: false }], { provider: "fal", modelId: model.modelId, requiredCapabilities: ["text-to-video"], aspectRatio: "9:16", durationSeconds: 5, resolution: "720x1280" }), /尚未通过验证/);
-assert.throws(() => selectVerifiedVideoModel([model], { provider: "fal", modelId: model.modelId, requiredCapabilities: ["audio-generation"], aspectRatio: "9:16", durationSeconds: 5, resolution: "720x1280" }), /不满足/);
-assert.throws(() => videoModelCapabilitySchema.parse({ ...model, verificationRef: null }), /验证时间/);
+assert.equal(
+  selectVerifiedVideoModel([model], {
+    provider: "fal",
+    modelId: model.modelId,
+    requiredCapabilities: ["text-to-video"],
+    aspectRatio: "9:16",
+    durationSeconds: 5,
+    resolution: "720x1280",
+  }).modelId,
+  model.modelId,
+);
+assert.throws(
+  () =>
+    selectVerifiedVideoModel([{ ...model, enabled: false }], {
+      provider: "fal",
+      modelId: model.modelId,
+      requiredCapabilities: ["text-to-video"],
+      aspectRatio: "9:16",
+      durationSeconds: 5,
+      resolution: "720x1280",
+    }),
+  /尚未通过验证/,
+);
+assert.throws(
+  () =>
+    selectVerifiedVideoModel([model], {
+      provider: "fal",
+      modelId: model.modelId,
+      requiredCapabilities: ["audio-generation"],
+      aspectRatio: "9:16",
+      durationSeconds: 5,
+      resolution: "720x1280",
+    }),
+  /不满足/,
+);
+assert.throws(
+  () => videoModelCapabilitySchema.parse({ ...model, verificationRef: null }),
+  /验证时间/,
+);
 
 console.log("PASS video provider capability registry");

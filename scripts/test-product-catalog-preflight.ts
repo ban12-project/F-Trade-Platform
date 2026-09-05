@@ -9,11 +9,9 @@ const document: ProductAgentDocumentSource = {
     record_id: "synthetic-catalog",
     source_ref: "document:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     evidence_refs: ["document:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"],
-    source_text: [
-      "| Kit No. | Product name |",
-      "| --- | --- |",
-      "| RYC251 | Synthetic Kit |",
-    ].join("\n"),
+    source_text: ["| Kit No. | Product name |", "| --- | --- |", "| RYC251 | Synthetic Kit |"].join(
+      "\n",
+    ),
     image_availability: "none",
     image_refs: [],
   },

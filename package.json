@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm build:remotion && next build",
+    "build": "pnpm check && pnpm build:remotion && next build",
     "build:remotion": "remotion bundle remotion/index.ts --out-dir .remotion",
     "build:test": "NEXT_ENABLE_TESTING_API=1 next build",
     "db:generate": "drizzle-kit generate",
@@ -93,7 +93,13 @@
     "test:video-social-publication": "tsx scripts/test-video-social-publication.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "eval:product-safety-ablation": "node --import tsx scripts/run-product-safety-ablation.ts"
+    "eval:product-safety-ablation": "node --import tsx scripts/run-product-safety-ablation.ts",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "check:ci": "biome ci .",
+    "format": "biome format --write .",
+    "lint:fix": "biome check --write .",
+    "test:workspace-navigation": "tsx scripts/test-workspace-navigation.ts && node --conditions=react-server --import tsx scripts/test-workspace-queries.ts"
   },
   "dependencies": {
     "@ai-sdk/alibaba": "^2.0.37",
@@ -138,6 +144,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.12",
     "@next/playwright": "16.3.2",
     "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
@@ -146,6 +153,7 @@
     "@types/react-dom": "19.2.4",
     "drizzle-kit": "0.31.10",
     "postcss": "^8.5.26",
+    "server-only": "0.0.1",
     "tailwindcss": "^4.3.3",
     "tsx": "4.23.12",
     "typescript": "7.0.2"

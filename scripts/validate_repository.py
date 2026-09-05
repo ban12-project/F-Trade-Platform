@@ -415,7 +415,7 @@ def check_database_baseline() -> None:
     for required in (
         '"use server"', "auth.api.getSession", "productCatalogFormSchema.safeParse",
         "productReviewFormSchema.safeParse", "createProductCatalogDraft",
-        "decideProductCatalogReview", "reviseProductCatalogDraft", 'revalidatePath("/workspace")',
+        "decideProductCatalogReview", "reviseProductCatalogDraft", 'revalidatePath("/workspace", "layout")',
     ):
         if required not in product_actions:
             raise AssertionError(f"Product catalog Server Action contract is missing: {required}")

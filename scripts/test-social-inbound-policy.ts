@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 
 import {
-  assessInboundDelivery,
-  assessReplyWindow,
   acceptInboundChannelEvent,
   acceptOfficialInboundWebhook,
+  assessInboundDelivery,
+  assessReplyWindow,
   inboundDeliveryKey,
   validateChannelInboundPolicy,
 } from "../lib/social/inbound-policy";
@@ -49,16 +49,42 @@ assert.deepEqual(assessReplyWindow(policy, message, "2026-08-24T10:00:01Z"), {
   automatedReplyAllowed: false,
   nextAction: "require_human_approved_template",
 });
-assert.throws(() => inboundDeliveryKey(policy, { ...message, direction: "outbound" }), /Only inbound/);
-assert.throws(() => acceptInboundChannelEvent(policy, { ...observation, observationRef: "" }, new Set()), /observation reference/);
-assert.throws(() => acceptInboundChannelEvent(policy, { ...observation, accountRef: "synthetic-other-account" }, new Set()), /must match/);
-assert.throws(() => validateChannelInboundPolicy({ ...policy, transport: "unapproved" as "official_api" }), /approved channel transport/);
-assert.throws(() => validateChannelInboundPolicy({ ...policy, inboundOnly: false }), /inbound-only/);
+assert.throws(
+  () => inboundDeliveryKey(policy, { ...message, direction: "outbound" }),
+  /Only inbound/,
+);
+assert.throws(
+  () => acceptInboundChannelEvent(policy, { ...observation, observationRef: "" }, new Set()),
+  /observation reference/,
+);
+assert.throws(
+  () =>
+    acceptInboundChannelEvent(
+      policy,
+      { ...observation, accountRef: "synthetic-other-account" },
+      new Set(),
+    ),
+  /must match/,
+);
+assert.throws(
+  () => validateChannelInboundPolicy({ ...policy, transport: "unapproved" as "official_api" }),
+  /approved channel transport/,
+);
+assert.throws(
+  () => validateChannelInboundPolicy({ ...policy, inboundOnly: false }),
+  /inbound-only/,
+);
 assert.throws(() => assessReplyWindow(policy, message, "2026-08-24T08:59:59Z"), /cannot precede/);
 
 const officialPolicy = { ...policy, transport: "official_api" as const };
 const officialWebhook = { ...observation, transport: "official_webhook" as const };
-assert.equal(acceptOfficialInboundWebhook(officialPolicy, officialWebhook, new Set()).status, "accepted");
-assert.throws(() => acceptOfficialInboundWebhook(policy, officialWebhook, new Set()), /official API policy/);
+assert.equal(
+  acceptOfficialInboundWebhook(officialPolicy, officialWebhook, new Set()).status,
+  "accepted",
+);
+assert.throws(
+  () => acceptOfficialInboundWebhook(policy, officialWebhook, new Set()),
+  /official API policy/,
+);
 
 console.log("PASS social inbound policy");

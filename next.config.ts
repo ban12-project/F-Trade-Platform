@@ -17,8 +17,7 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
-    exposeTestingApiInProductionBuild:
-      process.env.NEXT_ENABLE_TESTING_API === "1",
+    exposeTestingApiInProductionBuild: process.env.NEXT_ENABLE_TESTING_API === "1",
     turbopackRustReactCompiler: true,
   },
 };

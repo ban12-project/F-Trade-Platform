@@ -4,46 +4,55 @@
   "title": "HumanApproval",
   "type": "object",
   "additionalProperties": false,
-  "required": ["approval_id", "gate", "entity_type", "entity_id", "status", "requested_by_type", "requested_by_id", "requested_at"],
+  "required": [
+    "approval_id",
+    "gate",
+    "entity_type",
+    "entity_id",
+    "status",
+    "requested_by_type",
+    "requested_by_id",
+    "requested_at"
+  ],
   "properties": {
-    "approval_id": {"type": "string", "minLength": 1},
-    "gate": {"enum": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"]},
-    "entity_type": {"enum": ["product", "content", "quotation", "delivery_confirmation"]},
-    "entity_id": {"type": "string", "minLength": 1},
-    "status": {"enum": ["pending", "approved", "rejected"]},
-    "requested_by_type": {"enum": ["agent", "human", "system"]},
-    "requested_by_id": {"type": "string", "minLength": 1},
-    "requested_at": {"type": "string", "format": "date-time"},
+    "approval_id": { "type": "string", "minLength": 1 },
+    "gate": { "enum": ["gate_01_truth", "gate_02_quote", "gate_03_delivery"] },
+    "entity_type": { "enum": ["product", "content", "quotation", "delivery_confirmation"] },
+    "entity_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pending", "approved", "rejected"] },
+    "requested_by_type": { "enum": ["agent", "human", "system"] },
+    "requested_by_id": { "type": "string", "minLength": 1 },
+    "requested_at": { "type": "string", "format": "date-time" },
     "decision": {
       "type": "object",
       "additionalProperties": false,
       "required": ["actor_type", "decided_by", "decided_at", "evidence_ref"],
       "properties": {
-        "actor_type": {"const": "human"},
-        "decided_by": {"type": "string", "minLength": 1},
-        "decided_at": {"type": "string", "format": "date-time"},
-        "evidence_ref": {"type": "string", "minLength": 1},
-        "notes": {"type": "string"}
+        "actor_type": { "const": "human" },
+        "decided_by": { "type": "string", "minLength": 1 },
+        "decided_at": { "type": "string", "format": "date-time" },
+        "evidence_ref": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string" }
       }
     }
   },
   "allOf": [
     {
-      "if": {"properties": {"status": {"const": "pending"}}, "required": ["status"]},
-      "then": {"not": {"required": ["decision"]}},
-      "else": {"required": ["decision"]}
+      "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+      "then": { "not": { "required": ["decision"] } },
+      "else": { "required": ["decision"] }
     },
     {
-      "if": {"properties": {"gate": {"const": "gate_01_truth"}}, "required": ["gate"]},
-      "then": {"properties": {"entity_type": {"enum": ["product", "content"]}}}
+      "if": { "properties": { "gate": { "const": "gate_01_truth" } }, "required": ["gate"] },
+      "then": { "properties": { "entity_type": { "enum": ["product", "content"] } } }
     },
     {
-      "if": {"properties": {"gate": {"const": "gate_02_quote"}}, "required": ["gate"]},
-      "then": {"properties": {"entity_type": {"const": "quotation"}}}
+      "if": { "properties": { "gate": { "const": "gate_02_quote" } }, "required": ["gate"] },
+      "then": { "properties": { "entity_type": { "const": "quotation" } } }
     },
     {
-      "if": {"properties": {"gate": {"const": "gate_03_delivery"}}, "required": ["gate"]},
-      "then": {"properties": {"entity_type": {"const": "delivery_confirmation"}}}
+      "if": { "properties": { "gate": { "const": "gate_03_delivery" } }, "required": ["gate"] },
+      "then": { "properties": { "entity_type": { "const": "delivery_confirmation" } } }
     }
   ]
 }

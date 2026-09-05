@@ -32,7 +32,10 @@ const REQUIRED_CRITERIA = new Set<MvpAcceptanceCriterionId>([
 
 export function assertMvpAcceptanceDecision(summary: MvpAcceptanceSummary) {
   const criterionIds = new Set(summary.criteria.map((criterion) => criterion.criterion_id));
-  if (criterionIds.size !== REQUIRED_CRITERIA.size || [...REQUIRED_CRITERIA].some((id) => !criterionIds.has(id))) {
+  if (
+    criterionIds.size !== REQUIRED_CRITERIA.size ||
+    [...REQUIRED_CRITERIA].some((id) => !criterionIds.has(id))
+  ) {
     throw new Error("MVP acceptance summary must contain every required criterion exactly once");
   }
   if (summary.metrics.rfq_ready > summary.metrics.rfq_total) {

@@ -4,40 +4,60 @@
   "title": "QuotationHandoff",
   "type": "object",
   "additionalProperties": false,
-  "required": ["handoff_id", "rfq_id", "created_by_actor_type", "created_by_actor_id", "status", "quote"],
+  "required": [
+    "handoff_id",
+    "rfq_id",
+    "created_by_actor_type",
+    "created_by_actor_id",
+    "status",
+    "quote"
+  ],
   "properties": {
-    "handoff_id": {"type": "string", "minLength": 1},
-    "rfq_id": {"type": "string", "minLength": 1},
-    "product_id": {"type": "string", "minLength": 1},
-    "created_by_actor_type": {"const": "human"},
-    "created_by_actor_id": {"type": "string", "minLength": 1},
-    "status": {"enum": ["draft", "review_required", "revision_required", "approved", "sent"]},
+    "handoff_id": { "type": "string", "minLength": 1 },
+    "rfq_id": { "type": "string", "minLength": 1 },
+    "product_id": { "type": "string", "minLength": 1 },
+    "created_by_actor_type": { "const": "human" },
+    "created_by_actor_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["draft", "review_required", "revision_required", "approved", "sent"] },
     "quote": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["unit_price", "currency", "moq", "lead_time_days", "payment_terms", "validity_days"],
+      "required": [
+        "unit_price",
+        "currency",
+        "moq",
+        "lead_time_days",
+        "payment_terms",
+        "validity_days"
+      ],
       "properties": {
-        "unit_price": {"type": "number", "exclusiveMinimum": 0},
-        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
-        "moq": {"type": "integer", "minimum": 1},
-        "lead_time_days": {"type": "integer", "minimum": 0},
-        "payment_terms": {"type": "string", "minLength": 1},
-        "validity_days": {"type": "integer", "minimum": 1}
+        "unit_price": { "type": "number", "exclusiveMinimum": 0 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "moq": { "type": "integer", "minimum": 1 },
+        "lead_time_days": { "type": "integer", "minimum": 0 },
+        "payment_terms": { "type": "string", "minLength": 1 },
+        "validity_days": { "type": "integer", "minimum": 1 }
       }
     },
-    "approval_ref": {"type": "string", "minLength": 1},
-    "sent_at": {"type": "string", "format": "date-time"},
-    "sent_channel": {"type": "string", "minLength": 1},
-    "sent_ref": {"type": "string", "minLength": 1}
+    "approval_ref": { "type": "string", "minLength": 1 },
+    "sent_at": { "type": "string", "format": "date-time" },
+    "sent_channel": { "type": "string", "minLength": 1 },
+    "sent_ref": { "type": "string", "minLength": 1 }
   },
   "allOf": [
     {
-      "if": {"properties": {"status": {"enum": ["approved", "sent"]}}, "required": ["status"]},
-      "then": {"properties": {"approval_ref": {}}, "required": ["approval_ref"]}
+      "if": {
+        "properties": { "status": { "enum": ["approved", "sent"] } },
+        "required": ["status"]
+      },
+      "then": { "properties": { "approval_ref": {} }, "required": ["approval_ref"] }
     },
     {
-      "if": {"properties": {"status": {"const": "sent"}}, "required": ["status"]},
-      "then": {"properties": {"sent_at": {}, "sent_channel": {}, "sent_ref": {}}, "required": ["sent_at", "sent_channel", "sent_ref"]}
+      "if": { "properties": { "status": { "const": "sent" } }, "required": ["status"] },
+      "then": {
+        "properties": { "sent_at": {}, "sent_channel": {}, "sent_ref": {} },
+        "required": ["sent_at", "sent_channel", "sent_ref"]
+      }
     }
   ]
 }

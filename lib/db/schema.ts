@@ -12,8 +12,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-const createdAt = () =>
-  timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
+const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 const updatedAt = () =>
   timestamp("updated_at", { withTimezone: true })
     .defaultNow()
@@ -35,11 +34,7 @@ export const approvalGate = pgEnum("approval_gate", [
   "gate_02_quote",
   "gate_03_delivery",
 ]);
-export const approvalStatus = pgEnum("approval_status", [
-  "pending",
-  "approved",
-  "rejected",
-]);
+export const approvalStatus = pgEnum("approval_status", ["pending", "approved", "rejected"]);
 export const invitationStatus = pgEnum("invitation_status", [
   "pending",
   "accepted",
@@ -64,10 +59,7 @@ export const videoUploadReceiptStatus = pgEnum("video_upload_receipt_status", [
   "claimed",
   "failed",
 ]);
-export const videoProcessingJobKind = pgEnum("video_processing_job_kind", [
-  "ai_draft",
-  "render",
-]);
+export const videoProcessingJobKind = pgEnum("video_processing_job_kind", ["ai_draft", "render"]);
 export const videoProcessingJobStatus = pgEnum("video_processing_job_status", [
   "queued",
   "running",
@@ -75,10 +67,18 @@ export const videoProcessingJobStatus = pgEnum("video_processing_job_status", [
   "failed",
 ]);
 export const videoReviewStage = pgEnum("video_review_stage", ["pre_generation", "post_generation"]);
-export const videoReviewOutcome = pgEnum("video_review_outcome", ["accepted", "changes_requested", "skipped"]);
+export const videoReviewOutcome = pgEnum("video_review_outcome", [
+  "accepted",
+  "changes_requested",
+  "skipped",
+]);
 export const workspaceProjectKind = pgEnum("workspace_project_kind", ["marketing", "sales"]);
 export const workspaceProjectStatus = pgEnum("workspace_project_status", ["active", "archived"]);
-export const workspaceProjectMemberRole = pgEnum("workspace_project_member_role", ["owner", "editor", "viewer"]);
+export const workspaceProjectMemberRole = pgEnum("workspace_project_member_role", [
+  "owner",
+  "editor",
+  "viewer",
+]);
 export const workspaceItemRelation = pgEnum("workspace_item_relation", ["owned", "reference"]);
 
 export const user = pgTable(
@@ -373,7 +373,10 @@ export const videoJob = pgTable(
     check("video_job_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
     check("video_job_duration_positive", sql`${table.durationSeconds} > 0`),
     check("video_job_expected_cost_positive", sql`${table.expectedCostCents} > 0`),
-    check("video_job_reserved_cost_consistent", sql`${table.reservedCostCents} >= 0 AND ${table.reservedCostCents} <= ${table.expectedCostCents}`),
+    check(
+      "video_job_reserved_cost_consistent",
+      sql`${table.reservedCostCents} >= 0 AND ${table.reservedCostCents} <= ${table.expectedCostCents}`,
+    ),
     check(
       "video_job_lease_consistent",
       sql`(${table.status} = 'running' AND ${table.claimedBy} IS NOT NULL AND ${table.claimedAt} IS NOT NULL AND ${table.leaseExpiresAt} IS NOT NULL) OR (${table.status} <> 'running' AND ${table.claimedBy} IS NULL AND ${table.claimedAt} IS NULL AND ${table.leaseExpiresAt} IS NULL)`,
@@ -392,7 +395,10 @@ export const videoProviderConfig = pgTable(
     maximumAttempts: integer("maximum_attempts").default(1).notNull(),
     budgetLimitCents: integer("budget_limit_cents").default(1).notNull(),
     budgetCommittedCents: integer("budget_committed_cents").default(0).notNull(),
-    runtimeSettings: jsonb("runtime_settings").$type<Record<string, string>>().default({}).notNull(),
+    runtimeSettings: jsonb("runtime_settings")
+      .$type<Record<string, string>>()
+      .default({})
+      .notNull(),
     updatedBy: text("updated_by")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -404,8 +410,14 @@ export const videoProviderConfig = pgTable(
     check("video_provider_config_concurrency_positive", sql`${table.maximumConcurrentJobs} > 0`),
     check("video_provider_config_attempts_positive", sql`${table.maximumAttempts} > 0`),
     check("video_provider_config_budget_positive", sql`${table.budgetLimitCents} > 0`),
-    check("video_provider_config_budget_consistent", sql`${table.budgetCommittedCents} >= 0 AND ${table.budgetCommittedCents} <= ${table.budgetLimitCents}`),
-    check("video_provider_config_enabled_has_credential", sql`NOT ${table.enabled} OR ${table.credentialCiphertext} IS NOT NULL`),
+    check(
+      "video_provider_config_budget_consistent",
+      sql`${table.budgetCommittedCents} >= 0 AND ${table.budgetCommittedCents} <= ${table.budgetLimitCents}`,
+    ),
+    check(
+      "video_provider_config_enabled_has_credential",
+      sql`NOT ${table.enabled} OR ${table.credentialCiphertext} IS NOT NULL`,
+    ),
   ],
 );
 
@@ -437,8 +449,14 @@ export const videoModelConfig = pgTable(
     index("video_model_config_provider_enabled_idx").on(table.provider, table.enabled),
     check("video_model_config_id_nonempty", sql`length(btrim(${table.id})) > 0`),
     check("video_model_config_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
-    check("video_model_config_duration_consistent", sql`${table.durationMinimumSeconds} > 0 AND ${table.durationMaximumSeconds} >= ${table.durationMinimumSeconds}`),
-    check("video_model_config_enabled_verified", sql`NOT ${table.enabled} OR (${table.verifiedAt} IS NOT NULL AND ${table.verificationRef} IS NOT NULL AND length(btrim(${table.verificationRef})) > 0)`),
+    check(
+      "video_model_config_duration_consistent",
+      sql`${table.durationMinimumSeconds} > 0 AND ${table.durationMaximumSeconds} >= ${table.durationMinimumSeconds}`,
+    ),
+    check(
+      "video_model_config_enabled_verified",
+      sql`NOT ${table.enabled} OR (${table.verifiedAt} IS NOT NULL AND ${table.verificationRef} IS NOT NULL AND length(btrim(${table.verificationRef})) > 0)`,
+    ),
   ],
 );
 
@@ -447,17 +465,25 @@ export const videoAdvisoryReview = pgTable(
   "video_advisory_review",
   {
     id: text("id").primaryKey(),
-    videoProjectId: text("video_project_id").notNull().references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    videoProjectId: text("video_project_id")
+      .notNull()
+      .references(() => aggregateRecord.id, { onDelete: "restrict" }),
     stage: videoReviewStage("stage").notNull(),
     outcome: videoReviewOutcome("outcome").notNull(),
     reason: text("reason").notNull(),
     riskSnapshot: jsonb("risk_snapshot").$type<Record<string, unknown>>().default({}).notNull(),
-    decidedBy: text("decided_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    decidedBy: text("decided_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
     decidedAt: timestamp("decided_at", { withTimezone: true }).notNull(),
     createdAt: createdAt(),
   },
   (table) => [
-    index("video_advisory_review_project_stage_idx").on(table.videoProjectId, table.stage, table.decidedAt),
+    index("video_advisory_review_project_stage_idx").on(
+      table.videoProjectId,
+      table.stage,
+      table.decidedAt,
+    ),
     check("video_advisory_review_reason_nonempty", sql`length(btrim(${table.reason})) > 0`),
   ],
 );
@@ -467,7 +493,9 @@ export const videoCanvasDocument = pgTable(
   "video_canvas_document",
   {
     id: text("id").primaryKey(),
-    ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
     document: jsonb("document").$type<Record<string, unknown>>().notNull(),
     revision: integer("revision").default(1).notNull(),
     createdAt: createdAt(),
@@ -488,7 +516,9 @@ export const workspaceProject = pgTable(
     kind: workspaceProjectKind("kind").notNull(),
     status: workspaceProjectStatus("status").default("active").notNull(),
     title: text("title").notNull(),
-    createdById: text("created_by_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdById: text("created_by_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -504,10 +534,16 @@ export const workspaceProjectMember = pgTable(
   "workspace_project_member",
   {
     id: text("id").primaryKey(),
-    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => workspaceProject.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
     role: workspaceProjectMemberRole("role").notNull(),
-    createdById: text("created_by_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdById: text("created_by_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -522,13 +558,22 @@ export const workspaceProjectEvidence = pgTable(
   "workspace_project_evidence",
   {
     id: text("id").primaryKey(),
-    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
-    evidenceId: text("evidence_id").notNull().references(() => evidence.id, { onDelete: "restrict" }),
-    linkedById: text("linked_by_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => workspaceProject.id, { onDelete: "cascade" }),
+    evidenceId: text("evidence_id")
+      .notNull()
+      .references(() => evidence.id, { onDelete: "restrict" }),
+    linkedById: text("linked_by_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
     createdAt: createdAt(),
   },
   (table) => [
-    uniqueIndex("workspace_project_evidence_project_evidence_uidx").on(table.projectId, table.evidenceId),
+    uniqueIndex("workspace_project_evidence_project_evidence_uidx").on(
+      table.projectId,
+      table.evidenceId,
+    ),
     index("workspace_project_evidence_evidence_idx").on(table.evidenceId),
   ],
 );
@@ -538,18 +583,33 @@ export const workspaceProjectItem = pgTable(
   "workspace_project_item",
   {
     id: text("id").primaryKey(),
-    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
-    aggregateId: text("aggregate_id").notNull().references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => workspaceProject.id, { onDelete: "cascade" }),
+    aggregateId: text("aggregate_id")
+      .notNull()
+      .references(() => aggregateRecord.id, { onDelete: "restrict" }),
     role: text("role").notNull(),
     relation: workspaceItemRelation("relation").default("owned").notNull(),
     createdAt: createdAt(),
   },
   (table) => [
-    uniqueIndex("workspace_project_item_project_aggregate_uidx").on(table.projectId, table.aggregateId),
-    uniqueIndex("workspace_project_item_single_owner_uidx").on(table.aggregateId).where(sql`${table.relation} = 'owned'`),
+    uniqueIndex("workspace_project_item_project_aggregate_uidx").on(
+      table.projectId,
+      table.aggregateId,
+    ),
+    uniqueIndex("workspace_project_item_single_owner_uidx")
+      .on(table.aggregateId)
+      .where(sql`${table.relation} = 'owned'`),
     index("workspace_project_item_aggregate_idx").on(table.aggregateId),
-    check("workspace_project_item_role_allowed", sql`${table.role} in ('product_source', 'product_reference', 'marketing_content', 'marketing_video', 'sales_rfq', 'sales_quotation', 'sales_lead', 'delivery_confirmation')`),
-    check("workspace_project_item_relation_matches_role", sql`(${table.role} = 'product_reference' and ${table.relation} = 'reference') or (${table.role} <> 'product_reference' and ${table.relation} = 'owned')`),
+    check(
+      "workspace_project_item_role_allowed",
+      sql`${table.role} in ('product_source', 'product_reference', 'marketing_content', 'marketing_video', 'sales_rfq', 'sales_quotation', 'sales_lead', 'delivery_confirmation')`,
+    ),
+    check(
+      "workspace_project_item_relation_matches_role",
+      sql`(${table.role} = 'product_reference' and ${table.relation} = 'reference') or (${table.role} <> 'product_reference' and ${table.relation} = 'owned')`,
+    ),
   ],
 );
 
@@ -562,8 +622,12 @@ export const videoUploadReceipt = pgTable(
   "video_upload_receipt",
   {
     id: text("id").primaryKey(),
-    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "cascade" }),
-    ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => workspaceProject.id, { onDelete: "cascade" }),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
     blobPath: text("blob_path").notNull(),
     originalFilename: text("original_filename").notNull(),
     contentType: text("content_type").notNull(),
@@ -583,9 +647,18 @@ export const videoUploadReceipt = pgTable(
     uniqueIndex("video_upload_receipt_blob_path_uidx").on(table.blobPath),
     index("video_upload_receipt_owner_status_idx").on(table.ownerId, table.status),
     index("video_upload_receipt_expiry_idx").on(table.expiresAt),
-    check("video_upload_receipt_size_positive", sql`${table.sizeBytes} > 0 AND ((${table.contentType} LIKE 'image/%' AND ${table.sizeBytes} <= 20971520) OR (${table.contentType} IN ('video/mp4', 'video/quicktime') AND ${table.sizeBytes} < 1073741824))`),
-    check("video_upload_receipt_rights_nonempty", sql`length(btrim(${table.rightsEvidenceRef})) > 0`),
-    check("video_upload_receipt_claim_consistent", sql`(${table.status} = 'claimed' AND ${table.evidenceId} IS NOT NULL AND ${table.claimedAt} IS NOT NULL) OR ${table.status} <> 'claimed'`),
+    check(
+      "video_upload_receipt_size_positive",
+      sql`${table.sizeBytes} > 0 AND ((${table.contentType} LIKE 'image/%' AND ${table.sizeBytes} <= 20971520) OR (${table.contentType} IN ('video/mp4', 'video/quicktime') AND ${table.sizeBytes} < 1073741824))`,
+    ),
+    check(
+      "video_upload_receipt_rights_nonempty",
+      sql`length(btrim(${table.rightsEvidenceRef})) > 0`,
+    ),
+    check(
+      "video_upload_receipt_claim_consistent",
+      sql`(${table.status} = 'claimed' AND ${table.evidenceId} IS NOT NULL AND ${table.claimedAt} IS NOT NULL) OR ${table.status} <> 'claimed'`,
+    ),
   ],
 );
 
@@ -594,7 +667,9 @@ export const videoProcessingJob = pgTable(
   "video_processing_job",
   {
     id: text("id").primaryKey(),
-    videoProjectId: text("video_project_id").notNull().references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    videoProjectId: text("video_project_id")
+      .notNull()
+      .references(() => aggregateRecord.id, { onDelete: "restrict" }),
     kind: videoProcessingJobKind("kind").notNull(),
     status: videoProcessingJobStatus("status").default("queued").notNull(),
     requestKey: text("request_key").notNull(),
@@ -602,7 +677,9 @@ export const videoProcessingJob = pgTable(
     attempts: integer("attempts").default(0).notNull(),
     failureCode: text("failure_code"),
     failureMessage: text("failure_message"),
-    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -695,7 +772,10 @@ export const socialBrowserJob = pgTable(
     index("social_browser_job_status_created_idx").on(table.status, table.createdAt),
     check("social_browser_job_kind_nonempty", sql`length(btrim(${table.kind})) > 0`),
     check("social_browser_job_payload_nonempty", sql`length(btrim(${table.payloadRef})) > 0`),
-    check("social_browser_job_status_valid", sql`${table.status} IN ('queued', 'claimed', 'succeeded', 'failed', 'paused')`),
+    check(
+      "social_browser_job_status_valid",
+      sql`${table.status} IN ('queued', 'claimed', 'succeeded', 'failed', 'paused')`,
+    ),
   ],
 );
 
@@ -704,13 +784,17 @@ export const socialPublication = pgTable(
   "social_publication",
   {
     id: text("id").primaryKey(),
-    projectId: text("project_id").notNull().references(() => workspaceProject.id, { onDelete: "restrict" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => workspaceProject.id, { onDelete: "restrict" }),
     channelRef: text("channel_ref").notNull(),
     accountRef: text("account_ref").notNull(),
     contentRef: text("content_ref").notNull(),
     format: text("format").notNull(),
     confirmationRef: text("confirmation_ref").notNull(),
-    browserJobId: text("browser_job_id").references(() => socialBrowserJob.id, { onDelete: "restrict" }),
+    browserJobId: text("browser_job_id").references(() => socialBrowserJob.id, {
+      onDelete: "restrict",
+    }),
     externalPublicationRef: text("external_publication_ref"),
     status: text("status").default("confirmed").notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
@@ -720,9 +804,16 @@ export const socialPublication = pgTable(
   (table) => [
     index("social_publication_project_created_idx").on(table.projectId, table.createdAt),
     index("social_publication_account_created_idx").on(table.accountRef, table.createdAt),
-    uniqueIndex("social_publication_external_uidx").on(table.channelRef, table.accountRef, table.externalPublicationRef),
+    uniqueIndex("social_publication_external_uidx").on(
+      table.channelRef,
+      table.accountRef,
+      table.externalPublicationRef,
+    ),
     check("social_publication_format_valid", sql`${table.format} IN ('text', 'image', 'video')`),
-    check("social_publication_status_valid", sql`${table.status} IN ('confirmed', 'submitted', 'published', 'unknown', 'failed', 'paused')`),
+    check(
+      "social_publication_status_valid",
+      sql`${table.status} IN ('confirmed', 'submitted', 'published', 'unknown', 'failed', 'paused')`,
+    ),
   ],
 );
 
@@ -740,7 +831,11 @@ export const socialConversation = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("social_conversation_external_uidx").on(table.channelRef, table.accountRef, table.externalConversationRef),
+    uniqueIndex("social_conversation_external_uidx").on(
+      table.channelRef,
+      table.accountRef,
+      table.externalConversationRef,
+    ),
     index("social_conversation_lead_updated_idx").on(table.leadId, table.updatedAt),
   ],
 );
@@ -754,7 +849,9 @@ export const socialMessage = pgTable(
   "social_message",
   {
     id: text("id").primaryKey(),
-    conversationId: text("conversation_id").notNull().references(() => socialConversation.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => socialConversation.id, { onDelete: "cascade" }),
     externalMessageRef: text("external_message_ref").notNull(),
     direction: text("direction").notNull(),
     identityQuality: text("identity_quality").notNull(),
@@ -768,7 +865,10 @@ export const socialMessage = pgTable(
     uniqueIndex("social_message_external_uidx").on(table.conversationId, table.externalMessageRef),
     index("social_message_expiry_idx").on(table.expiresAt),
     check("social_message_direction_valid", sql`${table.direction} IN ('inbound', 'outbound')`),
-    check("social_message_identity_valid", sql`${table.identityQuality} IN ('dom_id', 'derived_fingerprint', 'manual')`),
+    check(
+      "social_message_identity_valid",
+      sql`${table.identityQuality} IN ('dom_id', 'derived_fingerprint', 'manual')`,
+    ),
     check("social_message_expiry_after_received", sql`${table.expiresAt} > ${table.receivedAt}`),
   ],
 );
@@ -784,15 +884,23 @@ export const socialChannelControl = pgTable(
     circuitStatus: text("circuit_status").default("paused").notNull(),
     pauseReason: text("pause_reason"),
     pauseEvidenceRef: text("pause_evidence_ref"),
-    changedBy: text("changed_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    changedBy: text("changed_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
     changedAt: timestamp("changed_at", { withTimezone: true }).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
     uniqueIndex("social_channel_control_account_uidx").on(table.channelRef, table.accountRef),
-    check("social_channel_control_status_valid", sql`${table.circuitStatus} IN ('active', 'paused')`),
-    check("social_channel_control_pause_consistent", sql`(${table.circuitStatus} = 'active' AND ${table.pauseReason} IS NULL) OR (${table.circuitStatus} = 'paused' AND ${table.pauseReason} IS NOT NULL)`),
+    check(
+      "social_channel_control_status_valid",
+      sql`${table.circuitStatus} IN ('active', 'paused')`,
+    ),
+    check(
+      "social_channel_control_pause_consistent",
+      sql`(${table.circuitStatus} = 'active' AND ${table.pauseReason} IS NULL) OR (${table.circuitStatus} = 'paused' AND ${table.pauseReason} IS NOT NULL)`,
+    ),
   ],
 );
 
@@ -821,9 +929,14 @@ export const productAgentModelConfig = pgTable(
   },
   (table) => [
     uniqueIndex("product_agent_model_config_name_uidx").on(table.name),
-    uniqueIndex("product_agent_model_config_default_uidx").on(table.isDefault).where(sql`${table.isDefault} = true`),
+    uniqueIndex("product_agent_model_config_default_uidx")
+      .on(table.isDefault)
+      .where(sql`${table.isDefault} = true`),
     check("product_agent_model_config_name_nonempty", sql`length(btrim(${table.name})) > 0`),
-    check("product_agent_model_config_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
+    check(
+      "product_agent_model_config_provider_nonempty",
+      sql`length(btrim(${table.provider})) > 0`,
+    ),
     check("product_agent_model_config_model_nonempty", sql`length(btrim(${table.model})) > 0`),
   ],
 );

@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolean }) {
   return (
     <main
-      className="fixed inset-0 overflow-y-auto bg-muted/30"
+      className="min-h-screen overflow-x-hidden bg-muted/30 pb-24"
       aria-busy="true"
       aria-label={project ? "正在加载项目工作区" : "正在加载工作台"}
       role="status"
@@ -24,7 +24,9 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
       {project ? (
         <div className="mx-auto max-w-[96rem] space-y-5 px-4 py-5 sm:px-6">
           <div className="flex min-w-max gap-2 overflow-hidden">
-            {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-14 w-40 rounded-xl" />)}
+            {["first", "second", "third", "fourth"].map((key) => (
+              <Skeleton key={key} className="h-14 w-40 rounded-xl" />
+            ))}
           </div>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)]">
             <div className="space-y-5">
@@ -37,7 +39,9 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
       ) : (
         <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-28 rounded-xl" />)}
+            {["first", "second", "third", "fourth"].map((key) => (
+              <Skeleton key={key} className="h-28 rounded-xl" />
+            ))}
           </div>
           <Skeleton className="h-80 rounded-xl" />
           <div className="grid gap-6 xl:grid-cols-2">
@@ -46,10 +50,28 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
           </div>
         </div>
       )}
-
-      <div className="fixed bottom-3 left-1/2 flex -translate-x-1/2 gap-2 rounded-xl border bg-background/95 p-2 shadow-lg md:bottom-6">
-        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-9 w-16" />)}
-      </div>
     </main>
+  );
+}
+
+export function WorkspaceDockSkeleton() {
+  return (
+    <div
+      aria-label="正在加载工作台操作"
+      role="status"
+      className="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2 rounded-2xl border bg-background p-2"
+    >
+      {["projects", "create", "tasks", "tools"].map((key) => (
+        <Skeleton key={key} className="h-11 w-16" />
+      ))}
+    </div>
+  );
+}
+export function WorkspacePanelSkeleton({ label = "正在加载当前步骤" }: { label?: string }) {
+  return (
+    <div role="status" aria-label={label} aria-busy="true" className="space-y-4 p-4">
+      <Skeleton className="h-8 w-40" />
+      <Skeleton className="h-48 w-full" />
+    </div>
   );
 }
