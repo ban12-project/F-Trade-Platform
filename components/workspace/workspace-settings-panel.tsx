@@ -166,11 +166,17 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
             </Field>
             <Field data-invalid={!!form.formState.errors.name}>
               <FieldLabel htmlFor="agent-config-name">配置名称</FieldLabel>
-              <Input
-                id="agent-config-name"
-                aria-invalid={!!form.formState.errors.name}
-                placeholder="例如：日常产品导入"
-                {...form.register("name")}
+              <Controller
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <Input
+                    id="agent-config-name"
+                    aria-invalid={!!form.formState.errors.name}
+                    placeholder="例如：日常产品导入"
+                    {...field}
+                  />
+                )}
               />
               <FieldError errors={[form.formState.errors.name]} />
             </Field>
@@ -221,10 +227,16 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
             </Field>
             <Field data-invalid={!!form.formState.errors.model}>
               <FieldLabel htmlFor="agent-model">默认模型</FieldLabel>
-              <Input
-                id="agent-model"
-                aria-invalid={!!form.formState.errors.model}
-                {...form.register("model")}
+              <Controller
+                control={form.control}
+                name="model"
+                render={({ field }) => (
+                  <Input
+                    id="agent-model"
+                    aria-invalid={!!form.formState.errors.model}
+                    {...field}
+                  />
+                )}
               />
               {selected?.discoveredModels.length ? (
                 <FieldDescription>
@@ -235,12 +247,18 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
             </Field>
             <Field data-invalid={!!form.formState.errors.baseUrl}>
               <FieldLabel htmlFor="agent-base-url">Base URL</FieldLabel>
-              <Input
-                id="agent-base-url"
-                inputMode="url"
-                placeholder="官方端点可留空"
-                aria-invalid={!!form.formState.errors.baseUrl}
-                {...form.register("baseUrl")}
+              <Controller
+                control={form.control}
+                name="baseUrl"
+                render={({ field }) => (
+                  <Input
+                    id="agent-base-url"
+                    inputMode="url"
+                    placeholder="官方端点可留空"
+                    aria-invalid={!!form.formState.errors.baseUrl}
+                    {...field}
+                  />
+                )}
               />
               <FieldError errors={[form.formState.errors.baseUrl]} />
             </Field>
@@ -248,22 +266,34 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
               <FieldLabel htmlFor="agent-api-key">
                 API key {selected?.apiKeyConfigured ? "（已配置）" : ""}
               </FieldLabel>
-              <Input
-                id="agent-api-key"
-                type="password"
-                autoComplete="new-password"
-                {...form.register("apiKey")}
+              <Controller
+                control={form.control}
+                name="apiKey"
+                render={({ field }) => (
+                  <Input
+                    id="agent-api-key"
+                    type="password"
+                    autoComplete="new-password"
+                    {...field}
+                  />
+                )}
               />
             </Field>
             <Field>
               <FieldLabel htmlFor="agent-auth-token">
                 Auth token {selected?.authTokenConfigured ? "（已配置）" : ""}
               </FieldLabel>
-              <Input
-                id="agent-auth-token"
-                type="password"
-                autoComplete="new-password"
-                {...form.register("authToken")}
+              <Controller
+                control={form.control}
+                name="authToken"
+                render={({ field }) => (
+                  <Input
+                    id="agent-auth-token"
+                    type="password"
+                    autoComplete="new-password"
+                    {...field}
+                  />
+                )}
               />
             </Field>
             <Field orientation="horizontal">
@@ -296,12 +326,18 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
             </Field>
             <Field data-invalid={!!form.formState.errors.headersJson}>
               <FieldLabel htmlFor="agent-headers">自定义 Headers（JSON）</FieldLabel>
-              <Textarea
-                id="agent-headers"
-                rows={4}
-                spellCheck={false}
-                aria-invalid={!!form.formState.errors.headersJson}
-                {...form.register("headersJson")}
+              <Controller
+                control={form.control}
+                name="headersJson"
+                render={({ field }) => (
+                  <Textarea
+                    id="agent-headers"
+                    rows={4}
+                    spellCheck={false}
+                    aria-invalid={!!form.formState.errors.headersJson}
+                    {...field}
+                  />
+                )}
               />
               <FieldDescription>不能在这里保存认证 Header。</FieldDescription>
               <FieldError errors={[form.formState.errors.headersJson]} />
