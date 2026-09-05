@@ -102,7 +102,7 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
   await form.getByLabel("OE / OEM 编号", { exact: true }).fill("SYN-OE-001");
   await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
   await page.getByRole("button", { name: "保存询盘", exact: true }).click();
-  const records = (type: string) =>
+  const records = (type: typeof schema.aggregateRecord.$inferSelect.type) =>
     db
       .select()
       .from(schema.aggregateRecord)
