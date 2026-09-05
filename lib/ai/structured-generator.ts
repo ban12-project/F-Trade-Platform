@@ -30,8 +30,10 @@ export interface StructuredGenerator {
 const safetyInstruction = `You generate marketing language only.
 Never invent or confirm engineering facts, OE numbers, vehicle fitment, dimensions,
 spline data, materials, certifications, prices, MOQs, or delivery times.
-Use only verifiedFacts exactly as supplied, preserve every evidenceRef, and put any
-unknown fact into a missing-information field for human review.`;
+Use only verifiedFacts exactly as supplied. Preserve evidenceRef in structured
+product_facts entries when the output schema includes them; never insert internal
+field names or evidence references into marketing prose. Omit unknown facts; only
+list them in a missing-information field when the output schema provides one.`;
 
 function assertSchemaValidates<T>(schema: FlexibleSchema<T>) {
   const normalized = asSchema(schema);

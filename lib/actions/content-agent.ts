@@ -5,25 +5,20 @@ import { z } from "zod";
 
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
-import { AiSdkStructuredGenerator } from "@/lib/ai/structured-generator";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
+import {
+  type contentGenerationOutputSchema,
+  generateMarketingContent,
+} from "@/lib/content/generation";
 import { listReadyProductContentSources } from "@/lib/content/store";
 import { contentAgentRequestSchema } from "@/lib/form-schemas";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
-const outputSchema = z.object({
-  hook: z.string().min(1).max(500),
-  body: z.string().min(1).max(4_000),
-  callToAction: z.string().min(1).max(500),
-  hashtags: z.array(z.string().min(1)).max(12),
-  visualInstruction: z.string().min(1).max(4_000),
-});
-
 export type ContentAgentActionState = {
   status: "idle" | "success" | "error";
   message: string;
-  draft?: z.infer<typeof outputSchema>;
+  draft?: z.infer<typeof contentGenerationOutputSchema>;
 };
 export async function generateContentDraftAction(
   _previous: ContentAgentActionState,
@@ -54,11 +49,11 @@ export async function generateContentDraftAction(
         (fact, index, facts) => facts.findIndex((other) => other.path === fact.path) === index,
       )
       .map((fact) => ({ field: fact.path, value: fact.value, evidenceRef: fact.evidenceRef }));
-    const draft = await new AiSdkStructuredGenerator().generate({
+    const draft = await generateMarketingContent({
       model: createProductAgentModel(await resolveProductAgentModelConfig()),
-      schema: outputSchema,
-      schemaName: "content_marketing_draft",
-      task: `Write an English ${parsed.data.contentType} B2B marketing draft. Objective: ${parsed.data.objective}. Target customer: ${parsed.data.targetCustomer}. Use only the supplied verified facts. Do not make claims about any absent engineering or commercial fact. Visual instruction must be non-engineering and must not imply product geometry, dimensions, materials, or part count.`,
+      contentType: parsed.data.contentType,
+      objective: parsed.data.objective,
+      targetCustomer: parsed.data.targetCustomer,
       verifiedFacts,
     });
     return { status: "success", message: "AI 初稿已生成；请人工核对后再创建待审内容。", draft };

@@ -48,8 +48,9 @@ export function createProductAgentModel(config: ProductAgentModelConfig): Langua
   validateProductAgentModelConfig(config);
   switch (config.provider) {
     case "openai":
-    case "openai-compatible":
       return createOpenAI(config.providerOptions as OpenAIProviderSettings)(config.model);
+    case "openai-compatible":
+      return createOpenAI(config.providerOptions as OpenAIProviderSettings).chat(config.model);
     case "anthropic":
       return createAnthropic(config.providerOptions as AnthropicProviderSettings)(config.model);
     case "google":
