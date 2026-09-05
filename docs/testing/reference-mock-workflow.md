@@ -27,3 +27,11 @@ node --import tsx scripts/test-synthetic-demo.ts
 回归同时验证原字段不变、mock 证据归属、无法批准缺证据草稿、来源篡改拒绝、下游产品/内容/RFQ 关联，以及非 synthetic 产品身份不能进入模拟覆盖入口。
 
 关联 #287、#26、#268。真实来源授权与工厂真实性要求仍用于真实业务；它们不阻断用户已明确授权的 mock 测试路径。
+
+## PostgreSQL 持久化回归
+
+`scripts/test-product-stream-postgres.ts` 在独立、仅 loopback 可访问的 `f_trade_stream_test` 数据库中调用 `test-mock-product-persistence.ts`。CI 使用 20 条完全合成的来源，运行同一 mock 补充逻辑，再调用实际的草稿插入与审核事务；不会将本机 reference 派生字段上传到 CI。
+
+测试回读产品状态和版本、项目关联、原始与 mock 字段证据、实际生成的批准引用、事件和审计。错误版本、错误审批 ID、并发重复批准，以及缺字段证据的批准都必须保持原子性。持久化前先移除领域模拟中的批准引用，以数据库审核事务生成的新引用为准。
+
+该检查扩大了真实 PostgreSQL 事务覆盖，不代表已完成 reference 文件的登录态浏览器导入或部署数据库验收。本机未配置 PostgreSQL 时，实际数据库执行证据以 CI 对应检查日志为准；不能用 TypeScript 通过替代数据库测试。
