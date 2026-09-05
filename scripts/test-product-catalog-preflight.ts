@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 
 import { discoverCatalogCandidates } from "../lib/product/catalog-candidates";
 import type { ProductAgentDocumentSource } from "../lib/product/document-source";
-import { createCatalogPreflightReport } from "./run-product-agent-catalog";
+import {
+  type CatalogResult,
+  completeCatalogBatch,
+  createCatalogPreflightReport,
+} from "./run-product-agent-catalog";
 
 const document: ProductAgentDocumentSource = {
   source: {
@@ -77,3 +81,63 @@ assert.deepEqual(layoutReport.document.layout_recovered_pages, [2]);
 assert.ok(
   layoutReport.manual_review.reasons.includes("layout_recovery_requires_visual_verification"),
 );
+
+async function verifyBatchFailures() {
+  function records(): CatalogResult[] {
+    return [0, 1, 2].map((index) => ({
+      identifier: `RYC-SYN-${index}`,
+      record_id: `synthetic-record-${index}`,
+      review_status: "source_review_required",
+      evidence_ref: `synthetic-evidence-${index}`,
+      status: "pending",
+    }));
+  }
+  for (const failedIndices of [new Set<number>(), new Set([0]), new Set([0, 1, 2])]) {
+    const results = records();
+    const attempted: number[] = [];
+    const reports: CatalogResult[][] = [];
+    const run = completeCatalogBatch(
+      results,
+      2,
+      async (index) => {
+        attempted.push(index);
+        if (failedIndices.has(index)) throw new Error("synthetic extraction failure");
+        return { draft: { synthetic: true }, evidence_locations: [] };
+      },
+      async () => {
+        reports.push(structuredClone(results));
+      },
+    );
+    if (failedIndices.size) {
+      await assert.rejects(run, new RegExp(`${failedIndices.size} failed, 0 pending`));
+    } else await run;
+    assert.deepEqual(attempted.toSorted(), [0, 1, 2]);
+    assert.ok(reports[0]?.every((record) => record.status === "pending"));
+    const final = reports.at(-1)!;
+    assert.equal(final.filter((record) => record.status === "failed").length, failedIndices.size);
+    assert.ok(final.every((record) => record.status !== "pending"));
+    assert.ok(
+      final.filter((record) => record.status === "succeeded").every((record) => record.draft),
+    );
+  }
+  let called = false;
+  await assert.rejects(
+    completeCatalogBatch(
+      records(),
+      1,
+      async () => {
+        called = true;
+        return {};
+      },
+      async () => {
+        throw new Error("synthetic report write failure");
+      },
+    ),
+    /report write failure/,
+  );
+  assert.equal(called, false, "initial report must be persisted before extraction starts");
+  console.log(
+    "PASS catalog batches preserve all outcomes and reject partial/all extraction failure",
+  );
+}
+void verifyBatchFailures();

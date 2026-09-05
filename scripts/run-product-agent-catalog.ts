@@ -65,7 +65,7 @@ function hasFlag(name: string) {
   return process.argv.includes(name);
 }
 
-type CatalogResult = {
+export type CatalogResult = {
   identifier: string;
   record_id: string;
   review_status: ReturnType<typeof discoverCatalogCandidates>[number]["review_status"];
@@ -191,24 +191,43 @@ async function main() {
     });
     await reportWrite;
   }
+  await completeCatalogBatch(
+    results,
+    concurrency,
+    async (index) => {
+      const candidate = candidates[index]!;
+      const result = await agent.run({ model, source: candidate.source, timeout_ms: timeoutMs });
+      return {
+        draft: result.draft,
+        evidence_locations: prepareProductAgentEvidenceSource(
+          candidate.source,
+        ).evidence_locations.filter((location) =>
+          result.draft.evidence_refs.includes(location.ref),
+        ),
+      };
+    },
+    writeReport,
+  );
+}
+
+/** Finish independent records and persist their outcomes before failing the batch. */
+export async function completeCatalogBatch(
+  results: CatalogResult[],
+  concurrency: number,
+  extract: (index: number) => Promise<Pick<CatalogResult, "draft" | "evidence_locations">>,
+  writeReport: () => Promise<void>,
+) {
+  if (!Number.isInteger(concurrency) || concurrency < 1)
+    throw new Error("Catalog concurrency must be a positive integer");
+  if (!results.length || results.some((result) => result.status !== "pending"))
+    throw new Error("Catalog batch requires pending records");
   await writeReport();
   let nextIndex = 0;
   async function worker() {
-    while (nextIndex < candidates.length) {
+    while (nextIndex < results.length) {
       const index = nextIndex++;
-      const candidate = candidates[index]!;
       try {
-        const result = await agent.run({ model, source: candidate.source, timeout_ms: timeoutMs });
-        results[index] = {
-          ...results[index]!,
-          status: "succeeded",
-          draft: result.draft,
-          evidence_locations: prepareProductAgentEvidenceSource(
-            candidate.source,
-          ).evidence_locations.filter((location) =>
-            result.draft.evidence_refs.includes(location.ref),
-          ),
-        };
+        results[index] = { ...results[index]!, ...(await extract(index)), status: "succeeded" };
       } catch (error) {
         results[index] = {
           ...results[index]!,
@@ -219,8 +238,14 @@ async function main() {
       await writeReport();
     }
   }
-  await Promise.all(Array.from({ length: Math.min(concurrency, candidates.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(concurrency, results.length) }, worker));
   await writeReport();
+  const failed = results.filter((result) => result.status === "failed").length;
+  const pending = results.filter((result) => result.status === "pending").length;
+  if (failed || pending)
+    throw new Error(
+      `Catalog batch incomplete: ${results.length - failed - pending} succeeded, ${failed} failed, ${pending} pending; see local report`,
+    );
 }
 
 if (process.argv[1]?.endsWith("run-product-agent-catalog.ts")) {
