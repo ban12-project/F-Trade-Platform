@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import re
@@ -66,6 +67,38 @@ def pdf_page_count(pdfinfo: str, path: Path) -> int:
     return int(match.group(1))
 
 
+PDF_PAGE_MARKER = re.compile(r"^<!-- f-trade:pdf-page=\d+ -->$", re.MULTILINE)
+
+
+def pdf_page_text(page: int, text: str) -> str:
+    # Reserve page markers for the converter, never allow source text to spoof them.
+    text = PDF_PAGE_MARKER.sub("[source page-marker text removed]", text)
+    return f"<!-- f-trade:pdf-page={page} -->\n{text.strip()}"
+
+
+def has_source_text(text: str) -> bool:
+    return bool(PDF_PAGE_MARKER.sub("", text).strip())
+
+
+def native_pdf_text(path: Path) -> str:
+    # MarkItDown's PDF dependency, used per physical page so table conversion cannot
+    # reorder pages or silently discard blank boundaries.
+    from pdfminer.converter import TextConverter
+    from pdfminer.layout import LAParams
+    from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
+    from pdfminer.pdfpage import PDFPage
+
+    parts = []
+    with path.open("rb") as stream:
+        manager = PDFResourceManager()
+        for number, page in enumerate(PDFPage.get_pages(stream), start=1):
+            with io.StringIO() as output:
+                with TextConverter(manager, output, laparams=LAParams()) as converter:
+                    PDFPageInterpreter(manager, converter).process_page(page)
+                    parts.append(pdf_page_text(number, output.getvalue()))
+    return "\n\n".join(parts)
+
+
 def local_pdf_ocr(path: Path) -> str:
     pdfinfo = executable("pdfinfo")
     pdftoppm = executable("pdftoppm")
@@ -86,7 +119,7 @@ def local_pdf_ocr(path: Path) -> str:
             Path(directory).glob("page-*.png"),
             key=lambda image: int(image.stem.rsplit("-", 1)[1]),
         )
-        if len(pages_as_images) != pages:
+        if [int(image.stem.rsplit("-", 1)[1]) for image in pages_as_images] != list(range(1, pages + 1)):
             raise RuntimeError("local OCR rendered an unexpected number of PDF pages")
         text_parts = []
         for image in pages_as_images:
@@ -94,12 +127,17 @@ def local_pdf_ocr(path: Path) -> str:
                 [tesseract, str(image), "stdout", "-l", language, "--psm", "3"],
                 check=True, capture_output=True, text=True,
             )
-            if result.stdout.strip():
-                text_parts.append(result.stdout.strip())
+            number = int(image.stem.rsplit("-", 1)[1])
+            text_parts.append(pdf_page_text(number, result.stdout))
     return "\n\n".join(text_parts).strip()
 
 
 def convert_with_markitdown(path: Path, remote_ocr: bool):
+    if path.suffix.lower() == ".pdf":
+        if remote_ocr:
+            remote_ocr_config()
+        return native_pdf_text(path)
+
     from markitdown import MarkItDown
 
     if remote_ocr:
@@ -136,15 +174,15 @@ def main() -> None:
         fail("remote OCR and local OCR cannot be enabled together")
     try:
         source_text = convert_with_markitdown(path, remote_ocr)
-        if not source_text and local_ocr and path.suffix.lower() == ".pdf":
+        if not has_source_text(source_text) and local_ocr and path.suffix.lower() == ".pdf":
             source_text = local_pdf_ocr(path)
     except (OSError, RuntimeError, subprocess.CalledProcessError, ValueError) as error:
         fail(str(error))
-    if not source_text:
+    if not has_source_text(source_text):
         if enabled("F_TRADE_METADATA_PREFLIGHT"):
             json.dump(
                 {
-                    "source_text": "",
+                    "source_text": source_text,
                     "document_sha256": digest,
                     "filename": path.name,
                     "media_type": path.suffix.lower().removeprefix("."),

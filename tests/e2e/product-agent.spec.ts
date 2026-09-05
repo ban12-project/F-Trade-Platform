@@ -219,9 +219,11 @@ test("scopes catalog candidates without treating the selector as evidence", () =
     "RYC302",
     "10XDC200",
   ]);
-  expect(candidates[0]?.source.record_id).toBe("synthetic-product-agent-test-ryc251");
+  expect(candidates[0]?.source.record_id).toBe("synthetic-product-agent-test-record-3");
   expect(candidates[0]?.source.candidate_identifier).toBe("RYC251");
-  expect(candidates[0]?.source.evidence_refs).toEqual(source.evidence_refs);
+  expect(candidates[0]?.source.evidence_refs).toEqual([`${source.evidence_refs[0]}#record-line=3`]);
+  expect(candidates[0]?.source.source_ref).toBe(source.source_ref);
+  expect(candidates[0]?.review_status).toBe("source_review_required");
   expect(candidates[0]?.source.source_text).toContain("OE-251");
   expect(candidates[0]?.source.source_text).not.toContain("RYC302");
 });

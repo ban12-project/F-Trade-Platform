@@ -297,3 +297,34 @@ new EvidenceLocatedProductAgent(delegate)
     console.error(error);
     process.exitCode = 1;
   });
+
+const pagedLocations = buildProductAgentEvidenceLocations(
+  "document:synthetic",
+  "<!-- f-trade:pdf-page=1 -->\n编号: 999999XD99999\n\n<!-- f-trade:pdf-page=2 -->\n\n<!-- f-trade:pdf-page=3 -->\n编号: 999999XD99999",
+);
+assert.equal(pagedLocations.length, 2);
+assert.equal(pagedLocations[0]?.source_ref, "document:synthetic#pdf-page=1");
+assert.equal(pagedLocations[1]?.source_ref, "document:synthetic#pdf-page=3");
+assert.notEqual(pagedLocations[0]?.ref, pagedLocations[1]?.ref);
+
+assert.match(pagedLocations[1]!.ref, /-page-3-/);
+const chineseSource = { ...source, source_text: "编号: 999999XD99999" };
+const chineseDraft = finalizeProductAgentDraft(
+  {
+    record_id: chineseSource.record_id,
+    source_ref: chineseSource.source_ref,
+    evidence_refs: chineseSource.evidence_refs,
+    field_evidence: { "product.internal_sku": chineseSource.evidence_refs[0] },
+    verification_status: "review_required",
+    blocking_missing_fields: [],
+    optional_missing_fields: [],
+    product: { internal_sku: "999999XD99999" },
+  },
+  chineseSource,
+);
+assert.equal(chineseDraft.product.internal_sku, "999999XD99999");
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(chineseDraft, { ...chineseSource, source_text: "OE: 999999XD99999" }),
+  /explicitly labelled source value/,
+);
