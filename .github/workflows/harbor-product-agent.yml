@@ -23,12 +23,12 @@ jobs:
     environment: ${{ inputs.provider }}-product-agent-eval
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           cache: true
       - name: Install application dependencies
@@ -94,7 +94,7 @@ jobs:
         run: python scripts/validate-harbor-product-agent-results.py
       - name: Upload sanitized Harbor summary
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: harbor-product-agent-results
           path: harbor-artifacts/product-agent-summary.json
