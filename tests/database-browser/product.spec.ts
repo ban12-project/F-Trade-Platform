@@ -461,26 +461,22 @@ test("authenticated browser reviews a mock product and its content through real 
         createdByType: "human",
         createdById: actorId,
       });
-      await tx
-        .insert(schema.approval)
-        .values({
-          id: target.approvalId,
-          aggregateId: target.id,
-          gate: "gate_01_truth",
-          status: "pending",
-          requestedByType: "human",
-          requestedById: actorId,
-          requestedAt: new Date(),
-        });
-      await tx
-        .insert(schema.workspaceProjectItem)
-        .values({
-          id: randomUUID(),
-          projectId,
-          aggregateId: target.id,
-          role: "marketing_content",
-          relation: "owned",
-        });
+      await tx.insert(schema.approval).values({
+        id: target.approvalId,
+        aggregateId: target.id,
+        gate: "gate_01_truth",
+        status: "pending",
+        requestedByType: "human",
+        requestedById: actorId,
+        requestedAt: new Date(),
+      });
+      await tx.insert(schema.workspaceProjectItem).values({
+        id: randomUUID(),
+        projectId,
+        aggregateId: target.id,
+        role: "marketing_content",
+        relation: "owned",
+      });
     });
   }
   const [targetA, targetB] = targets;
