@@ -64,7 +64,7 @@ test.beforeAll(async () => {
   await db.insert(schema.evidence).values({
     id: evidenceId,
     classification: "internal",
-    blobKey: "synthetic/mock-browser-not-a-real-blob",
+    blobKey: `synthetic/mock-sales-${evidenceId}-not-a-real-blob`,
     contentType: "text/plain",
     sha256: "a".repeat(64),
     sizeBytes: 0,
