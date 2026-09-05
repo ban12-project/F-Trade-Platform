@@ -45,6 +45,9 @@ jobs:
       - name: Test workspace navigation and query concurrency
         run: pnpm test:workspace && pnpm test:workspace-navigation
 
+      - name: Test Product Agent incremental validation
+        run: pnpm test:product-stream
+
       - name: Test Product Agent evidence locations
         run: pnpm test:product-agent-evidence
 
