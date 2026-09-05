@@ -45,3 +45,20 @@ pnpm test:e2e tests/e2e/project-workflow.spec.ts tests/e2e/video-workspace.spec.
 2. 用户检查 AI 初稿的顺序、截取区间、字幕和 CTA 后才能请求合成。
 3. 管理员在私有预览中核对画面、字幕、CTA 和事实来源，再通过或退回成片。
 4. 发布仍由已授权人员通过独立受控流程发起。
+
+## Issue #126：多平台真实媒体回归（2026-09-05）
+
+`pnpm test:ffmpeg-renderer` 使用同一个全黑合成 master（320×240、25 FPS、44.1 kHz 单声道测试音），生成五个平台的项目预设版本。两个 1.5 秒片段分别保留原声和静音，并使用 cover／contain；成片通过 ffprobe 校验 H.264、AAC、尺寸、帧率和时间线时长。解码后的像素检查分别验证字幕和 CTA，PCM 能量检查验证原声与静音，生成的导出清单仍为 `review_required`。原始 master 的摘要在拒绝校验和渲染前后保持一致。
+
+该测试已加入 repository-validate CI；它实际执行本地 FFmpeg 后端，不等同于已验证 Vercel Sandbox 镜像、真实资料权利、人工批准或平台接收。生产 Sandbox 的同一拼接步骤也统一输出 48 kHz 双声道 AAC，以避免混合原声与静音片段时采样率／声道不同造成漂移。修复前 3 秒时间线实测为 3.288526 秒，超出导出契约允许的 0.1 秒偏差。
+
+### 预设来源风险：尚不能关闭 #126
+
+项目精确预设不是平台全部可接受格式的枚举。2026-09-05 复核结果：
+
+- [YouTube 编码建议](https://support.google.com/youtube/answer/1722171)接受多种帧率和宽高比；项目选择的 30 FPS、1920×1080 和 3600 秒上限不能全部称作官方硬性限制。
+- [TikTok Media Transfer Guide](https://developers.tiktok.com/docs/en/content-posting-api-media-transfer-guide)记载 23–60 FPS、边长 360–4096 像素；最长发布时长还取决于账号。项目精确尺寸与帧率属于输出选择。
+- [X 媒体建议](https://docs.x.com/x-api/media/quickstart/best-practices)的 Post video 时长按账号和 media category 区分，140 秒不能再作为通用 Post video 官方上限。
+- Facebook／Instagram 的已记录官方链接本次读取失败，不能据此声称重新核验通过。
+
+后续需分离项目输出选择与平台版本化约束，并补齐 Meta 来源证据、账号相关限制及尚未测量的编码属性。当前清单的 `project_export_preset` 仅说明记录的测量值是否符合可识别项目预设，不承诺平台接受或发布成功。上述来源复核不修改现有预设数值，也不授予真实资料或发布权限。
