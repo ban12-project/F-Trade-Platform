@@ -135,6 +135,7 @@ function QuotationForm({
       ? {
           projectId,
           quotationId: entry.id,
+          evidenceRef: "",
           rfqId: entry.quotation.rfq_id,
           productId: entry.productId,
           unitPrice: String(entry.quotation.quote.unit_price),
@@ -147,6 +148,7 @@ function QuotationForm({
       : {
           projectId,
           quotationId: "",
+          evidenceRef: "",
           rfqId: rfqs[0]?.id ?? "",
           productId: products[0]?.id ?? "",
           unitPrice: "",
@@ -288,6 +290,21 @@ function QuotationForm({
                     rows={3}
                     {...form.register("paymentTerms")}
                   />
+                </Field>
+                <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                  <FieldLabel htmlFor={`quotation-source-${entry?.id ?? "new"}`}>
+                    报价依据
+                  </FieldLabel>
+                  <Input
+                    id={`quotation-source-${entry?.id ?? "new"}`}
+                    placeholder="evidence-quotation-001"
+                    aria-invalid={!!form.formState.errors.evidenceRef}
+                    {...form.register("evidenceRef")}
+                  />
+                  <FieldDescription>
+                    填写本次人工商业条款的依据引用；修订时重新填写。
+                  </FieldDescription>
+                  <FieldError errors={[form.formState.errors.evidenceRef]} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={`validity-${entry?.id ?? "new"}`}>有效期（天）</FieldLabel>
@@ -491,9 +508,15 @@ export function QuotationPanel({
         </p>
       </div>
       {revision ? (
-        <QuotationForm projectId={projectId} rfqs={ready} products={products} entry={revision} />
+        <QuotationForm
+          key={revision.id}
+          projectId={projectId}
+          rfqs={ready}
+          products={products}
+          entry={revision}
+        />
       ) : (
-        <QuotationForm projectId={projectId} rfqs={ready} products={products} />
+        <QuotationForm key="new" projectId={projectId} rfqs={ready} products={products} />
       )}
       {entries.map((entry) => (
         <Card key={entry.id}>

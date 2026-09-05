@@ -210,6 +210,7 @@ const positiveIntegerText = z
   .regex(/^[1-9]\d*$/, "必须填写正整数。");
 
 export const quotationDraftFormSchema = z.object({
+  evidenceRef: privateReference,
   projectId: z.uuid("项目标识无效。"),
   quotationId: z.uuid("报价标识无效。").optional().or(z.literal("")),
   rfqId: z.uuid("请选择 RFQ Ready。"),
