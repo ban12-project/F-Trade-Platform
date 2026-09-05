@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { quotationDraftFormSchema } from "../lib/form-schemas";
+import { quotationDecisionFormSchema, quotationDraftFormSchema } from "../lib/form-schemas";
 import {
   applyHumanQuoteDecision,
   createManualQuotation,
@@ -21,6 +21,29 @@ const quoteInput = {
 assert.equal(quotationDraftFormSchema.safeParse(quoteInput).success, true);
 for (const evidenceRef of [undefined, "", "untraceable"]) {
   assert.equal(quotationDraftFormSchema.safeParse({ ...quoteInput, evidenceRef }).success, false);
+}
+
+const reviewInput = {
+  projectId: quoteInput.projectId,
+  quotationId: quoteInput.rfqId,
+  reviewedVersion: "3",
+  approvalId: quoteInput.productId,
+  decision: "approved",
+  evidenceRef: quoteInput.evidenceRef,
+  notes: "",
+};
+assert.equal(quotationDecisionFormSchema.safeParse(reviewInput).success, true);
+for (const reviewedVersion of [undefined, "", "0", "01", "1e3", "9007199254740992"]) {
+  assert.equal(
+    quotationDecisionFormSchema.safeParse({ ...reviewInput, reviewedVersion }).success,
+    false,
+  );
+}
+for (const approvalId of [undefined, "", "invalid"]) {
+  assert.equal(
+    quotationDecisionFormSchema.safeParse({ ...reviewInput, approvalId }).success,
+    false,
+  );
 }
 
 const draft = createManualQuotation({

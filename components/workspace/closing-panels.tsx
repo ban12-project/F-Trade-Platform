@@ -343,7 +343,14 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
   const [state, action, pending] = useActionState(decideQuotationAction, initialClosingActionState);
   const form = useForm<z.infer<typeof quotationDecisionFormSchema>>({
     resolver: zodResolver(quotationDecisionFormSchema),
-    defaultValues: { projectId, quotationId: entry.id, evidenceRef: "", notes: "" },
+    defaultValues: {
+      projectId,
+      quotationId: entry.id,
+      reviewedVersion: String(entry.version),
+      approvalId: entry.approvalId ?? "",
+      evidenceRef: "",
+      notes: "",
+    },
   });
   useEffect(() => {
     if (state.status === "success") router.refresh();
@@ -357,7 +364,9 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
     <Card>
       <CardHeader>
         <CardTitle>Gate 02 报价审核</CardTitle>
-        <CardDescription>请核对全部人工商业条款，系统不会预选批准。</CardDescription>
+        <CardDescription>
+          审核版本 {entry.version}。请核对全部人工商业条款，系统不会预选批准。
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form id={`quote-decision-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
@@ -539,7 +548,11 @@ export function QuotationPanel({
           </CardContent>
           {canReview && entry.state === "QUOTE_REVIEW_REQUIRED" ? (
             <CardFooter className="block">
-              <QuoteDecision projectId={projectId} entry={entry} />
+              <QuoteDecision
+                key={`${entry.id}:${entry.version}:${entry.approvalId}`}
+                projectId={projectId}
+                entry={entry}
+              />
             </CardFooter>
           ) : null}
           {entry.state === "QUOTE_APPROVED" ? (
