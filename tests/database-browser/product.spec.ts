@@ -66,6 +66,7 @@ test("authenticated browser reviews a mock product and its content through real 
   page,
   context,
   baseURL,
+  browser,
 }) => {
   const path = `/workspace/${projectId}?panel=product`;
   // No auth bypass route: the application must verify the signed token against PostgreSQL.
@@ -294,6 +295,15 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.getByRole("tab", { name: "记录 1", exact: true }).click();
   await page.getByRole("button", { name: /MOCK browser content review/ }).click();
   const contentReview = page.locator("form#content-review");
+  const staleContext = await browser.newContext({ baseURL });
+  await staleContext.addCookies(await context.cookies());
+  const stalePage = await staleContext.newPage();
+  await stalePage.goto(`/workspace/${projectId}?panel=content&item=${contentDraft.id}`);
+  const staleReview = stalePage.locator("form#content-review");
+  await staleReview.getByRole("combobox").click();
+  await stalePage.getByRole("option", { name: "批准营销内容", exact: true }).click();
+  await staleReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+  await staleReview.locator("#content-review-notes").fill("Synthetic stale review attempt");
   await contentReview.getByRole("combobox").click();
   await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
   await contentReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
@@ -317,6 +327,25 @@ test("authenticated browser reviews a mock product and its content through real 
       and(eq(schema.approval.aggregateId, contentDraft.id), eq(schema.approval.status, "pending")),
     );
   expect(revisionApproval.id).not.toBe(contentApproval.id);
+  const beforeStale = await db
+    .select()
+    .from(schema.auditEvent)
+    .where(eq(schema.auditEvent.aggregateId, contentDraft.id));
+  await stalePage.getByRole("button", { name: "批准营销内容", exact: true }).click();
+  await expect(stalePage.getByText(/内容已更新|审核请求已更新/)).toBeVisible();
+  expect((await contentQuery())[0]).toEqual(revisedContent);
+  expect(
+    await db
+      .select()
+      .from(schema.auditEvent)
+      .where(eq(schema.auditEvent.aggregateId, contentDraft.id)),
+  ).toEqual(beforeStale);
+  const [stillPending] = await db
+    .select()
+    .from(schema.approval)
+    .where(eq(schema.approval.id, revisionApproval.id));
+  expect(stillPending.status).toBe("pending");
+  await staleContext.close();
   await contentReview.getByRole("combobox").click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
   await contentReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
