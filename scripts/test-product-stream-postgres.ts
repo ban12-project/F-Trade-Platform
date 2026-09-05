@@ -19,6 +19,8 @@ import {
 } from "../lib/product/stream-validation";
 import { decideProductCatalogReview } from "../lib/products";
 
+import { testMockProductPersistence } from "./test-mock-product-persistence";
+
 async function verify() {
   const connectionString = process.env.PRODUCT_STREAM_TEST_DATABASE_URL;
   assert.ok(connectionString, "Dedicated test database URL is required");
@@ -189,6 +191,7 @@ async function verify() {
     console.log(
       "PASS PostgreSQL migrations, incremental persistence, review guard, actual authorization locks and retained interruption audit",
     );
+    await testMockProductPersistence(database, identity.actorId, identity.projectId);
   } finally {
     await revoker.end();
     await pool.end();
