@@ -18,6 +18,20 @@ jobs:
     name: playwright-chromium
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: synthetic
+          POSTGRES_PASSWORD: synthetic
+          POSTGRES_DB: f_trade_browser_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U synthetic -d f_trade_browser_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -48,10 +62,15 @@ jobs:
       - name: Run production-build Playwright tests
         run: pnpm test:e2e
 
+      - name: Verify authenticated browser writes against isolated PostgreSQL
+        run: pnpm exec playwright test --config playwright.database.config.ts
+
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
-          path: blob-report/
+          path: |
+            blob-report/
+            blob-report-database/
           retention-days: 7
