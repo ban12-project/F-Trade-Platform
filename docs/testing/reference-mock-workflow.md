@@ -35,3 +35,19 @@ node --import tsx scripts/test-synthetic-demo.ts
 测试回读产品状态和版本、项目关联、原始与 mock 字段证据、实际生成的批准引用、事件和审计。错误版本、错误审批 ID、并发重复批准，以及缺字段证据的批准都必须保持原子性。持久化前先移除领域模拟中的批准引用，以数据库审核事务生成的新引用为准。
 
 该检查扩大了真实 PostgreSQL 事务覆盖，不代表已完成 reference 文件的登录态浏览器导入或部署数据库验收。本机未配置 PostgreSQL 时，实际数据库执行证据以 CI 对应检查日志为准；不能用 TypeScript 通过替代数据库测试。
+
+## 登录态浏览器与隔离数据库验收
+
+Issue #291 使用 `playwright.database.config.ts` 在 CI 的独立
+`f_trade_browser_test` PostgreSQL 数据库运行纯合成浏览器测试。它访问实际
+`/workspace` 页面，经产品创建和 Gate 01 的 Server Action 写入数据库，再回读
+产品版本、逐字段证据、审批、项目关联和审计记录。测试构建关闭 testing API，
+不使用 `/testing` 页面或替代 Action。
+
+账号和签名会话由测试预置；覆盖未登录页面拦截与登录后的实际操作，不覆盖邮件
+验证码登录、证据文件上传或真实工厂审批。证据记录和产品名称明确标记 MOCK，
+测试数据库由 CI 服务销毁，不连接已保存的业务数据库。此测试使用纯合成数据，
+不把原始 PDF 或本地参考资料派生内容提交到 CI。
+
+默认数据库连接仍使用 Neon。只有显式设置 `DATABASE_TRANSPORT=postgres` 才会
+启用原生 PostgreSQL 连接，且仅接受 loopback 主机；未知配置和远程地址会被拒绝。
