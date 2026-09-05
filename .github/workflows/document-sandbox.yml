@@ -30,7 +30,9 @@ concurrency:
 jobs:
   document-sandbox:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Cold builds install the complete media runtime; slow signed package mirrors
+    # can take more than 15 minutes before the offline smoke test starts.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - name: Build the runtime with only required source files
