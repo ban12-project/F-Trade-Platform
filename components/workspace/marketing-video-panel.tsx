@@ -463,15 +463,25 @@ function EditVideo({
             />
           </CardContent>
           {entry.downloadAvailable ? (
-            <CardFooter>
+            <CardFooter className="flex flex-wrap gap-2">
               <LinkButton
-                className="w-full"
+                className="flex-1"
                 href={`/api/video-download/${entry.id}`}
                 download
                 prefetch={false}
               >
                 <DownloadIcon data-icon="inline-start" />
                 下载 MP4
+              </LinkButton>
+              <LinkButton
+                variant="outline"
+                className="flex-1"
+                href={`/api/video-download/${entry.id}/manifest`}
+                download
+                prefetch={false}
+              >
+                <DownloadIcon data-icon="inline-start" />
+                下载导出清单
               </LinkButton>
             </CardFooter>
           ) : null}

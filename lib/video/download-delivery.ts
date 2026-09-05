@@ -9,6 +9,7 @@ import type { VideoProject } from "./contracts";
 import {
   approvedVideoDownloadHeaders,
   type DownloadSession,
+  resolveApprovedVideoAccess,
   resolveApprovedVideoDownload,
 } from "./download-policy";
 import { VercelPrivateVideoAssetStore } from "./private-asset-store";
@@ -48,3 +49,16 @@ export async function resolveWorkspaceApprovedVideoDownload(
 }
 
 export { approvedVideoDownloadHeaders };
+
+export async function resolveWorkspaceApprovedVideoManifest(
+  session: DownloadSession,
+  videoIdInput: string,
+) {
+  const database = getDatabase();
+  return resolveApprovedVideoAccess(
+    session,
+    videoIdInput,
+    (videoId) => loadVideo(videoId, database),
+    (project) => revalidateVideo(project, database),
+  );
+}
