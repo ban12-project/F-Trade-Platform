@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { expect, test } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
@@ -53,9 +53,9 @@ test.beforeAll(async () => {
   await db.insert(schema.evidence).values({
     id: evidenceId,
     classification: "internal",
-    blobKey: "synthetic/mock-browser-not-a-real-blob",
+    blobKey: `synthetic/${evidenceId}/not-a-real-blob`,
     contentType: "text/plain",
-    sha256: "a".repeat(64),
+    sha256: createHash("sha256").update(evidenceId).digest("hex"),
     sizeBytes: 0,
     sourceLabel: "MOCK evidence — synthetic test only",
     uploadedByType: "human",
@@ -76,7 +76,7 @@ test("real stream route persists every proposal and completes after response inv
     "Product name: MOCK streamed kit\nProduct type: clutch_kit\nPart No.: MOCK-STREAM-316";
   const located = prepareProductAgentEvidenceSource({
     record_id: randomUUID(),
-    source_ref: "mock-stream-316",
+    source_ref: "source-mock-stream-316",
     evidence_refs: [evidenceId],
     source_text: sourceText,
     image_availability: "none",
@@ -135,7 +135,7 @@ test("real stream route persists every proposal and completes after response inv
         projectId,
         modelConfigId: configId,
         model: "mock316",
-        sourceRef: "mock-stream-316",
+        sourceRef: "source-mock-stream-316",
         evidenceRef: evidenceId,
         sourceText,
       },
