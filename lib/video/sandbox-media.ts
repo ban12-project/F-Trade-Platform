@@ -307,6 +307,11 @@ export async function renderMarketingTimelineInSandbox(
         "yuv420p",
         "-c:a",
         "aac",
+        // Concat requires identical audio time bases and channel layouts across clips.
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
         "-shortest",
         output,
       ]);
