@@ -21,7 +21,7 @@
     "test:product-stream": "tsx scripts/test-product-stream.ts && tsx scripts/test-product-stream-store.ts && tsx scripts/test-product-stream-transport.ts && tsx scripts/test-product-stream-model.ts && tsx scripts/test-product-source-images.ts",
     "test:product-agent-evidence": "tsx scripts/test-product-agent-evidence-locations.ts",
     "test:catalog-preflight": "tsx scripts/test-product-catalog-preflight.ts",
-    "test:product-catalog-entry": "tsx scripts/test-product-catalog-entry.ts",
+    "test:product-catalog-entry": "tsx scripts/test-product-catalog-entry.ts && tsx scripts/test-product-cohorts.ts",
     "test:content-catalog-entry": "tsx scripts/test-content-catalog-entry.ts",
     "validate:mvp-acceptance": "tsx scripts/validate-mvp-acceptance-summary.ts",
     "test:mvp-acceptance": "tsx scripts/test-mvp-acceptance-summary.ts",
