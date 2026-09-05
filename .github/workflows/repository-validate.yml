@@ -45,6 +45,9 @@ jobs:
       - name: Test workspace navigation and query concurrency
         run: pnpm test:workspace && pnpm test:workspace-navigation
 
+      - name: Test Product Agent incremental validation
+        run: pnpm test:product-stream
+
       - name: Test Product Agent evidence locations
         run: pnpm test:product-agent-evidence
 
@@ -84,3 +87,35 @@ jobs:
 
       - name: Validate contracts and repository hygiene
         run: python scripts/validate_repository.py
+
+  product-stream-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: synthetic
+          POSTGRES_PASSWORD: synthetic
+          POSTGRES_DB: f_trade_stream_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U synthetic -d f_trade_stream_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Verify migrations and real PostgreSQL transaction behavior
+        run: pnpm exec tsx scripts/test-product-stream-postgres.ts
+        env:
+          PRODUCT_STREAM_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
