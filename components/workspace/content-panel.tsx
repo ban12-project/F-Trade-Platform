@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useActionState, useEffect, useState } from "react";
+import { startTransition, useActionState, useEffect, useEffectEvent, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 
@@ -139,7 +139,6 @@ function ContentDraftForm({
   products: ReadyProductContentSource[];
   detail?: ContentCatalogDetail;
 }) {
-  const router = useRouter();
   const revising = detail?.state === "CONTENT_REVISION_REQUIRED";
   const [saveState, saveAction, saving] = useActionState(
     revising ? reviseContentDraftAction : createContentDraftAction,
@@ -164,12 +163,14 @@ function ContentDraftForm({
     form.setValue("hashtags", aiState.draft.hashtags.join(" "), { shouldDirty: true });
     form.setValue("visualInstruction", aiState.draft.visualInstruction, { shouldDirty: true });
   }, [aiState.draft, form]);
+  const resetSavedDraft = useEffectEvent(() => {
+    form.reset(revising ? form.getValues() : defaultValues(products));
+  });
   useEffect(() => {
-    if (saveState.status === "success") {
-      form.reset(revising ? form.getValues() : defaultValues(products));
-      router.refresh();
-    }
-  }, [form, products, revising, router, saveState.status]);
+    // The Action revalidates the route. A new products array must not trigger
+    // another refresh or reset a draft the user has started editing afterwards.
+    if (saveState.status === "success") resetSavedDraft();
+  }, [saveState]);
   function data(values: ContentValues) {
     const result = new FormData();
     result.set("projectId", projectId);

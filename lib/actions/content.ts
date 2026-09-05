@@ -106,9 +106,7 @@ export async function reviseContentDraftAction(
   if (!session || !hasPermission(session.user.role, "content:write"))
     return { status: "error", message: "无权修订内容草稿。" };
   const contentId = formData.get("contentId");
-  const parsedContentId = contentReviewFormSchema
-    .pick({ contentId: true })
-    .safeParse({ contentId });
+  const parsedContentId = contentReviewFormSchema.shape.contentId.safeParse(contentId);
   if (!parsedContentId.success)
     return {
       status: "error",
@@ -122,17 +120,17 @@ export async function reviseContentDraftAction(
     if (projectId)
       await assertWorkspaceAggregateLink(
         projectId,
-        parsedContentId.data.contentId,
+        parsedContentId.data,
         "marketing",
         "content",
         session.user.id,
       );
-    await reviseContentDraft(parsedContentId.data.contentId, parsed.data, session.user.id);
-    revalidateContentPaths(projectId, parsedContentId.data.contentId);
+    await reviseContentDraft(parsedContentId.data, parsed.data, session.user.id);
+    revalidateContentPaths(projectId, parsedContentId.data);
     return {
       status: "success",
       message: "内容修订已保存，并已重新提交 Gate 01 审核。",
-      contentId: parsedContentId.data.contentId,
+      contentId: parsedContentId.data,
     };
   } catch (error) {
     return {

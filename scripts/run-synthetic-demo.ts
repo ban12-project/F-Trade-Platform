@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import contentSchemaJson from "../contracts/content/content.schema.json";
 import productSchemaJson from "../contracts/data/product-ready.schema.json";
 import quotationSchemaJson from "../contracts/sales/quotation-handoff.schema.json";
@@ -8,6 +9,7 @@ import quotationFixture from "../data/fixtures/quotation-handoff.synthetic.json"
 import rfqFixture from "../data/fixtures/rfq-ready.synthetic.json";
 import { decideContent } from "../lib/content/gate";
 import { publishThroughChannel } from "../lib/content/publication-policy";
+import type { ContentRecord } from "../lib/content/store";
 import { compileContract } from "../lib/contracts/validator";
 import {
   decideDeliveryConfirmation,
@@ -35,6 +37,14 @@ type JsonObject = Record<string, unknown>;
 export interface SyntheticDemoReport {
   classification: "synthetic";
   inputLinks: { productId: string; contentProductId: string; rfqOe: string };
+  contentInput: {
+    kind: "provided" | "fixture";
+    contentId: string;
+    draftSha256: string;
+    bodySha256: string;
+    approvedBodySha256: string;
+    publishedBodySha256: string;
+  };
   finalStates: Record<string, string>;
   transitionCount: number;
   approvedGates: string[];
@@ -104,9 +114,12 @@ function assertSyntheticIdentifier(value: unknown, label: string): asserts value
   }
 }
 
-export async function runSyntheticDemo(testProduct?: ProductReady): Promise<SyntheticDemoReport> {
+export async function runSyntheticDemo(
+  testProduct?: ProductReady,
+  testContent?: ContentRecord,
+): Promise<SyntheticDemoReport> {
   const selectedProduct = structuredClone(testProduct ?? productFixture);
-  const selectedContent = structuredClone(contentFixture);
+  let selectedContent = structuredClone(contentFixture);
   const selectedRfq = structuredClone(rfqFixture);
   const selectedQuotation = structuredClone(quotationFixture);
   if (testProduct) {
@@ -129,6 +142,32 @@ export async function runSyntheticDemo(testProduct?: ProductReady): Promise<Synt
     selectedRfq.product.product_type = String(testProduct.product.product_type);
     selectedRfq.product.oe_number = oe[0];
     selectedRfq.product.vehicle_model = String(testProduct.product.vehicle_model ?? "Mock model");
+  }
+  if (testContent) {
+    if (!testProduct || testContent.product_id !== testProduct.record_id)
+      throw new Error("Provided content must match the selected test product");
+    assertSyntheticIdentifier(testContent.content_id, "testContent.content_id");
+    if (testContent.status !== "review_required" || testContent.approval_ref)
+      throw new Error("Provided content must enter the simulated review without prior approval");
+    const sourceFacts = (["product", "specifications", "commercial"] as const).flatMap((section) =>
+      Object.entries(testProduct[section] ?? {}).map(([field, value]) => ({
+        field: `${section}.${field}`,
+        value: Array.isArray(value) ? value.join(", ") : String(value),
+        evidence_ref: testProduct.field_evidence[`${section}.${field}`],
+      })),
+    );
+    for (const fact of testContent.product_facts) {
+      if (
+        !sourceFacts.some(
+          (source) =>
+            source.field === fact.field &&
+            source.value === fact.value &&
+            source.evidence_ref === fact.evidence_ref,
+        )
+      )
+        throw new Error("Provided content fact does not match the selected product evidence");
+    }
+    selectedContent = structuredClone(testContent);
   }
   const [
     productSchema,
@@ -553,6 +592,18 @@ export async function runSyntheticDemo(testProduct?: ProductReady): Promise<Synt
       productId: String(productId),
       contentProductId: String(content.product_id),
       rfqOe: String((rfq.product as JsonObject).oe_number),
+    },
+    contentInput: {
+      kind: testContent ? "provided" : "fixture",
+      contentId: String(contentId),
+      draftSha256: createHash("sha256").update(JSON.stringify(content)).digest("hex"),
+      bodySha256: createHash("sha256").update(String(content.body)).digest("hex"),
+      approvedBodySha256: createHash("sha256")
+        .update(String((approvedContent as JsonObject).body))
+        .digest("hex"),
+      publishedBodySha256: createHash("sha256")
+        .update(String((publishedContent as JsonObject).body))
+        .digest("hex"),
     },
     finalStates,
     transitionCount,
