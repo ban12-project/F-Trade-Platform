@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
+import { createServer } from "node:http";
 import { expect, test } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -7,7 +8,9 @@ import { Pool } from "pg";
 import { decideContentReview } from "../../lib/content/store";
 import type { Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
-import { authSecret, databaseURL } from "../../playwright.database.config";
+import { prepareProductAgentEvidenceSource } from "../../lib/product/evidence-locations";
+import { encryptStoredSecret } from "../../lib/security/encrypted-secret";
+import { authSecret, databaseURL, modelConfigKey } from "../../playwright.database.config";
 
 const pool = new Pool({ connectionString: databaseURL });
 const db = drizzle(pool, { schema });
@@ -62,6 +65,108 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await pool.end();
+});
+
+test("real stream route persists every proposal and completes after response invalidation", async ({
+  context,
+  baseURL,
+}) => {
+  if (!baseURL) throw new Error("Missing browser base URL");
+  const sourceText =
+    "Product name: MOCK streamed kit\nProduct type: clutch_kit\nPart No.: MOCK-STREAM-316";
+  const located = prepareProductAgentEvidenceSource({
+    record_id: randomUUID(),
+    source_ref: "mock-stream-316",
+    evidence_refs: [evidenceId],
+    source_text: sourceText,
+    image_availability: "none",
+    image_refs: [],
+  });
+  const proposals = [
+    { field: "product.product_name", value: "MOCK streamed kit" },
+    { field: "product.product_type", value: "clutch_kit" },
+    { field: "product.internal_sku", value: "MOCK-STREAM-316" },
+  ].map((proposal) => {
+    const location = located.evidence_locations.find((item) => item.text.includes(proposal.value));
+    if (!location) throw new Error("Missing synthetic field location");
+    return { ...proposal, evidenceRef: location.ref };
+  });
+  // Only the provider is synthetic: exercise the production route, response pulls and database.
+  const provider = createServer(async (request, response) => {
+    for await (const _chunk of request) {
+      /* consume the request */
+    }
+    response.writeHead(200, { "Content-Type": "text/event-stream" });
+    const chunk = (delta: Record<string, string>, finish_reason: string | null) =>
+      `data: ${JSON.stringify({ id: "mock316", object: "chat.completion.chunk", created: 1, model: "mock316", choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
+    response.write(
+      chunk({ role: "assistant", content: JSON.stringify({ elements: proposals }) }, null),
+    );
+    response.end(`${chunk({}, "stop")}data: [DONE]\n\n`);
+  });
+  await new Promise<void>((resolve) => provider.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = provider.address();
+    if (!address || typeof address === "string") throw Error("Missing mock provider port");
+    const configId = randomUUID();
+    process.env.MODEL_CONFIG_ENCRYPTION_KEY = modelConfigKey;
+    await db.insert(schema.productAgentModelConfig).values({
+      id: configId,
+      name: configId,
+      provider: "openai-compatible",
+      model: "mock316",
+      baseUrl: `http://127.0.0.1:${address.port}/v1`,
+      apiKeyCiphertext: encryptStoredSecret("mock-only"),
+      updatedBy: actorId,
+    });
+    const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+    await context.addCookies([
+      {
+        name: "better-auth.session_token",
+        value: encodeURIComponent(`${token}.${signature}`),
+        url: baseURL,
+        httpOnly: true,
+        sameSite: "Lax",
+      },
+    ]);
+    const response = await context.request.post("/api/product-agent/stream", {
+      headers: { origin: baseURL },
+      multipart: {
+        projectId,
+        modelConfigId: configId,
+        model: "mock316",
+        sourceRef: "mock-stream-316",
+        evidenceRef: evidenceId,
+        sourceText,
+      },
+    });
+    expect(response.status()).toBe(200);
+    const events = (await response.text())
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(events.at(-1)).toMatchObject({ type: "stage", stage: "completed" });
+    expect(events.filter((event) => event.type === "draft")).toHaveLength(3);
+    const [run] = await db
+      .select()
+      .from(schema.productAgentStreamRun)
+      .where(eq(schema.productAgentStreamRun.id, events[0].runId));
+    expect(run.status).toBe("completed");
+    const [record] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, run.productId));
+    expect(record.payload.product).toEqual({
+      product_name: "MOCK streamed kit",
+      product_type: "clutch_kit",
+      internal_sku: "MOCK-STREAM-316",
+    });
+    expect(record.state).toBe("PRODUCT_REVIEW_REQUIRED");
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      provider.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
 });
 
 test("authenticated browser reviews a mock product and its content through real Server Actions", async ({

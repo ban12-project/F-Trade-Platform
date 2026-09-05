@@ -4,6 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 export const databaseURL = "postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_browser_test";
 export const authSecret = "synthetic-browser-database-secret-1234567890";
 export const socialMessageKey = Buffer.alloc(32, 7).toString("base64");
+export const modelConfigKey = Buffer.alloc(32, 8).toString("base64");
 const port = 3100;
 const baseURL = `http://127.0.0.1:${port}`;
 
@@ -27,6 +28,7 @@ export default defineConfig({
       DATABASE_URL: databaseURL,
       DATABASE_TRANSPORT: "postgres",
       SOCIAL_MESSAGE_ENCRYPTION_KEY: socialMessageKey,
+      MODEL_CONFIG_ENCRYPTION_KEY: modelConfigKey,
     },
     url: baseURL,
     reuseExistingServer: false,

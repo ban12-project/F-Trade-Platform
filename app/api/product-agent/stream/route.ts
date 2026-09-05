@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
@@ -70,27 +71,23 @@ export async function POST(request: Request) {
       controller.signal,
       AbortSignal.timeout(90_000),
     ]);
-    const refresh = () => {
-      revalidatePath(`/workspace/${projectId}`);
-    };
+    // Stream pulls run outside the handler's request context. Register invalidation here
+    // so Next restores that context after completion or cancellation of the response.
+    after(() => revalidatePath(`/workspace/${projectId}`));
     const events = runProductStream({
       runId: run.runId,
       source,
       signal,
       proposals: (located) => streamProductProposals({ model, source: located, signal }),
       persist: async (draft) => {
-        const saved = await persistProductStreamDraft(identity, run.runId, draft);
-        refresh();
-        return saved;
+        return persistProductStreamDraft(identity, run.runId, draft);
       },
       finish: async (status) => {
         await finishProductStreamRun(identity, run.runId, status);
-        refresh();
       },
     });
     return productStreamResponse(events, controller, async () => {
       await finishProductStreamRun(identity, run.runId, "interrupted");
-      refresh();
     });
   } catch {
     return Response.json(
