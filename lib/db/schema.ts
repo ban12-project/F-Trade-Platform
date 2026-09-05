@@ -941,4 +941,4 @@ export const productAgentModelConfig = pgTable(
   ],
 );
 
-export const authSchema = { user, session, account, verification };
+export const authSchema = { user, session, account, verification, passkey };

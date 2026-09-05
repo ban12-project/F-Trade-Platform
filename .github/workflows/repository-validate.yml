@@ -39,6 +39,9 @@ jobs:
       - name: Check formatting, imports, Next.js and React rules
         run: pnpm check:ci
 
+      - name: Test Better Auth core and Passkey schema mappings
+        run: pnpm exec tsx scripts/test-auth-schema.ts
+
       - name: Test workspace navigation and query concurrency
         run: pnpm test:workspace && pnpm test:workspace-navigation
 
