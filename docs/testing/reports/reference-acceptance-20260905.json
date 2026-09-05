@@ -1,0 +1,48 @@
+{
+  "classification": "sanitized_aggregate",
+  "run_id": "sanitized-reference-acceptance-audit-20260905",
+  "executed_at": "2026-09-05T10:49:02Z",
+  "criteria": [
+    {
+      "criterion_id": "product_import",
+      "status": "not_run",
+      "evidence_refs": ["sanitized-upload-307", "sanitized-catalog-268"]
+    },
+    {
+      "criterion_id": "content_gate",
+      "status": "not_run",
+      "evidence_refs": ["sanitized-kimi-content-294", "sanitized-browser-306"]
+    },
+    {
+      "criterion_id": "rfq_completion",
+      "status": "passed",
+      "evidence_refs": ["sanitized-browser-306"]
+    },
+    {
+      "criterion_id": "quotation_handoff",
+      "status": "passed",
+      "evidence_refs": ["sanitized-browser-306"]
+    },
+    {
+      "criterion_id": "follow_up_opportunity",
+      "status": "passed",
+      "evidence_refs": ["sanitized-browser-306"]
+    },
+    {
+      "criterion_id": "gate_bypass",
+      "status": "passed",
+      "evidence_refs": ["sanitized-browser-306"]
+    }
+  ],
+  "metrics": {
+    "manual_revision_count": 4,
+    "factual_error_count": 0,
+    "rfq_total": 1,
+    "rfq_ready": 1,
+    "gate_bypass_count": 0,
+    "blocked_external_dependency_count": 1
+  },
+  "decision": {
+    "status": "pending"
+  }
+}
