@@ -245,7 +245,7 @@ function assertSourceBackedFacts(draft: ProductDraft, sourceText: string) {
   assertLabelledTextFact(
     "product.internal_sku",
     draft.product.internal_sku,
-    ["Internal SKU", "Kit No.", "Part No.", "Type No."],
+    ["Internal SKU", "Kit No.", "Kit No", "Part No.", "Part No", "Type No.", "Type No", "编号"],
     sourceText,
   );
   assertLabelledTextFact(

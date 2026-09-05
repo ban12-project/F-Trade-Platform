@@ -297,3 +297,12 @@ new EvidenceLocatedProductAgent(delegate)
     console.error(error);
     process.exitCode = 1;
   });
+
+const pagedLocations = buildProductAgentEvidenceLocations(
+  "document:synthetic",
+  "<!-- f-trade:pdf-page=1 -->\n编号: 999999XD99999\n\n<!-- f-trade:pdf-page=2 -->\n\n<!-- f-trade:pdf-page=3 -->\n编号: 999999XD99999",
+);
+assert.equal(pagedLocations.length, 2);
+assert.equal(pagedLocations[0]?.source_ref, "document:synthetic#pdf-page=1");
+assert.equal(pagedLocations[1]?.source_ref, "document:synthetic#pdf-page=3");
+assert.notEqual(pagedLocations[0]?.ref, pagedLocations[1]?.ref);

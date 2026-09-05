@@ -5,7 +5,7 @@ import type { ProductDraft } from "./verification";
 const MAX_EVIDENCE_LOCATIONS = 512;
 const MARKDOWN_SEPARATOR = /^:?-{3,}:?$/;
 const SUPPORTED_LABEL =
-  /\b(?:product\s+name|product\s+type|internal\s+sku|kit\s+no\.?|part\s+no\.?|type\s+no\.?|oe(?:m)?(?:\s+no\.?)?|application|vehicle\s+brand|vehicle\s+model|clutch\s+diameter|spline\s+count|spline\s+size|friction\s+material|kit\s+contents|gross\s+weight|net\s+weight|package\s+size|moq|estimated\s+lead\s+time|lead\s+time|packaging|supported\s+customization|customization|sample\s+available)\b/i;
+  /\b(?:product\s+name|product\s+type|internal\s+sku|kit\s+no\.?|part\s+no\.?|type\s+no\.?|oe(?:m)?(?:\s+no\.?)?|application|vehicle\s+brand|vehicle\s+model|clutch\s+diameter|spline\s+count|spline\s+size|friction\s+material|kit\s+contents|gross\s+weight|net\s+weight|package\s+size|moq|estimated\s+lead\s+time|lead\s+time|packaging|supported\s+customization|customization|sample\s+available)\b|编号/i;
 
 export type ProductAgentEvidenceLocation = {
   ref: string;
@@ -13,6 +13,7 @@ export type ProductAgentEvidenceLocation = {
   start_line: number;
   end_line: number;
   text: string;
+  source_ref: string;
 };
 
 export type ProductAgentEvidenceLocatedSource = {
@@ -79,6 +80,13 @@ export function buildProductAgentEvidenceLocations(
   if (!baseEvidenceRef.trim())
     throw new Error("Product Agent evidence location requires a base evidence reference");
   const lines = sourceText.split(/\r?\n/);
+  const pageRefs: string[] = [];
+  let currentRef = baseEvidenceRef;
+  for (const line of lines) {
+    const marker = /^<!-- f-trade:pdf-page=(\d+) -->$/.exec(line.trim());
+    if (marker) currentRef = `${baseEvidenceRef}#pdf-page=${marker[1]}`;
+    pageRefs.push(currentRef);
+  }
   const tableLines = new Set<number>();
   const locations: ProductAgentEvidenceLocation[] = [];
 
@@ -106,7 +114,8 @@ export function buildProductAgentEvidenceLocations(
       const text = [headerLine, separatorLine, lines[index]!].join("\n");
       const rowLine = index + 1;
       locations.push({
-        ref: locationRef(baseEvidenceRef, "table_row", rowLine, rowLine, text),
+        ref: locationRef(pageRefs[index] ?? baseEvidenceRef, "table_row", rowLine, rowLine, text),
+        source_ref: pageRefs[index] ?? baseEvidenceRef,
         kind: "table_row",
         start_line: rowLine,
         end_line: rowLine,
@@ -123,7 +132,8 @@ export function buildProductAgentEvidenceLocations(
     const text = line.trim();
     const lineNumber = index + 1;
     locations.push({
-      ref: locationRef(baseEvidenceRef, "line", lineNumber, lineNumber, text),
+      ref: locationRef(pageRefs[index] ?? baseEvidenceRef, "line", lineNumber, lineNumber, text),
+      source_ref: pageRefs[index] ?? baseEvidenceRef,
       kind: "line",
       start_line: lineNumber,
       end_line: lineNumber,

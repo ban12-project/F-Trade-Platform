@@ -3,9 +3,16 @@ import { dirname, resolve } from "node:path";
 
 import { createProductAgentModel } from "../lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "../lib/ai/product-agent-model-config";
-import { discoverCatalogCandidates } from "../lib/product/catalog-candidates";
+import {
+  discoverCatalogCandidates,
+  selectCatalogCandidates,
+} from "../lib/product/catalog-candidates";
 import { preprocessProductAgentDocument } from "../lib/product/document-source";
 import { EvidenceLocatedProductAgent } from "../lib/product/evidence-located-agent";
+import {
+  type ProductAgentEvidenceLocation,
+  prepareProductAgentEvidenceSource,
+} from "../lib/product/evidence-locations";
 import {
   PRODUCT_AGENT_PROMPT_HASH,
   PRODUCT_AGENT_PROMPT_VERSION,
@@ -22,6 +29,12 @@ export interface CatalogPreflightReport {
   };
   candidate_count: number;
   candidate_identifiers: string[];
+  candidate_records: Array<
+    Pick<
+      ReturnType<typeof discoverCatalogCandidates>[number],
+      "record_id" | "identifier" | "review_status"
+    > & { evidence_ref: string }
+  >;
   manual_review: {
     status: "review_required";
     reasons: Array<
@@ -52,7 +65,11 @@ function hasFlag(name: string) {
 
 type CatalogResult = {
   identifier: string;
+  record_id: string;
+  review_status: ReturnType<typeof discoverCatalogCandidates>[number]["review_status"];
+  evidence_ref: string;
   status: "pending" | "succeeded" | "failed";
+  evidence_locations?: ProductAgentEvidenceLocation[];
   draft?: unknown;
   error?: string;
 };
@@ -80,6 +97,12 @@ export function createCatalogPreflightReport(
     },
     candidate_count: candidates.length,
     candidate_identifiers: candidates.map((candidate) => candidate.identifier),
+    candidate_records: candidates.map(({ identifier, record_id, review_status, source }) => ({
+      identifier,
+      record_id,
+      review_status,
+      evidence_ref: source.evidence_refs[0]!,
+    })),
     manual_review: {
       status: "review_required",
       reasons: reviewReasons,
@@ -111,14 +134,7 @@ async function main() {
     allowEmptySource: preflight,
   });
   const discoveredCandidates = discoverCatalogCandidates(document.source);
-  const candidates = (
-    onlyIdentifiers.size === 0
-      ? discoveredCandidates
-      : discoveredCandidates.filter((candidate) => onlyIdentifiers.has(candidate.identifier))
-  ).slice(0, limit);
-  if (onlyIdentifiers.size > 0 && candidates.length !== onlyIdentifiers.size) {
-    throw new Error("One or more requested catalog candidate identifiers were not found");
-  }
+  const candidates = selectCatalogCandidates(discoveredCandidates, onlyIdentifiers, limit);
   if (preflight) {
     console.log(JSON.stringify(createCatalogPreflightReport(document, candidates), null, 2));
     return;
@@ -130,6 +146,9 @@ async function main() {
   const model = createProductAgentModel(modelConfig);
   const results: CatalogResult[] = candidates.map((candidate) => ({
     identifier: candidate.identifier,
+    record_id: candidate.record_id,
+    review_status: candidate.review_status,
+    evidence_ref: candidate.source.evidence_refs[0]!,
     status: "pending",
   }));
   let reportWrite = Promise.resolve();
@@ -175,13 +194,18 @@ async function main() {
       try {
         const result = await agent.run({ model, source: candidate.source, timeout_ms: timeoutMs });
         results[index] = {
-          identifier: candidate.identifier,
+          ...results[index]!,
           status: "succeeded",
           draft: result.draft,
+          evidence_locations: prepareProductAgentEvidenceSource(
+            candidate.source,
+          ).evidence_locations.filter((location) =>
+            result.draft.evidence_refs.includes(location.ref),
+          ),
         };
       } catch (error) {
         results[index] = {
-          identifier: candidate.identifier,
+          ...results[index]!,
           status: "failed",
           error: error instanceof Error ? error.message : "unknown error",
         };

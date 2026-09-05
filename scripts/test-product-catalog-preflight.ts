@@ -35,6 +35,14 @@ assert.deepEqual(report, {
   },
   candidate_count: 1,
   candidate_identifiers: ["RYC251"],
+  candidate_records: [
+    {
+      identifier: "RYC251",
+      record_id: "synthetic-catalog-record-3",
+      review_status: "source_review_required",
+      evidence_ref: `${document.source.source_ref}#record-line=3`,
+    },
+  ],
   manual_review: {
     status: "review_required",
     reasons: ["catalog_candidates_require_source_field_review"],
