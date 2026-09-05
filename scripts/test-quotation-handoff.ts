@@ -1,10 +1,27 @@
 import assert from "node:assert/strict";
-
+import { quotationDraftFormSchema } from "../lib/form-schemas";
 import {
   applyHumanQuoteDecision,
   createManualQuotation,
   sendManualQuotation,
 } from "../lib/quotation/handoff";
+
+const quoteInput = {
+  projectId: "00000000-0000-4000-8000-000000000001",
+  rfqId: "00000000-0000-4000-8000-000000000002",
+  productId: "00000000-0000-4000-8000-000000000003",
+  unitPrice: "12.50",
+  currency: "USD",
+  moq: "10",
+  leadTimeDays: "30",
+  paymentTerms: "MOCK terms",
+  validityDays: "30",
+  evidenceRef: "evidence-mock-quotation",
+};
+assert.equal(quotationDraftFormSchema.safeParse(quoteInput).success, true);
+for (const evidenceRef of [undefined, "", "untraceable"]) {
+  assert.equal(quotationDraftFormSchema.safeParse({ ...quoteInput, evidenceRef }).success, false);
+}
 
 const draft = createManualQuotation({
   handoffId: "synthetic-handoff-gate-02",

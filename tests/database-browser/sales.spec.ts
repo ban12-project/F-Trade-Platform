@@ -134,6 +134,7 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
   const quote = page.locator("form#quotation-new");
   for (const [label, value] of [
     ["单价", "12.50"],
+    ["报价依据", evidenceId],
     ["MOQ", "10"],
     ["交期（天）", "30"],
     ["付款条件", "MOCK terms; no real offer"],
@@ -160,6 +161,7 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
     .toBe("QUOTE_REVISION_REQUIRED");
   const revision = page.locator(`form#quotation-${draft.id}`);
   await revision.getByLabel("单价", { exact: true }).fill("13.25");
+  await revision.getByLabel("报价依据", { exact: true }).fill(evidenceId);
   await page.getByRole("button", { name: "提交修订并再次送审", exact: true }).click();
   await expect
     .poll(async () => (await records("quotation"))[0].state)
@@ -188,6 +190,12 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
     .from(schema.auditEvent)
     .where(eq(schema.auditEvent.aggregateId, draft.id));
   expect(audits).toHaveLength(4);
+  const events = await db
+    .select()
+    .from(schema.workflowEvent)
+    .where(eq(schema.workflowEvent.aggregateId, draft.id));
+  expect(events).toHaveLength(4);
+  expect(events.every((event) => event.evidenceRefs.includes(evidenceId))).toBe(true);
   expect(audits.every((item) => item.actorId === actorId)).toBe(true);
   await page.reload();
   await expect(page.locator(`form#quote-send-${draft.id}`)).toBeVisible();

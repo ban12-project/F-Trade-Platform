@@ -238,14 +238,26 @@ export async function createOrReviseQuotation(
           version: sql`${aggregateRecord.version} + 1`,
         })
         .where(eq(aggregateRecord.id, id));
+      const eventId = randomUUID();
+      assertTransition({
+        eventId,
+        entityType: "quotation",
+        entityId: id,
+        fromState: "QUOTE_REVISION_REQUIRED",
+        toState: "QUOTE_REVIEW_REQUIRED",
+        actorType: "human",
+        actorId,
+        occurredAt: now.toISOString(),
+        evidenceRefs: [value.evidenceRef],
+      });
       await tx.insert(workflowEvent).values({
-        id: randomUUID(),
+        id: eventId,
         aggregateId: id,
         fromState: "QUOTE_REVISION_REQUIRED",
         toState: "QUOTE_REVIEW_REQUIRED",
         actorType: "human",
         actorId,
-        evidenceRefs: [],
+        evidenceRefs: [value.evidenceRef],
         occurredAt: now,
       });
     } else {
@@ -281,7 +293,7 @@ export async function createOrReviseQuotation(
         actorType: "human",
         actorId,
         occurredAt: now.toISOString(),
-        evidenceRefs: [],
+        evidenceRefs: [value.evidenceRef],
       });
       await tx.insert(workflowEvent).values({
         id: eventId,
@@ -290,7 +302,7 @@ export async function createOrReviseQuotation(
         toState: "QUOTE_REVIEW_REQUIRED",
         actorType: "human",
         actorId,
-        evidenceRefs: [],
+        evidenceRefs: [value.evidenceRef],
         occurredAt: now,
       });
     }
@@ -315,7 +327,12 @@ export async function createOrReviseQuotation(
       aggregateId: id,
       subjectType: "quotation",
       subjectId: id,
-      metadata: { project_id: value.projectId, rfq_id: value.rfqId, product_id: value.productId },
+      metadata: {
+        project_id: value.projectId,
+        rfq_id: value.rfqId,
+        product_id: value.productId,
+        evidence_ref: value.evidenceRef,
+      },
       occurredAt: now,
     });
     return { id };
