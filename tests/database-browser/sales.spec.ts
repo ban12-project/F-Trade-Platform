@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -66,7 +66,7 @@ test.beforeAll(async () => {
     classification: "internal",
     blobKey: `synthetic/mock-sales-${evidenceId}-not-a-real-blob`,
     contentType: "text/plain",
-    sha256: "a".repeat(64),
+    sha256: createHash("sha256").update(evidenceId).digest("hex"),
     sizeBytes: 0,
     sourceLabel: "MOCK evidence — synthetic test only",
     uploadedByType: "human",
