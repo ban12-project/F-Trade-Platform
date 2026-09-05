@@ -4,6 +4,8 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
+import { decideContentReview } from "../../lib/content/store";
+import type { Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
 import { authSecret, databaseURL } from "../../playwright.database.config";
 
@@ -66,6 +68,7 @@ test("authenticated browser reviews a mock product and its content through real 
   page,
   context,
   baseURL,
+  browser,
 }) => {
   const path = `/workspace/${projectId}?panel=product`;
   // No auth bypass route: the application must verify the signed token against PostgreSQL.
@@ -294,6 +297,15 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.getByRole("tab", { name: "记录 1", exact: true }).click();
   await page.getByRole("button", { name: /MOCK browser content review/ }).click();
   const contentReview = page.locator("form#content-review");
+  const staleContext = await browser.newContext({ baseURL });
+  await staleContext.addCookies(await context.cookies());
+  const stalePage = await staleContext.newPage();
+  await stalePage.goto(`/workspace/${projectId}?panel=content&item=${contentDraft.id}`);
+  const staleReview = stalePage.locator("form#content-review");
+  await staleReview.getByRole("combobox").click();
+  await stalePage.getByRole("option", { name: "批准营销内容", exact: true }).click();
+  await staleReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+  await staleReview.locator("#content-review-notes").fill("Synthetic stale review attempt");
   await contentReview.getByRole("combobox").click();
   await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
   await contentReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
@@ -317,6 +329,49 @@ test("authenticated browser reviews a mock product and its content through real 
       and(eq(schema.approval.aggregateId, contentDraft.id), eq(schema.approval.status, "pending")),
     );
   expect(revisionApproval.id).not.toBe(contentApproval.id);
+  const beforeStale = await db
+    .select()
+    .from(schema.auditEvent)
+    .where(eq(schema.auditEvent.aggregateId, contentDraft.id));
+  const eventsBeforeStale = await db
+    .select()
+    .from(schema.workflowEvent)
+    .where(eq(schema.workflowEvent.aggregateId, contentDraft.id));
+  await expect(
+    decideContentReview(
+      {
+        contentId: contentDraft.id,
+        reviewedVersion: String(revisedContent.version),
+        approvalId: contentApproval.id,
+        decision: "approved",
+        evidenceRef: evidenceId,
+        notes: "Synthetic wrong approval ID",
+      },
+      actorId,
+      db as unknown as Database,
+    ),
+  ).rejects.toThrow("审核请求已更新");
+  await stalePage.getByRole("button", { name: "批准营销内容", exact: true }).click();
+  await expect(stalePage.getByText(/内容已更新|审核请求已更新/)).toBeVisible();
+  expect((await contentQuery())[0]).toEqual(revisedContent);
+  expect(
+    await db
+      .select()
+      .from(schema.auditEvent)
+      .where(eq(schema.auditEvent.aggregateId, contentDraft.id)),
+  ).toEqual(beforeStale);
+  const [stillPending] = await db
+    .select()
+    .from(schema.approval)
+    .where(eq(schema.approval.id, revisionApproval.id));
+  expect(stillPending.status).toBe("pending");
+  expect(
+    await db
+      .select()
+      .from(schema.workflowEvent)
+      .where(eq(schema.workflowEvent.aggregateId, contentDraft.id)),
+  ).toEqual(eventsBeforeStale);
+  await staleContext.close();
   await contentReview.getByRole("combobox").click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
   await contentReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
@@ -383,4 +438,91 @@ test("authenticated browser reviews a mock product and its content through real 
     .from(schema.workspaceProjectItem)
     .where(eq(schema.workspaceProjectItem.aggregateId, contentDraft.id));
   expect(contentLink).toMatchObject({ projectId, role: "marketing_content" });
+
+  // Seed two independent pending records solely for the record-navigation regression.
+  const targets = ["A", "B"].map((label) => ({
+    label,
+    id: randomUUID(),
+    approvalId: randomUUID(),
+  }));
+  for (const target of targets) {
+    const { approval_ref: _approvalRef, ...payload } = approvedContent.payload;
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.aggregateRecord).values({
+        id: target.id,
+        type: "content",
+        state: "CONTENT_REVIEW_REQUIRED",
+        payload: {
+          ...payload,
+          content_id: target.id,
+          hook: `MOCK switching ${target.label}`,
+          status: "review_required",
+        },
+        createdByType: "human",
+        createdById: actorId,
+      });
+      await tx.insert(schema.approval).values({
+        id: target.approvalId,
+        aggregateId: target.id,
+        gate: "gate_01_truth",
+        status: "pending",
+        requestedByType: "human",
+        requestedById: actorId,
+        requestedAt: new Date(),
+      });
+      await tx.insert(schema.workspaceProjectItem).values({
+        id: randomUUID(),
+        projectId,
+        aggregateId: target.id,
+        role: "marketing_content",
+        relation: "owned",
+      });
+    });
+  }
+  const [targetA, targetB] = targets;
+  const [beforeA] = await db
+    .select()
+    .from(schema.aggregateRecord)
+    .where(eq(schema.aggregateRecord.id, targetA.id));
+  await page.goto(`/workspace/${projectId}?panel=content&item=${targetA.id}`);
+  await expect(page.locator("form#content-review")).toBeVisible();
+  await page.getByRole("button", { name: /MOCK switching B/ }).click();
+  await expect(page).toHaveURL(new RegExp(`item=${targetB.id}`));
+  const switchingReview = page.locator("form#content-review");
+  await switchingReview.getByRole("combobox").click();
+  await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
+  await switchingReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+  await page.getByRole("button", { name: "批准营销内容", exact: true }).click();
+  await expect
+    .poll(
+      async () =>
+        (
+          await db
+            .select()
+            .from(schema.aggregateRecord)
+            .where(eq(schema.aggregateRecord.id, targetB.id))
+        )[0].state,
+    )
+    .toBe("CONTENT_APPROVED");
+  expect(
+    (
+      await db
+        .select()
+        .from(schema.aggregateRecord)
+        .where(eq(schema.aggregateRecord.id, targetA.id))
+    )[0],
+  ).toEqual(beforeA);
+  const approvalsAfterSwitch = await db
+    .select()
+    .from(schema.approval)
+    .where(eq(schema.approval.aggregateId, targetA.id));
+  expect(approvalsAfterSwitch[0].status).toBe("pending");
+  const [approvedB] = await db
+    .select()
+    .from(schema.approval)
+    .where(eq(schema.approval.id, targetB.approvalId));
+  expect(approvedB.status).toBe("approved");
+  expect(
+    await db.select().from(schema.auditEvent).where(eq(schema.auditEvent.aggregateId, targetA.id)),
+  ).toEqual([]);
 });

@@ -4,6 +4,28 @@ import type { ProductReady } from "../lib/product/verification";
 import { assertTransition } from "../lib/workflow/transitions";
 
 const productId = "00000000-0000-4000-8000-000000000001";
+const validReview = {
+  contentId: productId,
+  reviewedVersion: "3",
+  approvalId: "00000000-0000-4000-8000-000000000003",
+  decision: "approved",
+  evidenceRef: "evidence-review-001",
+  notes: "",
+};
+if (!contentReviewFormSchema.safeParse(validReview).success)
+  throw new Error("Version-bound content review must accept a valid request");
+for (const patch of [
+  { reviewedVersion: undefined },
+  { reviewedVersion: "0" },
+  { reviewedVersion: "01" },
+  { reviewedVersion: "1e3" },
+  { reviewedVersion: "9007199254740992" },
+  { approvalId: undefined },
+  { approvalId: "invalid" },
+]) {
+  if (contentReviewFormSchema.safeParse({ ...validReview, ...patch }).success)
+    throw new Error("Content review must reject missing or invalid version/approval identity");
+}
 const input = contentDraftFormSchema.parse({
   productId,
   contentType: "product",

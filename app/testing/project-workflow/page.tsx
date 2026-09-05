@@ -161,6 +161,7 @@ const syntheticProductDetail: ProductCatalogDetail = {
   },
 };
 const syntheticContentDetail: ContentCatalogDetail = {
+  version: 2,
   id: "00000000-0000-4000-8000-000000000303",
   state: "CONTENT_REVISION_REQUIRED",
   createdAt: new Date("2026-09-01T00:00:00.000Z"),
