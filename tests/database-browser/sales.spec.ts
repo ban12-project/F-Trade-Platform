@@ -82,6 +82,7 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
   page,
   context,
   baseURL,
+  browser,
 }) => {
   const path = `/workspace/${projectId}?panel=rfq`;
   await page.goto(path);
@@ -150,6 +151,14 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
     product_id: productId,
     quote: { unit_price: 12.5, currency: "USD", moq: 10, lead_time_days: 30 },
   });
+  const staleContext = await browser.newContext({ baseURL });
+  await staleContext.addCookies(await context.cookies());
+  const stalePage = await staleContext.newPage();
+  await stalePage.goto(`/workspace/${projectId}?panel=quotation`);
+  const staleDecision = stalePage.locator(`form#quote-decision-${draft.id}`);
+  await staleDecision.getByRole("combobox").click();
+  await stalePage.getByRole("option", { name: "批准人工报价", exact: true }).click();
+  await staleDecision.getByLabel("审核证据", { exact: true }).fill(evidenceId);
   const decision = page.locator(`form#quote-decision-${draft.id}`);
   await decision.getByRole("combobox").click();
   await page.getByRole("option", { name: "退回人工报价", exact: true }).click();
@@ -166,6 +175,11 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
   await expect
     .poll(async () => (await records("quotation"))[0].state)
     .toBe("QUOTE_REVIEW_REQUIRED");
+  const [revisedQuote] = await records("quotation");
+  await stalePage.getByRole("button", { name: "批准人工报价", exact: true }).click();
+  await expect(stalePage.getByText(/报价已更新|审核请求已更新/)).toBeVisible();
+  expect((await records("quotation"))[0]).toEqual(revisedQuote);
+  await staleContext.close();
   await decision.getByRole("combobox").click();
   await page.getByRole("option", { name: "批准人工报价", exact: true }).click();
   await decision.getByLabel("审核证据", { exact: true }).fill(evidenceId);
