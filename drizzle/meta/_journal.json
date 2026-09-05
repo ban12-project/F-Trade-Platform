@@ -183,6 +183,13 @@
       "when": 1788534453251,
       "tag": "0025_remove_workspace_canvas",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788576282228,
+      "tag": "0026_product_agent_stream_run",
+      "breakpoints": true
     }
   ]
 }

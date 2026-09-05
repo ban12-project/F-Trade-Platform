@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { and, desc, eq, type InferInsertModel, inArray, sql } from "drizzle-orm";
 import type { z } from "zod";
-import { type Database, getDatabase } from "@/lib/db/client";
+import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
   approval,
   auditEvent,
+  productAgentStreamRun,
   workflowEvent,
   workspaceProject,
   workspaceProjectItem,
@@ -223,6 +224,19 @@ export async function createProductAgentDraft(
   metadata: Record<string, unknown>,
   projectId?: string,
 ) {
+  return getDatabase().transaction((tx) =>
+    insertProductAgentDraft(tx, draft, actorId, metadata, projectId),
+  );
+}
+
+/** Inserts into the caller's transaction, so stream creation and run tracking are atomic. */
+export async function insertProductAgentDraft(
+  tx: DatabaseTransaction,
+  draft: ProductDraft,
+  actorId: string,
+  metadata: Record<string, unknown>,
+  projectId?: string,
+) {
   if (draft.verification_status !== "review_required")
     throw new Error("Product Agent output must require Gate 01 review.");
   const id = draft.record_id;
@@ -240,66 +254,64 @@ export async function createProductAgentDraft(
     occurredAt: now.toISOString(),
     evidenceRefs: draft.evidence_refs,
   });
-  await getDatabase().transaction(async (tx) => {
-    if (projectId) {
-      const [project] = await tx
-        .select({ kind: workspaceProject.kind })
-        .from(workspaceProject)
-        .where(eq(workspaceProject.id, projectId))
-        .for("update");
-      if (!project || project.kind !== "marketing")
-        throw new Error("Product Agent 草稿只能关联到产品营销项目。");
-    }
-    await tx.insert(aggregateRecord).values({
-      id,
-      type: "product",
-      state: "PRODUCT_REVIEW_REQUIRED",
-      payload: draft as unknown as Record<string, unknown>,
-      createdByType: "agent",
-      createdById: "product_agent",
-    });
-    if (projectId)
-      await tx.insert(workspaceProjectItem).values({
-        id: randomUUID(),
-        projectId,
-        aggregateId: id,
-        role: "product_source",
-        relation: "owned",
-      });
-    await tx.insert(approval).values({
-      id: approvalId,
-      aggregateId: id,
-      gate: "gate_01_truth",
-      status: "pending",
-      requestedByType: "human",
-      requestedById: actorId,
-      requestedAt: now,
-    });
-    await tx.insert(workflowEvent).values({
-      id: eventId,
-      aggregateId: id,
-      fromState: "PRODUCT_IMPORTED",
-      toState: "PRODUCT_REVIEW_REQUIRED",
-      actorType: "agent",
-      actorId: "product_agent",
-      evidenceRefs: draft.evidence_refs,
-      occurredAt: now,
-    });
-    await tx.insert(auditEvent).values({
+  if (projectId) {
+    const [project] = await tx
+      .select({ kind: workspaceProject.kind })
+      .from(workspaceProject)
+      .where(eq(workspaceProject.id, projectId))
+      .for("update");
+    if (!project || project.kind !== "marketing")
+      throw new Error("Product Agent 草稿只能关联到产品营销项目。");
+  }
+  await tx.insert(aggregateRecord).values({
+    id,
+    type: "product",
+    state: "PRODUCT_REVIEW_REQUIRED",
+    payload: draft as unknown as Record<string, unknown>,
+    createdByType: "agent",
+    createdById: "product_agent",
+  });
+  if (projectId)
+    await tx.insert(workspaceProjectItem).values({
       id: randomUUID(),
-      action: "product_agent_draft_created",
-      actorType: "agent",
-      actorId: "product_agent",
+      projectId,
       aggregateId: id,
-      subjectType: "product",
-      subjectId: id,
-      metadata: {
-        ...metadata,
-        requested_by: actorId,
-        blocking_field_count: draft.blocking_missing_fields.length,
-      },
-      occurredAt: now,
+      role: "product_source",
+      relation: "owned",
     });
+  await tx.insert(approval).values({
+    id: approvalId,
+    aggregateId: id,
+    gate: "gate_01_truth",
+    status: "pending",
+    requestedByType: "human",
+    requestedById: actorId,
+    requestedAt: now,
+  });
+  await tx.insert(workflowEvent).values({
+    id: eventId,
+    aggregateId: id,
+    fromState: "PRODUCT_IMPORTED",
+    toState: "PRODUCT_REVIEW_REQUIRED",
+    actorType: "agent",
+    actorId: "product_agent",
+    evidenceRefs: draft.evidence_refs,
+    occurredAt: now,
+  });
+  await tx.insert(auditEvent).values({
+    id: randomUUID(),
+    action: "product_agent_draft_created",
+    actorType: "agent",
+    actorId: "product_agent",
+    aggregateId: id,
+    subjectType: "product",
+    subjectId: id,
+    metadata: {
+      ...metadata,
+      requested_by: actorId,
+      blocking_field_count: draft.blocking_missing_fields.length,
+    },
+    occurredAt: now,
   });
   return { id, approvalId, draft };
 }
@@ -477,6 +489,14 @@ export async function decideProductCatalogReview(
   const now = new Date();
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
+    // Lock the run before the aggregate, matching incremental persistence lock order.
+    const [activeRun] = await tx
+      .select()
+      .from(productAgentStreamRun)
+      .where(eq(productAgentStreamRun.productId, input.productId))
+      .for("update");
+    if (activeRun?.status === "running" && activeRun.expiresAt > new Date())
+      throw new Error("资料仍在生成中，可先核对字段；生成结束后才能提交审核决定。");
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,

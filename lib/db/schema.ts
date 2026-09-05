@@ -942,3 +942,32 @@ export const productAgentModelConfig = pgTable(
 );
 
 export const authSchema = { user, session, account, verification, passkey };
+
+export const productAgentStreamRun = pgTable(
+  "product_agent_stream_run",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => workspaceProject.id, { onDelete: "restrict" }),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    sessionId: text("session_id").notNull(),
+    status: text("status").$type<"running" | "completed" | "failed" | "interrupted">().notNull(),
+    modelMetadata: jsonb("model_metadata").$type<Record<string, string>>().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("product_agent_stream_product_uidx").on(table.productId),
+    check(
+      "product_agent_stream_status",
+      sql`${table.status} IN ('running', 'completed', 'failed', 'interrupted')`,
+    ),
+  ],
+);

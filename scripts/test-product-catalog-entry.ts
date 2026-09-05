@@ -321,13 +321,19 @@ async function testReviewSnapshot() {
   ])
     assert.equal(productReviewFormSchema.safeParse({ ...current, ...patch }).success, false);
 
-  async function exercise(input: typeof current, payload = completeDraft) {
+  async function exercise(
+    input: typeof current,
+    payload = completeDraft,
+    run?: { status: string; expiresAt: Date },
+  ) {
     const writes: { table: string; values: Record<string, unknown> }[] = [];
     let reads = 0;
     const tx = {
       select() {
+        let isRun = false;
         const query = {
-          from() {
+          from(table: Parameters<typeof getTableName>[0]) {
+            isRun = getTableName(table) === "product_agent_stream_run";
             return query;
           },
           where() {
@@ -335,6 +341,7 @@ async function testReviewSnapshot() {
           },
           async for(mode: string) {
             assert.equal(mode, "update");
+            if (isRun) return run ? [run] : [];
             return reads++ === 0
               ? [
                   {
@@ -417,6 +424,17 @@ async function testReviewSnapshot() {
       { decision, approval_id: approvalId, reviewed_version: 3 },
     );
   }
+  const generating = await exercise(current, completeDraft, {
+    status: "running",
+    expiresAt: new Date(Date.now() + 60000),
+  });
+  assert.match(String(generating.error), /资料仍在生成中/);
+  assert.deepEqual(generating.writes, []);
+  const abandoned = await exercise(current, completeDraft, {
+    status: "running",
+    expiresAt: new Date(0),
+  });
+  assert.equal(abandoned.error, undefined);
   const incomplete = await exercise(current, draft);
   assert.match(String(incomplete.error), /Product cannot be Ready/);
   assert.deepEqual(incomplete.writes, []);
