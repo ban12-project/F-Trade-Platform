@@ -161,3 +161,73 @@ if "--native-pdf" in sys.argv:
         middle = text.split("<!-- f-trade:pdf-page=2 -->")[1].split("<!-- f-trade:pdf-page=3 -->")[0]
         assert not middle.strip()
     print("PASS native PDF physical page integration")
+
+# Mixed pages: preserve native text and OCR only pages without text.
+native = "\n\n".join(MODULE.pdf_page_text(number, text) for number, text in [(1, "NATIVE FIRST"), (2, ""), (3, "NATIVE THIRD")])
+with patch.object(MODULE, "local_pdf_ocr", return_value=MODULE.pdf_page_text(2, "SYNTHETIC SCAN")) as ocr:
+    merged = MODULE.complete_local_pdf_text(Path("synthetic.pdf"), native)
+    assert MODULE.split_pdf_pages(merged) == [(1, "NATIVE FIRST"), (2, "SYNTHETIC SCAN"), (3, "NATIVE THIRD")]
+    ocr.assert_called_once_with(Path("synthetic.pdf"), [2], expected_pages=3)
+with patch.object(MODULE, "local_pdf_ocr") as ocr:
+    assert MODULE.complete_local_pdf_text(Path("synthetic.pdf"), MODULE.pdf_page_text(1, "NATIVE")) == MODULE.pdf_page_text(1, "NATIVE")
+    ocr.assert_not_called()
+with patch.object(MODULE, "local_pdf_ocr", return_value=MODULE.pdf_page_text(2, "")):
+    assert MODULE.split_pdf_pages(MODULE.complete_local_pdf_text(Path("synthetic.pdf"), native))[1] == (2, "")
+for invalid in ["unframed native text", MODULE.pdf_page_text(2, "gap"), MODULE.pdf_page_text(1, "first") + "\n" + MODULE.pdf_page_text(1, "duplicate")]:
+    with patch.object(MODULE, "local_pdf_ocr") as ocr:
+        try:
+            MODULE.complete_local_pdf_text(Path("synthetic.pdf"), invalid)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Invalid native boundaries must fail closed")
+        ocr.assert_not_called()
+with patch.object(MODULE, "local_pdf_ocr", return_value=MODULE.pdf_page_text(3, "WRONG PAGE")):
+    try:
+        MODULE.complete_local_pdf_text(Path("synthetic.pdf"), native)
+    except RuntimeError as error:
+        assert "unexpected physical page" in str(error)
+    else:
+        raise AssertionError("OCR response must match the requested page")
+
+commands = []
+def selected_run(args, **kwargs):
+    commands.append(args)
+    if args[0] == "pdfinfo":
+        return SimpleNamespace(stdout="Pages: 5\n")
+    if args[0] == "pdftoppm":
+        for number in range(int(args[args.index("-f") + 1]), int(args[args.index("-l") + 1]) + 1):
+            Path(f"{args[-1]}-{number}.png").touch()
+        return SimpleNamespace(stdout="")
+    return SimpleNamespace(stdout="SYNTHETIC SCAN")
+with patch.object(MODULE, "executable", side_effect=lambda name: name), patch.object(MODULE.subprocess, "run", side_effect=selected_run):
+    text = MODULE.local_pdf_ocr(Path("synthetic.pdf"), [2, 4, 5], expected_pages=5)
+    assert [number for number, _ in MODULE.split_pdf_pages(text)] == [2, 4, 5]
+    renders = [args for args in commands if args[0] == "pdftoppm"]
+    assert [(args[2], args[4]) for args in renders] == [("2", "2"), ("4", "5")]
+    assert len([args for args in commands if args[0] == "tesseract"]) == 3
+print("PASS mixed native/scanned PDF selective OCR and source preservation")
+
+if "--local-ocr" in sys.argv:
+    from PIL import Image, ImageDraw, ImageFont
+    from synthetic_pdf_fixture import build_pdf, text_command
+    scan = Image.new("L", (1000, 200), 255)
+    ImageDraw.Draw(scan).text((50, 60), "SYNTHETIC SCAN", fill=0, font=ImageFont.load_default(size=60))
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "synthetic-mixed.pdf"
+        path.write_bytes(build_pdf([
+            text_command("SYNTHETIC NATIVE FIRST", 50, 300),
+            b"q 500 0 0 100 50 250 cm /Scan Do Q",
+            b"",
+            text_command("SYNTHETIC NATIVE FOURTH", 50, 300),
+        ], (scan.width, scan.height, scan.tobytes())))
+        native_text = MODULE.native_pdf_text(path)
+        assert [bool(text) for _, text in MODULE.split_pdf_pages(native_text)] == [True, False, False, True]
+        with patch.dict(os.environ, {"F_TRADE_LOCAL_OCR_LANGUAGE": "eng"}, clear=False):
+            completed = MODULE.complete_local_pdf_text(path, native_text)
+        pages = MODULE.split_pdf_pages(completed)
+        original = MODULE.split_pdf_pages(native_text)
+        assert pages[0] == original[0] and pages[3] == original[3]
+        assert "SYNTHETIC SCAN" in pages[1][1]
+        assert pages[2] == (3, "")
+    print("PASS real Poppler/Tesseract mixed PDF integration with a blank page")

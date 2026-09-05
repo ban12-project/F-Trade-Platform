@@ -4,6 +4,7 @@ import { basename, extname, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { Sandbox } from "@vercel/sandbox";
+import { z } from "zod";
 
 import type { ProductAgentSource } from "./agent";
 
@@ -16,6 +17,7 @@ interface MarkItDownResult {
   filename: string;
   media_type: string;
   ocr_enabled?: boolean;
+  layout_recovered_pages?: number[];
   conversion_status?: "converted" | "no_text";
 }
 
@@ -33,6 +35,7 @@ export interface ProductAgentDocumentSource {
   filename: string;
   media_type: string;
   ocr_enabled: boolean;
+  layout_recovered_pages: number[];
   conversion_status: "converted" | "no_text";
 }
 
@@ -69,7 +72,11 @@ async function preprocessInSandbox(documentPath: string, allowEmptySource: boole
       cmd: "/opt/markitdown/bin/python3",
       args: ["/opt/f-trade/markitdown_preprocess.py", input],
       cwd: "/vercel/sandbox",
-      env: { F_TRADE_METADATA_PREFLIGHT: allowEmptySource ? "1" : "0" },
+      env: {
+        F_TRADE_METADATA_PREFLIGHT: allowEmptySource ? "1" : "0",
+        F_TRADE_LOCAL_OCR_ENABLED: process.env.F_TRADE_LOCAL_OCR_ENABLED === "1" ? "1" : "0",
+        F_TRADE_LOCAL_OCR_LANGUAGE: process.env.F_TRADE_LOCAL_OCR_LANGUAGE ?? "eng",
+      },
     });
     if (result.exitCode !== 0) {
       throw new Error(
@@ -116,6 +123,12 @@ export async function preprocessProductAgentDocument(
         )
       ).stdout;
   const converted = JSON.parse(stdout) as MarkItDownResult;
+  const layoutPages = z
+    .array(z.number().int().positive())
+    .safeParse(converted.layout_recovered_pages ?? []);
+  if (!layoutPages.success) {
+    throw new Error("MarkItDown preprocessing returned invalid layout page metadata");
+  }
   const conversionStatus = converted.conversion_status ?? "converted";
   if (
     !/^[a-f0-9]{64}$/.test(converted.document_sha256) ||
@@ -139,6 +152,7 @@ export async function preprocessProductAgentDocument(
     filename: converted.filename || basename(documentPath),
     media_type: converted.media_type,
     ocr_enabled: converted.ocr_enabled === true,
+    layout_recovered_pages: layoutPages.data,
     conversion_status: conversionStatus,
   };
 }

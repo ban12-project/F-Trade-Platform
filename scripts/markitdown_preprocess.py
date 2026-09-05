@@ -80,7 +80,7 @@ def has_source_text(text: str) -> bool:
     return bool(PDF_PAGE_MARKER.sub("", text).strip())
 
 
-def native_pdf_text(path: Path) -> str:
+def native_pdf_text(path: Path, layout_pages: list[int] | None = None) -> str:
     # MarkItDown's PDF dependency, used per physical page so table conversion cannot
     # reorder pages or silently discard blank boundaries.
     from pdfminer.converter import TextConverter
@@ -88,10 +88,21 @@ def native_pdf_text(path: Path) -> str:
     from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
     from pdfminer.pdfpage import PDFPage
 
+    import pdfplumber
+    from pdf_catalog_layout import page_catalog_text
+
     parts = []
-    with path.open("rb") as stream:
+    with path.open("rb") as stream, pdfplumber.open(path) as layout:
         manager = PDFResourceManager()
         for number, page in enumerate(PDFPage.get_pages(stream), start=1):
+            layout_page = layout.pages[number - 1]
+            recovered = page_catalog_text(layout_page)
+            layout_page.close()
+            if recovered is not None:
+                if layout_pages is not None:
+                    layout_pages.append(number)
+                parts.append(pdf_page_text(number, recovered))
+                continue
             with io.StringIO() as output:
                 with TextConverter(manager, output, laparams=LAParams()) as converter:
                     PDFPageInterpreter(manager, converter).process_page(page)
@@ -99,7 +110,7 @@ def native_pdf_text(path: Path) -> str:
     return "\n\n".join(parts)
 
 
-def local_pdf_ocr(path: Path) -> str:
+def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pages: int | None = None) -> str:
     pdfinfo = executable("pdfinfo")
     pdftoppm = executable("pdftoppm")
     tesseract = executable("tesseract")
@@ -108,18 +119,33 @@ def local_pdf_ocr(path: Path) -> str:
         raise RuntimeError(
             f"local OCR refuses PDFs above {MAX_LOCAL_OCR_PAGES} pages; received {pages}"
         )
+    if expected_pages is not None and expected_pages != pages:
+        raise RuntimeError("local OCR page count disagrees with native PDF extraction")
+    selected = list(range(1, pages + 1)) if page_numbers is None else page_numbers
+    if any(type(number) is not int or not 1 <= number <= pages for number in selected) or selected != sorted(set(selected)):
+        raise ValueError("local OCR requires unique ascending physical page numbers within the PDF")
+    if not selected:
+        return ""
     language = local_ocr_language()
     with tempfile.TemporaryDirectory(prefix="f-trade-local-ocr-") as directory:
         prefix = Path(directory) / "page"
-        subprocess.run(
-            [pdftoppm, "-r", "200", "-png", str(path), str(prefix)],
-            check=True, capture_output=True, text=True,
-        )
+        # Render only requested contiguous page ranges; native pages are never rasterized.
+        ranges = []
+        for number in selected:
+            if ranges and number == ranges[-1][1] + 1:
+                ranges[-1][1] = number
+            else:
+                ranges.append([number, number])
+        for start, end in ranges:
+            subprocess.run(
+                [pdftoppm, "-f", str(start), "-l", str(end), "-r", "200", "-png", str(path), str(prefix)],
+                check=True, capture_output=True, text=True,
+            )
         pages_as_images = sorted(
             Path(directory).glob("page-*.png"),
             key=lambda image: int(image.stem.rsplit("-", 1)[1]),
         )
-        if [int(image.stem.rsplit("-", 1)[1]) for image in pages_as_images] != list(range(1, pages + 1)):
+        if [int(image.stem.rsplit("-", 1)[1]) for image in pages_as_images] != selected:
             raise RuntimeError("local OCR rendered an unexpected number of PDF pages")
         text_parts = []
         for image in pages_as_images:
@@ -132,11 +158,35 @@ def local_pdf_ocr(path: Path) -> str:
     return "\n\n".join(text_parts).strip()
 
 
-def convert_with_markitdown(path: Path, remote_ocr: bool):
+def split_pdf_pages(text: str) -> list[tuple[int, str]]:
+    markers = list(re.finditer(r"^<!-- f-trade:pdf-page=(\d+) -->$", text, re.MULTILINE))
+    if not markers or text[:markers[0].start()].strip():
+        raise RuntimeError("PDF conversion must preserve physical page boundaries before OCR")
+    return [
+        (int(marker.group(1)), text[marker.end():markers[index + 1].start() if index + 1 < len(markers) else len(text)].strip())
+        for index, marker in enumerate(markers)
+    ]
+
+
+def complete_local_pdf_text(path: Path, native_text: str) -> str:
+    pages = split_pdf_pages(native_text)
+    if [number for number, _ in pages] != list(range(1, len(pages) + 1)):
+        raise RuntimeError("native PDF page sequence is incomplete or duplicated")
+    missing = [number for number, text in pages if not text.strip()]
+    if not missing:
+        return native_text
+    recovered = split_pdf_pages(local_pdf_ocr(path, missing, expected_pages=len(pages)))
+    if [number for number, _ in recovered] != missing:
+        raise RuntimeError("local OCR returned unexpected physical page boundaries")
+    replacements = dict(recovered)
+    return "\n\n".join(pdf_page_text(number, replacements.get(number, text)) for number, text in pages)
+
+
+def convert_with_markitdown(path: Path, remote_ocr: bool, layout_pages: list[int] | None = None):
     if path.suffix.lower() == ".pdf":
         if remote_ocr:
             remote_ocr_config()
-        return native_pdf_text(path)
+        return native_pdf_text(path, layout_pages)
 
     from markitdown import MarkItDown
 
@@ -172,10 +222,11 @@ def main() -> None:
     local_ocr = enabled("F_TRADE_LOCAL_OCR_ENABLED")
     if remote_ocr and local_ocr:
         fail("remote OCR and local OCR cannot be enabled together")
+    layout_pages = []
     try:
-        source_text = convert_with_markitdown(path, remote_ocr)
-        if not has_source_text(source_text) and local_ocr and path.suffix.lower() == ".pdf":
-            source_text = local_pdf_ocr(path)
+        source_text = convert_with_markitdown(path, remote_ocr, layout_pages=layout_pages)
+        if local_ocr and path.suffix.lower() == ".pdf":
+            source_text = complete_local_pdf_text(path, source_text)
     except (OSError, RuntimeError, subprocess.CalledProcessError, ValueError) as error:
         fail(str(error))
     if not has_source_text(source_text):
@@ -187,6 +238,7 @@ def main() -> None:
                     "filename": path.name,
                     "media_type": path.suffix.lower().removeprefix("."),
                     "ocr_enabled": remote_ocr or local_ocr,
+                    "layout_recovered_pages": layout_pages,
                     "conversion_status": "no_text",
                 },
                 sys.stdout,
@@ -207,6 +259,7 @@ def main() -> None:
             "filename": path.name,
             "media_type": path.suffix.lower().removeprefix("."),
             "ocr_enabled": remote_ocr or local_ocr,
+            "layout_recovered_pages": layout_pages,
             "conversion_status": "converted",
         },
         sys.stdout,

@@ -19,6 +19,7 @@ const document: ProductAgentDocumentSource = {
   filename: "synthetic-catalog.md",
   media_type: "md",
   ocr_enabled: false,
+  layout_recovered_pages: [],
   conversion_status: "converted",
 };
 
@@ -31,6 +32,7 @@ assert.deepEqual(report, {
     filename: "synthetic-catalog.md",
     media_type: "md",
     ocr_enabled: false,
+    layout_recovered_pages: [],
     conversion_status: "converted",
   },
   candidate_count: 1,
@@ -66,3 +68,12 @@ assert.deepEqual(imageOnlyReport.manual_review, {
 });
 
 console.log("PASS product catalog preflight");
+
+const layoutReport = createCatalogPreflightReport(
+  { ...document, layout_recovered_pages: [2] },
+  discoverCatalogCandidates(document.source),
+);
+assert.deepEqual(layoutReport.document.layout_recovered_pages, [2]);
+assert.ok(
+  layoutReport.manual_review.reasons.includes("layout_recovery_requires_visual_verification"),
+);

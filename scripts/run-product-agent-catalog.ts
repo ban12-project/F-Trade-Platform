@@ -25,6 +25,7 @@ export interface CatalogPreflightReport {
     filename: string;
     media_type: string;
     ocr_enabled: boolean;
+    layout_recovered_pages: number[];
     conversion_status: "converted" | "no_text";
   };
   candidate_count: number;
@@ -41,6 +42,7 @@ export interface CatalogPreflightReport {
       | "catalog_candidates_require_source_field_review"
       | "no_supported_catalog_candidates"
       | "ocr_text_requires_visual_verification"
+      | "layout_recovery_requires_visual_verification"
       | "document_conversion_requires_approved_ocr"
     >;
   };
@@ -81,6 +83,8 @@ export function createCatalogPreflightReport(
   const reviewReasons: CatalogPreflightReport["manual_review"]["reasons"] = [
     "catalog_candidates_require_source_field_review",
   ];
+  if (document.layout_recovered_pages.length > 0)
+    reviewReasons.push("layout_recovery_requires_visual_verification");
   if (candidates.length === 0) reviewReasons.push("no_supported_catalog_candidates");
   if (document.ocr_enabled) reviewReasons.push("ocr_text_requires_visual_verification");
   if (document.conversion_status === "no_text") {
@@ -93,6 +97,7 @@ export function createCatalogPreflightReport(
       filename: document.filename,
       media_type: document.media_type,
       ocr_enabled: document.ocr_enabled,
+      layout_recovered_pages: document.layout_recovered_pages,
       conversion_status: document.conversion_status,
     },
     candidate_count: candidates.length,
@@ -170,6 +175,7 @@ async function main() {
               filename: document.filename,
               media_type: document.media_type,
               ocr_enabled: document.ocr_enabled,
+              layout_recovered_pages: document.layout_recovered_pages,
             },
             candidate_count: candidates.length,
             success_count: successCount,
