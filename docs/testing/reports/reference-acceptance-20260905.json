@@ -1,7 +1,7 @@
 {
   "classification": "sanitized_aggregate",
   "run_id": "sanitized-reference-acceptance-audit-20260905",
-  "executed_at": "2026-09-05T10:49:02Z",
+  "executed_at": "2026-09-05T11:03:34Z",
   "criteria": [
     {
       "criterion_id": "product_import",
@@ -10,8 +10,8 @@
     },
     {
       "criterion_id": "content_gate",
-      "status": "not_run",
-      "evidence_refs": ["sanitized-kimi-content-294", "sanitized-browser-306"]
+      "status": "passed",
+      "evidence_refs": ["sanitized-kimi-content-294", "sanitized-local-content-310"]
     },
     {
       "criterion_id": "rfq_completion",
