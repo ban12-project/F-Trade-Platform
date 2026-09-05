@@ -4,9 +4,9 @@ import { type ProductAgentSource, validateProductAgentSource } from "./agent";
 import type { ProductAgentEvidenceLocatedSource } from "./evidence-locations";
 import { productStreamProposalSchema } from "./stream-contract";
 
-export const PRODUCT_STREAM_PROMPT_VERSION = "1.0.0";
+export const PRODUCT_STREAM_PROMPT_VERSION = "1.0.1";
 export const PRODUCT_STREAM_PROMPT = `Extract product field proposals from the supplied evidence-location excerpts.
-Return an array of objects with exactly field, value, and evidenceRef. Each object must be complete.
+Return a JSON object with an elements array. Each element must contain exactly field, value, and evidenceRef and must be complete.
 Emit each field at most once. Emit a proposal as soon as you identify its explicit source support.
 Use only the allowed field paths in the output schema. Preserve the exact labelled value and cite the
 opaque ref of the one excerpt containing both its applicable label and value. No source_ref, adjacent

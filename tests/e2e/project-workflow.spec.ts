@@ -135,13 +135,11 @@ test("streamed product fields remain review-only and keep a draft link after fai
   );
   await page.goto("/testing/project-workflow?panel=product");
   await page.waitForLoadState("networkidle");
-  await page
-    .getByLabel("产品资料", { exact: true })
-    .setInputFiles({
-      name: "synthetic.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from("Product name,Synthetic streamed clutch"),
-    });
+  await page.getByLabel("产品资料", { exact: true }).setInputFiles({
+    name: "synthetic.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Product name,Synthetic streamed clutch"),
+  });
   await page.getByRole("button", { name: "生成待审核草稿", exact: true }).click();
   const progress = page.getByRole("region", { name: "生成字段状态" });
   await expect(progress.getByText("Synthetic streamed clutch", { exact: true })).toBeVisible();
@@ -155,4 +153,22 @@ test("streamed product fields remain review-only and keep a draft link after fai
   await expect(
     page.getByText("生成已停止；已保存的字段仍需人工审核。", { exact: true }),
   ).toBeVisible();
+});
+
+test("product stream rejects cross-origin and unauthenticated requests", async ({
+  request,
+  baseURL,
+}) => {
+  const deniedOrigin = await request.post("/api/product-agent/stream", {
+    headers: { origin: "https://untrusted.invalid" },
+    data: "synthetic",
+  });
+  expect(deniedOrigin.status()).toBe(403);
+  expect(await deniedOrigin.json()).toEqual({ error: "请求来源无效。" });
+  const unauthenticated = await request.post("/api/product-agent/stream", {
+    headers: { origin: new URL(baseURL ?? "http://localhost:3000").origin },
+    data: "synthetic",
+  });
+  expect(unauthenticated.status()).toBe(403);
+  expect(await unauthenticated.json()).toEqual({ error: "仅管理员可运行流式产品导入。" });
 });
