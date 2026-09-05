@@ -376,7 +376,9 @@ def check_database_baseline() -> None:
             raise AssertionError(f"Retired project canvas persistence remains in the active schema: {forbidden}")
     for route in (ROOT / "app/workspace/page.tsx", ROOT / "app/workspace/[projectId]/page.tsx", ROOT / "app/workspace/[projectId]/video/page.tsx"):
         source = route.read_text(encoding="utf-8")
-        if "WorkspaceLoadingSkeleton" not in source or "WorkspaceCanvasSkeleton" in source or "ProjectCanvas" in source or "view=flow" in source:
+        if "@/components/workspace/workspace-loading-skeleton" not in source:
+            raise AssertionError(f"Workspace route does not reuse the shared loading UI: {route}")
+        if "WorkspaceCanvasSkeleton" in source or "ProjectCanvas" in source or "view=flow" in source:
             raise AssertionError(f"Workspace route still references the retired canvas shell: {route}")
     retired_paths = (
         ROOT / "components/workspace/project-canvas.tsx",

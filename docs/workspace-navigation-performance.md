@@ -31,3 +31,9 @@
 沿用 Next.js 官方 `examples/with-biome` 的 Git ignore、空格缩进以及 Next/React 推荐规则。固定 Biome v2 依赖并提交 lockfile；`pnpm format` 写格式，`pnpm lint:fix` 写安全修复，`pnpm check:ci` 只检查。生成物与锁文件不交给格式化器重写。底层 shadcn 标签/布局原语只对静态分析无法跨 props 推断的两处规则作局部、有理由的豁免。
 
 应用维持 Node 24，`.nvmrc` 与 package engines 对齐。CI 中 JavaScript Action 自身的 Node runtime 也必须为 Node 24；仅设置 setup-node 的 node-version 并不会升级旧 Action 的内置 runtime。Actions 更新交给 Dependabot 持续检查。保留现有发布平台集成，不添加未知部署密钥或自动生产发布。
+
+## #319：项目页静态壳与真实路由回归
+
+项目页现在把真实返回按钮、人工确认提示和响应式布局提升到数据边界之外，项目标题、徽章、成员、阶段导航、待办和详情分别流式加载。只在当前路由启用 `prefetch = "partial"`，避免移动端预取停留在父级工作台 loading。默认阶段和旧 URL 解析保持原逻辑，鉴权与项目读取仅在单次请求内去重。
+
+[验证记录与前后截图](testing/project-instant-navigation.md)记录真实鉴权路线的生产构建差分：撤销优化后四项 instant 检查失败，恢复后通过；两个视口加载完成后的截图逐像素一致。后续运行方式见 [instant-nav.rig.md](../instant-nav.rig.md)。

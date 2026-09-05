@@ -90,19 +90,21 @@ type ProjectWorkspaceProps = {
   basePath?: string;
 };
 
-function ProjectWorkspaceInner({
-  project,
-  tasks = [],
-  tasksPanel,
-  membersPanel,
-  stages,
-  activeStage,
-  panel,
-  basePath = `/workspace/${project.id}`,
-}: ProjectWorkspaceProps) {
+type ProjectWorkspaceFrameProps = {
+  title: ReactNode;
+  badges: ReactNode;
+  members?: ReactNode;
+  children: ReactNode;
+};
+
+function ProjectWorkspaceFrameInner({
+  title,
+  badges,
+  members,
+  children,
+}: ProjectWorkspaceFrameProps) {
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
-  const stage = stages.find((item) => item.id === activeStage) ?? stages[0]!;
   function returnToWorkspace(event: MouseEvent<HTMLElement>) {
     if (shouldUseNativeNavigation(event)) return;
     event.preventDefault();
@@ -119,87 +121,159 @@ function ProjectWorkspaceInner({
               size="icon"
               variant="ghost"
               aria-label="返回工作台"
+              data-testid="project-back-link"
             >
               <ArrowLeftIcon />
             </LinkButton>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold tracking-tight">{project.title}</h1>
+              {title}
               <div className="mt-1 flex flex-wrap gap-2">
-                <Badge variant="secondary">
-                  {project.kind === "marketing" ? "营销项目" : "销售项目"}
-                </Badge>
-                <Badge variant="outline">{project.status === "active" ? "进行中" : "已归档"}</Badge>
+                {badges}
                 <Badge variant="outline">关键动作需人工确认</Badge>
               </div>
             </div>
           </div>
-          {membersPanel ? <div className="flex items-center gap-2">{membersPanel}</div> : null}
+          {members ? <div className="flex items-center gap-2">{members}</div> : null}
         </div>
       </header>
-      <div className="mx-auto max-w-[96rem] px-4 py-5 sm:px-6">
-        <nav aria-label="项目阶段" className="overflow-x-auto pb-2">
-          <ol className="flex min-w-max items-stretch gap-1">
-            {stages.map((item, index) => {
-              const href = `${basePath}?panel=${item.id}`;
-              return (
-                <li key={item.id} className="flex items-center">
-                  <GuardedLink
-                    href={href}
-                    current={item.id === activeStage}
-                    className={`flex min-h-14 w-40 flex-col justify-center rounded-xl border px-3 outline-none transition-[background-color,border-color,transform] duration-[120ms] active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/50 ${item.id === activeStage ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
-                  >
-                    <span className="text-xs opacity-75">步骤 {index + 1}</span>
-                    <span className="text-sm font-medium">{item.label}</span>
-                  </GuardedLink>
-                  {index < stages.length - 1 ? (
-                    <ArrowRightIcon
-                      className="mx-1 size-4 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
-        <section
-          aria-label="当前阶段"
-          className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)]"
-        >
-          {tasksPanel ?? (
+      {children}
+    </main>
+  );
+}
+
+export function ProjectWorkspaceFrame(props: ProjectWorkspaceFrameProps) {
+  return (
+    <WorkspaceDirtyProvider>
+      <ProjectWorkspaceFrameInner {...props} />
+    </WorkspaceDirtyProvider>
+  );
+}
+
+export function ProjectWorkspaceTitle({ project }: { project: WorkspaceProjectSummary }) {
+  return <h1 className="truncate text-lg font-semibold tracking-tight">{project.title}</h1>;
+}
+
+export function ProjectWorkspaceBadges({ project }: { project: WorkspaceProjectSummary }) {
+  return (
+    <>
+      <Badge variant="secondary">{project.kind === "marketing" ? "营销项目" : "销售项目"}</Badge>
+      <Badge variant="outline">{project.status === "active" ? "进行中" : "已归档"}</Badge>
+    </>
+  );
+}
+
+export function ProjectWorkspaceBody({
+  navigation,
+  tasks,
+  details,
+}: {
+  navigation: ReactNode;
+  tasks: ReactNode;
+  details: ReactNode;
+}) {
+  return (
+    <div className="mx-auto max-w-[96rem] px-4 py-5 sm:px-6">
+      <nav aria-label="项目阶段" className="overflow-x-auto pb-2">
+        {navigation}
+      </nav>
+      <section
+        aria-label="当前阶段"
+        className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)]"
+      >
+        {tasks}
+        {details}
+      </section>
+    </div>
+  );
+}
+
+export function ProjectStageNavigation({
+  stages,
+  activeStage,
+  basePath,
+}: {
+  stages: ProjectStage[];
+  activeStage: string;
+  basePath: string;
+}) {
+  return (
+    <ol className="flex min-w-max items-stretch gap-1">
+      {stages.map((item, index) => {
+        const href = `${basePath}?panel=${item.id}`;
+        return (
+          <li key={item.id} className="flex items-center">
+            <GuardedLink
+              href={href}
+              current={item.id === activeStage}
+              className={`flex min-h-14 w-40 flex-col justify-center rounded-xl border px-3 outline-none transition-[background-color,border-color,transform] duration-[120ms] active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/50 ${item.id === activeStage ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+            >
+              <span className="text-xs opacity-75">步骤 {index + 1}</span>
+              <span className="text-sm font-medium">{item.label}</span>
+            </GuardedLink>
+            {index < stages.length - 1 ? (
+              <ArrowRightIcon className="mx-1 size-4 text-muted-foreground" aria-hidden="true" />
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function ProjectStageDetails({ stage, panel }: { stage: ProjectStage; panel: ReactNode }) {
+  return (
+    <aside aria-label={`${stage.label}详情与审批`} className="min-w-0">
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b">
+          <CardTitle role="heading" aria-level={2}>
+            {stage.label}
+          </CardTitle>
+          <CardDescription>批准、发送、发布和业务认定都需要明确的人工操作。</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <ScrollArea className="h-[calc(100vh-17rem)] min-h-[32rem]">
+            <div className="p-4 sm:p-5">{panel}</div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </aside>
+  );
+}
+
+export function ProjectWorkspace({
+  project,
+  tasks = [],
+  tasksPanel,
+  membersPanel,
+  stages,
+  activeStage,
+  panel,
+  basePath = `/workspace/${project.id}`,
+}: ProjectWorkspaceProps) {
+  const stage = stages.find((item) => item.id === activeStage) ?? stages[0]!;
+  return (
+    <ProjectWorkspaceFrame
+      title={<ProjectWorkspaceTitle project={project} />}
+      badges={<ProjectWorkspaceBadges project={project} />}
+      members={membersPanel}
+    >
+      <ProjectWorkspaceBody
+        navigation={
+          <ProjectStageNavigation stages={stages} activeStage={activeStage} basePath={basePath} />
+        }
+        tasks={
+          tasksPanel ?? (
             <ProjectStageTasks
               projectId={project.id}
               tasks={tasks}
               stage={stage}
               basePath={basePath}
             />
-          )}
-          <aside aria-label={`${stage.label}详情与审批`} className="min-w-0">
-            <Card className="overflow-hidden">
-              <CardHeader className="border-b">
-                <CardTitle role="heading" aria-level={2}>
-                  {stage.label}
-                </CardTitle>
-                <CardDescription>批准、发送、发布和业务认定都需要明确的人工操作。</CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[calc(100vh-17rem)] min-h-[32rem]">
-                  <div className="p-4 sm:p-5">{panel}</div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </aside>
-        </section>
-      </div>
-    </main>
-  );
-}
-
-export function ProjectWorkspace(props: ProjectWorkspaceProps) {
-  return (
-    <WorkspaceDirtyProvider>
-      <ProjectWorkspaceInner {...props} />
-    </WorkspaceDirtyProvider>
+          )
+        }
+        details={<ProjectStageDetails stage={stage} panel={panel} />}
+      />
+    </ProjectWorkspaceFrame>
   );
 }
 

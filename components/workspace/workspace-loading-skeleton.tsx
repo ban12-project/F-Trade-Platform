@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProjectWorkspaceBody } from "./project-workspace";
 
 export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolean }) {
   return (
@@ -22,20 +23,11 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
       </header>
 
       {project ? (
-        <div className="mx-auto max-w-[96rem] space-y-5 px-4 py-5 sm:px-6">
-          <div className="flex min-w-max gap-2 overflow-hidden">
-            {["first", "second", "third", "fourth"].map((key) => (
-              <Skeleton key={key} className="h-14 w-40 rounded-xl" />
-            ))}
-          </div>
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)]">
-            <div className="space-y-5">
-              <Skeleton className="h-32 rounded-xl" />
-              <Skeleton className="h-72 rounded-xl" />
-            </div>
-            <Skeleton className="h-[32rem] rounded-xl" />
-          </div>
-        </div>
+        <ProjectWorkspaceBody
+          navigation={<ProjectStageNavigationSkeleton />}
+          tasks={<ProjectTasksSkeleton />}
+          details={<ProjectDetailsSkeleton />}
+        />
       ) : (
         <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -74,4 +66,36 @@ export function WorkspacePanelSkeleton({ label = "正在加载当前步骤" }: {
       <Skeleton className="h-48 w-full" />
     </div>
   );
+}
+
+export function ProjectTitleSkeleton() {
+  return <Skeleton aria-label="正在加载项目名称" className="h-7 w-32" />;
+}
+export function ProjectBadgesSkeleton() {
+  return (
+    <>
+      <Skeleton className="h-5 w-16 rounded-full" />
+      <Skeleton className="h-5 w-16 rounded-full" />
+    </>
+  );
+}
+export function ProjectStageNavigationSkeleton() {
+  return (
+    <div role="status" aria-label="正在加载项目阶段" className="flex min-w-max gap-2">
+      {["first", "second", "third", "fourth"].map((key) => (
+        <Skeleton key={key} className="h-14 w-40 rounded-xl" />
+      ))}
+    </div>
+  );
+}
+export function ProjectTasksSkeleton() {
+  return (
+    <div role="status" aria-label="正在加载项目待办" className="space-y-5">
+      <Skeleton className="h-32 rounded-xl" />
+      <Skeleton className="h-72 rounded-xl" />
+    </div>
+  );
+}
+export function ProjectDetailsSkeleton() {
+  return <Skeleton role="status" aria-label="正在加载项目详情" className="h-[32rem] rounded-xl" />;
 }

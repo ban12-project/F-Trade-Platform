@@ -22,7 +22,7 @@ export default defineConfig({
     command: "pnpm exec next build && pnpm start",
     env: {
       PORT: String(port),
-      NEXT_ENABLE_TESTING_API: "0",
+      NEXT_ENABLE_TESTING_API: "1",
       BETTER_AUTH_SECRET: authSecret,
       BETTER_AUTH_URL: baseURL,
       DATABASE_URL: databaseURL,
