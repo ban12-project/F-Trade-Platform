@@ -48,10 +48,12 @@ export async function* runProductStream(
       yield event({ type: "field", field, status: "waiting", value: null, evidenceRef: null });
     yield event({ type: "stage", stage: "generating" });
     let count = 0;
+    const seen = new Set<string>();
     for await (const proposal of dependencies.proposals(source)) {
       dependencies.signal.throwIfAborted();
       if (++count > 100) throw new Error("Product stream exceeded its field limit");
       const checked = validateProductStreamProposal(draft, proposal, source);
+      seen.add(checked.proposal.field);
       if (checked.status === "source_validated") {
         const saved = await dependencies.persist(checked.draft);
         draft = checked.draft;
@@ -60,6 +62,16 @@ export async function* runProductStream(
       yield event({ type: "field", ...checked.proposal, status: checked.status });
     }
     dependencies.signal.throwIfAborted();
+    for (const field of productStreamFields) {
+      if (!seen.has(field))
+        yield event({
+          type: "field",
+          field,
+          status: "needs_evidence",
+          value: null,
+          evidenceRef: null,
+        });
+    }
     await dependencies.finish("completed");
     finished = true;
     yield event({ type: "stage", stage: "completed" });

@@ -89,3 +89,70 @@ test("desktop detail region is viewport-bound and scrolls internally", async ({ 
     "scroll",
   );
 });
+
+test("streamed product fields remain review-only and keep a draft link after failure", async ({
+  page,
+}) => {
+  const runId = "00000000-0000-4000-8000-000000000117";
+  const productId = "00000000-0000-4000-8000-000000000118";
+  const events = [
+    { type: "stage", stage: "generating" },
+    { type: "draft", productId, version: 2 },
+    {
+      type: "field",
+      field: "product.product_name",
+      value: "Synthetic streamed clutch",
+      evidenceRef: "evidence-synthetic",
+      status: "source_validated",
+    },
+    {
+      type: "field",
+      field: "product.oe_numbers",
+      value: null,
+      evidenceRef: null,
+      status: "needs_evidence",
+    },
+    {
+      type: "field",
+      field: "specifications.spline_count",
+      value: 0,
+      evidenceRef: "evidence-synthetic",
+      status: "invalid",
+    },
+    { type: "error", code: "run_failed", message: "生成已停止；已保存的字段仍需人工审核。" },
+    { type: "stage", stage: "failed" },
+  ];
+  await page.route("**/api/product-agent/stream", (route) =>
+    route.fulfill({
+      contentType: "application/x-ndjson",
+      body:
+        events
+          .map((event, index) =>
+            JSON.stringify({ protocol: "product-agent.v1", runId, sequence: index + 1, ...event }),
+          )
+          .join("\n") + "\n",
+    }),
+  );
+  await page.goto("/testing/project-workflow?panel=product");
+  await page.waitForLoadState("networkidle");
+  await page
+    .getByLabel("产品资料", { exact: true })
+    .setInputFiles({
+      name: "synthetic.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("Product name,Synthetic streamed clutch"),
+    });
+  await page.getByRole("button", { name: "生成待审核草稿", exact: true }).click();
+  const progress = page.getByRole("region", { name: "生成字段状态" });
+  await expect(progress.getByText("Synthetic streamed clutch", { exact: true })).toBeVisible();
+  await expect(progress.getByText("来源校验通过 · 待人工审核", { exact: true })).toBeVisible();
+  await expect(progress.getByText("待补证据", { exact: true })).toBeVisible();
+  await expect(progress.getByText("校验失败", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "打开已保存草稿（新窗口）" })).toHaveAttribute(
+    "href",
+    `/workspace/00000000-0000-4000-8000-000000000202?panel=product&item=${productId}`,
+  );
+  await expect(
+    page.getByText("生成已停止；已保存的字段仍需人工审核。", { exact: true }),
+  ).toBeVisible();
+});

@@ -18,7 +18,7 @@ import type { z } from "zod";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useProductStream } from "@/components/workspace/use-product-stream";
 import {
   initialProductActionState,
   initialProductAgentActionState,
@@ -249,21 +250,49 @@ function ProductDraftForm({
   );
 }
 
+const productStreamFieldLabels: Record<string, string> = {
+  "product.product_name": "产品名称",
+  "product.product_type": "产品类型",
+  "product.internal_sku": "产品编号",
+  "product.oe_numbers": "OE 编号",
+  "product.application": "适用范围",
+  "product.vehicle_brand": "车辆品牌",
+  "product.vehicle_model": "车型",
+  "specifications.clutch_diameter_mm": "离合器直径",
+  "specifications.spline_count": "花键齿数",
+  "specifications.spline_size": "花键尺寸",
+  "specifications.friction_material": "摩擦材料",
+  "specifications.kit_contents": "套件内容",
+  "specifications.gross_weight_kg": "毛重",
+  "specifications.net_weight_kg": "净重",
+  "specifications.package_size": "包装尺寸",
+  "commercial.moq": "起订量",
+  "commercial.estimated_lead_time_days": "资料中的预计交期",
+  "commercial.packaging": "包装",
+  "commercial.supported_customization": "支持定制",
+  "commercial.sample_available": "样品可用性",
+};
+
 function ProductAgentForm({
   projectId,
   modelConfigs,
   evidenceOptions,
+  canStream,
 }: {
+  canStream: boolean;
   projectId: string;
   modelConfigs: ProductAgentModelSettings[];
   evidenceOptions: EvidenceOption[];
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [state, action, pending] = useActionState(
+  const [actionState, action, actionPending] = useActionState(
     runProductAgentAction,
     initialProductAgentActionState,
   );
+  const stream = useProductStream();
+  const state = canStream ? stream.state : actionState;
+  const pending = canStream ? stream.pending : actionPending;
   const usableConfigs = modelConfigs.filter(
     (item) => item.apiKeyConfigured || item.authTokenConfigured,
   );
@@ -320,7 +349,8 @@ function ProductAgentForm({
     data.set("sourceText", values.sourceText);
     const file = fileRef.current?.files?.[0];
     if (file) data.set("document", file);
-    startTransition(() => action(data));
+    if (canStream) void stream.start(data);
+    else startTransition(() => action(data));
   }
   const choiceItems = Object.fromEntries(choices.map((choice) => [choice.value, choice.label]));
   return (
@@ -462,6 +492,52 @@ function ProductAgentForm({
           {pending ? <Spinner data-icon="inline-start" /> : <BotIcon data-icon="inline-start" />}
           生成待审核草稿
         </Button>
+        {canStream && pending ? (
+          <Button variant="outline" onClick={stream.stop}>
+            停止生成
+          </Button>
+        ) : null}
+        {canStream && state.productId ? (
+          <LinkButton
+            variant="outline"
+            href={`/workspace/${projectId}?panel=product&item=${state.productId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            打开已保存草稿（新窗口）
+          </LinkButton>
+        ) : null}
+        {canStream && Object.keys(stream.fields).length ? (
+          <section className="grid gap-2" aria-label="生成字段状态">
+            {Object.values(stream.fields).map((field) => (
+              <div key={field.field} className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0 text-sm">
+                  <p>{productStreamFieldLabels[field.field]}</p>
+                  {field.value !== null ? (
+                    <p className="break-words">
+                      {Array.isArray(field.value) ? field.value.join("、") : String(field.value)}
+                    </p>
+                  ) : null}
+                  {field.evidenceRef ? (
+                    <p className="break-all text-xs text-muted-foreground">
+                      证据：{field.evidenceRef}
+                    </p>
+                  ) : null}
+                </div>
+                <Badge variant={field.status === "invalid" ? "destructive" : "outline"}>
+                  {
+                    {
+                      waiting: "等待模型",
+                      source_validated: "来源校验通过 · 待人工审核",
+                      needs_evidence: "待补证据",
+                      invalid: "校验失败",
+                    }[field.status]
+                  }
+                </Badge>
+              </div>
+            ))}
+          </section>
+        ) : null}
         {choices.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             管理员需先在工作区设置中保存至少一个可用模型。
@@ -753,6 +829,7 @@ export function ProductPanel({
         </TabsList>
         <TabsContent value="agent">
           <ProductAgentForm
+            canStream={canReview}
             projectId={projectId}
             modelConfigs={agentModelConfigs}
             evidenceOptions={evidenceOptions}
