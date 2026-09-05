@@ -2,7 +2,10 @@ import { expect, test } from "@playwright/test";
 import { z } from "zod";
 import { createProductAgentModel } from "../../lib/ai/model-provider";
 import { AiSdkStructuredGenerator } from "../../lib/ai/structured-generator";
-import { generateMarketingContent } from "../../lib/content/generation";
+import {
+  assertGeneratedFitmentLiteral,
+  generateMarketingContent,
+} from "../../lib/content/generation";
 
 test("compatible content generation sends Chat Completions with the selected model and evidence", async () => {
   const draft = {
@@ -160,4 +163,31 @@ test("structured product facts still require the exact supplied value and eviden
     if (tampered) await expect(result).rejects.toThrow("not backed by supplied evidence");
     else await expect(result).resolves.toEqual(output);
   }
+});
+
+test("marketing copy preserves compressed fitment values without expanding identifiers", () => {
+  const fact = {
+    field: "product.vehicle_model",
+    value: "SYN100,200 SYN300,400",
+    evidenceRef: "synthetic:models",
+  };
+  const draft = {
+    hook: "MOCK",
+    body: fact.value,
+    callToAction: "Discuss test",
+    hashtags: [],
+    visualInstruction: "Text card",
+  };
+  expect(() => assertGeneratedFitmentLiteral(draft, [fact])).not.toThrow();
+  expect(() =>
+    assertGeneratedFitmentLiteral({ ...draft, body: "SYN100, SYN200, SYN300 and SYN400" }, [fact]),
+  ).toThrow("complete product.vehicle_model");
+  expect(() =>
+    assertGeneratedFitmentLiteral({ ...draft, body: "SYN100,200\nSYN300,400" }, [fact]),
+  ).toThrow();
+  expect(() =>
+    assertGeneratedFitmentLiteral({ ...draft, body: "General transport" }, [
+      { ...fact, field: "product.application", value: "Specific synthetic application" },
+    ]),
+  ).toThrow("complete product.application");
 });
