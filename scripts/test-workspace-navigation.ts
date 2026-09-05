@@ -75,7 +75,7 @@ for (const path of [
 ])
   assert.doesNotMatch(source(path), /WorkspaceActionDock/);
 const page = source("app/workspace/[projectId]/page.tsx");
-assert.match(page, /tasksPanel=/);
+assert.match(page, /StageTasks/);
 assert.match(page, /ProjectStagePanel/);
 assert.doesNotMatch(
   page,
