@@ -8,8 +8,11 @@ import readyProduct from "../../data/fixtures/product-ready.synthetic.json";
 import type { Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
 import { decideQuotation } from "../../lib/sales/closing-store";
-import { authSecret, databaseURL } from "../../playwright.database.config";
+import { decryptSocialMessageBody } from "../../lib/social/message-crypto";
+import { createStoredSocialMessageRecord } from "../../lib/social/message-record";
+import { authSecret, databaseURL, socialMessageKey } from "../../playwright.database.config";
 
+process.env.SOCIAL_MESSAGE_ENCRYPTION_KEY = socialMessageKey;
 const pool = new Pool({ connectionString: databaseURL });
 const db = drizzle(pool, { schema });
 const actorId = `synthetic-browser-${randomUUID()}`;
@@ -80,7 +83,7 @@ test.afterAll(async () => {
   await pool.end();
 });
 
-test("mock RFQ completes before quotation rejection, revision and approval", async ({
+test("mock RFQ proceeds through quotation, delivery, follow-up and opportunity", async ({
   page,
   context,
   baseURL,
@@ -249,6 +252,111 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
   expect(audits.every((item) => item.actorId === actorId)).toBe(true);
   await page.reload();
   await expect(page.locator(`form#quote-send-${draft.id}`)).toBeVisible();
-  // Approval is not external delivery. No send/transport is invoked by this test.
+  // Approval alone is not delivery. A simulated receipt is registered below.
   expect((await records("quotation"))[0].state).toBe("QUOTE_APPROVED");
+  const conversationId = randomUUID();
+  const channelRef = `synthetic-channel-${projectId}`;
+  const accountRef = `synthetic-account-${projectId}`;
+  const send = page.locator(`form#quote-send-${draft.id}`);
+  await send.getByLabel("发送渠道", { exact: true }).fill(channelRef);
+  await send.getByLabel("外部发送凭证", { exact: true }).fill(conversationId);
+  await page.locator(`button[form="quote-send-${draft.id}"]`).click();
+  await expect.poll(async () => (await records("quotation"))[0].state).toBe("QUOTE_SENT");
+  await expect.poll(async () => (await records("lead")).length).toBe(1);
+  const [lead] = await records("lead");
+  expect(lead.state).toBe("FOLLOW_UP");
+  expect(lead.payload.score_band).toBe("COLD");
+  expect(lead.payload.quotation_ref).toBe(draft.id);
+  // Simulated external inbound boundary only; business writes below remain real UI actions.
+  await db.insert(schema.socialConversation).values({
+    id: conversationId,
+    channelRef,
+    accountRef,
+    externalConversationRef: `mock-${conversationId}`,
+    leadId: lead.id,
+    lastMessageAt: new Date(),
+  });
+  await db.insert(schema.socialChannelControl).values({
+    id: randomUUID(),
+    channelRef,
+    accountRef,
+    enabled: true,
+    circuitStatus: "active",
+    changedBy: actorId,
+    changedAt: new Date(),
+  });
+  await db.insert(schema.socialMessage).values(
+    createStoredSocialMessageRecord({
+      id: randomUUID(),
+      conversationId,
+      externalMessageRef: `mock-inbound-${conversationId}`,
+      direction: "inbound",
+      identityQuality: "manual",
+      receivedAt: new Date(),
+      body: "MOCK buyer: please confirm lead time and payment terms for 25 SYN-OE-001 kits. Synthetic test only.",
+    }),
+  );
+  await page.goto(`/workspace/${projectId}?panel=follow-up`);
+  await expect(page.getByRole("button", { name: "确认有效商机", exact: true })).toBeDisabled();
+  const follow = page.locator(`form#follow-up-${lead.id}`);
+  await follow.getByRole("combobox").click();
+  await page.getByRole("option", { name: "询问交期", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("请求证据", { exact: true }).fill(evidenceId);
+  await page.getByRole("button", { name: "创建 Gate 03 请求", exact: true }).click();
+  await expect.poll(async () => (await records("delivery_confirmation")).length).toBe(1);
+  const [delivery] = await records("delivery_confirmation");
+  await page.goto(`/workspace/${projectId}?panel=delivery`);
+  const deliveryForm = page.locator(`form#delivery-${delivery.id}`);
+  await deliveryForm.getByRole("combobox").click();
+  await page.getByRole("option", { name: "确认交期", exact: true }).click();
+  await deliveryForm.getByLabel("确认交期（天）", { exact: true }).fill("21");
+  await deliveryForm.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+  await page.getByRole("button", { name: "确认人工交期", exact: true }).click();
+  await expect
+    .poll(async () => (await records("delivery_confirmation"))[0].state)
+    .toBe("DELIVERY_CONFIRMATION_CONFIRMED");
+  await page.goto(`/workspace/${projectId}?panel=follow-up`);
+  await follow.getByRole("combobox").click();
+  await page.getByRole("option", { name: "询问交期", exact: true }).click();
+  for (const label of ["提供 OE", "明确数量", "询问交期", "询问付款条件"]) {
+    await follow.getByRole("checkbox", { name: label, exact: true }).check();
+  }
+  await follow
+    .getByLabel("待人工发送内容", { exact: true })
+    .fill("MOCK reply: thank you for the inquiry. Synthetic test only.");
+  await follow.getByLabel("本次人工确认凭据", { exact: true }).fill(evidenceId);
+  await page.getByRole("button", { name: "人工确认并发送此回复", exact: true }).click();
+  await expect.poll(async () => (await records("lead"))[0].payload.score_band).toBe("HOT");
+  const [job] = await db
+    .select()
+    .from(schema.socialBrowserJob)
+    .where(eq(schema.socialBrowserJob.channelRef, channelRef));
+  expect(job.status).toBe("queued");
+  expect(job.kind).toBe("reply");
+  const [outbound] = await db
+    .select()
+    .from(schema.socialMessage)
+    .where(eq(schema.socialMessage.id, job.payloadRef));
+  expect(outbound.direction).toBe("outbound");
+  const reply = decryptSocialMessageBody(outbound.bodyCiphertext);
+  expect(reply).toContain("MOCK reply");
+  expect(reply).toContain("21");
+  expect(outbound.bodyCiphertext).not.toContain("MOCK reply");
+  await page.getByLabel("商机确认凭据", { exact: true }).fill(evidenceId);
+  await page.getByRole("button", { name: "确认有效商机", exact: true }).click();
+  await expect.poll(async () => (await records("lead"))[0].state).toBe("OPPORTUNITY");
+  const leadAudits = await db
+    .select()
+    .from(schema.auditEvent)
+    .where(eq(schema.auditEvent.aggregateId, lead.id));
+  expect(leadAudits.map((item) => item.action)).toContain("lead.opportunity_confirmed");
+  expect(
+    (
+      await db.select().from(schema.socialBrowserJob).where(eq(schema.socialBrowserJob.id, job.id))
+    )[0].status,
+  ).toBe("queued");
+  // No worker is connected: queued is not delivered, and all confirmations are simulated.
 });
