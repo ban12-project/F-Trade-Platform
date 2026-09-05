@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { discoverCatalogCandidates } from "../lib/product/catalog-candidates";
 import type { ProductAgentDocumentSource } from "../lib/product/document-source";
@@ -6,6 +9,7 @@ import {
   type CatalogResult,
   completeCatalogBatch,
   createCatalogPreflightReport,
+  writeCatalogReportSnapshot,
 } from "./run-product-agent-catalog";
 
 const document: ProductAgentDocumentSource = {
@@ -141,3 +145,33 @@ async function verifyBatchFailures() {
   );
 }
 void verifyBatchFailures();
+
+async function verifyReportHistory() {
+  const directory = await mkdtemp(join(tmpdir(), "f-trade-catalog-history-"));
+  try {
+    const reportPath = join(directory, "run.json");
+    const attempts = await Promise.allSettled([
+      writeCatalogReportSnapshot(reportPath, "first", true),
+      writeCatalogReportSnapshot(reportPath, "second", true),
+    ]);
+    assert.equal(attempts.filter((item) => item.status === "fulfilled").length, 1);
+    const failure = attempts.find((item) => item.status === "rejected");
+    assert.ok(failure?.status === "rejected");
+    assert.match(String(failure.reason), /choose a new --output/);
+    const previous = await readFile(reportPath, "utf8");
+    await assert.rejects(
+      writeCatalogReportSnapshot(reportPath, "replacement", true),
+      /already exists/,
+    );
+    assert.equal(await readFile(reportPath, "utf8"), previous);
+    await writeCatalogReportSnapshot(reportPath, "completed", false);
+    assert.equal(await readFile(reportPath, "utf8"), "completed");
+    assert.deepEqual(await readdir(directory), ["run.json"]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+  console.log(
+    "PASS new catalog runs cannot overwrite earlier reports, including concurrent starts",
+  );
+}
+void verifyReportHistory();
