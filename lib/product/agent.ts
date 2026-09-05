@@ -493,7 +493,10 @@ export function validateProductAgentSource(value: unknown): ProductAgentSource {
   if (source.image_availability === "real_product_image") {
     const refs = new Set(source.image_refs);
     if (
+      refs.size !== source.image_refs.length ||
+      source.image_refs.some((ref) => typeof ref !== "string" || !ref.trim()) ||
       imageInputs.length !== refs.size ||
+      new Set(imageInputs.map((input) => input?.ref)).size !== imageInputs.length ||
       imageInputs.some(
         (input) =>
           !input ||
