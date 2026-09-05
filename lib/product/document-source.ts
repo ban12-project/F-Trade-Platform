@@ -4,6 +4,7 @@ import { basename, extname, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { Sandbox } from "@vercel/sandbox";
+import { z } from "zod";
 
 import type { ProductAgentSource } from "./agent";
 
@@ -122,11 +123,10 @@ export async function preprocessProductAgentDocument(
         )
       ).stdout;
   const converted = JSON.parse(stdout) as MarkItDownResult;
-  const layoutPages = converted.layout_recovered_pages ?? [];
-  if (
-    !Array.isArray(layoutPages) ||
-    layoutPages.some((page) => !Number.isSafeInteger(page) || page < 1)
-  ) {
+  const layoutPages = z
+    .array(z.number().int().positive())
+    .safeParse(converted.layout_recovered_pages ?? []);
+  if (!layoutPages.success) {
     throw new Error("MarkItDown preprocessing returned invalid layout page metadata");
   }
   const conversionStatus = converted.conversion_status ?? "converted";
@@ -152,7 +152,7 @@ export async function preprocessProductAgentDocument(
     filename: converted.filename || basename(documentPath),
     media_type: converted.media_type,
     ocr_enabled: converted.ocr_enabled === true,
-    layout_recovered_pages: layoutPages,
+    layout_recovered_pages: layoutPages.data,
     conversion_status: conversionStatus,
   };
 }
