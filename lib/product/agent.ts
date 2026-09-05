@@ -1,5 +1,4 @@
 import { generateText, type LanguageModel, Output, type UserModelMessage } from "ai";
-
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import { compileContract } from "../contracts/validator";
 import {
@@ -7,6 +6,7 @@ import {
   PRODUCT_AGENT_PROMPT_VERSION,
   PRODUCT_AGENT_SYSTEM_PROMPT,
 } from "./product-agent-prompt";
+import { isFitmentField, PRODUCT_FITMENT_LABELS } from "./source-labels";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
 export interface ProductAgentSource {
@@ -183,8 +183,10 @@ function assertLabelledTextFact(
   if (value === undefined) return;
   if (
     typeof value !== "string" ||
-    !extractLabelledValues(sourceText, labels).some(
-      (sourceValue) => normalizeSourceValue(sourceValue) === normalizeSourceValue(value),
+    !extractLabelledValues(sourceText, labels).some((sourceValue) =>
+      isFitmentField(field)
+        ? sourceValue.trim() === value.trim()
+        : normalizeSourceValue(sourceValue) === normalizeSourceValue(value),
     )
   ) {
     throw new Error(`Product Agent field ${field} must match an explicitly labelled source value`);
@@ -251,19 +253,19 @@ function assertSourceBackedFacts(draft: ProductDraft, sourceText: string) {
   assertLabelledTextFact(
     "product.application",
     draft.product.application,
-    ["Application"],
+    PRODUCT_FITMENT_LABELS["product.application"],
     sourceText,
   );
   assertLabelledTextFact(
     "product.vehicle_brand",
     draft.product.vehicle_brand,
-    ["Vehicle brand"],
+    PRODUCT_FITMENT_LABELS["product.vehicle_brand"],
     sourceText,
   );
   assertLabelledTextFact(
     "product.vehicle_model",
     draft.product.vehicle_model,
-    ["Vehicle model"],
+    PRODUCT_FITMENT_LABELS["product.vehicle_model"],
     sourceText,
   );
   assertLabelledNumberFact(

@@ -354,3 +354,70 @@ assert.throws(
     ),
   /explicitly listed under an OE/,
 );
+
+// Reviewed fitment aliases retain complete, literal values and their own row evidence.
+const fitmentValue = "SYN-A10,12 SYN-B20";
+function fitmentCase(label: string, value = fitmentValue, field = "vehicle_model") {
+  const input = prepareProductAgentEvidenceSource({
+    ...source,
+    source_text: `| Part No. | ${label} | Disc PTO |\n| --- | --- | --- |\n| SYN-TEST | ${fitmentValue} | Spline: 9 OD:123mm Mat:Synthetic |`,
+  });
+  const draft = {
+    record_id: input.record_id,
+    source_ref: input.source_ref,
+    evidence_refs: input.evidence_refs,
+    field_evidence: { [`product.${field}`]: input.evidence_refs[0] },
+    verification_status: "review_required",
+    blocking_missing_fields: [],
+    optional_missing_fields: [],
+    product: { [field]: value },
+  };
+  return { input, draft };
+}
+for (const label of ["Fit Model", "Vehicle model", "fit model"]) {
+  const { input, draft } = fitmentCase(label);
+  const result = finalizeProductAgentDraft(draft, input);
+  assert.equal(result.product.vehicle_model, fitmentValue);
+  assert.doesNotThrow(() =>
+    assertProductAgentEvidenceLocations(result, input, finalizeProductAgentDraft),
+  );
+}
+for (const [label, value, field] of [
+  ["Model", fitmentValue, "vehicle_model"],
+  ["Application", fitmentValue, "vehicle_model"],
+  ["Fit Model", fitmentValue, "application"],
+  ["Fit Model", "SYN-A10", "vehicle_model"],
+  ["Fit Model", "SYN-A10, SYN-A12, SYN-B20", "vehicle_model"],
+  ["Fit Model", fitmentValue.toLowerCase(), "vehicle_model"],
+  ["Fit Model", `${fitmentValue}.`, "vehicle_model"],
+] as const) {
+  const { input, draft } = fitmentCase(label, value, field);
+  assert.throws(() => finalizeProductAgentDraft(draft, input), /explicitly labelled source value/);
+}
+const applicationCase = fitmentCase("Application", fitmentValue, "application");
+assert.doesNotThrow(() => finalizeProductAgentDraft(applicationCase.draft, applicationCase.input));
+const lineLocations = buildProductAgentEvidenceLocations(
+  "synthetic-fitment-line",
+  "Fit Model: SYN-A10\nModel: ambiguous",
+);
+assert.equal(lineLocations.length, 1);
+assert.equal(lineLocations[0]?.text, "Fit Model: SYN-A10");
+const componentCase = fitmentCase("Fit Model");
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      {
+        ...componentCase.draft,
+        specifications: { spline_count: 9 },
+        field_evidence: {
+          ...componentCase.draft.field_evidence,
+          "specifications.spline_count": componentCase.input.evidence_refs[0],
+        },
+      },
+      componentCase.input,
+    ),
+  /explicitly labelled source value/,
+);
+console.log(
+  "PASS literal fitment aliases, ambiguous labels, field separation and component guards",
+);
