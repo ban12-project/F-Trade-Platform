@@ -1,4 +1,5 @@
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { link, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { createProductAgentModel } from "../lib/ai/model-provider";
@@ -157,14 +158,13 @@ async function main() {
     status: "pending",
   }));
   let reportWrite = Promise.resolve();
+  let firstReport = true;
   async function writeReport() {
     reportWrite = reportWrite.then(async () => {
       const successCount = results.filter((result) => result.status === "succeeded").length;
       const failureCount = results.filter((result) => result.status === "failed").length;
-      const temporaryPath = `${outputPath}.tmp`;
-      await mkdir(dirname(outputPath), { recursive: true });
-      await writeFile(
-        temporaryPath,
+      await writeCatalogReportSnapshot(
+        outputPath,
         `${JSON.stringify(
           {
             model: `${modelConfig.provider}/${modelConfig.model}`,
@@ -186,8 +186,9 @@ async function main() {
           null,
           2,
         )}\n`,
+        firstReport,
       );
-      await rename(temporaryPath, outputPath);
+      firstReport = false;
     });
     await reportWrite;
   }
@@ -208,6 +209,32 @@ async function main() {
     },
     writeReport,
   );
+}
+
+/** Reserve a new run atomically; never replace a report left by an earlier batch. */
+export async function writeCatalogReportSnapshot(
+  outputPath: string,
+  contents: string,
+  createOnly: boolean,
+) {
+  await mkdir(dirname(outputPath), { recursive: true });
+  const temporaryPath = `${outputPath}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporaryPath, contents, { encoding: "utf8", flag: "wx", mode: 0o600 });
+    if (createOnly) {
+      try {
+        await link(temporaryPath, outputPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST")
+          throw new Error(
+            "Catalog report already exists; choose a new --output path to preserve previous results",
+          );
+        throw error;
+      }
+    } else await rename(temporaryPath, outputPath);
+  } finally {
+    await rm(temporaryPath, { force: true });
+  }
 }
 
 /** Finish independent records and persist their outcomes before failing the batch. */
