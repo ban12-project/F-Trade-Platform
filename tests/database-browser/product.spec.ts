@@ -261,6 +261,8 @@ test("authenticated browser reviews a mock product and its content through real 
   const savedContentResponse = await contentResponse;
   expect(savedContentResponse.ok()).toBe(true);
   await expect(page.getByText(/内容草稿已创建/)).toBeVisible();
+  // A successful save must settle, rather than continually refreshing on new product props.
+  await page.waitForLoadState("networkidle", { timeout: 5_000 });
   const contentQuery = () =>
     db
       .select()
