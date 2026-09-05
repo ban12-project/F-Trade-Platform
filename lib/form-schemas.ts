@@ -230,6 +230,11 @@ export const quotationDecisionFormSchema = z
   .object({
     projectId: z.uuid("项目标识无效。"),
     quotationId: z.uuid("报价标识无效。"),
+    reviewedVersion: z
+      .string()
+      .regex(/^[1-9]\d*$/, "审核版本无效，请刷新后重试。")
+      .refine((value) => Number.isSafeInteger(Number(value)), "审核版本无效。"),
+    approvalId: z.uuid("审核请求标识无效，请刷新后重试。"),
     decision: z.enum(["approved", "rejected"]),
     evidenceRef: privateReference,
     notes: z.string().trim().max(2_000),

@@ -69,6 +69,7 @@ const validateLead = compileContract<LeadRecord>(leadSchema);
 
 export type QuotationEntry = {
   id: string;
+  version: number;
   state: string;
   createdAt: Date;
   quotation: QuotationHandoff;
@@ -365,6 +366,8 @@ export async function decideQuotation(
         ),
       )
       .for("update");
+    if (record && String(record.version) !== value.reviewedVersion)
+      throw new Error("报价已更新，请刷新后重新审核当前条款。");
     if (!record || record.state !== "QUOTE_REVIEW_REQUIRED")
       throw new Error("该报价当前不处于 Gate 02 待审核状态。");
     const [pending] = await tx
@@ -379,6 +382,7 @@ export async function decideQuotation(
       )
       .for("update");
     if (!pending) throw new Error("未找到 Gate 02 待审核请求。");
+    if (pending.id !== value.approvalId) throw new Error("审核请求已更新，请刷新后重新审核。");
     const next = applyHumanQuoteDecision(record.payload as unknown as QuotationHandoff, {
       actorType: "human",
       actorId,
@@ -1191,6 +1195,7 @@ export async function listProjectQuotations(
     const payload = record.payload as unknown as QuotationHandoff & { product_id?: string };
     return {
       id: record.id,
+      version: record.version,
       state: record.state,
       createdAt: record.createdAt,
       quotation: payload,

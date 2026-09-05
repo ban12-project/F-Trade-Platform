@@ -5,7 +5,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import readyProduct from "../../data/fixtures/product-ready.synthetic.json";
+import type { Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
+import { decideQuotation } from "../../lib/sales/closing-store";
 import { authSecret, databaseURL } from "../../playwright.database.config";
 
 const pool = new Pool({ connectionString: databaseURL });
@@ -82,6 +84,7 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
   page,
   context,
   baseURL,
+  browser,
 }) => {
   const path = `/workspace/${projectId}?panel=rfq`;
   await page.goto(path);
@@ -150,6 +153,14 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
     product_id: productId,
     quote: { unit_price: 12.5, currency: "USD", moq: 10, lead_time_days: 30 },
   });
+  const staleContext = await browser.newContext({ baseURL });
+  await staleContext.addCookies(await context.cookies());
+  const stalePage = await staleContext.newPage();
+  await stalePage.goto(`/workspace/${projectId}?panel=quotation`);
+  const staleDecision = stalePage.locator(`form#quote-decision-${draft.id}`);
+  await staleDecision.getByRole("combobox").click();
+  await stalePage.getByRole("option", { name: "批准人工报价", exact: true }).click();
+  await staleDecision.getByLabel("审核证据", { exact: true }).fill(evidenceId);
   const decision = page.locator(`form#quote-decision-${draft.id}`);
   await decision.getByRole("combobox").click();
   await page.getByRole("option", { name: "退回人工报价", exact: true }).click();
@@ -166,12 +177,51 @@ test("mock RFQ completes before quotation rejection, revision and approval", asy
   await expect
     .poll(async () => (await records("quotation"))[0].state)
     .toBe("QUOTE_REVIEW_REQUIRED");
+  const [revisedQuote] = await records("quotation");
+  const approvalQuery = () =>
+    db.select().from(schema.approval).where(eq(schema.approval.aggregateId, draft.id));
+  const auditQuery = () =>
+    db.select().from(schema.auditEvent).where(eq(schema.auditEvent.aggregateId, draft.id));
+  const eventQuery = () =>
+    db.select().from(schema.workflowEvent).where(eq(schema.workflowEvent.aggregateId, draft.id));
+  const beforeApprovals = await approvalQuery();
+  const beforeAudits = await auditQuery();
+  const beforeEvents = await eventQuery();
+  const oldApproval = beforeApprovals.find((item) => item.status === "rejected");
+  const activeApproval = beforeApprovals.find((item) => item.status === "pending");
+  if (!oldApproval || !activeApproval)
+    throw new Error("Expected rejected and pending synthetic approvals");
+  expect(revisedQuote.version).toBe(3);
+  await expect(
+    decideQuotation(
+      {
+        projectId,
+        quotationId: draft.id,
+        reviewedVersion: String(revisedQuote.version),
+        approvalId: oldApproval.id,
+        decision: "approved",
+        evidenceRef: evidenceId,
+        notes: "MOCK wrong request",
+      },
+      actorId,
+      db as unknown as Database,
+    ),
+  ).rejects.toThrow("审核请求已更新");
+  await stalePage.getByRole("button", { name: "批准人工报价", exact: true }).click();
+  await expect(stalePage.getByText(/报价已更新|审核请求已更新/)).toBeVisible();
+  expect((await records("quotation"))[0]).toEqual(revisedQuote);
+  expect(await approvalQuery()).toEqual(beforeApprovals);
+  expect(await auditQuery()).toEqual(beforeAudits);
+  expect(await eventQuery()).toEqual(beforeEvents);
+  await staleContext.close();
   await decision.getByRole("combobox").click();
   await page.getByRole("option", { name: "批准人工报价", exact: true }).click();
   await decision.getByLabel("审核证据", { exact: true }).fill(evidenceId);
   await page.getByRole("button", { name: "批准人工报价", exact: true }).click();
   await expect.poll(async () => (await records("quotation"))[0].state).toBe("QUOTE_APPROVED");
   const [approved] = await records("quotation");
+  expect(approved.version).toBe(4);
+  expect(approved.payload.approval_ref).toBe(activeApproval.id);
   expect(approved.payload.quote).toEqual({ ...(draft.payload.quote as object), unit_price: 13.25 });
   const approvals = await db
     .select()
