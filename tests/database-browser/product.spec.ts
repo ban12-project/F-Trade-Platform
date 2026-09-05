@@ -116,7 +116,7 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.aggregateRecord.createdById, actorId));
   expect(created.state).toBe("PRODUCT_REVIEW_REQUIRED");
   expect(created.version).toBe(1);
-  const [pending] = await db
+  let [pending] = await db
     .select()
     .from(schema.approval)
     .where(eq(schema.approval.aggregateId, created.id));
@@ -126,6 +126,27 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.getByRole("button", { name: new RegExp(sku) }).click();
   await expect(page).toHaveURL(new RegExp(`item=${created.id}`));
   const review = page.locator("form#product-review");
+  await review.getByRole("combobox").first().click();
+  await page.getByRole("option", { name: "退回产品事实", exact: true }).click();
+  await review.getByLabel("审核证据", { exact: true }).click();
+  await page.getByRole("option", { name: /MOCK evidence/ }).click();
+  await review
+    .locator("#product-review-notes")
+    .fill("Synthetic source reference revision exercise.");
+  await page.getByRole("button", { name: "退回产品事实", exact: true }).click();
+  await expect(page.locator("form#revise-product")).toBeVisible();
+  await page
+    .locator("form#revise-product")
+    .getByLabel("来源引用", { exact: true })
+    .fill("source-mock-browser-revised");
+  await page.getByRole("button", { name: "提交修订并送审", exact: true }).click();
+  await expect(review).toBeVisible();
+  const rejectedApprovalId = pending.id;
+  [pending] = await db
+    .select()
+    .from(schema.approval)
+    .where(and(eq(schema.approval.aggregateId, created.id), eq(schema.approval.status, "pending")));
+  expect(pending.id).not.toBe(rejectedApprovalId);
   await review.getByRole("combobox").first().click();
   await page.getByRole("option", { name: "批准产品事实", exact: true }).click();
   await review.getByLabel("审核证据", { exact: true }).click();
@@ -159,9 +180,9 @@ test("authenticated browser reviews a mock product and its content through real 
     .select()
     .from(schema.aggregateRecord)
     .where(eq(schema.aggregateRecord.id, created.id));
-  expect(ready.version).toBe(2);
+  expect(ready.version).toBe(4);
   expect(ready.payload).toMatchObject({
-    source_ref: "source-mock-browser",
+    source_ref: "source-mock-browser-revised",
     verification_status: "verified",
     approval_ref: pending.id,
     product: {
@@ -193,6 +214,8 @@ test("authenticated browser reviews a mock product and its content through real 
   expect(events.map((event) => event.toState).sort()).toEqual([
     "PRODUCT_READY",
     "PRODUCT_REVIEW_REQUIRED",
+    "PRODUCT_REVIEW_REQUIRED",
+    "PRODUCT_REVISION_REQUIRED",
   ]);
   const audits = await db
     .select()
@@ -200,6 +223,8 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.auditEvent.aggregateId, created.id));
   expect(audits.map((event) => event.action).sort()).toEqual([
     "product_draft_created",
+    "product_draft_revised",
+    "product_gate_01_decided",
     "product_gate_01_decided",
   ]);
   expect(audits.every((event) => event.actorId === actorId)).toBe(true);

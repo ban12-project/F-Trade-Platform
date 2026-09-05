@@ -116,9 +116,7 @@ export async function reviseProductCatalogDraftAction(
     return { status: "error", message: "无权修订产品草稿。" };
   }
   const productId = formData.get("productId");
-  const parsedProductId = productReviewFormSchema
-    .pick({ productId: true })
-    .safeParse({ productId });
+  const parsedProductId = productReviewFormSchema.shape.productId.safeParse(productId);
   if (!parsedProductId.success)
     return {
       status: "error",
@@ -133,23 +131,18 @@ export async function reviseProductCatalogDraftAction(
     if (projectId)
       await assertWorkspaceAggregateLink(
         projectId,
-        parsedProductId.data.productId,
+        parsedProductId.data,
         "marketing",
         "product",
         session.user.id,
       );
     if (!projectId) throw new Error("产品修订必须在所属项目中进行。");
-    await reviseProductCatalogDraft(
-      parsedProductId.data.productId,
-      parsed.data,
-      session.user.id,
-      projectId,
-    );
-    revalidateProductPaths(projectId, parsedProductId.data.productId);
+    await reviseProductCatalogDraft(parsedProductId.data, parsed.data, session.user.id, projectId);
+    revalidateProductPaths(projectId, parsedProductId.data);
     return {
       status: "success",
       message: "修订及逐字段证据已保存，并重新提交 Gate 01 审核。",
-      productId: parsedProductId.data.productId,
+      productId: parsedProductId.data,
     };
   } catch (error) {
     return {
