@@ -77,6 +77,11 @@ export type ContentCopyCandidate = {
 };
 
 const parseContent = compileContract<ContentRecord>(contentSchema);
+function contentWorkflowEvidenceRefs(content: ContentRecord) {
+  // Multiple facts can legitimately cite the same document. Events require a set,
+  // while product_facts must retain each field's independent evidence binding.
+  return [...new Set(content.product_facts.map((fact) => fact.evidence_ref))];
+}
 const forbiddenVisualClaims = [
   "spline",
   "geometry",
@@ -304,7 +309,7 @@ export async function createContentDraft(
       actorType: "human",
       actorId,
       occurredAt: now.toISOString(),
-      evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
+      evidenceRefs: contentWorkflowEvidenceRefs(content),
     });
     await tx.insert(aggregateRecord).values({
       id,
@@ -338,7 +343,7 @@ export async function createContentDraft(
       toState: "CONTENT_REVIEW_REQUIRED",
       actorType: "human",
       actorId,
-      evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
+      evidenceRefs: contentWorkflowEvidenceRefs(content),
       occurredAt: now,
     });
     await tx.insert(auditEvent).values({
@@ -464,7 +469,7 @@ export async function copyContentDraftToProject(
       status: "review_required",
       approval_ref: undefined,
     });
-    const evidenceRefs = content.product_facts.map((fact) => fact.evidence_ref);
+    const evidenceRefs = contentWorkflowEvidenceRefs(content);
     assertTransition({
       eventId,
       entityType: "content",
@@ -812,7 +817,7 @@ export async function reviseContentDraft(
       actorType: "human",
       actorId,
       occurredAt: now.toISOString(),
-      evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
+      evidenceRefs: contentWorkflowEvidenceRefs(content),
     });
     const [updated] = await tx
       .update(aggregateRecord)
@@ -842,7 +847,7 @@ export async function reviseContentDraft(
       toState: "CONTENT_REVIEW_REQUIRED",
       actorType: "human",
       actorId,
-      evidenceRefs: content.product_facts.map((fact) => fact.evidence_ref),
+      evidenceRefs: contentWorkflowEvidenceRefs(content),
       occurredAt: now,
     });
     await tx.insert(auditEvent).values({

@@ -233,7 +233,9 @@ test("authenticated browser reviews a mock product and its content through real 
       Boolean(response.request().headers()["next-action"]),
   );
   await page.getByRole("button", { name: "创建待审内容", exact: true }).click();
-  expect((await contentResponse).ok()).toBe(true);
+  const savedContentResponse = await contentResponse;
+  expect(savedContentResponse.ok()).toBe(true);
+  expect(await savedContentResponse.text()).toContain('"status":"success"');
   const contentQuery = () =>
     db
       .select()
@@ -266,6 +268,29 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.getByRole("button", { name: /MOCK browser content review/ }).click();
   const contentReview = page.locator("form#content-review");
   await contentReview.getByRole("combobox").click();
+  await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
+  await contentReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+  await contentReview
+    .locator("#content-review-notes")
+    .fill("Synthetic revision exercise: check the wording.");
+  await page.getByRole("button", { name: "退回营销内容", exact: true }).click();
+  await expect.poll(async () => (await contentQuery())[0].state).toBe("CONTENT_REVISION_REQUIRED");
+  const revisedBody = `${contentBody} Revision checked in the synthetic workflow.`;
+  await page.locator("form#revise-content").getByLabel("正文", { exact: true }).fill(revisedBody);
+  await page.getByRole("button", { name: "提交修订并送审", exact: true }).click();
+  await expect.poll(async () => (await contentQuery())[0].state).toBe("CONTENT_REVIEW_REQUIRED");
+  const [revisedContent] = await contentQuery();
+  expect(revisedContent.version).toBe(3);
+  expect(revisedContent.payload.body).toBe(revisedBody);
+  expect(revisedContent.payload.product_facts).toEqual(contentDraft.payload.product_facts);
+  const [revisionApproval] = await db
+    .select()
+    .from(schema.approval)
+    .where(
+      and(eq(schema.approval.aggregateId, contentDraft.id), eq(schema.approval.status, "pending")),
+    );
+  expect(revisionApproval.id).not.toBe(contentApproval.id);
+  await contentReview.getByRole("combobox").click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
   await contentReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
   await contentReview
@@ -285,16 +310,16 @@ test("authenticated browser reviews a mock product and its content through real 
   );
   await expect(page.locator("form#content-review")).toHaveCount(0);
   const [approvedContent] = await contentQuery();
-  expect(approvedContent.version).toBe(2);
+  expect(approvedContent.version).toBe(4);
   expect(approvedContent.payload).toEqual({
-    ...contentDraft.payload,
+    ...revisedContent.payload,
     status: "approved",
-    approval_ref: contentApproval.id,
+    approval_ref: revisionApproval.id,
   });
   const [contentDecision] = await db
     .select()
     .from(schema.approval)
-    .where(eq(schema.approval.id, contentApproval.id));
+    .where(eq(schema.approval.id, revisionApproval.id));
   expect(contentDecision).toMatchObject({
     status: "approved",
     decidedById: actorId,
@@ -307,13 +332,22 @@ test("authenticated browser reviews a mock product and its content through real 
   expect(contentEvents.map((event) => event.toState).sort()).toEqual([
     "CONTENT_APPROVED",
     "CONTENT_REVIEW_REQUIRED",
+    "CONTENT_REVIEW_REQUIRED",
+    "CONTENT_REVISION_REQUIRED",
   ]);
+  expect(
+    contentEvents.every(
+      (event) => JSON.stringify(event.evidenceRefs) === JSON.stringify([evidenceId]),
+    ),
+  ).toBe(true);
   const contentAudits = await db
     .select()
     .from(schema.auditEvent)
     .where(eq(schema.auditEvent.aggregateId, contentDraft.id));
   expect(contentAudits.map((event) => event.action).sort()).toEqual([
     "content_draft_created",
+    "content_draft_revised",
+    "content_gate_01_decided",
     "content_gate_01_decided",
   ]);
   expect(contentAudits.every((event) => event.actorId === actorId)).toBe(true);
