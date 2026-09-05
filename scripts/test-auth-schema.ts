@@ -76,7 +76,9 @@ async function main() {
   const authSource = readFileSync(new URL("../lib/auth.ts", import.meta.url), "utf8");
   assert.match(authSource, /schema:\s*authSchema/);
   console.log("PASS authSchema exposes all core models and all Passkey plugin fields");
-  console.log("PASS real adapter resolves passkey owner and credential queries without network access");
+  console.log(
+    "PASS real adapter resolves passkey owner and credential queries without network access",
+  );
   console.log("PASS missing passkey mapping reproduces the reported error before SQL execution");
 }
 
