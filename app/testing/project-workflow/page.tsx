@@ -128,6 +128,7 @@ const syntheticAgentModels: ProductAgentModelSettings[] = [
   },
 ];
 const syntheticProductDetail: ProductCatalogDetail = {
+  version: 1,
   id: syntheticProduct.id,
   state: "PRODUCT_REVIEW_REQUIRED",
   createdAt: new Date("2026-09-01T00:00:00.000Z"),
@@ -317,6 +318,19 @@ async function ProjectWorkflowFixture({
         detail={productDetail}
         canReview
         agentModelConfigs={syntheticAgentModels}
+        evidenceOptions={
+          productDetail
+            ? [
+                {
+                  id: "evidence-product-001",
+                  sourceLabel: "Synthetic review evidence",
+                  contentType: "text/plain",
+                  classification: "internal",
+                  createdAt: new Date("2026-09-01T00:00:00Z"),
+                },
+              ]
+            : []
+        }
       />
     ),
     content: (
