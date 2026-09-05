@@ -260,7 +260,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.getByRole("button", { name: "创建待审内容", exact: true }).click();
   const savedContentResponse = await contentResponse;
   expect(savedContentResponse.ok()).toBe(true);
-  expect(await savedContentResponse.text()).toContain('"status":"success"');
+  await expect(page.getByText(/内容草稿已创建/)).toBeVisible();
   const contentQuery = () =>
     db
       .select()
