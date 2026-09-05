@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { and, desc, eq, type InferInsertModel, inArray, sql } from "drizzle-orm";
 import type { z } from "zod";
-import { getDatabase } from "@/lib/db/client";
+import { type Database, getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
   approval,
@@ -36,6 +36,7 @@ export type ProductCatalogEntry = {
 };
 
 export type ProductCatalogDetail = ProductCatalogEntry & {
+  version: number;
   draft: ProductDraft;
   approvalId: string | null;
 };
@@ -446,6 +447,7 @@ export async function getProductCatalogDetail(
   const entry = catalogEntry(row, approvalRow);
   return {
     ...entry,
+    version: row.version,
     draft: row.payload as unknown as ProductDraft,
     approvalId: approvalRow?.id ?? null,
   };
@@ -467,10 +469,14 @@ export async function getProjectProductCatalogDetail(
   return link ? getProductCatalogDetail(productId) : null;
 }
 
-export async function decideProductCatalogReview(input: ProductReviewInput, actorId: string) {
+export async function decideProductCatalogReview(
+  input: ProductReviewInput,
+  actorId: string,
+  database: Database = getDatabase(),
+) {
   const now = new Date();
   const eventId = randomUUID();
-  return getDatabase().transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,
@@ -482,6 +488,8 @@ export async function decideProductCatalogReview(input: ProductReviewInput, acto
       .where(and(eq(aggregateRecord.id, input.productId), eq(aggregateRecord.type, "product")))
       .for("update");
     if (!aggregate) throw new Error("产品草稿不存在。");
+    if (String(aggregate.version) !== input.reviewedVersion)
+      throw new Error("产品资料已更新，请刷新并重新审核当前版本。");
     if (aggregate.state !== "PRODUCT_REVIEW_REQUIRED")
       throw new Error("该产品当前不处于待审核状态。");
 
@@ -497,6 +505,8 @@ export async function decideProductCatalogReview(input: ProductReviewInput, acto
       )
       .for("update");
     if (!pendingApproval) throw new Error("未找到待处理的 Gate 01 审核请求。");
+    if (pendingApproval.id !== input.approvalId)
+      throw new Error("审核请求已变更，请刷新并重新审核当前版本。");
 
     const productApproval: ProductApproval = {
       approval_id: pendingApproval.id,
@@ -586,7 +596,11 @@ export async function decideProductCatalogReview(input: ProductReviewInput, acto
       aggregateId: aggregate.id,
       subjectType: "product",
       subjectId: aggregate.id,
-      metadata: { decision: input.decision, approval_id: pendingApproval.id },
+      metadata: {
+        decision: input.decision,
+        approval_id: pendingApproval.id,
+        reviewed_version: aggregate.version,
+      },
       occurredAt: now,
     });
     return { state: nextState, approvalId: pendingApproval.id };

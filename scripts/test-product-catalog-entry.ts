@@ -185,6 +185,8 @@ const reviewerApproval = {
 };
 assert.equal(
   productReviewFormSchema.safeParse({
+    reviewedVersion: "1",
+    approvalId: "00000000-0000-4000-8000-000000000302",
     productId: "not-a-uuid",
     decision: "approved",
     evidenceRef: "evidence-review-001",
@@ -194,6 +196,8 @@ assert.equal(
 );
 assert.equal(
   productReviewFormSchema.safeParse({
+    reviewedVersion: "1",
+    approvalId: "00000000-0000-4000-8000-000000000302",
     productId: "00000000-0000-4000-8000-000000000001",
     decision: "approved",
     evidenceRef: "/tmp/review",
@@ -290,3 +294,134 @@ assert.deepEqual(productCatalogDisplayIdentity({ internal_sku: "SYN-PARTIAL-001"
 });
 
 console.log("PASS governed intake reaches every ProductReady specification and commercial field");
+
+// Exercise the real transaction boundary with a locked, synthetic database snapshot.
+async function testReviewSnapshot() {
+  const { getTableName } = await import("drizzle-orm");
+  const { decideProductCatalogReview } = await import("../lib/products");
+  type Database = import("../lib/db/client").Database;
+  const productId = "00000000-0000-4000-8000-000000000001";
+  const approvalId = "00000000-0000-4000-8000-000000000302";
+  const current = productReviewFormSchema.parse({
+    productId,
+    approvalId,
+    reviewedVersion: "3",
+    decision: "approved",
+    evidenceRef: "evidence-synthetic-review",
+    notes: "",
+  });
+  for (const patch of [
+    { reviewedVersion: undefined },
+    { reviewedVersion: "" },
+    { reviewedVersion: "0" },
+    { reviewedVersion: "1.1" },
+    { reviewedVersion: "9007199254740992" },
+    { approvalId: undefined },
+    { approvalId: "invalid" },
+  ])
+    assert.equal(productReviewFormSchema.safeParse({ ...current, ...patch }).success, false);
+
+  async function exercise(input: typeof current, payload = completeDraft) {
+    const writes: { table: string; values: Record<string, unknown> }[] = [];
+    let reads = 0;
+    const tx = {
+      select() {
+        const query = {
+          from() {
+            return query;
+          },
+          where() {
+            return query;
+          },
+          async for(mode: string) {
+            assert.equal(mode, "update");
+            return reads++ === 0
+              ? [
+                  {
+                    id: productId,
+                    version: 3,
+                    state: "PRODUCT_REVIEW_REQUIRED",
+                    payload: { ...payload, record_id: productId },
+                  },
+                ]
+              : [{ id: approvalId, status: "pending" }];
+          },
+        };
+        return query;
+      },
+      update(table: Parameters<typeof getTableName>[0]) {
+        return {
+          set(values: Record<string, unknown>) {
+            writes.push({ table: getTableName(table), values });
+            return {
+              where() {
+                return {
+                  async returning() {
+                    return [{ id: productId }];
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      insert(table: Parameters<typeof getTableName>[0]) {
+        return {
+          async values(values: Record<string, unknown>) {
+            writes.push({ table: getTableName(table), values });
+          },
+        };
+      },
+    };
+    const database = {
+      async transaction(run: (value: typeof tx) => Promise<unknown>) {
+        return run(tx);
+      },
+    } as unknown as Database;
+    try {
+      return {
+        result: await decideProductCatalogReview(input, "synthetic-reviewer", database),
+        writes,
+      };
+    } catch (error) {
+      return { error, writes };
+    }
+  }
+  // A stale tab from before rejection, revision and resubmission cannot decide v3.
+  for (const decision of ["approved", "rejected"] as const) {
+    const stale = await exercise({
+      ...current,
+      reviewedVersion: "1",
+      decision,
+      notes: "Synthetic rejection",
+    });
+    assert.match(String(stale.error), /产品资料已更新/);
+    assert.deepEqual(stale.writes, []);
+    const wrongApproval = await exercise({
+      ...current,
+      approvalId: "00000000-0000-4000-8000-000000000301",
+      decision,
+      notes: "Synthetic rejection",
+    });
+    assert.match(String(wrongApproval.error), /审核请求已变更/);
+    assert.deepEqual(wrongApproval.writes, []);
+    const valid = await exercise({ ...current, decision, notes: "Synthetic review" });
+    assert.equal(valid.error, undefined);
+    assert.equal(
+      valid.result?.state,
+      decision === "approved" ? "PRODUCT_READY" : "PRODUCT_REVISION_REQUIRED",
+    );
+    assert.deepEqual(
+      valid.writes.find((write) => write.values.action === "product_gate_01_decided")?.values
+        .metadata,
+      { decision, approval_id: approvalId, reviewed_version: 3 },
+    );
+  }
+  const incomplete = await exercise(current, draft);
+  assert.match(String(incomplete.error), /Product cannot be Ready/);
+  assert.deepEqual(incomplete.writes, []);
+  console.log(
+    "PASS Gate 01 rejects stale versions and approval IDs before writes; current decisions and completeness checks remain enforced",
+  );
+}
+void testReviewSnapshot();

@@ -59,6 +59,11 @@ export const productCatalogFormSchema = z.object({
 export const productReviewFormSchema = z
   .object({
     productId: z.uuid("产品记录标识无效。"),
+    reviewedVersion: z
+      .string()
+      .regex(/^[1-9]\d*$/, "审核版本无效，请刷新后重试。")
+      .refine((value) => Number.isSafeInteger(Number(value)), "审核版本无效。"),
+    approvalId: z.uuid("审核请求标识无效，请刷新后重试。"),
     decision: z.enum(["approved", "rejected"]),
     evidenceRef: privateReference,
     notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),

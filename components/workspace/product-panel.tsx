@@ -502,7 +502,13 @@ function ProductReview({
   );
   const form = useForm<ReviewValues>({
     resolver: zodResolver(productReviewFormSchema),
-    defaultValues: { productId: detail.id, evidenceRef: "", notes: "" },
+    defaultValues: {
+      productId: detail.id,
+      reviewedVersion: String(detail.version),
+      approvalId: detail.approvalId ?? "",
+      evidenceRef: "",
+      notes: "",
+    },
   });
   useWorkspaceDirty(`product-review-${detail.id}`, form.formState.isDirty);
   useEffect(() => {
@@ -573,7 +579,9 @@ function ProductReview({
         <Card>
           <CardHeader>
             <CardTitle>Gate 01 决定</CardTitle>
-            <CardDescription>批准不会发布、报价或承诺交期；请先明确选择。</CardDescription>
+            <CardDescription>
+              审核版本 {detail.version}。批准不会发布、报价或承诺交期；请先明确选择。
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form id="product-review" onSubmit={form.handleSubmit(submit)}>
@@ -789,6 +797,7 @@ export function ProductPanel({
             )}
             {detail ? (
               <ProductReview
+                key={`${detail.id}:${detail.version}:${detail.approvalId}`}
                 projectId={projectId}
                 detail={detail}
                 canReview={canReview}
