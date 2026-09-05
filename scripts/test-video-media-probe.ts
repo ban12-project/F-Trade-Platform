@@ -9,8 +9,16 @@ import { parseFfprobeOutput, validateProbedVideoExport } from "../lib/video/medi
 const measured = parseFfprobeOutput({
   format: { format_name: "mov,mp4,m4a,3gp,3g2,mj2", duration: "5.0" },
   streams: [
-    { codec_type: "video", codec_name: "h264", width: 1080, height: 1920, r_frame_rate: "30/1" },
-    { codec_type: "audio", codec_name: "aac" },
+    {
+      codec_type: "video",
+      codec_name: "h264",
+      width: 1080,
+      height: 1920,
+      r_frame_rate: "30/1",
+      pix_fmt: "yuv420p",
+      sample_aspect_ratio: "1:1",
+    },
+    { codec_type: "audio", codec_name: "aac", sample_rate: "48000", channels: 2 },
     { codec_type: "subtitle", codec_name: "mov_text" },
   ],
 });
@@ -93,7 +101,8 @@ console.log("PASS measured frame rates are neither rounded nor malformed");
 const manifest = createVideoExportManifest(receipt);
 assert.equal(manifest.validation.status, "passed");
 assert.equal(manifest.validation.scope, "project_export_preset");
-assert.equal(manifest.schemaVersion, "1.1.0");
+assert.equal(manifest.schemaVersion, "1.2.0");
+assert.equal(manifest.encodingContractVersion, "1.0.0");
 assert.equal(manifest.platformAcceptance.status, "not_evaluated");
 assert.equal(manifest.reviewStatus, "review_required");
 assert.deepEqual(manifest.measured, receipt.measured);
@@ -121,4 +130,61 @@ assert.equal(
 );
 console.log(
   "PASS export manifests distinguish measured conformance from human approval and unknown presets",
+);
+
+assert.deepEqual(measured.encoding, {
+  pixelFormat: "yuv420p",
+  sampleAspectRatio: "1:1",
+  audioSampleRate: 48000,
+  audioChannels: 2,
+});
+for (const [field, actual] of [
+  ["pixelFormat", "yuv444p"],
+  ["sampleAspectRatio", "2:1"],
+  ["audioSampleRate", 96000],
+  ["audioChannels", 6],
+] as const) {
+  assert.throws(
+    () =>
+      validateProbedVideoExport("tiktok", {
+        ...measured,
+        encoding: { ...measured.encoding!, [field]: actual },
+      }),
+    new RegExp(field),
+  );
+}
+assert.throws(
+  () => validateProbedVideoExport("tiktok", { ...measured, encoding: undefined }),
+  /pixelFormat.*missing/,
+);
+assert.equal(
+  createVideoExportManifest({ ...receipt, measured: { ...receipt.measured, encoding: undefined } })
+    .validation.status,
+  "unverified",
+);
+assert.throws(
+  () =>
+    createReviewVideoExport({
+      videoId: receipt.videoId,
+      sourceAssetRef: receipt.sourceAssetRef,
+      platform: receipt.platform,
+      media: { ...measured, encoding: undefined },
+      timeline: { durationSeconds: 5 },
+    }),
+  /pixelFormat.*missing/,
+);
+const missingEncoding = parseFfprobeOutput({
+  format: { format_name: "mp4", duration: "5" },
+  streams: [
+    { codec_type: "video", codec_name: "h264", width: 1080, height: 1920, r_frame_rate: "30/1" },
+  ],
+});
+assert.deepEqual(missingEncoding.encoding, {
+  pixelFormat: null,
+  sampleAspectRatio: null,
+  audioSampleRate: null,
+  audioChannels: null,
+});
+console.log(
+  "PASS measured encoding rejects unsupported or missing fields and preserves historical uncertainty",
 );

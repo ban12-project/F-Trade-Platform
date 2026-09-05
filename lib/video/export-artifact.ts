@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import { z } from "zod";
-
 import {
   type VideoExportArtifact,
   videoExportArtifactSchema,
   videoPlatformSchema,
 } from "./contracts";
+import { videoEncodingSchema } from "./encoding-contract";
 import { type ProbedVideo, validateProbedVideoExport } from "./media-probe";
 
 const privateAssetRef = z
@@ -31,6 +31,7 @@ export const reviewVideoExportInputSchema = z
         fps: z.number().positive(),
         durationSeconds: z.number().positive(),
         subtitleStreamCount: z.number().int().min(0),
+        encoding: videoEncodingSchema.optional(),
       })
       .strict(),
     timeline: z.object({ durationSeconds: z.number().positive() }).strict(),
@@ -68,6 +69,7 @@ export function createReviewVideoExport(
       fps: value.media.fps,
       durationSeconds: value.media.durationSeconds,
       subtitleStreamCount: value.media.subtitleStreamCount,
+      encoding: value.media.encoding,
     },
     createdAt: new Date().toISOString(),
   });

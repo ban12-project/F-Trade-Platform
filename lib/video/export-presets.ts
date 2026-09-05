@@ -116,7 +116,12 @@ const mediaSchema = z.object({
 });
 
 export type VideoExportViolation = {
-  field: Exclude<keyof z.infer<typeof mediaSchema>, "platform">;
+  field:
+    | Exclude<keyof z.infer<typeof mediaSchema>, "platform">
+    | "pixelFormat"
+    | "sampleAspectRatio"
+    | "audioSampleRate"
+    | "audioChannels";
   actual: string | number | null;
   expected: string | number;
   remediation: "reencode" | "resize_or_crop" | "trim_or_review" | "add_audio";

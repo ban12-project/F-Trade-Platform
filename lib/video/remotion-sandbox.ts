@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { addBundleToSandbox, createSandbox, renderMediaOnVercel } from "@remotion/vercel";
-
+import { videoProbeEntries } from "./encoding-contract";
 import { parseFfprobeOutput } from "./media-probe";
 import { createRemotionCompositionProps } from "./remotion-props";
 import type { VideoRenderRequest } from "./rendering";
@@ -83,7 +83,7 @@ export async function renderMarketingTimelineWithRemotion(
           "-v",
           "error",
           "-show_entries",
-          "format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate",
+          videoProbeEntries,
           "-of",
           "json",
           rendered.sandboxFilePath,

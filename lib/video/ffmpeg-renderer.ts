@@ -137,7 +137,7 @@ export function createFfmpegTimelineRenderer(
             "-t",
             String(scene.durationSeconds),
             "-vf",
-            `${framing},fps=${request.fps}`,
+            `scale=trunc(iw*sar/2)*2:ih,setsar=1,${framing},setsar=1,fps=${request.fps}`,
             "-c:v",
             "libx264",
             "-pix_fmt",
