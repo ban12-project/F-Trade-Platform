@@ -421,3 +421,33 @@ assert.throws(
 console.log(
   "PASS literal fitment aliases, ambiguous labels, field separation and component guards",
 );
+
+// Caller selection metadata is not a ProductDraft field, even when it matches the SKU.
+const selectionSource = { ...componentSource, candidate_identifier: "RYC-SYN001" };
+assert.doesNotThrow(() => finalizeProductAgentDraft(componentDraft, selectionSource));
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      { ...componentDraft, candidate_identifier: "RYC-SYN001" },
+      selectionSource,
+    ),
+  /additional properties/,
+);
+console.log("PASS input-only candidate metadata cannot enter a ProductDraft");
+
+const kitSource = {
+  ...source,
+  source_text:
+    "| Part No. | Clutch Disc | Disc PTO |\n| --- | --- | --- |\n| SYN-KIT | component image | component image |",
+};
+const kitDraft = {
+  ...componentDraft,
+  product: {},
+  specifications: { kit_contents: ["clutch_disc"] },
+  field_evidence: { "specifications.kit_contents": source.evidence_refs[0] },
+};
+assert.throws(() => finalizeProductAgentDraft(kitDraft, kitSource), /kit_contents must match/);
+assert.doesNotThrow(() =>
+  finalizeProductAgentDraft(kitDraft, { ...kitSource, source_text: "Kit contents: clutch disc" }),
+);
+console.log("PASS kit membership requires its own explicit source label");

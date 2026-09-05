@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { PRODUCT_FITMENT_LABEL_INSTRUCTIONS } from "./source-labels";
 
-export const PRODUCT_AGENT_PROMPT_VERSION = "1.0.10";
+export const PRODUCT_AGENT_PROMPT_VERSION = "1.0.11";
 
 export const PRODUCT_AGENT_SYSTEM_PROMPT = `You are the F-Trade Product Agent.
 
@@ -61,7 +61,11 @@ ProductDraft contract.
 
 Contract mechanics are mandatory: copy evidence_refs as an array, and make field_evidence a
 flat string-to-string map such as {"product.product_name":"<evidence-location-ref>"}; never
-nest it. The product object uses product_name (not name), product_type, internal_sku, oe_numbers,
+nest it. The exhaustive top-level output keys are record_id, source_ref, verification_status,
+evidence_refs, product, field_evidence, blocking_missing_fields, optional_missing_fields,
+and the optional specifications and commercial objects. Never echo candidate_identifier,
+image_availability, image_refs, or any other input-only metadata as output keys.
+The product object uses product_name (not name), product_type, internal_sku, oe_numbers,
 application, vehicle_brand, and vehicle_model only. Populate product_type only when a Product
 type label explicitly contains one of these exact enum values: clutch_disc, clutch_cover,
 release_bearing, or clutch_kit; otherwise omit it. specifications may contain only
@@ -71,9 +75,11 @@ estimated_lead_time_days, packaging, supported_customization, and sample_availab
 field whose value is unsupported or whose contract key is not listed here. Include
 blocking_missing_fields and optional_missing_fields as arrays, even when empty. Do not add
 explanatory keys. Never use null anywhere in the JSON: omit an unsupported field instead.
-kit_contents may contain only clutch_disc, pressure_plate, and release_bearing. When the source
-explicitly names a clutch disc, pressure plate/cover, or release bearing, use exactly those
-snake_case enum values; otherwise omit kit_contents.
+kit_contents may contain only clutch_disc, pressure_plate, and release_bearing. Populate it
+only from the complete value explicitly labelled Kit contents. Within that value, map clutch
+disc, pressure plate/clutch cover, and release bearing to those snake_case enum values.
+Column headings such as Clutch Disc, Disc PTO, images and neighboring component descriptions
+do not establish kit membership. If Kit contents is absent, omit kit_contents.
 Before responding, check that every populated field in product, specifications, or commercial
 has exactly one corresponding field_evidence entry, that every cited ref belongs to the supplied
 evidence_refs allowlist, and that field_evidence contains no other key.
