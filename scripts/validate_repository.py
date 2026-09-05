@@ -371,7 +371,7 @@ def check_database_baseline() -> None:
     for required in ("workspaceItemRelation", "workspace_project_item_single_owner_uidx", "workspace_project_item_relation_matches_role"):
         if required not in workspace_schema:
             raise AssertionError(f"Workspace ownership contract is missing: {required}")
-    for forbidden in ("workspaceCanvasDocument", '"workspace_canvas_document"'):
+    for forbidden in ("workspaceCanvasDocument", '"workspace_canvas_document"', "videoCanvasDocument", '"video_canvas_document"'):
         if forbidden in workspace_schema:
             raise AssertionError(f"Retired project canvas persistence remains in the active schema: {forbidden}")
     for route in (ROOT / "app/workspace/page.tsx", ROOT / "app/workspace/[projectId]/page.tsx", ROOT / "app/workspace/[projectId]/video/page.tsx"):
@@ -430,6 +430,14 @@ def check_database_baseline() -> None:
     migration = chr(10).join(path.read_text(encoding="utf-8") for path in migrations)
     if 'DROP TABLE "workspace_canvas_document"' not in migration:
         raise AssertionError("Database migration must remove retired workspace canvas persistence")
+    retired_video_migration = ROOT / "drizzle/0027_remove_personal_video_canvas.sql"
+    if retired_video_migration.read_text(encoding="utf-8").strip() != 'DROP TABLE "video_canvas_document";':
+        raise AssertionError("Personal video canvas retirement must only drop its unused table")
+    for path in (ROOT / "lib/actions/video.ts", ROOT / "lib/video/canvas-contracts.ts"):
+        if "saveVideoCanvas" in path.read_text(encoding="utf-8"):
+            raise AssertionError(f"Retired personal video canvas save contract remains: {path}")
+    if (ROOT / "lib/video/canvas-store.ts").exists():
+        raise AssertionError("Retired personal video canvas store still exists")
     required_tables = {
         "user", "session", "account", "verification", "invitation",
         "aggregate_record", "approval", "evidence", "workflow_event", "audit_event", "passkey",

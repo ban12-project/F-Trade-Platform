@@ -36,6 +36,14 @@ async function verify() {
   const database = db as unknown as Database;
   try {
     await migrate(db, { migrationsFolder: "./drizzle" });
+    const retiredLayout = await pool.query(
+      "SELECT to_regclass('public.video_canvas_document') AS table_name",
+    );
+    assert.equal(
+      retiredLayout.rows[0]?.table_name,
+      null,
+      "Retired personal layout table must be absent after migrations",
+    );
     const identity = {
       actorId: "synthetic-admin",
       sessionId: "synthetic-session",

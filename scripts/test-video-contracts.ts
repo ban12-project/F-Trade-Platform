@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { saveVideoCanvasSchema, videoCanvasDocumentSchema } from "../lib/video/canvas-contracts";
+import { videoCanvasDocumentSchema } from "../lib/video/canvas-contracts";
 import {
   assertVideoPublicationEligible,
   isPrivateTestOnlyVideo,
@@ -93,10 +93,6 @@ const canvas = {
 };
 assert.equal(videoCanvasDocumentSchema.parse(canvas).nodes.length, 4);
 assert.equal(
-  saveVideoCanvasSchema.parse({ expectedRevision: 0, document: canvas }).expectedRevision,
-  0,
-);
-assert.equal(
   videoCanvasDocumentSchema.parse({
     ...canvas,
     factBinding: {
@@ -144,10 +140,6 @@ assert.equal(
   6,
 );
 assert.throws(() => videoCanvasDocumentSchema.parse({ ...canvas, version: 2 }), /Invalid input/);
-assert.throws(
-  () => saveVideoCanvasSchema.parse({ expectedRevision: -1, document: canvas }),
-  /Too small/,
-);
 assert.throws(
   () =>
     videoCanvasDocumentSchema.parse({
@@ -202,4 +194,4 @@ assert.throws(
   /缺少必要连线/,
 );
 
-console.log("PASS video contracts, canvas persistence, and advisory creative transitions");
+console.log("PASS video contracts, retained scene graph, and advisory creative transitions");

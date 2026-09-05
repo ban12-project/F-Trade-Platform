@@ -56,7 +56,7 @@ F-Trade 的真实业务顺序由领域状态机决定：产品事实核验后才
 - 删除 `@xyflow/react`、`elkjs` 及对应全局样式。
 - 项目创建和入站分流不再生成布局记录；历史项目直接从 `workspace_project` 加载。
 - `?view=flow` 诊断入口已经移除，避免形成第二套导航模型。
-- 个人 `video_canvas_document` 属于另一套遗留视频实验，仍须独立完成调用方和数据审计，不在本次迁移中删除。
+- 个人 `video_canvas_document` 属于另一套遗留视频实验；本 ADR 的原始迁移不删除它。Issue #260 的独立清理见 [ADR 0006](0006-retire-personal-video-canvas.md)。
 
 ### 5. 安全与领域边界
 
