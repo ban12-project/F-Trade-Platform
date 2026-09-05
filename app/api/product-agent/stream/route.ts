@@ -24,7 +24,11 @@ export const maxDuration = 120;
 
 export async function POST(request: Request) {
   // This cookie-authenticated mutation must originate from the app itself.
-  if (request.headers.get("origin") !== new URL(request.url).origin)
+  const allowedOrigins = new Set([new URL(request.url).origin]);
+  // Next's internal request URL can use a bind host behind a reverse proxy.
+  // Only add the operator-configured public origin, never caller-supplied forwarding headers.
+  if (process.env.BETTER_AUTH_URL) allowedOrigins.add(new URL(process.env.BETTER_AUTH_URL).origin);
+  if (!allowedOrigins.has(request.headers.get("origin") ?? ""))
     return Response.json({ error: "请求来源无效。" }, { status: 403 });
   const session = await auth.api.getSession({ headers: request.headers });
   if (session?.user.role !== "admin")
