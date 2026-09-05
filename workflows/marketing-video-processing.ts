@@ -87,9 +87,9 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
     const timeline = createMarketingEditTimeline(project, project.editDraft!);
     const preset = videoExportPresets.find(
       (candidate) =>
-        candidate.platform === project.editDraft!.platform && candidate.verification === "verified",
+        candidate.platform === project.editDraft!.platform && candidate.availability === "enabled",
     );
-    if (!preset) throw new Error("目标平台没有可用的已核验导出预设。");
+    if (!preset) throw new Error("目标平台没有已启用的项目导出预设。");
     const request = {
       timeline,
       platform: preset.platform,
