@@ -231,11 +231,7 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                 control={form.control}
                 name="model"
                 render={({ field }) => (
-                  <Input
-                    id="agent-model"
-                    aria-invalid={!!form.formState.errors.model}
-                    {...field}
-                  />
+                  <Input id="agent-model" aria-invalid={!!form.formState.errors.model} {...field} />
                 )}
               />
               {selected?.discoveredModels.length ? (
