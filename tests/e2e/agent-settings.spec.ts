@@ -104,9 +104,9 @@ async function captureSubmission(page: Page) {
   const data = await new Response(request.postData() ?? "", {
     headers: { "Content-Type": request.headers()["content-type"] },
   }).formData();
-  // React prefixes fields with the serialized FormData argument's numeric identifier.
+  // React prefixes FormData keys with the argument id, e.g. _1_name or 1_name.
   return Object.fromEntries(
-    Array.from(data.entries(), ([key, value]) => [key.replace(/^\d+_/, ""), value]),
+    Array.from(data.entries(), ([key, value]) => [key.replace(/^_?\d+_/, ""), value]),
   );
 }
 
