@@ -49,7 +49,8 @@ async function main() {
   });
   const pool = new Pool({ connectionString, max: 10 });
   const db = drizzle(pool, { schema });
-  const temp = await mkdtemp(join(root, "node_modules/.ftrade-pg-ablation-"));
+  await mkdir(join(root, "tmp"), { recursive: true });
+  const temp = await mkdtemp(join(root, "tmp/ftrade-pg-ablation-"));
   const credentials = {
     loginUsername: "",
     loginPassword: "",
