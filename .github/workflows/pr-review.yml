@@ -1,0 +1,59 @@
+name: PR review and ablations
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/pr-review.yml"
+      - "scripts/browser-fleet-ablation*"
+      - "scripts/test-browser-review*"
+      - "lib/browser-fleet/**"
+      - "ops/browser-node/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.number == 323 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Export tracked review inputs (no environment or deployment data)
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p review-input
+          git archive --format=tar "$HEAD_SHA" | gzip > review-input/head.tar.gz
+          git archive --format=tar "$BASE_SHA" | gzip > review-input/base.tar.gz
+          git diff --name-status "$BASE_SHA...$HEAD_SHA" > review-input/changed-files.txt
+          printf '%s\n' "$BASE_SHA" "$HEAD_SHA" > review-input/refs.txt
+          biome=$(find node_modules/.pnpm -path '*/@biomejs/cli-linux-x64/biome' -type f -print -quit)
+          test -n "$biome"
+          cp "$biome" review-input/biome
+          # Offline review uses only these installed public tool packages.
+          pnpm exec tsc --version > review-input/typescript-version.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pr-review-input
+          path: review-input/
+          retention-days: 1
+          include-hidden-files: false
