@@ -61,18 +61,16 @@ async function save(tx: DatabaseTransaction, row: NodeRow) {
     key_hash = ${row.key_hash}, status = ${row.status}, updated_at = now() WHERE id = ${row.id}`);
 }
 async function audit(tx: DatabaseTransaction, actorId: string, action: string, subjectId: string) {
-  await tx
-    .insert(auditEvent)
-    .values({
-      id: randomUUID(),
-      actorType: "system",
-      actorId,
-      action,
-      subjectType: "browser_node",
-      subjectId,
-      metadata: {},
-      occurredAt: new Date(),
-    });
+  await tx.insert(auditEvent).values({
+    id: randomUUID(),
+    actorType: "system",
+    actorId,
+    action,
+    subjectType: "browser_node",
+    subjectId,
+    metadata: {},
+    occurredAt: new Date(),
+  });
 }
 async function validSession(
   tx: DatabaseTransaction,
