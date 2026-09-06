@@ -83,6 +83,8 @@ jobs:
             lib/social/facebook-worker-protocol.ts
           )
           pnpm exec biome check --write "${files[@]}"
+          pnpm exec biome format --write "${files[@]}"
+          pnpm exec biome check --write "${files[@]}"
           pnpm exec biome ci "${files[@]}"
       - name: Application typecheck
         run: pnpm typecheck
