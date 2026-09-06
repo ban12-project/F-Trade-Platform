@@ -1,0 +1,35 @@
+name: Facebook worker validation
+
+on:
+  pull_request:
+    paths:
+      - "lib/social/**"
+      - "app/api/social-worker/**"
+      - "ops/social-worker/**"
+      - "scripts/test-facebook-worker-protocol.ts"
+      - ".github/workflows/facebook-worker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: npm install --global pnpm@11.24.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Pure worker and protocol tests
+        run: |
+          node --import tsx --test ops/social-worker/facebook-worker.test.ts ops/social-worker/facebook-v2.test.ts
+          pnpm exec tsx scripts/test-facebook-worker-protocol.ts
+      - name: Application typecheck
+        run: pnpm typecheck
