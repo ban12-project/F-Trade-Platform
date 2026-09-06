@@ -3,10 +3,11 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import { drizzle as postgresDrizzle } from "drizzle-orm/node-postgres";
 import { Pool as PostgresPool } from "pg";
 
+import * as facebookRuntimeSchema from "./facebook-runtime-schema";
 import * as productMediaSchema from "./product-media-schema";
 import * as coreSchema from "./schema";
 
-const schema = { ...coreSchema, ...productMediaSchema };
+const schema = { ...coreSchema, ...productMediaSchema, ...facebookRuntimeSchema };
 
 function requireDatabaseUrl() {
   const value = process.env.DATABASE_URL;

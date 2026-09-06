@@ -205,6 +205,7 @@ export function FacebookAccountPanel() {
                 </Button>
               </div>
               <iframe
+                key={connection.id}
                 ref={frame}
                 title="Facebook 安全登录与两步验证"
                 src={`${connection.origin}/login`}

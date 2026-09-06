@@ -64,6 +64,7 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date) {
       throw new Error("video_not_approved");
     }
     const video = videoProjectSchema.parse(content.payload);
+    await assertCurrentProductFactsForVideo(video, database);
     if (selection.mediaId !== video.renderedAssetRef) throw new Error("video_not_approved");
     const [asset] = await database
       .select()
@@ -165,6 +166,8 @@ export async function submitFacebookMediaPublication(
   actorId: string,
   database: Database = getDatabase(),
 ) {
+  if (actorId !== process.env.SOCIAL_FACEBOOK_OWNER_USER_ID)
+    throw new Error("facebook_account_owner_required");
   const value = facebookMediaSubmitFormSchema.parse(input);
   const scope = configuredFacebookWorkerScope();
   await assertWorkspaceProjectAccess(value.projectId, actorId, "write", database);
@@ -319,6 +322,7 @@ export async function readFacebookPublicationMedia(
       .where(
         and(
           eq(socialPublication.id, command.payloadRef),
+          eq(socialPublication.status, "submitted"),
           eq(socialPublication.browserJobId, command.jobId),
           eq(socialPublication.accountRef, scope.accountRef),
           eq(socialPublication.channelRef, scope.channelRef),

@@ -41,6 +41,8 @@ export async function saveFacebookCredentialsAction(input: unknown) {
 export async function openFacebookInteractiveAction(input: unknown) {
   const current = await owner();
   try {
+    if (process.env.SOCIAL_FACEBOOK_WORKER_ENABLED !== "1")
+      return { ok: false as const, message: "Facebook Worker 尚未启用，不能创建远程连接。" };
     return {
       ok: true as const,
       connection: await openFacebookInteractive(input, current.user.id, current.session.id),

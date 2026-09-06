@@ -204,6 +204,13 @@
       "when": 1788681600000,
       "tag": "0028_browser_fleet",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788686400000,
+      "tag": "0029_facebook_runtime",
+      "breakpoints": true
     }
   ]
 }

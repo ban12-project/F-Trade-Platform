@@ -150,7 +150,7 @@ export async function renewWatchdog(docker, containerId, deadline) {
     Cmd: [
       "node",
       "-e",
-      "require('node:fs').writeFileSync('/tmp/ftrade-lease',process.argv[1],{mode:0o600})",
+      "const fs=require('node:fs');const p='/tmp/ftrade-lease.'+process.pid;fs.writeFileSync(p,process.argv[1],{mode:0o600});fs.renameSync(p,'/tmp/ftrade-lease')",
       String(deadline),
     ],
   });

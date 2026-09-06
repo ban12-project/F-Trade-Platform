@@ -5,6 +5,7 @@ export async function POST(request: Request) {
   const respond = (body: unknown, status = 200) =>
     Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
   try {
+    if (process.env.SOCIAL_FACEBOOK_WORKER_ENABLED !== "1") return respond({ active: false }, 503);
     if (!request.body) return respond({ active: false }, 400);
     const reader = request.body.getReader();
     const chunks: Uint8Array[] = [];

@@ -28,6 +28,31 @@ async function readBody(request) {
 }
 export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
   const views = new Map();
+  function allowed(entry) {
+    return (
+      !!entry &&
+      !entry.closed &&
+      !entry.slot.stopping &&
+      slots.get(entry.slot.run.id) === entry.slot &&
+      entry.slot.expiresAt > Date.now()
+    );
+  }
+  function dispose(key, entry) {
+    entry.closed = true;
+    entry.slot.disconnectedAt = Date.now();
+    for (const request of entry.requests) request.destroy();
+    for (const socket of entry.sockets) socket.destroy();
+    views.delete(key);
+  }
+  // Established tunnels need their own expiry check, even while a Docker call
+  // blocks the Agent's next poll. Handshake-only checks do not revoke a tunnel.
+  const expiryTimer = setInterval(() => {
+    for (const [key, entry] of views) {
+      if (!allowed(entry) || (!entry.used && Date.now() - entry.createdAt > 30_000))
+        dispose(key, entry);
+    }
+  }, 250);
+  expiryTimer.unref();
   const source = readFileSync(new URL("./viewer.js", import.meta.url), "utf8");
   const server = http.createServer(async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
@@ -65,7 +90,15 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
         if (!slot?.ready || slot.stopping || slot.expiresAt <= Date.now()) return fail();
         const view = randomBytes(32).toString("base64url");
         const ws = randomBytes(32).toString("base64url");
-        views.set(view, { slot, ws, used: false, createdAt: Date.now(), sockets: new Set() });
+        views.set(view, {
+          slot,
+          ws,
+          used: false,
+          closed: false,
+          createdAt: Date.now(),
+          sockets: new Set(),
+          requests: new Set(),
+        });
         response.setHeader("Content-Type", "application/json");
         response.end(
           JSON.stringify({
@@ -79,7 +112,7 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
       const match = /^\/assets\/([A-Za-z0-9_-]{43})(\/.*)$/.exec(request.url ?? "");
       if (request.method !== "GET" || !match) return fail();
       const entry = views.get(match[1]);
-      if (!entry || entry.slot.stopping || entry.slot.expiresAt <= Date.now()) return fail();
+      if (!allowed(entry)) return fail();
       const path = safeAssetPath(match[2]);
       const upstream = await fetch(`http://127.0.0.1:${entry.slot.vncPort}${path}`, {
         signal: AbortSignal.timeout(5000),
@@ -89,8 +122,14 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
         await upstream.body?.cancel();
         return fail();
       }
-      const data = await upstream.arrayBuffer();
-      if (data.byteLength > 2_000_000) return fail();
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of upstream.body) {
+        size += chunk.byteLength;
+        if (size > 2_000_000 || !allowed(entry)) return fail();
+        chunks.push(chunk);
+      }
+      const data = Buffer.concat(chunks);
       response.setHeader(
         "Content-Type",
         upstream.headers.get("content-type") ?? "application/octet-stream",
@@ -104,19 +143,19 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
     const match = /^\/ws\/([A-Za-z0-9_-]{43})\/([A-Za-z0-9_-]{43})$/.exec(request.url ?? "");
     const entry = match && views.get(match[1]);
     if (
-      !entry ||
+      !allowed(entry) ||
       entry.used ||
       entry.ws !== match[2] ||
       Date.now() - entry.createdAt > 30_000 ||
-      entry.slot.stopping ||
-      entry.slot.expiresAt <= Date.now() ||
       request.headers.origin !== entry.slot.gatewayOrigin
     ) {
       socket.destroy();
       return;
     }
     entry.used = true;
-    entry.slot.connected = true;
+    // Register pending sockets before contacting upstream so closeRun also
+    // cancels a handshake that has not reached its upgrade callback yet.
+    entry.sockets.add(socket);
     const proxy = http.request({
       hostname: "127.0.0.1",
       port: entry.slot.vncPort,
@@ -133,17 +172,21 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
           : {}),
       },
     });
-    const close = () => {
-      entry.slot.disconnectedAt = Date.now();
-      socket.destroy();
-      proxy.destroy();
-    };
+    entry.requests.add(proxy);
+    const close = () => dispose(match[1], entry);
+    socket.once("close", close);
+    socket.once("error", close);
     proxy.setTimeout(10_000, close);
     proxy.on("error", close);
     proxy.on("response", close);
     proxy.on("upgrade", (response, upstream, upstreamHead) => {
       proxy.setTimeout(0);
-      entry.sockets.add(socket);
+      if (!allowed(entry) || socket.destroyed || views.get(match[1]) !== entry) {
+        upstream.destroy();
+        close();
+        return;
+      }
+      entry.slot.connected = true;
       entry.sockets.add(upstream);
       socket.write(
         `HTTP/1.1 101 Switching Protocols\r\n${Object.entries(response.headers)
@@ -167,16 +210,19 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
     });
     proxy.end();
   });
+  server.requestTimeout = 10_000;
+  server.headersTimeout = 10_000;
   server.listen(port, "127.0.0.1");
   return {
     server,
     closeRun(runId) {
       for (const [key, entry] of views)
-        if (entry.slot.run.id === runId) {
-          for (const socket of entry.sockets) socket.destroy();
-          views.delete(key);
-        }
+        if (entry.slot.run.id === runId) dispose(key, entry);
     },
-    close: () => server.close(),
+    close() {
+      clearInterval(expiryTimer);
+      for (const [key, entry] of views) dispose(key, entry);
+      server.close();
+    },
   };
 }

@@ -472,6 +472,7 @@ export function BrowserNodesPanel() {
           </CardHeader>
           <CardContent className="space-y-3">
             <iframe
+              key={connection.token}
               ref={frame}
               src={`${connection.origin}/viewer`}
               title="账号登录与两步验证"

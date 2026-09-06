@@ -13,7 +13,11 @@ import {
 
 async function actor() {
   const current = await auth.api.getSession({ headers: await headers() });
-  if (!current?.user || !hasPermission(current.user.role, "content:review"))
+  if (
+    !current?.user ||
+    !hasPermission(current.user.role, "content:review") ||
+    current.user.id !== process.env.SOCIAL_FACEBOOK_OWNER_USER_ID
+  )
     throw new Error("需要人工审核权限。");
   return current.user.id;
 }

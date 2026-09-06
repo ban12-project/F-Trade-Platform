@@ -10,7 +10,7 @@ import { assertCurrentProductFacts } from "./product-fact-runtime-policy";
 
 export async function assertCurrentProductFactsForVideo(
   project: VideoProject,
-  database: Database = getDatabase(),
+  database: Pick<Database, "select"> = getDatabase(),
 ) {
   const [product] = await database
     .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })

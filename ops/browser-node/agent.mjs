@@ -7,6 +7,7 @@ import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import { createGateway } from "./gateway.mjs";
+import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 
 const appOrigin = secureOrigin(process.env.FTRADE_URL ?? "");
 const accessKey = process.env.BROWSER_NODE_ACCESS_KEY_FILE
@@ -71,11 +72,6 @@ async function nodeCall(operation, fields = {}) {
   const data = await response.json();
   data.roundTripMs = performance.now() - started;
   return data;
-}
-function localDeadline(result, leaseUntil) {
-  const ttl = Math.min(90_000, leaseUntil - result.serverNow) - result.roundTripMs - 5000;
-  if (!Number.isFinite(ttl) || ttl <= 0) throw new Error("lease_response_expired");
-  return Date.now() + ttl;
 }
 async function checkpoint() {
   const safe = [...slots.values()].map((s) => ({
@@ -286,6 +282,13 @@ async function heartbeat(slot) {
     await stop(slot, "completed");
     return;
   }
+  if (slot.containerId && slot.ready) {
+    const runtime = await docker("GET", `/containers/${slot.containerId}/json`);
+    if (!runtime.State.Running) {
+      await stop(slot, "unknown");
+      return;
+    }
+  }
   if (slot.containerId) await renewWatchdog(docker, slot.containerId, slot.expiresAt);
 }
 let ticking = false;
@@ -309,10 +312,21 @@ async function tick() {
       availableMemoryMb: Math.max(0, Math.floor(freemem() / 1024 / 1024 - reserveMb)),
       localSlots: maxSlots,
     });
+    if (!result.run || slots.has(result.run.id)) {
+      pendingClaim = null;
+      return;
+    }
+    const prepared = await prepareClaimBeforeStart(
+      result,
+      (claim) => {
+        const expiresAt = localDeadline(claim, claim.run.leaseUntil);
+        return { expiresAt, spec: containerSpec(nodeId, claim.run, imageId, expiresAt) };
+      },
+      (outcome) => nodeCall("finish", outcome),
+    );
     pendingClaim = null;
-    if (!result.run || slots.has(result.run.id)) return;
-    const expiresAt = localDeadline(result, result.run.leaseUntil);
-    const spec = containerSpec(nodeId, result.run, imageId, expiresAt);
+    if (!prepared) return;
+    const { expiresAt, spec } = prepared;
     const slot = {
       run: result.run,
       spec,
@@ -326,7 +340,12 @@ async function tick() {
       stopping: false,
     };
     slots.set(result.run.id, slot);
-    await checkpoint();
+    try {
+      await checkpoint();
+    } catch {
+      await stop(slot, "failed");
+      return;
+    }
     slot.startPromise = launch(slot);
     void slot.startPromise
       .then(async () => {
