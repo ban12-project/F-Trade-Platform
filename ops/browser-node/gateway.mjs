@@ -216,8 +216,7 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
   return {
     server,
     closeRun(runId) {
-      for (const [key, entry] of views)
-        if (entry.slot.run.id === runId) dispose(key, entry);
+      for (const [key, entry] of views) if (entry.slot.run.id === runId) dispose(key, entry);
     },
     close() {
       clearInterval(expiryTimer);

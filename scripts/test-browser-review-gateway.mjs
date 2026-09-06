@@ -169,7 +169,11 @@ test("close during upstream handshake cannot resurrect a revoked tunnel", async 
   try {
     await delay(50);
     f.gateway.closeRun(f.slot.run.id);
-    assert.equal(await a.connected, false, "late upstream upgrade must not revive closed capability");
+    assert.equal(
+      await a.connected,
+      false,
+      "late upstream upgrade must not revive closed capability",
+    );
   } finally {
     a.destroy();
     f.close();
