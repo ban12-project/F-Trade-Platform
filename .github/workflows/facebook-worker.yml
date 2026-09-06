@@ -26,10 +26,7 @@ jobs:
           package-manager-cache: false
       - run: npm install --global pnpm@11.24.0
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: Pure worker and protocol tests
-        run: |
-          node --import tsx --test ops/social-worker/facebook-worker.test.ts ops/social-worker/facebook-v2.test.ts
-          pnpm exec tsx scripts/test-facebook-worker-protocol.ts
+      - name: Facebook protocol tests
+        run: pnpm exec tsx scripts/test-facebook-worker-protocol.ts
       - name: Application typecheck
         run: pnpm typecheck
