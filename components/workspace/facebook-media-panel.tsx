@@ -6,13 +6,7 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
@@ -79,7 +73,8 @@ export function FacebookMediaPanel() {
       <CardHeader>
         <CardTitle>发布图片 / 视频</CardTitle>
         <CardDescription>
-          单张 JPEG / PNG 配已审核文案，或一条已审核 MP4 成片。不接收任意外部素材 URL，不生成新视频。
+          单张 JPEG / PNG 配已审核文案，或一条已审核 MP4 成片。不接收任意外部素材
+          URL，不生成新视频。
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -15,8 +15,8 @@ import {
   videoGeneratedAsset,
   workspaceProjectItem,
 } from "@/lib/db/schema";
-import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
 import { videoProjectSchema } from "@/lib/video/contracts";
+import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { facebookMediaSubmitFormSchema } from "./facebook-account-forms";
 import {
@@ -25,11 +25,11 @@ import {
   parseFacebookMedia,
   parseFacebookMediaPayload,
 } from "./facebook-media-contract";
-import { assertPublicationEligible } from "./publication-store";
 import {
   configuredFacebookWorkerScope,
   facebookTextPayloadSchema,
 } from "./facebook-worker-protocol";
+import { assertPublicationEligible } from "./publication-store";
 import {
   digestSocialWorkerPayload,
   type SignedSocialWorkerCommand,
@@ -70,8 +70,7 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date) {
       .from(videoGeneratedAsset)
       .where(eq(videoGeneratedAsset.assetRef, selection.mediaId));
     if (
-      !asset ||
-      asset.contentType !== "video/mp4" ||
+      asset?.contentType !== "video/mp4" ||
       asset.sizeBytes <= 0 ||
       asset.sizeBytes > FACEBOOK_MEDIA_LIMITS.video
     ) {
@@ -116,12 +115,7 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date) {
   const [product] = await database
     .select({ state: aggregateRecord.state })
     .from(aggregateRecord)
-    .where(
-      and(
-        eq(aggregateRecord.id, asset.asset.productId),
-        eq(aggregateRecord.type, "product"),
-      ),
-    );
+    .where(and(eq(aggregateRecord.id, asset.asset.productId), eq(aggregateRecord.type, "product")));
   if (
     product?.state !== "PRODUCT_READY" ||
     !["image/jpeg", "image/png"].includes(asset.evidence.contentType)
@@ -333,12 +327,7 @@ export async function readFacebookPublicationMedia(
     const [job] = await tx
       .select()
       .from(socialBrowserJob)
-      .where(
-        and(
-          eq(socialBrowserJob.id, command.jobId),
-          eq(socialBrowserJob.status, "claimed"),
-        ),
-      );
+      .where(and(eq(socialBrowserJob.id, command.jobId), eq(socialBrowserJob.status, "claimed")));
     if (!publication || !job) throw new Error("media_job_not_claimed");
     await assertPublicationEligible(
       { ...publication, format: mediaPayload.format },
@@ -473,12 +462,7 @@ export async function authorizeFacebookPublication(
     const [job] = await tx
       .select()
       .from(socialBrowserJob)
-      .where(
-        and(
-          eq(socialBrowserJob.id, command.jobId),
-          eq(socialBrowserJob.status, "claimed"),
-        ),
-      );
+      .where(and(eq(socialBrowserJob.id, command.jobId), eq(socialBrowserJob.status, "claimed")));
     if (!publication || !job) throw new Error("publication_not_claimed");
     const { record } = await assertPublicationEligible(
       { ...publication, format: "text" },

@@ -20,7 +20,9 @@ export type FacebookMediaPayload = {
 };
 export type PreparedFacebookMedia = FacebookMedia & { path: string; filename: string };
 
-function fail(): never { throw new Error("invalid_facebook_media"); }
+function fail(): never {
+  throw new Error("invalid_facebook_media");
+}
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail();
   return value as Record<string, unknown>;
@@ -39,7 +41,12 @@ export function parseFacebookMedia(input: unknown): FacebookMedia {
   if (!["image/jpeg", "image/png", "video/mp4"].includes(String(v.contentType))) fail();
   const contentType = v.contentType as FacebookMedia["contentType"];
   const kind = contentType === "video/mp4" ? "video" : "image";
-  if (!Number.isSafeInteger(v.sizeBytes) || Number(v.sizeBytes) < 1 || Number(v.sizeBytes) > FACEBOOK_MEDIA_LIMITS[kind]) fail();
+  if (
+    !Number.isSafeInteger(v.sizeBytes) ||
+    Number(v.sizeBytes) < 1 ||
+    Number(v.sizeBytes) > FACEBOOK_MEDIA_LIMITS[kind]
+  )
+    fail();
   if (typeof v.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(v.sha256)) fail();
   return { assetRef, contentType, sizeBytes: Number(v.sizeBytes), sha256: v.sha256 };
 }
@@ -51,8 +58,13 @@ export function parseFacebookMediaPayload(input: unknown): FacebookMediaPayload 
   const media = parseFacebookMedia(v.media);
   if ((v.format === "video") !== (media.contentType === "video/mp4")) fail();
   return {
-    version: 2, channelRef: reference(v.channelRef), accountRef: reference(v.accountRef),
-    publicationId: reference(v.publicationId), format: v.format as "image" | "video", text: v.text, media,
+    version: 2,
+    channelRef: reference(v.channelRef),
+    accountRef: reference(v.accountRef),
+    publicationId: reference(v.publicationId),
+    format: v.format as "image" | "video",
+    text: v.text,
+    media,
   };
 }
 export function mediaFilename(media: FacebookMedia) {
@@ -60,9 +72,13 @@ export function mediaFilename(media: FacebookMedia) {
 }
 export function assertMediaMagic(bytes: Uint8Array, contentType: FacebookMedia["contentType"]) {
   const b = Buffer.from(bytes);
-  const matches = contentType === "image/png"
-    ? b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-    : contentType === "image/jpeg" ? b[0] === 255 && b[1] === 216 && b[2] === 255
-    : b.length >= 12 && b.toString("ascii", 4, 8) === "ftyp" && ["isom", "iso2", "mp41", "mp42", "avc1"].includes(b.toString("ascii", 8, 12));
+  const matches =
+    contentType === "image/png"
+      ? b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      : contentType === "image/jpeg"
+        ? b[0] === 255 && b[1] === 216 && b[2] === 255
+        : b.length >= 12 &&
+          b.toString("ascii", 4, 8) === "ftyp" &&
+          ["isom", "iso2", "mp41", "mp42", "avc1"].includes(b.toString("ascii", 8, 12));
   if (!matches) fail();
 }

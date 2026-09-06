@@ -3,21 +3,25 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 const reference = z.string().trim().min(1).max(200);
-export const facebookWorkerScopeSchema = z.object({
-  workerId: reference,
-  channelRef: reference,
-  accountRef: reference,
-}).strict();
+export const facebookWorkerScopeSchema = z
+  .object({
+    workerId: reference,
+    channelRef: reference,
+    accountRef: reference,
+  })
+  .strict();
 export type FacebookWorkerScope = z.infer<typeof facebookWorkerScopeSchema>;
 
-export const facebookInboundMessageSchema = z.object({
-  conversationRef: reference,
-  messageRef: reference,
-  direction: z.literal("inbound"),
-  identityQuality: z.literal("dom_id"),
-  body: z.string().trim().min(1).max(20_000),
-  receivedAt: z.iso.datetime(),
-}).strict();
+export const facebookInboundMessageSchema = z
+  .object({
+    conversationRef: reference,
+    messageRef: reference,
+    direction: z.literal("inbound"),
+    identityQuality: z.literal("dom_id"),
+    body: z.string().trim().min(1).max(20_000),
+    receivedAt: z.iso.datetime(),
+  })
+  .strict();
 
 const common = {
   ...facebookWorkerScopeSchema.shape,
@@ -27,30 +31,51 @@ const common = {
 export const facebookWorkerRequestSchema = z.discriminatedUnion("operation", [
   z.object({ ...common, operation: z.literal("status") }).strict(),
   z.object({ ...common, operation: z.literal("claim") }).strict(),
-  z.object({
-    ...common,
-    operation: z.literal("inbound"),
-    messages: z.array(facebookInboundMessageSchema).min(1).max(20),
-  }).strict(),
-  z.object({
-    ...common,
-    operation: z.literal("pause"),
-    reason: z.enum(["browser_unavailable", "page_contract_failed", "egress_ip_mismatch", "external_result_unknown", "worker_stopped", "login_required", "two_factor_required", "checkpoint_required"]),
-  }).strict(),
+  z
+    .object({
+      ...common,
+      operation: z.literal("inbound"),
+      messages: z.array(facebookInboundMessageSchema).min(1).max(20),
+    })
+    .strict(),
+  z
+    .object({
+      ...common,
+      operation: z.literal("pause"),
+      reason: z.enum([
+        "browser_unavailable",
+        "page_contract_failed",
+        "egress_ip_mismatch",
+        "external_result_unknown",
+        "worker_stopped",
+        "login_required",
+        "two_factor_required",
+        "checkpoint_required",
+      ]),
+    })
+    .strict(),
 ]);
 export type FacebookWorkerRequest = z.infer<typeof facebookWorkerRequestSchema>;
-const envelopeSchema = z.object({
-  request: facebookWorkerRequestSchema,
-  signature: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-}).strict();
+const envelopeSchema = z
+  .object({
+    request: facebookWorkerRequestSchema,
+    signature: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  })
+  .strict();
 
-export const facebookTextPayloadSchema = z.object({
-  channelRef: reference,
-  accountRef: reference,
-  publicationId: z.uuid(),
-  format: z.literal("text"),
-  text: z.string().min(1).max(20_000).refine((value) => value.trim().length > 0),
-}).strict();
+export const facebookTextPayloadSchema = z
+  .object({
+    channelRef: reference,
+    accountRef: reference,
+    publicationId: z.uuid(),
+    format: z.literal("text"),
+    text: z
+      .string()
+      .min(1)
+      .max(20_000)
+      .refine((value) => value.trim().length > 0),
+  })
+  .strict();
 
 function signingKey() {
   const key = Buffer.from(process.env.SOCIAL_WORKER_SIGNING_KEY ?? "", "base64");
