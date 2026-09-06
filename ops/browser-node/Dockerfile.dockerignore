@@ -1,0 +1,10 @@
+.git
+**/node_modules
+**/.next
+**/.remotion
+**/.env
+**/.env.*
+!**/.env.example
+ops/browser-node/upstream
+**/profiles
+**/node-state

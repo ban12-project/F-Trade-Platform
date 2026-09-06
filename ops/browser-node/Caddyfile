@@ -1,0 +1,4 @@
+{$BROWSER_DOMAIN} {
+  # Do not enable access logs: viewer asset/WS paths contain short-lived capabilities.
+  reverse_proxy 127.0.0.1:9400
+}
