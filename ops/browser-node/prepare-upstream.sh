@@ -15,6 +15,8 @@ if [ -n "$(git -C upstream status --porcelain)" ]; then
   printf '%s\n' 'Upstream working tree is dirty; refusing to overwrite it.' >&2
   exit 1
 fi
-git -C upstream fetch --depth=1 origin "$PIN"
+if ! git -C upstream cat-file -e "$PIN^{commit}" 2>/dev/null; then
+  git -C upstream fetch --depth=1 origin "$PIN"
+fi
 git -C upstream checkout --detach "$PIN"
 test "$(git -C upstream rev-parse HEAD)" = "$PIN"

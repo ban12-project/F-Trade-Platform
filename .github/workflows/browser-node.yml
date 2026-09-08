@@ -49,6 +49,8 @@ jobs:
         run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts
       - name: Offline Agent payload imports without application dependencies
         run: node scripts/test-browser-agent-payload.mjs
+      - name: Pinned upstream source cache and refusal checks
+        run: node scripts/test-browser-upstream.mjs
       - name: Real PostgreSQL reservations and migration
         run: pnpm exec tsx scripts/test-browser-fleet-postgres.ts
         env:
