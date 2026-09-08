@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import productReadyFixture from "../data/fixtures/product-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import {
   aggregateRecord,
@@ -20,6 +21,7 @@ import {
   resolveApprovedVideoDownload,
 } from "../lib/video/download-policy";
 import { approveReviewVideoExport, createReviewVideoExport } from "../lib/video/export-artifact";
+import { createVideoExportManifest } from "../lib/video/export-manifest";
 import { resolveWorkspacePrivateVideoPreview } from "../lib/video/preview-delivery";
 import { loadWorkspaceVideoForActor } from "../lib/video/workspace-access";
 
@@ -181,6 +183,43 @@ void (async () => {
     // production wiring: membership alone must not bypass fact revalidation.
     assert.equal((await resolveWorkspaceApprovedVideoManifest(member, id)).kind, "unavailable");
     assert.equal((await resolveWorkspaceApprovedVideoDownload(member, id)).kind, "unavailable");
+    const currentProduct = {
+      ...productReadyFixture,
+      record_id: project.productId,
+      evidence_refs: [...productReadyFixture.evidence_refs, "evidence-synthetic-fact"],
+      field_evidence: {
+        ...productReadyFixture.field_evidence,
+        "product.product_name": "evidence-synthetic-fact",
+      },
+      product: { ...productReadyFixture.product, product_name: "SYNTHETIC fixture" },
+    };
+    await db.insert(aggregateRecord).values({
+      id: project.productId,
+      type: "product",
+      state: "PRODUCT_READY",
+      payload: currentProduct,
+      createdByType: "human",
+      createdById: owner,
+    });
+    const manifestAccess = await resolveWorkspaceApprovedVideoManifest(member, id);
+    assert.equal(manifestAccess.kind, "ready");
+    assert.ok("artifact" in manifestAccess);
+    assert.equal(createVideoExportManifest(manifestAccess.artifact).videoId, id);
+    for (const changedProduct of [
+      {
+        ...currentProduct,
+        product: { ...currentProduct.product, product_name: "SYNTHETIC revised" },
+      },
+      { ...currentProduct, evidence_refs: productReadyFixture.evidence_refs },
+    ]) {
+      await db
+        .update(aggregateRecord)
+        .set({ payload: changedProduct })
+        .where(eq(aggregateRecord.id, project.productId));
+      assert.equal((await resolveWorkspaceApprovedVideoManifest(member, id)).kind, "unavailable");
+      assert.equal((await resolveWorkspaceApprovedVideoDownload(member, id)).kind, "unavailable");
+    }
+    await db.delete(aggregateRecord).where(eq(aggregateRecord.id, project.productId));
     assert.equal(
       (await resolveWorkspacePrivateVideoPreview(member, assetRef, store)).kind,
       "ready",
@@ -300,7 +339,9 @@ void (async () => {
     await db
       .delete(workspaceProject)
       .where(inArray(workspaceProject.id, [projectId, copyProjectId]));
-    await db.delete(aggregateRecord).where(inArray(aggregateRecord.id, [id, copyId]));
+    await db
+      .delete(aggregateRecord)
+      .where(inArray(aggregateRecord.id, [id, copyId, project.productId]));
     await db.delete(user).where(inArray(user.id, [owner, outsider]));
     await closeDatabase();
   }
