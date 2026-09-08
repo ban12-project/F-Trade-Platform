@@ -46,7 +46,7 @@ jobs:
           cache: true
       - run: pnpm install --frozen-lockfile
       - name: Lease, capacity, gateway and isolation regression tests
-        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-fleet-protocol.ts
+        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts
       - name: Real PostgreSQL reservations and migration
         run: pnpm exec tsx scripts/test-browser-fleet-postgres.ts
         env:
@@ -62,12 +62,12 @@ jobs:
         run: docker build -f ops/browser-node/Dockerfile -t ftrade-browser-node:ci .
       - name: Check new code with repository Biome rules
         if: ${{ !cancelled() }}
-        run: pnpm exec biome ci lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-fleet-postgres.ts
+        run: pnpm exec biome ci lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-fleet-postgres.ts
       - name: Export suggested formatting patch for review (never commits)
         if: ${{ failure() }}
         shell: bash
         run: |
-          files=(lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-fleet-postgres.ts)
+          files=(lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-fleet-postgres.ts)
           set +e
           pnpm exec biome check --write "${files[@]}"
           formatter_status=$?

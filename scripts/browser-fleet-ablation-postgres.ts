@@ -91,6 +91,7 @@ async function main() {
             nodeId: created.nodeId,
             channelRef: "synthetic-facebook",
             accountRef: randomUUID(),
+            expectedEgressIp: "203.0.113.10",
             pollSeconds: 0,
             credentials,
           },

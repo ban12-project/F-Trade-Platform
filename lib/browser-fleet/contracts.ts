@@ -32,6 +32,9 @@ export const accountFormSchema = z
     nodeId: id,
     channelRef: reference,
     accountRef: reference,
+    expectedEgressIp: z.union([z.ipv4(), z.ipv6()], {
+      error: "请填写代理服务商确认的固定 IPv4 或 IPv6 地址。",
+    }),
     pollSeconds: z
       .number()
       .int()
@@ -97,7 +100,15 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       runId: id,
       leaseId: id,
       stopped: z.literal(true),
-      outcome: z.enum(["completed", "failed", "needs_login", "needs_2fa", "checkpoint", "unknown"]),
+      outcome: z.enum([
+        "completed",
+        "failed",
+        "needs_login",
+        "needs_2fa",
+        "checkpoint",
+        "egress_mismatch",
+        "unknown",
+      ]),
     })
     .strict(),
   z

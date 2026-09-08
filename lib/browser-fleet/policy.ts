@@ -8,12 +8,20 @@ export type RunStatus =
   | "completed"
   | "failed"
   | "unknown";
-export type AuthState = "needs_login" | "needs_2fa" | "checkpoint" | "ready" | "result_unknown";
+export type AuthState =
+  | "needs_login"
+  | "needs_2fa"
+  | "checkpoint"
+  | "egress_mismatch"
+  | "ready"
+  | "result_unknown";
 export type Limits = { maxBrowsers: number; memoryBudgetMb: number; browserMemoryMb: number };
 export type Account = {
   id: string;
   channelRef: string;
   accountRef: string;
+  // Older version-1 documents must be reconfigured before their next lease.
+  expectedEgressIp?: string;
   enabled: boolean;
   authState: AuthState;
   credentialVersion: number;
@@ -245,7 +253,14 @@ export function requestStop(state: FleetState, run: Run) {
 export function finishRun(
   state: FleetState,
   runId: string,
-  outcome: "completed" | "failed" | "needs_login" | "needs_2fa" | "checkpoint" | "unknown",
+  outcome:
+    | "completed"
+    | "failed"
+    | "needs_login"
+    | "needs_2fa"
+    | "checkpoint"
+    | "egress_mismatch"
+    | "unknown",
   stopped: boolean,
   now: number,
 ) {
@@ -263,7 +278,7 @@ export function finishRun(
     run.kind === "publish" ? "unknown" : outcome === "completed" ? "completed" : "failed";
   run.failure = run.status === "completed" ? null : outcome;
   if (a) {
-    if (["needs_login", "needs_2fa", "checkpoint"].includes(outcome))
+    if (["needs_login", "needs_2fa", "checkpoint", "egress_mismatch"].includes(outcome))
       a.authState = outcome as AuthState;
     if (run.status === "unknown") a.authState = "result_unknown";
     else if (outcome === "unknown" && run.kind === "interactive") a.authState = "needs_login";

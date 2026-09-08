@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
+import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 
@@ -202,35 +203,12 @@ async function launch(slot) {
       await sleep(1000, undefined, { signal: slot.abort.signal });
     }
   }
-  // Start on a neutral egress page. The human sees the actual browser proxy IP,
-  // then navigates to Facebook using the same session via the dedicated tab.
-  const opened = await browserRequest(
-    slot,
-    "/tabs",
-    {
-      userId: slot.run.accountId,
-      sessionKey: slot.run.id,
-      url: "https://api.ipify.org/?format=json",
-      trace: false,
-    },
-    120_000,
+  slot.egressTabId = await openEgressCheckedSession(
+    (path, body) => browserRequest(slot, path, body),
+    slot.run,
   );
-  await opened.body?.cancel();
+  slot.egressCheckedAt = Date.now();
   if (slot.stopping) return;
-  if (slot.run.kind === "interactive") {
-    const login = await browserRequest(
-      slot,
-      "/tabs",
-      {
-        userId: slot.run.accountId,
-        sessionKey: slot.run.id,
-        url: "https://www.facebook.com/",
-        trace: false,
-      },
-      120_000,
-    );
-    await login.body?.cancel();
-  }
   for (let i = 0; i < 30; i++) {
     const response = await browserRequest(slot, "/vnc/status");
     const status = await response.json();
@@ -261,6 +239,20 @@ async function heartbeat(slot) {
     slot.outcome = "unknown";
     await stop(slot, "unknown");
     return;
+  }
+  if (slot.ready && Date.now() - slot.egressCheckedAt >= 30_000) {
+    try {
+      await verifyBrowserEgress(
+        (path, body) => browserRequest(slot, path, body),
+        slot.run,
+        slot.egressTabId,
+      );
+      slot.egressCheckedAt = Date.now();
+    } catch {
+      slot.outcome = "egress_mismatch";
+      await stop(slot, slot.outcome);
+      return;
+    }
   }
   const renewed = await nodeCall("heartbeat", {
     runId: slot.run.id,
@@ -371,9 +363,9 @@ async function tick() {
         }
         await stop(slot, slot.outcome);
       })
-      .catch(() => {
-        slot.outcome = "failed";
-        void stop(slot, "failed").catch(() => {});
+      .catch((error) => {
+        slot.outcome = error.message?.startsWith("egress_") ? "egress_mismatch" : "failed";
+        void stop(slot, slot.outcome).catch(() => {});
       });
   } catch {
     console.error("browser_node_poll_failed");

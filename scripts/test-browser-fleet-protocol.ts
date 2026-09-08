@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import {
+  accountFormSchema,
   nodeFormSchema,
   nodeRequestSchema,
   ownerCommandSchema,
@@ -70,4 +71,27 @@ test("owners cannot bypass publication approval by queueing a raw publish comman
     }).success,
     false,
   );
+});
+
+test("account grants require an explicit expected IP, never a host or auto-detected address", () => {
+  const value = {
+    nodeId: randomUUID(),
+    channelRef: "synthetic",
+    accountRef: "synthetic-account",
+    expectedEgressIp: "203.0.113.10",
+    pollSeconds: 300,
+    credentials: {
+      loginUsername: "",
+      loginPassword: "",
+      proxyHost: "proxy.example",
+      proxyPort: "3128",
+      proxyUsername: "",
+      proxyPassword: "",
+      clearLogin: false,
+      clearProxy: false,
+    },
+  };
+  assert.equal(accountFormSchema.safeParse(value).success, true);
+  for (const expectedEgressIp of [undefined, "", "auto", "proxy.example", "999.1.1.1"])
+    assert.equal(accountFormSchema.safeParse({ ...value, expectedEgressIp }).success, false);
 });

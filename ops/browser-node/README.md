@@ -38,7 +38,7 @@ FACEBOOK_CREDENTIAL_KEYS_JSON={"v1":"<32-byte base64 key>"}
 
 不要替换已有有效 Vault Key。沿用现有 `DATABASE_URL`、Better Auth 配置。主加密密钥永远只在平台，不能复制到 VPS 或 NEXT_PUBLIC_*。
 
-经审核后用项目的 `pnpm db:migrate` 应用迁移。登录具有 `settings:manage` 权限的账户，打开 `/workspace/browsers`：创建节点，填写该节点的 HTTPS 接管域名，设置容量，保存只展示一次的 Key。然后为节点授权账号、固定 HTTP 代理及可选加密账号密码。
+经审核后用项目的 `pnpm db:migrate` 应用迁移。登录具有 `settings:manage` 权限的账户，打开 `/workspace/browsers`：创建节点，填写该节点的 HTTPS 接管域名，设置容量，保存只展示一次的 Key。然后为节点授权账号、固定 HTTP 代理、由服务商确认的预期出口 IP 及可选加密账号密码。旧节点记录没有预期 IP 时必须重新保存授权，不能自动采用首次观测的地址。
 
 ## VPS 部署
 
@@ -74,7 +74,7 @@ BROWSER_DOMAIN=browser-a.example
 
 ## 使用与故障恢复
 
-平台保存授权后，节点用同一个 Key 获得账号配置。点击“排队打开浏览器”，有容量时启动，状态变成运行中后点击“接入登录 / 2FA”。核对代理出口和目标账号，完成登录后关闭连接，再显式确认登录有效。人工接管不是自动内容发布授权。
+平台保存授权后，节点用同一个 Key 获得账号配置。点击“排队打开浏览器”，有容量时启动，状态变成运行中后点击“接入登录 / 2FA”。启动时节点通过同账号浏览器会话读取固定 IP 查询页并匹配预期 IP，通过后才打开 Facebook；运行中每 30 秒复查，校验失败会停止本次运行并暂停后台任务。校验只接受完整、单一地址且未跳转的页面；不可用同宿主机 HTTP 请求替代浏览器观测。此检查是周期检测，不保证两次检测之间出口绝不变化。人工仍需核对目标账号，完成登录后关闭连接，再显式确认登录有效。人工接管不是自动内容发布授权。
 
 无任务时只有 Agent/Caddy 在线。查看运行容器时按 `io.ftrade.node` 标签过滤，避免公开完整 `docker inspect`，它可能包含代理密码。不要运行 `docker compose down -v`，不要删除 `ftbrowser-*` 卷；账号会话只保存 Cookies/localStorage，默认不保存 IndexedDB 或完整 Messenger 历史。
 

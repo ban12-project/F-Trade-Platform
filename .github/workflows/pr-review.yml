@@ -53,7 +53,7 @@ jobs:
       - name: Validate migration metadata
         run: pnpm db:check
       - name: Scheduler, protocol, gateway and failed-claim regressions
-        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-node.mjs scripts/test-browser-review-gateway.mjs scripts/test-browser-review-lease.mjs
+        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-review-gateway.mjs scripts/test-browser-review-lease.mjs
       - name: Paired control ablations (temporary variants, no external account traffic)
         run: node --import tsx scripts/browser-fleet-ablation.mjs
         env:

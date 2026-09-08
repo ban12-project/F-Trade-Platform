@@ -175,8 +175,10 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
         )
           throw new Error("resolve_running_or_unknown_result_first");
         if (!account.proxyCiphertext) throw new Error("proxy_required");
+        if (!account.expectedEgressIp) throw new Error("expected_egress_required");
         account.authState = "ready";
       } else {
+        if (!account.expectedEgressIp) throw new Error("expected_egress_required");
         const run = enqueueRun(
           state,
           {
@@ -281,6 +283,7 @@ async function grant(
       ring,
     );
   if (!account.proxyCiphertext) throw new Error("fixed_proxy_required");
+  account.expectedEgressIp = command.value.expectedEgressIp;
   account.pollSeconds = pollSeconds;
   account.credentialVersion++;
   account.authState = "needs_login";
@@ -365,6 +368,7 @@ async function nodeOperation(
     const account = state.accounts.find((a) => a.id === run.accountId);
     if (
       !account?.proxyCiphertext ||
+      !account.expectedEgressIp ||
       !account.enabled ||
       account.credentialVersion !== run.credentialVersion
     )
@@ -387,6 +391,7 @@ async function nodeOperation(
         accountId: account.id,
         accountRef: account.accountRef,
         channelRef: account.channelRef,
+        expectedEgressIp: account.expectedEgressIp,
         leaseId: run.leaseId,
         leaseUntil: run.leaseUntil,
         deadline: run.deadline,

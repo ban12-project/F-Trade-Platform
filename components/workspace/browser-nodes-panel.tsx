@@ -50,6 +50,7 @@ const stateLabels: Record<string, string> = {
   needs_login: "需要登录",
   needs_2fa: "需要 2FA",
   checkpoint: "需要安全验证",
+  egress_mismatch: "固定出口校验失败",
   result_unknown: "需要核对未知结果",
 };
 export function BrowserNodesPanel() {
@@ -75,6 +76,7 @@ export function BrowserNodesPanel() {
       nodeId: "",
       channelRef: "facebook-personal",
       accountRef: "",
+      expectedEgressIp: "",
       pollSeconds: 900,
       credentials: emptyCredentials,
     },
@@ -266,11 +268,17 @@ export function BrowserNodesPanel() {
               [
                 ["channelRef", "渠道标识"],
                 ["accountRef", "账号标识（固定不变）"],
+                ["expectedEgressIp", "预期固定出口 IP（由代理服务商确认）"],
               ] as const
             ).map(([name, label]) => (
-              <Field key={name}>
+              <Field key={name} data-invalid={!!accountForm.formState.errors[name]}>
                 <FieldLabel htmlFor={`account-${name}`}>{label}</FieldLabel>
-                <Input id={`account-${name}`} {...accountForm.register(name)} disabled={busy} />
+                <Input
+                  id={`account-${name}`}
+                  {...accountForm.register(name)}
+                  aria-invalid={!!accountForm.formState.errors[name]}
+                  disabled={busy}
+                />
                 <FieldError errors={[accountForm.formState.errors[name]]} />
               </Field>
             ))}

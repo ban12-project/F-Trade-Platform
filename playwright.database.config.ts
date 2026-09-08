@@ -29,6 +29,11 @@ export default defineConfig({
       DATABASE_TRANSPORT: "postgres",
       SOCIAL_MESSAGE_ENCRYPTION_KEY: socialMessageKey,
       MODEL_CONFIG_ENCRYPTION_KEY: modelConfigKey,
+      BROWSER_FLEET_ENABLED: "1",
+      FACEBOOK_CREDENTIAL_ACTIVE_KEY_ID: "synthetic",
+      FACEBOOK_CREDENTIAL_KEYS_JSON: JSON.stringify({
+        synthetic: Buffer.alloc(32, 3).toString("base64"),
+      }),
     },
     url: baseURL,
     reuseExistingServer: false,
