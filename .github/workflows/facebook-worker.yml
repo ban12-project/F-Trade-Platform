@@ -6,6 +6,7 @@ on:
       - "lib/social/**"
       - "lib/browser-fleet/**"
       - "scripts/test-facebook-publication-postgres.ts"
+      - "scripts/test-facebook-inbound-postgres.ts"
       - "drizzle/**"
       - "lib/actions/facebook-*.ts"
       - "lib/db/facebook-runtime-schema.ts"
@@ -69,6 +70,8 @@ jobs:
             lib/social/facebook-media-store.ts
             lib/social/facebook-proxy-protocol.ts
             lib/social/facebook-vault-crypto.ts
+            lib/social/facebook-inbound-store.ts
+            scripts/test-facebook-inbound-postgres.ts
             lib/social/facebook-worker-protocol.ts
             lib/social/job-store.ts
             scripts/test-facebook-publication-postgres.ts

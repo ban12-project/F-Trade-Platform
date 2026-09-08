@@ -20,6 +20,8 @@ import {
 } from "../lib/social/publication-store";
 import { digestSocialWorkerPayload } from "../lib/social/worker-protocol";
 
+import { testFacebookInbound } from "./test-facebook-inbound-postgres";
+
 async function main() {
   const connectionString = process.env.FACEBOOK_PUBLICATION_TEST_DATABASE_URL;
   assert.ok(connectionString, "Dedicated synthetic database required");
@@ -946,6 +948,7 @@ async function main() {
     console.log(
       "PASS receipt authorization binding, success/unknown persistence, duplicate replay, conflict rejection, lease expiry and shutdown preservation",
     );
+    await testFacebookInbound(database, actor);
   } finally {
     await closeDatabase();
     await pool.end();
