@@ -36,3 +36,13 @@
 - 测试结束成功停止并删除 Sandbox 及测试快照，没有留下常驻计算。首轮失败修正后才取得上述结果。
 
 这不是已登录浏览器的 cookie/加密历史恢复验证，不证明跨重启发布回执、固定代理或 noVNC 外网接管。后续平台生命周期实现仍须满足上方按需契约。
+
+## 按需退出与整体停止（实现基础）
+
+Agent 新增部署级 `BROWSER_NODE_ON_DEMAND=1`。连续成功领取到空队列且本地无运行任务时，默认 30 秒后关闭网关并退出。收到任务或发生领取错误会重置空闲计时；旧 VPS 默认模式不因空队列退出。按需部署必须使用不自动重启的 Agent 容器，不能套用 VPS 的 `unless-stopped` 重启策略。
+
+`stopIdleBrowserSandboxSession` 接收固定的 SDK Session，而非会自动恢复的 Sandbox facade。它核对 sessionId 和 Agent 的节点标签，活动 Agent 不停止；已退出 Agent 会先清理该节点的容器、停止 Docker，再停止整个会话。清理失败也尝试停止计算，但返回未确认状态，不能据此清除旧租约或记为正常释放。旧会话回调不会停止新会话。
+
+验证：5 项空闲策略/实际 Agent 子进程回归、6 项 session 停止/身份/失败分支回归及既有 65 项节点回归通过。实际 Agent 使用本机 HTTPS broker 和 Docker 协议夹具；没有真实账号。实时 `test-browser-sandbox-idle.mts` 在 Vercel 内安装 Docker，构造退出的无网络合成 Agent 容器，再调用真实回收函数；提供方确认 VM 已停止，重复检查保持相同 sessionId 且未恢复。测试实例已删除。类型与格式检查通过。
+
+上述函数尚未接入平台调度，不能宣称生产 worker 已自动按需运行。仍需持久化操作记录、授权校验、唤醒入口与 HTTPS 接管集成。
