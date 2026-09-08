@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { facebookCredentialFormSchema } from "@/lib/social/facebook-account-forms";
 
+import { inboxEnvelopeSchema } from "./inbox-schema";
+
 const id = z.uuid();
 const reference = z.string().trim().min(1).max(160);
 const origin = z.url().refine((v) => {
@@ -66,6 +68,15 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
 ]);
 const common = { installationId: id, bootId: id };
 export const nodeRequestSchema = z.discriminatedUnion("operation", [
+  z
+    .object({
+      ...common,
+      operation: z.literal("inbox-messages"),
+      runId: id,
+      leaseId: id,
+      envelope: inboxEnvelopeSchema,
+    })
+    .strict(),
   z
     .object({
       ...common,

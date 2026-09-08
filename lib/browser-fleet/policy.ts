@@ -36,6 +36,12 @@ export type Run = {
   accountId: string;
   kind: RunKind;
   jobRef: string | null;
+  inboxReceipts?: Array<{
+    requestId: string;
+    digest: string;
+    accepted: number;
+    duplicates: number;
+  }>;
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
   authSessionId: string | null;
@@ -318,6 +324,8 @@ export function publicState(state: FleetState) {
       loginSaved: !!loginCiphertext,
       proxySaved: !!proxyCiphertext,
     })),
-    runs: state.runs.map(({ ticketHash, authSessionId, leaseId, claimId, ...r }) => ({ ...r })),
+    runs: state.runs.map(
+      ({ ticketHash, authSessionId, leaseId, claimId, inboxReceipts, ...r }) => ({ ...r }),
+    ),
   };
 }

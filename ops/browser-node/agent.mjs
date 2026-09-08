@@ -8,6 +8,7 @@ import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
+import { createInboxReporter } from "./inbox.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import { readPublicationMedia } from "./media.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
@@ -424,8 +425,27 @@ async function tick() {
               return upload;
             });
           };
+          const adapterRun = structuredClone(slot.run);
+          delete adapterRun.inboxSigningKey;
           const outcome = await adapter.execute({
-            run: structuredClone(slot.run),
+            run: adapterRun,
+            reportInbound: createInboxReporter({
+              run: slot.run,
+              request: nodeCall,
+              assertActive: assertPublicationActive,
+              async checkEgress() {
+                try {
+                  await verifyBrowserEgress(
+                    (path, body) => browserRequest(slot, path, body),
+                    slot.run,
+                    slot.egressTabId,
+                  );
+                } catch (error) {
+                  await stop(slot, "egress_mismatch");
+                  throw error;
+                }
+              },
+            }),
             authorizePublication,
             preparePublicationMedia,
             reportPublication: createPublicationReporter({ run: slot.run, request: nodeCall }),

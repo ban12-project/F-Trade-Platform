@@ -452,3 +452,43 @@ test("Docker archive transport sends binary bytes rather than JSON encoding", as
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("inbox reporter binds one lease, checks egress and stops after ambiguous delivery", async () => {
+  const { createInboxReporter } = await import("../ops/browser-node/inbox.mjs");
+  const { verifyInboxPacket } = await import("../lib/browser-fleet/inbox-protocol.ts");
+  const secret = Buffer.alloc(32, 5).toString("base64url");
+  const run = { kind: "inbox", id: randomUUID(), leaseId: randomUUID(), inboxSigningKey: secret };
+  let egress = 0;
+  let calls = 0;
+  let fail = false;
+  const report = createInboxReporter({
+    run,
+    assertActive() {},
+    async checkEgress() {
+      egress++;
+    },
+    async request(operation, fields) {
+      calls++;
+      assert.equal(operation, "inbox-messages");
+      const packet = verifyInboxPacket(secret, fields.envelope);
+      assert.equal(packet.runId, run.id);
+      assert.equal(packet.leaseId, run.leaseId);
+      if (fail) throw new Error("synthetic_lost_response");
+      return { receipt: { accepted: 1, duplicates: 0, replayed: false } };
+    },
+  });
+  const message = {
+    conversationRef: "synthetic-conversation",
+    messageRef: "synthetic-message",
+    direction: "inbound",
+    identityQuality: "dom_id",
+    body: "SYNTHETIC",
+    receivedAt: new Date().toISOString(),
+  };
+  await report([message], new Date().toISOString());
+  fail = true;
+  await assert.rejects(report([message], new Date().toISOString()), /synthetic_lost_response/);
+  await assert.rejects(report([message], new Date().toISOString()), /inbox_reporter_unavailable/);
+  assert.equal(calls, 2);
+  assert.equal(egress, 2);
+});

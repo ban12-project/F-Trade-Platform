@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { z } from "zod";
 
+import { facebookInboundMessageSchema } from "./facebook-inbound-schema";
+
 const reference = z.string().trim().min(1).max(200);
 export const facebookWorkerScopeSchema = z
   .object({
@@ -12,16 +14,7 @@ export const facebookWorkerScopeSchema = z
   .strict();
 export type FacebookWorkerScope = z.infer<typeof facebookWorkerScopeSchema>;
 
-export const facebookInboundMessageSchema = z
-  .object({
-    conversationRef: reference,
-    messageRef: reference,
-    direction: z.literal("inbound"),
-    identityQuality: z.literal("dom_id"),
-    body: z.string().trim().min(1).max(20_000),
-    receivedAt: z.iso.datetime(),
-  })
-  .strict();
+export { facebookInboundMessageSchema } from "./facebook-inbound-schema";
 
 const common = {
   ...facebookWorkerScopeSchema.shape,

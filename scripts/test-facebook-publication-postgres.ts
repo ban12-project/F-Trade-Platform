@@ -20,6 +20,7 @@ import {
 } from "../lib/social/publication-store";
 import { digestSocialWorkerPayload } from "../lib/social/worker-protocol";
 
+import { testBrowserInbox } from "./test-browser-inbox-postgres";
 import { testFacebookInbound } from "./test-facebook-inbound-postgres";
 
 async function main() {
@@ -508,6 +509,7 @@ async function main() {
       stoppedRunIds: [],
       capabilities: ["interactive", "publish"],
     });
+    await testBrowserInbox(database, { nodeId: node.nodeId, accessKey: node.accessKey }, identity);
     const fleetJob = await fixture();
     assert.equal(await claim(), null, "Legacy worker must not claim a node-bound account");
     const request = {

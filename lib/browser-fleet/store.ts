@@ -25,6 +25,7 @@ import {
   type OwnerCommand,
   ownerCommandSchema,
 } from "./contracts";
+import { acceptInboxPacket, inboxSigningKey } from "./inbox";
 import {
   bindInstallation,
   claimRun,
@@ -422,6 +423,7 @@ async function nodeOperation(
         id: run.id,
         kind: run.kind,
         jobRef: run.jobRef,
+        ...(run.kind === "inbox" ? { inboxSigningKey: inboxSigningKey(row.id, run, account) } : {}),
         ...(publication
           ? { publication, publicationDigest: digestSocialWorkerPayload(publication) }
           : {}),
@@ -459,6 +461,9 @@ async function nodeOperation(
   }
   const run = state.runs.find((r) => r.id === request.runId);
   if (!run || run.leaseId !== request.leaseId) throw new Error("lease_mismatch");
+  if (request.operation === "inbox-messages") {
+    return { receipt: await acceptInboxPacket(tx, row.id, state, run, request.envelope, now) };
+  }
   if (request.operation === "publication-media") {
     return {
       mediaSource: await resolvePublicationMedia(
