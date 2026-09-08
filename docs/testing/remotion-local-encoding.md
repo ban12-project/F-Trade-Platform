@@ -40,3 +40,7 @@ The frozen transition kept the sampled center pixel free of red across 120 outpu
 The source video is now muted, with source audio in a separate Sequence bounded to the approved clip duration, outside Freeze. Both streams receive explicit trimBefore/trimAfter. Re-rendering the same fixture preserved the included 440 Hz amplitude at 0.1408629, reduced the excluded tone to 0.0001269 (below the 0.002 regression threshold), and retained zero red marker frames. Audio is measured after AAC decode; the criterion is bounded residual, not mathematically zero energy.
 
 The final real MP4 also passes the application export-artifact duration/encoding checks for a four-second timeline. Local typecheck, Biome and ABCD regression pass. This is a synthetic trim control, not proof for all media, network sources or remote Sandbox behavior. The local fixture HTTP server was stopped after testing.
+
+## Full build verification
+
+At source commit `9ad6b99`, full `pnpm build` completed: Remotion bundle, workflow compilation, default Turbopack production build and TypeScript checks. Cache Components and both React Compiler flags remain enabled. The workflow step/flow/webhook trace manifests respectively include 55/36/36 existing Remotion files; no referenced Remotion file was missing. The repository production-boundary test passed, confirming synthetic fixtures return 404 and anonymous workspace requests redirect to authentication. The build reports 228 lint warnings. This verifies local packaging/startup, not remote CI, deployment or Sandbox execution.
