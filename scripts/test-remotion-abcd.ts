@@ -104,21 +104,31 @@ const props = createRemotionCompositionProps(
 assert.equal(props.clips[0]?.trimStartFrame, 60);
 assert.equal(props.clips[0]?.caption, "RYC302 Clutch Kit");
 assert.equal(compositionDurationInFrames(props), 240);
-assert.deepEqual(resolveAbcdBeatState(props.clips[0]!, 0), {
+const firstClip = props.clips[0];
+assert.ok(firstClip);
+assert.equal(
+  compositionDurationInFrames({
+    ...props,
+    clips: [firstClip, { ...firstClip, id: "second" }],
+  }),
+  480,
+  "Transitions must preserve the full approved duration of every clip",
+);
+assert.deepEqual(resolveAbcdBeatState(firstClip, 0), {
   attention: true,
   branding: true,
   connection: false,
   direction: false,
   phaseStartFrame: 0,
 });
-assert.deepEqual(resolveAbcdBeatState(props.clips[0]!, 100), {
+assert.deepEqual(resolveAbcdBeatState(firstClip, 100), {
   attention: false,
   branding: true,
   connection: true,
   direction: false,
   phaseStartFrame: 80,
 });
-assert.deepEqual(resolveAbcdBeatState(props.clips[0]!, 200), {
+assert.deepEqual(resolveAbcdBeatState(firstClip, 200), {
   attention: false,
   branding: true,
   connection: false,

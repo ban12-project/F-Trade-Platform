@@ -2,6 +2,7 @@ import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import {
   AbsoluteFill,
+  Freeze,
   Img,
   interpolate,
   OffthreadVideo,
@@ -206,8 +207,18 @@ export function AbcdMarketingVideo({ clips, productName, ctaText }: AbcdMarketin
     <TransitionSeries>
       {clips.flatMap((clip, index) => {
         const sequence = (
-          <TransitionSeries.Sequence key={clip.id} durationInFrames={clip.durationInFrames}>
-            <Beat clip={clip} productName={productName} ctaText={ctaText} />
+          <TransitionSeries.Sequence
+            key={clip.id}
+            durationInFrames={
+              clip.durationInFrames + (index < clips.length - 1 ? transitionFrames : 0)
+            }
+          >
+            <Freeze
+              frame={clip.durationInFrames - 1}
+              active={(frame) => frame >= clip.durationInFrames}
+            >
+              <Beat clip={clip} productName={productName} ctaText={ctaText} />
+            </Freeze>
           </TransitionSeries.Sequence>
         );
         if (index === clips.length - 1) return [sequence];

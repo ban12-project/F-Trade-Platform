@@ -24,3 +24,9 @@ pnpm exec remotion render remotion/index.ts AbcdIndustrialVertical tmp/remotion-
 ```
 
 Remove only `--color-space=bt709` for the baseline comparison. Probe both outputs; do not infer actual pixel format from render options. Local binaries and media remain outside Git. The application Sandbox renderer and Sandbox smoke now explicitly pass `colorSpace: 'bt709'`; a remote run remains required to prove that environment.
+
+## Multi-clip timeline verification
+
+The workflow uses the sum of approved clip durations when creating its export artifact and rejects drift above 0.1 seconds. The composition previously subtracted eight frames per transition (0.2667 seconds at 30 fps), so even two clips could fail that gate. The composition now preserves the sum and adds the overlap as a frozen final frame on each outgoing clip. The next clip starts at its approved boundary; the outgoing source does not intentionally advance into unapproved footage.
+
+A real local render of two four-second synthetic image clips produced 240 frames, measured 8.042667 seconds, and successfully created a review-required export artifact against the eight-second approved timeline. Six frames around the transition were visually inspected without blank frames. This validates the image composition and timing path; source-video/audio trim behavior and external Sandbox remain unverified.
