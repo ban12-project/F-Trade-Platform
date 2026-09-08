@@ -6,6 +6,8 @@ export type PublicationPayload = {
   media?: { sha256: string };
 };
 export type PublicationRun = {
+  id?: string;
+  accountId?: string;
   kind: string;
   accountRef: string;
   channelRef: string;
@@ -35,7 +37,10 @@ export type PublicationDriver<Session> = {
     attachmentCount: number;
     attachmentName?: string;
   }>;
-  publish(session: Session): Promise<void>;
+  publish(
+    session: Session,
+    authorization: { authorizationId: string; localExpiresAt: number },
+  ): Promise<void>;
   observe(
     session: Session,
     payload: PublicationPayload,

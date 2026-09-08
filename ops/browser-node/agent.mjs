@@ -52,7 +52,11 @@ if (process.env.BROWSER_TASK_ADAPTER) {
     extra.capabilities.some((c) => !["inbox", "publish"].includes(c))
   )
     throw new Error("reviewed_adapter_invalid");
-  adapter = { capabilities: ["interactive", ...extra.capabilities], execute: extra.execute };
+  adapter = {
+    capabilities: ["interactive", ...extra.capabilities],
+    execute: extra.execute,
+    publicationScopes: extra.publicationScopes,
+  };
 }
 const slots = new Map();
 let gatewayOrigin = "";
@@ -118,6 +122,7 @@ for (const network of oldNetworks) await docker("DELETE", `/networks/${network.I
 await nodeCall("recover", {
   stoppedRunIds: sync.runs.filter(isLive).map((r) => r.id),
   capabilities: adapter.capabilities,
+  ...(adapter.publicationScopes ? { publicationScopes: adapter.publicationScopes } : {}),
 });
 const gateway = createGateway({
   appOrigin,

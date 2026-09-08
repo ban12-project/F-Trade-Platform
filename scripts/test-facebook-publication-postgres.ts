@@ -515,6 +515,30 @@ async function main() {
       availableMemoryMb: 4096,
       localSlots: 1,
     };
+    await handleBrowserNodeRequest(node.accessKey, {
+      ...identity,
+      operation: "recover",
+      stoppedRunIds: [],
+      capabilities: ["interactive", "publish"],
+      publicationScopes: [
+        {
+          channelRef: "unconfigured-channel",
+          accountRef: "unconfigured-account",
+          expiresAt: Date.now() + 60000,
+        },
+      ],
+    });
+    assert.equal((await handleBrowserNodeRequest(node.accessKey, request)).run, null);
+    const unconfiguredReservation = await db.execute(
+      sql`SELECT job_id FROM browser_fleet_publication WHERE job_id = ${fleetJob.jobId}`,
+    );
+    assert.equal(unconfiguredReservation.rows.length, 0);
+    await handleBrowserNodeRequest(node.accessKey, {
+      ...identity,
+      operation: "recover",
+      stoppedRunIds: [],
+      capabilities: ["interactive", "publish"],
+    });
     const requests = [request, { ...request, requestId: randomUUID() }];
     const responses = await Promise.all(
       requests.map((item) => handleBrowserNodeRequest(node.accessKey!, item)),
@@ -569,6 +593,16 @@ async function main() {
       leaseId: leases[0].leaseId,
       ready: true,
     });
+    await db.execute(
+      sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{publicationScopes}', '[]'::jsonb) WHERE id = ${node.nodeId}`,
+    );
+    await assert.rejects(
+      handleBrowserNodeRequest(node.accessKey, authorizationRequest),
+      /publication_lease_inactive/,
+    );
+    await db.execute(
+      sql`UPDATE browser_fleet_node SET document = document - 'publicationScopes' WHERE id = ${node.nodeId}`,
+    );
     await assert.rejects(
       handleBrowserNodeRequest(node.accessKey, { ...authorizationRequest, leaseId: randomUUID() }),
       /lease_mismatch/,

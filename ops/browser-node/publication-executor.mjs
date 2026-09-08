@@ -88,7 +88,7 @@ export function createPublicationExecutor(driver) {
       )
         throw new Error("publication_authorization_expired");
       clickStarted = true;
-      await driver.publish(session);
+      await driver.publish(session, authorization);
       active();
       const observation = await driver.observe(session, payload, signal);
       if (

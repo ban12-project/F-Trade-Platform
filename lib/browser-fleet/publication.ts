@@ -16,7 +16,14 @@ import {
   resolveFacebookMediaSource,
 } from "@/lib/social/facebook-media-store";
 import { digestSocialWorkerPayload } from "@/lib/social/worker-protocol";
-import { type Account, enqueueRun, type FleetState, type Run, requestStop } from "./policy";
+import {
+  type Account,
+  enqueueRun,
+  type FleetState,
+  publicationScopeActive,
+  type Run,
+  requestStop,
+} from "./policy";
 
 /** Called under the node row lock. The job lock and unique reservation exclude
  * legacy workers and duplicate polls, including after terminal run pruning. */
@@ -30,6 +37,7 @@ export async function schedulePublications(
   for (const account of state.accounts) {
     if (
       !account.enabled ||
+      !publicationScopeActive(state, account, now) ||
       account.authState !== "ready" ||
       !account.expectedEgressIp ||
       state.runs.some(
@@ -227,6 +235,7 @@ export async function authorizePublication(
     run.leaseUntil <= now ||
     run.deadline <= now ||
     !account?.enabled ||
+    !publicationScopeActive(state, account, now) ||
     account.authState !== "ready" ||
     account.credentialVersion !== run.credentialVersion ||
     !account.expectedEgressIp
@@ -492,6 +501,7 @@ export async function resolvePublicationMedia(
     run.leaseUntil <= now ||
     run.deadline <= now ||
     !account?.enabled ||
+    !publicationScopeActive(state, account, now) ||
     account.authState !== "ready" ||
     account.credentialVersion !== run.credentialVersion
   )

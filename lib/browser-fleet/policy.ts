@@ -58,6 +58,7 @@ export type FleetState = {
   installationId: string | null;
   bootId: string | null;
   capabilities: RunKind[];
+  publicationScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   lastSeenAt: number;
   accounts: Account[];
   runs: Run[];
@@ -178,6 +179,17 @@ export function scheduleInbox(state: FleetState, now: number, newId: () => strin
     );
   }
 }
+export function publicationScopeActive(state: FleetState, account: Account, now: number) {
+  return (
+    state.publicationScopes === undefined ||
+    state.publicationScopes.some(
+      (scope) =>
+        scope.channelRef === account.channelRef &&
+        scope.accountRef === account.accountRef &&
+        scope.expiresAt > now,
+    )
+  );
+}
 export function claimRun(
   state: FleetState,
   input: { requestId: string; leaseId: string; availableMemoryMb: number; localSlots: number },
@@ -202,6 +214,7 @@ export function claimRun(
         !occupied.has(r.accountId) &&
         a?.enabled &&
         state.capabilities.includes(r.kind) &&
+        (r.kind !== "publish" || publicationScopeActive(state, a, now)) &&
         (r.kind === "interactive" || a.authState === "ready")
       );
     })

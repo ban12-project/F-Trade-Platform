@@ -256,3 +256,19 @@ test("inbox is paused until a human verifies a new account", () => {
   assert.throws(() => enqueue(s, "a", "inbox"));
   assert.ok(enqueue(s));
 });
+
+test("publication profiles constrain queued claims by account, channel and expiry", () => {
+  for (const scope of [
+    { channelRef: "other", accountRef: "a", expiresAt: 5000 },
+    { channelRef: "facebook", accountRef: "b", expiresAt: 5000 },
+    { channelRef: "facebook", accountRef: "a", expiresAt: 1001 },
+  ]) {
+    const state = fixture();
+    state.publicationScopes = [scope];
+    const run = enqueue(state, "a", "publish", 1000, "job");
+    assert.equal(claim(state, 1001), null);
+    assert.equal(run.status, "queued");
+    state.publicationScopes = [{ channelRef: "facebook", accountRef: "a", expiresAt: 5000 }];
+    assert.equal(claim(state, 1002)?.id, run.id);
+  }
+});

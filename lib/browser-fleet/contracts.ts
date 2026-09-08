@@ -114,6 +114,18 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       operation: z.literal("recover"),
       stoppedRunIds: z.array(id).max(100),
       capabilities: z.array(z.enum(["interactive", "inbox", "publish"])).max(3),
+      publicationScopes: z
+        .array(
+          z
+            .object({
+              channelRef: reference,
+              accountRef: reference,
+              expiresAt: z.number().int().positive(),
+            })
+            .strict(),
+        )
+        .max(16)
+        .optional(),
     })
     .strict(),
   z
