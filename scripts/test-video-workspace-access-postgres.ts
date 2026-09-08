@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import productReadyFixture from "../data/fixtures/product-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
+import { productMediaAsset } from "../lib/db/product-media-schema";
 import {
   aggregateRecord,
+  evidence,
   user,
   workspaceProject,
   workspaceProjectItem,
@@ -43,6 +45,9 @@ void (async () => {
     copyId = randomUUID(),
     copyProjectId = randomUUID();
   const assetRef = `asset-synthetic-${randomUUID()}`;
+  const sourceRef = `evidence-synthetic-source-${randomUUID()}`;
+  const rightsRef = `evidence-synthetic-rights-${randomUUID()}`;
+  const mediaId = randomUUID();
   const project = videoProjectSchema.parse({
     id,
     productId: randomUUID(),
@@ -59,9 +64,9 @@ void (async () => {
     ],
     sourceAssets: [
       {
-        assetRef: "evidence-synthetic-source",
+        assetRef: sourceRef,
         mediaType: "image",
-        rightsEvidenceRef: "evidence-synthetic-rights",
+        rightsEvidenceRef: rightsRef,
       },
     ],
     scenes: [
@@ -70,7 +75,7 @@ void (async () => {
         prompt: "SYNTHETIC",
         durationSeconds: 3,
         claimRefs: [],
-        assetRefs: ["evidence-synthetic-source"],
+        assetRefs: [sourceRef],
       },
     ],
     renderedAssetRef: assetRef,
@@ -81,7 +86,7 @@ void (async () => {
       clips: [
         {
           clipId: "clip-synthetic",
-          assetRef: "evidence-synthetic-source",
+          assetRef: sourceRef,
           mediaType: "image",
           trimStartMs: 0,
           durationMs: 3000,
@@ -219,6 +224,70 @@ void (async () => {
       assert.equal((await resolveWorkspaceApprovedVideoManifest(member, id)).kind, "unavailable");
       assert.equal((await resolveWorkspaceApprovedVideoDownload(member, id)).kind, "unavailable");
     }
+    await db
+      .update(aggregateRecord)
+      .set({ payload: currentProduct })
+      .where(eq(aggregateRecord.id, project.productId));
+    await db.insert(evidence).values(
+      [sourceRef, rightsRef].map((id) => ({
+        id,
+        classification: "internal" as const,
+        blobKey: `synthetic-test/${id}`,
+        contentType: "text/plain",
+        sha256: createHash("sha256").update(id).digest("hex"),
+        sizeBytes: 0,
+        sourceLabel: "SYNTHETIC metadata only; no uploaded file",
+        uploadedByType: "human" as const,
+        uploadedById: owner,
+      })),
+    );
+    const media = {
+      id: mediaId,
+      productId: project.productId,
+      evidenceId: sourceRef,
+      origin: "user_upload",
+      mediaType: "image",
+      role: "product_hero",
+      contentType: "image/png",
+      width: 1080,
+      height: 1920,
+      rightsEvidenceRef: rightsRef,
+      editingAllowed: true,
+      publicDistributionAllowed: true,
+      reviewStatus: "approved",
+      reviewedBy: owner,
+      reviewedAt: new Date(),
+      reviewEvidenceRef: rightsRef,
+      createdBy: owner,
+      rightsExpiresAt: null,
+    };
+    await db.insert(productMediaAsset).values(media);
+    const backedVideo = videoProjectSchema.parse({
+      ...approved,
+      sourceAssets: approved.sourceAssets.map((asset) => ({ ...asset, productMediaId: mediaId })),
+    });
+    await db
+      .update(aggregateRecord)
+      .set({ payload: backedVideo })
+      .where(eq(aggregateRecord.id, id));
+    assert.equal((await resolveWorkspaceApprovedVideoManifest(member, id)).kind, "ready");
+    for (const revoked of [
+      { reviewStatus: "rejected" },
+      { rightsExpiresAt: new Date(0) },
+      { editingAllowed: false },
+      { publicDistributionAllowed: false },
+      { rightsEvidenceRef: sourceRef },
+    ]) {
+      await db.update(productMediaAsset).set(revoked).where(eq(productMediaAsset.id, mediaId));
+      assert.equal((await resolveWorkspaceApprovedVideoManifest(member, id)).kind, "unavailable");
+      assert.equal((await resolveWorkspaceApprovedVideoDownload(member, id)).kind, "unavailable");
+      await db.update(productMediaAsset).set(media).where(eq(productMediaAsset.id, mediaId));
+      assert.equal((await resolveWorkspaceApprovedVideoManifest(member, id)).kind, "ready");
+    }
+    await db.delete(productMediaAsset).where(eq(productMediaAsset.id, mediaId));
+    assert.equal((await resolveWorkspaceApprovedVideoManifest(member, id)).kind, "unavailable");
+    assert.equal((await resolveWorkspaceApprovedVideoDownload(member, id)).kind, "unavailable");
+    await db.update(aggregateRecord).set({ payload: approved }).where(eq(aggregateRecord.id, id));
     await db.delete(aggregateRecord).where(eq(aggregateRecord.id, project.productId));
     assert.equal(
       (await resolveWorkspacePrivateVideoPreview(member, assetRef, store)).kind,
@@ -336,6 +405,8 @@ void (async () => {
       "PASS migrated PostgreSQL video preview/download/manifest membership: member, outsider/admin, missing identity, wrong relation/role, revocation, reassignment and unowned video; denials never read private storage",
     );
   } finally {
+    await db.delete(productMediaAsset).where(eq(productMediaAsset.id, mediaId));
+    await db.delete(evidence).where(inArray(evidence.id, [sourceRef, rightsRef]));
     await db
       .delete(workspaceProject)
       .where(inArray(workspaceProject.id, [projectId, copyProjectId]));
