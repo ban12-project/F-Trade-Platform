@@ -180,4 +180,139 @@ test("inbox profiles require reviewed identity, expiry and stable attribute mapp
     validateInboxProfile({ ...profile, identityHref: "https://evil.invalid/x" }),
   ).toThrow();
   expect(() => validateInboxProfile({ ...profile, attributes: {} })).toThrow();
+  for (const pagination of [
+    null,
+    [],
+    { other: {} },
+    { list: { container: "#inbox", start: ".start" } },
+    { thread: { container: "#thread", start: ".start", end: ".end,button" } },
+  ])
+    expect(() => validateInboxProfile({ ...profile, pagination })).toThrow(
+      "inbox_pagination_invalid",
+    );
 });
+
+for (const mode of [
+  "normal",
+  "missing_start",
+  "page_limit",
+  "missing_end",
+  "gap",
+  "conflict",
+  "abort",
+  "changed_before_scroll",
+] as const) {
+  test(`reviewed inbox pagination ${mode}`, async ({ page, context }) => {
+    const pagedProfile = {
+      ...profile,
+      pagination: {
+        list: { container: "#inbox", start: ".start", end: ".end" },
+        thread: { container: "#thread", start: ".start", end: ".end" },
+      },
+    };
+    const controller = new AbortController();
+    let advances = 0;
+    const time = new Date(Date.now() - 2000).toISOString();
+    await context.route("**/*", async (route) => {
+      const isList = route.request().url() === profile.url;
+      const id = route.request().url().split("/").at(-1);
+      const records = isList
+        ? Array.from(
+            { length: mode === "page_limit" ? 100 : 4 },
+            (_, i) =>
+              `<a class="thread record" data-thread-id="thread-${i}" href="https://www.facebook.com/messages/t/thread-${i}">Thread ${i}</a>`,
+          ).join("")
+        : Array.from(
+            { length: 5 },
+            (_, i) =>
+              `<div class="message incoming record" data-message-id="msg-${id}-${i}"><p class="body">SYNTHETIC ${i}</p><time datetime="${time}">Time</time></div>`,
+          ).join("");
+      await route.fulfill({
+        contentType: "text/html",
+        body: `<style>#inbox,#thread{height:220px;overflow-y:auto}.record{display:block;height:100px;margin:0}p{margin:0}.start,.end{height:20px}</style><a id="identity" href="${profile.identityHref}">Identity</a><main id="${isList ? "inbox" : "thread"}">${isList ? (mode === "missing_start" ? "" : '<div class="start">Start</div>') : `<h1 data-thread-id="${id}">Thread</h1><div class="end">End</div>`}${records}${isList ? (mode === "missing_end" ? "" : '<div class="end">End</div>') : '<div class="start">Start</div>'}</main>`,
+      });
+    });
+    const reports: Array<{
+      messages: Array<Record<string, unknown>>;
+      completion?: Record<string, unknown>;
+    }> = [];
+    const request = async (path: string, body: Record<string, unknown> = {}) => {
+      if (path === "/tabs" || path.endsWith("/navigate")) {
+        await page.goto(String(body.url));
+        if (String(body.url) !== profile.url)
+          await page.locator("#thread").evaluate((element) => {
+            element.scrollTop = element.scrollHeight;
+          });
+        return Response.json({ ok: true, tabId: "paged-tab", url: page.url() });
+      }
+      expect(path.endsWith("/evaluate")).toBe(true);
+      // The fourth argument carries the previously observed cursor only on a scroll.
+      const expression = String(body.expression);
+      const isAdvance = /,\{"ids":\[/.test(expression);
+      if (isAdvance) {
+        advances++;
+        if (mode === "changed_before_scroll")
+          await page
+            .locator("a.thread")
+            .first()
+            .evaluate((element) => {
+              element.setAttribute("data-thread-id", "changed");
+              (element as HTMLAnchorElement).href = "https://www.facebook.com/messages/t/changed";
+            });
+      }
+      const result = await page.evaluate(expression);
+      if (isAdvance && mode === "gap")
+        await page.locator("#inbox").evaluate((element) => {
+          element.querySelectorAll("a").forEach((link, index) => {
+            link.setAttribute("data-thread-id", `replacement-${index}`);
+            link.href = `https://www.facebook.com/messages/t/replacement-${index}`;
+          });
+        });
+      if (isAdvance && mode === "conflict" && String(body.expression).includes('"thread",'))
+        await page.locator(".body").evaluateAll((elements) => {
+          for (const element of elements) element.textContent = "SYNTHETIC edited";
+        });
+      if (isAdvance && mode === "abort") controller.abort();
+      return Response.json({ ok: true, result });
+    };
+    const outcome = await createFacebookInbox(
+      pagedProfile,
+      request,
+    )({
+      run: {
+        kind: "inbox",
+        id: randomUUID(),
+        accountId: randomUUID(),
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
+      },
+      signal: controller.signal,
+      async reportInbound(messages, _observedAt, completion) {
+        reports.push({ messages, completion });
+      },
+    });
+    expect(outcome).toBe(
+      mode === "normal"
+        ? "completed"
+        : ["missing_end", "abort", "changed_before_scroll"].includes(mode)
+          ? "failed"
+          : "page_contract_failed",
+    );
+    expect(reports.filter((report) => report.completion)).toHaveLength(mode === "normal" ? 1 : 0);
+    if (mode === "normal") {
+      expect(advances).toBeGreaterThan(8);
+      const messages = reports.flatMap((report) => report.messages);
+      expect(messages).toHaveLength(20);
+      expect(reports.filter((report) => !report.completion)).toHaveLength(10);
+      expect(new Set(messages.map((message) => message.messageRef)).size).toBe(20);
+      expect(reports.at(-1)?.completion).toMatchObject({
+        conversationCount: 4,
+        messageCount: 20,
+        coverage: "visible_inbox",
+      });
+    }
+    if (mode === "missing_start") expect(advances).toBe(0);
+    if (mode === "page_limit") expect(advances).toBe(39);
+    if (mode === "changed_before_scroll" || mode === "abort") expect(advances).toBe(1);
+  });
+}

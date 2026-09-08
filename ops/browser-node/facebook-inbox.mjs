@@ -78,10 +78,35 @@ export function validateInboxProfile(value, now = Date.now()) {
   for (const key of ["conversationId", "messageId"])
     if (!/^data-[a-z][a-z0-9-]{1,60}$/.test(value.attributes?.[key] ?? ""))
       throw new Error("inbox_profile_attributes_invalid");
+  if (value.pagination !== undefined) {
+    if (
+      !value.pagination ||
+      typeof value.pagination !== "object" ||
+      Array.isArray(value.pagination) ||
+      Object.keys(value.pagination).some((key) => !["list", "thread"].includes(key))
+    )
+      throw new Error("inbox_pagination_invalid");
+    for (const config of Object.values(value.pagination)) {
+      if (
+        !config ||
+        typeof config !== "object" ||
+        Array.isArray(config) ||
+        Object.keys(config).sort().join(",") !== "container,end,start" ||
+        Object.values(config).some(
+          (selector) =>
+            typeof selector !== "string" ||
+            !selector.trim() ||
+            selector.length > 500 ||
+            selector.includes(","),
+        )
+      )
+        throw new Error("inbox_pagination_invalid");
+    }
+  }
   return structuredClone(value);
 }
 
-// Read-only page code. Never clicks a reply control, types, sends or scrolls.
+// Observation-only page code, with optional reviewed container scrolling. Never clicks or types.
 
 async function boundedJson(response) {
   if (!response.ok || !response.body) throw new Error("inbox_browser_response_invalid");
@@ -128,13 +153,15 @@ export function createFacebookInbox(input, browserRequest) {
       if (tabId && (tab.ok !== true || tab.tabId !== tabId))
         throw new Error("inbox_navigation_invalid");
       tabId = tab.tabId;
-      active();
+      return collect(mode, conversationRef);
+    };
+    const evaluate = async (mode, conversationRef, advance) => {
       for (let attempt = 0; attempt < 9; attempt++) {
         active();
         const result = await boundedJson(
-          await browserRequest(`/tabs/${encodeURIComponent(tab.tabId)}/evaluate`, {
+          await browserRequest(`/tabs/${encodeURIComponent(tabId)}/evaluate`, {
             userId: run.accountId,
-            expression: `(${pageProgram})(${JSON.stringify(profile)},${JSON.stringify(mode)},${JSON.stringify(conversationRef ?? null)})`,
+            expression: `(${pageProgram})(${JSON.stringify(profile)},${JSON.stringify(mode)},${JSON.stringify(conversationRef ?? null)},${JSON.stringify(advance ?? null)})`,
           }),
         );
         if (!result.ok) throw new Error("inbox_read_failed");
@@ -143,6 +170,7 @@ export function createFacebookInbox(input, browserRequest) {
           await delay(250, undefined, { signal });
           continue;
         }
+        if (result.result?.retry) throw new Error("inbox_page_changed");
         if (
           ["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"].includes(
             result.result?.attention,
@@ -155,6 +183,50 @@ export function createFacebookInbox(input, browserRequest) {
         return result.result;
       }
     };
+    const collect = async (mode, conversationRef) => {
+      let page = await evaluate(mode, conversationRef);
+      if (!profile.pagination?.[mode]) return page;
+      if (!page.atStart)
+        throw Object.assign(new Error("inbox_start_missing"), {
+          attention: "page_contract_failed",
+        });
+      const records = new Map();
+      let bodySize = 0;
+      for (let step = 0; step < 40; step++) {
+        if (!Array.isArray(page.items) || !Array.isArray(page.cursor?.ids))
+          throw new Error("inbox_page_invalid");
+        for (const item of page.items) {
+          const key = mode === "list" ? item.conversationRef : item.messageRef;
+          const prior = records.get(key);
+          if (prior && JSON.stringify(prior) !== JSON.stringify(item))
+            throw Object.assign(new Error("inbox_page_conflict"), {
+              attention: "page_contract_failed",
+            });
+          if (!prior && mode === "thread") {
+            bodySize += item.body.length;
+            if (bodySize > 200000) throw new Error("inbox_scan_size_limit");
+          }
+          records.set(key, item);
+          if (records.size > 200) throw new Error("inbox_scan_size_limit");
+        }
+        if (page.atEnd) return [...records.values()];
+        if (step === 39) throw new Error("inbox_scan_size_limit");
+        const previous = page;
+        const advanced = await evaluate(mode, conversationRef, previous.cursor);
+        if (advanced.advanced !== true) throw new Error("inbox_scroll_failed");
+        for (let attempt = 0; attempt < 9; attempt++) {
+          await delay(250, undefined, { signal });
+          page = await evaluate(mode, conversationRef);
+          if (JSON.stringify(page.cursor) !== JSON.stringify(previous.cursor) || page.atEnd) break;
+          if (attempt === 8) throw new Error("inbox_scroll_stalled");
+        }
+        // Half-viewport scrolling must preserve a stable anchor across pages.
+        // Refuse a gap rather than claiming that skipped records were observed.
+        if (!page.cursor?.ids.some((id) => previous.cursor.ids.includes(id)))
+          throw Object.assign(new Error("inbox_page_gap"), { attention: "page_contract_failed" });
+      }
+      throw new Error("inbox_scan_size_limit");
+    };
     try {
       if (
         run.kind !== "inbox" ||
@@ -166,16 +238,24 @@ export function createFacebookInbox(input, browserRequest) {
         throw new Error("inbox_scope_invalid");
       const threads = await read(profile.url, "list");
       let messageCount = 0;
+      let pending = [];
       for (const thread of threads) {
         const messages = await read(thread.url, "thread", thread.conversationRef);
-        // Small batches bound UTF-8 JSON below the node HTTP limit even for 20k bodies.
-        for (let offset = 0; offset < messages.length; offset += 2) {
+        // Carry the odd record across threads so 200 records fit 100 signed batches.
+        for (const message of messages) {
           active();
-          const batch = messages.slice(offset, offset + 2);
-          if (messageCount + batch.length > 200) throw new Error("inbox_scan_size_limit");
-          await reportInbound(batch, new Date().toISOString());
-          messageCount += batch.length;
+          if (messageCount >= 200) throw new Error("inbox_scan_size_limit");
+          pending.push(message);
+          messageCount++;
+          if (pending.length === 2) {
+            await reportInbound(pending, new Date().toISOString());
+            pending = [];
+          }
         }
+      }
+      if (pending.length) {
+        active();
+        await reportInbound(pending, new Date().toISOString());
       }
       const finalThreads = await read(profile.url, "list");
       const references = (list) =>

@@ -1,6 +1,6 @@
 // Trusted page program, read as source so host transpilers cannot inject helper dependencies.
 // biome-ignore lint/correctness/noUnusedVariables: The driver reads and invokes this fixed page source.
-function readInbox(profile, mode, expectedConversation) {
+function readInbox(profile, mode, expectedConversation, advance) {
   try {
     if (
       Date.now() >= Date.parse(profile.expiresAt) ||
@@ -28,6 +28,46 @@ function readInbox(profile, mode, expectedConversation) {
     if (all(document, profile.selectors.loading).length) return { retry: "loading" };
     if (one(document, profile.selectors.identity).href !== profile.identityHref)
       throw new Error("inbox_identity_changed");
+    if (!["list", "thread"].includes(mode)) throw new Error("inbox_mode_invalid");
+    const paging = profile.pagination?.[mode];
+    const root = one(document, profile.selectors[mode === "list" ? "inboxReady" : "threadReady"]);
+    const container = paging ? one(document, paging.container) : null;
+    if (container && container !== root && !root.contains(container))
+      throw new Error("inbox_scroll_scope_invalid");
+    const inViewport = (element) => {
+      if (!container) return true;
+      if (!container.contains(element)) return false;
+      const a = element.getBoundingClientRect(),
+        b = container.getBoundingClientRect();
+      return a.bottom > b.top && a.top < b.bottom && a.right > b.left && a.left < b.right;
+    };
+    const itemsInView = (selector) => all(root, selector).filter(inViewport);
+    const finish = (items, ids) => {
+      if (!paging) return items;
+      if (
+        container.clientHeight < 40 ||
+        !["auto", "scroll"].includes(getComputedStyle(container).overflowY)
+      )
+        throw new Error("inbox_scroll_container_invalid");
+      const marker = (selector) => {
+        const matches = all(container, selector).filter(inViewport);
+        if (matches.length > 1) throw new Error("inbox_scroll_marker_ambiguous");
+        return matches.length === 1;
+      };
+      const cursor = { ids, top: container.scrollTop };
+      const atStart = marker(paging.start),
+        atEnd = marker(paging.end);
+      if (advance) {
+        if (JSON.stringify(cursor) !== JSON.stringify(advance)) return { retry: "page_changed" };
+        if (atEnd) throw new Error("inbox_scroll_after_end");
+        container.scrollTo({
+          top: cursor.top + container.clientHeight * (mode === "list" ? 0.5 : -0.5),
+          behavior: "instant",
+        });
+        return { advanced: true };
+      }
+      return { items, cursor, atStart, atEnd };
+    };
     const reference = (el, attr) => {
       const value = el.getAttribute(attr);
       if (!value || !value.trim() || value.length > 200 || value !== value.trim())
@@ -35,10 +75,12 @@ function readInbox(profile, mode, expectedConversation) {
       return value;
     };
     if (mode === "list") {
-      if (location.href !== profile.url || all(document, profile.selectors.moreThreads).length)
+      if (
+        location.href !== profile.url ||
+        (!paging && all(document, profile.selectors.moreThreads).length)
+      )
         throw new Error("inbox_list_incomplete");
-      const root = one(document, profile.selectors.inboxReady);
-      const links = all(root, profile.selectors.conversationLink);
+      const links = itemsInView(profile.selectors.conversationLink);
       if (
         links.length > 20 ||
         (!links.length && all(root, profile.selectors.emptyInbox).length !== 1)
@@ -61,17 +103,26 @@ function readInbox(profile, mode, expectedConversation) {
       });
       if (new Set(result.map((item) => item.conversationRef)).size !== result.length)
         throw new Error("inbox_duplicate_thread");
-      return result;
+      return finish(
+        result,
+        result.map((item) => item.conversationRef),
+      );
     }
-    if (all(document, profile.selectors.moreMessages).length)
+    if (
+      !location.pathname.startsWith("/messages/t/") ||
+      decodeURIComponent(location.pathname.slice("/messages/t/".length)) !== expectedConversation ||
+      location.search ||
+      location.hash
+    )
+      throw new Error("inbox_thread_location_changed");
+    if (!paging && all(document, profile.selectors.moreMessages).length)
       throw new Error("inbox_thread_incomplete");
-    const root = one(document, profile.selectors.threadReady);
     if (
       reference(one(root, profile.selectors.threadIdentity), profile.attributes.conversationId) !==
       expectedConversation
     )
       throw new Error("inbox_thread_changed");
-    const elements = all(root, profile.selectors.message);
+    const elements = itemsInView(profile.selectors.message);
     if (
       elements.length > 100 ||
       (!elements.length && all(root, profile.selectors.emptyThread).length !== 1)
@@ -111,7 +162,7 @@ function readInbox(profile, mode, expectedConversation) {
         receivedAt: new Date(time).toISOString(),
       });
     }
-    return messages;
+    return finish(messages, [...ids]);
   } catch {
     return { attention: "page_contract_failed" };
   }

@@ -139,6 +139,7 @@ export async function testInboxRoundTrip(
           moreThreads: ".more-threads",
           moreMessages: ".more-messages",
         },
+        pagination: { thread: { container: "#thread", start: ".start", end: ".end" } },
         attributes: { conversationId: "data-thread-id", messageId: "data-message-id" },
       };
       const context: BrowserContext = await browser.newContext();
@@ -154,20 +155,26 @@ export async function testInboxRoundTrip(
           if (target === `https://www.facebook.com/messages/t/${threadRef}`)
             return route.fulfill({
               contentType: "text/html",
-              body: `${owner}<main id="thread"><h1 data-thread-id="${threadRef}">Thread</h1><section class="message incoming" data-message-id="${messageRef}"><p class="body">${body}</p><time datetime="${receivedAt}">Time</time></section></main>`,
+              body: `<style>#thread{height:220px;overflow-y:auto}.message{height:100px}.start,.end{height:20px}p{margin:0}</style>${owner}<main id="thread"><h1 data-thread-id="${threadRef}">Thread</h1><div class="end">End</div>${[0, 1, 2].map((i) => `<section class="message outgoing" data-message-id="outgoing-${i}">Synthetic outbound</section>`).join("")}<section class="message incoming" data-message-id="${messageRef}"><p class="body">${body}</p><time datetime="${receivedAt}">Time</time></section><div class="start">Start</div></main>`,
             });
           return route.abort();
         });
         const page: Page = await context.newPage();
+        let scrolls = 0;
         const browserRequest = async (
           path: string,
           value: Record<string, unknown> = {},
         ): Promise<Response> => {
           if (path === "/tabs" || path.endsWith("/navigate")) {
             await page.goto(String(value.url));
+            if (String(value.url) !== profile.url)
+              await page.locator("#thread").evaluate((element) => {
+                element.scrollTop = element.scrollHeight;
+              });
             return Response.json({ ok: true, tabId: "synthetic-tab", url: page.url() });
           }
-          if (path.endsWith("/evaluate"))
+          if (path.endsWith("/evaluate")) {
+            if (/,\{"ids":\[/.test(String(value.expression))) scrolls++;
             return Response.json({
               ok: true,
               result: await page.evaluate(String(value.expression)).catch((error) => {
@@ -175,6 +182,7 @@ export async function testInboxRoundTrip(
                 throw error;
               }),
             });
+          }
           throw new Error("unexpected_browser_write");
         };
         const receipts: Array<{ accepted: number; duplicates: number; replayed: boolean }> = [];
@@ -203,6 +211,10 @@ export async function testInboxRoundTrip(
           browserRequest,
         )({ run, signal: new AbortController().signal, reportInbound: report });
         assert.equal(outcome, attempt === 0 ? "failed" : "completed");
+        assert.ok(
+          scrolls >= 2,
+          "Each run must collect across actual container scrolls before reporting",
+        );
         assert.equal(
           deliveredBatches,
           attempt + 1,
