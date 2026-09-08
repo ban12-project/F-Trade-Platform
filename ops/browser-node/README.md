@@ -182,3 +182,11 @@ CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose �
 当前单次最多 20 个可见线程、每线程 100 个可见消息元素、总计 200 条入站消息；线程正文总量最多 200000 字符，响应最多 1000000 字节。每批最多 2 条，避免多字节正文超过上报容量。超限会失败，不静默截断并宣称完成；更大收件箱的分页/游标方案仍需独立实现与验证。
 
 `tests/e2e/facebook-inbox.spec.ts` 在完全拦截网络的 Chromium 夹具上连接生产签名上报器，覆盖正常/空/仅出站、错误身份/线程、缺失或重复 ID、方向歧义、未完成分页、挑战、列表变化和回执丢失。真实 Camofox 网络、真实 Facebook DOM、VPS 日志/插件隐私和 Messenger PIN/历史行为仍未验收。固定上游 evaluate 会把返回值传给本地插件事件；不得添加未经审核的插件或把这些事件写入日志/遥测。
+
+### 浏览器到入站分流的组合回归
+
+`test-browser-inbox-roundtrip.ts` 已纳入迁移后的 PostgreSQL 测试主程序，并由 Facebook worker CI 安装 Chromium 后执行。测试将实际 Chromium 页面采集、生产签名上报器、真实回环 HTTP、生产 Route Handler、数据库加密/去重和现有人工分流放在同一次运行中。第一次提交成功后故意销毁 HTTP 响应连接：该轮不重发、不推进检查时间；下一轮读取同一消息返回 duplicate，存储仍只有一条，随后人工分流得到 Lead/RFQ 收集任务。浏览器对 Facebook 地址的请求全部拦截为合成 HTML。
+
+初次组合运行在 HTTP 之前失败：tsx 对函数加入的 `__name` 辅助调用经 `.toString()` 进入页面，但页面没有该宿主辅助函数。页面代码现保存在固定的 `facebook-inbox-page.js` / `facebook-publication-page.js`，由 `page-programs.cjs` 按固定本地路径读入，避免宿主编译器改写代码。不得从任务传入程序或路径；镜像必须连同这些资源一起打包。修复后组合回归与 23 项页面回归通过，原失败不记为成功。
+
+该组合测试的 Camofox REST 接口由 Chromium 桥接，Node HTTP 服务调用生产 Route Handler，未启动 Next.js HTTP 服务或真实 Camofox 进程。固定代理/出口检查在此处是测试替身，其独立回归不能被合并描述为本次真实代理验证；容器、真实 Facebook、页面契约和运维隐私仍须分别证明。

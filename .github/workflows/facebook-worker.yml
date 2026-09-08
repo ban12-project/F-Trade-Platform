@@ -5,9 +5,11 @@ on:
     paths:
       - "lib/social/**"
       - "lib/browser-fleet/**"
+      - "ops/browser-node/**"
       - "scripts/test-facebook-publication-postgres.ts"
       - "scripts/test-facebook-inbound-postgres.ts"
       - "scripts/test-browser-inbox-postgres.ts"
+      - "scripts/test-browser-inbox-roundtrip.ts"
       - "drizzle/**"
       - "lib/actions/facebook-*.ts"
       - "lib/db/facebook-runtime-schema.ts"
@@ -73,6 +75,7 @@ jobs:
             lib/social/facebook-vault-crypto.ts
             lib/social/facebook-inbound-schema.ts
             scripts/test-browser-inbox-postgres.ts
+            scripts/test-browser-inbox-roundtrip.ts
             lib/social/facebook-inbound-store.ts
             scripts/test-facebook-inbound-postgres.ts
             lib/social/facebook-worker-protocol.ts
@@ -82,6 +85,8 @@ jobs:
           pnpm exec biome ci "${files[@]}"
       - name: Application typecheck
         run: pnpm typecheck
+      - name: Install synthetic Chromium runtime
+        run: pnpm exec playwright install --with-deps chromium
       - name: Migrated PostgreSQL publication claim and authorization
         run: node --conditions=react-server --import tsx scripts/test-facebook-publication-postgres.ts
         env:
