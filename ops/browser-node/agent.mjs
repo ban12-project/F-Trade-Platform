@@ -11,6 +11,7 @@ import { createGateway } from "./gateway.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import { readPublicationMedia } from "./media.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
+import { stagePublicationUpload } from "./upload.mjs";
 
 const appOrigin = secureOrigin(process.env.FTRADE_URL ?? "");
 const accessKey = process.env.BROWSER_NODE_ACCESS_KEY_FILE
@@ -370,34 +371,60 @@ async function tick() {
             },
             request: nodeCall,
           });
+          const assertPublicationActive = () => {
+            if (
+              !slot.ready ||
+              slot.stopping ||
+              slot.abort.signal.aborted ||
+              slot.expiresAt <= Date.now()
+            )
+              throw new Error("publication_lease_inactive");
+          };
+          let mediaRead;
+          const readAssignedMedia = () => {
+            mediaRead ??= readPublicationMedia({
+              run: slot.run,
+              assertActive: assertPublicationActive,
+              request: (operation, fields) =>
+                fetch(`${appOrigin}/api/browser-nodes`, {
+                  method: "POST",
+                  redirect: "error",
+                  signal: AbortSignal.any([slot.abort.signal, AbortSignal.timeout(120_000)]),
+                  headers: {
+                    Authorization: `Bearer ${accessKey}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ operation, installationId, bootId, ...fields }),
+                }),
+            });
+            return mediaRead.then((asset) => {
+              assertPublicationActive();
+              return asset;
+            });
+          };
+          let mediaPreparation;
+          const preparePublicationMedia = () => {
+            mediaPreparation ??= readAssignedMedia().then((asset) =>
+              stagePublicationUpload({
+                docker,
+                nodeId,
+                run: slot.run,
+                containerId: slot.containerId,
+                asset,
+                assertActive: assertPublicationActive,
+              }),
+            );
+            return mediaPreparation.then((upload) => {
+              assertPublicationActive();
+              return upload;
+            });
+          };
           const outcome = await adapter.execute({
             run: structuredClone(slot.run),
             authorizePublication,
+            preparePublicationMedia,
             reportPublication: createPublicationReporter({ run: slot.run, request: nodeCall }),
-            readPublicationMedia: () =>
-              readPublicationMedia({
-                run: slot.run,
-                assertActive() {
-                  if (
-                    !slot.ready ||
-                    slot.stopping ||
-                    slot.abort.signal.aborted ||
-                    slot.expiresAt <= Date.now()
-                  )
-                    throw new Error("publication_lease_inactive");
-                },
-                request: (operation, fields) =>
-                  fetch(`${appOrigin}/api/browser-nodes`, {
-                    method: "POST",
-                    redirect: "error",
-                    signal: AbortSignal.any([slot.abort.signal, AbortSignal.timeout(120_000)]),
-                    headers: {
-                      Authorization: `Bearer ${accessKey}`,
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ operation, installationId, bootId, ...fields }),
-                  }),
-              }),
+            readPublicationMedia: readAssignedMedia,
             signal: slot.abort.signal,
             browserRequest: (path, body) => browserRequest(slot, path, body),
           });

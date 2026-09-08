@@ -1,14 +1,20 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { containerSpec, stopContainer } from "../ops/browser-node/docker.mjs";
+import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/docker.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
 import { readPublicationMedia } from "../ops/browser-node/media.mjs";
 import {
   createPublicationAuthorizer,
   createPublicationReporter,
 } from "../ops/browser-node/publication.mjs";
+import { publicationUploadArchive, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
 
 const nodeId = randomUUID();
 const accountId = randomUUID();
@@ -338,5 +344,111 @@ test("media reader rejects truncated, oversized, altered and wrong-type bytes", 
       }),
       /publication_media_/,
     );
+  }
+});
+
+test("generated upload archive is readable by system tar and contains only the confirmed file", async () => {
+  const bytes = Buffer.from("synthetic confirmed image");
+  const media = {
+    contentType: "image/png",
+    sizeBytes: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+  const upload = publicationUploadArchive({ bytes, media });
+  const temporary = await mkdtemp(join(tmpdir(), "ftrade-upload-test-"));
+  try {
+    const archive = join(temporary, "upload.tar");
+    await writeFile(archive, upload.archive);
+    const file = upload.path.slice("/tmp/".length);
+    assert.equal(
+      execFileSync("tar", ["-tf", archive], { encoding: "utf8" }),
+      `ftrade-uploads/\n${file}\n`,
+    );
+    assert.deepEqual(execFileSync("tar", ["-xOf", archive, file]), bytes);
+    assert.throws(
+      () => publicationUploadArchive({ bytes: Buffer.from("changed"), media }),
+      /publication_upload_invalid/,
+    );
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+});
+
+test("upload staging verifies container ownership and never accepts task paths", async () => {
+  const bytes = Buffer.from("synthetic");
+  const media = {
+    contentType: "image/png",
+    sizeBytes: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+  const assigned = { kind: "publish", id: randomUUID(), accountId: randomUUID() };
+  const assignedNode = randomUUID();
+  const containerId = "a".repeat(64);
+  const calls = [];
+  const docker = async (method, path, body) => {
+    calls.push({ method, path, body });
+    if (method === "GET")
+      return {
+        State: { Running: true },
+        Config: {
+          Labels: {
+            "io.ftrade.node": assignedNode,
+            "io.ftrade.run": assigned.id,
+            "io.ftrade.account": assigned.accountId,
+          },
+        },
+      };
+    assert.ok(Buffer.isBuffer(body));
+  };
+  const result = await stagePublicationUpload({
+    docker,
+    nodeId: assignedNode,
+    run: assigned,
+    containerId,
+    asset: { bytes, media, path: "/etc/passwd" },
+    assertActive() {},
+  });
+  assert.equal(result.path, `/tmp/ftrade-uploads/${media.sha256}.png`);
+  assert.equal(
+    calls[1].path,
+    `/containers/${containerId}/archive?path=%2Ftmp&noOverwriteDirNonDir=1`,
+  );
+  calls.length = 0;
+  await assert.rejects(
+    stagePublicationUpload({
+      docker,
+      nodeId: randomUUID(),
+      run: assigned,
+      containerId,
+      asset: { bytes, media },
+      assertActive() {},
+    }),
+    /publication_container_mismatch/,
+  );
+  assert.equal(calls.length, 1);
+});
+
+test("Docker archive transport sends binary bytes rather than JSON encoding", async () => {
+  const directory = await mkdtemp("/tmp/ft-docker-");
+  const socket = join(directory, "engine.sock");
+  let observed;
+  const server = createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      observed = { bytes: Buffer.concat(chunks), type: request.headers["content-type"] };
+      response.end("{}");
+    });
+  });
+  try {
+    server.listen(socket);
+    await once(server, "listening");
+    const bytes = Buffer.from([0, 255, 1, 128]);
+    await dockerClient(socket)("PUT", "/containers/synthetic/archive?path=%2Ftmp", bytes);
+    assert.deepEqual(observed.bytes, bytes);
+    assert.equal(observed.type, "application/x-tar");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
   }
 });

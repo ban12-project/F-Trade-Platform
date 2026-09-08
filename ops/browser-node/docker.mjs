@@ -4,14 +4,18 @@ import http from "node:http";
 export function dockerClient(socketPath = "/var/run/docker.sock") {
   return async function docker(method, path, body, timeout = 45_000) {
     return new Promise((resolve, reject) => {
-      const data = body === undefined ? undefined : JSON.stringify(body);
+      const binary = Buffer.isBuffer(body);
+      const data = body === undefined ? undefined : binary ? body : JSON.stringify(body);
       const request = http.request(
         {
           socketPath,
           method,
           path,
           headers: data
-            ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) }
+            ? {
+                "Content-Type": binary ? "application/x-tar" : "application/json",
+                "Content-Length": Buffer.byteLength(data),
+              }
             : {},
         },
         (response) => {
@@ -103,7 +107,7 @@ export function containerSpec(nodeId, run, imageId, deadline) {
         "CAMOFOX_CRASH_REPORT_ENABLED=false",
         "CAMOFOX_PROFILE_DIR=/data/profiles",
         "CAMOFOX_COOKIES_DIR=/data/cookies",
-        "CAMOFOX_UPLOADS_DIR=/data/uploads",
+        "CAMOFOX_UPLOADS_DIR=/tmp/ftrade-uploads",
         "CAMOFOX_TRACES_DIR=/data/traces",
         "MAX_SESSIONS=1",
         "MAX_TABS_PER_SESSION=4",
