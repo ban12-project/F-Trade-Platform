@@ -146,6 +146,35 @@ export function BrowserNodesPanel() {
       setBusy(false);
     }
   }
+  const connectedNode = nodes.find((node) => node.id === connection?.nodeId);
+  const connectedRun = connectedNode?.runs.find((run) => run.id === connection?.runId);
+  const connectedAccount = connectedNode?.accounts.find(
+    (account) => account.id === connectedRun?.accountId,
+  );
+  const canFillLogin =
+    connectedNode?.status === "active" &&
+    connectedRun?.kind === "interactive" &&
+    connectedRun.status === "running" &&
+    connectedRun.ticketUsed &&
+    !connectedRun.stopRequested &&
+    !connectedRun.savedLoginState &&
+    connectedAccount?.enabled &&
+    connectedAccount.loginSaved &&
+    connectedNode.loginFillScopes.some(
+      (scope) =>
+        scope.channelRef === connectedAccount.channelRef &&
+        scope.accountRef === connectedAccount.accountRef,
+    );
+  const loginStatus =
+    connectedRun?.savedLoginOutcome === "filled"
+      ? "已填入，请在远程页面完成登录和 2FA。"
+      : connectedRun?.savedLoginOutcome === "refused"
+        ? "未能填入，请在远程页面检查登录表单。"
+        : connectedRun?.savedLoginOutcome === "unknown"
+          ? "填充结果未知，本次不再重试。请重新接入后核对。"
+          : connectedRun?.savedLoginState
+            ? "填充请求已记录，正在等待节点结果。"
+            : "仅填入已保存的账号和密码；请自行检查并提交登录。需要已接入浏览器及有效的登录页面规则。";
   return (
     <div className="space-y-6">
       <p role="status" className="text-sm text-muted-foreground">
@@ -489,6 +518,26 @@ export function BrowserNodesPanel() {
               sandbox="allow-scripts allow-same-origin"
               className="h-[640px] w-full rounded border"
             />
+            <div className="flex flex-col items-start gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || !canFillLogin}
+                onClick={() => {
+                  void send({
+                    operation: "use-saved-login",
+                    nodeId: connection.nodeId,
+                    runId: connection.runId,
+                    confirmed: true,
+                  });
+                }}
+              >
+                填入已保存账号和密码
+              </Button>
+              <p role="status" className="text-sm text-muted-foreground">
+                {loginStatus}
+              </p>
+            </div>
             <Button
               type="button"
               onClick={async () => {

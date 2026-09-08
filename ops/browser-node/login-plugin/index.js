@@ -4,7 +4,13 @@ import pageProgram from "./page-program.cjs";
 const fillPage = new Function(`return (${pageProgram});`)();
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 export function validateLoginProfile(profile, now = Date.now()) {
-  if (profile?.version !== 1 || !/^evidence-[a-z0-9_-]{3,120}$/i.test(profile.reviewRef ?? ""))
+  if (
+    !profile ||
+    Object.keys(profile).sort().join(",") !==
+      "expiresAt,form,password,reviewRef,reviewedAt,url,username,version" ||
+    profile.version !== 1 ||
+    !/^evidence-[a-z0-9_-]{3,120}$/i.test(profile.reviewRef ?? "")
+  )
     throw new Error("login_profile_invalid");
   const reviewed = Date.parse(profile.reviewedAt),
     expires = Date.parse(profile.expiresAt);
@@ -89,6 +95,7 @@ export function createLoginFill({
       const page = sessions.get(accountId)?.tabGroups.get(runId)?.get(packet.tabId)?.page;
       if (!page || page.isClosed()) return { outcome: "refused" };
       used = true; // Consume before calling the browser; even a lost response cannot retry.
+      await page.bringToFront();
       const outcome = await page.evaluate(fillPage, {
         profile,
         username: packet.username,
@@ -109,16 +116,35 @@ export function createLoginFill({
 }
 
 export function register(app, ctx, config = {}) {
-  // Deliberately disabled until the platform owner-session/one-use release is wired.
-  if (config.enabled !== true) return;
+  // Loading the plugin does not expose an endpoint without explicit per-run configuration.
+  if (config.enabled !== true || !process.env.FTRADE_LOGIN_PROFILE_JSON) return;
   if (!ctx.config?.accessKey) throw new Error("login_access_key_required");
+  const profile = validateLoginProfile(JSON.parse(process.env.FTRADE_LOGIN_PROFILE_JSON));
   const fill = createLoginFill({
     sessions: ctx.sessions,
     accountId: process.env.FTRADE_ACCOUNT_ID,
     runId: process.env.FTRADE_RUN_ID,
     kind: process.env.FTRADE_RUN_KIND,
-    profile: config.profile,
+    profile,
     leaseDeadline: () => Number(readFileSync("/tmp/ftrade-lease", "utf8")),
+  });
+  app.get("/ftrade/login-status", ctx.auth(), (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      validateLoginProfile(profile);
+      const deadline = Number(readFileSync("/tmp/ftrade-lease", "utf8"));
+      if (!Number.isFinite(deadline) || deadline <= Date.now())
+        throw new Error("login_lease_expired");
+      res.json({
+        version: 1,
+        runId: process.env.FTRADE_RUN_ID,
+        accountId: process.env.FTRADE_ACCOUNT_ID,
+        reviewRef: profile.reviewRef,
+        expiresAt: Date.parse(profile.expiresAt),
+      });
+    } catch {
+      res.status(403).json({ error: "login_unavailable" });
+    }
   });
   app.post("/ftrade/login-fill", ctx.auth(), async (req, res) => {
     res.set("Cache-Control", "no-store");

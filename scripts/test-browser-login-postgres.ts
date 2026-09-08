@@ -255,6 +255,24 @@ export async function testBrowserLogin(
       assert.ok(body.expiresAt <= Date.now() + 30000 && body.expiresAt <= notice.expiresAt);
     } else assert.deepEqual(body, { error: "node_request_denied" });
   }
+  const receipt = {
+    operation: "login-result",
+    runId: current.run.id,
+    leaseId: current.run.leaseId,
+    authorizationId: notice.id,
+    outcome: "filled",
+  };
+  await assert.rejects(
+    () => call({ ...receipt, authorizationId: randomUUID() }),
+    /saved_login_result_not_authorized/,
+  );
+  assert.equal((await call(receipt)).replayed, false);
+  assert.equal((await call(receipt)).replayed, true);
+  await assert.rejects(
+    () => call({ ...receipt, outcome: "unknown" }),
+    /saved_login_result_conflict/,
+  );
+  assert.equal((await state()).accounts[0].authState, "needs_login");
   assert.equal((await current.heartbeat()).loginAuthorization, undefined);
   await assert.rejects(current.authorize, /already_requested/);
   const publicView = await call({ operation: "sync" });
@@ -280,6 +298,25 @@ export async function testBrowserLogin(
   );
   assert.equal(JSON.stringify(audit).includes(password), false);
   await current.finish();
+  const refused = await start();
+  await refused.authorize();
+  const refusedNotice = (await refused.heartbeat()).loginAuthorization as { id: string };
+  const refusedRequest = {
+    runId: refused.run.id,
+    leaseId: refused.run.leaseId,
+    authorizationId: refusedNotice.id,
+  };
+  await assert.rejects(
+    () => call({ operation: "login-result", ...refusedRequest, outcome: "filled" }),
+    /saved_login_result_not_authorized/,
+  );
+  await call({ operation: "login-result", ...refusedRequest, outcome: "refused" });
+  assert.equal((await refused.heartbeat()).loginAuthorization, undefined);
+  await assert.rejects(
+    () => call({ operation: "claim-login", ...refusedRequest }),
+    /saved_login_not_authorized/,
+  );
+  await refused.finish();
   const lost = await start();
   await lost.authorize();
   const lostNotice = (await lost.heartbeat()).loginAuthorization as { id: string };

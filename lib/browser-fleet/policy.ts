@@ -50,7 +50,13 @@ export type Run = {
     accepted: number;
     duplicates: number;
   }>;
-  savedLogin?: { id: string; requestedAt: number; expiresAt: number; claimedAt: number | null };
+  savedLogin?: {
+    id: string;
+    requestedAt: number;
+    expiresAt: number;
+    claimedAt: number | null;
+    outcome?: "filled" | "refused" | "unknown";
+  };
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
   authSessionId: string | null;
@@ -364,7 +370,9 @@ export function publicState(state: FleetState) {
     limits: state.limits,
     lastSeenAt: state.lastSeenAt,
     capabilities: state.capabilities,
-    loginFillScopes: state.loginFillScopes ?? [],
+    loginFillScopes: (state.loginFillScopes ?? []).filter(
+      (scope) => scope.expiresAt > Date.now() + 10000,
+    ),
     accounts: state.accounts.map(({ loginCiphertext, proxyCiphertext, ...a }) => ({
       ...a,
       loginSaved: !!loginCiphertext,
@@ -373,6 +381,7 @@ export function publicState(state: FleetState) {
     runs: state.runs.map(
       ({ ticketHash, authSessionId, leaseId, claimId, inboxReceipts, savedLogin, ...r }) => ({
         ...r,
+        savedLoginOutcome: savedLogin?.outcome ?? null,
         savedLoginState: savedLogin
           ? savedLogin.claimedAt === null
             ? "requested"

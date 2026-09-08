@@ -57,6 +57,7 @@ for (const mode of [
     );
     const controlledPage = {
       isClosed: () => page.isClosed(),
+      bringToFront: () => page.bringToFront(),
       async evaluate(program: Parameters<typeof page.evaluate>[0], payload: unknown) {
         evaluations++;
         if (mode === "browser_error") throw new Error(`SYNTHETIC upstream exception ${password}`);
@@ -129,7 +130,14 @@ test("login plugin is disabled by default and rejects missing runtime authority"
     {},
   );
   expect(routes).toBe(0);
-  expect(() => register({}, {}, { enabled: true })).toThrow("login_access_key_required");
+  const previous = process.env.FTRADE_LOGIN_PROFILE_JSON;
+  process.env.FTRADE_LOGIN_PROFILE_JSON = JSON.stringify(profile);
+  try {
+    expect(() => register({}, {}, { enabled: true })).toThrow("login_access_key_required");
+  } finally {
+    if (previous === undefined) delete process.env.FTRADE_LOGIN_PROFILE_JSON;
+    else process.env.FTRADE_LOGIN_PROFILE_JSON = previous;
+  }
   expect(() =>
     createLoginFill({
       sessions: new Map(),

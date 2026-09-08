@@ -35,6 +35,7 @@ services:
       MAX_RUNNING_BROWSERS: ${MAX_RUNNING_BROWSERS:-2}
       HOST_RESERVE_MB: ${HOST_RESERVE_MB:-1024}
       GATEWAY_PORT: "9400"
+      FACEBOOK_LOGIN_PROFILES_FILE: ${FACEBOOK_LOGIN_PROFILES_FILE:-}
     volumes:
       # Host-level authority. Only use a trusted, dedicated Linux VPS.
       - /var/run/docker.sock:/var/run/docker.sock

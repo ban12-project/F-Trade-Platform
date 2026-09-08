@@ -25,6 +25,7 @@ services:
       MAX_RUNNING_BROWSERS: ${MAX_RUNNING_BROWSERS:-2}
       HOST_RESERVE_MB: ${HOST_RESERVE_MB:-1024}
       GATEWAY_PORT: "9400"
+      FACEBOOK_LOGIN_PROFILES_FILE: ${FACEBOOK_LOGIN_PROFILES_FILE:-}
     volumes:
       # This grants host-level Docker authority. Use a dedicated trusted VPS.
       # Never mount this socket in the Camofox browser containers.

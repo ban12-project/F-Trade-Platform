@@ -9,6 +9,12 @@ import { join } from "node:path";
 import test from "node:test";
 import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/docker.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
+import {
+  configureLoginRuntime,
+  loadLoginProfiles,
+  loginProfileForRun,
+  loginScopes,
+} from "../ops/browser-node/login.mjs";
 import { readPublicationMedia } from "../ops/browser-node/media.mjs";
 import {
   createPublicationAuthorizer,
@@ -590,5 +596,62 @@ test("Facebook adapter advertises only explicitly configured inbox accounts", as
     if (previousPublishing === undefined) delete process.env.FACEBOOK_DOM_PROFILES_FILE;
     else process.env.FACEBOOK_DOM_PROFILES_FILE = previousPublishing;
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("saved login profiles remain private, bounded and interactive-account scoped", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ftrade-login-profile-"));
+  const path = join(dir, "profiles.json");
+  const profile = {
+    version: 1,
+    reviewRef: "evidence-synthetic-profile-review",
+    reviewedAt: new Date(Date.now() - 1000).toISOString(),
+    expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    url: "https://www.facebook.com/login/",
+    form: "#login",
+    username: "#email",
+    password: "#password",
+  };
+  const entry = { channelRef: "facebook-personal", accountRef: "synthetic-account", profile };
+  try {
+    assert.equal((await loadLoginProfiles()).size, 0);
+    await writeFile(path, JSON.stringify([entry]), { mode: 0o600 });
+    const profiles = await loadLoginProfiles(path);
+    assert.deepEqual(loginScopes(profiles), [
+      {
+        channelRef: entry.channelRef,
+        accountRef: entry.accountRef,
+        expiresAt: Date.parse(profile.expiresAt),
+      },
+    ]);
+    const scopedRun = {
+      ...run,
+      kind: "interactive",
+      channelRef: entry.channelRef,
+      accountRef: entry.accountRef,
+    };
+    assert.deepEqual(loginProfileForRun(profiles, scopedRun), profile);
+    assert.equal(loginProfileForRun(profiles, { ...scopedRun, kind: "inbox" }), null);
+    assert.equal(loginProfileForRun(profiles, { ...scopedRun, accountRef: "other" }), null);
+    const spec = { body: { Env: [] } };
+    configureLoginRuntime(spec, { ...scopedRun, kind: "publish" }, profile);
+    assert.deepEqual(spec.body.Env, []);
+    configureLoginRuntime(spec, scopedRun, profile);
+    assert.equal(spec.body.Env.length, 4);
+    assert.ok(spec.body.Env.includes(`FTRADE_RUN_ID=${run.id}`));
+    assert.equal(
+      spec.body.Env.some((value) => value.includes("proxy.example")),
+      false,
+    );
+    for (const invalid of [
+      [entry, entry],
+      [{ ...entry, credential: "SYNTHETIC" }],
+      [{ ...entry, profile: { ...profile, expiresAt: new Date(0).toISOString() } }],
+    ]) {
+      await writeFile(path, JSON.stringify(invalid));
+      await assert.rejects(() => loadLoginProfiles(path));
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });

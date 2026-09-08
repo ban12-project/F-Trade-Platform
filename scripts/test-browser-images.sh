@@ -19,7 +19,7 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   test -x /root/.cache/camoufox/camoufox-bin
   node --check /opt/ftrade/watchdog.mjs
   node --check /app/server.js
-  node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; register({ post() { throw new Error("login_default_must_be_off"); } }, {}, {});'"'"'
+  node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
   /root/.cache/camoufox/camoufox-bin --version
 '
 

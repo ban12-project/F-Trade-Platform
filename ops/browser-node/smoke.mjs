@@ -15,6 +15,7 @@ for (const path of [
   "./egress.mjs",
   "./gateway.mjs",
   "./lease.mjs",
+  "./login.mjs",
   "./media.mjs",
   "./publication.mjs",
   "./upload.mjs",

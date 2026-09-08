@@ -10,6 +10,13 @@ import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
 import { createInboxReporter } from "./inbox.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
+import {
+  configureLoginRuntime,
+  createSavedLoginExecutor,
+  loadLoginProfiles,
+  loginProfileForRun,
+  loginScopes,
+} from "./login.mjs";
 import { readPublicationMedia } from "./media.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
 import { stagePublicationUpload } from "./upload.mjs";
@@ -44,6 +51,9 @@ if (image.Config?.Labels?.["io.ftrade.lease-watchdog"] !== "1")
 // Resolve the local tag once. Platform payloads cannot choose images, mounts,
 // shell commands, host ports, or a Docker API endpoint.
 const imageId = image.Id;
+const loginProfiles = await loadLoginProfiles(process.env.FACEBOOK_LOGIN_PROFILES_FILE);
+if (loginProfiles.size && image.Config?.Labels?.["io.ftrade.login-fill"] !== "1")
+  throw new Error("reviewed_login_image_required");
 let adapter = { capabilities: ["interactive"] };
 if (process.env.BROWSER_TASK_ADAPTER) {
   const extra = await import(pathToFileURL(process.env.BROWSER_TASK_ADAPTER).href);
@@ -124,6 +134,7 @@ for (const network of oldNetworks) await docker("DELETE", `/networks/${network.I
 await nodeCall("recover", {
   stoppedRunIds: sync.runs.filter(isLive).map((r) => r.id),
   capabilities: adapter.capabilities,
+  loginFillScopes: loginScopes(loginProfiles),
   ...(adapter.publicationScopes ? { publicationScopes: adapter.publicationScopes } : {}),
   ...(adapter.inboxScopes ? { inboxScopes: adapter.inboxScopes } : {}),
 });
@@ -293,6 +304,53 @@ async function heartbeat(slot) {
     }
   }
   if (slot.containerId) await renewWatchdog(docker, slot.containerId, slot.expiresAt);
+  if (
+    slot.ready &&
+    slot.connected &&
+    !slot.disconnectedAt &&
+    slot.run.kind === "interactive" &&
+    renewed.loginAuthorization &&
+    !slot.loginTask
+  ) {
+    const profile = loginProfileForRun(loginProfiles, slot.run);
+    if (!profile) return;
+    const execute = createSavedLoginExecutor({
+      run: slot.run,
+      profile,
+      assertActive() {
+        if (
+          !slot.ready ||
+          !slot.connected ||
+          slot.disconnectedAt ||
+          slot.stopping ||
+          slot.abort.signal.aborted ||
+          slot.expiresAt <= Date.now()
+        )
+          throw new Error("login_lease_inactive");
+      },
+      async checkEgress() {
+        try {
+          await verifyBrowserEgress(
+            (path, body) => browserRequest(slot, path, body),
+            slot.run,
+            slot.egressTabId,
+          );
+          slot.egressCheckedAt = Date.now();
+        } catch (error) {
+          await stop(slot, "egress_mismatch");
+          throw error;
+        }
+      },
+      request: nodeCall,
+      browserRequest: (path, body) => browserRequest(slot, path, body),
+    });
+    // Run independently so slow navigation cannot starve other slots' lease heartbeats.
+    slot.loginTask = execute(renewed.loginAuthorization)
+      .then(async (outcome) => {
+        if (outcome === "unknown") await stop(slot, "unknown");
+      })
+      .catch(() => stop(slot, "unknown"));
+  }
 }
 let ticking = false;
 async function tick() {
@@ -323,7 +381,9 @@ async function tick() {
       result,
       (claim) => {
         const expiresAt = localDeadline(claim, claim.run.leaseUntil);
-        return { expiresAt, spec: containerSpec(nodeId, claim.run, imageId, expiresAt) };
+        const spec = containerSpec(nodeId, claim.run, imageId, expiresAt);
+        configureLoginRuntime(spec, claim.run, loginProfileForRun(loginProfiles, claim.run));
+        return { expiresAt, spec };
       },
       (outcome) => nodeCall("finish", outcome),
     );

@@ -511,12 +511,31 @@ async function nodeOperation(
   }
   const run = state.runs.find((r) => r.id === request.runId);
   if (!run || run.leaseId !== request.leaseId) throw new Error("lease_mismatch");
+  if (request.operation === "login-result") {
+    const authorization = run.savedLogin;
+    if (
+      run.kind !== "interactive" ||
+      !authorization ||
+      authorization.id !== request.authorizationId ||
+      (authorization.claimedAt === null && request.outcome !== "refused")
+    )
+      throw new Error("saved_login_result_not_authorized");
+    if (authorization.outcome && authorization.outcome !== request.outcome)
+      throw new Error("saved_login_result_conflict");
+    const replayed = !!authorization.outcome;
+    if (!replayed) {
+      authorization.outcome = request.outcome;
+      await audit(tx, row.owner_id, `browser_credentials.login_${request.outcome}`, run.id);
+    }
+    return { recorded: true, replayed };
+  }
   if (request.operation === "claim-login") {
     const { account, loginCiphertext, scopeExpiry } = await savedLoginAccount(tx, row, run, now);
     const authorization = run.savedLogin;
     if (
       !authorization ||
       authorization.id !== request.authorizationId ||
+      authorization.outcome ||
       authorization.claimedAt !== null ||
       authorization.expiresAt <= now
     )
@@ -589,7 +608,12 @@ async function nodeOperation(
     requestStop(state, run);
   const renewed = renewRun(state, run.id, request.leaseId, request.ready, now);
   let loginAuthorization: { id: string; expiresAt: number } | undefined;
-  if (renewed && run.savedLogin?.claimedAt === null && run.savedLogin.expiresAt > now) {
+  if (
+    renewed &&
+    run.savedLogin?.claimedAt === null &&
+    !run.savedLogin.outcome &&
+    run.savedLogin.expiresAt > now
+  ) {
     try {
       await savedLoginAccount(tx, row, run, now);
       loginAuthorization = { id: run.savedLogin.id, expiresAt: run.savedLogin.expiresAt };
