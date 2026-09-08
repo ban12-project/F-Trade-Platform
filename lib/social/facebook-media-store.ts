@@ -262,7 +262,7 @@ export async function buildFacebookPublicationPayload(
   if (!["text", "image", "video"].includes(publication.format)) {
     throw new Error("publication_format_invalid");
   }
-  const { record } = await assertPublicationEligible(
+  const { record, gate } = await assertPublicationEligible(
     { ...publication, format: publication.format as "text" | "image" | "video" },
     tx,
     now,
@@ -275,13 +275,23 @@ export async function buildFacebookPublicationPayload(
     .from(facebookPublicationManifest)
     .where(eq(facebookPublicationManifest.publicationId, publication.id));
   if (manifest || record.type !== "content") throw new Error("publication_format_invalid");
-  return facebookTextPayloadSchema.parse({
+  const payload = facebookTextPayloadSchema.parse({
     channelRef: publication.channelRef,
     accountRef: publication.accountRef,
     publicationId: publication.id,
     format: "text",
     text: record.payload.body,
   });
+  const confirmation = publication.textConfirmation;
+  if (
+    !confirmation ||
+    confirmation.contentVersion !== record.version ||
+    confirmation.approvalRef !== gate.id ||
+    confirmation.payloadDigest !== digestSocialWorkerPayload(payload)
+  ) {
+    throw new Error("text_confirmation_stale_or_missing");
+  }
+  return payload;
 }
 
 export async function buildFacebookMediaPayload(

@@ -211,6 +211,13 @@
       "when": 1788686400000,
       "tag": "0029_facebook_runtime",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788840000000,
+      "tag": "0030_text_publication_confirmation",
+      "breakpoints": true
     }
   ]
 }

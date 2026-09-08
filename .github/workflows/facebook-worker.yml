@@ -8,6 +8,7 @@ on:
       - "drizzle/**"
       - "lib/actions/facebook-*.ts"
       - "lib/db/facebook-runtime-schema.ts"
+      - "lib/db/schema.ts"
       - "app/api/social-worker/**"
       - "app/workspace/facebook/**"
       - "components/workspace/facebook-*.tsx"

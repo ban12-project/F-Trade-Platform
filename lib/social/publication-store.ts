@@ -23,8 +23,9 @@ import {
   productMediaRuntimeRecordFromRow,
 } from "@/lib/video/product-media-runtime-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
-
+import { facebookTextPayloadSchema } from "./facebook-worker-protocol";
 import { createControlledPublicationCommand } from "./publication-command";
+import { digestSocialWorkerPayload } from "./worker-protocol";
 
 export type PublicationCandidate = {
   id: string;
@@ -76,6 +77,7 @@ export async function assertPublicationEligible(
     throw new Error("渠道未启用或已暂停，不能提交发布。");
   const [record] = await tx
     .select({
+      version: aggregateRecord.version,
       type: aggregateRecord.type,
       state: aggregateRecord.state,
       payload: aggregateRecord.payload,
@@ -95,18 +97,12 @@ export async function assertPublicationEligible(
   if ((record.type === "video") !== (value.format === "video"))
     throw new Error("发布格式与已批准记录类型不一致。");
   const [gate] = await tx
-    .select({ id: approval.id })
+    .select({ id: approval.id, status: approval.status })
     .from(approval)
-    .where(
-      and(
-        eq(approval.aggregateId, value.contentRef),
-        eq(approval.gate, "gate_01_truth"),
-        eq(approval.status, "approved"),
-      ),
-    )
-    .orderBy(desc(approval.requestedAt))
+    .where(and(eq(approval.aggregateId, value.contentRef), eq(approval.gate, "gate_01_truth")))
+    .orderBy(desc(approval.requestedAt), desc(approval.createdAt), desc(approval.id))
     .limit(1);
-  if (!gate) throw new Error("缺少 Gate 01 批准记录。");
+  if (gate?.status !== "approved") throw new Error("缺少当前 Gate 01 批准记录。");
   if (record.type === "video") {
     const video = videoProjectSchema.parse(record.payload);
     assertVideoPublicationEligible(video);
@@ -173,7 +169,11 @@ export async function listProjectPublicationData(
         .orderBy(desc(socialPublication.createdAt))
         .limit(50)
     : [];
-  const publishedRefs = new Set(publications.map((item) => item.contentRef));
+  const publishedRefs = new Set(
+    publications
+      .filter((item) => !(item.format === "text" && item.status === "paused"))
+      .map((item) => item.contentRef),
+  );
   const records = projectRecords.filter(
     ({ record }) =>
       ["CONTENT_APPROVED", "VIDEO_APPROVED"].includes(record.state) &&
@@ -286,6 +286,22 @@ export async function submitControlledPublication(
         contentRef: value.contentRef,
         format: value.format,
         confirmationRef: value.confirmationRef,
+        textConfirmation:
+          value.format === "text"
+            ? {
+                contentVersion: record.version,
+                approvalRef: gate.id,
+                payloadDigest: digestSocialWorkerPayload(
+                  facebookTextPayloadSchema.parse({
+                    channelRef: value.channelRef,
+                    accountRef: value.accountRef,
+                    publicationId: id,
+                    format: "text",
+                    text: record.payload.body,
+                  }),
+                ),
+              }
+            : null,
         browserJobId: jobId,
         status: "submitted",
       })

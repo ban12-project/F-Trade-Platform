@@ -12,6 +12,10 @@ import { productMediaAsset } from "../lib/db/product-media-schema";
 import * as schema from "../lib/db/schema";
 import { authorizeFacebookPublication } from "../lib/social/facebook-media-store";
 import { claimNextSocialWorkerJob } from "../lib/social/job-store";
+import {
+  listProjectPublicationData,
+  submitControlledPublication,
+} from "../lib/social/publication-store";
 
 async function main() {
   const connectionString = process.env.FACEBOOK_PUBLICATION_TEST_DATABASE_URL;
@@ -41,7 +45,7 @@ async function main() {
       id: contentRef,
       type: "content",
       state: "CONTENT_APPROVED",
-      payload: { body: "SYNTHETIC review fixture; no product claims." },
+      payload: { body: "SYNTHETIC review fixture; no product claims.", status: "approved" },
       createdByType: "human",
       createdById: actor,
     });
@@ -64,6 +68,23 @@ async function main() {
       decidedAt: now,
       evidenceRef: "synthetic-review",
     });
+    if (format === "text" && jobAccount === accountRef) {
+      const saved = await submitControlledPublication(
+        {
+          projectId,
+          contentRef,
+          format,
+          channelRef,
+          accountRef,
+          confirmationRef: `evidence-synthetic-${randomUUID()}`,
+        },
+        actor,
+        database,
+      );
+      assert.ok(saved.browserJobId);
+      assert.equal(saved.textConfirmation?.contentVersion, 1);
+      return { id: saved.id, jobId: saved.browserJobId, contentRef };
+    }
     await db.insert(schema.socialBrowserJob).values({
       id: jobId,
       channelRef,
@@ -163,6 +184,13 @@ async function main() {
     await db
       .insert(schema.workspaceProject)
       .values({ id: projectId, kind: "marketing", title: "SYNTHETIC", createdById: actor });
+    await db.insert(schema.workspaceProjectMember).values({
+      id: randomUUID(),
+      projectId,
+      userId: actor,
+      createdById: actor,
+      role: "owner",
+    });
     await db.insert(schema.socialChannelControl).values({
       id: randomUUID(),
       channelRef,
@@ -191,6 +219,82 @@ async function main() {
       .where(eq(schema.aggregateRecord.id, text.contentRef));
     await assert.rejects(authorizeFacebookPublication(claimed.command, claimed.payload, database));
     console.log("PASS text claim authorizes; tampering and post-claim edits denied");
+
+    const beforeClaim = await fixture();
+    await db
+      .update(schema.aggregateRecord)
+      .set({ version: 2 })
+      .where(eq(schema.aggregateRecord.id, beforeClaim.contentRef));
+    await expectPaused(beforeClaim.jobId);
+    assert.ok(
+      (await listProjectPublicationData(projectId, database)).candidates.some(
+        (item) => item.id === beforeClaim.contentRef,
+      ),
+    );
+    const reconfirmed = await submitControlledPublication(
+      {
+        projectId,
+        contentRef: beforeClaim.contentRef,
+        format: "text",
+        channelRef,
+        accountRef,
+        confirmationRef: `evidence-reconfirmed-${randomUUID()}`,
+      },
+      actor,
+      database,
+    );
+    assert.equal(reconfirmed.textConfirmation?.contentVersion, 2);
+    const renewedClaim = await claim();
+    assert.ok(renewedClaim);
+    assert.equal(renewedClaim.command.command.jobId, reconfirmed.browserJobId);
+    await authorizeFacebookPublication(renewedClaim.command, renewedClaim.payload, database);
+
+    const bodyChanged = await fixture();
+    // Even a writer that fails to increment the version must not alter confirmed text.
+    await db
+      .update(schema.aggregateRecord)
+      .set({ payload: { body: "changed before claim" } })
+      .where(eq(schema.aggregateRecord.id, bodyChanged.contentRef));
+    await expectPaused(bodyChanged.jobId);
+    const historical = await fixture();
+    await db
+      .update(schema.socialPublication)
+      .set({ textConfirmation: null })
+      .where(eq(schema.socialPublication.id, historical.id));
+    await expectPaused(historical.jobId);
+    const reapproved = await fixture();
+    await db.insert(schema.approval).values({
+      id: randomUUID(),
+      aggregateId: reapproved.contentRef,
+      gate: "gate_01_truth",
+      status: "approved",
+      requestedByType: "human",
+      requestedById: actor,
+      requestedAt: new Date(now.getTime() + 1000),
+      decidedByType: "human",
+      decidedById: actor,
+      decidedAt: new Date(now.getTime() + 1000),
+      evidenceRef: "synthetic-new-review",
+    });
+    await expectPaused(reapproved.jobId);
+    const rejected = await fixture();
+    await db.insert(schema.approval).values({
+      id: randomUUID(),
+      aggregateId: rejected.contentRef,
+      gate: "gate_01_truth",
+      status: "rejected",
+      requestedByType: "human",
+      requestedById: actor,
+      requestedAt: new Date(now.getTime() + 1000),
+      decidedByType: "human",
+      decidedById: actor,
+      decidedAt: new Date(now.getTime() + 1000),
+      evidenceRef: "synthetic-rejected-review",
+    });
+    await expectPaused(rejected.jobId);
+    console.log(
+      "PASS text confirmation rejects pre-claim versions, body edits, historical rows and changed approvals",
+    );
 
     const image = await imageFixture();
     const mediaClaim = await claim();
