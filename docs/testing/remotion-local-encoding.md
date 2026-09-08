@@ -44,3 +44,7 @@ The final real MP4 also passes the application export-artifact duration/encoding
 ## Full build verification
 
 At source commit `9ad6b99`, full `pnpm build` completed: Remotion bundle, workflow compilation, default Turbopack production build and TypeScript checks. Cache Components and both React Compiler flags remain enabled. The workflow step/flow/webhook trace manifests respectively include 55/36/36 existing Remotion files; no referenced Remotion file was missing. The repository production-boundary test passed, confirming synthetic fixtures return 404 and anonymous workspace requests redirect to authentication. The build reports 228 lint warnings. This verifies local packaging/startup, not remote CI, deployment or Sandbox execution.
+
+## Remote execution prerequisite
+
+On 2026-09-08, the linked local project configuration was inspected without printing secrets. Its existing Vercel OIDC token expired at 2026-09-02 01:40:11 UTC. No Vercel CLI was available on PATH or in the inspected local npx cache to refresh it. The isolated test worktree has no remote credentials. No remote Sandbox request was made with the expired token. Refresh authorized Vercel credentials before attempting remote rendering; this is an authentication prerequisite, not a render failure. Token contents and project identifiers are not recorded here.
