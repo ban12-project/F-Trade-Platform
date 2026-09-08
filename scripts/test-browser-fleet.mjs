@@ -303,3 +303,25 @@ test("inbox profile scope gates scheduling and queued claims without affecting m
   const manual = enqueue(s, "b", "interactive", 2000);
   assert.equal(claim(s, 2001)?.id, manual.id);
 });
+
+test("operator attention pauses unattended work while preserving manual recovery", () => {
+  for (const outcome of ["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"]) {
+    const state = fixture();
+    enqueue(state, "a", "inbox");
+    const run = claim(state);
+    enqueue(state, "a", "publish", 1500, `job-${outcome}`);
+    finishRun(state, run.id, outcome, true, 2000);
+    assert.equal(state.accounts[0].authState, outcome);
+    assert.equal(state.accounts[0].lastCheckedAt, null);
+    assert.equal(claim(state, 3000), null);
+    scheduleInbox(state, 1000000, randomUUID);
+    assert.equal(
+      state.runs.some(
+        (item) => item.accountId === "a" && item.kind === "inbox" && item.status === "queued",
+      ),
+      false,
+    );
+    const manual = enqueue(state, "a", "interactive", 1000000);
+    assert.equal(claim(state, 1000001)?.id, manual.id);
+  }
+});

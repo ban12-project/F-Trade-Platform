@@ -30,6 +30,8 @@ const profile = {
     time: "time",
     emptyThread: ".empty",
     challenge: ".challenge",
+    loginRequired: ".login",
+    twoFactorRequired: ".two-factor",
     loading: ".loading",
     moreThreads: ".more-threads",
     moreMessages: ".more-messages",
@@ -45,6 +47,8 @@ for (const mode of [
   "more_threads",
   "more_messages",
   "challenge",
+  "login",
+  "two_factor",
   "duplicate_message",
   "wrong_thread",
   "changed_list",
@@ -63,7 +67,7 @@ for (const mode of [
         listReads++;
         return route.fulfill({
           contentType: "text/html",
-          body: `${identity}<main id="inbox">${mode === "empty" ? '<p class="empty">Empty</p>' : `<a class="thread" data-thread-id="thread-1" href="https://www.facebook.com/messages/t/thread-1">Thread</a>`}${mode === "changed_list" && listReads > 1 ? '<a class="thread" data-thread-id="thread-2" href="https://www.facebook.com/messages/t/thread-2">New</a>' : ""}</main>${mode === "more_threads" ? '<b class="more-threads">More</b>' : ""}${mode === "challenge" ? '<b class="challenge">Challenge</b>' : ""}`,
+          body: `${identity}<main id="inbox">${mode === "empty" ? '<p class="empty">Empty</p>' : `<a class="thread" data-thread-id="thread-1" href="https://www.facebook.com/messages/t/thread-1">Thread</a>`}${mode === "changed_list" && listReads > 1 ? '<a class="thread" data-thread-id="thread-2" href="https://www.facebook.com/messages/t/thread-2">New</a>' : ""}</main>${mode === "more_threads" ? '<b class="more-threads">More</b>' : ""}${mode === "challenge" ? '<b class="challenge">Challenge</b>' : ""}${mode === "login" ? '<b class="login">Login</b>' : ""}${mode === "two_factor" ? '<b class="two-factor">2FA</b>' : ""}`,
         });
       }
       if (url === "https://www.facebook.com/messages/t/thread-1")
@@ -117,7 +121,19 @@ for (const mode of [
       browserRequest,
     )({ run, signal: new AbortController().signal, reportInbound });
     const success = ["normal", "empty", "outbound_only"].includes(mode);
-    expect(result).toBe(success ? "completed" : "failed");
+    expect(result).toBe(
+      success
+        ? "completed"
+        : mode === "lost_receipt"
+          ? "failed"
+          : mode === "challenge"
+            ? "checkpoint"
+            : mode === "login"
+              ? "needs_login"
+              : mode === "two_factor"
+                ? "needs_2fa"
+                : "page_contract_failed",
+    );
     expect(reports.filter((value) => value.completion)).toHaveLength(success ? 1 : 0);
     if (mode === "normal") {
       expect(reports[0].messages).toHaveLength(1);

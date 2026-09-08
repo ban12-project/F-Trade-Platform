@@ -10,4 +10,6 @@ export function createFacebookInbox(
     observedAt: string,
     completion?: Record<string, unknown>,
   ): Promise<unknown>;
-}) => Promise<"completed" | "failed">;
+}) => Promise<
+  "completed" | "failed" | "needs_login" | "needs_2fa" | "checkpoint" | "page_contract_failed"
+>;

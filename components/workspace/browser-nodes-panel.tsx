@@ -50,6 +50,7 @@ const stateLabels: Record<string, string> = {
   needs_login: "需要登录",
   needs_2fa: "需要 2FA",
   checkpoint: "需要安全验证",
+  page_contract_failed: "页面规则需重新核对，后台已暂停",
   egress_mismatch: "固定出口校验失败",
   result_unknown: "需要核对未知结果",
 };

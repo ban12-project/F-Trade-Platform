@@ -509,7 +509,12 @@ async function main() {
       stoppedRunIds: [],
       capabilities: ["interactive", "publish"],
     });
-    await testBrowserInbox(database, { nodeId: node.nodeId, accessKey: node.accessKey }, identity);
+    await testBrowserInbox(
+      database,
+      { nodeId: node.nodeId, accessKey: node.accessKey },
+      identity,
+      owner,
+    );
     await testInboxRoundTrip(
       database,
       { nodeId: node.nodeId, accessKey: node.accessKey },

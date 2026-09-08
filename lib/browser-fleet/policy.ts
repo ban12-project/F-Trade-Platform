@@ -12,6 +12,7 @@ export type AuthState =
   | "needs_login"
   | "needs_2fa"
   | "checkpoint"
+  | "page_contract_failed"
   | "egress_mismatch"
   | "ready"
   | "result_unknown";
@@ -305,6 +306,7 @@ export function finishRun(
     | "needs_login"
     | "needs_2fa"
     | "checkpoint"
+    | "page_contract_failed"
     | "egress_mismatch"
     | "unknown",
   stopped: boolean,
@@ -336,7 +338,15 @@ export function finishRun(
         ? "inbox_completion_missing"
         : outcome;
   if (a) {
-    if (["needs_login", "needs_2fa", "checkpoint", "egress_mismatch"].includes(outcome))
+    if (
+      [
+        "needs_login",
+        "needs_2fa",
+        "checkpoint",
+        "page_contract_failed",
+        "egress_mismatch",
+      ].includes(outcome)
+    )
       a.authState = outcome as AuthState;
     if (run.status === "unknown") a.authState = "result_unknown";
     else if (outcome === "unknown" && run.kind === "interactive") a.authState = "needs_login";

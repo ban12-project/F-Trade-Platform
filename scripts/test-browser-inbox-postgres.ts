@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { POST } from "../app/api/browser-nodes/route";
 import { signInboxPacket } from "../lib/browser-fleet/inbox-protocol";
-import { handleBrowserNodeRequest } from "../lib/browser-fleet/store";
+import { handleBrowserNodeRequest, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import type { Database } from "../lib/db/client";
 import { socialMessage } from "../lib/db/schema";
 
@@ -11,6 +11,7 @@ export async function testBrowserInbox(
   database: Database,
   node: { nodeId: string; accessKey: string },
   identity: { installationId: string; bootId: string },
+  owner: { id: string; sessionId: string },
 ) {
   process.env.SOCIAL_MESSAGE_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
   await database.execute(
@@ -277,6 +278,66 @@ export async function testBrowserInbox(
   assert.equal(
     (emptySaved.rows[0].document as typeof state).accounts[0].lastCheckedAt,
     Date.parse(emptyObserved),
+  );
+  await database.execute(
+    sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{accounts,0,nextPollAt}', '0'::jsonb) WHERE id = ${node.nodeId}`,
+  );
+  const attentionClaim = await handleBrowserNodeRequest(node.accessKey, {
+    ...identity,
+    operation: "claim",
+    requestId: randomUUID(),
+    availableMemoryMb: 4096,
+    localSlots: 1,
+  });
+  const attentionRun = attentionClaim.run as { id: string; leaseId: string; accountId: string };
+  assert.ok(attentionRun?.id);
+  await handleBrowserNodeRequest(node.accessKey, {
+    ...identity,
+    operation: "finish",
+    runId: attentionRun.id,
+    leaseId: attentionRun.leaseId,
+    outcome: "page_contract_failed",
+    stopped: true,
+  });
+  const paused = await database.execute(
+    sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+  );
+  const pausedAccount = (
+    paused.rows[0].document as { accounts: Array<{ authState: string; lastCheckedAt: number }> }
+  ).accounts[0];
+  assert.equal(pausedAccount.authState, "page_contract_failed");
+  assert.equal(pausedAccount.lastCheckedAt, Date.parse(emptyObserved));
+  await database.execute(
+    sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{accounts,0,nextPollAt}', '0'::jsonb) WHERE id = ${node.nodeId}`,
+  );
+  assert.equal(
+    (
+      await handleBrowserNodeRequest(node.accessKey, {
+        ...identity,
+        operation: "claim",
+        requestId: randomUUID(),
+        availableMemoryMb: 4096,
+        localSlots: 1,
+      })
+    ).run,
+    null,
+  );
+  await ownerBrowserCommand(
+    {
+      operation: "confirm-login",
+      nodeId: node.nodeId,
+      accountId: attentionRun.accountId,
+      confirmed: true,
+    },
+    owner,
+  );
+  const recovered = await database.execute(
+    sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+  );
+  assert.equal(
+    (recovered.rows[0].document as { accounts: Array<{ authState: string }> }).accounts[0]
+      .authState,
+    "ready",
   );
   await database.execute(
     sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{accounts,0,pollSeconds}', '0'::jsonb) WHERE id = ${node.nodeId}`,

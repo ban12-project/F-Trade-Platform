@@ -182,6 +182,7 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
         "needs_login",
         "needs_2fa",
         "checkpoint",
+        "page_contract_failed",
         "egress_mismatch",
         "unknown",
       ]),

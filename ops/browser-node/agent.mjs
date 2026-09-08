@@ -460,6 +460,7 @@ async function tick() {
             "needs_login",
             "needs_2fa",
             "checkpoint",
+            "page_contract_failed",
             "failed",
             "unknown",
           ].includes(outcome)

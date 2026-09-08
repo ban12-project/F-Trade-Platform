@@ -63,6 +63,17 @@ export function validateInboxProfile(value, now = Date.now()) {
     )
   )
     throw new Error("inbox_profile_selectors_invalid");
+  for (const key of ["loginRequired", "twoFactorRequired"]) {
+    const selector = value.selectors[key];
+    if (
+      selector !== undefined &&
+      (typeof selector !== "string" ||
+        !selector.trim() ||
+        selector.length > 500 ||
+        selector.includes(","))
+    )
+      throw new Error("inbox_profile_selectors_invalid");
+  }
   for (const key of ["conversationId", "messageId"])
     if (!/^data-[a-z][a-z0-9-]{1,60}$/.test(value.attributes?.[key] ?? ""))
       throw new Error("inbox_profile_attributes_invalid");
@@ -124,6 +135,15 @@ export function createFacebookInbox(input, browserRequest) {
         }),
       );
       if (!result.ok) throw new Error("inbox_read_failed");
+      if (
+        ["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"].includes(
+          result.result?.attention,
+        )
+      ) {
+        const error = new Error("inbox_operator_attention");
+        error.attention = result.result.attention;
+        throw error;
+      }
       return result.result;
     };
     try {
@@ -162,7 +182,22 @@ export function createFacebookInbox(input, browserRequest) {
         messageCount,
       });
       return "completed";
-    } catch {
+    } catch (error) {
+      if (
+        ["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"].includes(
+          error?.attention,
+        )
+      )
+        return error.attention;
+      if (
+        [
+          "inbox_list_changed",
+          "inbox_scan_size_limit",
+          "inbox_profile_expired",
+          "inbox_navigation_invalid",
+        ].includes(error?.message)
+      )
+        return "page_contract_failed";
       // No error text or message body escapes into controller logs or diagnostics.
       return "failed";
     }
