@@ -56,6 +56,7 @@ export async function main() {
       codec: "h264",
       audioCodec: "aac",
       pixelFormat: "yuv420p",
+      colorSpace: "bt709",
       crf: 18,
       enforceAudioTrack: true,
       outputFile: "/vercel/sandbox/output.mp4",

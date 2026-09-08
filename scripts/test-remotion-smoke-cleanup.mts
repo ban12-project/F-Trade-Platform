@@ -75,7 +75,9 @@ mock.module("@remotion/vercel", {
     addBundleToSandbox: async () => {
       if (!renderEnabled) throw new Error("synthetic bundle failure");
     },
-    renderMediaOnVercel: async () => {
+    renderMediaOnVercel: async (options: { colorSpace: string; pixelFormat: string }) => {
+      assert.equal(options.colorSpace, "bt709");
+      assert.equal(options.pixelFormat, "yuv420p");
       assert.ok(renderEnabled);
       return { sandboxFilePath: "/vercel/sandbox/output.mp4" };
     },
