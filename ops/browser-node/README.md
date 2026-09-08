@@ -96,3 +96,11 @@ pnpm typecheck
 CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose 校验与 Agent 镜像构建。真实浏览器镜像、真实代理、HTTPS/noVNC、FB 登录/2FA、重启恢复及压力测试必须在试运行 VPS 验收，合成测试不能替代这些验收。
 
 依据：PostgreSQL 行锁 https://www.postgresql.org/docs/current/explicit-locking.html；Docker socket 权限 https://docs.docker.com/engine/security/；Camofox 固定源 https://github.com/jo-inc/camofox-browser/tree/e5a36f5cd0332fde6597de474329a308a53a0716。
+
+## 发布队列与节点预留（#322 迭代中）
+
+迁移 `0031_browser_fleet_publication.sql` 为业务任务持久化唯一的节点/run 绑定。节点声明 `publish` 能力后，领取请求会为已授权、登录就绪的账号预留排队中的发布任务；实际租约领取时重新检查内容确认和媒体清单，并将载荷放入 `run.publication`。重复请求返回原租约，容量限制仍由同一个节点行锁控制。
+
+绑定节点的账号不会再由旧单 Worker 领取或处理超时；已有节点预留也不能使用旧授权、媒体读取和结果回执接口。节点所有者可以停止自动调度的发布。租约隔离、浏览器停止、重启恢复不会证明发布成功：已披露载荷而没有业务回执的任务转为结果未知并暂停渠道，不自动重试。启动前校验拒绝的任务则暂停，保留人工重新确认路径。
+
+这不是可上线的发布执行器：默认 Agent 仍仅声明 `interactive`。下一步需要租约绑定的最终授权、媒体交付及幂等回执接口，再接真实发布/被动私信适配器。不能为了跑通而改用旧 Worker 的全局签名凭据。合成 PostgreSQL 回归已覆盖实际 broker 的并发预留、重放、跨 Worker 隔离、所有者停止与未知结果同步；没有执行真实 Facebook 发布。

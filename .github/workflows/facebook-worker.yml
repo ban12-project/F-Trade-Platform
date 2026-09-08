@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "lib/social/**"
+      - "lib/browser-fleet/**"
       - "scripts/test-facebook-publication-postgres.ts"
       - "drizzle/**"
       - "lib/actions/facebook-*.ts"

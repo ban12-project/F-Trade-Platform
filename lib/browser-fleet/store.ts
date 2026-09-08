@@ -34,6 +34,7 @@ import {
   scheduleInbox,
   sweep,
 } from "./policy";
+import { claimPublication, reconcilePublications, schedulePublications } from "./publication";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
 
 type NodeRow = {
@@ -195,7 +196,8 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       }
     } else {
       const run = state.runs.find((r) => r.id === command.runId);
-      if (!run || run.requestedBy !== actor.id) throw new Error("run_forbidden");
+      if (!run || (run.kind === "interactive" && run.requestedBy !== actor.id))
+        throw new Error("run_forbidden");
       if (command.operation === "stop") requestStop(state, run);
       else {
         if (
@@ -217,6 +219,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       }
     }
     sweep(state, now);
+    await reconcilePublications(tx, row.id, state, now);
     await save(tx, row);
     await audit(tx, actor.id, `browser_node.${command.operation}`, row.id);
     return result;
@@ -295,7 +298,10 @@ async function grant(
 /** Single node row lock serializes capacity reservations across concurrent HTTP
  * polls. Different nodes lock different rows. No in-process mutex is relied on.
  */
-export async function handleBrowserNodeRequest(accessKey: string, input: unknown) {
+export async function handleBrowserNodeRequest(
+  accessKey: string,
+  input: unknown,
+): Promise<Record<string, unknown>> {
   const nodeId = accessKeyNodeId(accessKey);
   const request = nodeRequestSchema.parse(input);
   return getDatabase().transaction(async (tx) => {
@@ -330,6 +336,7 @@ export async function handleBrowserNodeRequest(accessKey: string, input: unknown
     }
     state.lastSeenAt = now;
     sweep(state, now);
+    await reconcilePublications(tx, row.id, state, now);
     await save(tx, row);
     return { ...result, serverNow: now };
   });
@@ -362,6 +369,7 @@ async function nodeOperation(
     const liveSessions = new Set(valid.map((s) => s.id));
     for (const r of waiting)
       if (!r.authSessionId || !liveSessions.has(r.authSessionId)) requestStop(state, r);
+    await schedulePublications(tx, row.id, state, now);
     scheduleInbox(state, now, randomUUID);
     const run = claimRun(state, { ...request, leaseId: randomUUID() }, now);
     if (!run) return { run: null };
@@ -381,6 +389,12 @@ async function nodeOperation(
         configuredFacebookKeyring(),
       ),
     );
+    const publication =
+      run.kind === "publish" ? await claimPublication(tx, row.id, run, account, now) : null;
+    if (run.kind === "publish" && !publication) {
+      finishRun(state, run.id, "failed", true, now);
+      return { run: null };
+    }
     await audit(tx, row.id, "browser_lease.claimed", run.id);
     // Neither login passwords nor platform master keys are part of sync/claim.
     return {
@@ -388,6 +402,7 @@ async function nodeOperation(
         id: run.id,
         kind: run.kind,
         jobRef: run.jobRef,
+        ...(publication ? { publication } : {}),
         accountId: account.id,
         accountRef: account.accountRef,
         channelRef: account.channelRef,

@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { get } from "@vercel/blob";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { facebookPublicationManifest } from "@/lib/db/facebook-runtime-schema";
 import { productMediaAsset } from "@/lib/db/product-media-schema";
@@ -380,6 +380,7 @@ export async function readFacebookPublicationMedia(
         and(
           eq(socialBrowserJob.id, command.jobId),
           eq(socialBrowserJob.status, "claimed"),
+          sql`NOT EXISTS (SELECT 1 FROM browser_fleet_publication p WHERE p.job_id = ${socialBrowserJob.id})`,
           eq(socialBrowserJob.kind, "publish"),
           eq(socialBrowserJob.payloadRef, command.payloadRef),
           eq(socialBrowserJob.channelRef, scope.channelRef),
@@ -524,6 +525,7 @@ export async function authorizeFacebookPublication(
         and(
           eq(socialBrowserJob.id, command.jobId),
           eq(socialBrowserJob.status, "claimed"),
+          sql`NOT EXISTS (SELECT 1 FROM browser_fleet_publication p WHERE p.job_id = ${socialBrowserJob.id})`,
           eq(socialBrowserJob.kind, "publish"),
           eq(socialBrowserJob.payloadRef, command.payloadRef),
           eq(socialBrowserJob.channelRef, scope.channelRef),

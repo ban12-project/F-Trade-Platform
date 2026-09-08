@@ -68,6 +68,8 @@ async function pauseExpiredClaims(
         lt(socialBrowserJob.updatedAt, cutoff),
         eq(socialBrowserJob.channelRef, scope.channelRef),
         eq(socialBrowserJob.accountRef, scope.accountRef),
+        sql`NOT EXISTS (SELECT 1 FROM browser_fleet_binding b WHERE b.channel_ref = ${socialBrowserJob.channelRef} AND b.account_ref = ${socialBrowserJob.accountRef})`,
+        sql`NOT EXISTS (SELECT 1 FROM browser_fleet_publication p WHERE p.job_id = ${socialBrowserJob.id})`,
       ),
     )
     .for("update", { skipLocked: true });
@@ -127,6 +129,8 @@ export async function claimNextSocialWorkerJob(
           eq(socialBrowserJob.status, "queued"),
           eq(socialBrowserJob.channelRef, scope.channelRef),
           eq(socialBrowserJob.accountRef, scope.accountRef),
+          sql`NOT EXISTS (SELECT 1 FROM browser_fleet_binding b WHERE b.channel_ref = ${socialBrowserJob.channelRef} AND b.account_ref = ${socialBrowserJob.accountRef})`,
+          sql`NOT EXISTS (SELECT 1 FROM browser_fleet_publication p WHERE p.job_id = ${socialBrowserJob.id})`,
         ),
       )
       .orderBy(socialBrowserJob.createdAt)

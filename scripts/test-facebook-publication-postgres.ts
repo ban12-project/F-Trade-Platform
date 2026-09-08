@@ -2,11 +2,12 @@
  * No browser, Facebook account, or blob/network delivery is used. */
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
-import type { Database } from "../lib/db/client";
+import { handleBrowserNodeRequest, ownerBrowserCommand } from "../lib/browser-fleet/store";
+import { closeDatabase, type Database } from "../lib/db/client";
 import { facebookPublicationManifest } from "../lib/db/facebook-runtime-schema";
 import { productMediaAsset } from "../lib/db/product-media-schema";
 import * as schema from "../lib/db/schema";
@@ -14,6 +15,7 @@ import { authorizeFacebookPublication } from "../lib/social/facebook-media-store
 import { claimNextSocialWorkerJob } from "../lib/social/job-store";
 import {
   listProjectPublicationData,
+  recordControlledPublicationResult,
   submitControlledPublication,
 } from "../lib/social/publication-store";
 
@@ -23,6 +25,12 @@ async function main() {
   const address = new URL(connectionString);
   assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(address.hostname));
   assert.equal(address.pathname, "/facebook_publication_test");
+  process.env.DATABASE_URL = connectionString;
+  process.env.DATABASE_TRANSPORT = "postgres";
+  process.env.FACEBOOK_CREDENTIAL_ACTIVE_KEY_ID = "synthetic";
+  process.env.FACEBOOK_CREDENTIAL_KEYS_JSON = JSON.stringify({
+    synthetic: Buffer.alloc(32, 3).toString("base64"),
+  });
   const pool = new Pool({ connectionString });
   const db = drizzle(pool, { schema });
   const database = db as unknown as Database;
@@ -431,7 +439,153 @@ async function main() {
       authorizeFacebookPublication(ownClaim.command, ownClaim.payload, database),
     );
     console.log("PASS authorization checks job scope; own timed-out claim pauses without retry");
+    await db
+      .update(schema.socialChannelControl)
+      .set({ circuitStatus: "active", pauseReason: null })
+      .where(eq(schema.socialChannelControl.accountRef, accountRef));
+    await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, actor));
+    const sessionId = randomUUID();
+    await db.insert(schema.session).values({
+      id: sessionId,
+      token: randomUUID(),
+      userId: actor,
+      expiresAt: new Date(Date.now() + 3600000),
+    });
+    const owner = { id: actor, sessionId };
+    const node = await ownerBrowserCommand(
+      {
+        operation: "create",
+        value: {
+          name: "Synthetic publication node",
+          gatewayOrigin: "https://synthetic-node.example.invalid",
+          maxBrowsers: 1,
+          memoryBudgetMb: 2048,
+          browserMemoryMb: 2048,
+        },
+      },
+      owner,
+    );
+    assert.ok(node.nodeId && node.accessKey);
+    await ownerBrowserCommand(
+      {
+        operation: "grant",
+        value: {
+          nodeId: node.nodeId,
+          channelRef,
+          accountRef,
+          expectedEgressIp: "203.0.113.10",
+          pollSeconds: 0,
+          credentials: {
+            loginUsername: "",
+            loginPassword: "",
+            proxyHost: "synthetic-proxy.example.invalid",
+            proxyPort: "3128",
+            proxyUsername: "",
+            proxyPassword: "",
+            clearLogin: false,
+            clearProxy: false,
+          },
+        },
+      },
+      owner,
+    );
+    const metadata = await db.execute(
+      sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+    );
+    const nodeAccount = (metadata.rows[0].document as { accounts: Array<{ id: string }> })
+      .accounts[0].id;
+    await ownerBrowserCommand(
+      { operation: "confirm-login", nodeId: node.nodeId, accountId: nodeAccount, confirmed: true },
+      owner,
+    );
+    const identity = { installationId: randomUUID(), bootId: randomUUID() };
+    await handleBrowserNodeRequest(node.accessKey, {
+      ...identity,
+      operation: "recover",
+      stoppedRunIds: [],
+      capabilities: ["interactive", "publish"],
+    });
+    const fleetJob = await fixture();
+    assert.equal(await claim(), null, "Legacy worker must not claim a node-bound account");
+    const request = {
+      ...identity,
+      operation: "claim",
+      requestId: randomUUID(),
+      availableMemoryMb: 4096,
+      localSlots: 1,
+    };
+    const requests = [request, { ...request, requestId: randomUUID() }];
+    const responses = await Promise.all(
+      requests.map((item) => handleBrowserNodeRequest(node.accessKey!, item)),
+    );
+    const leases = responses.map((r) => r.run).filter(Boolean) as Array<{
+      id: string;
+      leaseId: string;
+      jobRef: string;
+      publication: Record<string, unknown>;
+    }>;
+    assert.equal(leases.length, 1);
+    assert.equal(leases[0].jobRef, fleetJob.jobId);
+    assert.equal(leases[0].publication.publicationId, fleetJob.id);
+    await assert.rejects(
+      recordControlledPublicationResult(
+        {
+          jobId: fleetJob.jobId,
+          outcome: "published",
+          externalPublicationRef: "synthetic-forged-receipt",
+        },
+        database,
+      ),
+      /绑定租约/,
+    );
+    const reservation = await db.execute(
+      sql`SELECT * FROM browser_fleet_publication WHERE job_id = ${fleetJob.jobId}`,
+    );
+    assert.equal(reservation.rows.length, 1);
+    assert.equal(reservation.rows[0].run_id, leases[0].id);
+    const winningIndex = responses.findIndex((item) => item.run);
+    const repeat = await handleBrowserNodeRequest(node.accessKey, requests[winningIndex]);
+    assert.deepEqual(
+      repeat.run,
+      responses[winningIndex].run,
+      "Same request must return the original lease and payload",
+    );
+    await assert.rejects(
+      handleBrowserNodeRequest(node.accessKey, {
+        ...identity,
+        operation: "finish",
+        runId: leases[0].id,
+        leaseId: randomUUID(),
+        outcome: "completed",
+        stopped: true,
+      }),
+    );
+    await ownerBrowserCommand(
+      { operation: "stop", nodeId: node.nodeId, runId: leases[0].id },
+      owner,
+    );
+    await handleBrowserNodeRequest(node.accessKey, {
+      ...identity,
+      operation: "finish",
+      runId: leases[0].id,
+      leaseId: leases[0].leaseId,
+      outcome: "completed",
+      stopped: true,
+    });
+    const [fleetOutcome] = await db
+      .select()
+      .from(schema.socialPublication)
+      .where(eq(schema.socialPublication.id, fleetJob.id));
+    assert.equal(fleetOutcome.status, "unknown", "Browser completion is not a publication receipt");
+    assert.equal(
+      (await handleBrowserNodeRequest(node.accessKey, { ...request, requestId: randomUUID() })).run,
+      null,
+    );
+    console.log(
+      "PASS actual broker reserves one publication, excludes legacy claims, replays the lease and keeps unreceipted completion unknown",
+    );
   } finally {
+    await closeDatabase();
     await pool.end();
   }
 }

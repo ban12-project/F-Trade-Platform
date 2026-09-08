@@ -360,6 +360,10 @@ export async function recordControlledPublicationResult(
       .where(eq(socialBrowserJob.id, value.jobId))
       .for("update");
     if (!job || job.kind !== "publish") throw new Error("发布任务不存在。");
+    const fleet = await tx.execute(
+      sql`SELECT job_id FROM browser_fleet_publication WHERE job_id = ${job.id}`,
+    );
+    if (fleet.rows.length) throw new Error("节点发布必须使用绑定租约的回执。");
     const [publication] = await tx
       .select()
       .from(socialPublication)
