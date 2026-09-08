@@ -182,9 +182,11 @@ test("saved password fill uses the actual owner action and never returns credent
   });
   expect(released.credential).toEqual(credential);
   await nodeCall({ operation: "finish", runId, leaseId, stopped: true, outcome: "unknown" });
+  // Node receipts reach this page through its five-second status refresh.
+  // Allow the next refresh plus request latency instead of racing its interval.
   await expect(
     page.getByText("填充结果未知，本次不再重试。请重新接入后核对。", { exact: true }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   const interrupted = await pool.query("SELECT document FROM browser_fleet_node WHERE id=$1", [
     nodeId,
   ]);
@@ -197,9 +199,9 @@ test("saved password fill uses the actual owner action and never returns credent
     authorizationId: heartbeat.loginAuthorization.id,
     outcome: "filled",
   });
-  await expect(
-    page.getByText("已填入，请在远程页面完成登录和 2FA。", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("已填入，请在远程页面完成登录和 2FA。", { exact: true })).toBeVisible(
+    { timeout: 15_000 },
+  );
   const rows = await pool.query("SELECT document FROM browser_fleet_node WHERE id=$1", [nodeId]);
   expect(rows.rows[0].document.accounts[0].authState).toBe("needs_login");
   expect(await page.content()).not.toContain(credential.password);
