@@ -2,6 +2,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { addBundleToSandbox, createSandbox, renderMediaOnVercel } from "@remotion/vercel";
 import { del, issueSignedToken, presignUrl, put } from "@vercel/blob";
+import { videoProbeEntries } from "../lib/video/encoding-contract";
+import { parseFfprobeOutput, validateProbedVideoExport } from "../lib/video/media-probe";
 
 async function main() {
   const sourcePath = resolve(process.argv[2] ?? "tmp/pdfs/ryt-ryc302-product.png");
@@ -77,11 +79,30 @@ async function main() {
       cmd: "find",
       args: ["/vercel/sandbox/node_modules", "-type", "f", "-name", "ffprobe"],
     });
-    if (ffprobeSearch.exitCode !== 0 || !(await ffprobeSearch.stdout()).trim())
+    const ffprobe = (await ffprobeSearch.stdout())
+      .split("\n")
+      .map((path) => path.trim())
+      .find((path) => /^\/vercel\/sandbox\/node_modules\/.+\/ffprobe$/.test(path));
+    if (ffprobeSearch.exitCode !== 0 || !ffprobe)
       throw new Error("Remotion Sandbox ffprobe was not found.");
+    const inspected = await sandbox.runCommand({
+      cmd: ffprobe,
+      args: [
+        "-v",
+        "error",
+        "-show_entries",
+        videoProbeEntries,
+        "-of",
+        "json",
+        rendered.sandboxFilePath,
+      ],
+    });
+    if (inspected.exitCode !== 0) throw new Error("Remotion Sandbox output probe failed.");
+    const measured = parseFfprobeOutput(JSON.parse(await inspected.stdout()));
+    validateProbedVideoExport("facebook", measured);
     await writeFile(outputPath, await sandbox.fs.readFile(rendered.sandboxFilePath));
     console.log(
-      `PASS Vercel Sandbox rendered ${uploaded ? "private" : "public"} Remotion source to ${outputPath}`,
+      `PASS Vercel Sandbox rendered and validated ${uploaded ? "private" : "public"} Remotion source against the project Facebook export preset: ${outputPath}`,
     );
   } finally {
     await sandbox?.stop().catch(() => undefined);
