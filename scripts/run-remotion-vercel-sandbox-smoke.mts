@@ -57,8 +57,8 @@ export async function main() {
       enforceAudioTrack: true,
       outputFile: "/vercel/sandbox/output.mp4",
       inputProps: {
-        productName: "RYC302 Clutch Kit",
-        ctaText: "Request product details",
+        productName: "SYNTHETIC DEMO",
+        ctaText: "Review test output",
         fps: 30,
         clips: [
           {
@@ -69,7 +69,7 @@ export async function main() {
             durationInFrames: 120,
             fitMode: "contain",
             audioMode: "muted",
-            caption: "Built for distributor inquiries",
+            caption: "Synthetic render validation",
             abcdRoles: ["attention", "branding", "connection", "direction"],
             motionPreset: "hero_reveal",
           },

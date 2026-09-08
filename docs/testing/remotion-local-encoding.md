@@ -65,3 +65,21 @@ previous PR head `be4a078` passed all Actions after quota restoration; the local
 workspace OIDC token was still expired, so live private-source validation remains
 pending refreshed credentials. A Vercel check labelled “Canceled by Ignored Build
 Step” does not establish a new preview deployment.
+
+## Live private-source Sandbox verification
+
+2026-09-08: with refreshed OIDC from the workspace `.env.local` overriding `.env`,
+the actual smoke script completed private Blob upload, exact-path signed source
+access, Vercel Sandbox rendering, in-Sandbox ffprobe validation, local output
+write, Sandbox stop and Blob deletion. PASS was emitted after both cleanup calls
+resolved. The smoke copy now explicitly labels the result SYNTHETIC DEMO instead
+of asserting a product identifier.
+
+The source was the existing, entirely synthetic local contact sheet. Independent
+local ffprobe measured 1080×1920, 30/1 FPS, H.264/yuv420p, AAC 48 kHz stereo,
+4.053333 seconds and 1,046,724 bytes. A frame at 2 seconds was inspected: the
+private source contact sheet and synthetic labels were visible. This proves the
+real private-source transport/render/encoding path; the contact-sheet layout is
+not a creative-quality acceptance, an authorized real-product preview, a deployed
+workflow test or platform publishing acceptance. Media and logs remain in the
+ignored `tmp/remotion-local/` directory; no signed URL or credential is committed.
