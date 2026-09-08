@@ -1,4 +1,5 @@
 import { handleBrowserNodeRequest } from "@/lib/browser-fleet/store";
+import { parseFacebookMedia } from "@/lib/social/facebook-media-contract";
 
 export async function POST(request: Request) {
   const response = (body: unknown, status = 200) =>
@@ -28,9 +29,23 @@ export async function POST(request: Request) {
       }
       parts.push(value);
     }
-    return response(
-      await handleBrowserNodeRequest(accessKey, JSON.parse(Buffer.concat(parts).toString("utf8"))),
+    const result = await handleBrowserNodeRequest(
+      accessKey,
+      JSON.parse(Buffer.concat(parts).toString("utf8")),
     );
+    if (result.stream instanceof ReadableStream) {
+      const media = parseFacebookMedia(result.media);
+      return new Response(result.stream, {
+        headers: {
+          "Content-Type": media.contentType,
+          "Content-Length": String(media.sizeBytes),
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Disposition": "attachment",
+        },
+      });
+    }
+    return response(result);
   } catch {
     return response({ error: "node_request_denied" }, 403);
   } finally {

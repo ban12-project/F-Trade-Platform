@@ -10,6 +10,10 @@ import {
   facebookProxySecretSchema,
 } from "@/lib/social/facebook-account-forms";
 import {
+  type FacebookMediaSource,
+  openFacebookMediaSource,
+} from "@/lib/social/facebook-media-store";
+import {
   configuredFacebookKeyring,
   decryptFacebookCredential,
   encryptFacebookCredential,
@@ -40,6 +44,7 @@ import {
   claimPublication,
   reconcilePublications,
   recordPublicationReceipt,
+  resolvePublicationMedia,
   schedulePublications,
 } from "./publication";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
@@ -308,10 +313,11 @@ async function grant(
 export async function handleBrowserNodeRequest(
   accessKey: string,
   input: unknown,
+  openMedia: typeof openFacebookMediaSource = openFacebookMediaSource,
 ): Promise<Record<string, unknown>> {
   const nodeId = accessKeyNodeId(accessKey);
   const request = nodeRequestSchema.parse(input);
-  return getDatabase().transaction(async (tx) => {
+  const response = await getDatabase().transaction(async (tx) => {
     const row = await lockNode(tx, nodeId);
     if (row.status !== "active" || !matches(accessKey, row.key_hash))
       throw new Error("node_unauthorized");
@@ -345,8 +351,14 @@ export async function handleBrowserNodeRequest(
     sweep(state, now);
     await reconcilePublications(tx, row.id, state, now);
     await save(tx, row);
-    return { ...result, serverNow: now };
+    return { ...result, serverNow: now } as Record<string, unknown>;
   });
+  if (response.mediaSource) {
+    // Private blob I/O happens after releasing the node lock. The transport only
+    // receives bytes and confirmed media metadata, never the internal blob path.
+    return openMedia(response.mediaSource as FacebookMediaSource);
+  }
+  return response;
 }
 async function nodeOperation(
   tx: DatabaseTransaction,
@@ -446,6 +458,18 @@ async function nodeOperation(
   }
   const run = state.runs.find((r) => r.id === request.runId);
   if (!run || run.leaseId !== request.leaseId) throw new Error("lease_mismatch");
+  if (request.operation === "publication-media") {
+    return {
+      mediaSource: await resolvePublicationMedia(
+        tx,
+        row.id,
+        state,
+        run,
+        request.payloadDigest,
+        now,
+      ),
+    };
+  }
   if (request.operation === "publication-result") {
     const { authorizationId, payloadDigest, outcome, externalPublicationRef, failureCode } =
       request;

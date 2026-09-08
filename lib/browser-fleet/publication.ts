@@ -11,7 +11,10 @@ import {
   socialChannelControl,
   socialPublication,
 } from "@/lib/db/schema";
-import { buildFacebookPublicationPayload } from "@/lib/social/facebook-media-store";
+import {
+  buildFacebookPublicationPayload,
+  resolveFacebookMediaSource,
+} from "@/lib/social/facebook-media-store";
 import { digestSocialWorkerPayload } from "@/lib/social/worker-protocol";
 import { type Account, enqueueRun, type FleetState, type Run, requestStop } from "./policy";
 
@@ -470,4 +473,67 @@ export async function recordPublicationReceipt(
   run.publicationOutcome = receipt.outcome;
   requestStop(state, run);
   return { outcome: receipt.outcome, replayed: false };
+}
+
+export async function resolvePublicationMedia(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  state: FleetState,
+  run: Run,
+  payloadDigest: string,
+  now: number,
+) {
+  const account = state.accounts.find((a) => a.id === run.accountId);
+  if (
+    run.kind !== "publish" ||
+    !run.jobRef ||
+    run.status !== "running" ||
+    run.stopRequested ||
+    run.leaseUntil <= now ||
+    run.deadline <= now ||
+    !account?.enabled ||
+    account.authState !== "ready" ||
+    account.credentialVersion !== run.credentialVersion
+  )
+    throw new Error("publication_lease_inactive");
+  const reserved = await tx.execute(
+    sql`SELECT payload FROM browser_fleet_publication WHERE node_id = ${nodeId} AND run_id = ${run.id} AND job_id = ${run.jobRef} FOR UPDATE`,
+  );
+  if (
+    !reserved.rows[0]?.payload ||
+    digestSocialWorkerPayload(reserved.rows[0].payload as Record<string, unknown>) !== payloadDigest
+  )
+    throw new Error("publication_payload_invalid");
+  const binding = await tx.execute(
+    sql`SELECT id FROM browser_fleet_binding WHERE node_id = ${nodeId} AND channel_ref = ${account.channelRef} AND account_ref = ${account.accountRef}`,
+  );
+  if (!binding.rows.length) throw new Error("publication_account_unbound");
+  const [job] = await tx
+    .select()
+    .from(socialBrowserJob)
+    .where(eq(socialBrowserJob.id, run.jobRef))
+    .for("update");
+  if (
+    job?.status !== "claimed" ||
+    job.kind !== "publish" ||
+    job.accountRef !== account.accountRef ||
+    job.channelRef !== account.channelRef
+  )
+    throw new Error("publication_not_claimed");
+  const [publication] = await tx
+    .select()
+    .from(socialPublication)
+    .where(
+      and(eq(socialPublication.id, job.payloadRef), eq(socialPublication.browserJobId, job.id)),
+    )
+    .for("update");
+  if (
+    publication?.status !== "submitted" ||
+    publication.accountRef !== account.accountRef ||
+    publication.channelRef !== account.channelRef
+  )
+    throw new Error("publication_scope_invalid");
+  const payload = await buildFacebookPublicationPayload(tx, publication, new Date(now));
+  if (digestSocialWorkerPayload(payload) !== payloadDigest) throw new Error("publication_changed");
+  return resolveFacebookMediaSource(tx, publication, new Date(now));
 }

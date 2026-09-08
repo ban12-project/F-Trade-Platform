@@ -539,3 +539,40 @@ export async function authorizeFacebookPublication(
     }
   });
 }
+
+export type FacebookMediaSource = { blobKey: string; media: FacebookMediaPayload["media"] };
+export async function resolveFacebookMediaSource(
+  tx: Tx,
+  publication: typeof socialPublication.$inferSelect,
+  now: Date,
+): Promise<FacebookMediaSource> {
+  const payload = await buildFacebookPublicationPayload(tx, publication, now);
+  const mediaPayload = parseFacebookMediaPayload(payload);
+  const [manifest] = await tx
+    .select()
+    .from(facebookPublicationManifest)
+    .where(eq(facebookPublicationManifest.publicationId, publication.id));
+  if (!manifest) throw new Error("media_manifest_missing");
+  const source = await sourceFor(
+    { ...publication, format: mediaPayload.format, mediaId: manifest.mediaId },
+    tx,
+    now,
+  );
+  return { blobKey: source.blobKey, media: mediaPayload.media };
+}
+export async function openFacebookMediaSource(source: FacebookMediaSource) {
+  const blob = await get(source.blobKey, {
+    access: "private",
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  });
+  if (
+    !blob?.stream ||
+    blob.statusCode !== 200 ||
+    blob.blob.contentType !== source.media.contentType ||
+    blob.blob.size !== source.media.sizeBytes
+  ) {
+    await blob?.stream?.cancel();
+    throw new Error("media_unavailable");
+  }
+  return { stream: blob.stream, media: source.media };
+}

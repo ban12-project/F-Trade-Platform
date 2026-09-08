@@ -67,3 +67,20 @@ async function main() {
 }
 
 void main();
+
+assert.equal(
+  digestSocialWorkerPayload({
+    media: { contentType: "image/png", sizeBytes: 123, sha256: "synthetic" },
+    nested: [{ b: 2, a: 1 }],
+  }),
+  digestSocialWorkerPayload({
+    nested: [{ a: 1, b: 2 }],
+    media: { sha256: "synthetic", sizeBytes: 123, contentType: "image/png" },
+  }),
+  "Nested object order must not change after JSONB storage",
+);
+assert.notEqual(
+  digestSocialWorkerPayload({ media: [1, 2] }),
+  digestSocialWorkerPayload({ media: [2, 1] }),
+  "Array order remains significant",
+);

@@ -69,6 +69,15 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
   z
     .object({
       ...common,
+      operation: z.literal("publication-media"),
+      runId: id,
+      leaseId: id,
+      payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    })
+    .strict(),
+  z
+    .object({
+      ...common,
       operation: z.literal("publication-result"),
       runId: id,
       leaseId: id,

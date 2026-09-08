@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import test from "node:test";
 import { containerSpec, stopContainer } from "../ops/browser-node/docker.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
+import { readPublicationMedia } from "../ops/browser-node/media.mjs";
 import {
   createPublicationAuthorizer,
   createPublicationReporter,
@@ -278,4 +279,64 @@ test("receipt retry preserves the observation and cannot change lease or outcome
     /publication_receipt_conflict/,
   );
   assert.equal(calls.length, 2);
+});
+
+test("media reader releases only manifest-matching bytes and fixes request scope", async () => {
+  const bytes = Buffer.from("synthetic-image");
+  const media = {
+    contentType: "image/png",
+    sizeBytes: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+  const assigned = {
+    kind: "publish",
+    id: randomUUID(),
+    leaseId: randomUUID(),
+    publicationDigest: "a".repeat(64),
+    publication: { media },
+  };
+  const result = await readPublicationMedia({
+    run: assigned,
+    assertActive() {},
+    async request(operation, body) {
+      assert.equal(operation, "publication-media");
+      assert.deepEqual(body, {
+        runId: assigned.id,
+        leaseId: assigned.leaseId,
+        payloadDigest: assigned.publicationDigest,
+      });
+      return new Response(bytes, {
+        headers: { "Content-Type": media.contentType, "Content-Length": String(bytes.length) },
+      });
+    },
+  });
+  assert.deepEqual(result.bytes, bytes);
+});
+
+test("media reader rejects truncated, oversized, altered and wrong-type bytes", async () => {
+  const bytes = Buffer.from("synthetic-image");
+  const media = {
+    contentType: "image/png",
+    sizeBytes: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+  for (const [body, type] of [
+    [bytes.subarray(1), "image/png"],
+    [Buffer.concat([bytes, bytes]), "image/png"],
+    [Buffer.alloc(bytes.length), "image/png"],
+    [bytes, "text/html"],
+  ]) {
+    await assert.rejects(
+      readPublicationMedia({
+        run: { kind: "publish", publicationDigest: "a".repeat(64), publication: { media } },
+        assertActive() {},
+        async request() {
+          return new Response(body, {
+            headers: { "Content-Type": type, "Content-Length": String(bytes.length) },
+          });
+        },
+      }),
+      /publication_media_/,
+    );
+  }
 });

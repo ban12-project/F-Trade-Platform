@@ -9,6 +9,7 @@ import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./doc
 import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
+import { readPublicationMedia } from "./media.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
 
 const appOrigin = secureOrigin(process.env.FTRADE_URL ?? "");
@@ -373,6 +374,30 @@ async function tick() {
             run: structuredClone(slot.run),
             authorizePublication,
             reportPublication: createPublicationReporter({ run: slot.run, request: nodeCall }),
+            readPublicationMedia: () =>
+              readPublicationMedia({
+                run: slot.run,
+                assertActive() {
+                  if (
+                    !slot.ready ||
+                    slot.stopping ||
+                    slot.abort.signal.aborted ||
+                    slot.expiresAt <= Date.now()
+                  )
+                    throw new Error("publication_lease_inactive");
+                },
+                request: (operation, fields) =>
+                  fetch(`${appOrigin}/api/browser-nodes`, {
+                    method: "POST",
+                    redirect: "error",
+                    signal: AbortSignal.any([slot.abort.signal, AbortSignal.timeout(120_000)]),
+                    headers: {
+                      Authorization: `Bearer ${accessKey}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ operation, installationId, bootId, ...fields }),
+                  }),
+              }),
             signal: slot.abort.signal,
             browserRequest: (path, body) => browserRequest(slot, path, body),
           });

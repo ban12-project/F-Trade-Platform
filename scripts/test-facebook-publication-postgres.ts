@@ -647,7 +647,7 @@ async function main() {
       "PASS actual broker reserves one publication, excludes legacy claims, replays the lease and keeps unreceipted completion unknown",
     );
 
-    for (const outcome of ["published", "unknown", "expired"] as const) {
+    for (const outcome of ["published", "unknown", "expired", "media"] as const) {
       accountRef = randomUUID();
       await db.insert(schema.socialChannelControl).values({
         id: randomUUID(),
@@ -692,7 +692,8 @@ async function main() {
         { operation: "confirm-login", nodeId: node.nodeId, accountId: bound.id, confirmed: true },
         owner,
       );
-      const target = await fixture();
+      const expectedOutcome = outcome === "published" ? "published" : "unknown";
+      const target = outcome === "media" ? await imageFixture() : await fixture();
       const claimResponse = await handleBrowserNodeRequest(node.accessKey, {
         ...request,
         requestId: randomUUID(),
@@ -706,6 +707,77 @@ async function main() {
         leaseId: lease.leaseId,
         ready: true,
       });
+      if (outcome === "media") {
+        let opened = 0;
+        const mediaRequest = {
+          ...identity,
+          operation: "publication-media",
+          runId: lease.id,
+          leaseId: lease.leaseId,
+          payloadDigest: lease.publicationDigest,
+        };
+        const openMedia = async (source: {
+          blobKey: string;
+          media: {
+            assetRef: string;
+            contentType: "image/png" | "image/jpeg" | "video/mp4";
+            sizeBytes: number;
+            sha256: string;
+          };
+        }) => {
+          opened++;
+          assert.ok(source.blobKey.startsWith("synthetic/"));
+          return {
+            stream: new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(new Uint8Array(100));
+                controller.close();
+              },
+            }),
+            media: source.media,
+          };
+        };
+        await assert.rejects(
+          handleBrowserNodeRequest(
+            node.accessKey,
+            { ...mediaRequest, leaseId: randomUUID() },
+            openMedia,
+          ),
+          /lease_mismatch/,
+        );
+        assert.equal(opened, 0);
+        const delivered = await handleBrowserNodeRequest(node.accessKey, mediaRequest, openMedia);
+        assert.equal("mediaSource" in delivered, false);
+        assert.equal("blobKey" in delivered, false);
+        assert.equal(
+          (await new Response(delivered.stream as ReadableStream).arrayBuffer()).byteLength,
+          100,
+        );
+        assert.equal(opened, 1);
+        assert.ok("mediaId" in target && typeof target.mediaId === "string");
+        await db
+          .update(productMediaAsset)
+          .set({ publicDistributionAllowed: false })
+          .where(eq(productMediaAsset.id, target.mediaId));
+        await assert.rejects(
+          handleBrowserNodeRequest(node.accessKey, mediaRequest, openMedia),
+          /image_rights_invalid/,
+        );
+        assert.equal(opened, 1, "Revoked media must not reach private storage");
+        await handleBrowserNodeRequest(node.accessKey, {
+          ...identity,
+          operation: "finish",
+          runId: lease.id,
+          leaseId: lease.leaseId,
+          outcome: "unknown",
+          stopped: true,
+        });
+        await assert.rejects(
+          handleBrowserNodeRequest(node.accessKey, mediaRequest, openMedia),
+          /publication_lease_inactive/,
+        );
+        continue;
+      }
       const authorized = await handleBrowserNodeRequest(node.accessKey, {
         ...identity,
         operation: "authorize-publication",
@@ -752,9 +824,9 @@ async function main() {
         await handleBrowserNodeRequest(node.accessKey, { ...identity, operation: "sync" });
       } else {
         const accepted = await handleBrowserNodeRequest(node.accessKey, resultRequest);
-        assert.deepEqual(accepted.receipt, { outcome, replayed: false });
+        assert.deepEqual(accepted.receipt, { outcome: expectedOutcome, replayed: false });
         const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);
-        assert.deepEqual(repeated.receipt, { outcome, replayed: true });
+        assert.deepEqual(repeated.receipt, { outcome: expectedOutcome, replayed: true });
         await assert.rejects(
           handleBrowserNodeRequest(node.accessKey, {
             ...resultRequest,
@@ -786,7 +858,7 @@ async function main() {
         assert.equal(record.state, "CONTENT_PUBLISHED");
         assert.equal(record.version, 2);
         const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);
-        assert.deepEqual(repeated.receipt, { outcome, replayed: true });
+        assert.deepEqual(repeated.receipt, { outcome: expectedOutcome, replayed: true });
         const duplicateTarget = await fixture();
         const duplicateClaim = await handleBrowserNodeRequest(node.accessKey, {
           ...request,
