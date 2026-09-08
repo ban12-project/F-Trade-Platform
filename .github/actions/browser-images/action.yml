@@ -38,6 +38,9 @@ runs:
     - name: Fetch pinned Camofox source (no deployment credentials)
       shell: bash
       run: sh ops/browser-node/prepare-upstream.sh
+    - name: Check login plugin against pinned upstream loader and authentication
+      shell: bash
+      run: node scripts/test-camofox-login-contract.mjs
     - uses: docker/setup-buildx-action@v4
     - name: Build both native images and load for tests
       uses: docker/bake-action@v7.3.0
