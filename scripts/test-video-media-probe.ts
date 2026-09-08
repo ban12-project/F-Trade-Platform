@@ -7,20 +7,38 @@ import {
 import { parseFfprobeOutput, validateProbedVideoExport } from "../lib/video/media-probe";
 
 const measured = parseFfprobeOutput({
-  format: { format_name: "mov,mp4,m4a,3gp,3g2,mj2", duration: "5.0" },
+  format: {
+    format_name: "mov,mp4,m4a,3gp,3g2,mj2",
+    duration: "5.0",
+    size: "1250000",
+    bit_rate: "2000000",
+  },
   streams: [
     {
       codec_type: "video",
       codec_name: "h264",
+      bit_rate: "1800000",
       width: 1080,
       height: 1920,
       r_frame_rate: "30/1",
       pix_fmt: "yuv420p",
       sample_aspect_ratio: "1:1",
     },
-    { codec_type: "audio", codec_name: "aac", sample_rate: "48000", channels: 2 },
+    {
+      codec_type: "audio",
+      codec_name: "aac",
+      bit_rate: "128000",
+      sample_rate: "48000",
+      channels: 2,
+    },
     { codec_type: "subtitle", codec_name: "mov_text" },
   ],
+});
+assert.deepEqual(measured.resources, {
+  fileSizeBytes: 1250000,
+  containerBitrateBps: 2000000,
+  videoBitrateBps: 1800000,
+  audioBitrateBps: 128000,
 });
 assert.equal(measured.subtitleStreamCount, 1);
 assert.equal(validateProbedVideoExport("tiktok", measured).platform, "tiktok");
@@ -101,7 +119,7 @@ console.log("PASS measured frame rates are neither rounded nor malformed");
 const manifest = createVideoExportManifest(receipt);
 assert.equal(manifest.validation.status, "passed");
 assert.equal(manifest.validation.scope, "project_export_preset");
-assert.equal(manifest.schemaVersion, "1.2.0");
+assert.equal(manifest.schemaVersion, "1.3.0");
 assert.equal(manifest.encodingContractVersion, "1.0.0");
 assert.equal(manifest.platformAcceptance.status, "not_evaluated");
 assert.equal(manifest.reviewStatus, "review_required");
@@ -187,4 +205,64 @@ assert.deepEqual(missingEncoding.encoding, {
 });
 console.log(
   "PASS measured encoding rejects unsupported or missing fields and preserves historical uncertainty",
+);
+
+assert.equal(manifest.resourceMeasurement.bitrateScope, "reported_average");
+assert.equal(manifest.resourceMeasurement.peakBitrate, "not_measured");
+assert.deepEqual(manifest.resourceMeasurement.unknownFields, []);
+const historicalResources = createVideoExportManifest({
+  ...receipt,
+  measured: { ...receipt.measured, resources: undefined },
+});
+assert.deepEqual(historicalResources.measured.resources, {
+  fileSizeBytes: null,
+  containerBitrateBps: null,
+  videoBitrateBps: null,
+  audioBitrateBps: null,
+});
+assert.equal(historicalResources.resourceMeasurement.unknownFields.length, 4);
+assert.equal(historicalResources.platformAcceptance.status, "not_evaluated");
+for (const invalid of [
+  undefined,
+  "N/A",
+  "",
+  "0",
+  "-1",
+  "1.5",
+  "1e6",
+  " 12",
+  "Infinity",
+  "9007199254740992",
+]) {
+  const report = parseFfprobeOutput({
+    format: { format_name: "mp4", duration: "5", size: invalid, bit_rate: invalid },
+    streams: [
+      {
+        codec_type: "video",
+        codec_name: "h264",
+        width: 1080,
+        height: 1920,
+        r_frame_rate: "30/1",
+        bit_rate: invalid,
+      },
+    ],
+  });
+  assert.deepEqual(report.resources, {
+    fileSizeBytes: null,
+    containerBitrateBps: null,
+    videoBitrateBps: null,
+    audioBitrateBps: null,
+  });
+}
+assert.throws(() =>
+  createVideoExportManifest({
+    ...receipt,
+    measured: {
+      ...receipt.measured,
+      resources: { ...measured.resources!, fileSizeBytes: Number.MAX_SAFE_INTEGER + 1 },
+    },
+  }),
+);
+console.log(
+  "PASS reported size/bitrate units, invalid and historical unknowns; average never certifies peak or platform acceptance",
 );
