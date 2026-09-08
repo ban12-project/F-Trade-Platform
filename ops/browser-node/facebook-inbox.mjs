@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import pagePrograms from "./page-programs.cjs";
 
 const pageProgram = pagePrograms.inbox;
@@ -128,23 +129,31 @@ export function createFacebookInbox(input, browserRequest) {
         throw new Error("inbox_navigation_invalid");
       tabId = tab.tabId;
       active();
-      const result = await boundedJson(
-        await browserRequest(`/tabs/${encodeURIComponent(tab.tabId)}/evaluate`, {
-          userId: run.accountId,
-          expression: `(${pageProgram})(${JSON.stringify(profile)},${JSON.stringify(mode)},${JSON.stringify(conversationRef ?? null)})`,
-        }),
-      );
-      if (!result.ok) throw new Error("inbox_read_failed");
-      if (
-        ["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"].includes(
-          result.result?.attention,
-        )
-      ) {
-        const error = new Error("inbox_operator_attention");
-        error.attention = result.result.attention;
-        throw error;
+      for (let attempt = 0; attempt < 9; attempt++) {
+        active();
+        const result = await boundedJson(
+          await browserRequest(`/tabs/${encodeURIComponent(tab.tabId)}/evaluate`, {
+            userId: run.accountId,
+            expression: `(${pageProgram})(${JSON.stringify(profile)},${JSON.stringify(mode)},${JSON.stringify(conversationRef ?? null)})`,
+          }),
+        );
+        if (!result.ok) throw new Error("inbox_read_failed");
+        if (result.result?.retry === "loading") {
+          if (attempt === 8) throw new Error("inbox_loading_timeout");
+          await delay(250, undefined, { signal });
+          continue;
+        }
+        if (
+          ["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"].includes(
+            result.result?.attention,
+          )
+        ) {
+          const error = new Error("inbox_operator_attention");
+          error.attention = result.result.attention;
+          throw error;
+        }
+        return result.result;
       }
-      return result.result;
     };
     try {
       if (
@@ -190,12 +199,9 @@ export function createFacebookInbox(input, browserRequest) {
       )
         return error.attention;
       if (
-        [
-          "inbox_list_changed",
-          "inbox_scan_size_limit",
-          "inbox_profile_expired",
-          "inbox_navigation_invalid",
-        ].includes(error?.message)
+        ["inbox_scan_size_limit", "inbox_profile_expired", "inbox_navigation_invalid"].includes(
+          error?.message,
+        )
       )
         return "page_contract_failed";
       // No error text or message body escapes into controller logs or diagnostics.

@@ -40,6 +40,9 @@ const profile = {
 };
 for (const mode of [
   "normal",
+  "loading_then_ready",
+  "loading_timeout",
+  "loading_abort",
   "empty",
   "wrong_identity",
   "missing_id",
@@ -57,6 +60,8 @@ for (const mode of [
 ] as const) {
   test(`read-only inbox collector ${mode}`, async ({ page, context }) => {
     let listReads = 0;
+    let loadingReads = 0;
+    const controller = new AbortController();
     const time = new Date(Date.now() - 2000).toISOString();
     const identity = `<a id="identity" href="${mode === "wrong_identity" ? "https://www.facebook.com/other" : profile.identityHref}">Identity</a>`;
     const message = (id: string, direction: string) =>
@@ -67,7 +72,7 @@ for (const mode of [
         listReads++;
         return route.fulfill({
           contentType: "text/html",
-          body: `${identity}<main id="inbox">${mode === "empty" ? '<p class="empty">Empty</p>' : `<a class="thread" data-thread-id="thread-1" href="https://www.facebook.com/messages/t/thread-1">Thread</a>`}${mode === "changed_list" && listReads > 1 ? '<a class="thread" data-thread-id="thread-2" href="https://www.facebook.com/messages/t/thread-2">New</a>' : ""}</main>${mode === "more_threads" ? '<b class="more-threads">More</b>' : ""}${mode === "challenge" ? '<b class="challenge">Challenge</b>' : ""}${mode === "login" ? '<b class="login">Login</b>' : ""}${mode === "two_factor" ? '<b class="two-factor">2FA</b>' : ""}`,
+          body: `${identity}${mode.startsWith("loading_") ? '<b class="loading">Loading</b>' : ""}<main id="inbox">${mode === "empty" ? '<p class="empty">Empty</p>' : `<a class="thread" data-thread-id="thread-1" href="https://www.facebook.com/messages/t/thread-1">Thread</a>`}${mode === "changed_list" && listReads > 1 ? '<a class="thread" data-thread-id="thread-2" href="https://www.facebook.com/messages/t/thread-2">New</a>' : ""}</main>${mode === "more_threads" ? '<b class="more-threads">More</b>' : ""}${mode === "challenge" ? '<b class="challenge">Challenge</b>' : ""}${mode === "login" ? '<b class="login">Login</b>' : ""}${mode === "two_factor" ? '<b class="two-factor">2FA</b>' : ""}`,
         });
       }
       if (url === "https://www.facebook.com/messages/t/thread-1")
@@ -85,8 +90,16 @@ for (const mode of [
         await page.goto(String(body.url));
         return Response.json({ ok: true, tabId: "synthetic-tab", url: page.url() });
       }
-      if (path.endsWith("/evaluate"))
-        return Response.json({ ok: true, result: await page.evaluate(String(body.expression)) });
+      if (path.endsWith("/evaluate")) {
+        if (await page.locator(".loading").count()) {
+          loadingReads++;
+          if (mode === "loading_then_ready" && loadingReads % 2 === 0)
+            await page.locator(".loading").evaluate((element) => element.remove());
+        }
+        const result = await page.evaluate(String(body.expression));
+        if (mode === "loading_abort") controller.abort();
+        return Response.json({ ok: true, result });
+      }
       throw new Error("Unexpected non-read endpoint");
     };
     const reports: Array<{
@@ -119,12 +132,12 @@ for (const mode of [
     const result = await createFacebookInbox(
       profile,
       browserRequest,
-    )({ run, signal: new AbortController().signal, reportInbound });
-    const success = ["normal", "empty", "outbound_only"].includes(mode);
+    )({ run, signal: controller.signal, reportInbound });
+    const success = ["normal", "empty", "outbound_only", "loading_then_ready"].includes(mode);
     expect(result).toBe(
       success
         ? "completed"
-        : mode === "lost_receipt"
+        : ["lost_receipt", "changed_list", "loading_timeout", "loading_abort"].includes(mode)
           ? "failed"
           : mode === "challenge"
             ? "checkpoint"
@@ -142,6 +155,19 @@ for (const mode of [
     }
     if (["empty", "outbound_only"].includes(mode))
       expect(reports.at(-1)?.completion?.messageCount).toBe(0);
+    if (mode === "loading_timeout") {
+      expect(loadingReads).toBe(9);
+      expect(reports).toHaveLength(0);
+      expect(calls.some((path) => path.endsWith("/navigate"))).toBe(false);
+    }
+    if (mode === "loading_abort") {
+      expect(loadingReads).toBe(1);
+      expect(reports).toHaveLength(0);
+    }
+    if (mode === "loading_then_ready") {
+      expect(loadingReads).toBe(4);
+      expect(reports[0].messages[0].messageRef).toBe("msg-1");
+    }
     expect(calls.filter((path) => path === "/tabs")).toHaveLength(1);
     expect(calls.some((path) => /click|type|upload/.test(path))).toBe(false);
   });

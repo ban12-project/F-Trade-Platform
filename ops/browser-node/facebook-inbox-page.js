@@ -25,7 +25,7 @@ function readInbox(profile, mode, expectedConversation) {
     );
     if (attention.length > 1) throw new Error("inbox_attention_ambiguous");
     if (attention.length) return { attention: attention[0][1] };
-    if (all(document, profile.selectors.loading).length) throw new Error("inbox_incomplete");
+    if (all(document, profile.selectors.loading).length) return { retry: "loading" };
     if (one(document, profile.selectors.identity).href !== profile.identityHref)
       throw new Error("inbox_identity_changed");
     const reference = (el, attr) => {
