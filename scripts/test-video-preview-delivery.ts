@@ -40,7 +40,7 @@ void (async () => {
   assert.equal(ready.kind, "ready");
   assert.equal(reads, 1);
   const workspaceReady = await resolveWorkspacePrivateVideoPreview(
-    { user: { role: "user" } },
+    { user: { id: "synthetic-viewer", role: "user" } },
     "asset-video-001",
     store,
     async () => true,
@@ -49,7 +49,7 @@ void (async () => {
   assert.equal(
     (
       await resolveWorkspacePrivateVideoPreview(
-        { user: { role: "user" } },
+        { user: { id: "synthetic-viewer", role: "user" } },
         "asset-video-001",
         store,
         async () => false,

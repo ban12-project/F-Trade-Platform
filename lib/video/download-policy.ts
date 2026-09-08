@@ -10,7 +10,7 @@ import {
 } from "./contracts";
 import type { PrivateGeneratedVideoRead } from "./private-asset-store";
 
-export type DownloadSession = { user?: { role?: string | null } | null } | null;
+export type DownloadSession = { user?: { id?: string; role?: string | null } | null } | null;
 export type DownloadRecord = { state: string; payload: unknown };
 export type DownloadStore = {
   getGeneratedVideo(
@@ -18,7 +18,7 @@ export type DownloadStore = {
     range?: string | null,
   ): Promise<PrivateGeneratedVideoRead | null>;
 };
-export type LoadVideo = (videoId: string) => Promise<DownloadRecord | undefined>;
+export type LoadVideo = (videoId: string, actorId: string) => Promise<DownloadRecord | undefined>;
 export type RevalidateVideo = (project: VideoProject) => Promise<void>;
 
 export type ApprovedVideoDownloadResolution =
@@ -37,10 +37,11 @@ export async function resolveApprovedVideoAccess(
   findVideo: LoadVideo,
   assertCurrent: RevalidateVideo,
 ): Promise<ApprovedVideoAccess> {
-  if (!hasPermission(session?.user?.role, "workspace:view")) return { kind: "forbidden" };
+  if (!session?.user?.id || !hasPermission(session.user.role, "workspace:view"))
+    return { kind: "forbidden" };
   const videoId = z.uuid().safeParse(videoIdInput);
   if (!videoId.success) return { kind: "not_found" };
-  const record = await findVideo(videoId.data);
+  const record = await findVideo(videoId.data, session.user.id);
   if (!record || record.state !== "VIDEO_APPROVED") return { kind: "not_found" };
   const parsed = videoProjectSchema.safeParse(record.payload);
   if (!parsed.success) return { kind: "unavailable" };

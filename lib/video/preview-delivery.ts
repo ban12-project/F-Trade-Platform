@@ -1,15 +1,12 @@
-import { eq } from "drizzle-orm";
 import { hasPermission } from "@/lib/authz";
-import { getDatabase } from "@/lib/db/client";
-import { aggregateRecord } from "@/lib/db/schema";
-import { videoProjectSchema } from "./contracts";
 import {
   generatedVideoAssetRefSchema,
   type PrivateGeneratedVideoRead,
   VercelPrivateVideoAssetStore,
 } from "./private-asset-store";
+import { isWorkspaceRenderedAssetForActor } from "./workspace-access";
 
-type PreviewSession = { user?: { role?: string | null } | null } | null;
+type PreviewSession = { user?: { id?: string; role?: string | null } | null } | null;
 
 export type PrivateVideoPreviewStore = Pick<VercelPrivateVideoAssetStore, "getGeneratedVideo">;
 
@@ -35,27 +32,21 @@ export async function resolveAdminPrivateVideoPreview(
   return asset ? { kind: "ready", asset } : { kind: "not_found" };
 }
 
-async function isMvpRenderedAsset(assetRef: string) {
-  const rows = await getDatabase()
-    .select({ payload: aggregateRecord.payload })
-    .from(aggregateRecord)
-    .where(eq(aggregateRecord.type, "video"));
-  return rows.some(({ payload }) => {
-    const project = videoProjectSchema.safeParse(payload);
-    return project.success && project.data.editDraft && project.data.renderedAssetRef === assetRef;
-  });
-}
-
 export async function resolveWorkspacePrivateVideoPreview(
   session: PreviewSession,
   assetRefInput: string,
   store: PrivateVideoPreviewStore = new VercelPrivateVideoAssetStore(),
-  isAuthorizedAsset: (assetRef: string) => Promise<boolean> = isMvpRenderedAsset,
+  isAuthorizedAsset: (
+    assetRef: string,
+    actorId: string,
+  ) => Promise<boolean> = isWorkspaceRenderedAssetForActor,
   range?: string | null,
 ): Promise<PrivateVideoPreviewResolution> {
-  if (!hasPermission(session?.user?.role, "workspace:view")) return { kind: "forbidden" };
+  if (!session?.user?.id || !hasPermission(session.user.role, "workspace:view"))
+    return { kind: "forbidden" };
   const assetRef = generatedVideoAssetRefSchema.safeParse(assetRefInput);
-  if (!assetRef.success || !(await isAuthorizedAsset(assetRef.data))) return { kind: "not_found" };
+  if (!assetRef.success || !(await isAuthorizedAsset(assetRef.data, session.user.id)))
+    return { kind: "not_found" };
   const asset = await store.getGeneratedVideo(assetRef.data, range);
   return asset ? { kind: "ready", asset } : { kind: "not_found" };
 }
