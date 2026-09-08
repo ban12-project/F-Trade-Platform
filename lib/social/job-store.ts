@@ -24,9 +24,11 @@ import {
 import { assessReplyWindow } from "@/lib/social/inbound-policy";
 import { decryptSocialMessageBody } from "@/lib/social/message-crypto";
 import { digestSocialWorkerPayload, signSocialWorkerCommand } from "@/lib/social/worker-protocol";
-import { videoProjectSchema } from "@/lib/video/contracts";
-
-import { assertPublicationEligible } from "./publication-store";
+import { buildFacebookPublicationPayload } from "./facebook-media-store";
+import {
+  configuredFacebookWorkerScope,
+  type FacebookWorkerScope,
+} from "./facebook-worker-protocol";
 
 export type ClaimedSocialJob = {
   command: ReturnType<typeof signSocialWorkerCommand>;
@@ -53,14 +55,21 @@ const CLAIM_RESULT_TIMEOUT_MS = 10 * 60_000;
 
 async function pauseExpiredClaims(
   tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
-  workerId: string,
+  scope: FacebookWorkerScope,
   now: Date,
 ) {
   const cutoff = new Date(now.getTime() - CLAIM_RESULT_TIMEOUT_MS);
   const staleJobs = await tx
     .select()
     .from(socialBrowserJob)
-    .where(and(eq(socialBrowserJob.status, "claimed"), lt(socialBrowserJob.updatedAt, cutoff)))
+    .where(
+      and(
+        eq(socialBrowserJob.status, "claimed"),
+        lt(socialBrowserJob.updatedAt, cutoff),
+        eq(socialBrowserJob.channelRef, scope.channelRef),
+        eq(socialBrowserJob.accountRef, scope.accountRef),
+      ),
+    )
     .for("update", { skipLocked: true });
   for (const stale of staleJobs) {
     await tx
@@ -91,7 +100,7 @@ async function pauseExpiredClaims(
       id: randomUUID(),
       action: "social_browser_job.result_timeout",
       actorType: "system",
-      actorId: workerId,
+      actorId: scope.workerId,
       subjectType: "social_browser_job",
       subjectId: stale.id,
       metadata: { job_kind: stale.kind, retry_allowed: false },
@@ -106,12 +115,20 @@ export async function claimNextSocialWorkerJob(
   now = new Date(),
   database: Database = getDatabase(),
 ): Promise<ClaimedSocialJob | null> {
+  const scope = configuredFacebookWorkerScope();
+  if (workerId !== scope.workerId) throw new Error("worker_scope_invalid");
   return database.transaction(async (tx) => {
-    await pauseExpiredClaims(tx, workerId, now);
+    await pauseExpiredClaims(tx, scope, now);
     const [job] = await tx
       .select()
       .from(socialBrowserJob)
-      .where(eq(socialBrowserJob.status, "queued"))
+      .where(
+        and(
+          eq(socialBrowserJob.status, "queued"),
+          eq(socialBrowserJob.channelRef, scope.channelRef),
+          eq(socialBrowserJob.accountRef, scope.accountRef),
+        ),
+      )
       .orderBy(socialBrowserJob.createdAt)
       .limit(1)
       .for("update", { skipLocked: true });
@@ -166,37 +183,13 @@ export async function claimNextSocialWorkerJob(
             ),
           )
           .for("update");
-        if (!publication || publication.status !== "submitted")
+        if (
+          publication?.status !== "submitted" ||
+          publication.channelRef !== job.channelRef ||
+          publication.accountRef !== job.accountRef
+        )
           throw new Error("发布任务与发布记录状态不一致。");
-        const { record } = await assertPublicationEligible(
-          {
-            projectId: publication.projectId,
-            contentRef: publication.contentRef,
-            format: publication.format as "text" | "image" | "video",
-            channelRef: publication.channelRef,
-            accountRef: publication.accountRef,
-          },
-          tx,
-          now,
-        );
-        if (record.type === "video") {
-          const video = videoProjectSchema.parse(record.payload);
-          if (!video.renderedAssetRef) throw new Error("已批准视频缺少可发布成片。");
-          payload = {
-            publicationId: publication.id,
-            format: "video",
-            assetRef: video.renderedAssetRef,
-          };
-        } else {
-          const content = record.payload as Record<string, unknown>;
-          if (typeof content.body !== "string" || !content.body.trim())
-            throw new Error("已批准内容缺少最终正文。");
-          payload = {
-            publicationId: publication.id,
-            format: publication.format,
-            text: content.body,
-          };
-        }
+        payload = await buildFacebookPublicationPayload(tx, publication, now);
       } else if (job.kind === "reply") {
         const [message] = await tx
           .select()

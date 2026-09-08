@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "lib/social/**"
+      - "scripts/test-facebook-publication-postgres.ts"
+      - "drizzle/**"
       - "lib/actions/facebook-*.ts"
       - "lib/db/facebook-runtime-schema.ts"
       - "app/api/social-worker/**"
@@ -19,6 +21,18 @@ jobs:
   synthetic:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: synthetic
+          POSTGRES_PASSWORD: synthetic
+          POSTGRES_DB: facebook_publication_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U synthetic -d facebook_publication_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v5
         with:
@@ -54,7 +68,13 @@ jobs:
             lib/social/facebook-proxy-protocol.ts
             lib/social/facebook-vault-crypto.ts
             lib/social/facebook-worker-protocol.ts
+            lib/social/job-store.ts
+            scripts/test-facebook-publication-postgres.ts
           )
           pnpm exec biome ci "${files[@]}"
       - name: Application typecheck
         run: pnpm typecheck
+      - name: Migrated PostgreSQL publication claim and authorization
+        run: node --conditions=react-server --import tsx scripts/test-facebook-publication-postgres.ts
+        env:
+          FACEBOOK_PUBLICATION_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/facebook_publication_test

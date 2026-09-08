@@ -253,6 +253,37 @@ export async function submitFacebookMediaPublication(
   });
 }
 
+/** One signed payload contract shared by job claiming and final authorization. */
+export async function buildFacebookPublicationPayload(
+  tx: Tx,
+  publication: typeof socialPublication.$inferSelect,
+  now: Date,
+): Promise<Record<string, unknown>> {
+  if (!["text", "image", "video"].includes(publication.format)) {
+    throw new Error("publication_format_invalid");
+  }
+  const { record } = await assertPublicationEligible(
+    { ...publication, format: publication.format as "text" | "image" | "video" },
+    tx,
+    now,
+  );
+  if (publication.format !== "text") {
+    return buildFacebookMediaPayload(tx, publication, now);
+  }
+  const [manifest] = await tx
+    .select({ id: facebookPublicationManifest.publicationId })
+    .from(facebookPublicationManifest)
+    .where(eq(facebookPublicationManifest.publicationId, publication.id));
+  if (manifest || record.type !== "content") throw new Error("publication_format_invalid");
+  return facebookTextPayloadSchema.parse({
+    channelRef: publication.channelRef,
+    accountRef: publication.accountRef,
+    publicationId: publication.id,
+    format: "text",
+    text: record.payload.body,
+  });
+}
+
 export async function buildFacebookMediaPayload(
   tx: Tx,
   publication: typeof socialPublication.$inferSelect,
@@ -262,7 +293,11 @@ export async function buildFacebookMediaPayload(
     .select()
     .from(facebookPublicationManifest)
     .where(eq(facebookPublicationManifest.publicationId, publication.id));
-  if (!manifest || !["image", "video"].includes(manifest.format)) {
+  if (
+    !manifest ||
+    !["image", "video"].includes(manifest.format) ||
+    manifest.format !== publication.format
+  ) {
     throw new Error("media_manifest_missing");
   }
   const source = await sourceFor(
@@ -331,7 +366,16 @@ export async function readFacebookPublicationMedia(
     const [job] = await tx
       .select()
       .from(socialBrowserJob)
-      .where(and(eq(socialBrowserJob.id, command.jobId), eq(socialBrowserJob.status, "claimed")));
+      .where(
+        and(
+          eq(socialBrowserJob.id, command.jobId),
+          eq(socialBrowserJob.status, "claimed"),
+          eq(socialBrowserJob.kind, "publish"),
+          eq(socialBrowserJob.payloadRef, command.payloadRef),
+          eq(socialBrowserJob.channelRef, scope.channelRef),
+          eq(socialBrowserJob.accountRef, scope.accountRef),
+        ),
+      );
     if (!publication || !job) throw new Error("media_job_not_claimed");
     await assertPublicationEligible(
       { ...publication, format: mediaPayload.format },
@@ -466,14 +510,19 @@ export async function authorizeFacebookPublication(
     const [job] = await tx
       .select()
       .from(socialBrowserJob)
-      .where(and(eq(socialBrowserJob.id, command.jobId), eq(socialBrowserJob.status, "claimed")));
+      .where(
+        and(
+          eq(socialBrowserJob.id, command.jobId),
+          eq(socialBrowserJob.status, "claimed"),
+          eq(socialBrowserJob.kind, "publish"),
+          eq(socialBrowserJob.payloadRef, command.payloadRef),
+          eq(socialBrowserJob.channelRef, scope.channelRef),
+          eq(socialBrowserJob.accountRef, scope.accountRef),
+        ),
+      );
     if (!publication || !job) throw new Error("publication_not_claimed");
-    const { record } = await assertPublicationEligible(
-      { ...publication, format: "text" },
-      tx,
-      new Date(),
-    );
-    if (record.type !== "content" || record.payload.body !== current.text) {
+    const expected = await buildFacebookPublicationPayload(tx, publication, new Date());
+    if (digestSocialWorkerPayload(expected) !== command.payloadDigest) {
       throw new Error("publication_changed");
     }
   });
