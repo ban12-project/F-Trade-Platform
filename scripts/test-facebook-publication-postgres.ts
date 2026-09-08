@@ -1,5 +1,5 @@
-/** Synthetic, migrated PostgreSQL regression for claim -> signed authorization.
- * No browser, Facebook account, or blob/network delivery is used. */
+/** Synthetic migrated PostgreSQL regressions, including intercepted Chromium and
+ * real loopback HTTP. No real Facebook account, proxy or Blob delivery is used. */
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
@@ -21,6 +21,7 @@ import {
 import { digestSocialWorkerPayload } from "../lib/social/worker-protocol";
 import { testBrowserInbox } from "./test-browser-inbox-postgres";
 import { testInboxRoundTrip } from "./test-browser-inbox-roundtrip";
+import { testBrowserLogin } from "./test-browser-login-postgres";
 import { testFacebookInbound } from "./test-facebook-inbound-postgres";
 
 async function main() {
@@ -521,6 +522,7 @@ async function main() {
       identity,
       actor,
     );
+    await testBrowserLogin(database, owner);
     const fleetJob = await fixture();
     assert.equal(await claim(), null, "Legacy worker must not claim a node-bound account");
     const request = {

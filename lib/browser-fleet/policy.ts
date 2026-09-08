@@ -50,6 +50,7 @@ export type Run = {
     accepted: number;
     duplicates: number;
   }>;
+  savedLogin?: { id: string; requestedAt: number; expiresAt: number; claimedAt: number | null };
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
   authSessionId: string | null;
@@ -72,6 +73,7 @@ export type FleetState = {
   installationId: string | null;
   bootId: string | null;
   capabilities: RunKind[];
+  loginFillScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   inboxScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   publicationScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   lastSeenAt: number;
@@ -362,13 +364,21 @@ export function publicState(state: FleetState) {
     limits: state.limits,
     lastSeenAt: state.lastSeenAt,
     capabilities: state.capabilities,
+    loginFillScopes: state.loginFillScopes ?? [],
     accounts: state.accounts.map(({ loginCiphertext, proxyCiphertext, ...a }) => ({
       ...a,
       loginSaved: !!loginCiphertext,
       proxySaved: !!proxyCiphertext,
     })),
     runs: state.runs.map(
-      ({ ticketHash, authSessionId, leaseId, claimId, inboxReceipts, ...r }) => ({ ...r }),
+      ({ ticketHash, authSessionId, leaseId, claimId, inboxReceipts, savedLogin, ...r }) => ({
+        ...r,
+        savedLoginState: savedLogin
+          ? savedLogin.claimedAt === null
+            ? "requested"
+            : "claimed"
+          : null,
+      }),
     ),
   };
 }

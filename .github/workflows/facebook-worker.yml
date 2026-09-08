@@ -10,6 +10,7 @@ on:
       - "scripts/test-facebook-inbound-postgres.ts"
       - "scripts/test-browser-inbox-postgres.ts"
       - "scripts/test-browser-inbox-roundtrip.ts"
+      - "scripts/test-browser-login-postgres.ts"
       - "drizzle/**"
       - "lib/actions/facebook-*.ts"
       - "lib/db/facebook-runtime-schema.ts"

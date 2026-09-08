@@ -35,6 +35,7 @@ import {
   initialState,
   isLive,
   publicState,
+  type Run,
   renewRun,
   requestStop,
   scheduleInbox,
@@ -105,6 +106,43 @@ async function validSession(
       ),
     );
   return !!current && !current.banned && hasPermission(current.role, "settings:manage");
+}
+async function savedLoginAccount(tx: DatabaseTransaction, row: NodeRow, run: Run, now: number) {
+  const state = row.document;
+  const account = state.accounts.find((item) => item.id === run.accountId);
+  const scopeExpiry = Math.max(
+    0,
+    ...(state.loginFillScopes ?? [])
+      .filter(
+        (scope) =>
+          scope.channelRef === account?.channelRef && scope.accountRef === account?.accountRef,
+      )
+      .map((scope) => scope.expiresAt),
+  );
+  if (
+    row.status !== "active" ||
+    run.kind !== "interactive" ||
+    run.requestedBy !== row.owner_id ||
+    run.status !== "running" ||
+    run.stopRequested ||
+    !run.ticketUsed ||
+    run.leaseUntil <= now + 10000 ||
+    run.deadline <= now + 10000 ||
+    !account?.enabled ||
+    !account.loginCiphertext ||
+    !account.proxyCiphertext ||
+    !account.expectedEgressIp ||
+    account.credentialVersion !== run.credentialVersion ||
+    !state.capabilities.includes("interactive") ||
+    scopeExpiry <= now + 10000 ||
+    !(await validSession(tx, row.owner_id, run.authSessionId, now))
+  )
+    throw new Error("saved_login_unavailable");
+  const binding = await tx.execute(
+    sql`SELECT id FROM browser_fleet_binding WHERE node_id = ${row.id} AND channel_ref = ${account.channelRef} AND account_ref = ${account.accountRef}`,
+  );
+  if (!binding.rows.length) throw new Error("saved_login_unavailable");
+  return { account, loginCiphertext: account.loginCiphertext, scopeExpiry };
 }
 export async function listBrowserNodes(actorId: string) {
   const [owner] = await getDatabase()
@@ -212,7 +250,17 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       if (!run || (run.kind === "interactive" && run.requestedBy !== actor.id))
         throw new Error("run_forbidden");
       if (command.operation === "stop") requestStop(state, run);
-      else {
+      else if (command.operation === "use-saved-login") {
+        await savedLoginAccount(tx, row, run, now);
+        if (run.authSessionId !== actor.sessionId || run.savedLogin)
+          throw new Error("saved_login_already_requested_or_wrong_session");
+        run.savedLogin = {
+          id: randomUUID(),
+          requestedAt: now,
+          expiresAt: Math.min(now + 60000, run.leaseUntil, run.deadline),
+          claimedAt: null,
+        };
+      } else {
         if (
           row.status !== "active" ||
           run.kind !== "interactive" ||
@@ -345,6 +393,7 @@ export async function handleBrowserNodeRequest(
       state.capabilities = [...new Set(request.capabilities)];
       state.publicationScopes = request.publicationScopes;
       state.inboxScopes = request.inboxScopes;
+      state.loginFillScopes = request.loginFillScopes ?? [];
       result = { active: true };
     } else {
       if (state.bootId !== request.bootId) throw new Error("stale_node_process");
@@ -462,6 +511,33 @@ async function nodeOperation(
   }
   const run = state.runs.find((r) => r.id === request.runId);
   if (!run || run.leaseId !== request.leaseId) throw new Error("lease_mismatch");
+  if (request.operation === "claim-login") {
+    const { account, loginCiphertext, scopeExpiry } = await savedLoginAccount(tx, row, run, now);
+    const authorization = run.savedLogin;
+    if (
+      !authorization ||
+      authorization.id !== request.authorizationId ||
+      authorization.claimedAt !== null ||
+      authorization.expiresAt <= now
+    )
+      throw new Error("saved_login_not_authorized");
+    const credential = facebookLoginSecretSchema.parse(
+      decryptFacebookCredential(loginCiphertext, account, "login", configuredFacebookKeyring()),
+    );
+    authorization.claimedAt = now;
+    await audit(tx, row.owner_id, "browser_credentials.login_released", run.id);
+    return {
+      credential,
+      authorizationId: authorization.id,
+      expiresAt: Math.min(
+        now + 30000,
+        authorization.expiresAt,
+        run.leaseUntil,
+        run.deadline,
+        scopeExpiry,
+      ),
+    };
+  }
   if (request.operation === "inbox-messages") {
     return { receipt: await acceptInboxPacket(tx, row.id, state, run, request.envelope, now) };
   }
@@ -512,9 +588,19 @@ async function nodeOperation(
   )
     requestStop(state, run);
   const renewed = renewRun(state, run.id, request.leaseId, request.ready, now);
+  let loginAuthorization: { id: string; expiresAt: number } | undefined;
+  if (renewed && run.savedLogin?.claimedAt === null && run.savedLogin.expiresAt > now) {
+    try {
+      await savedLoginAccount(tx, row, run, now);
+      loginAuthorization = { id: run.savedLogin.id, expiresAt: run.savedLogin.expiresAt };
+    } catch {
+      /* Continue heartbeat without disclosing an invalid login request. */
+    }
+  }
   return renewed
     ? {
         active: true,
+        ...(loginAuthorization ? { loginAuthorization } : {}),
         leaseUntil: renewed.leaseUntil,
         deadline: renewed.deadline,
         connectBefore: renewed.connectBefore,

@@ -62,12 +62,29 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
       confirmed: z.literal(true),
     })
     .strict(),
+  z
+    .object({
+      operation: z.literal("use-saved-login"),
+      nodeId: id,
+      runId: id,
+      confirmed: z.literal(true),
+    })
+    .strict(),
   z.object({ operation: z.literal("open"), nodeId: id, accountId: id }).strict(),
   z.object({ operation: z.literal("stop"), nodeId: id, runId: id }).strict(),
   z.object({ operation: z.literal("ticket"), nodeId: id, runId: id }).strict(),
 ]);
 const common = { installationId: id, bootId: id };
 export const nodeRequestSchema = z.discriminatedUnion("operation", [
+  z
+    .object({
+      ...common,
+      operation: z.literal("claim-login"),
+      runId: id,
+      leaseId: id,
+      authorizationId: id,
+    })
+    .strict(),
   z
     .object({
       ...common,
@@ -126,6 +143,18 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       stoppedRunIds: z.array(id).max(100),
       capabilities: z.array(z.enum(["interactive", "inbox", "publish"])).max(3),
       publicationScopes: z
+        .array(
+          z
+            .object({
+              channelRef: reference,
+              accountRef: reference,
+              expiresAt: z.number().int().positive(),
+            })
+            .strict(),
+        )
+        .max(16)
+        .optional(),
+      loginFillScopes: z
         .array(
           z
             .object({
