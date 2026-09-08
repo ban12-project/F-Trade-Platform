@@ -12,6 +12,10 @@ import {
 } from "../lib/db/schema";
 import { videoProjectSchema } from "../lib/video/contracts";
 import {
+  resolveWorkspaceApprovedVideoDownload,
+  resolveWorkspaceApprovedVideoManifest,
+} from "../lib/video/download-delivery";
+import {
   resolveApprovedVideoAccess,
   resolveApprovedVideoDownload,
 } from "../lib/video/download-policy";
@@ -173,6 +177,10 @@ void (async () => {
     });
     const member = { user: { id: owner, role: "user" } },
       stranger = { user: { id: outsider, role: "user" } };
+    // The fixture deliberately has no current ProductReady record. Exercise the
+    // production wiring: membership alone must not bypass fact revalidation.
+    assert.equal((await resolveWorkspaceApprovedVideoManifest(member, id)).kind, "unavailable");
+    assert.equal((await resolveWorkspaceApprovedVideoDownload(member, id)).kind, "unavailable");
     assert.equal(
       (await resolveWorkspacePrivateVideoPreview(member, assetRef, store)).kind,
       "ready",
@@ -187,6 +195,8 @@ void (async () => {
       expected = "not_found",
     ) => {
       const before = [reads, revalidations];
+      assert.equal((await resolveWorkspaceApprovedVideoManifest(session, id)).kind, expected);
+      assert.equal((await resolveWorkspaceApprovedVideoDownload(session, id)).kind, expected);
       assert.equal(
         (await resolveWorkspacePrivateVideoPreview(session, assetRef, store)).kind,
         expected,
