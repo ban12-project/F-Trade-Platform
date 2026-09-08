@@ -37,7 +37,7 @@ async function main() {
   process.env.SOCIAL_WORKER_ACCOUNT_REF = accountRef;
   process.env.SOCIAL_WORKER_SIGNING_KEY = Buffer.alloc(32, 7).toString("base64");
 
-  async function fixture(format = "text", jobAccount = accountRef) {
+  async function fixture(format = "text", jobAccount = accountRef, stalePreview = false) {
     const contentRef = randomUUID();
     const id = randomUUID();
     const jobId = randomUUID();
@@ -69,6 +69,42 @@ async function main() {
       evidenceRef: "synthetic-review",
     });
     if (format === "text" && jobAccount === accountRef) {
+      if (stalePreview) {
+        const oldPreview = (await listProjectPublicationData(projectId, database)).candidates.find(
+          (item) => item.id === contentRef,
+        );
+        assert.ok(oldPreview);
+        await db
+          .update(schema.aggregateRecord)
+          .set({ version: 2 })
+          .where(eq(schema.aggregateRecord.id, contentRef));
+        await assert.rejects(
+          submitControlledPublication(
+            {
+              projectId,
+              contentRef,
+              format,
+              channelRef,
+              accountRef,
+              previewDigest: oldPreview.previewDigest,
+              confirmationRef: `evidence-stale-${randomUUID()}`,
+            },
+            actor,
+            database,
+          ),
+          /内容已更新/,
+        );
+        assert.equal(
+          (
+            await db
+              .select()
+              .from(schema.socialPublication)
+              .where(eq(schema.socialPublication.contentRef, contentRef))
+          ).length,
+          0,
+        );
+      }
+
       const saved = await submitControlledPublication(
         {
           projectId,
@@ -76,13 +112,16 @@ async function main() {
           format,
           channelRef,
           accountRef,
+          previewDigest: (await listProjectPublicationData(projectId, database)).candidates.find(
+            (item) => item.id === contentRef,
+          )?.previewDigest,
           confirmationRef: `evidence-synthetic-${randomUUID()}`,
         },
         actor,
         database,
       );
       assert.ok(saved.browserJobId);
-      assert.equal(saved.textConfirmation?.contentVersion, 1);
+      assert.equal(saved.textConfirmation?.contentVersion, stalePreview ? 2 : 1);
       return { id: saved.id, jobId: saved.browserJobId, contentRef };
     }
     await db.insert(schema.socialBrowserJob).values({
@@ -201,7 +240,7 @@ async function main() {
       changedAt: now,
     });
 
-    const text = await fixture();
+    const text = await fixture("text", accountRef, true);
     const claimed = await claim();
     assert.ok(claimed);
     assert.equal(claimed.command.command.jobId, text.jobId);
@@ -238,6 +277,9 @@ async function main() {
         format: "text",
         channelRef,
         accountRef,
+        previewDigest: (await listProjectPublicationData(projectId, database)).candidates.find(
+          (item) => item.id === beforeClaim.contentRef,
+        )?.previewDigest,
         confirmationRef: `evidence-reconfirmed-${randomUUID()}`,
       },
       actor,
