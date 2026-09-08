@@ -4,6 +4,7 @@ import { once } from "node:events";
 import test from "node:test";
 import { containerSpec, stopContainer } from "../ops/browser-node/docker.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
+import { createPublicationAuthorizer } from "../ops/browser-node/publication.mjs";
 
 const nodeId = randomUUID();
 const accountId = randomUUID();
@@ -131,4 +132,113 @@ test("iframe has exact frame-ancestor policy and unauthorized admission fails", 
     gateway.close();
     gateway.server.closeAllConnections();
   }
+});
+
+test("publication authorization checks egress before request and reuses one attempt", async () => {
+  const events = [];
+  const publication = {
+    kind: "publish",
+    id: randomUUID(),
+    leaseId: randomUUID(),
+    publicationDigest: "a".repeat(64),
+  };
+  const authorizationId = randomUUID();
+  const authorize = createPublicationAuthorizer({
+    run: publication,
+    assertActive: () => events.push("active"),
+    checkEgress: async () => events.push("egress"),
+    request: async (operation, body) => {
+      assert.equal(operation, "authorize-publication");
+      assert.deepEqual(body, {
+        runId: publication.id,
+        leaseId: publication.leaseId,
+        payloadDigest: publication.publicationDigest,
+      });
+      events.push("request");
+      return {
+        serverNow: Date.now(),
+        roundTripMs: 10,
+        authorization: {
+          authorizationId,
+          expiresAt: Date.now() + 30000,
+          payloadDigest: publication.publicationDigest,
+        },
+      };
+    },
+  });
+  const [first, second] = await Promise.all([authorize(), authorize()]);
+  assert.deepEqual(first, second);
+  assert.equal(events.filter((item) => item === "request").length, 1);
+  assert.ok(events.indexOf("egress") < events.indexOf("request"));
+  assert.ok(first.localExpiresAt < first.expiresAt);
+});
+
+test("publication authorization never retries a failed egress check or ambiguous request", async () => {
+  for (const failure of ["egress", "request"]) {
+    let requests = 0;
+    let checks = 0;
+    const authorize = createPublicationAuthorizer({
+      run: {
+        kind: "publish",
+        id: randomUUID(),
+        leaseId: randomUUID(),
+        publicationDigest: "a".repeat(64),
+      },
+      assertActive() {},
+      async checkEgress() {
+        checks++;
+        if (failure === "egress") throw new Error("egress");
+      },
+      async request() {
+        requests++;
+        throw new Error("request");
+      },
+    });
+    await assert.rejects(authorize(), new RegExp(failure));
+    await assert.rejects(authorize(), new RegExp(failure));
+    assert.equal(checks, 1);
+    assert.equal(requests, failure === "egress" ? 0 : 1);
+  }
+});
+
+test("publication authorization rejects expired responses and revoked local leases", async () => {
+  let active = true;
+  const authorize = createPublicationAuthorizer({
+    run: {
+      kind: "publish",
+      id: randomUUID(),
+      leaseId: randomUUID(),
+      publicationDigest: "a".repeat(64),
+    },
+    assertActive() {
+      if (!active) throw new Error("stopped");
+    },
+    async checkEgress() {},
+    async request() {
+      return {
+        serverNow: Date.now(),
+        roundTripMs: 0,
+        authorization: {
+          authorizationId: randomUUID(),
+          expiresAt: Date.now(),
+          payloadDigest: "a".repeat(64),
+        },
+      };
+    },
+  });
+  await assert.rejects(authorize(), /lease_response_expired/);
+  active = false;
+  const stopped = createPublicationAuthorizer({
+    run: { kind: "publish", publicationDigest: "a".repeat(64) },
+    assertActive() {
+      throw new Error("stopped");
+    },
+    async checkEgress() {
+      assert.fail("must not probe after stop");
+    },
+    async request() {
+      assert.fail("must not request after stop");
+    },
+  });
+  await assert.rejects(stopped(), /stopped/);
 });

@@ -66,6 +66,15 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
 ]);
 const common = { installationId: id, bootId: id };
 export const nodeRequestSchema = z.discriminatedUnion("operation", [
+  z
+    .object({
+      ...common,
+      operation: z.literal("authorize-publication"),
+      runId: id,
+      leaseId: id,
+      payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    })
+    .strict(),
   z.object({ ...common, operation: z.literal("sync") }).strict(),
   z
     .object({

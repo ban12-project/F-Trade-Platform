@@ -18,6 +18,7 @@ import {
   recordControlledPublicationResult,
   submitControlledPublication,
 } from "../lib/social/publication-store";
+import { digestSocialWorkerPayload } from "../lib/social/worker-protocol";
 
 async function main() {
   const connectionString = process.env.FACEBOOK_PUBLICATION_TEST_DATABASE_URL;
@@ -550,6 +551,63 @@ async function main() {
       responses[winningIndex].run,
       "Same request must return the original lease and payload",
     );
+    const authorizationRequest = {
+      ...identity,
+      operation: "authorize-publication",
+      runId: leases[0].id,
+      leaseId: leases[0].leaseId,
+      payloadDigest: digestSocialWorkerPayload(leases[0].publication),
+    };
+    await assert.rejects(
+      handleBrowserNodeRequest(node.accessKey, authorizationRequest),
+      /publication_lease_inactive/,
+    );
+    await handleBrowserNodeRequest(node.accessKey, {
+      ...identity,
+      operation: "heartbeat",
+      runId: leases[0].id,
+      leaseId: leases[0].leaseId,
+      ready: true,
+    });
+    await assert.rejects(
+      handleBrowserNodeRequest(node.accessKey, { ...authorizationRequest, leaseId: randomUUID() }),
+      /lease_mismatch/,
+    );
+    await assert.rejects(
+      handleBrowserNodeRequest(node.accessKey, {
+        ...authorizationRequest,
+        payloadDigest: "0".repeat(64),
+      }),
+      /publication_payload_invalid/,
+    );
+    const authorization = await handleBrowserNodeRequest(node.accessKey, authorizationRequest);
+    const replayAuthorization = await handleBrowserNodeRequest(
+      node.accessKey,
+      authorizationRequest,
+    );
+    assert.deepEqual(replayAuthorization.authorization, authorization.authorization);
+    await db.execute(
+      sql`UPDATE browser_fleet_publication SET authorized_until = 1 WHERE job_id = ${fleetJob.jobId}`,
+    );
+    await assert.rejects(
+      handleBrowserNodeRequest(node.accessKey, authorizationRequest),
+      /publication_authorization_expired/,
+    );
+    const [beforeEdit] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, fleetJob.contentRef));
+    await db
+      .update(schema.aggregateRecord)
+      .set({ version: beforeEdit.version + 1 })
+      .where(eq(schema.aggregateRecord.id, fleetJob.contentRef));
+    await assert.rejects(
+      handleBrowserNodeRequest(node.accessKey, authorizationRequest),
+      /text_confirmation_stale_or_missing/,
+    );
+    console.log(
+      "PASS node authorization checks readiness, lease, payload and current content; replay never refreshes an expired attempt",
+    );
     await assert.rejects(
       handleBrowserNodeRequest(node.accessKey, {
         ...identity,
@@ -563,6 +621,10 @@ async function main() {
     await ownerBrowserCommand(
       { operation: "stop", nodeId: node.nodeId, runId: leases[0].id },
       owner,
+    );
+    await assert.rejects(
+      handleBrowserNodeRequest(node.accessKey, authorizationRequest),
+      /publication_lease_inactive/,
     );
     await handleBrowserNodeRequest(node.accessKey, {
       ...identity,

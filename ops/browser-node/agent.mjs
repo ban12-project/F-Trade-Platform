@@ -9,6 +9,7 @@ import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./doc
 import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
+import { createPublicationAuthorizer } from "./publication.mjs";
 
 const appOrigin = secureOrigin(process.env.FTRADE_URL ?? "");
 const accessKey = process.env.BROWSER_NODE_ACCESS_KEY_FILE
@@ -343,8 +344,34 @@ async function tick() {
       .then(async () => {
         if (!slot.ready || slot.stopping || slot.run.kind === "interactive") return;
         try {
+          const authorizePublication = createPublicationAuthorizer({
+            run: slot.run,
+            assertActive() {
+              if (
+                !slot.ready ||
+                slot.stopping ||
+                slot.abort.signal.aborted ||
+                slot.expiresAt <= Date.now()
+              )
+                throw new Error("publication_lease_inactive");
+            },
+            async checkEgress() {
+              try {
+                await verifyBrowserEgress(
+                  (path, body) => browserRequest(slot, path, body),
+                  slot.run,
+                  slot.egressTabId,
+                );
+              } catch (error) {
+                await stop(slot, "egress_mismatch");
+                throw error;
+              }
+            },
+            request: nodeCall,
+          });
           const outcome = await adapter.execute({
-            run: { ...slot.run },
+            run: structuredClone(slot.run),
+            authorizePublication,
             signal: slot.abort.signal,
             browserRequest: (path, body) => browserRequest(slot, path, body),
           });

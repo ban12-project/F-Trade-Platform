@@ -197,3 +197,86 @@ export async function reconcilePublications(
         );
   }
 }
+
+/** Authorize one external attempt, never minting a second attempt for the same
+ * reserved job. Replays recover the original authorization only while valid. */
+export async function authorizePublication(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  state: FleetState,
+  run: Run,
+  payloadDigest: string,
+  now: number,
+) {
+  const account = state.accounts.find((item) => item.id === run.accountId);
+  if (
+    run.kind !== "publish" ||
+    !run.jobRef ||
+    run.status !== "running" ||
+    run.stopRequested ||
+    run.leaseUntil <= now ||
+    run.deadline <= now ||
+    !account?.enabled ||
+    account.authState !== "ready" ||
+    account.credentialVersion !== run.credentialVersion ||
+    !account.expectedEgressIp
+  )
+    throw new Error("publication_lease_inactive");
+  const result = await tx.execute(sql`SELECT * FROM browser_fleet_publication
+    WHERE node_id = ${nodeId} AND run_id = ${run.id} AND job_id = ${run.jobRef} FOR UPDATE`);
+  const reservation = result.rows[0];
+  if (
+    !reservation?.payload ||
+    digestSocialWorkerPayload(reservation.payload as Record<string, unknown>) !== payloadDigest
+  )
+    throw new Error("publication_payload_invalid");
+  const binding = await tx.execute(
+    sql`SELECT id FROM browser_fleet_binding WHERE node_id = ${nodeId} AND channel_ref = ${account.channelRef} AND account_ref = ${account.accountRef}`,
+  );
+  if (!binding.rows.length) throw new Error("publication_account_unbound");
+  const [job] = await tx
+    .select()
+    .from(socialBrowserJob)
+    .where(eq(socialBrowserJob.id, run.jobRef))
+    .for("update");
+  if (
+    job?.status !== "claimed" ||
+    job.kind !== "publish" ||
+    job.channelRef !== account.channelRef ||
+    job.accountRef !== account.accountRef
+  )
+    throw new Error("publication_not_claimed");
+  const [publication] = await tx
+    .select()
+    .from(socialPublication)
+    .where(
+      and(eq(socialPublication.id, job.payloadRef), eq(socialPublication.browserJobId, job.id)),
+    )
+    .for("update");
+  if (
+    publication?.status !== "submitted" ||
+    publication.channelRef !== account.channelRef ||
+    publication.accountRef !== account.accountRef
+  )
+    throw new Error("publication_scope_invalid");
+  const payload = await buildFacebookPublicationPayload(tx, publication, new Date(now));
+  if (digestSocialWorkerPayload(payload) !== payloadDigest) throw new Error("publication_changed");
+  if (reservation.authorization_id) {
+    if (
+      reservation.authorized_lease_id !== run.leaseId ||
+      Number(reservation.authorized_until) <= now
+    )
+      throw new Error("publication_authorization_expired");
+    return {
+      authorizationId: String(reservation.authorization_id),
+      expiresAt: Number(reservation.authorized_until),
+      payloadDigest,
+    };
+  }
+  const authorizationId = randomUUID();
+  const expiresAt = Math.min(now + 30_000, run.leaseUntil, run.deadline);
+  await tx.execute(
+    sql`UPDATE browser_fleet_publication SET authorization_id = ${authorizationId}, authorized_lease_id = ${run.leaseId}, authorized_until = ${expiresAt} WHERE job_id = ${job.id}`,
+  );
+  return { authorizationId, expiresAt, payloadDigest };
+}

@@ -14,6 +14,7 @@ import {
   decryptFacebookCredential,
   encryptFacebookCredential,
 } from "@/lib/social/facebook-vault-crypto";
+import { digestSocialWorkerPayload } from "@/lib/social/worker-protocol";
 import {
   type NodeRequest,
   nodeRequestSchema,
@@ -34,7 +35,12 @@ import {
   scheduleInbox,
   sweep,
 } from "./policy";
-import { claimPublication, reconcilePublications, schedulePublications } from "./publication";
+import {
+  authorizePublication,
+  claimPublication,
+  reconcilePublications,
+  schedulePublications,
+} from "./publication";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
 
 type NodeRow = {
@@ -402,7 +408,9 @@ async function nodeOperation(
         id: run.id,
         kind: run.kind,
         jobRef: run.jobRef,
-        ...(publication ? { publication } : {}),
+        ...(publication
+          ? { publication, publicationDigest: digestSocialWorkerPayload(publication) }
+          : {}),
         accountId: account.id,
         accountRef: account.accountRef,
         channelRef: account.channelRef,
@@ -437,6 +445,18 @@ async function nodeOperation(
   }
   const run = state.runs.find((r) => r.id === request.runId);
   if (!run || run.leaseId !== request.leaseId) throw new Error("lease_mismatch");
+  if (request.operation === "authorize-publication") {
+    const authorization = await authorizePublication(
+      tx,
+      row.id,
+      state,
+      run,
+      request.payloadDigest,
+      now,
+    );
+    await audit(tx, row.id, "browser_publication.authorized", run.id);
+    return { authorization };
+  }
   if (request.operation === "finish") {
     finishRun(state, run.id, request.outcome, request.stopped, now);
     await audit(tx, row.id, "browser_lease.stopped", run.id);
