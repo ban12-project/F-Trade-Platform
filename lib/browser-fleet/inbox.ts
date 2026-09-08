@@ -1,7 +1,8 @@
 import "server-only";
 import { createHmac } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { DatabaseTransaction } from "@/lib/db/client";
+import { socialChannelControl } from "@/lib/db/schema";
 import { ingestFacebookInboundBatch } from "@/lib/social/facebook-inbound-store";
 import { digestSocialWorkerPayload } from "@/lib/social/worker-protocol";
 import { verifyInboxPacket } from "./inbox-protocol";
@@ -64,18 +65,52 @@ export async function acceptInboxPacket(
     if (existing.digest !== digest) throw new Error("inbox_request_conflict");
     return { accepted: existing.accepted, duplicates: existing.duplicates, replayed: true };
   }
-  if (receipts.length >= 100) throw new Error("inbox_batch_limit");
-  const result = await ingestFacebookInboundBatch(
-    tx,
-    {
-      channelRef: account.channelRef,
-      accountRef: account.accountRef,
-      observedAt: packet.observedAt,
-      messages: packet.messages,
-    },
-    nodeId,
-    new Date(now),
-  );
+  if (run.inboxCompletion) throw new Error("inbox_scan_already_complete");
+  if (receipts.length >= (packet.completion ? 101 : 100)) throw new Error("inbox_batch_limit");
+  let result: { accepted: number; duplicates: number };
+  if (packet.completion) {
+    const started = Date.parse(packet.completion.scanStartedAt);
+    if (
+      started < run.createdAt ||
+      started > observed ||
+      observed < run.createdAt ||
+      packet.completion.messageCount !==
+        receipts.reduce((sum, item) => sum + item.accepted + item.duplicates, 0)
+    )
+      throw new Error("inbox_completion_invalid");
+    const [control] = await tx
+      .select()
+      .from(socialChannelControl)
+      .where(
+        and(
+          eq(socialChannelControl.channelRef, account.channelRef),
+          eq(socialChannelControl.accountRef, account.accountRef),
+        ),
+      )
+      .for("update");
+    if (!control?.enabled || control.circuitStatus !== "active")
+      throw new Error("inbound_channel_inactive");
+    run.inboxCompletion = {
+      observedAt: observed,
+      reviewRef: packet.completion.reviewRef,
+      coverage: packet.completion.coverage,
+      conversationCount: packet.completion.conversationCount,
+      messageCount: packet.completion.messageCount,
+    };
+    result = { accepted: 0, duplicates: 0 };
+  } else {
+    result = await ingestFacebookInboundBatch(
+      tx,
+      {
+        channelRef: account.channelRef,
+        accountRef: account.accountRef,
+        observedAt: packet.observedAt,
+        messages: packet.messages,
+      },
+      nodeId,
+      new Date(now),
+    );
+  }
   receipts.push({ requestId: packet.requestId, digest, ...result });
   return { ...result, replayed: false };
 }

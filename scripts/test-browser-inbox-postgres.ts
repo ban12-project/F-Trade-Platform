@@ -143,6 +143,61 @@ export async function testBrowserInbox(
     ).length,
     1,
   );
+  const completion = {
+    reviewRef: "evidence-synthetic-inbox",
+    scanStartedAt: packet.observedAt,
+    coverage: "visible_inbox",
+    conversationCount: 1,
+    messageCount: 1,
+  };
+  const completePacket = {
+    ...packet,
+    requestId: randomUUID(),
+    observedAt: new Date().toISOString(),
+    messages: [],
+    completion,
+  };
+  const completeRequest = {
+    ...request,
+    envelope: signInboxPacket(run.inboxSigningKey, completePacket),
+  };
+  await assert.rejects(
+    handleBrowserNodeRequest(node.accessKey, {
+      ...request,
+      envelope: signInboxPacket(run.inboxSigningKey, {
+        ...completePacket,
+        completion: { ...completion, messageCount: 2 },
+      }),
+    }),
+    /inbox_completion_invalid/,
+  );
+  await assert.rejects(
+    handleBrowserNodeRequest(node.accessKey, {
+      ...request,
+      envelope: signInboxPacket(run.inboxSigningKey, {
+        ...completePacket,
+        completion: { ...completion, scanStartedAt: new Date(0).toISOString() },
+      }),
+    }),
+    /inbox_completion_invalid/,
+  );
+  assert.deepEqual((await handleBrowserNodeRequest(node.accessKey, completeRequest)).receipt, {
+    accepted: 0,
+    duplicates: 0,
+    replayed: false,
+  });
+  assert.deepEqual((await handleBrowserNodeRequest(node.accessKey, completeRequest)).receipt, {
+    accepted: 0,
+    duplicates: 0,
+    replayed: true,
+  });
+  await assert.rejects(
+    handleBrowserNodeRequest(node.accessKey, {
+      ...request,
+      envelope: signInboxPacket(run.inboxSigningKey, { ...packet, requestId: randomUUID() }),
+    }),
+    /inbox_scan_already_complete/,
+  );
   await handleBrowserNodeRequest(node.accessKey, {
     ...identity,
     operation: "finish",
@@ -152,6 +207,70 @@ export async function testBrowserInbox(
     stopped: true,
   });
   await assert.rejects(handleBrowserNodeRequest(node.accessKey, request), /inbox_lease_inactive/);
+  const saved = await database.execute(
+    sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+  );
+  const state = saved.rows[0].document as {
+    accounts: Array<{ lastCheckedAt: number }>;
+    runs: Array<{ id: string; status: string }>;
+  };
+  assert.equal(state.accounts[0].lastCheckedAt, Date.parse(completePacket.observedAt));
+  assert.equal(state.runs.find((item) => item.id === run.id)?.status, "completed");
+  await database.execute(
+    sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{accounts,0,nextPollAt}', '0'::jsonb) WHERE id = ${node.nodeId}`,
+  );
+  const emptyClaim = await handleBrowserNodeRequest(node.accessKey, {
+    ...identity,
+    operation: "claim",
+    requestId: randomUUID(),
+    availableMemoryMb: 4096,
+    localSlots: 1,
+  });
+  const emptyRun = emptyClaim.run as typeof run;
+  assert.ok(emptyRun?.inboxSigningKey);
+  await handleBrowserNodeRequest(node.accessKey, {
+    ...identity,
+    operation: "heartbeat",
+    runId: emptyRun.id,
+    leaseId: emptyRun.leaseId,
+    ready: true,
+  });
+  const emptyObserved = new Date().toISOString();
+  const emptyResult = await handleBrowserNodeRequest(node.accessKey, {
+    ...identity,
+    operation: "inbox-messages",
+    runId: emptyRun.id,
+    leaseId: emptyRun.leaseId,
+    envelope: signInboxPacket(emptyRun.inboxSigningKey, {
+      runId: emptyRun.id,
+      leaseId: emptyRun.leaseId,
+      requestId: randomUUID(),
+      observedAt: emptyObserved,
+      messages: [],
+      completion: {
+        ...completion,
+        scanStartedAt: emptyObserved,
+        conversationCount: 0,
+        messageCount: 0,
+      },
+    }),
+  });
+  assert.deepEqual(emptyResult.receipt, { accepted: 0, duplicates: 0, replayed: false });
+  await handleBrowserNodeRequest(node.accessKey, {
+    ...identity,
+    operation: "finish",
+    runId: emptyRun.id,
+    leaseId: emptyRun.leaseId,
+    outcome: "completed",
+    stopped: true,
+  });
+  const emptySaved = await database.execute(
+    sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+  );
+  assert.equal(
+    (emptySaved.rows[0].document as typeof state).accounts[0].lastCheckedAt,
+    Date.parse(emptyObserved),
+  );
   await database.execute(
     sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{accounts,0,pollSeconds}', '0'::jsonb) WHERE id = ${node.nodeId}`,
   );

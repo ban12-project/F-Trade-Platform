@@ -213,12 +213,19 @@ test("2FA marks attention and prevents unattended polling", () => {
   );
   assert.ok(enqueue(s, "a", "interactive", 3_000_000));
 });
-test("completed polling advances watermark time, not instant DM guarantees", () => {
+test("persisted inbox completion advances observation time, not shutdown time", () => {
   const s = fixture();
   enqueue(s, "a", "inbox");
   const r = claim(s);
+  r.inboxCompletion = {
+    observedAt: 1800,
+    reviewRef: "evidence-synthetic",
+    coverage: "visible_inbox",
+    conversationCount: 0,
+    messageCount: 0,
+  };
   finishRun(s, r.id, "completed", true, 2000);
-  assert.equal(s.accounts[0].lastCheckedAt, 2000);
+  assert.equal(s.accounts[0].lastCheckedAt, 1800);
   assert.equal(s.accounts[0].nextPollAt, 902_000);
 });
 test("browser exit never becomes a publication success or an automatic retry", () => {
@@ -271,4 +278,15 @@ test("publication profiles constrain queued claims by account, channel and expir
     state.publicationScopes = [{ channelRef: "facebook", accountRef: "a", expiresAt: 5000 }];
     assert.equal(claim(state, 1002)?.id, run.id);
   }
+});
+
+test("unreceipted inbox completion never advances the check time", () => {
+  const s = fixture();
+  enqueue(s, "a", "inbox");
+  const r = claim(s);
+  finishRun(s, r.id, "completed", true, 2000);
+  assert.equal(r.status, "failed");
+  assert.equal(r.failure, "inbox_completion_missing");
+  assert.equal(s.accounts[0].lastCheckedAt, null);
+  assert.ok(s.accounts[0].nextPollAt >= 302000);
 });

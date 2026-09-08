@@ -6,11 +6,12 @@ export function createInboxReporter({ run, request, assertActive, checkEgress })
   const { id: runId, leaseId, inboxSigningKey } = run;
   let pending;
   let failed = false;
-  return async (messages, observedAt) => {
-    if (failed || pending) throw new Error("inbox_reporter_unavailable");
+  let completed = false;
+  return async (messages, observedAt, completion) => {
+    if (failed || pending || completed) throw new Error("inbox_reporter_unavailable");
     if (run.kind !== "inbox" || !inboxSigningKey) throw new Error("inbox_run_invalid");
     assertActive();
-    if (!Array.isArray(messages) || !messages.length || messages.length > 20)
+    if (!Array.isArray(messages) || (!messages.length && !completion) || messages.length > 20)
       throw new Error("inbox_messages_invalid");
     const packet = {
       runId,
@@ -25,6 +26,17 @@ export function createInboxReporter({ run, request, assertActive, checkEgress })
         body: message.body,
         receivedAt: message.receivedAt,
       })),
+      ...(completion
+        ? {
+            completion: {
+              reviewRef: completion.reviewRef,
+              scanStartedAt: completion.scanStartedAt,
+              coverage: completion.coverage,
+              conversationCount: completion.conversationCount,
+              messageCount: completion.messageCount,
+            },
+          }
+        : {}),
     };
     const envelope = { packet, signature: inboxSignature(inboxSigningKey, packet) };
     if (Buffer.byteLength(JSON.stringify(envelope)) > 250000)
@@ -44,6 +56,7 @@ export function createInboxReporter({ run, request, assertActive, checkEgress })
         receipt.accepted + receipt.duplicates !== messages.length
       )
         throw new Error("inbox_receipt_invalid");
+      if (completion) completed = true;
       return receipt;
     } catch (error) {
       // Stop this polling run on ambiguity. A later poll deduplicates by message ID.

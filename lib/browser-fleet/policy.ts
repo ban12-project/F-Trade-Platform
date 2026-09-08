@@ -36,6 +36,13 @@ export type Run = {
   accountId: string;
   kind: RunKind;
   jobRef: string | null;
+  inboxCompletion?: {
+    observedAt: number;
+    reviewRef: string;
+    coverage: "visible_inbox";
+    conversationCount: number;
+    messageCount: number;
+  };
   inboxReceipts?: Array<{
     requestId: string;
     digest: string;
@@ -294,23 +301,30 @@ export function finishRun(
   run.ticketHash = null;
   // Only a persisted, lease-bound business receipt establishes success.
   // Browser shutdown by itself remains unknown.
+  const completed = outcome === "completed" && (run.kind !== "inbox" || !!run.inboxCompletion);
   run.status =
     run.kind === "publish"
       ? run.publicationOutcome === "published"
         ? "completed"
         : "unknown"
-      : outcome === "completed"
+      : completed
         ? "completed"
         : "failed";
-  run.failure = run.status === "completed" ? null : outcome;
+  run.failure =
+    run.status === "completed"
+      ? null
+      : run.kind === "inbox" && outcome === "completed"
+        ? "inbox_completion_missing"
+        : outcome;
   if (a) {
     if (["needs_login", "needs_2fa", "checkpoint", "egress_mismatch"].includes(outcome))
       a.authState = outcome as AuthState;
     if (run.status === "unknown") a.authState = "result_unknown";
     else if (outcome === "unknown" && run.kind === "interactive") a.authState = "needs_login";
     if (run.kind === "inbox") {
-      if (outcome === "completed") a.lastCheckedAt = now;
-      a.nextPollAt = now + Math.max(a.pollSeconds * 1000, outcome === "completed" ? 0 : 300_000);
+      if (completed && run.inboxCompletion)
+        a.lastCheckedAt = Math.max(a.lastCheckedAt ?? 0, run.inboxCompletion.observedAt);
+      a.nextPollAt = now + Math.max(a.pollSeconds * 1000, completed ? 0 : 300_000);
     }
   }
 }

@@ -492,3 +492,34 @@ test("inbox reporter binds one lease, checks egress and stops after ambiguous de
   assert.equal(calls, 2);
   assert.equal(egress, 2);
 });
+
+test("empty inbox scan requires explicit signed completion and closes the reporter", async () => {
+  const { createInboxReporter } = await import("../ops/browser-node/inbox.mjs");
+  const { verifyInboxPacket } = await import("../lib/browser-fleet/inbox-protocol.ts");
+  const secret = Buffer.alloc(32, 8).toString("base64url");
+  const run = { kind: "inbox", id: randomUUID(), leaseId: randomUUID(), inboxSigningKey: secret };
+  let calls = 0;
+  const reporter = createInboxReporter({
+    run,
+    assertActive() {},
+    async checkEgress() {},
+    async request(_, fields) {
+      calls++;
+      const packet = verifyInboxPacket(secret, fields.envelope);
+      assert.equal(packet.completion.messageCount, 0);
+      assert.equal(packet.messages.length, 0);
+      return { receipt: { accepted: 0, duplicates: 0, replayed: false } };
+    },
+  });
+  const now = new Date().toISOString();
+  await assert.rejects(reporter([], now), /inbox_messages_invalid/);
+  await reporter([], now, {
+    reviewRef: "evidence-synthetic-empty",
+    scanStartedAt: now,
+    coverage: "visible_inbox",
+    conversationCount: 0,
+    messageCount: 0,
+  });
+  await assert.rejects(reporter([], now), /inbox_reporter_unavailable/);
+  assert.equal(calls, 1);
+});
