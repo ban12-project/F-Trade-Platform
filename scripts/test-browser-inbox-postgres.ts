@@ -64,6 +64,13 @@ export async function testBrowserInbox(
     leaseId: run.leaseId,
     ready: true,
   });
+  await database.execute(
+    sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{inboxScopes}', '[]'::jsonb) WHERE id = ${node.nodeId}`,
+  );
+  await assert.rejects(handleBrowserNodeRequest(node.accessKey, request), /inbox_lease_inactive/);
+  await database.execute(
+    sql`UPDATE browser_fleet_node SET document = document - 'inboxScopes' WHERE id = ${node.nodeId}`,
+  );
   await assert.rejects(
     handleBrowserNodeRequest(node.accessKey, {
       ...request,

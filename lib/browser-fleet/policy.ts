@@ -71,6 +71,7 @@ export type FleetState = {
   installationId: string | null;
   bootId: string | null;
   capabilities: RunKind[];
+  inboxScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   publicationScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   lastSeenAt: number;
   accounts: Account[];
@@ -169,7 +170,13 @@ export function sweep(state: FleetState, now: number) {
 export function scheduleInbox(state: FleetState, now: number, newId: () => string) {
   if (!state.capabilities.includes("inbox")) return;
   for (const a of state.accounts) {
-    if (!a.enabled || a.authState !== "ready" || a.pollSeconds === 0 || a.nextPollAt > now)
+    if (
+      !a.enabled ||
+      !inboxScopeActive(state, a, now) ||
+      a.authState !== "ready" ||
+      a.pollSeconds === 0 ||
+      a.nextPollAt > now
+    )
       continue;
     if (
       state.runs.some(
@@ -203,6 +210,17 @@ export function publicationScopeActive(state: FleetState, account: Account, now:
     )
   );
 }
+export function inboxScopeActive(state: FleetState, account: Account, now: number) {
+  return (
+    state.inboxScopes === undefined ||
+    state.inboxScopes.some(
+      (scope) =>
+        scope.channelRef === account.channelRef &&
+        scope.accountRef === account.accountRef &&
+        scope.expiresAt > now,
+    )
+  );
+}
 export function claimRun(
   state: FleetState,
   input: { requestId: string; leaseId: string; availableMemoryMb: number; localSlots: number },
@@ -228,6 +246,7 @@ export function claimRun(
         a?.enabled &&
         state.capabilities.includes(r.kind) &&
         (r.kind !== "publish" || publicationScopeActive(state, a, now)) &&
+        (r.kind !== "inbox" || inboxScopeActive(state, a, now)) &&
         (r.kind === "interactive" || a.authState === "ready")
       );
     })

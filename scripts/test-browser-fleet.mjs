@@ -290,3 +290,16 @@ test("unreceipted inbox completion never advances the check time", () => {
   assert.equal(s.accounts[0].lastCheckedAt, null);
   assert.ok(s.accounts[0].nextPollAt >= 302000);
 });
+
+test("inbox profile scope gates scheduling and queued claims without affecting manual login", () => {
+  const s = fixture();
+  s.inboxScopes = [{ channelRef: "facebook", accountRef: "a", expiresAt: 2000 }];
+  scheduleInbox(s, 1000, randomUUID);
+  assert.deepEqual(
+    s.runs.map((run) => run.accountId),
+    ["a"],
+  );
+  assert.equal(claim(s, 2000), null);
+  const manual = enqueue(s, "b", "interactive", 2000);
+  assert.equal(claim(s, 2001)?.id, manual.id);
+});

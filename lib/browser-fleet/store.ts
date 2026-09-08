@@ -344,6 +344,7 @@ export async function handleBrowserNodeRequest(
       state.bootId = request.bootId;
       state.capabilities = [...new Set(request.capabilities)];
       state.publicationScopes = request.publicationScopes;
+      state.inboxScopes = request.inboxScopes;
       result = { active: true };
     } else {
       if (state.bootId !== request.bootId) throw new Error("stale_node_process");

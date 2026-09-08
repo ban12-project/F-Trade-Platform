@@ -523,3 +523,72 @@ test("empty inbox scan requires explicit signed completion and closes the report
   await assert.rejects(reporter([], now), /inbox_reporter_unavailable/);
   assert.equal(calls, 1);
 });
+
+test("Facebook adapter advertises only explicitly configured inbox accounts", async () => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = await mkdtemp(join(tmpdir(), "synthetic-inbox-profile-"));
+  const previousInbox = process.env.FACEBOOK_INBOX_PROFILES_FILE;
+  const previousPublishing = process.env.FACEBOOK_DOM_PROFILES_FILE;
+  try {
+    const selectorKeys = [
+      "identity",
+      "inboxReady",
+      "conversationLink",
+      "emptyInbox",
+      "threadReady",
+      "threadIdentity",
+      "message",
+      "inbound",
+      "outbound",
+      "body",
+      "time",
+      "emptyThread",
+      "challenge",
+      "loading",
+      "moreThreads",
+      "moreMessages",
+    ];
+    const profile = {
+      version: 1,
+      accountRef: "synthetic-account",
+      channelRef: "synthetic-channel",
+      reviewRef: "evidence-synthetic-inbox",
+      reviewedAt: new Date(Date.now() - 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString(),
+      url: "https://www.facebook.com/messages",
+      identityHref: "https://www.facebook.com/synthetic-owner",
+      selectors: Object.fromEntries(selectorKeys.map((key) => [key, `.${key}`])),
+      attributes: { conversationId: "data-thread-id", messageId: "data-message-id" },
+    };
+    const path = join(directory, "profiles.json");
+    await writeFile(path, JSON.stringify([profile]));
+    process.env.FACEBOOK_INBOX_PROFILES_FILE = path;
+    delete process.env.FACEBOOK_DOM_PROFILES_FILE;
+    const adapter = await import(
+      `../ops/browser-node/facebook-adapter.mjs?synthetic=${randomUUID()}`
+    );
+    assert.deepEqual(adapter.capabilities, ["inbox"]);
+    assert.deepEqual(adapter.publicationScopes, []);
+    assert.deepEqual(adapter.inboxScopes, [
+      {
+        channelRef: profile.channelRef,
+        accountRef: profile.accountRef,
+        expiresAt: Date.parse(profile.expiresAt),
+      },
+    ]);
+    assert.equal(
+      await adapter.execute({
+        run: { kind: "inbox", channelRef: profile.channelRef, accountRef: "different-account" },
+      }),
+      "failed",
+    );
+  } finally {
+    if (previousInbox === undefined) delete process.env.FACEBOOK_INBOX_PROFILES_FILE;
+    else process.env.FACEBOOK_INBOX_PROFILES_FILE = previousInbox;
+    if (previousPublishing === undefined) delete process.env.FACEBOOK_DOM_PROFILES_FILE;
+    else process.env.FACEBOOK_DOM_PROFILES_FILE = previousPublishing;
+    await rm(directory, { recursive: true, force: true });
+  }
+});

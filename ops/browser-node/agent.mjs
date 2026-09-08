@@ -57,6 +57,7 @@ if (process.env.BROWSER_TASK_ADAPTER) {
     capabilities: ["interactive", ...extra.capabilities],
     execute: extra.execute,
     publicationScopes: extra.publicationScopes,
+    inboxScopes: extra.inboxScopes,
   };
 }
 const slots = new Map();
@@ -124,6 +125,7 @@ await nodeCall("recover", {
   stoppedRunIds: sync.runs.filter(isLive).map((r) => r.id),
   capabilities: adapter.capabilities,
   ...(adapter.publicationScopes ? { publicationScopes: adapter.publicationScopes } : {}),
+  ...(adapter.inboxScopes ? { inboxScopes: adapter.inboxScopes } : {}),
 });
 const gateway = createGateway({
   appOrigin,

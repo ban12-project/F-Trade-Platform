@@ -137,6 +137,18 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
         )
         .max(16)
         .optional(),
+      inboxScopes: z
+        .array(
+          z
+            .object({
+              channelRef: reference,
+              accountRef: reference,
+              expiresAt: z.number().int().positive(),
+            })
+            .strict(),
+        )
+        .max(16)
+        .optional(),
     })
     .strict(),
   z

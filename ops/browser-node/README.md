@@ -155,7 +155,7 @@ CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose �
 
 `ingestFacebookInboundBatch(tx, input, actorId)` 复用现有会话、消息加密及 30 天有效期。在同一事务内锁定渠道控制和会话，按渠道/账号/会话/消息标识去重；相同标识但正文或接收时间变化会拒绝整个批次，不静默覆盖。乱序消息不倒退 `lastMessageAt`，已删除消息不会被重新填充正文。暂停渠道、未来消息、超过保留期的消息和过期观察均拒绝。每批最多 20 条，审计不含正文。
 
-新会话保持 `leadId = null`，进入现有待分流列表；只有人工调用现有分流动作才会建立销售项目、Lead 和 RFQ 收集任务。真实 PostgreSQL 回归覆盖并发去重、批次回滚、加密与有效期、删除重放及人工分流后的继续入站。此函数是领域存储边界，不是认证接口：调用者仍须校验节点身份、有效 inbox 租约、账号范围、签名及重放约束。节点签名 HTTP 接口见下文；页面消息采集仍待实现，不能启用 inbox 能力来声称已完成私信接收。
+新会话保持 `leadId = null`，进入现有待分流列表；只有人工调用现有分流动作才会建立销售项目、Lead 和 RFQ 收集任务。真实 PostgreSQL 回归覆盖并发去重、批次回滚、加密与有效期、删除重放及人工分流后的继续入站。此函数是领域存储边界，不是认证接口：调用者仍须校验节点身份、有效 inbox 租约、账号范围、签名及重放约束。节点签名 HTTP 接口见下文；可配置页面采集器见下文；未配置经审核的真实页面契约时不能声称已完成私信接收。
 
 ### 租约签名入站接口
 
@@ -163,10 +163,22 @@ CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose �
 
 每个请求绑定 UUID 和载荷摘要，消息与回执同事务写入。相同请求重放返回原计数；相同编号改稿拒绝。每运行最多 100 个消息批次，每批 1–20 条，另加一个显式完成回执；HTTP 总请求最多 256 KiB，Agent 在 250000 字节处提前拒绝过大封包。正文超过单批容量时由采集器拆批，不能截断成另一条消息。运行终止后旧请求拒绝，内部摘要回执不进入管理 UI；消息正文不写入节点文档或审计。
 
-数据库回归直接执行实际 Route Handler 和 broker，覆盖签名、HTTP 鉴权/大小限制、租约、过期与重放。尚未通过真实 HTTP 网络、VPS 或 Facebook 页面采集验收；内置适配器仍仅支持显式配置的发布，默认 Agent 仍只有人工交互。轮询完成协议见下文；下一步仍是页面收件箱采集，不能通过空实现返回 completed 来宣称完成检查。
+数据库回归直接执行实际 Route Handler 和 broker，覆盖签名、HTTP 鉴权/大小限制、租约、过期与重放。尚未通过真实 HTTP 网络、VPS 或 Facebook 页面采集验收；内置适配器可显式配置发布或收件箱，默认 Agent 仍只有人工交互。轮询完成协议见下文；可配置页面采集见下文，不能通过空实现返回 completed 来宣称完成检查。
 
 ### 轮询完成回执
 
 采集器完成当前可见收件箱检查后，调用 `reportInbound([], observedAt, completion)`。`completion` 含 `reviewRef`、`scanStartedAt`、`coverage: "visible_inbox"`、`conversationCount` 和 `messageCount`。服务端要求开始时间属于当前运行，消息总数等于该运行已提交批次的接受数与重复数之和，并再次检查渠道可用。无消息也必须提交这份显式回执；普通空消息批次无效。允许最多 100 个消息批次加 1 个完成回执。
 
 完成回执与运行状态原子保存，精确重放幂等；完成后新消息批次拒绝。只有持久化完成回执且正常停止，才把 inbox 标记 completed 并以 observedAt 更新检查时间。仅返回 completed 的旧适配器会以 inbox_completion_missing 失败，检查时间不变。异常结束不推进检查时间。这里证明的是受信任驱动声明的可见范围，不是全部历史、隐藏线程或 Messenger 加密历史已完整收集；签名和审核引用不能自行证明页面观察真实性。
+
+### 可配置的只读收件箱采集器
+
+`facebook-adapter.mjs` 现在可分别读取 `FACEBOOK_DOM_PROFILES_FILE`（发布）和 `FACEBOOK_INBOX_PROFILES_FILE`（收件箱）。至少提供一类配置，只有存在相应已校验配置时才声明该能力。两类配置独立声明账号范围和到期时间；平台在收件箱调度、领取和上报时拒绝过期或未覆盖账号。默认 Agent 仍只启用人工交互，仓库没有真实 Facebook 选择器配置。
+
+收件箱配置同样是 1–16 项数组，每项含 version/channelRef/accountRef/reviewRef/reviewedAt/expiresAt/url/identityHref。selectors 必须完整包含 `identity`、`inboxReady`、`conversationLink`、`emptyInbox`、`threadReady`、`threadIdentity`、`message`、`inbound`、`outbound`、`body`、`time`、`emptyThread`、`challenge`、`loading`、`moreThreads`、`moreMessages`。`attributes.conversationId` 和 `attributes.messageId` 指定经过核对的稳定 data-* 属性；message 的 inbound/outbound 选择器作用于消息元素自身。时间元素必须提供可解析的 datetime。不能用正文指纹冒充稳定消息 ID，不能把消息列表中的任意用户链接当作当前账号身份。
+
+采集器在同一租约标签页内导航，只使用 create/navigate/evaluate，不使用 click/type/upload。线程链接必须属于固定 Facebook `/messages/t/` 路径并与会话 ID 一致。每个页面检查当前账号和加载/挑战状态；明确出站消息跳过，入站方向不明、ID 缺失或重复、时间无效、显示更多分页、列表变化均停止且不提交完成回执。已接受的前序批次保留，下一轮按稳定消息 ID 去重。观察范围明确为 visible_inbox，不声称已读取所有隐藏或加密历史；打开线程可能产生平台已读状态，不能解释为平台侧零副作用。
+
+当前单次最多 20 个可见线程、每线程 100 个可见消息元素、总计 200 条入站消息；线程正文总量最多 200000 字符，响应最多 1000000 字节。每批最多 2 条，避免多字节正文超过上报容量。超限会失败，不静默截断并宣称完成；更大收件箱的分页/游标方案仍需独立实现与验证。
+
+`tests/e2e/facebook-inbox.spec.ts` 在完全拦截网络的 Chromium 夹具上连接生产签名上报器，覆盖正常/空/仅出站、错误身份/线程、缺失或重复 ID、方向歧义、未完成分页、挑战、列表变化和回执丢失。真实 Camofox 网络、真实 Facebook DOM、VPS 日志/插件隐私和 Messenger PIN/历史行为仍未验收。固定上游 evaluate 会把返回值传给本地插件事件；不得添加未经审核的插件或把这些事件写入日志/遥测。

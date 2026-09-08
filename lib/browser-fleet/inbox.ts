@@ -6,7 +6,7 @@ import { socialChannelControl } from "@/lib/db/schema";
 import { ingestFacebookInboundBatch } from "@/lib/social/facebook-inbound-store";
 import { digestSocialWorkerPayload } from "@/lib/social/worker-protocol";
 import { verifyInboxPacket } from "./inbox-protocol";
-import type { Account, FleetState, Run } from "./policy";
+import { type Account, type FleetState, inboxScopeActive, type Run } from "./policy";
 
 /** Only the derived key is disclosed to this lease; the master key stays on the server. */
 export function inboxSigningKey(nodeId: string, run: Run, account: Account) {
@@ -42,6 +42,7 @@ export async function acceptInboxPacket(
     run.leaseUntil <= now ||
     run.deadline <= now ||
     !account?.enabled ||
+    !inboxScopeActive(state, account, now) ||
     account.authState !== "ready" ||
     account.credentialVersion !== run.credentialVersion ||
     !account.expectedEgressIp ||
