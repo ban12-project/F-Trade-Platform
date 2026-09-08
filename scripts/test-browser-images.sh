@@ -9,15 +9,7 @@ for image in "$agent" "$browser"; do
   test "$(docker image inspect --format '{{.Architecture}}' "$image")" = "$ARCH"
   test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$REVISION"
 done
-docker run --rm --network none --entrypoint node "$agent" --input-type=module -e '
-  import assert from "node:assert/strict";
-  import { initialState } from "./lib/browser-fleet/policy.ts";
-  import { createAccessKey, accessKeyNodeId } from "./lib/browser-fleet/security.ts";
-  assert.equal(process.arch, process.argv[1]);
-  assert.equal(initialState({maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048}).runs.length, 0);
-  const id = crypto.randomUUID();
-  assert.equal(accessKeyNodeId(createAccessKey(id)), id);
-' "$node_arch"
+docker run --rm --network none --entrypoint node "$agent" ops/browser-node/smoke.mjs "$node_arch"
 test "$(docker image inspect --format '{{index .Config.Labels "io.ftrade.lease-watchdog"}}' "$browser")" = 1
 docker run --rm --network none --entrypoint sh "$browser" -ec '
   command -v Xvfb
