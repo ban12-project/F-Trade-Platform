@@ -6,6 +6,7 @@ import { accessKeyNodeId, createAccessKey } from "../../lib/browser-fleet/securi
 import { createFacebookDriver } from "./facebook-driver.mjs";
 import { createFacebookInbox } from "./facebook-inbox.mjs";
 import { createInboxReporter } from "./inbox.mjs";
+import { register as registerLogin } from "./login-plugin/index.js";
 import pagePrograms from "./page-programs.cjs";
 import { createPublicationExecutor } from "./publication-executor.mjs";
 
@@ -20,6 +21,15 @@ for (const path of [
 ]) {
   await import(path);
 }
+registerLogin(
+  {
+    post() {
+      throw new Error("login_plugin_must_default_off");
+    },
+  },
+  {},
+  {},
+);
 if (process.argv[2]) assert.equal(process.arch, process.argv[2]);
 assert.equal(Number(process.versions.node.split(".")[0]), 24);
 assert.equal(
