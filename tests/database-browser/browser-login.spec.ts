@@ -181,6 +181,15 @@ test("saved password fill uses the actual owner action and never returns credent
     authorizationId: heartbeat.loginAuthorization.id,
   });
   expect(released.credential).toEqual(credential);
+  await nodeCall({ operation: "finish", runId, leaseId, stopped: true, outcome: "unknown" });
+  await expect(
+    page.getByText("填充结果未知，本次不再重试。请重新接入后核对。", { exact: true }),
+  ).toBeVisible();
+  const interrupted = await pool.query("SELECT document FROM browser_fleet_node WHERE id=$1", [
+    nodeId,
+  ]);
+  expect(interrupted.rows[0].document.runs[0].savedLogin.outcome).toBeUndefined();
+  await expect(button).toBeDisabled();
   await nodeCall({
     operation: "login-result",
     runId,

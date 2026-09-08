@@ -365,29 +365,41 @@ export function finishRun(
     }
   }
 }
-export function publicState(state: FleetState) {
+function savedLoginOutcome(run: Run, now: number): "filled" | "refused" | "unknown" | null {
+  const authorization = run.savedLogin;
+  if (!authorization) return null;
+  if (authorization.outcome) return authorization.outcome;
+  const inactive =
+    run.status !== "running" || run.stopRequested || run.leaseUntil <= now || run.deadline <= now;
+  if (authorization.claimedAt === null)
+    return inactive || authorization.expiresAt <= now ? "refused" : null;
+  // Credential validity is at most 30 seconds. Allow the node's 10-second
+  // result transport timeout, then show uncertainty instead of waiting forever.
+  const receiptDueAt = Math.min(authorization.expiresAt, authorization.claimedAt + 30000) + 10000;
+  return inactive || receiptDueAt <= now ? "unknown" : null;
+}
+export function publicState(state: FleetState, now = Date.now()) {
   return {
     limits: state.limits,
     lastSeenAt: state.lastSeenAt,
     capabilities: state.capabilities,
-    loginFillScopes: (state.loginFillScopes ?? []).filter(
-      (scope) => scope.expiresAt > Date.now() + 10000,
-    ),
+    loginFillScopes: (state.loginFillScopes ?? []).filter((scope) => scope.expiresAt > now + 10000),
     accounts: state.accounts.map(({ loginCiphertext, proxyCiphertext, ...a }) => ({
       ...a,
       loginSaved: !!loginCiphertext,
       proxySaved: !!proxyCiphertext,
     })),
-    runs: state.runs.map(
-      ({ ticketHash, authSessionId, leaseId, claimId, inboxReceipts, savedLogin, ...r }) => ({
+    runs: state.runs.map((run) => {
+      const { ticketHash, authSessionId, leaseId, claimId, inboxReceipts, savedLogin, ...r } = run;
+      return {
         ...r,
-        savedLoginOutcome: savedLogin?.outcome ?? null,
+        savedLoginOutcome: savedLoginOutcome(run, now),
         savedLoginState: savedLogin
           ? savedLogin.claimedAt === null
             ? "requested"
             : "claimed"
           : null,
-      }),
-    ),
+      };
+    }),
   };
 }

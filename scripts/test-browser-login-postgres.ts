@@ -334,6 +334,23 @@ export async function testBrowserLogin(
     403,
     "Discarding the response cannot re-release a credential",
   );
+  await call({
+    operation: "finish",
+    runId: lost.run.id,
+    leaseId: lost.run.leaseId,
+    stopped: true,
+    outcome: "unknown",
+  });
+  const interrupted = (await call({ operation: "sync" })).runs as Array<{
+    id: string;
+    savedLoginOutcome: string | null;
+  }>;
+  assert.equal(interrupted.find((run) => run.id === lost.run.id)?.savedLoginOutcome, "unknown");
+  assert.equal((await state()).runs.at(-1)?.savedLogin?.outcome, undefined);
+  await call({ ...lostRequest, operation: "login-result", outcome: "filled" });
+  const recovered = (await call({ operation: "sync" })).runs as typeof interrupted;
+  assert.equal(recovered.find((run) => run.id === lost.run.id)?.savedLoginOutcome, "filled");
+  assert.equal((await state()).accounts[0].authState, "needs_login");
   await ownerBrowserCommand({ operation: "revoke", nodeId }, owner);
   assert.equal((await http(lostRequest)).status, 403);
   console.log(

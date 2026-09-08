@@ -325,3 +325,34 @@ test("operator attention pauses unattended work while preserving manual recovery
     assert.equal(claim(state, 1000001)?.id, manual.id);
   }
 });
+
+test("saved login waiting ends after interruption or expiry without inventing a receipt", () => {
+  const s = fixture();
+  const now = Date.now();
+  const r = enqueue(s, "a", "interactive", now);
+  claim(s, now + 1);
+  renewRun(s, r.id, r.leaseId, true, now + 2);
+  r.savedLogin = { id: randomUUID(), requestedAt: now, expiresAt: now + 20000, claimedAt: null };
+  s.accounts[0].authState = "needs_login";
+  const outcome = (at = now + 3) => publicState(s, at).runs[0].savedLoginOutcome;
+  assert.equal(outcome(), null);
+  assert.equal(outcome(now + 20000), "refused", "Expired unclaimed authorization cannot fill");
+  assert.equal(r.savedLogin.outcome, undefined, "Read projection must not forge a node receipt");
+  r.savedLogin.claimedAt = now + 4;
+  assert.equal(outcome(now + 20000), null, "Allow the bounded result transport window");
+  assert.equal(outcome(now + 30000), "unknown", "Missing receipt stops looking pending");
+  r.status = "quarantined";
+  assert.equal(outcome(), "unknown");
+  r.status = "failed";
+  assert.equal(outcome(), "unknown");
+  r.savedLogin.claimedAt = null;
+  assert.equal(outcome(), "refused");
+  r.savedLogin.claimedAt = now + 4;
+  r.savedLogin.outcome = "filled";
+  assert.equal(outcome(now + 60000), "filled", "Persisted receipt survives runtime shutdown");
+  assert.equal(
+    s.accounts[0].authState,
+    "needs_login",
+    "Read projection must not mutate account state",
+  );
+});
