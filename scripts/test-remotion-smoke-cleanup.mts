@@ -86,6 +86,8 @@ mock.module("@remotion/vercel", {
 const { main } = await import("./run-remotion-vercel-sandbox-smoke.mjs");
 const previous = process.env.BLOB_READ_WRITE_TOKEN;
 const previousUrl = process.env.REMOTION_SMOKE_SOURCE_URL;
+const previousStore = process.env.BLOB_STORE_ID;
+const previousOidc = process.env.VERCEL_OIDC_TOKEN;
 process.env.BLOB_READ_WRITE_TOKEN = "synthetic-not-a-credential";
 delete process.env.REMOTION_SMOKE_SOURCE_URL;
 try {
@@ -120,6 +122,19 @@ try {
   failCleanup = true;
   await assert.rejects(main(), /cleanup failed/);
   assert.equal(log.mock.callCount(), 1, "Cleanup failure must never print another PASS");
+  // OIDC-only projects must reach the SDK and clean up without a legacy token.
+  delete process.env.BLOB_READ_WRITE_TOKEN;
+  process.env.BLOB_STORE_ID = "store_synthetic";
+  process.env.VERCEL_OIDC_TOKEN = "synthetic-oidc-not-a-credential";
+  failCleanup = false;
+  events.length = 0;
+  const beforeDelete = deleted;
+  await main();
+  assert.equal(deleted, beforeDelete + 1, "OIDC-only uploads must be deleted");
+  assert.equal(events.at(-1), "pass");
+  failSigning = true;
+  await assert.rejects(main(), /synthetic signing failure/);
+  assert.equal(deleted, beforeDelete + 2, "OIDC signing failure must still delete source");
   log.mock.restore();
   console.log(
     "PASS smoke failure cleanup: signing, visible cleanup failure, independent Sandbox/Blob cleanup",
@@ -129,5 +144,9 @@ try {
   else process.env.BLOB_READ_WRITE_TOKEN = previous;
   if (previousUrl === undefined) delete process.env.REMOTION_SMOKE_SOURCE_URL;
   else process.env.REMOTION_SMOKE_SOURCE_URL = previousUrl;
+  if (previousStore === undefined) delete process.env.BLOB_STORE_ID;
+  else process.env.BLOB_STORE_ID = previousStore;
+  if (previousOidc === undefined) delete process.env.VERCEL_OIDC_TOKEN;
+  else process.env.VERCEL_OIDC_TOKEN = previousOidc;
   mock.restoreAll();
 }

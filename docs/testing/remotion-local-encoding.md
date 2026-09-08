@@ -48,3 +48,20 @@ At source commit `9ad6b99`, full `pnpm build` completed: Remotion bundle, workfl
 ## Remote execution prerequisite
 
 On 2026-09-08, the linked local project configuration was inspected without printing secrets. Its existing Vercel OIDC token expired at 2026-09-02 01:40:11 UTC. No Vercel CLI was available on PATH or in the inspected local npx cache to refresh it. The isolated test worktree has no remote credentials. No remote Sandbox request was made with the expired token. Refresh authorized Vercel credentials before attempting remote rendering; this is an authentication prerequisite, not a render failure. Token contents and project identifiers are not recorded here.
+
+## OIDC-only smoke credentials
+
+The private-source smoke now lets the installed Blob SDK resolve credentials for
+upload, signing and deletion, as the application does. `BLOB_STORE_ID` with a
+valid `VERCEL_OIDC_TOKEN` is supported; a legacy `BLOB_READ_WRITE_TOKEN` is not a
+mandatory precondition. The uploaded object is always scheduled for deletion,
+even when no legacy token exists or signing fails.
+
+The extended synthetic regression fails against the previous script at its
+legacy-token guard and passes with the fix, including successful cleanup and
+cleanup after signing failure. This uses mocked storage/Sandbox boundaries and
+does not prove live OIDC authorization or a remote render. On 2026-09-08, the
+previous PR head `be4a078` passed all Actions after quota restoration; the local
+workspace OIDC token was still expired, so live private-source validation remains
+pending refreshed credentials. A Vercel check labelled “Canceled by Ignored Build
+Step” does not establish a new preview deployment.

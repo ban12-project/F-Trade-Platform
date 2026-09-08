@@ -9,7 +9,6 @@ import { parseFfprobeOutput, validateProbedVideoExport } from "../lib/video/medi
 export async function main() {
   const sourcePath = resolve(process.argv[2] ?? "tmp/pdfs/ryt-ryc302-product.png");
   const outputPath = resolve(process.argv[3] ?? "tmp/videos/ryc302-remotion-vercel-smoke.mp4");
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
   const publicSourceUrl = process.env.REMOTION_SMOKE_SOURCE_URL?.trim();
   let uploaded: Awaited<ReturnType<typeof put>> | undefined;
   let sourceUrl = publicSourceUrl;
@@ -19,14 +18,11 @@ export async function main() {
     cleanupFailed = false;
   try {
     if (!sourceUrl) {
-      if (!token)
-        throw new Error("BLOB_READ_WRITE_TOKEN is required for the private-source smoke test.");
       const testKey = `video/test/remotion-sandbox-${Date.now()}${extname(sourcePath) || ".png"}`;
       uploaded = await put(testKey, new Blob([await readFile(sourcePath)], { type: "image/png" }), {
         access: "private",
         addRandomSuffix: false,
         contentType: "image/png",
-        token,
       });
       const validUntil = Date.now() + 10 * 60 * 1_000;
       const readToken = await issueSignedToken({
@@ -114,9 +110,7 @@ export async function main() {
       cleanupUpload = uploaded;
     const cleanup = await Promise.allSettled([
       ...(cleanupSandbox ? [Promise.resolve().then(() => cleanupSandbox.stop())] : []),
-      ...(cleanupUpload && token
-        ? [Promise.resolve().then(() => del(cleanupUpload.url, { token }))]
-        : []),
+      ...(cleanupUpload ? [Promise.resolve().then(() => del(cleanupUpload.url))] : []),
     ]);
     cleanupFailed = cleanup.some((result) => result.status === "rejected");
   }
