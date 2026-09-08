@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord, videoProcessingJob } from "@/lib/db/schema";
+import { videoProcessingFailureMessage } from "./processing-failures";
 
 export type VideoProcessingKind = "ai_draft" | "render";
 export type VideoProcessingStatus = "queued" | "running" | "succeeded" | "failed";
@@ -127,7 +128,6 @@ export async function completeVideoJob(jobId: string, database: Database = getDa
 export async function failVideoJob(
   jobId: string,
   code: string,
-  message: string,
   database: Database = getDatabase(),
 ) {
   await database.transaction(async (tx) => {
@@ -137,7 +137,7 @@ export async function failVideoJob(
         status: "failed",
         completedAt: new Date(),
         failureCode: code,
-        failureMessage: message.slice(0, 500),
+        failureMessage: videoProcessingFailureMessage(code),
       })
       .where(and(eq(videoProcessingJob.id, jobId), eq(videoProcessingJob.status, "running")))
       .returning({ videoProjectId: videoProcessingJob.videoProjectId });
@@ -166,7 +166,8 @@ export async function latestVideoProcessingJobs(
         id: row.id,
         kind: row.kind,
         status: row.status,
-        failureMessage: row.failureMessage,
+        failureMessage:
+          row.status === "failed" ? videoProcessingFailureMessage(row.failureCode) : null,
       });
     }
   return result;

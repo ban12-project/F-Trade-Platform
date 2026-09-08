@@ -9,6 +9,7 @@ import {
 import { createReviewVideoExport } from "@/lib/video/export-artifact";
 import { videoExportPresets } from "@/lib/video/export-presets";
 import { VercelPrivateVideoAssetStore } from "@/lib/video/private-asset-store";
+import { videoProcessingFailureMessage } from "@/lib/video/processing-failures";
 import { completeVideoJob, failVideoJob, markVideoJobRunning } from "@/lib/video/processing-jobs";
 import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
 import {
@@ -67,12 +68,8 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
     });
     await updateMarketingVideoEditDraft(input.videoId, draft, input.actorId);
     await completeVideoJob(input.jobId);
-  } catch (error) {
-    await failVideoJob(
-      input.jobId,
-      "AI_DRAFT_FAILED",
-      error instanceof Error ? error.message : "未知 AI 初稿错误",
-    );
+  } catch {
+    await failVideoJob(input.jobId, "AI_DRAFT_FAILED");
   }
 }
 
@@ -137,10 +134,10 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
     });
     await completeGuardedMarketingVideoRender(input.videoId, assetRef, exportArtifact);
     await completeVideoJob(input.jobId);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "未知渲染错误";
+  } catch {
+    const message = videoProcessingFailureMessage("RENDER_FAILED");
     if (rendering) await failMarketingVideoRender(input.videoId, message);
-    await failVideoJob(input.jobId, "RENDER_FAILED", message);
+    await failVideoJob(input.jobId, "RENDER_FAILED");
   }
 }
 
