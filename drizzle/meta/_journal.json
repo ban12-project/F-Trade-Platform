@@ -232,6 +232,13 @@
       "when": 1788840000002,
       "tag": "0032_browser_publication_authorization",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788840000003,
+      "tag": "0033_browser_publication_receipt",
+      "breakpoints": true
     }
   ]
 }

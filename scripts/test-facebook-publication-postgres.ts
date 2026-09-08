@@ -39,7 +39,7 @@ async function main() {
   const actor = randomUUID();
   const projectId = randomUUID();
   const channelRef = randomUUID();
-  const accountRef = randomUUID();
+  let accountRef = randomUUID();
   const workerId = randomUUID();
   process.env.SOCIAL_WORKER_ID = workerId;
   process.env.SOCIAL_WORKER_CHANNEL_REF = channelRef;
@@ -645,6 +645,200 @@ async function main() {
     );
     console.log(
       "PASS actual broker reserves one publication, excludes legacy claims, replays the lease and keeps unreceipted completion unknown",
+    );
+
+    for (const outcome of ["published", "unknown", "expired"] as const) {
+      accountRef = randomUUID();
+      await db.insert(schema.socialChannelControl).values({
+        id: randomUUID(),
+        channelRef,
+        accountRef,
+        enabled: true,
+        circuitStatus: "active",
+        changedBy: actor,
+        changedAt: new Date(),
+      });
+      await ownerBrowserCommand(
+        {
+          operation: "grant",
+          value: {
+            nodeId: node.nodeId,
+            channelRef,
+            accountRef,
+            expectedEgressIp: "203.0.113.10",
+            pollSeconds: 0,
+            credentials: {
+              loginUsername: "",
+              loginPassword: "",
+              proxyHost: "synthetic-proxy.example.invalid",
+              proxyPort: "3128",
+              proxyUsername: "",
+              proxyPassword: "",
+              clearLogin: false,
+              clearProxy: false,
+            },
+          },
+        },
+        owner,
+      );
+      const nodeRow: { rows: Array<Record<string, unknown>> } = await db.execute(
+        sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+      );
+      const bound: { id: string; accountRef: string } | undefined = (
+        nodeRow.rows[0].document as { accounts: Array<{ id: string; accountRef: string }> }
+      ).accounts.find((a) => a.accountRef === accountRef);
+      assert.ok(bound);
+      await ownerBrowserCommand(
+        { operation: "confirm-login", nodeId: node.nodeId, accountId: bound.id, confirmed: true },
+        owner,
+      );
+      const target = await fixture();
+      const claimResponse = await handleBrowserNodeRequest(node.accessKey, {
+        ...request,
+        requestId: randomUUID(),
+      });
+      const lease = claimResponse.run as { id: string; leaseId: string; publicationDigest: string };
+      assert.ok(lease);
+      await handleBrowserNodeRequest(node.accessKey, {
+        ...identity,
+        operation: "heartbeat",
+        runId: lease.id,
+        leaseId: lease.leaseId,
+        ready: true,
+      });
+      const authorized = await handleBrowserNodeRequest(node.accessKey, {
+        ...identity,
+        operation: "authorize-publication",
+        runId: lease.id,
+        leaseId: lease.leaseId,
+        payloadDigest: lease.publicationDigest,
+      });
+      const resultRequest = {
+        ...identity,
+        operation: "publication-result",
+        runId: lease.id,
+        leaseId: lease.leaseId,
+        authorizationId: (authorized.authorization as { authorizationId: string }).authorizationId,
+        payloadDigest: lease.publicationDigest,
+        outcome: outcome === "published" ? "published" : "unknown",
+        ...(outcome === "published"
+          ? { externalPublicationRef: `synthetic-post-${randomUUID()}` }
+          : { failureCode: "synthetic_observation_unknown" }),
+      };
+      await assert.rejects(
+        handleBrowserNodeRequest(node.accessKey, {
+          ...resultRequest,
+          authorizationId: randomUUID(),
+        }),
+        /publication_receipt_scope_invalid/,
+      );
+      if (outcome === "expired") {
+        const document = await db.execute(
+          sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+        );
+        const state = document.rows[0].document as {
+          runs: Array<{ id: string; leaseUntil: number }>;
+        };
+        const active = state.runs.find((r) => r.id === lease.id);
+        assert.ok(active);
+        active.leaseUntil = 1;
+        await db.execute(
+          sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(state)}::jsonb WHERE id = ${node.nodeId}`,
+        );
+        await assert.rejects(
+          handleBrowserNodeRequest(node.accessKey, resultRequest),
+          /publication_lease_inactive/,
+        );
+        await handleBrowserNodeRequest(node.accessKey, { ...identity, operation: "sync" });
+      } else {
+        const accepted = await handleBrowserNodeRequest(node.accessKey, resultRequest);
+        assert.deepEqual(accepted.receipt, { outcome, replayed: false });
+        const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);
+        assert.deepEqual(repeated.receipt, { outcome, replayed: true });
+        await assert.rejects(
+          handleBrowserNodeRequest(node.accessKey, {
+            ...resultRequest,
+            ...(outcome === "published"
+              ? { externalPublicationRef: "synthetic-conflicting-post" }
+              : { failureCode: "synthetic_conflict" }),
+          }),
+          /publication_receipt_conflict/,
+        );
+      }
+      await handleBrowserNodeRequest(node.accessKey, {
+        ...identity,
+        operation: "finish",
+        runId: lease.id,
+        leaseId: lease.leaseId,
+        outcome: "completed",
+        stopped: true,
+      });
+      const [saved] = await db
+        .select()
+        .from(schema.socialPublication)
+        .where(eq(schema.socialPublication.id, target.id));
+      assert.equal(saved.status, outcome === "published" ? "published" : "unknown");
+      if (outcome === "published") {
+        const [record] = await db
+          .select()
+          .from(schema.aggregateRecord)
+          .where(eq(schema.aggregateRecord.id, target.contentRef));
+        assert.equal(record.state, "CONTENT_PUBLISHED");
+        assert.equal(record.version, 2);
+        const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);
+        assert.deepEqual(repeated.receipt, { outcome, replayed: true });
+        const duplicateTarget = await fixture();
+        const duplicateClaim = await handleBrowserNodeRequest(node.accessKey, {
+          ...request,
+          requestId: randomUUID(),
+        });
+        const duplicateLease = duplicateClaim.run as {
+          id: string;
+          leaseId: string;
+          publicationDigest: string;
+        };
+        await handleBrowserNodeRequest(node.accessKey, {
+          ...identity,
+          operation: "heartbeat",
+          runId: duplicateLease.id,
+          leaseId: duplicateLease.leaseId,
+          ready: true,
+        });
+        const duplicateAuthorization = await handleBrowserNodeRequest(node.accessKey, {
+          ...identity,
+          operation: "authorize-publication",
+          runId: duplicateLease.id,
+          leaseId: duplicateLease.leaseId,
+          payloadDigest: duplicateLease.publicationDigest,
+        });
+        await assert.rejects(
+          handleBrowserNodeRequest(node.accessKey, {
+            ...resultRequest,
+            runId: duplicateLease.id,
+            leaseId: duplicateLease.leaseId,
+            payloadDigest: duplicateLease.publicationDigest,
+            authorizationId: (duplicateAuthorization.authorization as { authorizationId: string })
+              .authorizationId,
+          }),
+          /publication_external_ref_duplicate/,
+        );
+        const [uncommitted] = await db
+          .select()
+          .from(schema.socialPublication)
+          .where(eq(schema.socialPublication.id, duplicateTarget.id));
+        assert.equal(uncommitted.status, "submitted");
+        await handleBrowserNodeRequest(node.accessKey, {
+          ...identity,
+          operation: "finish",
+          runId: duplicateLease.id,
+          leaseId: duplicateLease.leaseId,
+          outcome: "unknown",
+          stopped: true,
+        });
+      }
+    }
+    console.log(
+      "PASS receipt authorization binding, success/unknown persistence, duplicate replay, conflict rejection, lease expiry and shutdown preservation",
     );
   } finally {
     await closeDatabase();

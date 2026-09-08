@@ -36,6 +36,7 @@ export type Run = {
   accountId: string;
   kind: RunKind;
   jobRef: string | null;
+  publicationOutcome?: "published" | "unknown";
   requestedBy: string;
   authSessionId: string | null;
   createdAt: number;
@@ -272,10 +273,16 @@ export function finishRun(
   }
   const a = state.accounts.find((a) => a.id === run.accountId);
   run.ticketHash = null;
-  // Browser shutdown is not a publication receipt. The existing signed result
-  // protocol must establish success separately; this scheduler never does so.
+  // Only a persisted, lease-bound business receipt establishes success.
+  // Browser shutdown by itself remains unknown.
   run.status =
-    run.kind === "publish" ? "unknown" : outcome === "completed" ? "completed" : "failed";
+    run.kind === "publish"
+      ? run.publicationOutcome === "published"
+        ? "completed"
+        : "unknown"
+      : outcome === "completed"
+        ? "completed"
+        : "failed";
   run.failure = run.status === "completed" ? null : outcome;
   if (a) {
     if (["needs_login", "needs_2fa", "checkpoint", "egress_mismatch"].includes(outcome))

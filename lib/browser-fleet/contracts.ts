@@ -69,6 +69,29 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
   z
     .object({
       ...common,
+      operation: z.literal("publication-result"),
+      runId: id,
+      leaseId: id,
+      authorizationId: id,
+      payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
+      outcome: z.enum(["published", "unknown"]),
+      externalPublicationRef: reference.optional(),
+      failureCode: z
+        .string()
+        .regex(/^[a-z0-9_]{1,120}$/)
+        .optional(),
+    })
+    .strict()
+    .refine(
+      (value) =>
+        value.outcome === "published"
+          ? !!value.externalPublicationRef && !value.failureCode
+          : !!value.failureCode && !value.externalPublicationRef,
+      "Receipt must contain only the outcome's required evidence.",
+    ),
+  z
+    .object({
+      ...common,
       operation: z.literal("authorize-publication"),
       runId: id,
       leaseId: id,

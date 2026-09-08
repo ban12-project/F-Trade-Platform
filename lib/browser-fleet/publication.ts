@@ -2,11 +2,18 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
+import { publishContent } from "@/lib/content/gate";
 import type { DatabaseTransaction } from "@/lib/db/client";
-import { socialBrowserJob, socialChannelControl, socialPublication } from "@/lib/db/schema";
+import {
+  aggregateRecord,
+  auditEvent,
+  socialBrowserJob,
+  socialChannelControl,
+  socialPublication,
+} from "@/lib/db/schema";
 import { buildFacebookPublicationPayload } from "@/lib/social/facebook-media-store";
 import { digestSocialWorkerPayload } from "@/lib/social/worker-protocol";
-import { type Account, enqueueRun, type FleetState, type Run } from "./policy";
+import { type Account, enqueueRun, type FleetState, type Run, requestStop } from "./policy";
 
 /** Called under the node row lock. The job lock and unique reservation exclude
  * legacy workers and duplicate polls, including after terminal run pruning. */
@@ -279,4 +286,188 @@ export async function authorizePublication(
     sql`UPDATE browser_fleet_publication SET authorization_id = ${authorizationId}, authorized_lease_id = ${run.leaseId}, authorized_until = ${expiresAt} WHERE job_id = ${job.id}`,
   );
   return { authorizationId, expiresAt, payloadDigest };
+}
+
+export async function recordPublicationReceipt(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  state: FleetState,
+  run: Run,
+  receipt: {
+    authorizationId: string;
+    payloadDigest: string;
+    outcome: "published" | "unknown";
+    externalPublicationRef?: string;
+    failureCode?: string;
+  },
+  now: number,
+) {
+  if (run.kind !== "publish" || !run.jobRef) throw new Error("publication_run_invalid");
+  const result = await tx.execute(
+    sql`SELECT * FROM browser_fleet_publication WHERE node_id = ${nodeId} AND run_id = ${run.id} AND job_id = ${run.jobRef} FOR UPDATE`,
+  );
+  const reservation = result.rows[0];
+  if (
+    !reservation ||
+    reservation.authorization_id !== receipt.authorizationId ||
+    reservation.authorized_lease_id !== run.leaseId ||
+    !reservation.payload ||
+    digestSocialWorkerPayload(reservation.payload as Record<string, unknown>) !==
+      receipt.payloadDigest
+  )
+    throw new Error("publication_receipt_scope_invalid");
+  if (reservation.receipt) {
+    if (
+      digestSocialWorkerPayload(reservation.receipt as Record<string, unknown>) !==
+      digestSocialWorkerPayload(receipt)
+    )
+      throw new Error("publication_receipt_conflict");
+    return { outcome: receipt.outcome, replayed: true };
+  }
+  const account = state.accounts.find((item) => item.id === run.accountId);
+  // Authorization bounds the start of the effect. Its receipt may arrive after
+  // that short window, but a first receipt still requires the original live lease.
+  if (
+    run.status !== "running" ||
+    run.stopRequested ||
+    run.leaseUntil <= now ||
+    run.deadline <= now ||
+    !account?.enabled ||
+    account.authState !== "ready" ||
+    account.credentialVersion !== run.credentialVersion
+  )
+    throw new Error("publication_lease_inactive");
+  const binding = await tx.execute(
+    sql`SELECT id FROM browser_fleet_binding WHERE node_id = ${nodeId} AND channel_ref = ${account.channelRef} AND account_ref = ${account.accountRef}`,
+  );
+  if (!binding.rows.length) throw new Error("publication_account_unbound");
+  const [job] = await tx
+    .select()
+    .from(socialBrowserJob)
+    .where(eq(socialBrowserJob.id, run.jobRef))
+    .for("update");
+  if (
+    job?.status !== "claimed" ||
+    job.kind !== "publish" ||
+    job.accountRef !== account.accountRef ||
+    job.channelRef !== account.channelRef
+  )
+    throw new Error("publication_not_claimed");
+  const [publication] = await tx
+    .select()
+    .from(socialPublication)
+    .where(
+      and(eq(socialPublication.id, job.payloadRef), eq(socialPublication.browserJobId, job.id)),
+    )
+    .for("update");
+  if (
+    publication?.status !== "submitted" ||
+    publication.accountRef !== account.accountRef ||
+    publication.channelRef !== account.channelRef
+  )
+    throw new Error("publication_scope_invalid");
+  if (receipt.outcome === "published") {
+    const payload = await buildFacebookPublicationPayload(tx, publication, new Date(now));
+    if (
+      digestSocialWorkerPayload(payload) !== receipt.payloadDigest ||
+      !receipt.externalPublicationRef
+    )
+      throw new Error("publication_changed");
+    // The database unique index also arbitrates concurrent duplicate external IDs.
+    const [duplicate] = await tx
+      .select({ id: socialPublication.id })
+      .from(socialPublication)
+      .where(
+        and(
+          eq(socialPublication.channelRef, account.channelRef),
+          eq(socialPublication.accountRef, account.accountRef),
+          eq(socialPublication.externalPublicationRef, receipt.externalPublicationRef),
+        ),
+      )
+      .limit(1);
+    if (duplicate) throw new Error("publication_external_ref_duplicate");
+    await tx
+      .update(socialBrowserJob)
+      .set({
+        status: "succeeded",
+        resultRef: receipt.externalPublicationRef,
+        failureCode: null,
+        updatedAt: new Date(now),
+      })
+      .where(eq(socialBrowserJob.id, job.id));
+    await tx
+      .update(socialPublication)
+      .set({
+        status: "published",
+        externalPublicationRef: receipt.externalPublicationRef,
+        publishedAt: new Date(now),
+        updatedAt: new Date(now),
+      })
+      .where(eq(socialPublication.id, publication.id));
+    const [content] = await tx
+      .select()
+      .from(aggregateRecord)
+      .where(eq(aggregateRecord.id, publication.contentRef))
+      .for("update");
+    if (content.type === "content")
+      await tx
+        .update(aggregateRecord)
+        .set({
+          state: "CONTENT_PUBLISHED",
+          payload: publishContent(content.payload, "system", receipt.externalPublicationRef),
+          version: content.version + 1,
+        })
+        .where(eq(aggregateRecord.id, content.id));
+  } else {
+    await tx
+      .update(socialBrowserJob)
+      .set({
+        status: "paused",
+        failureCode: receipt.failureCode ?? "external_result_unknown",
+        updatedAt: new Date(now),
+      })
+      .where(eq(socialBrowserJob.id, job.id));
+    await tx
+      .update(socialPublication)
+      .set({ status: "unknown", updatedAt: new Date(now) })
+      .where(eq(socialPublication.id, publication.id));
+    await tx
+      .update(socialChannelControl)
+      .set({
+        circuitStatus: "paused",
+        pauseReason: "external_result_unknown",
+        pauseEvidenceRef: job.id,
+        changedAt: new Date(now),
+        updatedAt: new Date(now),
+      })
+      .where(
+        and(
+          eq(socialChannelControl.channelRef, account.channelRef),
+          eq(socialChannelControl.accountRef, account.accountRef),
+        ),
+      );
+    account.authState = "result_unknown";
+  }
+  await tx.execute(
+    sql`UPDATE browser_fleet_publication SET receipt = ${JSON.stringify(receipt)}::jsonb, received_at = ${new Date(now)} WHERE job_id = ${job.id}`,
+  );
+  await tx.insert(auditEvent).values({
+    id: randomUUID(),
+    actorType: "system",
+    actorId: nodeId,
+    action: `social_publication.${receipt.outcome}`,
+    subjectType: "social_publication",
+    subjectId: publication.id,
+    aggregateId: publication.contentRef,
+    metadata: {
+      job_id: job.id,
+      run_id: run.id,
+      authorization_id: receipt.authorizationId,
+      retry_allowed: false,
+    },
+    occurredAt: new Date(now),
+  });
+  run.publicationOutcome = receipt.outcome;
+  requestStop(state, run);
+  return { outcome: receipt.outcome, replayed: false };
 }

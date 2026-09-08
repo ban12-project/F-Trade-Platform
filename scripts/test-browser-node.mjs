@@ -4,7 +4,10 @@ import { once } from "node:events";
 import test from "node:test";
 import { containerSpec, stopContainer } from "../ops/browser-node/docker.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
-import { createPublicationAuthorizer } from "../ops/browser-node/publication.mjs";
+import {
+  createPublicationAuthorizer,
+  createPublicationReporter,
+} from "../ops/browser-node/publication.mjs";
 
 const nodeId = randomUUID();
 const accountId = randomUUID();
@@ -241,4 +244,38 @@ test("publication authorization rejects expired responses and revoked local leas
     },
   });
   await assert.rejects(stopped(), /stopped/);
+});
+
+test("receipt retry preserves the observation and cannot change lease or outcome", async () => {
+  const calls = [];
+  const assigned = {
+    kind: "publish",
+    id: randomUUID(),
+    leaseId: randomUUID(),
+    publicationDigest: "a".repeat(64),
+  };
+  const report = createPublicationReporter({
+    run: assigned,
+    async request(operation, body) {
+      calls.push({ operation, body });
+      if (calls.length === 1) throw new Error("response_lost");
+      return { receipt: { outcome: "published", replayed: true } };
+    },
+  });
+  const receipt = {
+    authorizationId: randomUUID(),
+    outcome: "published",
+    externalPublicationRef: "synthetic-post",
+    runId: "untrusted-run",
+  };
+  await assert.rejects(report(receipt), /response_lost/);
+  assert.deepEqual(await report(receipt), { outcome: "published", replayed: true });
+  assert.deepEqual(calls[0], calls[1]);
+  assert.equal(calls[1].body.runId, assigned.id);
+  assert.equal(calls[1].body.leaseId, assigned.leaseId);
+  await assert.rejects(
+    report({ ...receipt, externalPublicationRef: "conflicting-post" }),
+    /publication_receipt_conflict/,
+  );
+  assert.equal(calls.length, 2);
 });

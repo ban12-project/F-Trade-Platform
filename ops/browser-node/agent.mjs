@@ -9,7 +9,7 @@ import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./doc
 import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
-import { createPublicationAuthorizer } from "./publication.mjs";
+import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
 
 const appOrigin = secureOrigin(process.env.FTRADE_URL ?? "");
 const accessKey = process.env.BROWSER_NODE_ACCESS_KEY_FILE
@@ -372,6 +372,7 @@ async function tick() {
           const outcome = await adapter.execute({
             run: structuredClone(slot.run),
             authorizePublication,
+            reportPublication: createPublicationReporter({ run: slot.run, request: nodeCall }),
             signal: slot.abort.signal,
             browserRequest: (path, body) => browserRequest(slot, path, body),
           });

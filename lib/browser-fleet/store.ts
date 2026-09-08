@@ -39,6 +39,7 @@ import {
   authorizePublication,
   claimPublication,
   reconcilePublications,
+  recordPublicationReceipt,
   schedulePublications,
 } from "./publication";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
@@ -445,6 +446,18 @@ async function nodeOperation(
   }
   const run = state.runs.find((r) => r.id === request.runId);
   if (!run || run.leaseId !== request.leaseId) throw new Error("lease_mismatch");
+  if (request.operation === "publication-result") {
+    const { authorizationId, payloadDigest, outcome, externalPublicationRef, failureCode } =
+      request;
+    const receipt = {
+      authorizationId,
+      payloadDigest,
+      outcome,
+      ...(externalPublicationRef ? { externalPublicationRef } : {}),
+      ...(failureCode ? { failureCode } : {}),
+    };
+    return { receipt: await recordPublicationReceipt(tx, row.id, state, run, receipt, now) };
+  }
   if (request.operation === "authorize-publication") {
     const authorization = await authorizePublication(
       tx,
