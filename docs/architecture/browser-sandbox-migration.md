@@ -70,3 +70,15 @@ Agent 新增部署级 `BROWSER_NODE_ON_DEMAND=1`。连续成功领取到空队�
 `start-sandbox.sh` 只在已授权且正在运行的 VM 内执行。它检查 root 所有的 0600 配置／密钥文件、节点及操作标识和不可变本地镜像 ID，通过文件锁串行启动。相同操作对应的 Agent 已退出时，不再次启动；不同操作遇到仍运行的 Agent 时要求协调，不能强制替换。脚本不删除 profile 卷。平台生成运行配置和实际调用该脚本的部分仍待接入。
 
 实际 Agent 子进程的恢复过滤与空闲退出回归、会话停止回归共 11 项通过，既有 65 项节点回归通过；启动脚本语法通过检查。新增 Compose 配置验证随双架构镜像 CI 执行。以上尚不证明新启动脚本已在真实 Sandbox 中完成端到端运行。
+
+## 实测发现的资源控制兼容问题（2026-09-10）
+
+首次实际调用启动脚本失败：未初始化嵌套 cgroup 时，Docker 创建的层级进入 threaded 模式，带内存上限的 Agent 无法启动。无资源限制的 hello-world 通过不能证明此配置可用。失败实例已删除。
+
+`prepare-sandbox-cgroups.sh` 采用 [Moby 的嵌套 cgroup 初始化方法](https://github.com/moby/moby/blob/master/hack/dind)，在专用 VM 的首个 Docker 容器之前把现有进程放入子 domain，并启用内存及线程控制器；没有移除容器限制，也不操作 VM 命名空间之外的层级。已经进入不兼容模式时拒绝继续。重试有次数上限，不能永久阻塞启动。
+
+独立真实 Sandbox 探针已验证修复前限内存容器启动失败、初始化后相同配置成功，容器内核 `memory.max` 实际为 67108864（64 MiB）。探针实例均已删除。恢复时 cgroup 是新内核状态，必须在重启 Docker 前重新初始化，不能把文件系统快照当成已恢复资源控制配置。
+
+`test-browser-sandbox-start.mts` 使用已提交 Agent 源码、空队列 HTTPS 合成 broker、临时节点 Key 和不可变本地测试镜像，实际执行启动脚本。它测试重复启动、Agent 空闲退出、HTTPS 接管静态资源及整机回收，不发放真实账号任务，不证明浏览器 profile、代理或 WebSocket 接管。
+
+使用 `8b9bed1` 的完整合成实测通过：Agent 正常启动，容器内核内存上限为 536870912（512 MiB），重复调用返回 already-running，公开 HTTPS 地址可以访问 `/viewer`；空闲退出后同一操作返回 already-exited，没有重新启动。随后真实 session 回收函数停止整个 VM，元数据确认 stopped 且 sessionId 未变。最后删除实例和测试快照，清理完成后才写入成功结果。生产派发与实际业务接管仍未完成。

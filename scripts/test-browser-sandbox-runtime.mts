@@ -119,6 +119,11 @@ try {
   await sandbox.stop();
   console.log("Snapshot stopped; resuming same Sandbox");
   sandbox = await Sandbox.get({ name, resume: true });
+  await run(
+    "resume-cgroups",
+    "bash /vercel/sandbox/source/ops/browser-node/prepare-sandbox-cgroups.sh",
+    30000,
+  );
   await sandbox.runCommand({
     cmd: "sh",
     args: ["-c", "exec dockerd >/tmp/ftrade-dockerd.log 2>&1"],
