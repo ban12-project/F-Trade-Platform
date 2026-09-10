@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { Sandbox } from "@vercel/sandbox";
+import { startBrowserSandboxRuntime } from "../lib/browser-fleet/sandbox-runtime";
 import { stopIdleBrowserSandboxSession } from "../lib/browser-fleet/sandbox-session";
 import { createAccessKey } from "../lib/browser-fleet/security";
 
@@ -86,27 +87,29 @@ http.createServer(async (req, res) => {
     await run("image", "docker image inspect --format '{{.Id}}' ftrade-start-agent:test")
   ).trim();
   assert.match(image, /^sha256:[a-f0-9]{64}$/);
-  await sandbox.currentSession().writeFiles([
-    {
-      path: "/tmp/ftrade-runtime.env",
-      mode: 0o600,
-      content: `BROWSER_NODE_ID=${nodeId}\nBROWSER_SANDBOX_OPERATION_ID=${operationId}\nBROWSER_AGENT_IMAGE=${image}\nBROWSER_IMAGE=${image}\nFTRADE_URL=${sandbox.domain(9401)}\n`,
-    },
-  ]);
   await run(
     "broker",
-    'install -m 600 /tmp/ftrade-runtime.env /var/lib/ftrade-sandbox/runtime.env; docker run -d --name synthetic-broker --network host -v /var/lib/ftrade-sandbox:/fixture:ro "$1" node /fixture/broker.mjs "$2" "$3"',
+    'docker run -d --name synthetic-broker --network host -v /var/lib/ftrade-sandbox:/fixture:ro "$1" node /fixture/broker.mjs "$2" "$3"',
     60000,
     [image, nodeId, sandbox.domain(9400)],
   );
-  const startScript = "/vercel/sandbox/source/ops/browser-node/start-sandbox.sh";
-  assert.match(
-    await run("start", 'bash "$1" "$2" "$3"', 60000, [startScript, nodeId, operationId]),
-    /started/,
-  );
-  assert.match(
-    await run("duplicate", 'bash "$1" "$2" "$3"', 60000, [startScript, nodeId, operationId]),
-    /already-running/,
+  const runtimeSession = sandbox.currentSession();
+  const runtimeInput = {
+    nodeId,
+    operationId,
+    appOrigin: sandbox.domain(9401),
+    agentImage: image,
+    browserImage: image,
+    accessKey: key,
+  };
+  const start = () =>
+    startBrowserSandboxRuntime(runtimeSession, runtimeSession.sessionId, runtimeInput);
+  assert.equal(await start(), "started");
+  assert.equal(await start(), "already-running");
+  console.log("PASS provider boundary startup and duplicate request");
+  await run(
+    "staging-cleanup",
+    "test -z \"$(find /tmp -maxdepth 1 -name 'ftrade-runtime-*.key' -print)\"; test -z \"$(find /tmp -maxdepth 1 -name 'ftrade-runtime-*.env' -print)\"",
   );
   // Observe readiness without waking another session or waiting past its idle window.
   assert.equal(
@@ -132,10 +135,8 @@ http.createServer(async (req, res) => {
     "timeout 50 docker wait ftrade-browser-agent; test \"$(docker inspect --format '{{.State.ExitCode}}' ftrade-browser-agent)\" = 0; docker logs ftrade-browser-agent | grep -q browser_node_idle_exit",
     55000,
   );
-  assert.match(
-    await run("no-restart", 'bash "$1" "$2" "$3"', 60000, [startScript, nodeId, operationId]),
-    /already-exited/,
-  );
+  assert.equal(await start(), "already-exited");
+  console.log("PASS same operation does not restart the exited Agent");
   const brokerLog = await run("broker-operations", "docker logs synthetic-broker");
   assert.match(brokerLog, /^sync\nrecover\nclaim\n/);
   const session = sandbox.currentSession();

@@ -48,7 +48,7 @@ jobs:
       - name: Lease, capacity, gateway and isolation regression tests
         run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts
       - name: On-demand Agent idle exit and session shutdown
-        run: node --import tsx --test scripts/test-browser-idle.mjs scripts/test-browser-sandbox-session.ts
+        run: node --import tsx --test scripts/test-browser-idle.mjs scripts/test-browser-sandbox-session.ts scripts/test-browser-sandbox-runtime.ts
       - name: Offline Agent payload imports without application dependencies
         run: node scripts/test-browser-agent-payload.mjs
       - name: Pinned upstream source cache and refusal checks
