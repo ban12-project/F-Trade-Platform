@@ -260,6 +260,13 @@
       "when": 1789020000002,
       "tag": "0036_browser_sandbox_dispatch",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1789086000000,
+      "tag": "0037_browser_sandbox_outbox",
+      "breakpoints": true
     }
   ]
 }

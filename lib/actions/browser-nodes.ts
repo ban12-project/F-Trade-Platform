@@ -3,6 +3,8 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
+import { ownerCommandSchema } from "@/lib/browser-fleet/contracts";
+import { deliverQueuedBrowserSandboxes } from "@/lib/browser-fleet/sandbox-workflow-delivery";
 import { listBrowserNodes, ownerBrowserCommand } from "@/lib/browser-fleet/store";
 
 async function actor() {
@@ -17,7 +19,17 @@ export async function browserNodesAction() {
 export async function browserNodeCommandAction(input: unknown) {
   const current = await actor();
   try {
-    return { ok: true as const, result: await ownerBrowserCommand(input, current) };
+    const command = ownerCommandSchema.parse(input);
+    const result = await ownerBrowserCommand(command, current);
+    if (command.operation === "open") {
+      try {
+        await deliverQueuedBrowserSandboxes(command.nodeId);
+      } catch {
+        // The queue and outbox have committed. Do not report the open as failed
+        // and encourage a duplicate request; the delivery endpoint can retry.
+      }
+    }
+    return { ok: true as const, result };
   } catch {
     return {
       ok: false as const,

@@ -5,6 +5,8 @@ on:
       - "lib/browser-fleet/**"
       - "lib/actions/browser-nodes.ts"
       - "app/api/browser-nodes/**"
+      - "app/api/browser-sandbox-dispatch/**"
+      - "workflows/browser-sandbox.ts"
       - "app/workspace/browsers/**"
       - "components/workspace/browser-nodes-panel.tsx"
       - "ops/browser-node/**"
@@ -50,7 +52,7 @@ jobs:
       - name: On-demand Agent idle exit and session shutdown
         run: node --import tsx --test scripts/test-browser-idle.mjs scripts/test-browser-sandbox-session.ts scripts/test-browser-sandbox-runtime.ts scripts/test-browser-sandbox-provider.ts
       - name: Sandbox dispatch orchestration
-        run: node --conditions=react-server --import tsx --test scripts/test-browser-sandbox-controller.ts scripts/test-browser-sandbox-monitor.ts scripts/test-browser-sandbox-recovery.ts
+        run: node --conditions=react-server --import tsx --test scripts/test-browser-sandbox-controller.ts scripts/test-browser-sandbox-monitor.ts scripts/test-browser-sandbox-recovery.ts scripts/test-browser-sandbox-dispatch-route.ts
       - name: Offline Agent payload imports without application dependencies
         run: node scripts/test-browser-agent-payload.mjs
       - name: Pinned upstream source cache and refusal checks

@@ -51,6 +51,7 @@ import {
 } from "./publication";
 import { sealBrowserSandboxKey } from "./sandbox-credentials";
 import { registerBrowserSandbox } from "./sandbox-lifecycle";
+import { enqueueManualBrowserSandboxStart } from "./sandbox-outbox";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
 
 type NodeRow = {
@@ -318,6 +319,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
     sweep(state, now);
     await reconcilePublications(tx, row.id, state, now);
     await save(tx, row);
+    if (command.operation === "open") await enqueueManualBrowserSandboxStart(tx, row.id);
     await audit(tx, actor.id, `browser_node.${command.operation}`, row.id);
     return result;
   });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
+import { enqueueRun, type FleetState, initialState } from "../lib/browser-fleet/policy";
 import { authorizeManualSandboxStart } from "../lib/browser-fleet/sandbox-authorization";
 import { openBrowserSandboxKey } from "../lib/browser-fleet/sandbox-credentials";
 import {
@@ -9,11 +9,16 @@ import {
   recordedBrowserSandboxDispatch,
 } from "../lib/browser-fleet/sandbox-dispatch";
 import {
-  beginBrowserSandboxStart,
   bindBrowserSandboxGateway,
   settleBrowserSandboxOperation,
 } from "../lib/browser-fleet/sandbox-lifecycle";
 import { monitorBrowserSandboxSession } from "../lib/browser-fleet/sandbox-monitor";
+import {
+  claimBrowserSandboxDelivery,
+  deliverBrowserSandboxOutbox,
+  enqueueManualBrowserSandboxStart,
+  recordBrowserSandboxDelivery,
+} from "../lib/browser-fleet/sandbox-outbox";
 import type { BrowserSandboxProviderHandle } from "../lib/browser-fleet/sandbox-provider";
 import { digest } from "../lib/browser-fleet/security";
 import { listBrowserNodes, ownerBrowserCommand } from "../lib/browser-fleet/store";
@@ -120,8 +125,8 @@ async function testDispatchAuthorization(
   assert.ok(created.nodeId);
   const nodeId = created.nodeId;
   const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
-  const accountId = randomUUID(),
-    now = Date.now();
+  const accountId = randomUUID();
+  let now = Date.now();
   state.accounts.push({
     id: accountId,
     channelRef: "synthetic",
@@ -136,26 +141,53 @@ async function testDispatchAuthorization(
     nextPollAt: 0,
     lastCheckedAt: null,
   });
-  const run = enqueueRun(
-    state,
-    {
-      id: randomUUID(),
-      accountId,
-      kind: "interactive",
-      jobRef: null,
-      requestedBy: owner.id,
-      authSessionId: owner.sessionId,
-    },
-    now,
-  );
   const save = () =>
     database.execute(
       sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(state)}::jsonb WHERE id = ${nodeId}`,
     );
   await save();
-  const operation = await database.transaction((tx) => beginBrowserSandboxStart(tx, nodeId));
-  assert.ok(operation?.operation_id);
-  const operationId = operation.operation_id;
+  await assert.rejects(
+    database.transaction(async (tx) => {
+      const temporary = structuredClone(state);
+      enqueueRun(
+        temporary,
+        {
+          id: randomUUID(),
+          accountId,
+          kind: "interactive",
+          jobRef: null,
+          requestedBy: owner.id,
+          authSessionId: owner.sessionId,
+        },
+        Date.now(),
+      );
+      await tx.execute(
+        sql`UPDATE browser_fleet_node SET document=${JSON.stringify(temporary)}::jsonb WHERE id=${nodeId}`,
+      );
+      assert.ok(await enqueueManualBrowserSandboxStart(tx, nodeId));
+      throw new Error("synthetic transaction rollback");
+    }),
+    /synthetic transaction rollback/,
+  );
+  const rolledBack = await database.execute(sql`SELECT n.document, s.phase,
+    (SELECT count(*)::integer FROM browser_sandbox_outbox o WHERE o.node_id=n.id) AS pending
+    FROM browser_fleet_node n JOIN browser_sandbox s ON s.node_id=n.id WHERE n.id=${nodeId}`);
+  assert.equal(rolledBack.rows[0].phase, "stopped");
+  assert.equal(rolledBack.rows[0].pending, 0);
+  assert.deepEqual(rolledBack.rows[0].document, state);
+  const opened = await ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner);
+  assert.deepEqual(Object.keys(opened), ["runId"]);
+  const queued =
+    await database.execute(sql`SELECT n.document, s.operation_id FROM browser_fleet_node n
+    JOIN browser_sandbox s ON s.node_id=n.id WHERE n.id=${nodeId}`);
+  const savedState = queued.rows[0].document as FleetState;
+  state.runs = savedState.runs;
+  const run = state.runs.find((item) => item.id === opened.runId);
+  assert.ok(run);
+  now = Date.now();
+  const operationId = queued.rows[0].operation_id as string;
+  assert.ok(operationId);
+  await testOutboxDelivery(database, nodeId, operationId);
   const authorize = (id = operationId, time = now) =>
     database.transaction((tx) => authorizeManualSandboxStart(tx, nodeId, id, time));
   assert.ok(await authorize());
@@ -268,5 +300,57 @@ async function testDispatchAuthorization(
   assert.equal(await authorize(), null);
   console.log(
     "PASS: manual dispatch rechecks operation, current owner/session, queued demand, expiry, account version and revocation",
+  );
+}
+
+async function testOutboxDelivery(database: Database, nodeId: string, operationId: string) {
+  const entries =
+    await database.execute(sql`SELECT operation_id, node_id FROM browser_sandbox_outbox
+    WHERE node_id=${nodeId}`);
+  assert.deepEqual(entries.rows, [{ operation_id: operationId, node_id: nodeId }]);
+  const claims = await Promise.all(
+    Array.from({ length: 12 }, () => claimBrowserSandboxDelivery(database, nodeId)),
+  );
+  const winners = claims.filter((item) => item !== null);
+  assert.equal(winners.length, 1);
+  const first = winners[0];
+  assert.equal(first.operationId, operationId);
+  assert.equal(await claimBrowserSandboxDelivery(database, randomUUID()), null);
+  await database.execute(sql`UPDATE browser_sandbox_outbox SET claim_until=now()-interval '1 minute'
+    WHERE operation_id=${operationId}::uuid`);
+  const second = await claimBrowserSandboxDelivery(database, nodeId);
+  assert.ok(second);
+  assert.notEqual(second.claimId, first.claimId);
+  assert.equal(
+    await recordBrowserSandboxDelivery(database, operationId, first.claimId, "stale"),
+    false,
+  );
+  await database.execute(sql`UPDATE browser_sandbox_outbox SET claim_until=now()-interval '1 minute'
+    WHERE operation_id=${operationId}::uuid`);
+  let calls = 0;
+  assert.deepEqual(
+    await deliverBrowserSandboxOutbox(
+      database,
+      async (node, operation) => {
+        assert.equal(node, nodeId);
+        assert.equal(operation, operationId);
+        calls++;
+        throw new Error("lost workflow start response");
+      },
+      nodeId,
+    ),
+    { delivered: 0 },
+  );
+  assert.equal(calls, 1, "a lost response is not immediately retried");
+  assert.equal(await claimBrowserSandboxDelivery(database, nodeId), null);
+  await database.execute(sql`UPDATE browser_sandbox_outbox SET claim_until=now()-interval '1 minute'
+    WHERE operation_id=${operationId}::uuid`);
+  assert.deepEqual(
+    await deliverBrowserSandboxOutbox(database, async () => "synthetic-workflow", nodeId),
+    { delivered: 1 },
+  );
+  assert.equal(await claimBrowserSandboxDelivery(database, nodeId), null);
+  console.log(
+    "PASS: owner open atomically creates outbox; concurrent delivery, expired lease, stale receipt and lost response recovery",
   );
 }
