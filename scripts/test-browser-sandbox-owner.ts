@@ -5,7 +5,13 @@ import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
 import { authorizeManualSandboxStart } from "../lib/browser-fleet/sandbox-authorization";
 import { openBrowserSandboxKey } from "../lib/browser-fleet/sandbox-credentials";
 import { claimManualSandboxDispatch } from "../lib/browser-fleet/sandbox-dispatch";
-import { beginBrowserSandboxStart } from "../lib/browser-fleet/sandbox-lifecycle";
+import {
+  beginBrowserSandboxStart,
+  bindBrowserSandboxGateway,
+  settleBrowserSandboxOperation,
+} from "../lib/browser-fleet/sandbox-lifecycle";
+import { monitorBrowserSandboxSession } from "../lib/browser-fleet/sandbox-monitor";
+import type { BrowserSandboxProviderHandle } from "../lib/browser-fleet/sandbox-provider";
 import { digest } from "../lib/browser-fleet/security";
 import { listBrowserNodes, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import type { Database } from "../lib/db/client";
@@ -188,6 +194,50 @@ async function testDispatchAuthorization(
     await database.execute(sql`UPDATE "user" SET banned = false WHERE id = ${owner.id}`);
   }
   assert.ok(await authorize());
+  await database.transaction(async (tx) => {
+    assert.equal(
+      await bindBrowserSandboxGateway(
+        tx,
+        nodeId,
+        operationId,
+        "monitor-session",
+        "https://gateway.example.invalid",
+      ),
+      true,
+    );
+    assert.equal(
+      await settleBrowserSandboxOperation(tx, nodeId, operationId, {
+        status: "running",
+        sessionId: "monitor-session",
+      }),
+      true,
+    );
+  });
+  assert.equal(
+    await monitorBrowserSandboxSession(nodeId, "monitor-session", {
+      inspect: async () =>
+        ({
+          status: "stopped",
+          currentSession: () => ({ sessionId: "monitor-session", status: "stopped" }),
+        }) as unknown as BrowserSandboxProviderHandle,
+    }),
+    "stopped",
+  );
+  const retired =
+    await database.execute(sql`SELECT s.phase, s.session_id, n.gateway_origin, n.document
+    FROM browser_sandbox s JOIN browser_fleet_node n ON n.id = s.node_id WHERE n.id = ${nodeId}`);
+  assert.equal(retired.rows[0].phase, "stopped");
+  assert.equal(retired.rows[0].session_id, null);
+  assert.equal(retired.rows[0].gateway_origin, null);
+  assert.equal((retired.rows[0].document as typeof state).runs[0].status, "queued");
+  assert.equal(
+    await monitorBrowserSandboxSession(nodeId, "monitor-session", {
+      inspect: async () => {
+        throw new Error("must not query stale session");
+      },
+    }),
+    "superseded",
+  );
   await ownerBrowserCommand({ operation: "revoke", nodeId }, owner);
   assert.equal(await authorize(), null);
   console.log(
