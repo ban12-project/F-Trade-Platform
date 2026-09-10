@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 import { getDatabase } from "../db/client";
 import { authorizeManualSandboxStart } from "./sandbox-authorization";
-import { claimManualSandboxDispatch } from "./sandbox-dispatch";
+import { claimManualSandboxDispatch, recordedBrowserSandboxDispatch } from "./sandbox-dispatch";
 import { bindBrowserSandboxGateway, settleBrowserSandboxOperation } from "./sandbox-lifecycle";
 import { provisionBrowserSandbox } from "./sandbox-provider";
 import { startBrowserSandboxRuntime } from "./sandbox-runtime";
@@ -20,6 +20,8 @@ const configSchema = z
 type Config = z.infer<typeof configSchema>;
 
 const dependencies = {
+  recorded: (nodeId: string, operationId: string) =>
+    recordedBrowserSandboxDispatch(getDatabase(), nodeId, operationId),
   claim: (nodeId: string, operationId: string) =>
     getDatabase().transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId)),
   authorize: (nodeId: string, operationId: string) =>
@@ -51,9 +53,12 @@ export async function dispatchManualBrowserSandbox(
   config: Config,
   deps: BrowserSandboxControllerDependencies = dependencies,
 ) {
+  const recorded = await deps.recorded(nodeId, operationId);
+  if (recorded) return recorded;
   const settings = configSchema.parse(config);
   const claim = await deps.claim(nodeId, operationId);
-  if (!claim) return { status: "not-dispatched" as const };
+  if (!claim)
+    return (await deps.recorded(nodeId, operationId)) ?? { status: "not-dispatched" as const };
   let captured: Awaited<ReturnType<typeof provisionBrowserSandbox>> | undefined;
   try {
     // Claim and provider I/O are separate transactions: recheck after commit.

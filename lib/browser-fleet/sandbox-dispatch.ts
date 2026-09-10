@@ -1,8 +1,24 @@
 import "server-only";
 
 import { sql } from "drizzle-orm";
-import type { DatabaseTransaction } from "../db/client";
+import type { DatabaseExecutor, DatabaseTransaction } from "../db/client";
 import { authorizeManualSandboxStart } from "./sandbox-authorization";
+
+/** Replay only a successfully recorded session for this exact dispatched
+ * operation. This read does not authorize new compute or release credentials.
+ * Even revoked owners need the existing monitor to finish stopping the VM.
+ */
+export async function recordedBrowserSandboxDispatch(
+  db: DatabaseExecutor,
+  nodeId: string,
+  operationId: string,
+) {
+  const rows = await db.execute(sql`SELECT session_id FROM browser_sandbox
+    WHERE node_id = ${nodeId} AND dispatch_operation_id = ${operationId}::uuid
+    AND phase IN ('running', 'stopping') AND session_id IS NOT NULL`);
+  const row = rows.rows[0] as { session_id: string } | undefined;
+  return row ? { status: "running" as const, sessionId: row.session_id } : null;
+}
 
 /** Claim BEFORE provider I/O, commit, then invoke the provider once. If the
  * process dies anywhere after commit, recovery inspects the named instance;

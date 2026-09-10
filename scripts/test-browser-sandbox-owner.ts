@@ -4,7 +4,10 @@ import { sql } from "drizzle-orm";
 import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
 import { authorizeManualSandboxStart } from "../lib/browser-fleet/sandbox-authorization";
 import { openBrowserSandboxKey } from "../lib/browser-fleet/sandbox-credentials";
-import { claimManualSandboxDispatch } from "../lib/browser-fleet/sandbox-dispatch";
+import {
+  claimManualSandboxDispatch,
+  recordedBrowserSandboxDispatch,
+} from "../lib/browser-fleet/sandbox-dispatch";
 import {
   beginBrowserSandboxStart,
   bindBrowserSandboxGateway,
@@ -213,6 +216,11 @@ async function testDispatchAuthorization(
       true,
     );
   });
+  assert.deepEqual(await recordedBrowserSandboxDispatch(database, nodeId, operationId), {
+    status: "running",
+    sessionId: "monitor-session",
+  });
+  assert.equal(await recordedBrowserSandboxDispatch(database, nodeId, randomUUID()), null);
   let inspections = 0,
     revocations = 0;
   await database.execute(sql`UPDATE "user" SET banned = true WHERE id = ${owner.id}`);
@@ -244,6 +252,7 @@ async function testDispatchAuthorization(
     await database.execute(sql`SELECT s.phase, s.session_id, n.gateway_origin, n.document
     FROM browser_sandbox s JOIN browser_fleet_node n ON n.id = s.node_id WHERE n.id = ${nodeId}`);
   assert.equal(retired.rows[0].phase, "stopped");
+  assert.equal(await recordedBrowserSandboxDispatch(database, nodeId, operationId), null);
   assert.equal(retired.rows[0].session_id, null);
   assert.equal(retired.rows[0].gateway_origin, null);
   assert.equal((retired.rows[0].document as typeof state).runs[0].status, "queued");

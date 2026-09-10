@@ -28,6 +28,9 @@ function fixture(
     },
   };
   const deps = {
+    async recorded() {
+      return null;
+    },
     async claim() {
       calls.push("claim");
       return fail === "claim" ? null : { mode: "create", nodeId, operationId };
@@ -115,5 +118,15 @@ test("invalid deployment config fails before taking a dispatch claim", async () 
   await assert.rejects(
     dispatchManualBrowserSandbox(nodeId, operationId, { ...config, agentImage: "latest" }, f.deps),
   );
+  assert.deepEqual(f.calls, []);
+});
+
+test("lost step receipt resumes monitoring recorded session without provisioning or keys", async () => {
+  const f = fixture();
+  f.deps.recorded = async () => ({ status: "running", sessionId: "recorded-session" });
+  assert.deepEqual(await dispatchManualBrowserSandbox(nodeId, operationId, config, f.deps), {
+    status: "running",
+    sessionId: "recorded-session",
+  });
   assert.deepEqual(f.calls, []);
 });
