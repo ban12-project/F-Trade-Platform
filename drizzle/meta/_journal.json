@@ -239,6 +239,13 @@
       "when": 1788840000003,
       "tag": "0033_browser_publication_receipt",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1789020000000,
+      "tag": "0034_browser_sandbox",
+      "breakpoints": true
     }
   ]
 }

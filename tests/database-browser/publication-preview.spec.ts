@@ -100,7 +100,8 @@ test("stale displayed preview cannot create a publication; refreshed preview con
     },
   ]);
   await page.goto(`/workspace/${projectId}?panel=publication`);
-  await expect(page.getByText("SYNTHETIC preview one", { exact: true })).toBeVisible();
+  const confirmation = page.locator("#publication-confirmation");
+  await expect(confirmation.getByText("SYNTHETIC preview one", { exact: true })).toBeVisible();
   await page.getByLabel("逐帖人工确认凭据").fill("evidence-synthetic-preview");
   await db
     .update(schema.aggregateRecord)
@@ -120,7 +121,7 @@ test("stale displayed preview cannot create a publication; refreshed preview con
       .where(eq(schema.socialPublication.contentRef, contentRef)),
   ).toHaveLength(0);
   await page.reload();
-  await expect(page.getByText("SYNTHETIC preview two", { exact: true })).toBeVisible();
+  await expect(confirmation.getByText("SYNTHETIC preview two", { exact: true })).toBeVisible();
   await page.getByLabel("逐帖人工确认凭据").fill("evidence-synthetic-preview-current");
   await page.getByRole("button", { name: "确认并提交此条发布", exact: true }).click();
   await expect

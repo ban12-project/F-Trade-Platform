@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { claimRun, enqueueRun, initialState } from "../lib/browser-fleet/policy";
+import { testBrowserSandboxLifecycle } from "./test-browser-sandbox-postgres";
 
 async function main() {
   const connectionString = process.env.BROWSER_FLEET_TEST_DATABASE_URL;
@@ -127,6 +128,7 @@ async function main() {
       ]),
       (error: unknown) => (error as { code?: string }).code === "23514",
     );
+    await testBrowserSandboxLifecycle(pool);
     console.log(
       "PASS: custom migration, 12 simultaneous claims / 2 slots, unique account binding, document version constraint",
     );
