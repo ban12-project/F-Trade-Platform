@@ -49,13 +49,15 @@ import {
   resolvePublicationMedia,
   schedulePublications,
 } from "./publication";
+import { sealBrowserSandboxKey } from "./sandbox-credentials";
+import { registerBrowserSandbox } from "./sandbox-lifecycle";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
 
 type NodeRow = {
   id: string;
   owner_id: string;
   name: string;
-  gateway_origin: string;
+  gateway_origin: string | null;
   key_hash: string;
   status: string;
   document: FleetState;
@@ -173,18 +175,40 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
   return getDatabase().transaction(async (tx) => {
     if (!(await validSession(tx, actor.id, actor.sessionId, Date.now())))
       throw new Error("owner_session_expired");
-    if (command.operation === "create") {
+    if (command.operation === "create" || command.operation === "create-sandbox") {
+      const managed = command.operation === "create-sandbox";
+      if (managed && process.env.BROWSER_SANDBOX_ENABLED !== "1")
+        throw new Error("sandbox_deployment_not_enabled");
+      // Serialize this owner's node quota across concurrent creation requests.
+      await tx.execute(sql`SELECT id FROM "user" WHERE id = ${actor.id} FOR UPDATE`);
       const count = await tx.execute(
         sql`SELECT id FROM browser_fleet_node WHERE owner_id = ${actor.id}`,
       );
       if (count.rows.length >= 50) throw new Error("node_limit");
       const id = randomUUID();
       const accessKey = createAccessKey(id);
-      const { name, gatewayOrigin, ...limits } = command.value;
+      const { name } = command.value;
+      const gatewayOrigin =
+        command.operation === "create" ? secureOrigin(command.value.gatewayOrigin) : null;
+      const limits =
+        command.operation === "create"
+          ? {
+              maxBrowsers: command.value.maxBrowsers,
+              memoryBudgetMb: command.value.memoryBudgetMb,
+              browserMemoryMb: command.value.browserMemoryMb,
+            }
+          : { maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 };
       await tx.execute(sql`INSERT INTO browser_fleet_node (id, owner_id, name, gateway_origin, key_hash, document)
-        VALUES (${id}, ${actor.id}, ${name}, ${secureOrigin(gatewayOrigin)}, ${digest(accessKey)}, ${JSON.stringify(initialState(limits))}::jsonb)`);
+        VALUES (${id}, ${actor.id}, ${name}, ${gatewayOrigin}, ${digest(accessKey)}, ${JSON.stringify(initialState(limits))}::jsonb)`);
+      if (managed) {
+        await registerBrowserSandbox(tx, id);
+        const ciphertext = sealBrowserSandboxKey(id, accessKey, configuredFacebookKeyring());
+        await tx.execute(
+          sql`UPDATE browser_sandbox SET access_key_ciphertext = ${ciphertext} WHERE node_id = ${id}`,
+        );
+      }
       await audit(tx, actor.id, "browser_node.created", id);
-      return { nodeId: id, accessKey };
+      return managed ? { nodeId: id } : { nodeId: id, accessKey };
     }
     const nodeId = command.operation === "grant" ? command.value.nodeId : command.nodeId;
     const row = await lockNode(tx, nodeId);
@@ -202,7 +226,18 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       for (const run of state.runs)
         if (isLive(run) || run.status === "queued") requestStop(state, run);
       row.status = command.operation === "revoke" ? "revoked" : "active";
-      if (command.operation === "rotate") result = { accessKey: key };
+      const managed = await tx.execute(
+        sql`SELECT node_id FROM browser_sandbox WHERE node_id = ${row.id}`,
+      );
+      if (managed.rows.length) {
+        const ciphertext =
+          command.operation === "rotate"
+            ? sealBrowserSandboxKey(row.id, key, configuredFacebookKeyring())
+            : null;
+        await tx.execute(
+          sql`UPDATE browser_sandbox SET access_key_ciphertext = ${ciphertext}, updated_at = now() WHERE node_id = ${row.id}`,
+        );
+      } else if (command.operation === "rotate") result = { accessKey: key };
     } else if (command.operation === "grant") {
       if (row.status !== "active") throw new Error("node_revoked");
       await grant(tx, row, command, actor.id, now);
@@ -263,6 +298,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       } else {
         if (
           row.status !== "active" ||
+          !row.gateway_origin ||
           run.kind !== "interactive" ||
           run.status !== "running" ||
           run.stopRequested ||
@@ -381,6 +417,7 @@ export async function handleBrowserNodeRequest(
     bindInstallation(state, request.installationId);
     let result: Record<string, unknown>;
     if (request.operation === "sync") {
+      if (!row.gateway_origin) throw new Error("sandbox_gateway_not_ready");
       result = { nodeId, gatewayOrigin: row.gateway_origin, ...publicState(state) };
     } else if (request.operation === "recover") {
       // The agent calls this only after inspecting and stopping all containers

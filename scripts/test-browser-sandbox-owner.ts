@@ -1,0 +1,96 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { sql } from "drizzle-orm";
+import { openBrowserSandboxKey } from "../lib/browser-fleet/sandbox-credentials";
+import { digest } from "../lib/browser-fleet/security";
+import { listBrowserNodes, ownerBrowserCommand } from "../lib/browser-fleet/store";
+import type { Database } from "../lib/db/client";
+import {
+  configuredFacebookKeyring,
+  decryptFacebookCredential,
+} from "../lib/social/facebook-vault-crypto";
+
+export async function testBrowserSandboxOwner(
+  database: Database,
+  owner: { id: string; sessionId: string },
+) {
+  const previous = process.env.BROWSER_SANDBOX_ENABLED;
+  const command = { operation: "create-sandbox", value: { name: "SYNTHETIC on-demand" } };
+  try {
+    delete process.env.BROWSER_SANDBOX_ENABLED;
+    await assert.rejects(ownerBrowserCommand(command, owner), /not_enabled/);
+    process.env.BROWSER_SANDBOX_ENABLED = "1";
+    await assert.rejects(
+      ownerBrowserCommand(command, { ...owner, sessionId: randomUUID() }),
+      /session_expired/,
+    );
+    await assert.rejects(
+      ownerBrowserCommand(
+        { ...command, value: { ...command.value, gatewayOrigin: "https://example.invalid" } },
+        owner,
+      ),
+    );
+    const result = await ownerBrowserCommand(command, owner);
+    assert.ok(result.nodeId);
+    assert.deepEqual(Object.keys(result), ["nodeId"], "managed keys never go to the page");
+    const nodeId = result.nodeId;
+    const read = async () => {
+      const rows = await database.execute(sql`SELECT n.key_hash, n.gateway_origin, n.status,
+        s.access_key_ciphertext, s.phase, s.operation_id FROM browser_fleet_node n
+        JOIN browser_sandbox s ON s.node_id = n.id WHERE n.id = ${nodeId}`);
+      return rows.rows[0] as {
+        key_hash: string;
+        gateway_origin: string | null;
+        status: string;
+        access_key_ciphertext: string | null;
+        phase: string;
+        operation_id: string | null;
+      };
+    };
+    const first = await read();
+    assert.ok(first.access_key_ciphertext);
+    const ciphertext = first.access_key_ciphertext;
+    const ring = configuredFacebookKeyring();
+    const key = openBrowserSandboxKey(nodeId, first.access_key_ciphertext, ring);
+    assert.equal(digest(key), first.key_hash);
+    assert.ok(!first.access_key_ciphertext.includes(key));
+    assert.equal(first.gateway_origin, null);
+    assert.equal(first.phase, "stopped");
+    assert.equal(first.operation_id, null);
+    assert.throws(() => openBrowserSandboxKey(randomUUID(), ciphertext, ring));
+    assert.throws(() =>
+      decryptFacebookCredential(
+        ciphertext,
+        { channelRef: "browser-sandbox", accountRef: nodeId },
+        "login",
+        ring,
+      ),
+    );
+    const publicNodes = await listBrowserNodes(owner.id);
+    assert.ok(publicNodes.some((node) => node.id === nodeId));
+    assert.ok(!JSON.stringify(publicNodes).includes(first.access_key_ciphertext));
+    assert.ok(!JSON.stringify(publicNodes).includes(key));
+    assert.deepEqual(await read(), first, "listing does not mutate or wake a node");
+    const rotated = await ownerBrowserCommand({ operation: "rotate", nodeId }, owner);
+    assert.equal(rotated.accessKey, undefined);
+    const second = await read();
+    assert.ok(second.access_key_ciphertext);
+    assert.notEqual(second.key_hash, first.key_hash);
+    assert.equal(
+      digest(openBrowserSandboxKey(nodeId, second.access_key_ciphertext, ring)),
+      second.key_hash,
+    );
+    assert.equal(second.phase, "stopped");
+    await ownerBrowserCommand({ operation: "revoke", nodeId }, owner);
+    const revoked = await read();
+    assert.equal(revoked.status, "revoked");
+    assert.equal(revoked.access_key_ciphertext, null);
+    assert.equal(revoked.phase, "stopped");
+    console.log(
+      "PASS: managed node authorization, encrypted key isolation, metadata-only create/list/rotate/revoke",
+    );
+  } finally {
+    if (previous === undefined) delete process.env.BROWSER_SANDBOX_ENABLED;
+    else process.env.BROWSER_SANDBOX_ENABLED = previous;
+  }
+}

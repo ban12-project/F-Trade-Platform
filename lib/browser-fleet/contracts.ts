@@ -47,6 +47,12 @@ export const accountFormSchema = z
   })
   .strict();
 export const ownerCommandSchema = z.discriminatedUnion("operation", [
+  z
+    .object({
+      operation: z.literal("create-sandbox"),
+      value: z.object({ name: nodeFormSchema.shape.name }).strict(),
+    })
+    .strict(),
   z.object({ operation: z.literal("create"), value: nodeFormSchema }).strict(),
   z.object({ operation: z.literal("grant"), value: accountFormSchema }).strict(),
   z.object({ operation: z.literal("rotate"), nodeId: id }).strict(),
