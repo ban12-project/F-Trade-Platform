@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
+import { recordedBrowserSandboxDispatch } from "../lib/browser-fleet/sandbox-dispatch";
 import {
   beginBrowserSandboxStart,
   beginBrowserSandboxStop,
@@ -11,12 +12,20 @@ import {
   registerBrowserSandbox,
   settleBrowserSandboxOperation,
 } from "../lib/browser-fleet/sandbox-lifecycle";
+import {
+  claimBrowserSandboxRecovery,
+  recordRecoveredBrowserSandboxStop,
+} from "../lib/browser-fleet/sandbox-recovery";
 import type { Database } from "../lib/db/client";
 
 export async function testBrowserSandboxLifecycle(pool: Pool) {
   await pool.query(
     await readFile(new URL("../drizzle/0034_browser_sandbox.sql", import.meta.url), "utf8"),
   );
+  for (const migration of ["0035_browser_sandbox_credentials", "0036_browser_sandbox_dispatch"])
+    await pool.query(
+      await readFile(new URL(`../drizzle/${migration}.sql`, import.meta.url), "utf8"),
+    );
   const database = drizzle(pool) as unknown as Database;
   const nodeId = randomUUID();
   const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
@@ -156,6 +165,62 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
   const finalStop = await stop("session-two");
   assert.ok(finalStop?.operation_id);
   await settle(finalStop.operation_id, { status: "stopped" });
+  const failedStart = await start();
+  assert.ok(failedStart?.operation_id);
+  const failedId = failedStart.operation_id;
+  await pool.query("UPDATE browser_sandbox SET dispatch_operation_id=$2 WHERE node_id=$1", [
+    nodeId,
+    failedId,
+  ]);
+  const recover = (id = failedId) =>
+    database.transaction((tx) => claimBrowserSandboxRecovery(tx, nodeId, id));
+  assert.deepEqual(await recover(randomUUID()), { status: "superseded" });
+  assert.deepEqual(await recover(), { status: "pending" }, "an unbound session cannot be guessed");
+  await bind(failedId, "failed-session");
+  assert.deepEqual(await recover(), { status: "pending" }, "fresh startup gets time to finish");
+  await pool.query(
+    "UPDATE browser_sandbox SET updated_at=now()-interval '6 minutes' WHERE node_id=$1",
+    [nodeId],
+  );
+  assert.deepEqual(await recover(), { status: "captured", sessionId: "failed-session" });
+  assert.equal(await bind(failedId, "failed-session"), false, "recovery fences late gateway bind");
+  await assert.rejects(
+    settle(failedId, { status: "running", sessionId: "failed-session" }),
+    /result_mismatch/,
+  );
+  assert.equal(await recordedBrowserSandboxDispatch(database, nodeId, failedId), null);
+  await settle(failedId, { status: "unknown" });
+  assert.deepEqual(await recover(), { status: "captured", sessionId: "failed-session" });
+  assert.equal(await start(), null, "a recovery claim alone does not permit new compute");
+  const record = (id: string, session: string) =>
+    database.transaction((tx) => recordRecoveredBrowserSandboxStop(tx, nodeId, id, session));
+  assert.equal(await record(randomUUID(), "failed-session"), false);
+  assert.equal(await record(failedId, "other-session"), false);
+  assert.equal(await record(failedId, "failed-session"), true);
+  assert.deepEqual(await recover(), { status: "superseded" });
+  const recovered = await pool.query(
+    "SELECT gateway_origin, document FROM browser_fleet_node WHERE id=$1",
+    [nodeId],
+  );
+  assert.equal(recovered.rows[0].gateway_origin, null);
+  assert.deepEqual(
+    recovered.rows[0].document,
+    saved.rows[0].document,
+    "recovery preserves leases and queue",
+  );
+  const unknownStart = await start();
+  assert.ok(unknownStart?.operation_id);
+  await pool.query("UPDATE browser_sandbox SET dispatch_operation_id=$2 WHERE node_id=$1", [
+    nodeId,
+    unknownStart.operation_id,
+  ]);
+  await bind(unknownStart.operation_id, "unknown-session");
+  await settle(unknownStart.operation_id, { status: "unknown" });
+  assert.deepEqual(await recover(unknownStart.operation_id), {
+    status: "captured",
+    sessionId: "unknown-session",
+  });
+  await record(unknownStart.operation_id, "unknown-session");
   await pool.query("UPDATE browser_fleet_node SET status='revoked' WHERE id=$1", [nodeId]);
   assert.equal(await start(), null);
   console.log(

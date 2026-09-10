@@ -15,7 +15,8 @@ export async function recordedBrowserSandboxDispatch(
 ) {
   const rows = await db.execute(sql`SELECT session_id FROM browser_sandbox
     WHERE node_id = ${nodeId} AND dispatch_operation_id = ${operationId}::uuid
-    AND phase IN ('running', 'stopping') AND session_id IS NOT NULL`);
+    AND (phase = 'running' OR (phase = 'stopping' AND operation_id IS DISTINCT FROM dispatch_operation_id))
+    AND session_id IS NOT NULL`);
   const row = rows.rows[0] as { session_id: string } | undefined;
   return row ? { status: "running" as const, sessionId: row.session_id } : null;
 }
