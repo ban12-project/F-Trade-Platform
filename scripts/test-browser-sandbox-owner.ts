@@ -105,6 +105,7 @@ export async function testBrowserSandboxOwner(
     assert.equal(revoked.access_key_ciphertext, null);
     assert.equal(revoked.phase, "stopped");
     await testDispatchAuthorization(database, owner);
+    await testCancelledStarts(database, owner);
     console.log(
       "PASS: managed node authorization, encrypted key isolation, metadata-only create/list/rotate/revoke",
     );
@@ -112,6 +113,115 @@ export async function testBrowserSandboxOwner(
     if (previous === undefined) delete process.env.BROWSER_SANDBOX_ENABLED;
     else process.env.BROWSER_SANDBOX_ENABLED = previous;
   }
+}
+
+async function testCancelledStarts(database: Database, owner: { id: string; sessionId: string }) {
+  for (const scenario of [
+    "stop",
+    "account",
+    "revoke",
+    "expired-session",
+    "claimed",
+    "remaining-demand",
+  ] as const) {
+    const created = await ownerBrowserCommand(
+      { operation: "create-sandbox", value: { name: `SYNTHETIC cancellation ${scenario}` } },
+      owner,
+    );
+    assert.ok(created.nodeId);
+    const nodeId = created.nodeId;
+    const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
+    const accountId = randomUUID();
+    state.accounts.push({
+      id: accountId,
+      channelRef: "synthetic",
+      accountRef: randomUUID(),
+      enabled: true,
+      authState: "needs_login",
+      credentialVersion: 1,
+      loginCiphertext: null,
+      proxyCiphertext: "synthetic-encrypted-proxy",
+      expectedEgressIp: "203.0.113.1",
+      pollSeconds: 0,
+      nextPollAt: 0,
+      lastCheckedAt: null,
+    });
+    const secondAccountId = randomUUID();
+    if (scenario === "remaining-demand")
+      state.accounts.push({ ...state.accounts[0], id: secondAccountId, accountRef: randomUUID() });
+    await database.execute(
+      sql`UPDATE browser_fleet_node SET document=${JSON.stringify(state)}::jsonb WHERE id=${nodeId}`,
+    );
+    const opened = await ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner);
+    const second =
+      scenario === "remaining-demand"
+        ? await ownerBrowserCommand(
+            { operation: "open", nodeId, accountId: secondAccountId },
+            owner,
+          )
+        : null;
+    const read = async () =>
+      (
+        await database.execute(sql`SELECT phase, operation_id, dispatch_operation_id,
+      provider_initialized FROM browser_sandbox WHERE node_id=${nodeId}`)
+      ).rows[0];
+    const initial = await read();
+    const operationId = initial.operation_id as string;
+    assert.ok(operationId);
+    const claim = () =>
+      database.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId));
+    if (scenario === "claimed") assert.ok(await claim());
+    if (scenario === "stop" || scenario === "claimed" || scenario === "remaining-demand")
+      await ownerBrowserCommand({ operation: "stop", nodeId, runId: opened.runId }, owner);
+    else if (scenario === "account")
+      await ownerBrowserCommand({ operation: "account", nodeId, accountId, enabled: false }, owner);
+    else if (scenario === "revoke")
+      await ownerBrowserCommand({ operation: "revoke", nodeId }, owner);
+    else {
+      const row = (
+        await database.execute(sql`SELECT document FROM browser_fleet_node WHERE id=${nodeId}`)
+      ).rows[0];
+      const document = row.document as FleetState;
+      document.runs[0].authSessionId = randomUUID();
+      await database.execute(
+        sql`UPDATE browser_fleet_node SET document=${JSON.stringify(document)}::jsonb WHERE id=${nodeId}`,
+      );
+    }
+    if (second) {
+      assert.equal(
+        (await read()).operation_id,
+        operationId,
+        "other valid queued demand retains the start",
+      );
+      assert.equal((await read()).phase, "starting");
+      await ownerBrowserCommand({ operation: "stop", nodeId, runId: second.runId }, owner);
+    }
+    assert.equal(await claim(), null);
+    const after = await read();
+    if (scenario === "claimed") {
+      assert.equal(after.phase, "starting", "a provider claim cannot be undone by cancellation");
+      assert.equal(after.operation_id, operationId);
+      assert.equal(after.dispatch_operation_id, operationId);
+      assert.equal(after.provider_initialized, true);
+    } else {
+      assert.equal(after.phase, "stopped");
+      assert.equal(after.operation_id, null);
+      assert.equal(after.dispatch_operation_id, null);
+      assert.equal(after.provider_initialized, false);
+      assert.equal(await claim(), null, "late delivery cannot revive a cancelled intent");
+      if (scenario === "stop") {
+        await ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner);
+        const restarted = await read();
+        assert.equal(restarted.phase, "starting");
+        assert.notEqual(restarted.operation_id, operationId);
+        assert.equal(await claim(), null, "old delivery cannot cancel a later authorized start");
+        assert.deepEqual(await read(), restarted);
+      }
+    }
+  }
+  console.log(
+    "PASS: unclaimed cancelled/disabled/revoked/expired demand releases start intent; claimed provider operations stay fenced",
+  );
 }
 
 async function testDispatchAuthorization(

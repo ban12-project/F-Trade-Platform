@@ -31,7 +31,10 @@ export async function claimManualSandboxDispatch(
   nodeId: string,
   operationId: string,
 ) {
-  if (!(await authorizeManualSandboxStart(tx, nodeId, operationId))) return null;
+  if (!(await authorizeManualSandboxStart(tx, nodeId, operationId))) {
+    await cancelUnclaimedBrowserSandboxStart(tx, nodeId, operationId);
+    return null;
+  }
   // authorizeManualSandboxStart holds node then Sandbox row locks.
   const rows = await tx.execute(sql`SELECT phase, provider_initialized, dispatch_operation_id
     FROM browser_sandbox WHERE node_id = ${nodeId}`);
@@ -48,4 +51,35 @@ export async function claimManualSandboxDispatch(
     operationId,
     mode: row.provider_initialized ? ("resume" as const) : ("create" as const),
   };
+}
+
+/** Caller has established that manual demand is no longer authorized. Only an
+ * intent with no provider dispatch claim or bound session may be cancelled.
+ * A timeout after dispatch is not evidence that compute never started.
+ */
+async function cancelUnclaimedBrowserSandboxStart(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  operationId: string,
+) {
+  await tx.execute(sql`SELECT id FROM browser_fleet_node WHERE id = ${nodeId} FOR UPDATE`);
+  const rows = await tx.execute(sql`UPDATE browser_sandbox SET phase = 'stopped',
+    operation_id = NULL, operation_kind = NULL, updated_at = now()
+    WHERE node_id = ${nodeId} AND operation_id = ${operationId}::uuid
+    AND operation_kind = 'start' AND phase = 'starting' AND session_id IS NULL
+    AND dispatch_operation_id IS DISTINCT FROM ${operationId}::uuid RETURNING node_id`);
+  return rows.rows.length === 1;
+}
+
+/** After an owner mutation, release only an unclaimed start whose remaining
+ * queue no longer carries valid manual demand. No provider or Workflow I/O.
+ */
+export async function cancelInvalidManualSandboxStart(tx: DatabaseTransaction, nodeId: string) {
+  await tx.execute(sql`SELECT id FROM browser_fleet_node WHERE id = ${nodeId} FOR UPDATE`);
+  const rows = await tx.execute(sql`SELECT operation_id FROM browser_sandbox
+    WHERE node_id = ${nodeId} AND phase = 'starting' AND operation_kind = 'start'
+    AND session_id IS NULL AND dispatch_operation_id IS DISTINCT FROM operation_id FOR UPDATE`);
+  const operationId = rows.rows[0]?.operation_id as string | undefined;
+  if (!operationId || (await authorizeManualSandboxStart(tx, nodeId, operationId))) return false;
+  return cancelUnclaimedBrowserSandboxStart(tx, nodeId, operationId);
 }

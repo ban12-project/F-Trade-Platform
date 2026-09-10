@@ -50,6 +50,7 @@ import {
   schedulePublications,
 } from "./publication";
 import { sealBrowserSandboxKey } from "./sandbox-credentials";
+import { cancelInvalidManualSandboxStart } from "./sandbox-dispatch";
 import { registerBrowserSandbox } from "./sandbox-lifecycle";
 import { enqueueManualBrowserSandboxStart } from "./sandbox-outbox";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
@@ -320,6 +321,8 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
     await reconcilePublications(tx, row.id, state, now);
     await save(tx, row);
     if (command.operation === "open") await enqueueManualBrowserSandboxStart(tx, row.id);
+    if (["stop", "account", "rotate", "revoke"].includes(command.operation))
+      await cancelInvalidManualSandboxStart(tx, row.id);
     await audit(tx, actor.id, `browser_node.${command.operation}`, row.id);
     return result;
   });
