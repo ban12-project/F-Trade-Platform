@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
+import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
+import { authorizeManualSandboxStart } from "../lib/browser-fleet/sandbox-authorization";
 import { openBrowserSandboxKey } from "../lib/browser-fleet/sandbox-credentials";
+import { beginBrowserSandboxStart } from "../lib/browser-fleet/sandbox-lifecycle";
 import { digest } from "../lib/browser-fleet/security";
 import { listBrowserNodes, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import type { Database } from "../lib/db/client";
@@ -86,6 +89,7 @@ export async function testBrowserSandboxOwner(
     assert.equal(revoked.status, "revoked");
     assert.equal(revoked.access_key_ciphertext, null);
     assert.equal(revoked.phase, "stopped");
+    await testDispatchAuthorization(database, owner);
     console.log(
       "PASS: managed node authorization, encrypted key isolation, metadata-only create/list/rotate/revoke",
     );
@@ -93,4 +97,87 @@ export async function testBrowserSandboxOwner(
     if (previous === undefined) delete process.env.BROWSER_SANDBOX_ENABLED;
     else process.env.BROWSER_SANDBOX_ENABLED = previous;
   }
+}
+
+async function testDispatchAuthorization(
+  database: Database,
+  owner: { id: string; sessionId: string },
+) {
+  const created = await ownerBrowserCommand(
+    { operation: "create-sandbox", value: { name: "SYNTHETIC dispatch" } },
+    owner,
+  );
+  assert.ok(created.nodeId);
+  const nodeId = created.nodeId;
+  const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
+  const accountId = randomUUID(),
+    now = Date.now();
+  state.accounts.push({
+    id: accountId,
+    channelRef: "synthetic",
+    accountRef: randomUUID(),
+    enabled: true,
+    authState: "needs_login",
+    credentialVersion: 1,
+    loginCiphertext: null,
+    proxyCiphertext: "synthetic-encrypted-proxy",
+    expectedEgressIp: "203.0.113.1",
+    pollSeconds: 0,
+    nextPollAt: 0,
+    lastCheckedAt: null,
+  });
+  const run = enqueueRun(
+    state,
+    {
+      id: randomUUID(),
+      accountId,
+      kind: "interactive",
+      jobRef: null,
+      requestedBy: owner.id,
+      authSessionId: owner.sessionId,
+    },
+    now,
+  );
+  const save = () =>
+    database.execute(
+      sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(state)}::jsonb WHERE id = ${nodeId}`,
+    );
+  await save();
+  const operation = await database.transaction((tx) => beginBrowserSandboxStart(tx, nodeId));
+  assert.ok(operation?.operation_id);
+  const operationId = operation.operation_id;
+  const authorize = (id = operationId, time = now) =>
+    database.transaction((tx) => authorizeManualSandboxStart(tx, nodeId, id, time));
+  assert.ok(await authorize());
+  assert.equal(await authorize(randomUUID()), null);
+  assert.equal(await authorize(operationId, now + 900000), null);
+  run.authSessionId = randomUUID();
+  await save();
+  assert.equal(await authorize(), null);
+  run.authSessionId = owner.sessionId;
+  state.accounts[0].enabled = false;
+  await save();
+  assert.equal(await authorize(), null);
+  state.accounts[0].enabled = true;
+  state.accounts[0].credentialVersion++;
+  await save();
+  assert.equal(await authorize(), null);
+  state.accounts[0].credentialVersion--;
+  run.stopRequested = true;
+  await save();
+  assert.equal(await authorize(), null);
+  run.stopRequested = false;
+  await save();
+  await database.execute(sql`UPDATE "user" SET banned = true WHERE id = ${owner.id}`);
+  try {
+    assert.equal(await authorize(), null);
+  } finally {
+    await database.execute(sql`UPDATE "user" SET banned = false WHERE id = ${owner.id}`);
+  }
+  assert.ok(await authorize());
+  await ownerBrowserCommand({ operation: "revoke", nodeId }, owner);
+  assert.equal(await authorize(), null);
+  console.log(
+    "PASS: manual dispatch rechecks operation, current owner/session, queued demand, expiry, account version and revocation",
+  );
 }
