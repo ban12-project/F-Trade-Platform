@@ -130,3 +130,22 @@ test("lost step receipt resumes monitoring recorded session without provisioning
   });
   assert.deepEqual(f.calls, []);
 });
+
+test("recorded session recovery survives unavailable deployment configuration", async () => {
+  const f = fixture();
+  f.deps.recorded = async () => ({ status: "running", sessionId: "recorded-session" });
+  const unavailable = () => {
+    throw new Error("deployment configuration unavailable");
+  };
+  assert.deepEqual(await dispatchManualBrowserSandbox(nodeId, operationId, unavailable, f.deps), {
+    status: "running",
+    sessionId: "recorded-session",
+  });
+  assert.deepEqual(f.calls, []);
+  const fresh = fixture();
+  await assert.rejects(
+    dispatchManualBrowserSandbox(nodeId, operationId, unavailable, fresh.deps),
+    /deployment configuration unavailable/,
+  );
+  assert.deepEqual(fresh.calls, []);
+});

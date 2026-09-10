@@ -50,12 +50,13 @@ export type BrowserSandboxControllerDependencies = typeof dependencies;
 export async function dispatchManualBrowserSandbox(
   nodeId: string,
   operationId: string,
-  config: Config,
+  config: Config | (() => Config) = configuredBrowserSandboxRuntime,
   deps: BrowserSandboxControllerDependencies = dependencies,
 ) {
   const recorded = await deps.recorded(nodeId, operationId);
   if (recorded) return recorded;
-  const settings = configSchema.parse(config);
+  // Retiring existing compute must not depend on configuration for new starts.
+  const settings = configSchema.parse(typeof config === "function" ? config() : config);
   const claim = await deps.claim(nodeId, operationId);
   if (!claim)
     return (await deps.recorded(nodeId, operationId)) ?? { status: "not-dispatched" as const };

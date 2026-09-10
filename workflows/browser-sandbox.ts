@@ -1,13 +1,10 @@
 import { sleep } from "workflow";
-import {
-  configuredBrowserSandboxRuntime,
-  dispatchManualBrowserSandbox,
-} from "@/lib/browser-fleet/sandbox-controller";
+import { dispatchManualBrowserSandbox } from "@/lib/browser-fleet/sandbox-controller";
 import { monitorBrowserSandboxSession } from "@/lib/browser-fleet/sandbox-monitor";
 
 async function dispatch(nodeId: string, operationId: string) {
   "use step";
-  return dispatchManualBrowserSandbox(nodeId, operationId, configuredBrowserSandboxRuntime());
+  return dispatchManualBrowserSandbox(nodeId, operationId);
 }
 async function observe(nodeId: string, sessionId: string) {
   "use step";
