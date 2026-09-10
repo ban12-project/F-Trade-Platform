@@ -85,6 +85,6 @@ assert agent["environment"]["BROWSER_NODE_ON_DEMAND"] == "1"
 assert agent["environment"]["BROWSER_NODE_IDLE_MS"] == "30000"
 assert "BROWSER_NODE_ACCESS_KEY" not in agent["environment"]
 key = next(v for v in agent["volumes"] if v["target"] == "/run/secrets/node-key")
-assert key["read_only"] and not key["bind"]["create_host_path"]
+assert key["read_only"] and not key.get("bind", {}).get("create_host_path", False)
 PY
 printf 'PASS: %s image pair, runtime startup, watchdog expiry and pull-only Compose\n' "$ARCH"

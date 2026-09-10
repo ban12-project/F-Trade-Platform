@@ -65,6 +65,20 @@ try {
     "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y -qq docker.io docker-compose-v2",
     240_000,
   );
+  await sandbox.writeFiles([
+    { path: "/tmp/ftrade-payload.tar", content: payload },
+    { path: "/tmp/ftrade-upstream.tar", content: source },
+  ]);
+  await run(
+    "unpack",
+    "mkdir -p /vercel/sandbox/source/ops/browser-node/upstream; tar -xf /tmp/ftrade-payload.tar -C /vercel/sandbox/source; tar -xf /tmp/ftrade-upstream.tar -C /vercel/sandbox/source/ops/browser-node/upstream",
+    30_000,
+  );
+  await run(
+    "cgroups",
+    "bash /vercel/sandbox/source/ops/browser-node/prepare-sandbox-cgroups.sh",
+    30000,
+  );
   await sandbox.runCommand({
     cmd: "sh",
     args: ["-c", "exec dockerd >/tmp/ftrade-dockerd.log 2>&1"],
@@ -75,15 +89,6 @@ try {
     "docker-ready",
     "for i in $(seq 1 30); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
     40_000,
-  );
-  await sandbox.writeFiles([
-    { path: "/tmp/ftrade-payload.tar", content: payload },
-    { path: "/tmp/ftrade-upstream.tar", content: source },
-  ]);
-  await run(
-    "unpack",
-    "mkdir -p /vercel/sandbox/source/ops/browser-node/upstream; tar -xf /tmp/ftrade-payload.tar -C /vercel/sandbox/source; tar -xf /tmp/ftrade-upstream.tar -C /vercel/sandbox/source/ops/browser-node/upstream",
-    30_000,
   );
   await run(
     "build-agent",

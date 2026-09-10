@@ -33,6 +33,7 @@ for image in (agent["image"], agent["environment"]["BROWSER_IMAGE"]):
     assert re.fullmatch(r"sha256:[a-f0-9]{64}", image), "immutable local image required"
 PY
 if ! docker info >/dev/null 2>&1; then
+  bash "$(dirname -- "$compose")/prepare-sandbox-cgroups.sh"
   # Never let dockerd inherit the startup lock or a waiter cannot recover.
   nohup dockerd >"$runtime/dockerd.log" 2>&1 </dev/null 9>&- &
   ready=false
