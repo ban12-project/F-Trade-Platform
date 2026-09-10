@@ -213,16 +213,33 @@ async function testDispatchAuthorization(
       true,
     );
   });
-  assert.equal(
-    await monitorBrowserSandboxSession(nodeId, "monitor-session", {
-      inspect: async () =>
-        ({
-          status: "stopped",
-          currentSession: () => ({ sessionId: "monitor-session", status: "stopped" }),
-        }) as unknown as BrowserSandboxProviderHandle,
-    }),
-    "stopped",
-  );
+  let inspections = 0,
+    revocations = 0;
+  await database.execute(sql`UPDATE "user" SET banned = true WHERE id = ${owner.id}`);
+  try {
+    assert.equal(
+      await monitorBrowserSandboxSession(nodeId, "monitor-session", {
+        inspect: async () => {
+          const status = inspections++ === 0 ? "running" : "stopped";
+          return {
+            status,
+            currentSession: () => ({ sessionId: "monitor-session", status }),
+          } as unknown as BrowserSandboxProviderHandle;
+        },
+        revoke: async () => {
+          revocations++;
+          return "stopped";
+        },
+        retire: async () => {
+          throw new Error("revoked owner must not use idle-only retirement");
+        },
+      }),
+      "stopped",
+    );
+    assert.equal(revocations, 1);
+  } finally {
+    await database.execute(sql`UPDATE "user" SET banned = false WHERE id = ${owner.id}`);
+  }
   const retired =
     await database.execute(sql`SELECT s.phase, s.session_id, n.gateway_origin, n.document
     FROM browser_sandbox s JOIN browser_fleet_node n ON n.id = s.node_id WHERE n.id = ${nodeId}`);

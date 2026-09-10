@@ -9,6 +9,13 @@ function fixture(status = "running", retired = "stopped") {
   const calls: string[] = [];
   let inspections = 0;
   const deps = {
+    async revoked() {
+      return false;
+    },
+    async revoke() {
+      calls.push("revoke");
+      return "stopped";
+    },
     async current() {
       calls.push("current");
       return true;
@@ -66,4 +73,11 @@ test("provider failures retain pending state for observation without another sta
   };
   assert.equal(await monitorBrowserSandboxSession("node", "session", f.deps), "pending");
   assert.deepEqual(f.calls, ["current"]);
+});
+
+test("revoked owner or node stops even an active Agent then verifies provider stop", async () => {
+  const f = fixture("running", "busy");
+  f.deps.revoked = async () => true;
+  assert.equal(await monitorBrowserSandboxSession("node", "session", f.deps), "stopped");
+  assert.deepEqual(f.calls, ["current", "inspect", "revoke", "inspect", "record"]);
 });

@@ -16,6 +16,24 @@ export async function stopIdleBrowserSandboxSession(
   nodeId: string,
   expectedSessionId: string,
 ) {
+  return stopBrowserSandboxSession(session, nodeId, expectedSessionId, false);
+}
+
+/** Only the platform's current authorization check can select this path. */
+export async function stopRevokedBrowserSandboxSession(
+  session: BrowserSandboxSession,
+  nodeId: string,
+  expectedSessionId: string,
+) {
+  return stopBrowserSandboxSession(session, nodeId, expectedSessionId, true);
+}
+
+async function stopBrowserSandboxSession(
+  session: BrowserSandboxSession,
+  nodeId: string,
+  expectedSessionId: string,
+  revoked: boolean,
+) {
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(nodeId))
     throw new Error("sandbox_node_invalid");
   if (session.sessionId !== expectedSessionId) return "superseded" as const;
@@ -34,13 +52,24 @@ export async function stopIdleBrowserSandboxSession(
   if (inspected.exitCode !== 0) throw new Error("sandbox_agent_state_unknown");
   const [owner, status, extra] = (await inspected.stdout()).trim().split("|");
   if (owner !== nodeId || extra !== undefined) throw new Error("sandbox_agent_identity_mismatch");
-  if (status === "running" || status === "restarting") return "busy" as const;
-  if (status !== "exited") throw new Error("sandbox_agent_state_unknown");
+  if ((status === "running" || status === "restarting") && !revoked) return "busy" as const;
+  if (!["exited", "running", "restarting"].includes(status))
+    throw new Error("sandbox_agent_state_unknown");
 
   // Agent failure can leave a browser behind. Gracefully drain only this node's
   // containers before stopping compute; the broker reconciles the old leases.
   let drained = false;
   try {
+    if (revoked && status !== "exited") {
+      // Let Agent stop/checkpoint its browsers before the residual cleanup.
+      const agent = await session.runCommand({
+        cmd: "docker",
+        args: ["stop", "-t", "60", "ftrade-browser-agent"],
+        sudo: true,
+        timeoutMs: 70000,
+      });
+      if (agent.exitCode !== 0) throw new Error("sandbox_agent_stop_unconfirmed");
+    }
     const result = await session.runCommand({
       cmd: "sh",
       args: [

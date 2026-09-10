@@ -3,9 +3,29 @@ import test from "node:test";
 import {
   type BrowserSandboxSession,
   stopIdleBrowserSandboxSession,
+  stopRevokedBrowserSandboxSession,
 } from "../lib/browser-fleet/sandbox-session";
 
 const nodeId = "11111111-1111-4111-8111-111111111111";
+test("revocation gracefully stops an active Agent before draining and stopping its VM", async () => {
+  const { session, calls } = fixture("running", `${nodeId}|running`);
+  assert.equal(
+    await stopRevokedBrowserSandboxSession(session, nodeId, session.sessionId),
+    "stopped",
+  );
+  assert.deepEqual(calls, ["docker", "docker", "sh", "stop"]);
+});
+test("revocation cannot stop a different node or superseding session", async () => {
+  const wrong = fixture("running", "other-node|running");
+  await assert.rejects(
+    stopRevokedBrowserSandboxSession(wrong.session, nodeId, wrong.session.sessionId),
+    /identity_mismatch/,
+  );
+  assert.deepEqual(wrong.calls, ["docker"]);
+  const stale = fixture();
+  assert.equal(await stopRevokedBrowserSandboxSession(stale.session, nodeId, "old"), "superseded");
+  assert.deepEqual(stale.calls, []);
+});
 function fixture(status = "running", output = `${nodeId}|exited`, drainExit = 0) {
   const calls: string[] = [];
   const session: BrowserSandboxSession = {

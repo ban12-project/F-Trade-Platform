@@ -1,10 +1,11 @@
 import "server-only";
 
 import { sql } from "drizzle-orm";
+import { hasPermission } from "../authz";
 import { getDatabase } from "../db/client";
 import { beginBrowserSandboxStop, settleBrowserSandboxOperation } from "./sandbox-lifecycle";
 import { inspectBrowserSandbox } from "./sandbox-provider";
-import { stopIdleBrowserSandboxSession } from "./sandbox-session";
+import { stopIdleBrowserSandboxSession, stopRevokedBrowserSandboxSession } from "./sandbox-session";
 
 const dependencies = {
   async current(nodeId: string, sessionId: string) {
@@ -14,6 +15,15 @@ const dependencies = {
   },
   inspect: inspectBrowserSandbox,
   retire: stopIdleBrowserSandboxSession,
+  revoke: stopRevokedBrowserSandboxSession,
+  async revoked(nodeId: string) {
+    const rows = await getDatabase().execute(sql`SELECT n.status, u.role, u.banned
+      FROM browser_fleet_node n LEFT JOIN "user" u ON u.id = n.owner_id WHERE n.id = ${nodeId}`);
+    const row = rows.rows[0] as
+      | { status: string; role: string | null; banned: boolean | null }
+      | undefined;
+    return row?.status !== "active" || !!row.banned || !hasPermission(row.role, "settings:manage");
+  },
   async recordStopped(nodeId: string, sessionId: string) {
     return getDatabase().transaction(async (tx) => {
       // Same node-first lock order as owner commands and dispatch.
@@ -59,7 +69,11 @@ export async function monitorBrowserSandboxSession(
     const session = sandbox.currentSession();
     if (session.sessionId !== sessionId) return "superseded" as const;
     if (sandbox.status === "running" && session.status === "running") {
-      const result = await deps.retire(session, nodeId, sessionId);
+      const result = await ((await deps.revoked(nodeId)) ? deps.revoke : deps.retire)(
+        session,
+        nodeId,
+        sessionId,
+      );
       if (result === "busy") return "active" as const;
       // Confirm provider metadata even after a successful stop response.
       if (result !== "stopped") return "pending" as const;
