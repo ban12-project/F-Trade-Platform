@@ -129,7 +129,12 @@ const sync = await nodeCall("sync");
 if (sync.nodeId !== nodeId) throw new Error("node_identity_mismatch");
 gatewayOrigin = secureOrigin(sync.gatewayOrigin);
 const filters = encodeURIComponent(JSON.stringify({ label: [`io.ftrade.node=${nodeId}`] }));
-const leftovers = await docker("GET", `/containers/json?all=true&filters=${filters}`);
+// The managed Agent also carries the node label so the platform can retire its
+// exact session. Only task containers belong in browser lease recovery.
+const browserFilters = encodeURIComponent(
+  JSON.stringify({ label: [`io.ftrade.node=${nodeId}`, "io.ftrade.run"] }),
+);
+const leftovers = await docker("GET", `/containers/json?all=true&filters=${browserFilters}`);
 for (const container of leftovers) await stopContainer(docker, container.Id);
 const oldNetworks = await docker("GET", `/networks?filters=${filters}`);
 for (const network of oldNetworks) await docker("DELETE", `/networks/${network.Id}`);

@@ -1,0 +1,50 @@
+# Invoked by the trusted platform runtime inside one dedicated Sandbox.
+# This is separate from the resident VPS installation.
+name: ftrade-browser-sandbox
+services:
+  agent:
+    image: ${BROWSER_AGENT_IMAGE:?Set the reviewed local Agent image ID}
+    pull_policy: never
+    container_name: ftrade-browser-agent
+    restart: "no"
+    init: true
+    network_mode: host
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      io.ftrade.node: ${BROWSER_NODE_ID:?Set the platform node ID}
+      io.ftrade.role: agent
+      io.ftrade.operation: ${BROWSER_SANDBOX_OPERATION_ID:?Set the committed start operation ID}
+    environment:
+      FTRADE_URL: ${FTRADE_URL:?Set the HTTPS platform origin}
+      BROWSER_NODE_ACCESS_KEY_FILE: /run/secrets/node-key
+      BROWSER_IMAGE: ${BROWSER_IMAGE:?Set the reviewed local browser image ID}
+      BROWSER_NODE_ON_DEMAND: "1"
+      BROWSER_NODE_IDLE_MS: "30000"
+      MAX_RUNNING_BROWSERS: "1"
+      HOST_RESERVE_MB: "1024"
+      GATEWAY_PORT: "9400"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: /var/lib/ftrade-sandbox/node-key
+        target: /run/secrets/node-key
+        read_only: true
+        bind:
+          create_host_path: false
+      - node-state:/var/lib/browser-node
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
+volumes:
+  node-state:

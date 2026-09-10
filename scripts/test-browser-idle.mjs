@@ -45,6 +45,7 @@ test("actual Agent exits after an empty queue in on-demand mode", { timeout: 300
   const nodeId = randomUUID();
   const key = createAccessKey(nodeId);
   const operations = [];
+  let browserRecoverySeen = false;
   let child, broker, docker;
   try {
     const config = join(dir, "cert.cnf");
@@ -96,6 +97,13 @@ test("actual Agent exits after an empty queue in on-demand mode", { timeout: 300
     await once(broker, "listening");
     const socketPath = join(dir, "docker.sock");
     docker = http.createServer((req, res) => {
+      if (req.url.startsWith("/containers/json")) {
+        const filters = JSON.parse(
+          new URL(req.url, "http://docker.invalid").searchParams.get("filters"),
+        );
+        assert.deepEqual(filters.label, [`io.ftrade.node=${nodeId}`, "io.ftrade.run"]);
+        browserRecoverySeen = true;
+      }
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify(
@@ -131,6 +139,11 @@ test("actual Agent exits after an empty queue in on-demand mode", { timeout: 300
     const [code] = await once(child, "exit", { signal: AbortSignal.timeout(25000) });
     assert.equal(code, 0, output);
     assert.match(output, /browser_node_ready/);
+    assert.equal(
+      browserRecoverySeen,
+      true,
+      "Agent recovery excludes the controller's own container",
+    );
     assert.match(output, /browser_node_idle_exit/);
     assert.deepEqual(operations, ["sync", "recover", "claim", "claim"]);
     assert.equal(output.includes(key), false);
