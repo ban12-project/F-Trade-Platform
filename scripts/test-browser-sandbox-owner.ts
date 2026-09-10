@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
 import { authorizeManualSandboxStart } from "../lib/browser-fleet/sandbox-authorization";
 import { openBrowserSandboxKey } from "../lib/browser-fleet/sandbox-credentials";
+import { claimManualSandboxDispatch } from "../lib/browser-fleet/sandbox-dispatch";
 import { beginBrowserSandboxStart } from "../lib/browser-fleet/sandbox-lifecycle";
 import { digest } from "../lib/browser-fleet/security";
 import { listBrowserNodes, ownerBrowserCommand } from "../lib/browser-fleet/store";
@@ -149,6 +150,18 @@ async function testDispatchAuthorization(
   const authorize = (id = operationId, time = now) =>
     database.transaction((tx) => authorizeManualSandboxStart(tx, nodeId, id, time));
   assert.ok(await authorize());
+  const dispatched = await Promise.all(
+    Array.from({ length: 12 }, () =>
+      database.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId)),
+    ),
+  );
+  const winners = dispatched.filter((value) => value !== null);
+  assert.equal(winners.length, 1);
+  assert.deepEqual(winners[0], { nodeId, operationId, mode: "create" });
+  assert.equal(
+    await database.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId)),
+    null,
+  );
   assert.equal(await authorize(randomUUID()), null);
   assert.equal(await authorize(operationId, now + 900000), null);
   run.authSessionId = randomUUID();
