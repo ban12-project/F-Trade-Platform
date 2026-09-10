@@ -7,6 +7,7 @@ import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
 import {
   beginBrowserSandboxStart,
   beginBrowserSandboxStop,
+  bindBrowserSandboxGateway,
   registerBrowserSandbox,
   settleBrowserSandboxOperation,
 } from "../lib/browser-fleet/sandbox-lifecycle";
@@ -76,7 +77,22 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
   assert.equal(await settle(randomUUID(), { status: "running", sessionId: "stale" }), false);
   await settle(operationId, { status: "unknown" });
   assert.equal(await start(), null, "uncertain provider results must not create a replacement");
+  await assert.rejects(
+    settle(operationId, { status: "running", sessionId: "session-one" }),
+    /unbound/,
+  );
+  const bind = (id: string, session: string, origin = "https://gateway.example.invalid") =>
+    database.transaction((tx) => bindBrowserSandboxGateway(tx, nodeId, id, session, origin));
+  assert.equal(await bind(randomUUID(), "stale"), false);
+  await assert.rejects(bind(operationId, "session-one", "http://invalid.example"), /https/);
+  assert.equal(await bind(operationId, "session-one"), true);
+  assert.equal(await bind(operationId, "another-session"), false);
   assert.equal(await settle(operationId, { status: "running", sessionId: "session-one" }), true);
+  assert.equal(await bind(operationId, "session-one", "https://stale.example"), false);
+  const gateway = await pool.query("SELECT gateway_origin FROM browser_fleet_node WHERE id=$1", [
+    nodeId,
+  ]);
+  assert.equal(gateway.rows[0].gateway_origin, "https://gateway.example.invalid");
   assert.equal(
     await settle(operationId, { status: "unknown" }),
     false,
@@ -135,6 +151,7 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
     ),
   );
   // Revocation prevents a later start even when work remains queued.
+  assert.equal(await bind(next.operation_id, "session-two"), true);
   await settle(next.operation_id, { status: "running", sessionId: "session-two" });
   const finalStop = await stop("session-two");
   assert.ok(finalStop?.operation_id);

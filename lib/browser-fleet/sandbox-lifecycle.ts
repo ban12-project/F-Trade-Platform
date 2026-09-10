@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DatabaseTransaction } from "../db/client";
 import type { FleetState } from "./policy";
+import { secureOrigin } from "./security";
 
 export type SandboxLifecycle = {
   node_id: string;
@@ -75,6 +76,34 @@ export async function beginBrowserSandboxStop(
   return result.rows[0] as SandboxLifecycle;
 }
 
+/** Publish the provider's captured session before Agent sync. The Agent needs
+ * this origin during boot, so it cannot wait for the final running receipt.
+ * Caller supplies SDK metadata, never a client-provided URL or session ID.
+ */
+export async function bindBrowserSandboxGateway(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  operationId: string,
+  sessionId: string,
+  gatewayOrigin: string,
+) {
+  const { lifecycle, broker } = await lock(tx, nodeId);
+  if (
+    broker.status !== "active" ||
+    lifecycle?.operation_id !== operationId ||
+    lifecycle.operation_kind !== "start" ||
+    (lifecycle.session_id !== null && lifecycle.session_id !== sessionId)
+  )
+    return false;
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(sessionId)) throw new Error("sandbox_session_invalid");
+  const origin = secureOrigin(gatewayOrigin);
+  await tx.execute(sql`UPDATE browser_sandbox SET session_id = ${sessionId}, updated_at = now()
+    WHERE node_id = ${nodeId}`);
+  await tx.execute(sql`UPDATE browser_fleet_node SET gateway_origin = ${origin}, updated_at = now()
+    WHERE id = ${nodeId}`);
+  return true;
+}
+
 /** Only an observation of the provider operation may settle it. A timeout is
  * unknown, not stopped; retain the same name/operation for read-only recovery.
  */
@@ -98,6 +127,8 @@ export async function settleBrowserSandboxOperation(
     throw new Error("sandbox_operation_result_mismatch");
   if (result.status === "running" && !/^[A-Za-z0-9_-]{1,200}$/.test(result.sessionId))
     throw new Error("sandbox_session_invalid");
+  if (result.status === "running" && lifecycle.session_id !== result.sessionId)
+    throw new Error("sandbox_gateway_session_unbound");
   await tx.execute(sql`UPDATE browser_sandbox SET phase = ${result.status},
     session_id = ${result.status === "running" ? result.sessionId : null},
     operation_id = NULL, operation_kind = NULL, updated_at = now() WHERE node_id = ${nodeId}`);

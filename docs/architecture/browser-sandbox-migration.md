@@ -82,3 +82,11 @@ Agent 新增部署级 `BROWSER_NODE_ON_DEMAND=1`。连续成功领取到空队�
 `test-browser-sandbox-start.mts` 使用已提交 Agent 源码、空队列 HTTPS 合成 broker、临时节点 Key 和不可变本地测试镜像，实际执行启动脚本。它测试重复启动、Agent 空闲退出、HTTPS 接管静态资源及整机回收，不发放真实账号任务，不证明浏览器 profile、代理或 WebSocket 接管。
 
 使用 `8b9bed1` 的完整合成实测通过：Agent 正常启动，容器内核内存上限为 536870912（512 MiB），重复调用返回 already-running，公开 HTTPS 地址可以访问 `/viewer`；空闲退出后同一操作返回 already-exited，没有重新启动。随后真实 session 回收函数停止整个 VM，元数据确认 stopped 且 sessionId 未变。最后删除实例和测试快照，清理完成后才写入成功结果。生产派发与实际业务接管仍未完成。
+
+## 私密配置下发与网关绑定
+
+`startBrowserSandboxRuntime` 对固定的运行中 Session 下发私密配置。密钥只进入 0600 文件，不出现在命令参数；过期会话不执行 I/O。启动和部分上传失败均尝试清理临时文件，清理未确认时不能返回成功。脚本在文件锁内检查已存在 Agent，使用校验后的 Compose 配置快照启动，避免校验和执行读取不同配置。
+
+`3413027` 的真实 Sandbox 测试已通过，成功结果文件在清理完成后写入：私密下发、重复操作、临时文件清理、512 MiB 内存上限、HTTPS 静态页面、空闲退出及整机回收均通过，测试实例和快照已删除。6 项失败／会话隔离单元回归通过。
+
+数据库新增 `bindBrowserSandboxGateway`，将提供方 Session 和 HTTPS origin 在同一事务中绑定到当前启动操作。必须先绑定再允许 Agent sync，不能等 Agent 启动成功后才提供它启动所需的地址。旧操作、另一会话和已撤销节点不能回填；未绑定会话不能结算为 running。真实数据库回归覆盖这些边界。云端派发调用方和部署仍待接入。
