@@ -54,6 +54,32 @@ async function docker() {
     "for i in $(seq 1 30); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
   );
 }
+async function browserProfile(mode: "write" | "read") {
+  assert.ok(session);
+  await session.writeFiles([
+    {
+      path: "/tmp/ftrade-profile-fixture.mjs",
+      content: await readFile("scripts/browser-sandbox-profile-fixture.mjs"),
+    },
+  ]);
+  await run(
+    `browser-profile-${mode}`,
+    `
+    docker run -d --name ftrade-profile-proof --read-only --shm-size=256m
+      --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777
+      -v ftrade-browser-profile-proof:/data
+      -v /tmp/ftrade-profile-fixture.mjs:/fixture.mjs:ro
+      -e FTRADE_LEASE_DEADLINE=$(( $(date +%s) * 1000 + 90000 ))
+      -e CAMOFOX_PROFILE_DIR=/data/profiles -e CAMOFOX_CRASH_REPORT_ENABLED=false
+      -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true
+      ${template.browserImage} >/dev/null
+    docker exec ftrade-profile-proof node /fixture.mjs ${mode}
+    docker stop -t 20 ftrade-profile-proof >/dev/null
+    docker rm ftrade-profile-proof >/dev/null
+  `.replace(/\n {6}/g, " "),
+    150000,
+  );
+}
 async function freeze() {
   await run(
     "freeze",
@@ -81,6 +107,7 @@ try {
     `cd /vercel/sandbox/source; IMAGE_PREFIX=ftrade-sandbox BUILD_TAG=test ARCH=amd64 REVISION=${template.revision} bash scripts/test-browser-images.sh`,
     120000,
   );
+  await browserProfile("write");
   await run(
     "write-synthetic-volume",
     `docker volume create ftrade-template-proof >/dev/null; docker run --rm --network none -v ftrade-template-proof:/proof --entrypoint sh ${template.agentImage} -ec 'printf SYNTHETIC_TEMPLATE_RESTORE > /proof/marker'`,
@@ -103,6 +130,7 @@ try {
     "restored-synthetic-volume",
     `test "$(docker run --rm --network none -v ftrade-template-proof:/proof --entrypoint cat ${template.agentImage} /proof/marker)" = SYNTHETIC_TEMPLATE_RESTORE; docker image inspect ${template.browserImage} >/dev/null`,
   );
+  await browserProfile("read");
   await freeze();
 } finally {
   if (provisionAttempted) {
@@ -124,7 +152,8 @@ await writeFile(
       templateSnapshotId: template.snapshotId,
       passed: true,
       syntheticVolumeRestored: true,
-      actualBrowserProfileVerified: false,
+      actualBrowserProfileVerified: true,
+      profileScope: "synthetic cookie and localStorage only; no IndexedDB or real login",
       cleanedUp: true,
     },
     null,
