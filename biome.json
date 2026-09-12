@@ -33,5 +33,13 @@
     "parser": {
       "tailwindDirectives": true
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["vercel.json"],
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
 }
