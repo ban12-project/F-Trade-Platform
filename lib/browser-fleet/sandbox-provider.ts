@@ -19,7 +19,7 @@ export type BrowserSandboxProviderRequest = z.infer<typeof requestSchema>;
 
 export type BrowserSandboxProviderHandle = Pick<
   Sandbox,
-  "name" | "status" | "persistent" | "timeout" | "currentSession" | "domain"
+  "name" | "status" | "persistent" | "timeout" | "vcpus" | "tags" | "currentSession" | "domain"
 >;
 export type BrowserSandboxProvider = {
   create(input: Parameters<typeof Sandbox.create>[0]): Promise<BrowserSandboxProviderHandle>;
@@ -56,8 +56,16 @@ export async function provisionBrowserSandbox(
       // Inspect first. Never use getOrCreate: a lost snapshot must not turn an
       // established account profile into a fresh, empty runtime.
       const existing = await provider.get({ name, resume: false });
-      if (existing.name !== name || !existing.persistent || existing.status !== "stopped")
+      if (
+        existing.name !== name ||
+        !existing.persistent ||
+        existing.status !== "stopped" ||
+        existing.tags?.["ftrade-node"] !== request.nodeId
+      )
         throw new Error("sandbox_requires_reconciliation");
+      // A stopped sandbox retains externally edited resource configuration. Do
+      // not wake a larger VM (or guess when resource metadata is missing).
+      if (existing.vcpus !== 2) throw new Error("sandbox_resources_require_reconciliation");
       // Persistent configuration can be edited outside this application. Refuse
       // to resume if its stored deadline no longer satisfies our compute bound.
       // Do not repair it by extending an already running session's timeout.

@@ -17,6 +17,8 @@ function fixture(status = "stopped", fails = false, timeout: number | undefined 
     ({
       name: `ftrade-browser-${nodeId}`,
       persistent: true,
+      vcpus: 2,
+      tags: { "ftrade-node": nodeId },
       timeout,
       status: state,
       currentSession: () => ({ status: "running", sessionId: "current" }),
@@ -148,5 +150,27 @@ test("lost initial create requires exact tags and a single matching provider ses
       variant === "valid" ? "first" : null,
     );
     if (variant.endsWith("tag")) assert.equal(lists, 0);
+  }
+});
+
+test("resume refuses changed resources or foreign ownership without waking compute", async () => {
+  const overrides: Partial<BrowserSandboxProviderHandle>[] = [
+    { vcpus: 4 },
+    { vcpus: 1 },
+    { vcpus: undefined },
+    { vcpus: Number.NaN },
+    { tags: undefined },
+    { tags: {} },
+    { tags: { "ftrade-node": randomUUID() } },
+  ];
+  for (const override of overrides) {
+    const f = fixture();
+    const get = f.provider.get;
+    f.provider.get = async (input) => ({ ...(await get(input)), ...override });
+    await assert.rejects(
+      provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, f.provider),
+      { message: "sandbox_provision_unconfirmed" },
+    );
+    assert.deepEqual(f.calls, [{ get: { name: `ftrade-browser-${nodeId}`, resume: false } }]);
   }
 });
