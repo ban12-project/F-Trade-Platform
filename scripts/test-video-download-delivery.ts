@@ -88,7 +88,7 @@ const findApproved = async () => ({ state: "VIDEO_APPROVED", payload: approvedPr
 
 void (async () => {
   const manifestAccess = await resolveApprovedVideoAccess(
-    { user: { role: "user" } },
+    { user: { id: "synthetic-viewer", role: "user" } },
     videoId,
     findApproved,
     async () => undefined,
@@ -112,7 +112,7 @@ void (async () => {
   assert.equal(
     (
       await resolveApprovedVideoAccess(
-        { user: { role: "user" } },
+        { user: { id: "synthetic-viewer", role: "user" } },
         videoId,
         findApproved,
         async () => {
@@ -124,7 +124,7 @@ void (async () => {
   );
   let revalidated = 0;
   const result = await resolveApprovedVideoDownload(
-    { user: { role: "user" } },
+    { user: { id: "synthetic-viewer", role: "user" } },
     videoId,
     "bytes=0-2",
     store,
@@ -159,7 +159,7 @@ void (async () => {
   assert.equal(
     (
       await resolveApprovedVideoDownload(
-        { user: { role: "user" } },
+        { user: { id: "synthetic-viewer", role: "user" } },
         videoId,
         null,
         store,
@@ -172,7 +172,7 @@ void (async () => {
   assert.equal(
     (
       await resolveApprovedVideoDownload(
-        { user: { role: "user" } },
+        { user: { id: "synthetic-viewer", role: "user" } },
         videoId,
         null,
         store,
@@ -187,7 +187,7 @@ void (async () => {
   assert.equal(
     (
       await resolveApprovedVideoDownload(
-        { user: { role: "user" } },
+        { user: { id: "synthetic-viewer", role: "user" } },
         videoId,
         null,
         store,
@@ -203,7 +203,7 @@ void (async () => {
   assert.equal(
     (
       await resolveApprovedVideoDownload(
-        { user: { role: "user" } },
+        { user: { id: "synthetic-viewer", role: "user" } },
         videoId,
         null,
         store,
@@ -225,7 +225,7 @@ void (async () => {
   assert.equal(
     (
       await resolveApprovedVideoDownload(
-        { user: { role: "user" } },
+        { user: { id: "synthetic-viewer", role: "user" } },
         videoId,
         null,
         {
@@ -242,7 +242,7 @@ void (async () => {
   assert.equal(
     (
       await resolveApprovedVideoDownload(
-        { user: { role: "user" } },
+        { user: { id: "synthetic-viewer", role: "user" } },
         "invalid",
         null,
         store,
