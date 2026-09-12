@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 export type VaultScope = { channelRef: string; accountRef: string };
-export type VaultPurpose = "login" | "proxy";
+export type VaultPurpose = "login" | "proxy" | "node-access";
 export type VaultKeyring = { activeKeyId: string; keys: Record<string, string> };
 const bad = () => new Error("facebook_credential_unavailable");
 function key(ring: VaultKeyring, id: string) {
@@ -12,7 +12,12 @@ function key(ring: VaultKeyring, id: string) {
   return bytes;
 }
 function aad(scope: VaultScope, purpose: VaultPurpose, keyId: string) {
-  if (!scope.channelRef || !scope.accountRef || !["login", "proxy"].includes(purpose)) throw bad();
+  if (
+    !scope.channelRef ||
+    !scope.accountRef ||
+    !["login", "proxy", "node-access"].includes(purpose)
+  )
+    throw bad();
   return Buffer.from(
     JSON.stringify([
       "f-trade-facebook-vault-v1",

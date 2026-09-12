@@ -8,6 +8,7 @@ import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
+import { createIdleExitPolicy } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import {
@@ -21,6 +22,7 @@ import { readPublicationMedia } from "./media.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
 import { stagePublicationUpload } from "./upload.mjs";
 
+const idleExit = createIdleExitPolicy();
 const appOrigin = secureOrigin(process.env.FTRADE_URL ?? "");
 const accessKey = process.env.BROWSER_NODE_ACCESS_KEY_FILE
   ? (await readFile(process.env.BROWSER_NODE_ACCESS_KEY_FILE, "utf8")).trim()
@@ -127,7 +129,12 @@ const sync = await nodeCall("sync");
 if (sync.nodeId !== nodeId) throw new Error("node_identity_mismatch");
 gatewayOrigin = secureOrigin(sync.gatewayOrigin);
 const filters = encodeURIComponent(JSON.stringify({ label: [`io.ftrade.node=${nodeId}`] }));
-const leftovers = await docker("GET", `/containers/json?all=true&filters=${filters}`);
+// The managed Agent also carries the node label so the platform can retire its
+// exact session. Only task containers belong in browser lease recovery.
+const browserFilters = encodeURIComponent(
+  JSON.stringify({ label: [`io.ftrade.node=${nodeId}`, "io.ftrade.run"] }),
+);
+const leftovers = await docker("GET", `/containers/json?all=true&filters=${browserFilters}`);
 for (const container of leftovers) await stopContainer(docker, container.Id);
 const oldNetworks = await docker("GET", `/networks?filters=${filters}`);
 for (const network of oldNetworks) await docker("DELETE", `/networks/${network.Id}`);
@@ -366,6 +373,7 @@ async function tick() {
         }
       }),
     );
+    if (slots.size) idleExit.observe(false, Date.now());
     if (slots.size >= maxSlots || [...slots.values()].some((s) => s.stopping)) return;
     pendingClaim ??= randomUUID();
     const result = await nodeCall("claim", {
@@ -373,10 +381,16 @@ async function tick() {
       availableMemoryMb: Math.max(0, Math.floor(freemem() / 1024 / 1024 - reserveMb)),
       localSlots: maxSlots,
     });
+    if (stopping) return;
     if (!result.run || slots.has(result.run.id)) {
       pendingClaim = null;
+      if (idleExit.observe(!result.run && slots.size === 0, Date.now())) {
+        console.log("browser_node_idle_exit");
+        await shutdown();
+      }
       return;
     }
+    idleExit.observe(false, Date.now());
     const prepared = await prepareClaimBeforeStart(
       result,
       (claim) => {
@@ -388,7 +402,7 @@ async function tick() {
       (outcome) => nodeCall("finish", outcome),
     );
     pendingClaim = null;
-    if (!prepared) return;
+    if (!prepared || stopping) return;
     const { expiresAt, spec } = prepared;
     const slot = {
       run: result.run,
@@ -536,6 +550,7 @@ async function tick() {
         void stop(slot, slot.outcome).catch(() => {});
       });
   } catch {
+    idleExit.observe(false, Date.now());
     console.error("browser_node_poll_failed");
   } finally {
     ticking = false;
@@ -544,18 +559,17 @@ async function tick() {
 const timer = setInterval(() => {
   void tick();
 }, 10_000);
-await tick();
 async function shutdown() {
   if (stopping) return;
   stopping = true;
   clearInterval(timer);
   gateway.close();
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     [...slots.values()].map((slot) =>
       stop(slot, slot.run.kind === "publish" ? "unknown" : "failed"),
     ),
   );
-  process.exit(0);
+  process.exit(results.some((result) => result.status === "rejected") ? 1 : 0);
 }
 process.on("SIGTERM", () => {
   void shutdown();
@@ -563,3 +577,5 @@ process.on("SIGTERM", () => {
 process.on("SIGINT", () => {
   void shutdown();
 });
+
+await tick();

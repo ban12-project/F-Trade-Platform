@@ -239,6 +239,34 @@
       "when": 1788840000003,
       "tag": "0033_browser_publication_receipt",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1789020000000,
+      "tag": "0034_browser_sandbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1789020000001,
+      "tag": "0035_browser_sandbox_credentials",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1789020000002,
+      "tag": "0036_browser_sandbox_dispatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1789086000000,
+      "tag": "0037_browser_sandbox_outbox",
+      "breakpoints": true
     }
   ]
 }

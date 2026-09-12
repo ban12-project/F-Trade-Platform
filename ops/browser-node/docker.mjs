@@ -135,7 +135,13 @@ export function containerSpec(nodeId, run, imageId, deadline) {
         MemorySwap: run.memoryMb * 1024 * 1024,
         NanoCpus: 2_000_000_000,
         ShmSize: 256 * 1024 * 1024,
-        Tmpfs: { "/tmp": "rw,nosuid,nodev,size=512m,mode=1777" },
+        Tmpfs: {
+          "/tmp": "rw,nosuid,nodev,size=512m,mode=1777",
+          // Camoufox beta.24 requires this directory even with Playwright's
+          // separate profile path. Keep runtime metadata ephemeral; account
+          // storage is checkpointed by the persistence plugin into /data.
+          "/root/.camoufox": "rw,nosuid,nodev,size=16m,mode=700",
+        },
         Mounts: [{ Type: "volume", Source: volume, Target: "/data" }],
         NetworkMode: name,
         PortBindings: {

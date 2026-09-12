@@ -29,6 +29,7 @@ trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
 deadline=$(( $(date +%s) * 1000 + 70000 ))
 docker run -d --name "$name" --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
+  --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
   --tmpfs /data:rw,nosuid,nodev,size=64m,mode=700 \
   -e "FTRADE_LEASE_DEADLINE=$deadline" \
   -e CAMOFOX_CRASH_REPORT_ENABLED=false -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true \
@@ -66,5 +67,25 @@ assert services["agent"]["environment"]["BROWSER_IMAGE"] == sys.argv[3]
 assert services["browser-image"]["image"] == sys.argv[3]
 assert services["browser-image"]["entrypoint"] == ["/bin/true"]
 assert services["agent"]["depends_on"]["browser-image"]["condition"] == "service_completed_successfully"
+PY
+FTRADE_URL=https://synthetic.example BROWSER_NODE_ID=11111111-1111-4111-8111-111111111111 \
+  BROWSER_SANDBOX_OPERATION_ID=22222222-2222-4222-8222-222222222222 \
+  BROWSER_AGENT_IMAGE="$agent" BROWSER_IMAGE="$browser" \
+  docker compose -f ops/browser-node/compose.sandbox.yaml config --format json > "$config"
+python3 - "$config" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    services = json.load(handle)["services"]
+assert list(services) == ["agent"]
+agent = services["agent"]
+assert agent["restart"] == "no"
+assert agent["pull_policy"] == "never"
+assert agent["container_name"] == "ftrade-browser-agent"
+assert agent["labels"]["io.ftrade.role"] == "agent"
+assert agent["environment"]["BROWSER_NODE_ON_DEMAND"] == "1"
+assert agent["environment"]["BROWSER_NODE_IDLE_MS"] == "30000"
+assert "BROWSER_NODE_ACCESS_KEY" not in agent["environment"]
+key = next(v for v in agent["volumes"] if v["target"] == "/run/secrets/node-key")
+assert key["read_only"] and not key.get("bind", {}).get("create_host_path", False)
 PY
 printf 'PASS: %s image pair, runtime startup, watchdog expiry and pull-only Compose\n' "$ARCH"
