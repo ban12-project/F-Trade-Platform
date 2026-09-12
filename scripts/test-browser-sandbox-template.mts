@@ -67,6 +67,7 @@ async function browserProfile(mode: "write" | "read") {
     `
     docker run -d --name ftrade-profile-proof --read-only --shm-size=256m
       --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777
+      --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700
       -v ftrade-browser-profile-proof:/data
       -v /tmp/ftrade-profile-fixture.mjs:/fixture.mjs:ro
       -e FTRADE_LEASE_DEADLINE=$(( $(date +%s) * 1000 + 90000 ))

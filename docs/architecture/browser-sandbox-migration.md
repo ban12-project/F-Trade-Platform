@@ -197,4 +197,8 @@ Server Action 提交后立即尝试投递该节点的一个待办，仍只返回
 
 可写缓存对照实验将 XDG cache/config 指向 `/tmp`，并显式指定原浏览器二进制。Fontconfig／dconf 写入警告消失，但 API 仍返回 500，profile 目录异常及二十秒 headless 握手超时仍在。因此缓存不可写不是足以解释或修复问题的原因；没有把实验设置推广到生产。证据位于 ignored `tmp/browser-sandbox-template-test-f2773a50-4f4a-4a3c-b70e-e63621779b07/browser-profile-write.log`，测试 VM 与快照已删除。诊断中的原生启动现在另设二十秒 timeout，下一步核查固定发行包和启动协议兼容性。
 
+依据 [Camoufox #572](https://github.com/daijro/camoufox/issues/572)，对照试验仅新增 `/root/.camoufox` 的 16 MiB tmpfs，保持只读根文件系统。真实标签页创建及合成 cookie／localStorage 写入首次通过，故将该目录挂载加入 Agent 容器规格与镜像冒烟配置；账号存储仍由 persistence 插件写到 `/data`。已有模板中的旧 Agent 镜像不包含此修复，部署前必须重建模板。
+
+该次测试恢复 VM 后在 cgroup 初始化遇到 Device or resource busy，未执行恢复后的 cookie 读取。不能把首次写入通过记作完整持久化通过。证据在 ignored `tmp/browser-sandbox-template-test-3c075242-97b1-456e-8099-0c51bcf4ab22/`，测试 VM 和孤立快照已删除；当前下一阻塞是恢复阶段的 cgroup 初始化。
+
 6 项控制器回归及真实 PostgreSQL 回归通过，验证已记录会话重放、错误操作拒绝和停止后拒绝。该路径只解决数据库已经成功记录的情况；提供方创建响应丢失或尚未写入 running 的操作仍需核实与恢复，不能宣称 unknown 恢复已完成。

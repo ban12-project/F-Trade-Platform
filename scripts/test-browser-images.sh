@@ -29,6 +29,7 @@ trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
 deadline=$(( $(date +%s) * 1000 + 70000 ))
 docker run -d --name "$name" --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
+  --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
   --tmpfs /data:rw,nosuid,nodev,size=64m,mode=700 \
   -e "FTRADE_LEASE_DEADLINE=$deadline" \
   -e CAMOFOX_CRASH_REPORT_ENABLED=false -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true \
