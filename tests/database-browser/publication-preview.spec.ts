@@ -101,7 +101,19 @@ test("stale displayed preview cannot create a publication; refreshed preview con
   ]);
   await page.goto(`/workspace/${projectId}?panel=publication`);
   const confirmation = page.locator("#publication-confirmation:visible");
+  const submit = page.locator('button[form="publication-confirmation"]:visible');
   await expect(confirmation).toHaveCount(1);
+  await expect(submit).toHaveCount(1);
+  await expect(submit).toHaveAccessibleName("确认并提交此条发布");
+  await expect
+    .poll(() =>
+      submit.evaluate(
+        (button: HTMLButtonElement) =>
+          button.form === document.querySelector("#publication-confirmation:not([hidden])") &&
+          !!button.form?.checkVisibility(),
+      ),
+    )
+    .toBe(true);
   await expect(confirmation.getByText("SYNTHETIC preview one", { exact: true })).toBeVisible();
   await confirmation.getByLabel("逐帖人工确认凭据").fill("evidence-synthetic-preview");
   await db
@@ -111,7 +123,7 @@ test("stale displayed preview cannot create a publication; refreshed preview con
       payload: { status: "approved", body: "SYNTHETIC preview two", hook: "SYNTHETIC" },
     })
     .where(eq(schema.aggregateRecord.id, contentRef));
-  await confirmation.getByRole("button", { name: "确认并提交此条发布", exact: true }).click();
+  await submit.click();
   await expect(
     page.getByText("内容已更新，请刷新页面、核对新预览后重新确认。", { exact: true }),
   ).toBeVisible();
@@ -125,7 +137,7 @@ test("stale displayed preview cannot create a publication; refreshed preview con
   await expect(confirmation).toHaveCount(1);
   await expect(confirmation.getByText("SYNTHETIC preview two", { exact: true })).toBeVisible();
   await confirmation.getByLabel("逐帖人工确认凭据").fill("evidence-synthetic-preview-current");
-  await confirmation.getByRole("button", { name: "确认并提交此条发布", exact: true }).click();
+  await submit.click();
   await expect
     .poll(async () => {
       const [saved] = await db
