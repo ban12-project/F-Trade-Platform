@@ -22,13 +22,14 @@ async function api(path, body) {
     try {
       const { launchOptions } = await import("/app/node_modules/camoufox-js/dist/index.js");
       const options = await launchOptions({
+        executable_path: "/root/.cache/camoufox/camoufox-bin",
         headless: true,
         exclude_addons: ["UBO"],
         enable_cache: true,
       });
       console.log("Synthetic diagnostic: launch options resolved");
       const { firefox } = await import("/app/node_modules/playwright-core/index.mjs");
-      const browser = await firefox.launch(options);
+      const browser = await firefox.launch({ ...options, timeout: 20000 });
       await browser.close();
       console.log("Synthetic diagnostic: headless browser launched");
     } catch (error) {

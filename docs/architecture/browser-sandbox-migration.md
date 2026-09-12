@@ -195,4 +195,6 @@ Server Action 提交后立即尝试投递该节点的一个待办，仍只返回
 
 进一步合成诊断在浏览器启动阶段观察到 180 秒握手超时，日志包括只读 `/root/.cache/dconf`、Fontconfig 无可写缓存、profile 目录异常和缺失 `glxtest`。尚未确定哪一项是直接原因，不能声称修复。证据在 ignored `tmp/browser-sandbox-template-test-3f15f9c4-c063-4cfc-a2f6-785109bfa30e/browser-profile-write.log`；该 VM 及孤立快照由测试清理，随后提供方查询返回 not_found。诊断夹具新增独立进程硬期限及外层 timeout，防止仅依赖 SDK 命令超时导致诊断运行过久。
 
+可写缓存对照实验将 XDG cache/config 指向 `/tmp`，并显式指定原浏览器二进制。Fontconfig／dconf 写入警告消失，但 API 仍返回 500，profile 目录异常及二十秒 headless 握手超时仍在。因此缓存不可写不是足以解释或修复问题的原因；没有把实验设置推广到生产。证据位于 ignored `tmp/browser-sandbox-template-test-f2773a50-4f4a-4a3c-b70e-e63621779b07/browser-profile-write.log`，测试 VM 与快照已删除。诊断中的原生启动现在另设二十秒 timeout，下一步核查固定发行包和启动协议兼容性。
+
 6 项控制器回归及真实 PostgreSQL 回归通过，验证已记录会话重放、错误操作拒绝和停止后拒绝。该路径只解决数据库已经成功记录的情况；提供方创建响应丢失或尚未写入 running 的操作仍需核实与恢复，不能宣称 unknown 恢复已完成。
