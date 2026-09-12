@@ -8,6 +8,7 @@ import {
 } from "./contracts";
 import { videoEncodingSchema } from "./encoding-contract";
 import { type ProbedVideo, validateProbedVideoExport } from "./media-probe";
+import { videoResourceMeasurementsSchema } from "./resource-measurements";
 
 const privateAssetRef = z
   .string()
@@ -32,6 +33,7 @@ export const reviewVideoExportInputSchema = z
         durationSeconds: z.number().positive(),
         subtitleStreamCount: z.number().int().min(0),
         encoding: videoEncodingSchema.optional(),
+        resources: videoResourceMeasurementsSchema.optional(),
       })
       .strict(),
     timeline: z.object({ durationSeconds: z.number().positive() }).strict(),
@@ -70,6 +72,7 @@ export function createReviewVideoExport(
       durationSeconds: value.media.durationSeconds,
       subtitleStreamCount: value.media.subtitleStreamCount,
       encoding: value.media.encoding,
+      resources: value.media.resources,
     },
     createdAt: new Date().toISOString(),
   });

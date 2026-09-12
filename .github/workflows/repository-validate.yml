@@ -37,6 +37,10 @@ jobs:
 
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify Remotion smoke failure cleanup with synthetic resources
+        run: node --experimental-test-module-mocks --import tsx scripts/test-remotion-smoke-cleanup.mts
+      - name: Verify video failure summaries omit private provider details
+        run: node --conditions=react-server --import tsx scripts/test-video-failure-privacy.ts
 
       - name: Check formatting, imports, Next.js and React rules
         shell: bash
@@ -127,3 +131,7 @@ jobs:
         run: pnpm exec tsx scripts/test-product-stream-postgres.ts
         env:
           PRODUCT_STREAM_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+      - name: Verify video delivery project isolation with PostgreSQL
+        run: node --conditions=react-server --import tsx scripts/test-video-workspace-access-postgres.ts
+        env:
+          VIDEO_ACCESS_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test

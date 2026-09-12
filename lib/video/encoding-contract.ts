@@ -12,4 +12,4 @@ export const videoEncodingSchema = z
 export type VideoEncoding = z.infer<typeof videoEncodingSchema>;
 
 export const videoProbeEntries =
-  "format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt,sample_aspect_ratio,sample_rate,channels";
+  "format=format_name,duration,size,bit_rate:stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt,sample_aspect_ratio,sample_rate,channels,bit_rate";

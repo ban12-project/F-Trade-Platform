@@ -22,10 +22,7 @@ export type AbcdMarketingVideoProps = {
 export const transitionFrames = 8;
 
 export function compositionDurationInFrames(props: AbcdMarketingVideoProps) {
-  return (
-    props.clips.reduce((total, clip) => total + clip.durationInFrames, 0) -
-    Math.max(0, props.clips.length - 1) * transitionFrames
-  );
+  return props.clips.reduce((total, clip) => total + clip.durationInFrames, 0);
 }
 
 /**

@@ -9,14 +9,21 @@ import {
   validateVideoExport,
   videoExportPresets,
 } from "./export-presets";
+import { reportedPositiveInteger, type VideoResourceMeasurements } from "./resource-measurements";
 
 const execFileAsync = promisify(execFile);
 
 const ffprobeSchema = z.object({
-  format: z.object({ format_name: z.string().min(1), duration: z.string().min(1) }),
+  format: z.object({
+    format_name: z.string().min(1),
+    duration: z.string().min(1),
+    size: z.string().optional(),
+    bit_rate: z.string().optional(),
+  }),
   streams: z.array(
     z.object({
       codec_type: z.string(),
+      bit_rate: z.string().optional(),
       codec_name: z.string().optional(),
       width: z.number().int().positive().optional(),
       height: z.number().int().positive().optional(),
@@ -39,6 +46,7 @@ export type ProbedVideo = {
   durationSeconds: number;
   subtitleStreamCount: number;
   encoding?: VideoEncoding;
+  resources?: VideoResourceMeasurements;
 };
 
 function parseRate(value: string | undefined) {
@@ -65,6 +73,12 @@ export function parseFfprobeOutput(raw: unknown): ProbedVideo {
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0)
     throw new Error("ffprobe returned an invalid duration");
   return {
+    resources: {
+      fileSizeBytes: reportedPositiveInteger(report.format.size),
+      containerBitrateBps: reportedPositiveInteger(report.format.bit_rate),
+      videoBitrateBps: reportedPositiveInteger(video.bit_rate),
+      audioBitrateBps: reportedPositiveInteger(audio?.bit_rate),
+    },
     encoding: {
       pixelFormat: video.pix_fmt ?? null,
       sampleAspectRatio: video.sample_aspect_ratio ?? null,

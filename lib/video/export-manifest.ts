@@ -5,6 +5,7 @@ import {
   videoExportPresets,
 } from "./export-presets";
 import { validateProbedVideoExport } from "./media-probe";
+import { unknownVideoResourceMeasurements } from "./resource-measurements";
 
 type ManifestValidation = {
   scope: "project_export_preset";
@@ -52,15 +53,25 @@ export function createVideoExportManifest(input: VideoExportArtifact) {
       };
     }
   }
+  const resources = artifact.measured.resources ?? unknownVideoResourceMeasurements();
   return {
-    schemaVersion: "1.2.0",
+    schemaVersion: "1.3.0",
     encodingContractVersion: "1.0.0",
+    resourceMeasurement: {
+      contractVersion: "1.0.0",
+      source: "ffprobe_metadata" as const,
+      bitrateScope: "reported_average" as const,
+      unknownFields: Object.entries(resources)
+        .filter(([, value]) => value === null)
+        .map(([key]) => key),
+      peakBitrate: "not_measured" as const,
+    },
     exportId: artifact.id,
     videoId: artifact.videoId,
     platform: artifact.platform,
     surface: artifact.surface,
     preset: { version: artifact.presetVersion, sourceUrl: artifact.presetSourceUrl },
-    measured: artifact.measured,
+    measured: { ...artifact.measured, resources },
     timelineDurationSeconds: artifact.timelineDurationSeconds,
     reviewStatus: artifact.status,
     renderedAt: artifact.createdAt,

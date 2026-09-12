@@ -507,7 +507,8 @@ export async function getWorkspaceProject(
   actorId: string,
   database: Database = getDatabase(),
 ): Promise<WorkspaceProjectSummary | null> {
-  await assertWorkspaceProjectAccess(projectId, actorId, "view", database);
+  // Missing and inaccessible projects have the same read result. Keep membership
+  // in the query itself; do not catch database failures as if they were 404s.
   const [row] = await database
     .select({
       id: workspaceProject.id,
@@ -517,7 +518,14 @@ export async function getWorkspaceProject(
       updatedAt: workspaceProject.updatedAt,
     })
     .from(workspaceProject)
-    .where(eq(workspaceProject.id, projectId));
+    .innerJoin(workspaceProjectMember, eq(workspaceProjectMember.projectId, workspaceProject.id))
+    .where(
+      and(
+        eq(workspaceProject.id, projectId),
+        eq(workspaceProjectMember.userId, actorId),
+        inArray(workspaceProjectMember.role, ["owner", "editor", "viewer"]),
+      ),
+    );
   return row ?? null;
 }
 

@@ -2,9 +2,12 @@ import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import {
   AbsoluteFill,
+  Freeze,
+  Html5Audio,
   Img,
   interpolate,
   OffthreadVideo,
+  Sequence,
   spring,
   useCurrentFrame,
   useVideoConfig,
@@ -48,8 +51,9 @@ function MediaLayer({ clip }: { clip: AbcdMarketingVideoProps["clips"][number] }
   ) : (
     <OffthreadVideo
       src={clip.src}
-      startFrom={clip.trimStartFrame}
-      volume={clip.audioMode === "source" ? 1 : 0}
+      trimBefore={clip.trimStartFrame}
+      trimAfter={clip.trimStartFrame + clip.durationInFrames}
+      muted
       style={commonStyle}
     />
   );
@@ -206,8 +210,27 @@ export function AbcdMarketingVideo({ clips, productName, ctaText }: AbcdMarketin
     <TransitionSeries>
       {clips.flatMap((clip, index) => {
         const sequence = (
-          <TransitionSeries.Sequence key={clip.id} durationInFrames={clip.durationInFrames}>
-            <Beat clip={clip} productName={productName} ctaText={ctaText} />
+          <TransitionSeries.Sequence
+            key={clip.id}
+            durationInFrames={
+              clip.durationInFrames + (index < clips.length - 1 ? transitionFrames : 0)
+            }
+          >
+            {clip.mediaType === "video" && clip.audioMode === "source" ? (
+              <Sequence durationInFrames={clip.durationInFrames} layout="none">
+                <Html5Audio
+                  src={clip.src}
+                  trimBefore={clip.trimStartFrame}
+                  trimAfter={clip.trimStartFrame + clip.durationInFrames}
+                />
+              </Sequence>
+            ) : null}
+            <Freeze
+              frame={clip.durationInFrames - 1}
+              active={(frame) => frame >= clip.durationInFrames}
+            >
+              <Beat clip={clip} productName={productName} ctaText={ctaText} />
+            </Freeze>
           </TransitionSeries.Sequence>
         );
         if (index === clips.length - 1) return [sequence];

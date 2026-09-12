@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { marketingVideoDraftSchema } from "./edit-contracts";
 import { videoEncodingSchema } from "./encoding-contract";
+import { videoResourceMeasurementsSchema } from "./resource-measurements";
 
 const privateRef = z
   .string()
@@ -41,6 +42,7 @@ export const videoExportArtifactSchema = z
         durationSeconds: z.number().positive(),
         subtitleStreamCount: z.number().int().min(0),
         encoding: videoEncodingSchema.optional(),
+        resources: videoResourceMeasurementsSchema.optional(),
       })
       .strict(),
     createdAt: z.iso.datetime(),

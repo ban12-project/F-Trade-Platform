@@ -68,7 +68,7 @@
     "test:video-job-runner": "tsx scripts/test-video-job-runner.ts",
     "test:video-job-submission": "tsx scripts/test-video-job-submission.ts",
     "test:video-private-assets": "tsx scripts/test-video-private-asset-store.ts",
-    "test:video-preview-delivery": "tsx scripts/test-video-preview-delivery.ts",
+    "test:video-preview-delivery": "node --conditions=react-server --import tsx scripts/test-video-preview-delivery.ts",
     "test:video-export-presets": "tsx scripts/test-video-export-presets.ts",
     "test:video-acceptance": "tsx scripts/test-video-acceptance.ts",
     "test:video-execution": "tsx scripts/test-video-execution.ts",
