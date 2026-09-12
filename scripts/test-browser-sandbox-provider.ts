@@ -10,12 +10,13 @@ import {
 
 const nodeId = randomUUID(),
   operationId = randomUUID();
-function fixture(status = "stopped", fails = false) {
+function fixture(status = "stopped", fails = false, timeout: number | undefined = 1200000) {
   const calls: unknown[] = [];
   const handle = (state: string) =>
     ({
       name: `ftrade-browser-${nodeId}`,
       persistent: true,
+      timeout,
       status: state,
       currentSession: () => ({ status: "running", sessionId: "current" }),
       domain: () => "https://gateway.example.invalid",
@@ -86,4 +87,26 @@ test("uncertain create is not retried and inspection never enables resume", asyn
   const read = fixture();
   await inspectBrowserSandbox(nodeId, read.provider);
   assert.deepEqual(read.calls, [{ get: { name: `ftrade-browser-${nodeId}`, resume: false } }]);
+});
+
+test("resume refuses unbounded or changed timeout configuration before waking compute", async () => {
+  for (const timeout of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1200001]) {
+    const f = fixture("stopped", false, timeout);
+    await assert.rejects(
+      provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, f.provider),
+      { message: "sandbox_provision_unconfirmed" },
+    );
+    assert.deepEqual(f.calls, [{ get: { name: `ftrade-browser-${nodeId}`, resume: false } }]);
+  }
+  const shorter = fixture("stopped", false, 60000);
+  await provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, shorter.provider);
+  assert.equal(shorter.calls.length, 2);
+  const missing = fixture();
+  const get = missing.provider.get;
+  missing.provider.get = async (input) => ({ ...(await get(input)), timeout: undefined });
+  await assert.rejects(
+    provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, missing.provider),
+    { message: "sandbox_provision_unconfirmed" },
+  );
+  assert.equal(missing.calls.length, 1);
 });

@@ -19,7 +19,7 @@ export type BrowserSandboxProviderRequest = z.infer<typeof requestSchema>;
 
 export type BrowserSandboxProviderHandle = Pick<
   Sandbox,
-  "name" | "status" | "persistent" | "currentSession" | "domain"
+  "name" | "status" | "persistent" | "timeout" | "currentSession" | "domain"
 >;
 export type BrowserSandboxProvider = {
   create(input: Parameters<typeof Sandbox.create>[0]): Promise<BrowserSandboxProviderHandle>;
@@ -58,6 +58,16 @@ export async function provisionBrowserSandbox(
       const existing = await provider.get({ name, resume: false });
       if (existing.name !== name || !existing.persistent || existing.status !== "stopped")
         throw new Error("sandbox_requires_reconciliation");
+      // Persistent configuration can be edited outside this application. Refuse
+      // to resume if its stored deadline no longer satisfies our compute bound.
+      // Do not repair it by extending an already running session's timeout.
+      if (
+        typeof existing.timeout !== "number" ||
+        !Number.isFinite(existing.timeout) ||
+        existing.timeout <= 0 ||
+        existing.timeout > 20 * 60 * 1000
+      )
+        throw new Error("sandbox_timeout_requires_reconciliation");
       sandbox = await provider.get({ name, resume: true });
     }
     if (sandbox.name !== name || !sandbox.persistent || sandbox.status !== "running")
