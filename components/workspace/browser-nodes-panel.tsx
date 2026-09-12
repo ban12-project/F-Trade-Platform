@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SandboxRegistrationCard } from "@/components/workspace/sandbox-registration-card";
 import { browserNodeCommandAction, browserNodesAction } from "@/lib/actions/browser-nodes";
 import { accountFormSchema, nodeFormSchema } from "@/lib/browser-fleet/contracts";
 
@@ -54,7 +55,7 @@ const stateLabels: Record<string, string> = {
   egress_mismatch: "固定出口校验失败",
   result_unknown: "需要核对未知结果",
 };
-export function BrowserNodesPanel() {
+export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?: boolean }) {
   const [nodes, setNodes] = useState<Nodes>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -197,9 +198,13 @@ export function BrowserNodesPanel() {
           </CardContent>
         </Card>
       )}
+      <SandboxRegistrationCard
+        enabled={sandboxEnabled}
+        onCreated={async () => setNodes(await browserNodesAction())}
+      />
       <Card>
         <CardHeader>
-          <CardTitle>创建 Browser 节点</CardTitle>
+          <CardTitle>连接自管服务器</CardTitle>
           <CardDescription>
             设置这台 VPS 的容量。平台不按账号数量启动浏览器，只有排队任务获得租约后才启动。
           </CardDescription>

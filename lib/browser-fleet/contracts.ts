@@ -29,6 +29,7 @@ export const nodeFormSchema = z
     path: ["memoryBudgetMb"],
     message: "内存预算至少容纳一个浏览器。",
   });
+export const sandboxNodeFormSchema = z.object({ name: nodeFormSchema.shape.name }).strict();
 export const accountFormSchema = z
   .object({
     nodeId: id,
@@ -50,7 +51,7 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
   z
     .object({
       operation: z.literal("create-sandbox"),
-      value: z.object({ name: nodeFormSchema.shape.name }).strict(),
+      value: sandboxNodeFormSchema,
     })
     .strict(),
   z.object({ operation: z.literal("create"), value: nodeFormSchema }).strict(),

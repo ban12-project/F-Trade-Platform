@@ -254,3 +254,9 @@ cgroup 初始化保留五次尝试上限，在失败的尝试之间等待一秒�
 合成测试通过真实 viewer canvas 发送鼠标点击和 Control+L／键盘导航，随后在远端浏览器内读取 DOM 点击标记与 location.hash，确认操作实际到达远端。截图中远端地址栏可见 `#ftrade-keyboard-proof`，与断言一致。观察夹具仅安装点击监听并读取结果，没有通过浏览器 API 代替键鼠动作。
 
 证据位于 ignored `tmp/browser-sandbox-websocket-27c76842-b7d3-47ed-97bc-0d3bfb0f0219/`，包含 `desktop-input.png` 与清理完成后的 `result.json`。测试 VM 和快照已删除。已覆盖模板内网关、认证、画面和基础键鼠传输；实际平台父页面、票据签发、生产 Workflow、数据库连接身份、代理及真实账号链路仍未完成。
+
+### 平台托管节点创建入口
+
+浏览器管理页新增托管创建卡片，只填写名称；服务端将启用开关作为布尔展示状态传给客户端，实际 Server Action 仍独立检查会话、管理权限、输入和后端开关。客户端与命令契约复用 `sandboxNodeFormSchema`。创建成功提示尚未启动浏览器，不索取网关和接入密钥；列表刷新失败不会把已经创建的节点报告为创建失败。原自管服务器入口保留。
+
+两项 Playwright 回归验证关闭状态不可提交、空名称校验，以及真实 Action 请求只包含 create-sandbox 和整理后的名称；请求被拦截，未进行业务写入。隔离 Next.js 16.3.2 Turbopack 实例的编译与运行错误均为空，React 树与截图确认卡片正常渲染。测试页仅在 NEXT_ENABLE_TESTING_API=1 时可用。没有启用生产或创建云端实例，托管创建 UI 的存在不代表整条生产派发链路已验收。
