@@ -33,6 +33,9 @@ export async function claimBrowserSandboxDelivery(db: Database, nodeId?: string)
   const rows = await db.execute(sql`WITH candidate AS (
     SELECT operation_id FROM browser_sandbox_outbox
     WHERE workflow_run_id IS NULL AND (claim_until IS NULL OR claim_until < now()) ${scope}
+    AND EXISTS (SELECT 1 FROM browser_sandbox s WHERE s.node_id = browser_sandbox_outbox.node_id
+      AND s.phase <> 'stopped' AND (s.operation_id = browser_sandbox_outbox.operation_id
+        OR s.dispatch_operation_id = browser_sandbox_outbox.operation_id))
     ORDER BY created_at, operation_id FOR UPDATE SKIP LOCKED LIMIT 1
   ) UPDATE browser_sandbox_outbox o SET claim_id = ${claimId}::uuid,
     claim_until = now() + interval '5 minutes' FROM candidate c

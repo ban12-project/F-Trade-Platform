@@ -216,6 +216,12 @@ async function testCancelledStarts(database: Database, owner: { id: string; sess
         assert.notEqual(restarted.operation_id, operationId);
         assert.equal(await claim(), null, "old delivery cannot cancel a later authorized start");
         assert.deepEqual(await read(), restarted);
+        const delivery = await claimBrowserSandboxDelivery(database, nodeId);
+        assert.equal(
+          delivery?.operationId,
+          restarted.operation_id,
+          "cancelled outbox entries must not consume the immediate next-start delivery slot",
+        );
       }
     }
   }
@@ -402,6 +408,31 @@ async function testDispatchAuthorization(
     await monitorBrowserSandboxSession(nodeId, "monitor-session", {
       inspect: async () => {
         throw new Error("must not query stale session");
+      },
+    }),
+    "superseded",
+  );
+  const nextStarts = await Promise.all(
+    Array.from({ length: 12 }, () =>
+      database.transaction((tx) => enqueueManualBrowserSandboxStart(tx, nodeId)),
+    ),
+  );
+  const nextWinners = nextStarts.filter((value) => value !== null);
+  assert.equal(nextWinners.length, 1, "queued work after stop creates one durable next start");
+  const nextOperation = nextWinners[0].operationId;
+  assert.notEqual(nextOperation, operationId);
+  const nextClaim = await database.transaction((tx) =>
+    claimManualSandboxDispatch(tx, nodeId, nextOperation),
+  );
+  assert.deepEqual(nextClaim, { nodeId, operationId: nextOperation, mode: "resume" });
+  assert.equal(
+    await database.transaction((tx) => enqueueManualBrowserSandboxStart(tx, nodeId)),
+    null,
+  );
+  assert.equal(
+    await monitorBrowserSandboxSession(nodeId, "monitor-session", {
+      inspect: async () => {
+        throw new Error("old session must not be inspected after next start");
       },
     }),
     "superseded",
