@@ -236,3 +236,9 @@ cgroup 初始化保留五次尝试上限，在失败的尝试之间等待一秒�
 调度函数本身仍计入 Functions 使用量；每五分钟约每天 288 次调用，并非零费用。正常打开仍立即投递，调度仅承担重试，不改变浏览器按需启动和空闲整机停止约束。
 
 本轮只读查询 Vercel 项目变量元数据，确认 `CRON_SECRET`、`BROWSER_SANDBOX_ENABLED`、`BROWSER_SANDBOX_TEMPLATE_SNAPSHOT_ID` 尚未配置；`DATABASE_URL` 在 production／preview 中为 sensitive 类型，仍未核实其连接身份。未输出变量值。
+
+### 真实 VNC 的公网 WebSocket 握手
+
+`scripts/test-browser-sandbox-websocket.mts` 使用修复版模板启动真实浏览器和 VNC，再由模板中的网关代码代理 noVNC 模块与 WebSocket。合成 broker 只批准测试票据，不访问平台用户或真实账号。实测通过公网 HTTPS 读取 noVNC 模块，经 TLS WebSocket 收到真实 VNC 的 RFB 协议问候；同一 WebSocket 能力地址再次使用被拒绝。
+
+证据位于 ignored `tmp/browser-sandbox-websocket-55dff74a-7df7-4b2b-96ea-ccbb273fffd4/result.json`，测试 VM 和快照已删除。此验证只覆盖传输握手与重复使用拒绝，未进行 VNC 密码认证、桌面渲染或交互，亦未验证平台票据签发、代理出口和真实账号接管。测试实例最长五分钟，不改变生产关闭状态。
