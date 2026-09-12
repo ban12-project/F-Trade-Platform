@@ -202,3 +202,13 @@ Server Action 提交后立即尝试投递该节点的一个待办，仍只返回
 该次测试恢复 VM 后在 cgroup 初始化遇到 Device or resource busy，未执行恢复后的 cookie 读取。不能把首次写入通过记作完整持久化通过。证据在 ignored `tmp/browser-sandbox-template-test-3c075242-97b1-456e-8099-0c51bcf4ab22/`，测试 VM 和孤立快照已删除；当前下一阻塞是恢复阶段的 cgroup 初始化。
 
 6 项控制器回归及真实 PostgreSQL 回归通过，验证已记录会话重放、错误操作拒绝和停止后拒绝。该路径只解决数据库已经成功记录的情况；提供方创建响应丢失或尚未写入 running 的操作仍需核实与恢复，不能宣称 unknown 恢复已完成。
+
+### 真实浏览器恢复验证通过
+
+cgroup 初始化保留五次尝试上限，在失败的尝试之间等待一秒，总等待最多四秒；耗尽后记录控制器和进程编号以便排查。一次成功不足以证明恢复竞争已完全消除，失败仍会终止启动。
+
+采用当前初始化脚本与 `/root/.camoufox` 临时目录挂载后，合成测试完成真实标签页创建、cookie／localStorage 写入、整机停止、恢复和读取，两个浏览器状态断言均通过。结果位于 ignored `tmp/browser-sandbox-template-test-676101ed-d748-450e-a87e-e27859a1f10b/result.json`，其中 `actualBrowserProfileVerified` 与 `cleanedUp` 均为 true。测试实例及孤立测试快照已删除。此次未测试 IndexedDB、真实账号登录、代理、noVNC 或生产 Workflow。
+
+该验证在旧模板上临时上传当前初始化脚本，并显式创建修复后挂载规格的浏览器容器；旧模板 Agent 镜像仍须重建，不能把此结果作为生产模板已更新的证据。提交 `63d1622` 的 CI 构建、Playwright、数据库和双架构镜像冒烟均通过；Vercel 构建被 Ignored Build Step 取消，不代表已部署预览。
+
+再次只读核对新数据库：38 条迁移哈希与当前分支一致，用户、Sandbox、outbox 记录仍均为零。生产数据库连接身份尚未核实。

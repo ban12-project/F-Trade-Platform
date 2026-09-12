@@ -18,6 +18,13 @@ for attempt in 1 2 3 4 5; do
     grep -qw memory "$root/cgroup.subtree_control"
     exit 0
   fi
+  # Resume may still be moving/creating VM processes. Immediate retries exhaust
+  # the entire allowance before the transient root population can settle.
+  if test "$attempt" -lt 5; then sleep 1; fi
+done
+for state in cgroup.type cgroup.controllers cgroup.subtree_control cgroup.procs; do
+  printf 'sandbox_cgroup_%s=' "$state" >&2
+  cat "$root/$state" >&2
 done
 printf 'sandbox_memory_controller_unavailable\n' >&2
 exit 1

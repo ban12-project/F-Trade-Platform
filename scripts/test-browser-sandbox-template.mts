@@ -41,8 +41,10 @@ async function run(stage: string, script: string, timeoutMs = 60000) {
   console.log(`PASS ${stage}`);
 }
 async function docker() {
-  await run("cgroups", "bash /vercel/sandbox/source/ops/browser-node/prepare-sandbox-cgroups.sh");
   assert.ok(session);
+  // Exercise the current initializer independently of the older template image.
+  await session.writeFiles([{ path: "/tmp/ftrade-prepare-cgroups.sh", content: await readFile("ops/browser-node/prepare-sandbox-cgroups.sh") }]);
+  await run("cgroups", "bash /tmp/ftrade-prepare-cgroups.sh");
   await session.runCommand({
     cmd: "sh",
     args: ["-c", "exec dockerd >/tmp/ftrade-dockerd.log 2>&1"],
