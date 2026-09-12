@@ -226,3 +226,13 @@ cgroup 初始化保留五次尝试上限，在失败的尝试之间等待一秒�
 `scripts/test-browser-sandbox-start.mts` 现在可接收模板构建结果，直接使用快照内脚本及不可变 Agent／浏览器镜像，不上传替代运行源码或重新构建 Agent。合成 broker 只返回空任务。新模板实测通过私密运行配置下发、重复启动返回 already-running、临时文件清理、512 MiB 内存限制、HTTPS viewer 静态入口、空闲正常退出、同一操作不会重启已退出 Agent，以及提供方确认整机 stopped。
 
 证据位于 ignored `tmp/browser-sandbox-start-cbc08017-c16d-4241-b068-de1d1cee91d1/result.json`，记录模板与测试提交版本。测试 VM 和快照已删除。此测试没有真实任务，不覆盖 PostgreSQL outbox 到生产 Workflow 的投递、浏览器 WebSocket 或代理；HTTPS 静态入口通过不等于 noVNC 接管已通过。
+
+### 派发重试调度配置
+
+`vercel.json` 配置每五分钟调用 `/api/browser-sandbox-dispatch`，为即时投递失败或回执丢失后的 outbox 提供后续触发。每次最多领取十条，领取期限仍为五分钟；需求已过期时派发重新授权会拒绝启动。调度不创建空队列任务、不直接创建或恢复 Sandbox。
+
+已只读核实当前 ban12 团队套餐为 Pro。Vercel [套餐限制](https://vercel.com/docs/cron-jobs/usage-and-pricing)支持该频率，[Cron 仅在生产部署生效](https://vercel.com/docs/cron-jobs/quickstart)，预览通过不能证明调度已运行。部署必须配置 `CRON_SECRET`，端点使用 [Vercel Bearer 约定](https://vercel.com/docs/cron-jobs/manage-cron-jobs)校验；开关关闭时不读取待办或启动 Workflow。此提交仅补齐部署配置，尚未部署、未启用生产。
+
+调度函数本身仍计入 Functions 使用量；每五分钟约每天 288 次调用，并非零费用。正常打开仍立即投递，调度仅承担重试，不改变浏览器按需启动和空闲整机停止约束。
+
+本轮只读查询 Vercel 项目变量元数据，确认 `CRON_SECRET`、`BROWSER_SANDBOX_ENABLED`、`BROWSER_SANDBOX_TEMPLATE_SNAPSHOT_ID` 尚未配置；`DATABASE_URL` 在 production／preview 中为 sensitive 类型，仍未核实其连接身份。未输出变量值。
