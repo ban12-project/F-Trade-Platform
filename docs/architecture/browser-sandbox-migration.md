@@ -183,4 +183,10 @@ Server Action 提交后立即尝试投递该节点的一个待办，仍只返回
 
 同一提交的 [Playwright 运行 34683613726](https://github.com/ban12-project/F-Trade-Platform/actions/runs/34683613726) 已成功完成，确认此前发布预览的表单外按钮定位修复通过浏览器回归。该结果证明此测试已恢复，不代替 Sandbox 真实 Workflow 或生产接管验收。
 
+### 模板创建与恢复实测
+
+`scripts/test-browser-sandbox-template.mts` 已通过实际 `provisionBrowserSandbox` 从上述模板创建持久实例，并通过同一提供方入口恢复。初始镜像和无卷检查、镜像冒烟、合成卷写入、整机停止、resume:false 状态查询及二十分钟配置检查通过；恢复后的会话 ID 不同，合成卷标记和浏览器镜像仍在。测试 VM 及其孤立测试快照已删除，原模板保留。证据位于 ignored `tmp/browser-sandbox-template-test-8c72d095-f6ec-4178-af0b-cd593a0e58d5/result.json`。
+
+该测试仅证明模板派发、Docker 与合成卷恢复，没有使用账号、代理或真实浏览器 profile，不能据此声称登录状态、WebSocket 接管和生产 Workflow 已验收。
+
 6 项控制器回归及真实 PostgreSQL 回归通过，验证已记录会话重放、错误操作拒绝和停止后拒绝。该路径只解决数据库已经成功记录的情况；提供方创建响应丢失或尚未写入 running 的操作仍需核实与恢复，不能宣称 unknown 恢复已完成。
