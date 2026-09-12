@@ -212,3 +212,11 @@ cgroup 初始化保留五次尝试上限，在失败的尝试之间等待一秒�
 该验证在旧模板上临时上传当前初始化脚本，并显式创建修复后挂载规格的浏览器容器；旧模板 Agent 镜像仍须重建，不能把此结果作为生产模板已更新的证据。提交 `63d1622` 的 CI 构建、Playwright、数据库和双架构镜像冒烟均通过；Vercel 构建被 Ignored Build Step 取消，不代表已部署预览。
 
 再次只读核对新数据库：38 条迁移哈希与当前分支一致，用户、Sandbox、outbox 记录仍均为零。生产数据库连接身份尚未核实。
+
+### 修复版模板交付验证
+
+已从运行提交 `8109b93` 重建模板，证据位于 ignored `tmp/browser-sandbox-template-f99ff5cf-555d-49ff-99d0-5c7bae5469b7/result.json`。新 Agent 镜像包含只读根文件系统下的 `/root/.camoufox` 临时挂载，模板内初始化脚本包含有界 cgroup 重试。镜像冒烟、无账号卷检查通过，构建 VM 已删除。
+
+提交 `250c9a1` 的测试直接使用模板内脚本，不再上传替代初始化脚本。真实浏览器 cookie／localStorage 在写入、整机停止及恢复后读取全部通过，结果位于 ignored `tmp/browser-sandbox-template-test-d23ac3b2-c520-48ad-abab-e508f6ae795c/result.json`；测试 VM 与孤立测试快照均已删除。该结果仍不覆盖实际 Agent 派发、真实登录、代理、noVNC 或生产 Workflow。
+
+新模板验证后，已删除未用于生产的旧模板 `snap_e9WUZREfFGXUKsAuTM5F5WKAyY7f`；保留新模板的七天到期设置，清理回执在 ignored `tmp/retired-browser-template.json`。生产开关保持关闭。
