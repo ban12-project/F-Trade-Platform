@@ -177,4 +177,10 @@ Server Action 提交后立即尝试投递该节点的一个待办，仍只返回
 
 脚本保留一个七天到期的模板快照，删除构建 VM，并在独立的 ignored `tmp/browser-sandbox-template-<uuid>/result.json` 保存提交、上游版本、快照 ID 和不可变镜像 ID。快照存储可能计费；构建失败时删除临时 VM 及其孤立快照。模板成功生成也不自动启用生产，仍需用真实派发接口验证模板启动、恢复和浏览器会话持久化。当前只完成脚本格式及独立 TypeScript 检查，尚未运行该模板构建，不存在可声称已部署的新模板。
 
+### 首次模板构建实测
+
+提交 `cdd77f8` 已实际完成模板构建：Docker/cgroup 初始化、Agent／浏览器镜像构建、镜像冒烟、无容器和无账号卷检查、Docker 停止均通过，生成七天有效模板快照后删除了构建 VM。证据保存在 ignored `tmp/browser-sandbox-template-18f72bfb-00bb-4648-80df-3ada4983c9f7/result.json`，包含快照与不可变镜像 ID；没有启用生产或配置账号。模板恢复及真实浏览器 profile 一致性尚未验证。
+
+同一提交的 [Playwright 运行 34683613726](https://github.com/ban12-project/F-Trade-Platform/actions/runs/34683613726) 已成功完成，确认此前发布预览的表单外按钮定位修复通过浏览器回归。该结果证明此测试已恢复，不代替 Sandbox 真实 Workflow 或生产接管验收。
+
 6 项控制器回归及真实 PostgreSQL 回归通过，验证已记录会话重放、错误操作拒绝和停止后拒绝。该路径只解决数据库已经成功记录的情况；提供方创建响应丢失或尚未写入 running 的操作仍需核实与恢复，不能宣称 unknown 恢复已完成。
