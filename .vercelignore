@@ -1,0 +1,67 @@
+# Preserve local exclusions for CLI uploads; Biome requires the root ignore file.
+# macOS / editor
+.DS_Store
+.AppleDouble
+.LSOverride
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node / build output (future application code)
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+.remotion/
+*.tsbuildinfo
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Browser automation state can contain bearer sessions, Cookies and customer messages.
+.agent-browser/
+.browser-profiles/
+.auth/
+browser-profiles/
+storage-state*.json
+storageState*.json
+cookies.json
+cookie.json
+session-state*.json
+*.har
+
+# Temporary artifacts
+tmp/
+output/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+/.swc
+
+# Authorized local catalog references must never be committed or uploaded.
+docs/reference/*.pdf
+.vercel
+.env*.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Reproducible synthetic review outputs, uploaded by CI only.
+artifacts/browser-fleet-review/
+
+!.gitignore
