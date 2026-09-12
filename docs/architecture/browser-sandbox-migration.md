@@ -242,3 +242,9 @@ cgroup 初始化保留五次尝试上限，在失败的尝试之间等待一秒�
 `scripts/test-browser-sandbox-websocket.mts` 使用修复版模板启动真实浏览器和 VNC，再由模板中的网关代码代理 noVNC 模块与 WebSocket。合成 broker 只批准测试票据，不访问平台用户或真实账号。实测通过公网 HTTPS 读取 noVNC 模块，经 TLS WebSocket 收到真实 VNC 的 RFB 协议问候；同一 WebSocket 能力地址再次使用被拒绝。
 
 证据位于 ignored `tmp/browser-sandbox-websocket-55dff74a-7df7-4b2b-96ea-ccbb273fffd4/result.json`，测试 VM 和快照已删除。此验证只覆盖传输握手与重复使用拒绝，未进行 VNC 密码认证、桌面渲染或交互，亦未验证平台票据签发、代理出口和真实账号接管。测试实例最长五分钟，不改变生产关闭状态。
+
+### noVNC 密码认证与实际画面
+
+云端合成测试现使用本地 Chromium 打开模板内真实 viewer 页面，经允许来源的 postMessage 交付独立测试票据，执行 noVNC 密码认证。首次仅检查 canvas 尺寸时截图仍为空白，不能证明画面已到达；回归因此增加等待非单色像素更新，避免把连接成功当成桌面渲染成功。
+
+严格复测通过，人工检查截图可见远端 Firefox 的 Example Domain 页面。证据位于 ignored `tmp/browser-sandbox-websocket-d32f2efc-3ea1-475c-bc9c-ebfcb083de24/`，包含 `desktop.png` 与清理后写入的 `result.json`。首次及复测的 VM、快照均已删除。本次未测试键鼠输入、实际平台父页面及票据签发、代理出口或真实账号，不把画面可见等同于完整接管验收。

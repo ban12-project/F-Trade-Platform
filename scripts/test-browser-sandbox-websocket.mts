@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import https from "node:https";
+import { chromium, expect } from "@playwright/test";
 import { Sandbox } from "@vercel/sandbox";
 import { z } from "zod";
 
@@ -152,6 +153,54 @@ try {
   console.log("PASS TLS WebSocket proxy delivered real VNC RFB greeting");
   await assert.rejects(tunnel(address, origin));
   console.log("PASS used WebSocket capability rejected");
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.goto(`${origin}/viewer`, { waitUntil: "networkidle", timeout: 15000 });
+    // This isolated viewer is its own parent on the fixture's allowed origin.
+    // Real platform postMessage admission remains a separate integration check.
+    await page.evaluate(
+      ({ token, target }) => {
+        window.postMessage({ type: "ftrade-browser-ticket", token }, target);
+      },
+      { token: `${ticket}-viewer`, target: origin },
+    );
+    await expect(page.locator("#status")).toContainText("已连接", { timeout: 20000 });
+    const canvas = page.locator("#screen canvas");
+    await expect(canvas).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          canvas.evaluate((element) => {
+            const c = element as HTMLCanvasElement;
+            return c.width > 100 && c.height > 100;
+          }),
+        { timeout: 10000 },
+      )
+      .toBe(true);
+    await expect
+      .poll(
+        () =>
+          canvas.evaluate((element) => {
+            const c = element as HTMLCanvasElement;
+            const context = c.getContext("2d");
+            if (!context) return 0;
+            const pixels = context.getImageData(0, 0, c.width, c.height).data;
+            const colors = new Set<string>();
+            for (let i = 0; i < pixels.length; i += 256) {
+              colors.add(`${pixels[i]},${pixels[i + 1]},${pixels[i + 2]}`);
+              if (colors.size > 8) break;
+            }
+            return colors.size;
+          }),
+        { timeout: 15000 },
+      )
+      .toBeGreaterThan(8);
+    await page.screenshot({ path: `${output}/desktop.png` });
+    console.log("PASS real noVNC viewer authenticated and received nonblank desktop");
+  } finally {
+    await browser.close();
+  }
 } finally {
   if (sandbox) {
     try {
@@ -167,7 +216,8 @@ await writeFile(
   JSON.stringify({
     templateSnapshotId: template.snapshotId,
     passed: true,
-    scope: "real VNC RFB greeting through TLS gateway; no VNC authentication or desktop rendering",
+    scope:
+      "real noVNC password authentication and desktop canvas over TLS; no platform admission, proxy or real account",
     cleanedUp: true,
   }),
   { mode: 0o600 },

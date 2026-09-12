@@ -12,11 +12,12 @@ const slot = {
   vncPort: 6080,
   vncPassword: config.password,
 };
+const tickets = new Set([config.ticket, `${config.ticket}-viewer`]);
 const gateway = createGateway({
   appOrigin: config.origin,
   slots: new Map([[config.runId, slot]]),
   nodeCall: async (operation, input) => {
-    if (operation !== "admit" || input.ticket !== config.ticket) throw new Error("denied");
+    if (operation !== "admit" || !tickets.delete(input.ticket)) throw new Error("denied");
     return { runId: config.runId };
   },
 });
