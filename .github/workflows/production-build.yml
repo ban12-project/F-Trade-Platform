@@ -32,7 +32,7 @@ jobs:
         with:
           cache: true
       - run: pnpm install --frozen-lockfile
-      - name: Build with the deployment command and testing APIs disabled
-        run: pnpm build
+      - name: Build application with testing APIs disabled
+        run: pnpm build:remotion && pnpm exec next build
       - name: Verify synthetic fixtures stay private to test builds
         run: node scripts/test-production-route-boundaries.mjs

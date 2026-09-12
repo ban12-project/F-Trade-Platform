@@ -1,0 +1,94 @@
+name: Facebook worker validation
+
+on:
+  pull_request:
+    paths:
+      - "lib/social/**"
+      - "lib/browser-fleet/**"
+      - "ops/browser-node/**"
+      - "scripts/test-facebook-publication-postgres.ts"
+      - "scripts/test-facebook-inbound-postgres.ts"
+      - "scripts/test-browser-inbox-postgres.ts"
+      - "scripts/test-browser-inbox-roundtrip.ts"
+      - "scripts/test-browser-login-postgres.ts"
+      - "drizzle/**"
+      - "lib/actions/facebook-*.ts"
+      - "lib/db/facebook-runtime-schema.ts"
+      - "lib/db/schema.ts"
+      - "app/api/social-worker/**"
+      - "app/workspace/facebook/**"
+      - "components/workspace/facebook-*.tsx"
+      - "components/workspace/workspace-facebook-attention.tsx"
+      - ".github/workflows/facebook-worker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: synthetic
+          POSTGRES_PASSWORD: synthetic
+          POSTGRES_DB: facebook_publication_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U synthetic -d facebook_publication_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: npm install --global pnpm@11.24.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Facebook change-set checks
+        shell: bash
+        run: |
+          files=(
+            app/api/social-worker/facebook/authorize/route.ts
+            app/api/social-worker/facebook/interactive/route.ts
+            app/api/social-worker/facebook/media/route.ts
+            app/api/social-worker/facebook/proxy/route.ts
+            app/workspace/facebook/page.tsx
+            app/workspace/layout.tsx
+            components/workspace/facebook-account-panel.tsx
+            components/workspace/facebook-attention-notice.tsx
+            components/workspace/facebook-media-panel.tsx
+            components/workspace/workspace-facebook-attention.tsx
+            lib/actions/facebook-account.ts
+            lib/actions/facebook-media.ts
+            lib/db/facebook-runtime-schema.ts
+            lib/social/facebook-account-forms.ts
+            lib/social/facebook-account-store.ts
+            lib/social/facebook-interactive-protocol.ts
+            lib/social/facebook-media-contract.ts
+            lib/social/facebook-media-store.ts
+            lib/social/facebook-proxy-protocol.ts
+            lib/social/facebook-vault-crypto.ts
+            lib/social/facebook-inbound-schema.ts
+            scripts/test-browser-inbox-postgres.ts
+            scripts/test-browser-inbox-roundtrip.ts
+            lib/social/facebook-inbound-store.ts
+            scripts/test-facebook-inbound-postgres.ts
+            lib/social/facebook-worker-protocol.ts
+            lib/social/job-store.ts
+            scripts/test-facebook-publication-postgres.ts
+          )
+          pnpm exec biome ci "${files[@]}"
+      - name: Application typecheck
+        run: pnpm typecheck
+      - name: Install synthetic Chromium runtime
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Migrated PostgreSQL publication claim and authorization
+        run: node --conditions=react-server --import tsx scripts/test-facebook-publication-postgres.ts
+        env:
+          FACEBOOK_PUBLICATION_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/facebook_publication_test

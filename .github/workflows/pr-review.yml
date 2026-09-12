@@ -1,0 +1,73 @@
+name: Browser fleet review and ablations
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - ".github/workflows/pr-review.yml"
+      - "scripts/browser-fleet-ablation*"
+      - "scripts/test-browser-review*"
+      - "lib/browser-fleet/**"
+      - "lib/social/facebook-*.ts"
+      - "lib/actions/facebook-*.ts"
+      - "lib/db/**"
+      - "drizzle/**"
+      - "app/api/social-worker/facebook/**"
+      - "ops/browser-node/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: synthetic
+          POSTGRES_PASSWORD: synthetic
+          POSTGRES_DB: browser_fleet_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U synthetic -d browser_fleet_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Typecheck all source and experiment scripts
+        run: pnpm typecheck
+      - name: Validate migration metadata
+        run: pnpm db:check
+      - name: Scheduler, protocol, gateway and failed-claim regressions
+        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-review-gateway.mjs scripts/test-browser-review-lease.mjs
+      - name: Paired control ablations (temporary variants, no external account traffic)
+        run: node --import tsx scripts/browser-fleet-ablation.mjs
+        env:
+          REVIEW_REVISION: ${{ github.sha }}
+      - name: Full migrations, actual authorization and PostgreSQL locking ablation
+        run: node --conditions=react-server --import tsx scripts/browser-fleet-ablation-postgres.ts
+        env:
+          BROWSER_FLEET_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/browser_fleet_test
+          REVIEW_REVISION: ${{ github.sha }}
+      - name: Export synthetic measurements only
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-fleet-ablation-results
+          path: artifacts/browser-fleet-review/
+          retention-days: 7
+          if-no-files-found: warn

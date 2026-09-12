@@ -23,10 +23,12 @@ import {
   productMediaRuntimeRecordFromRow,
 } from "@/lib/video/product-media-runtime-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
-
+import { facebookTextPayloadSchema } from "./facebook-worker-protocol";
 import { createControlledPublicationCommand } from "./publication-command";
+import { digestSocialWorkerPayload } from "./worker-protocol";
 
 export type PublicationCandidate = {
+  previewDigest: string;
   id: string;
   format: "text" | "video";
   title: string;
@@ -44,6 +46,18 @@ export type PublicationEntry = {
   status: string;
   createdAt: Date;
 };
+
+function previewDigest(
+  record: { id: string; version: number; payload: Record<string, unknown> },
+  format: string,
+) {
+  return digestSocialWorkerPayload({
+    contentRef: record.id,
+    version: record.version,
+    format,
+    payload: record.payload,
+  });
+}
 
 export async function assertPublicationEligible(
   value: {
@@ -76,6 +90,7 @@ export async function assertPublicationEligible(
     throw new Error("渠道未启用或已暂停，不能提交发布。");
   const [record] = await tx
     .select({
+      version: aggregateRecord.version,
       type: aggregateRecord.type,
       state: aggregateRecord.state,
       payload: aggregateRecord.payload,
@@ -95,18 +110,12 @@ export async function assertPublicationEligible(
   if ((record.type === "video") !== (value.format === "video"))
     throw new Error("发布格式与已批准记录类型不一致。");
   const [gate] = await tx
-    .select({ id: approval.id })
+    .select({ id: approval.id, status: approval.status })
     .from(approval)
-    .where(
-      and(
-        eq(approval.aggregateId, value.contentRef),
-        eq(approval.gate, "gate_01_truth"),
-        eq(approval.status, "approved"),
-      ),
-    )
-    .orderBy(desc(approval.requestedAt))
+    .where(and(eq(approval.aggregateId, value.contentRef), eq(approval.gate, "gate_01_truth")))
+    .orderBy(desc(approval.requestedAt), desc(approval.createdAt), desc(approval.id))
     .limit(1);
-  if (!gate) throw new Error("缺少 Gate 01 批准记录。");
+  if (gate?.status !== "approved") throw new Error("缺少当前 Gate 01 批准记录。");
   if (record.type === "video") {
     const video = videoProjectSchema.parse(record.payload);
     assertVideoPublicationEligible(video);
@@ -173,7 +182,11 @@ export async function listProjectPublicationData(
         .orderBy(desc(socialPublication.createdAt))
         .limit(50)
     : [];
-  const publishedRefs = new Set(publications.map((item) => item.contentRef));
+  const publishedRefs = new Set(
+    publications
+      .filter((item) => !(item.format === "text" && item.status === "paused"))
+      .map((item) => item.contentRef),
+  );
   const records = projectRecords.filter(
     ({ record }) =>
       ["CONTENT_APPROVED", "VIDEO_APPROVED"].includes(record.state) &&
@@ -201,6 +214,7 @@ export async function listProjectPublicationData(
         return [
           {
             id: record.id,
+            previewDigest: previewDigest(record, "text"),
             format: "text",
             title: typeof payload.hook === "string" ? payload.hook : "已批准营销内容",
             preview: typeof payload.body === "string" ? payload.body : "",
@@ -210,6 +224,7 @@ export async function listProjectPublicationData(
         return [
           {
             id: record.id,
+            previewDigest: previewDigest(record, "video"),
             format: "video",
             title: typeof payload.objective === "string" ? payload.objective : "已批准营销视频",
             preview: "已批准的私有视频成片；发布前请再次核对平台预览。",
@@ -231,6 +246,9 @@ export async function submitControlledPublication(
   return database.transaction(async (tx) => {
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
     const { control, record, gate } = await assertPublicationEligible(value, tx, now);
+    if (value.previewDigest !== previewDigest({ ...record, id: value.contentRef }, value.format)) {
+      throw new Error("内容已更新，请刷新页面、核对新预览后重新确认。");
+    }
     const idempotencyKey = `publish:${value.projectId}:${value.contentRef}:${value.channelRef}:${value.accountRef}:${value.confirmationRef}`;
     const existingJob = await tx.query.socialBrowserJob.findFirst({
       where: eq(socialBrowserJob.idempotencyKey, idempotencyKey),
@@ -286,6 +304,22 @@ export async function submitControlledPublication(
         contentRef: value.contentRef,
         format: value.format,
         confirmationRef: value.confirmationRef,
+        textConfirmation:
+          value.format === "text"
+            ? {
+                contentVersion: record.version,
+                approvalRef: gate.id,
+                payloadDigest: digestSocialWorkerPayload(
+                  facebookTextPayloadSchema.parse({
+                    channelRef: value.channelRef,
+                    accountRef: value.accountRef,
+                    publicationId: id,
+                    format: "text",
+                    text: record.payload.body,
+                  }),
+                ),
+              }
+            : null,
         browserJobId: jobId,
         status: "submitted",
       })
@@ -326,6 +360,10 @@ export async function recordControlledPublicationResult(
       .where(eq(socialBrowserJob.id, value.jobId))
       .for("update");
     if (!job || job.kind !== "publish") throw new Error("发布任务不存在。");
+    const fleet = await tx.execute(
+      sql`SELECT job_id FROM browser_fleet_publication WHERE job_id = ${job.id}`,
+    );
+    if (fleet.rows.length) throw new Error("节点发布必须使用绑定租约的回执。");
     const [publication] = await tx
       .select()
       .from(socialPublication)

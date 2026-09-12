@@ -1,0 +1,62 @@
+name: ftrade-browser-node
+services:
+  # Pull the runtime into the host Docker engine, then exit without launching a browser.
+  browser-image:
+    image: ${BROWSER_IMAGE:-ghcr.io/ban12-project/f-trade-platform-browser:main}
+    pull_policy: always
+    entrypoint: ["/bin/true"]
+    network_mode: none
+    read_only: true
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+  agent:
+    image: ${BROWSER_NODE_IMAGE:-ghcr.io/ban12-project/f-trade-platform-browser-node:main}
+    pull_policy: always
+    depends_on:
+      browser-image:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      FTRADE_URL: ${FTRADE_URL:?Set the HTTPS platform origin}
+      BROWSER_NODE_ACCESS_KEY: ${BROWSER_NODE_ACCESS_KEY:?Set the platform node key}
+      BROWSER_IMAGE: ${BROWSER_IMAGE:-ghcr.io/ban12-project/f-trade-platform-browser:main}
+      MAX_RUNNING_BROWSERS: ${MAX_RUNNING_BROWSERS:-2}
+      HOST_RESERVE_MB: ${HOST_RESERVE_MB:-1024}
+      GATEWAY_PORT: "9400"
+      FACEBOOK_LOGIN_PROFILES_FILE: ${FACEBOOK_LOGIN_PROFILES_FILE:-}
+    volumes:
+      # Host-level authority. Only use a trusted, dedicated Linux VPS.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - node-state:/var/lib/browser-node
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
+  gateway:
+    image: caddy:2
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      BROWSER_DOMAIN: ${BROWSER_DOMAIN:?Set the node gateway domain}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+volumes:
+  node-state:
+  caddy-data:
+  caddy-config:

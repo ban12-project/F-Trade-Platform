@@ -67,11 +67,20 @@ function sign(command: SocialWorkerCommand) {
 }
 
 function canonicalPayload(payload: Record<string, unknown>) {
-  return JSON.stringify(
-    Object.fromEntries(
-      Object.entries(payload).sort(([left], [right]) => left.localeCompare(right)),
-    ),
-  );
+  function sorted(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(sorted);
+    if (value !== null && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, sorted(item)]),
+      );
+    }
+    return value;
+  }
+  // PostgreSQL jsonb changes nested key order. Normalize JSON values first,
+  // then sort every object while preserving array order and scalar values.
+  return JSON.stringify(sorted(JSON.parse(JSON.stringify(payload))));
 }
 
 export function digestSocialWorkerPayload(payload: Record<string, unknown>) {

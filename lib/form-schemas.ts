@@ -337,6 +337,7 @@ export const inboundRoutingFormSchema = z
   });
 
 export const publicationConfirmationFormSchema = z.object({
+  previewDigest: z.string().regex(/^[a-f0-9]{64}$/, "请刷新页面并重新核对发布预览。"),
   projectId: z.uuid(),
   contentRef: z.uuid("内容标识无效。"),
   format: z.enum(["text", "image", "video"]),

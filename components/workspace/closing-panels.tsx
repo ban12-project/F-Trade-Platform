@@ -1143,6 +1143,7 @@ export function PublicationPanel({
     resolver: zodResolver(publicationConfirmationFormSchema),
     defaultValues: {
       projectId,
+      previewDigest: candidates[0]?.previewDigest ?? "",
       contentRef: candidates[0]?.id ?? "",
       format: candidates[0]?.format ?? "text",
       channelRef: channels[0]?.channelRef ?? "",
@@ -1158,8 +1159,10 @@ export function PublicationPanel({
     if (state.status === "success") router.refresh();
   }, [router, state.status]);
   function submit(value: z.infer<typeof publicationConfirmationFormSchema>) {
+    if (!selected) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item);
+    data.set("previewDigest", selected.previewDigest);
     startTransition(() => action(data));
   }
   return (
@@ -1195,7 +1198,10 @@ export function PublicationPanel({
                       onValueChange={(value) => {
                         const item = candidates.find((candidate) => candidate.id === value);
                         field.onChange(value);
-                        if (item) form.setValue("format", item.format);
+                        if (item) {
+                          form.setValue("format", item.format);
+                          form.setValue("previewDigest", item.previewDigest);
+                        }
                       }}
                     >
                       <SelectTrigger className="w-full">

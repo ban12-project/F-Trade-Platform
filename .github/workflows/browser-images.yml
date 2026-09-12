@@ -1,0 +1,129 @@
+name: Browser images (GHCR)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ops/browser-node/**"
+      - "lib/browser-fleet/policy.ts"
+      - "lib/browser-fleet/security.ts"
+      - "lib/browser-fleet/inbox-signature.mjs"
+      - "scripts/test-browser-images.sh"
+      - "scripts/test-camofox-login-contract.mjs"
+      - ".github/actions/browser-images/**"
+      - ".github/workflows/browser-images.yml"
+      - ".github/workflows/pr-review.yml"
+      - ".dockerignore"
+  pull_request:
+    paths:
+      - "ops/browser-node/**"
+      - "lib/browser-fleet/policy.ts"
+      - "lib/browser-fleet/security.ts"
+      - "lib/browser-fleet/inbox-signature.mjs"
+      - "scripts/test-browser-images.sh"
+      - "scripts/test-camofox-login-contract.mjs"
+      - ".github/actions/browser-images/**"
+      - ".github/workflows/browser-images.yml"
+      - ".github/workflows/pr-review.yml"
+      - ".dockerignore"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-images-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: "false"
+
+jobs:
+  release-validation:
+    if: >-
+      github.repository == 'ban12-project/F-Trade-Platform' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/pr-review.yml
+    permissions:
+      contents: read
+
+  validate:
+    name: Build and smoke-test (${{ matrix.arch }}, no push)
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/browser-images
+        with:
+          arch: ${{ matrix.arch }}
+
+  publish:
+    needs: release-validation
+    name: Publish tested images (${{ matrix.arch }})
+    if: >-
+      github.repository == 'ban12-project/F-Trade-Platform' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/browser-images
+        with:
+          arch: ${{ matrix.arch }}
+          publish: "true"
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+
+  manifests:
+    name: Publish multi-architecture tags
+    needs: publish
+    if: >-
+      github.repository == 'ban12-project/F-Trade-Platform' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Assemble both images before updating main/latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash ops/browser-node/publish-manifests.sh

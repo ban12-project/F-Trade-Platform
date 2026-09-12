@@ -1,5 +1,6 @@
 import { type ReactNode, Suspense } from "react";
 import { WorkspaceDockData } from "@/components/workspace/workspace-dock-data";
+import { WorkspaceFacebookAttention } from "@/components/workspace/workspace-facebook-attention";
 import { WorkspaceDockSkeleton } from "@/components/workspace/workspace-loading-skeleton";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 
@@ -12,6 +13,9 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         </Suspense>
       }
     >
+      <Suspense fallback={null}>
+        <WorkspaceFacebookAttention />
+      </Suspense>
       {children}
     </WorkspaceShell>
   );

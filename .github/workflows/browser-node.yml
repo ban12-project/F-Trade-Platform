@@ -1,0 +1,87 @@
+name: Browser node validation
+on:
+  pull_request:
+    paths:
+      - "lib/browser-fleet/**"
+      - "lib/actions/browser-nodes.ts"
+      - "app/api/browser-nodes/**"
+      - "app/workspace/browsers/**"
+      - "components/workspace/browser-nodes-panel.tsx"
+      - "ops/browser-node/**"
+      - "scripts/test-browser-*.ts"
+      - "scripts/test-browser-*.mjs"
+      - "drizzle/**"
+      - ".github/workflows/browser-node.yml"
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: synthetic
+          POSTGRES_PASSWORD: synthetic
+          POSTGRES_DB: browser_fleet_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U synthetic -d browser_fleet_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Lease, capacity, gateway and isolation regression tests
+        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts
+      - name: Offline Agent payload imports without application dependencies
+        run: node scripts/test-browser-agent-payload.mjs
+      - name: Pinned upstream source cache and refusal checks
+        run: node scripts/test-browser-upstream.mjs
+      - name: Real PostgreSQL reservations and migration
+        run: pnpm exec tsx scripts/test-browser-fleet-postgres.ts
+        env:
+          BROWSER_FLEET_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/browser_fleet_test
+      - name: Application typecheck
+        if: ${{ !cancelled() }}
+        run: pnpm typecheck
+      - name: Validate Compose without printing secrets
+        if: ${{ !cancelled() }}
+        run: docker compose --env-file ops/browser-node/.env.example -f ops/browser-node/compose.yaml config --quiet
+      - name: Build controller image
+        if: ${{ !cancelled() }}
+        run: docker build -f ops/browser-node/Dockerfile -t ftrade-browser-node:ci .
+      - name: Check new code with repository Biome rules
+        if: ${{ !cancelled() }}
+        run: pnpm exec biome ci lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-fleet-postgres.ts
+      - name: Export suggested formatting patch for review (never commits)
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          files=(lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-fleet-postgres.ts)
+          set +e
+          pnpm exec biome check --write "${files[@]}"
+          formatter_status=$?
+          set -e
+          git diff --binary -- "${files[@]}" > browser-node-format.patch
+          printf 'Formatter exit code: %s. Original validation result is unchanged.\n' "$formatter_status"
+      - name: Upload formatting suggestions
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-node-format
+          path: browser-node-format.patch
+          retention-days: 2

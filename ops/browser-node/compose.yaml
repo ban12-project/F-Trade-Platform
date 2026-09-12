@@ -1,0 +1,53 @@
+name: ftrade-browser-node
+services:
+  agent:
+    build:
+      context: ../..
+      dockerfile: ops/browser-node/Dockerfile
+    image: ftrade-browser-node:lease-v1
+    restart: unless-stopped
+    init: true
+    # Linux-only: connect to browser ports which Docker publishes on host loopback.
+    network_mode: host
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      FTRADE_URL: ${FTRADE_URL:?Set the HTTPS platform origin}
+      BROWSER_NODE_ACCESS_KEY: ${BROWSER_NODE_ACCESS_KEY:?Create a node key in the platform}
+      BROWSER_IMAGE: ${BROWSER_IMAGE:-ftrade-browser:lease-v1}
+      MAX_RUNNING_BROWSERS: ${MAX_RUNNING_BROWSERS:-2}
+      HOST_RESERVE_MB: ${HOST_RESERVE_MB:-1024}
+      GATEWAY_PORT: "9400"
+      FACEBOOK_LOGIN_PROFILES_FILE: ${FACEBOOK_LOGIN_PROFILES_FILE:-}
+    volumes:
+      # This grants host-level Docker authority. Use a dedicated trusted VPS.
+      # Never mount this socket in the Camofox browser containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - node-state:/var/lib/browser-node
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
+  gateway:
+    image: caddy:2
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      BROWSER_DOMAIN: ${BROWSER_DOMAIN:?Set the same domain as the platform node gateway origin}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+volumes:
+  node-state:
+  caddy-data:
+  caddy-config:

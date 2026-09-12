@@ -197,6 +197,48 @@
       "when": 1788578007667,
       "tag": "0027_remove_personal_video_canvas",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1788681600000,
+      "tag": "0028_browser_fleet",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788686400000,
+      "tag": "0029_facebook_runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788840000000,
+      "tag": "0030_text_publication_confirmation",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788840000001,
+      "tag": "0031_browser_fleet_publication",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1788840000002,
+      "tag": "0032_browser_publication_authorization",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788840000003,
+      "tag": "0033_browser_publication_receipt",
+      "breakpoints": true
     }
   ]
 }

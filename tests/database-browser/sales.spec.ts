@@ -251,16 +251,20 @@ test("mock RFQ proceeds through quotation, delivery, follow-up and opportunity",
   expect(events.every((event) => event.evidenceRefs.includes(evidenceId))).toBe(true);
   expect(audits.every((item) => item.actorId === actorId)).toBe(true);
   await page.reload();
-  await expect(page.locator(`form#quote-send-${draft.id}`)).toBeVisible();
+  // Streaming SSR may temporarily stage another copy under a hidden S:* container.
+  // Scope to the accessible panel, never select an arbitrary first duplicate.
+  const quotationDetails = page.getByRole("complementary", { name: "报价详情与审批" });
+  const send = quotationDetails.locator(`form#quote-send-${draft.id}`);
+  await expect(send).toHaveCount(1);
+  await expect(send).toBeVisible();
   // Approval alone is not delivery. A simulated receipt is registered below.
   expect((await records("quotation"))[0].state).toBe("QUOTE_APPROVED");
   const conversationId = randomUUID();
   const channelRef = `synthetic-channel-${projectId}`;
   const accountRef = `synthetic-account-${projectId}`;
-  const send = page.locator(`form#quote-send-${draft.id}`);
   await send.getByLabel("发送渠道", { exact: true }).fill(channelRef);
   await send.getByLabel("外部发送凭证", { exact: true }).fill(conversationId);
-  await page.locator(`button[form="quote-send-${draft.id}"]`).click();
+  await quotationDetails.locator(`button[form="quote-send-${draft.id}"]`).click();
   await expect.poll(async () => (await records("quotation"))[0].state).toBe("QUOTE_SENT");
   await expect.poll(async () => (await records("lead")).length).toBe(1);
   const [lead] = await records("lead");

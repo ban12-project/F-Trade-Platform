@@ -772,6 +772,11 @@ export const socialPublication = pgTable(
     contentRef: text("content_ref").notNull(),
     format: text("format").notNull(),
     confirmationRef: text("confirmation_ref").notNull(),
+    textConfirmation: jsonb("text_confirmation").$type<{
+      contentVersion: number;
+      approvalRef: string;
+      payloadDigest: string;
+    }>(),
     browserJobId: text("browser_job_id").references(() => socialBrowserJob.id, {
       onDelete: "restrict",
     }),

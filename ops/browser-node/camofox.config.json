@@ -1,0 +1,9 @@
+{
+  "interactive": { "mode": "off" },
+  "plugins": {
+    "ftrade-login": { "enabled": true },
+    "youtube": { "enabled": false },
+    "persistence": { "enabled": true, "profileDir": "/data/profiles", "indexedDB": false },
+    "vnc": { "enabled": true, "resolution": "1440x900" }
+  }
+}

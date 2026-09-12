@@ -1,0 +1,76 @@
+name: Build browser node image pair
+description: Build and smoke-test native images; only trusted main jobs may publish.
+inputs:
+  arch:
+    description: Native runner architecture, amd64 or arm64
+    required: true
+  publish:
+    description: Publish run-scoped tags after all smoke tests pass
+    default: "false"
+  registry-token:
+    description: GITHUB_TOKEN from the main-only packages-write job
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare image metadata and enforce publication boundary
+      shell: bash
+      env:
+        TARGET_ARCH: ${{ inputs.arch }}
+        PUBLISH_IMAGES: ${{ inputs.publish }}
+      run: |
+        set -euo pipefail
+        case "$TARGET_ARCH" in amd64|arm64) ;; *) exit 1 ;; esac
+        case "$PUBLISH_IMAGES" in true|false) ;; *) exit 1 ;; esac
+        if [[ "$PUBLISH_IMAGES" == true ]]; then
+          [[ "$GITHUB_REPOSITORY" == ban12-project/F-Trade-Platform ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$GITHUB_EVENT_NAME" == push || "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
+        fi
+        {
+          echo "ARCH=$TARGET_ARCH"
+          echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "BUILD_TAG=run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "REVISION=$GITHUB_SHA"
+          echo "SOURCE=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+        } >> "$GITHUB_ENV"
+    - name: Fetch pinned Camofox source (no deployment credentials)
+      shell: bash
+      run: sh ops/browser-node/prepare-upstream.sh
+    - name: Check login plugin against pinned upstream loader and authentication
+      shell: bash
+      run: node scripts/test-camofox-login-contract.mjs
+    - uses: docker/setup-buildx-action@v4
+    - name: Build both native images and load for tests
+      uses: docker/bake-action@v7.3.0
+      with:
+        source: .
+        files: ops/browser-node/docker-bake.hcl
+        targets: |
+          agent
+          browser
+        load: true
+        provenance: "false"
+    - name: Test image contents, startup, watchdog and pull-only Compose
+      shell: bash
+      run: bash scripts/test-browser-images.sh
+    - name: Log in to GHCR only after validation
+      if: inputs.publish == 'true'
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.registry-token }}
+    - name: Push tested run-scoped images with provenance and SBOM
+      if: inputs.publish == 'true'
+      uses: docker/bake-action@v7.3.0
+      with:
+        source: .
+        files: ops/browser-node/docker-bake.hcl
+        targets: |
+          agent
+          browser
+        push: true
+        provenance: mode=min
+        sbom: "true"
