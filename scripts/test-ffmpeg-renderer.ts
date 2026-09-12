@@ -110,6 +110,18 @@ void (async () => {
           assert.ok((await stat(filePath)).size > 0);
           const measured = await inspectVideoFile(filePath, ffprobeBin);
           assert.equal(validateProbedVideoExport(preset.platform, measured), preset);
+          assert.equal(measured.resources?.fileSizeBytes, (await stat(filePath)).size);
+          for (const field of [
+            "containerBitrateBps",
+            "videoBitrateBps",
+            "audioBitrateBps",
+          ] as const) {
+            assert.ok(
+              (measured.resources?.[field] ?? 0) > 0,
+              `${field} must be measured from the actual export`,
+            );
+          }
+
           assert.deepEqual(measured.encoding, {
             pixelFormat: "yuv420p",
             sampleAspectRatio: "1:1",
