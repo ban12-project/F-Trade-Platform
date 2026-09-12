@@ -1,11 +1,24 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { Sandbox } from "@vercel/sandbox";
+import { z } from "zod";
 import { startBrowserSandboxRuntime } from "../lib/browser-fleet/sandbox-runtime";
 import { stopIdleBrowserSandboxSession } from "../lib/browser-fleet/sandbox-session";
 import { createAccessKey } from "../lib/browser-fleet/security";
+
+const template = process.argv[2]
+  ? z
+      .object({
+        snapshotId: z.string().regex(/^[A-Za-z0-9_-]+$/),
+        revision: z.string().regex(/^[a-f0-9]{40}$/),
+        agentImage: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+        browserImage: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+        builderDeleted: z.literal(true),
+      })
+      .parse(JSON.parse(await readFile(process.argv[2], "utf8")))
+  : undefined;
 
 // Opt-in live test. Empty synthetic broker; never a real account or task.
 const nodeId = randomUUID(),
@@ -17,7 +30,8 @@ const payload = execFileSync(
   ["archive", "--format=tar", revision, "ops/browser-node", "lib/browser-fleet"],
   { maxBuffer: 20_000_000 },
 );
-const output = "tmp/browser-sandbox-start";
+const output = `tmp/browser-sandbox-start-${nodeId}`;
+console.log(`Runtime verification evidence: ${output}`);
 await mkdir(output, { recursive: true, mode: 0o700 });
 let sandbox: Sandbox | undefined;
 async function run(stage: string, script: string, timeoutMs = 60000, args: string[] = []) {
@@ -37,16 +51,21 @@ async function run(stage: string, script: string, timeoutMs = 60000, args: strin
   return stdout;
 }
 try {
-  sandbox = await Sandbox.create({
+  const options = {
     persistent: false,
     ports: [9400, 9401],
     resources: { vcpus: 2 },
     timeout: 600000,
-  });
+  };
+  sandbox = await Sandbox.create(
+    template
+      ? { ...options, source: { type: "snapshot", snapshotId: template.snapshotId } }
+      : options,
+  );
   await writeFile(`${output}/sandbox-name`, sandbox.name, { mode: 0o600 });
   console.log("Created bounded synthetic startup Sandbox");
   await sandbox.currentSession().writeFiles([
-    { path: "/tmp/ftrade-start-source.tar", content: payload, mode: 0o600 },
+    ...(template ? [] : [{ path: "/tmp/ftrade-start-source.tar", content: payload, mode: 0o600 }]),
     { path: "/tmp/ftrade-node-key", content: key, mode: 0o600 },
     {
       path: "/tmp/ftrade-broker.mjs",
@@ -68,7 +87,10 @@ http.createServer(async (req, res) => {
   ]);
   await run(
     "install",
-    "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y -qq docker.io docker-compose-v2; mkdir -p /vercel/sandbox/source /var/lib/ftrade-sandbox; chmod 700 /var/lib/ftrade-sandbox; tar -xf /tmp/ftrade-start-source.tar -C /vercel/sandbox/source; install -m 600 /tmp/ftrade-node-key /var/lib/ftrade-sandbox/node-key; install -m 600 /tmp/ftrade-broker.mjs /var/lib/ftrade-sandbox/broker.mjs; rm /tmp/ftrade-node-key",
+    (template
+      ? ""
+      : "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y -qq docker.io docker-compose-v2; mkdir -p /vercel/sandbox/source; tar -xf /tmp/ftrade-start-source.tar -C /vercel/sandbox/source; ") +
+      "mkdir -p /var/lib/ftrade-sandbox; chmod 700 /var/lib/ftrade-sandbox; install -m 600 /tmp/ftrade-node-key /var/lib/ftrade-sandbox/node-key; install -m 600 /tmp/ftrade-broker.mjs /var/lib/ftrade-sandbox/broker.mjs; rm /tmp/ftrade-node-key",
     240000,
   );
   await run("cgroups", "bash /vercel/sandbox/source/ops/browser-node/prepare-sandbox-cgroups.sh");
@@ -78,14 +100,19 @@ http.createServer(async (req, res) => {
     sudo: true,
     detached: true,
   });
+  if (!template)
+    await run(
+      "build",
+      "for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 1; done; cd /vercel/sandbox/source; docker build --label io.ftrade.lease-watchdog=1 -f ops/browser-node/Dockerfile -t ftrade-start-agent:test .",
+      240000,
+    );
   await run(
-    "build",
-    "for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 1; done; cd /vercel/sandbox/source; docker build --label io.ftrade.lease-watchdog=1 -f ops/browser-node/Dockerfile -t ftrade-start-agent:test .",
-    240000,
+    "docker-ready",
+    "for i in $(seq 1 30); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
   );
-  const image = (
-    await run("image", "docker image inspect --format '{{.Id}}' ftrade-start-agent:test")
-  ).trim();
+  const image =
+    template?.agentImage ??
+    (await run("image", "docker image inspect --format '{{.Id}}' ftrade-start-agent:test")).trim();
   assert.match(image, /^sha256:[a-f0-9]{64}$/);
   await run(
     "broker",
@@ -99,7 +126,7 @@ http.createServer(async (req, res) => {
     operationId,
     appOrigin: sandbox.domain(9401),
     agentImage: image,
-    browserImage: image,
+    browserImage: template?.browserImage ?? image,
     accessKey: key,
   };
   const start = () =>
@@ -157,6 +184,12 @@ http.createServer(async (req, res) => {
 }
 await writeFile(
   `${output}/result.json`,
-  JSON.stringify({ revision, passed: true, cleanedUp: true }),
+  JSON.stringify({
+    revision,
+    templateSnapshotId: template?.snapshotId,
+    templateRevision: template?.revision,
+    passed: true,
+    cleanedUp: true,
+  }),
   { mode: 0o600 },
 );

@@ -220,3 +220,9 @@ cgroup 初始化保留五次尝试上限，在失败的尝试之间等待一秒�
 提交 `250c9a1` 的测试直接使用模板内脚本，不再上传替代初始化脚本。真实浏览器 cookie／localStorage 在写入、整机停止及恢复后读取全部通过，结果位于 ignored `tmp/browser-sandbox-template-test-d23ac3b2-c520-48ad-abab-e508f6ae795c/result.json`；测试 VM 与孤立测试快照均已删除。该结果仍不覆盖实际 Agent 派发、真实登录、代理、noVNC 或生产 Workflow。
 
 新模板验证后，已删除未用于生产的旧模板 `snap_e9WUZREfFGXUKsAuTM5F5WKAyY7f`；保留新模板的七天到期设置，清理回执在 ignored `tmp/retired-browser-template.json`。生产开关保持关闭。
+
+### 模板内 Agent 启动与空闲停止
+
+`scripts/test-browser-sandbox-start.mts` 现在可接收模板构建结果，直接使用快照内脚本及不可变 Agent／浏览器镜像，不上传替代运行源码或重新构建 Agent。合成 broker 只返回空任务。新模板实测通过私密运行配置下发、重复启动返回 already-running、临时文件清理、512 MiB 内存限制、HTTPS viewer 静态入口、空闲正常退出、同一操作不会重启已退出 Agent，以及提供方确认整机 stopped。
+
+证据位于 ignored `tmp/browser-sandbox-start-cbc08017-c16d-4241-b068-de1d1cee91d1/result.json`，记录模板与测试提交版本。测试 VM 和快照已删除。此测试没有真实任务，不覆盖 PostgreSQL outbox 到生产 Workflow 的投递、浏览器 WebSocket 或代理；HTTPS 静态入口通过不等于 noVNC 接管已通过。
