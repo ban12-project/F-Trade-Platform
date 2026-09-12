@@ -13,6 +13,7 @@ import {
   settleBrowserSandboxOperation,
 } from "../lib/browser-fleet/sandbox-lifecycle";
 import {
+  bindInitialBrowserSandboxRecovery,
   claimBrowserSandboxRecovery,
   recordRecoveredBrowserSandboxStop,
 } from "../lib/browser-fleet/sandbox-recovery";
@@ -221,6 +222,29 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
     sessionId: "unknown-session",
   });
   await record(unknownStart.operation_id, "unknown-session");
+  const unbound = await start();
+  assert.ok(unbound?.operation_id);
+  const unboundId = unbound.operation_id;
+  await pool.query("UPDATE browser_sandbox SET dispatch_operation_id=$2 WHERE node_id=$1", [
+    nodeId,
+    unboundId,
+  ]);
+  const capture = (id = unboundId, session = "discovered-session") =>
+    database.transaction((tx) => bindInitialBrowserSandboxRecovery(tx, nodeId, id, session));
+  assert.equal(await capture(), false, "fresh startup cannot be captured");
+  await settle(unboundId, { status: "unknown" });
+  assert.deepEqual(await recover(unboundId), { status: "unbound" });
+  assert.equal(await capture(randomUUID()), false);
+  const captures = await Promise.all(Array.from({ length: 8 }, () => capture()));
+  assert.equal(captures.filter(Boolean).length, 1, "only one discovery can fence the operation");
+  assert.equal(await capture(unboundId, "different-session"), false);
+  assert.equal(await bind(unboundId, "late-controller"), false);
+  await assert.rejects(
+    settle(unboundId, { status: "running", sessionId: "discovered-session" }),
+    /result_mismatch/,
+  );
+  assert.equal(await start(), null);
+  assert.equal(await record(unboundId, "discovered-session"), true);
   await pool.query("UPDATE browser_fleet_node SET status='revoked' WHERE id=$1", [nodeId]);
   assert.equal(await start(), null);
   console.log(

@@ -94,3 +94,30 @@ export async function inspectBrowserSandbox(
     throw new Error("sandbox_inspection_unconfirmed");
   }
 }
+
+/** Identify only an initial create whose response was lost. A later resume must
+ * never be inferred from the stable name or the original creation tag.
+ */
+export async function discoverInitialBrowserSandboxSession(
+  nodeId: string,
+  operationId: string,
+  provider: Pick<typeof Sandbox, "get"> = Sandbox,
+) {
+  uuid.parse(nodeId);
+  uuid.parse(operationId);
+  const sandbox = await provider.get({ name: `ftrade-browser-${nodeId}`, resume: false });
+  if (
+    sandbox.name !== `ftrade-browser-${nodeId}` ||
+    !sandbox.persistent ||
+    sandbox.tags?.["ftrade-node"] !== nodeId ||
+    sandbox.tags?.["ftrade-created-by"] !== operationId
+  )
+    return null;
+  const ids: string[] = [];
+  for await (const session of await sandbox.listSessions({ limit: 2 })) {
+    ids.push(session.id);
+    if (ids.length > 1) return null;
+  }
+  const current = sandbox.currentSession();
+  return ids.length === 1 && ids[0] === current.sessionId ? current.sessionId : null;
+}

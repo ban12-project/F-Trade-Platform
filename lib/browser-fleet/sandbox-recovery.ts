@@ -5,7 +5,7 @@ import { type DatabaseTransaction, getDatabase } from "../db/client";
 import { recordedBrowserSandboxDispatch } from "./sandbox-dispatch";
 import { settleBrowserSandboxOperation } from "./sandbox-lifecycle";
 import { monitorBrowserSandboxSession } from "./sandbox-monitor";
-import { inspectBrowserSandbox } from "./sandbox-provider";
+import { discoverInitialBrowserSandboxSession, inspectBrowserSandbox } from "./sandbox-provider";
 import { stopRevokedBrowserSandboxSession } from "./sandbox-session";
 
 /** Fence a failed start before stopping its bound session. Five minutes without
@@ -37,11 +37,31 @@ export async function claimBrowserSandboxRecovery(
   // A concurrent successful dispatch will be picked up by the next observation.
   if (row.phase === "running") return { status: "pending" as const };
   if (row.operation_id !== operationId) return { status: "superseded" as const };
-  if (!row.session_id || (row.phase === "starting" && !row.stale))
-    return { status: "pending" as const };
+  if (row.phase === "starting" && !row.stale) return { status: "pending" as const };
+  if (!row.session_id) return { status: "unbound" as const };
   await tx.execute(sql`UPDATE browser_sandbox SET phase = 'stopping', operation_kind = 'stop',
     updated_at = now() WHERE node_id = ${nodeId}`);
   return { status: "captured" as const, sessionId: row.session_id };
+}
+
+/** Provider ownership/history was checked before this transaction. Recheck the
+ * current unbound dispatch under the node lock, then fence the old controller.
+ */
+export async function bindInitialBrowserSandboxRecovery(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  operationId: string,
+  sessionId: string,
+) {
+  await tx.execute(sql`SELECT id FROM browser_fleet_node WHERE id = ${nodeId} FOR UPDATE`);
+  const rows = await tx.execute(sql`UPDATE browser_sandbox
+    SET session_id = ${sessionId}, phase = 'stopping', operation_kind = 'stop', updated_at = now()
+    WHERE node_id = ${nodeId} AND operation_id = ${operationId}::uuid
+      AND dispatch_operation_id = ${operationId}::uuid AND operation_kind = 'start'
+      AND session_id IS NULL AND (phase = 'unknown' OR
+        (phase = 'starting' AND updated_at < now() - interval '5 minutes'))
+    RETURNING node_id`);
+  return rows.rows.length === 1;
 }
 
 export async function recordRecoveredBrowserSandboxStop(
@@ -70,6 +90,11 @@ const dependencies = {
   monitor: monitorBrowserSandboxSession,
   claim: (nodeId: string, operationId: string) =>
     getDatabase().transaction((tx) => claimBrowserSandboxRecovery(tx, nodeId, operationId)),
+  discover: discoverInitialBrowserSandboxSession,
+  bind: (nodeId: string, operationId: string, sessionId: string) =>
+    getDatabase().transaction((tx) =>
+      bindInitialBrowserSandboxRecovery(tx, nodeId, operationId, sessionId),
+    ),
   inspect: inspectBrowserSandbox,
   drain: stopRevokedBrowserSandboxSession,
   record: (nodeId: string, operationId: string, sessionId: string) =>
@@ -79,9 +104,9 @@ const dependencies = {
 };
 export type BrowserSandboxRecoveryDependencies = typeof dependencies;
 
-/** Read-only provider lookup and captured-session stop only. Unbound sessions
- * remain uncertain: a name alone does not prove which session belongs to this
- * operation. Neither keys nor a new create/resume are permitted in recovery.
+/** Read-only provider lookup and captured-session stop only. Unbound initial
+ * creates require matching ownership tags and single-session history. Neither
+ * keys nor a new create/resume are permitted in recovery.
  */
 export async function recoverBrowserSandboxDispatch(
   nodeId: string,
@@ -91,7 +116,13 @@ export async function recoverBrowserSandboxDispatch(
   try {
     const recorded = await deps.recorded(nodeId, operationId);
     if (recorded) return deps.monitor(nodeId, recorded.sessionId);
-    const claim = await deps.claim(nodeId, operationId);
+    let claim = await deps.claim(nodeId, operationId);
+    if (claim.status === "unbound") {
+      const sessionId = await deps.discover(nodeId, operationId);
+      if (!sessionId) return "pending";
+      if (!(await deps.bind(nodeId, operationId, sessionId))) return "pending";
+      claim = { status: "captured", sessionId };
+    }
     if (claim.status !== "captured") return claim.status;
     const sandbox = await deps.inspect(nodeId);
     if (sandbox.name !== `ftrade-browser-${nodeId}` || !sandbox.persistent) return "pending";

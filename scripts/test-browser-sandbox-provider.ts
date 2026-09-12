@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   type BrowserSandboxProvider,
   type BrowserSandboxProviderHandle,
+  discoverInitialBrowserSandboxSession,
   inspectBrowserSandbox,
   provisionBrowserSandbox,
 } from "../lib/browser-fleet/sandbox-provider";
@@ -109,4 +110,43 @@ test("resume refuses unbounded or changed timeout configuration before waking co
     { message: "sandbox_provision_unconfirmed" },
   );
   assert.equal(missing.calls.length, 1);
+});
+
+test("lost initial create requires exact tags and a single matching provider session", async () => {
+  for (const variant of [
+    "valid",
+    "node-tag",
+    "operation-tag",
+    "resumed",
+    "missing-history",
+    "current-mismatch",
+  ]) {
+    let lists = 0;
+    const provider = {
+      async get(input: { name: string; resume: boolean }) {
+        assert.deepEqual(input, { name: `ftrade-browser-${nodeId}`, resume: false });
+        return {
+          name: input.name,
+          persistent: true,
+          tags: {
+            "ftrade-node": variant === "node-tag" ? randomUUID() : nodeId,
+            "ftrade-created-by": variant === "operation-tag" ? randomUUID() : operationId,
+          },
+          currentSession: () => ({ sessionId: variant === "current-mismatch" ? "new" : "first" }),
+          async listSessions() {
+            lists++;
+            return (async function* () {
+              if (variant !== "missing-history") yield { id: "first" };
+              if (variant === "resumed") yield { id: "second" };
+            })();
+          },
+        };
+      },
+    } as unknown as NonNullable<Parameters<typeof discoverInitialBrowserSandboxSession>[2]>;
+    assert.equal(
+      await discoverInitialBrowserSandboxSession(nodeId, operationId, provider),
+      variant === "valid" ? "first" : null,
+    );
+    if (variant.endsWith("tag")) assert.equal(lists, 0);
+  }
 });

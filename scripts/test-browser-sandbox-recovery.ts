@@ -71,7 +71,7 @@ test("stopped and transitional sessions never execute runtime commands", async (
     assert.ok(!f.calls.includes("drain") && !f.calls.includes("stop"));
   }
 });
-test("unbound or superseded operations never inspect or create compute", async () => {
+test("pending or superseded operations never inspect or create compute", async () => {
   for (const status of ["pending", "superseded"] as const) {
     const f = fixture();
     f.deps.claim = async () => ({ status });
@@ -101,4 +101,29 @@ test("concurrent successful dispatch resumes normal monitoring", async () => {
   f.deps.recorded = async () => ({ status: "running", sessionId: "bound" });
   assert.equal(await recoverBrowserSandboxDispatch("node", "operation", f.deps), "active");
   assert.deepEqual(f.calls, ["monitor"]);
+});
+
+test("proven initial create is bound and fenced before any stop", async () => {
+  const f = fixture();
+  f.deps.claim = async () => ({ status: "unbound" });
+  f.deps.discover = async () => {
+    f.calls.push("discover");
+    return "bound";
+  };
+  f.deps.bind = async () => {
+    f.calls.push("bind");
+    return true;
+  };
+  assert.equal(await recoverBrowserSandboxDispatch("node", "operation", f.deps), "stopped");
+  assert.deepEqual(f.calls, ["discover", "bind", "inspect", "drain", "inspect", "record"]);
+});
+test("unproven ownership or lost binding race never stops the provider", async () => {
+  for (const proven of [false, true]) {
+    const f = fixture();
+    f.deps.claim = async () => ({ status: "unbound" });
+    f.deps.discover = async () => (proven ? "bound" : null);
+    f.deps.bind = async () => false;
+    assert.equal(await recoverBrowserSandboxDispatch("node", "operation", f.deps), "pending");
+    assert.deepEqual(f.calls, []);
+  }
 });
