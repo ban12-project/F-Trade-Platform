@@ -105,6 +105,11 @@ try {
       mode: 0o600,
     },
     {
+      path: "/tmp/ftrade-input-proof.mjs",
+      content: await readFile("scripts/browser-sandbox-input-proof.mjs"),
+      mode: 0o600,
+    },
+    {
       path: "/tmp/ftrade-profile-fixture.mjs",
       content: await readFile("scripts/browser-sandbox-profile-fixture.mjs"),
       mode: 0o600,
@@ -124,7 +129,7 @@ try {
   // Secrets here are random synthetic VNC credentials, never a real node key.
   await run(
     "browser",
-    `docker run -d --name vnc-proof --read-only --shm-size=256m --tmpfs /tmp:rw,size=512m,mode=1777 --tmpfs /root/.camoufox:rw,size=16m,mode=700 -v vnc-proof:/data -v /tmp/ftrade-profile-fixture.mjs:/fixture.mjs:ro -p 127.0.0.1:6080:6080 -e ENABLE_VNC=1 -e VNC_BIND=0.0.0.0 -e VNC_PASSWORD=${password} -e CAMOFOX_PROFILE_DIR=/data/profiles -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true -e FTRADE_LEASE_DEADLINE=$(( $(date +%s) * 1000 + 90000 )) ${template.browserImage} >/dev/null\ntimeout --kill-after=5s 120s docker exec vnc-proof node /fixture.mjs write`,
+    `docker run -d --name vnc-proof --read-only --shm-size=256m --tmpfs /tmp:rw,size=512m,mode=1777 --tmpfs /root/.camoufox:rw,size=16m,mode=700 -v vnc-proof:/data -v /tmp/ftrade-profile-fixture.mjs:/fixture.mjs:ro -v /tmp/ftrade-input-proof.mjs:/input-proof.mjs:ro -p 127.0.0.1:6080:6080 -e ENABLE_VNC=1 -e VNC_BIND=0.0.0.0 -e VNC_PASSWORD=${password} -e CAMOFOX_PROFILE_DIR=/data/profiles -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true -e FTRADE_LEASE_DEADLINE=$(( $(date +%s) * 1000 + 90000 )) ${template.browserImage} >/dev/null\ntimeout --kill-after=5s 120s docker exec vnc-proof node /fixture.mjs write`,
     150000,
   );
   await run(
@@ -198,6 +203,15 @@ try {
       .toBeGreaterThan(8);
     await page.screenshot({ path: `${output}/desktop.png` });
     console.log("PASS real noVNC viewer authenticated and received nonblank desktop");
+    await run("input-setup", "docker exec vnc-proof node /input-proof.mjs setup");
+    await canvas.click({ position: { x: 500, y: 400 } });
+    await run("mouse-proof", "docker exec vnc-proof node /input-proof.mjs mouse");
+    await page.keyboard.press("Control+l");
+    await page.keyboard.type("https://example.com/#ftrade-keyboard-proof");
+    await page.keyboard.press("Enter");
+    await run("keyboard-proof", "docker exec vnc-proof node /input-proof.mjs keyboard");
+    await page.screenshot({ path: `${output}/desktop-input.png` });
+    console.log("PASS mouse and keyboard state verified inside remote browser");
   } finally {
     await browser.close();
   }
@@ -217,7 +231,7 @@ await writeFile(
     templateSnapshotId: template.snapshotId,
     passed: true,
     scope:
-      "real noVNC password authentication and desktop canvas over TLS; no platform admission, proxy or real account",
+      "real noVNC authentication, desktop, mouse and keyboard over TLS; no platform admission, proxy or real account",
     cleanedUp: true,
   }),
   { mode: 0o600 },

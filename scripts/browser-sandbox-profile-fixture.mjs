@@ -54,6 +54,7 @@ try {
   const userId = "synthetic-profile";
   const tab = await api("/tabs", { userId, sessionKey: "synthetic", url: "https://example.com" });
   assert.ok(tab.tabId);
+  writeFileSync("/tmp/ftrade-synthetic-tab-id", tab.tabId, { mode: 0o600 });
   if (mode === "write")
     await api(`/tabs/${tab.tabId}/evaluate`, {
       userId,

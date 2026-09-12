@@ -248,3 +248,9 @@ cgroup 初始化保留五次尝试上限，在失败的尝试之间等待一秒�
 云端合成测试现使用本地 Chromium 打开模板内真实 viewer 页面，经允许来源的 postMessage 交付独立测试票据，执行 noVNC 密码认证。首次仅检查 canvas 尺寸时截图仍为空白，不能证明画面已到达；回归因此增加等待非单色像素更新，避免把连接成功当成桌面渲染成功。
 
 严格复测通过，人工检查截图可见远端 Firefox 的 Example Domain 页面。证据位于 ignored `tmp/browser-sandbox-websocket-d32f2efc-3ea1-475c-bc9c-ebfcb083de24/`，包含 `desktop.png` 与清理后写入的 `result.json`。首次及复测的 VM、快照均已删除。本次未测试键鼠输入、实际平台父页面及票据签发、代理出口或真实账号，不把画面可见等同于完整接管验收。
+
+### 真实 noVNC 键鼠输入
+
+合成测试通过真实 viewer canvas 发送鼠标点击和 Control+L／键盘导航，随后在远端浏览器内读取 DOM 点击标记与 location.hash，确认操作实际到达远端。截图中远端地址栏可见 `#ftrade-keyboard-proof`，与断言一致。观察夹具仅安装点击监听并读取结果，没有通过浏览器 API 代替键鼠动作。
+
+证据位于 ignored `tmp/browser-sandbox-websocket-27c76842-b7d3-47ed-97bc-0d3bfb0f0219/`，包含 `desktop-input.png` 与清理完成后的 `result.json`。测试 VM 和快照已删除。已覆盖模板内网关、认证、画面和基础键鼠传输；实际平台父页面、票据签发、生产 Workflow、数据库连接身份、代理及真实账号链路仍未完成。
