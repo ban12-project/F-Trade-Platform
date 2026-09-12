@@ -193,4 +193,6 @@ Server Action 提交后立即尝试投递该节点的一个待办，仍只返回
 
 用户更换数据库后，已对本地 `.env` 指向、初始无业务表的 Neon 数据库应用当前分支全部 38 条迁移，并按迁移 ID 对照本地文件哈希核实一致。初始化后用户、Sandbox、outbox 记录均为零；未迁移旧数据、未创建管理员、未启用 Sandbox。Vercel production 的 DATABASE_URL 为不可下载明文的敏感配置，尚未证明线上部署已连接同一数据库。
 
+进一步合成诊断在浏览器启动阶段观察到 180 秒握手超时，日志包括只读 `/root/.cache/dconf`、Fontconfig 无可写缓存、profile 目录异常和缺失 `glxtest`。尚未确定哪一项是直接原因，不能声称修复。证据在 ignored `tmp/browser-sandbox-template-test-3f15f9c4-c063-4cfc-a2f6-785109bfa30e/browser-profile-write.log`；该 VM 及孤立快照由测试清理，随后提供方查询返回 not_found。诊断夹具新增独立进程硬期限及外层 timeout，防止仅依赖 SDK 命令超时导致诊断运行过久。
+
 6 项控制器回归及真实 PostgreSQL 回归通过，验证已记录会话重放、错误操作拒绝和停止后拒绝。该路径只解决数据库已经成功记录的情况；提供方创建响应丢失或尚未写入 running 的操作仍需核实与恢复，不能宣称 unknown 恢复已完成。

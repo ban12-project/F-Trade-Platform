@@ -73,7 +73,7 @@ async function browserProfile(mode: "write" | "read") {
       -e CAMOFOX_PROFILE_DIR=/data/profiles -e CAMOFOX_CRASH_REPORT_ENABLED=false
       -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true
       ${template.browserImage} >/dev/null
-    docker exec ftrade-profile-proof node /fixture.mjs ${mode}
+    timeout --kill-after=5s 120s docker exec ftrade-profile-proof node /fixture.mjs ${mode}
     docker stop -t 20 ftrade-profile-proof >/dev/null
     docker rm ftrade-profile-proof >/dev/null
   `.replace(/\n {6}/g, " "),

@@ -4,6 +4,8 @@ import { writeFileSync } from "node:fs";
 
 const mode = process.argv[2];
 assert.ok(mode === "write" || mode === "read");
+// Fetch cancellation alone cannot bound native browser startup diagnostics.
+const hardDeadline = setTimeout(() => process.exit(124), 110000);
 const timer = setInterval(
   () => writeFileSync("/tmp/ftrade-lease", String(Date.now() + 90000)),
   5000,
@@ -17,6 +19,21 @@ async function api(path, body) {
   });
   if (response.status !== 200) {
     // This fixture has synthetic data only; retain the error for live diagnosis.
+    try {
+      const { launchOptions } = await import("/app/node_modules/camoufox-js/dist/index.js");
+      const options = await launchOptions({
+        headless: true,
+        exclude_addons: ["UBO"],
+        enable_cache: true,
+      });
+      console.log("Synthetic diagnostic: launch options resolved");
+      const { firefox } = await import("/app/node_modules/playwright-core/index.mjs");
+      const browser = await firefox.launch(options);
+      await browser.close();
+      console.log("Synthetic diagnostic: headless browser launched");
+    } catch (error) {
+      console.log("Synthetic launch diagnostic:", String(error).slice(0, 3000));
+    }
     throw new Error(
       `browser API ${path}: ${response.status} ${(await response.text()).slice(0, 2000)}`,
     );
@@ -49,4 +66,5 @@ try {
   console.log(`PASS synthetic browser ${mode}: cookie and localStorage`);
 } finally {
   clearInterval(timer);
+  clearTimeout(hardDeadline);
 }
