@@ -1,11 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { type Database, getDatabase } from "@/lib/db/client";
-import { evidence } from "@/lib/db/schema";
-import { VercelPrivateBlobEvidenceStore } from "@/lib/evidence/vercel-private-blob";
+import { persistUploadedEvidence } from "@/lib/evidence/persist-upload";
 
 import { prepareUploadedVideoAssets, type UploadedVideoSourceAsset } from "./uploaded-assets";
 
@@ -319,31 +317,18 @@ async function storeProvenanceEvidence(
   );
   const bytes = new TextEncoder().encode(manifest);
   const sha256 = createHash("sha256").update(bytes).digest("hex");
-  const evidenceId = `evidence-${sha256}`;
-  const [existing] = await database
-    .select({ id: evidence.id })
-    .from(evidence)
-    .where(eq(evidence.sha256, sha256))
-    .limit(1);
-  if (existing) return existing.id;
-  const stored = await new VercelPrivateBlobEvidenceStore().put({
-    evidenceId,
-    filename: `internet-media-private-test-${sha256}.json`,
-    contentType: "application/json",
-    body: new Blob([bytes], { type: "application/json" }),
-  });
-  await database.insert(evidence).values({
-    id: evidenceId,
-    classification: "restricted",
-    blobKey: stored.pathname,
-    contentType: "application/json",
-    sha256,
-    sizeBytes: bytes.byteLength,
-    sourceLabel: "internet-search:wikimedia-commons:private-test-only",
-    uploadedByType: "human",
-    uploadedById: actorId,
-  });
-  return evidenceId;
+  return persistUploadedEvidence(
+    {
+      actorId,
+      filename: `internet-media-private-test-${sha256}.json`,
+      contentType: "application/json",
+      sha256,
+      sizeBytes: bytes.byteLength,
+      sourceLabel: "internet-search:wikimedia-commons:private-test-only",
+      body: new Blob([bytes], { type: "application/json" }),
+    },
+    database,
+  );
 }
 
 export async function importInternetVideoMedia(

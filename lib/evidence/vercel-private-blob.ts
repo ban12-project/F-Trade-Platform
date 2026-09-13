@@ -1,4 +1,4 @@
-import { get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 
 import type { EvidenceRead, EvidenceStore, EvidenceWrite, StoredEvidence } from "./store";
 import { safeEvidencePathSegment } from "./store";
@@ -19,6 +19,10 @@ export class VercelPrivateBlobEvidenceStore implements EvidenceStore {
       pathname: result.pathname,
       contentType: input.contentType,
     };
+  }
+
+  async delete(pathname: string): Promise<void> {
+    await del(pathname, { token: process.env.BLOB_READ_WRITE_TOKEN });
   }
 
   async get(pathname: string): Promise<EvidenceRead | null> {

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { get } from "@vercel/blob";
 import { and, eq, inArray } from "drizzle-orm";
@@ -133,8 +133,8 @@ function matchesFileSignature(contentType: string, prefix: Uint8Array) {
   return false;
 }
 
-async function hashPrivateBlob(pathname: string, contentType: string) {
-  const result = await get(pathname, { access: "private", useCache: false });
+async function hashPrivateBlob(pathname: string, contentType: string, readBlob: typeof get) {
+  const result = await readBlob(pathname, { access: "private", useCache: false });
   if (!result || result.statusCode !== 200 || !result.stream)
     throw new Error("无法读取刚上传的私有素材。");
   const hash = createHash("sha256");
@@ -160,6 +160,7 @@ export async function claimCompletedVideoUploads(
   projectId: string,
   rightsEvidenceRef: string,
   database: Database = getDatabase(),
+  readBlob: typeof get = get,
 ): Promise<UploadedVideoSourceAsset[]> {
   const receiptIds = claimVideoUploadReceiptsSchema.parse(receiptIdsInput);
   let rows = [] as Array<typeof videoUploadReceipt.$inferSelect>;
@@ -202,9 +203,9 @@ export async function claimCompletedVideoUploads(
       continue;
     }
     if (row.status !== "uploaded") throw new Error("素材上传尚未完成，请稍后重试。");
-    const verified = await hashPrivateBlob(row.blobPath, row.contentType);
+    const verified = await hashPrivateBlob(row.blobPath, row.contentType, readBlob);
     if (verified.sizeBytes !== row.sizeBytes) throw new Error("素材大小与上传签名不一致。");
-    const evidenceId = `evidence-${verified.sha256}`;
+    const evidenceId = `evidence-${randomUUID()}`;
     let resolvedEvidenceId = evidenceId;
     await database.transaction(async (tx) => {
       const [current] = await tx
@@ -214,24 +215,21 @@ export async function claimCompletedVideoUploads(
         .for("update");
       if (!current || !["uploaded", "claimed"].includes(current.status))
         throw new Error("素材上传状态已发生变化。");
-      const [existing] = await tx
-        .select({ id: evidence.id })
-        .from(evidence)
-        .where(eq(evidence.sha256, verified.sha256))
-        .limit(1);
-      resolvedEvidenceId = existing?.id ?? evidenceId;
-      if (!existing)
-        await tx.insert(evidence).values({
-          id: evidenceId,
-          classification: "restricted",
-          blobKey: row.blobPath,
-          contentType: row.contentType,
-          sha256: verified.sha256,
-          sizeBytes: verified.sizeBytes,
-          sourceLabel: `marketing-upload:${mediaTypeForVideoUpload(videoUploadContentTypeSchema.parse(row.contentType))}`,
-          uploadedByType: "human",
-          uploadedById: actorId,
-        });
+      if (current.status === "claimed" && current.evidenceId) {
+        resolvedEvidenceId = current.evidenceId;
+        return;
+      }
+      await tx.insert(evidence).values({
+        id: evidenceId,
+        classification: "restricted",
+        blobKey: row.blobPath,
+        contentType: row.contentType,
+        sha256: verified.sha256,
+        sizeBytes: verified.sizeBytes,
+        sourceLabel: `marketing-upload:${mediaTypeForVideoUpload(videoUploadContentTypeSchema.parse(row.contentType))}`,
+        uploadedByType: "human",
+        uploadedById: actorId,
+      });
       await tx
         .update(videoUploadReceipt)
         .set({
