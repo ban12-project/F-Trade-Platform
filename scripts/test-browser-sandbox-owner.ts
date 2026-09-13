@@ -507,14 +507,12 @@ async function testListedSandboxPhases(
   nodeId: string,
 ) {
   const outsiderId = randomUUID();
-  await database
-    .insert(user)
-    .values({
-      id: outsiderId,
-      name: "SYNTHETIC outsider",
-      email: `${outsiderId}@example.invalid`,
-      role: "admin",
-    });
+  await database.insert(user).values({
+    id: outsiderId,
+    name: "SYNTHETIC outsider",
+    email: `${outsiderId}@example.invalid`,
+    role: "admin",
+  });
   try {
     assert.deepEqual(
       await listBrowserNodes(outsiderId),
