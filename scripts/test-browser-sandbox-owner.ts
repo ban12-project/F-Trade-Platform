@@ -396,6 +396,68 @@ async function testDispatchAuthorization(
   } finally {
     await database.execute(sql`UPDATE "user" SET banned = false WHERE id = ${owner.id}`);
   }
+  // Repeat from a captured running session with a failed Agent inspection.
+  // Use the production authorization and stop-recording database paths.
+  await database.execute(sql`UPDATE browser_sandbox SET phase='running',
+    session_id='monitor-session' WHERE node_id=${nodeId}`);
+  await database.execute(sql`UPDATE browser_fleet_node SET gateway_origin='https://gateway.example.invalid'
+    WHERE id=${nodeId}`);
+  const originalDocument = (
+    await database.execute(sql`SELECT document FROM browser_fleet_node WHERE id=${nodeId}`)
+  ).rows[0].document;
+  let providerStopped = false;
+  let fallbackStops = 0;
+  const failureInspection = async () =>
+    ({
+      status: providerStopped ? "stopped" : "running",
+      currentSession: () => ({
+        sessionId: "monitor-session",
+        status: "running",
+        stop: async () => {
+          fallbackStops++;
+        },
+      }),
+    }) as unknown as BrowserSandboxProviderHandle;
+  await database.execute(sql`UPDATE "user" SET banned=true WHERE id=${owner.id}`);
+  try {
+    assert.equal(
+      await monitorBrowserSandboxSession(nodeId, "monitor-session", {
+        inspect: failureInspection,
+        revoke: async () => {
+          throw new Error("synthetic_agent_inspection_failed");
+        },
+      }),
+      "pending",
+      "successful stop response is insufficient while provider still reports running",
+    );
+    assert.equal(fallbackStops, 1);
+    const pending = (
+      await database.execute(
+        sql`SELECT phase,session_id FROM browser_sandbox WHERE node_id=${nodeId}`,
+      )
+    ).rows[0];
+    assert.deepEqual(pending, { phase: "running", session_id: "monitor-session" });
+    providerStopped = true;
+    assert.equal(
+      await monitorBrowserSandboxSession(nodeId, "monitor-session", {
+        inspect: failureInspection,
+      }),
+      "stopped",
+    );
+    assert.equal(
+      fallbackStops,
+      1,
+      "confirmed stopped metadata must not issue another runtime command",
+    );
+    assert.deepEqual(
+      (await database.execute(sql`SELECT document FROM browser_fleet_node WHERE id=${nodeId}`))
+        .rows[0].document,
+      originalDocument,
+      "fallback shutdown must not settle business leases or results",
+    );
+  } finally {
+    await database.execute(sql`UPDATE "user" SET banned=false WHERE id=${owner.id}`);
+  }
   const retired =
     await database.execute(sql`SELECT s.phase, s.session_id, n.gateway_origin, n.document
     FROM browser_sandbox s JOIN browser_fleet_node n ON n.id = s.node_id WHERE n.id = ${nodeId}`);
