@@ -23,6 +23,7 @@ import type { BrowserSandboxProviderHandle } from "../lib/browser-fleet/sandbox-
 import { digest } from "../lib/browser-fleet/security";
 import { listBrowserNodes, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import type { Database } from "../lib/db/client";
+import { user } from "../lib/db/schema";
 import {
   configuredFacebookKeyring,
   decryptFacebookCredential,
@@ -85,10 +86,14 @@ export async function testBrowserSandboxOwner(
       ),
     );
     const publicNodes = await listBrowserNodes(owner.id);
-    assert.ok(publicNodes.some((node) => node.id === nodeId));
+    const managed = publicNodes.find((node) => node.id === nodeId);
+    assert.equal(managed?.sandbox?.phase, "stopped");
+    assert.ok(Number.isFinite(managed?.sandbox?.updatedAt));
+    assert.deepEqual(Object.keys(managed?.sandbox ?? {}).sort(), ["phase", "updatedAt"]);
     assert.ok(!JSON.stringify(publicNodes).includes(first.access_key_ciphertext));
     assert.ok(!JSON.stringify(publicNodes).includes(key));
     assert.deepEqual(await read(), first, "listing does not mutate or wake a node");
+    await testListedSandboxPhases(database, owner, nodeId);
     const rotated = await ownerBrowserCommand({ operation: "rotate", nodeId }, owner);
     assert.equal(rotated.accessKey, undefined);
     const second = await read();
@@ -493,5 +498,80 @@ async function testOutboxDelivery(database: Database, nodeId: string, operationI
   assert.equal(await claimBrowserSandboxDelivery(database, nodeId), null);
   console.log(
     "PASS: owner open atomically creates outbox; concurrent delivery, expired lease, stale receipt and lost response recovery",
+  );
+}
+
+async function testListedSandboxPhases(
+  database: Database,
+  owner: { id: string; sessionId: string },
+  nodeId: string,
+) {
+  const outsiderId = randomUUID();
+  await database
+    .insert(user)
+    .values({
+      id: outsiderId,
+      name: "SYNTHETIC outsider",
+      email: `${outsiderId}@example.invalid`,
+      role: "admin",
+    });
+  try {
+    assert.deepEqual(
+      await listBrowserNodes(outsiderId),
+      [],
+      "another admin cannot list this owner's nodes",
+    );
+    await database.execute(sql`UPDATE "user" SET banned=true WHERE id=${outsiderId}`);
+    await assert.rejects(listBrowserNodes(outsiderId), /owner_revoked/);
+    await database.execute(
+      sql`UPDATE "user" SET banned=false, role='viewer' WHERE id=${outsiderId}`,
+    );
+    await assert.rejects(listBrowserNodes(outsiderId), /owner_revoked/);
+  } finally {
+    await database.execute(sql`DELETE FROM "user" WHERE id=${outsiderId}`);
+  }
+  const operationId = randomUUID();
+  for (const phase of ["starting", "running", "stopping", "unknown", "stopped"] as const) {
+    const kind =
+      phase === "stopping" ? "stop" : ["starting", "unknown"].includes(phase) ? "start" : null;
+    await database.execute(sql`UPDATE browser_sandbox SET phase=${phase},
+      operation_kind=${kind}, operation_id=${kind ? operationId : null}::uuid,
+      session_id=${["running", "stopping"].includes(phase) ? "synthetic-provider-session" : null},
+      updated_at='2026-09-01T00:00:00Z' WHERE node_id=${nodeId}`);
+    const before = (
+      await database.execute(sql`SELECT * FROM browser_sandbox WHERE node_id=${nodeId}`)
+    ).rows;
+    // Disabled provisioning must not hide existing lifecycle evidence.
+    process.env.BROWSER_SANDBOX_ENABLED = "0";
+    const listed = await listBrowserNodes(owner.id);
+    process.env.BROWSER_SANDBOX_ENABLED = "1";
+    const managed = listed.find((node) => node.id === nodeId);
+    assert.deepEqual(managed?.sandbox, { phase, updatedAt: Date.parse("2026-09-01T00:00:00Z") });
+    assert.ok(!JSON.stringify(listed).includes(operationId));
+    assert.ok(!JSON.stringify(listed).includes("synthetic-provider-session"));
+    assert.deepEqual(
+      (await database.execute(sql`SELECT * FROM browser_sandbox WHERE node_id=${nodeId}`)).rows,
+      before,
+    );
+  }
+  const external = await ownerBrowserCommand(
+    {
+      operation: "create",
+      value: {
+        name: "SYNTHETIC self-managed",
+        gatewayOrigin: "https://example.invalid",
+        maxBrowsers: 1,
+        memoryBudgetMb: 2048,
+        browserMemoryMb: 2048,
+      },
+    },
+    owner,
+  );
+  assert.equal(
+    (await listBrowserNodes(owner.id)).find((node) => node.id === external.nodeId)?.sandbox,
+    null,
+  );
+  console.log(
+    "PASS: owner list distinguishes managed lifecycle from self-managed nodes without provider identifiers or mutations, including while disabled",
   );
 }
