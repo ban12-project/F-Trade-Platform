@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SandboxRegistrationCard } from "@/components/workspace/sandbox-registration-card";
+import { SandboxStatus } from "@/components/workspace/sandbox-status";
 import { browserNodeCommandAction, browserNodesAction } from "@/lib/actions/browser-nodes";
 import { accountFormSchema, nodeFormSchema } from "@/lib/browser-fleet/contracts";
 
@@ -256,8 +257,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
         <CardHeader>
           <CardTitle>授权账号与同步配置</CardTitle>
           <CardDescription>
-            相同节点、渠道和账号标识再次保存即更新。凭据加密保存，留空保留原值；修改后停止该账号的旧租约。浏览器会话留在绑定
-            VPS 的独立卷中。
+            相同节点、渠道和账号标识再次保存即更新。凭据加密保存，留空保留原值；修改后停止该账号的旧租约。浏览器会话保存在绑定节点的独立存储中。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -371,6 +371,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <SandboxStatus sandbox={node.sandbox} />
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
