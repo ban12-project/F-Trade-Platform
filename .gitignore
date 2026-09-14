@@ -59,6 +59,7 @@ docs/reference/*.pdf
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*
 
 # Reproducible synthetic review outputs, uploaded by CI only.
 artifacts/browser-fleet-review/
