@@ -69,11 +69,18 @@ export async function monitorBrowserSandboxSession(
     const session = sandbox.currentSession();
     if (session.sessionId !== sessionId) return "superseded" as const;
     if (sandbox.status === "running" && session.status === "running") {
-      const result = await ((await deps.revoked(nodeId)) ? deps.revoke : deps.retire)(
-        session,
-        nodeId,
-        sessionId,
-      );
+      const revoked = await deps.revoked(nodeId);
+      let result: Awaited<ReturnType<typeof stopIdleBrowserSandboxSession>>;
+      try {
+        result = await (revoked ? deps.revoke : deps.retire)(session, nodeId, sessionId);
+      } catch {
+        if (!revoked) throw new Error("sandbox_idle_inspection_unconfirmed");
+        // A missing/unreachable Agent cannot keep revoked compute alive. Stop
+        // only the captured session; this is not proof of clean browser drain
+        // and must not settle any publication receipt or release a lease.
+        await session.stop();
+        result = "stopped";
+      }
       if (result === "busy") return "active" as const;
       // Confirm provider metadata even after a successful stop response.
       if (result !== "stopped") return "pending" as const;
