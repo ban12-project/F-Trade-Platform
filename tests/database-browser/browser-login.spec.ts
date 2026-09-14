@@ -207,3 +207,59 @@ test("saved password fill uses the actual owner action and never returns credent
   expect(await page.content()).not.toContain(credential.password);
   expect(await page.content()).not.toContain(credential.username);
 });
+
+test("owner page reads managed lifecycle changes while cloud provisioning stays disabled", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  if (!baseURL) throw new Error("Missing local browser URL");
+  await context.addCookies([
+    {
+      name: "better-auth.session_token",
+      value: cookie,
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  const before = await pool.query(
+    "SELECT count(*)::int AS count FROM browser_sandbox_outbox WHERE node_id=$1",
+    [nodeId],
+  );
+  await page.goto("/workspace/browsers");
+  await expect(page.getByText("自管服务器", { exact: true })).toBeVisible();
+  const updatedAt = "2026-09-01T00:00:00Z";
+  try {
+    await pool.query(
+      "INSERT INTO browser_sandbox (node_id,sandbox_name,updated_at) VALUES ($1,$2,$3)",
+      [nodeId, `ftrade-browser-${nodeId}`, updatedAt],
+    );
+    await expect(page.getByText("按需浏览器", { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("已停止", { exact: true })).toBeVisible();
+    await expect(page.getByText("不是云端实时状态。", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "创建托管节点", exact: true })).toBeDisabled();
+    const operationId = randomUUID();
+    await pool.query(
+      "UPDATE browser_sandbox SET phase='unknown', operation_id=$2, operation_kind='start' WHERE node_id=$1",
+      [nodeId, operationId],
+    );
+    await expect(page.getByText("需要核对", { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("尚未确认云端是否停止，请先核对，勿重复启动。")).toBeVisible();
+    const html = await page.content();
+    expect(html).not.toContain(operationId);
+    expect(html).not.toContain(accessKey);
+    const after = await pool.query(
+      "SELECT count(*)::int AS count FROM browser_sandbox_outbox WHERE node_id=$1",
+      [nodeId],
+    );
+    expect(after.rows).toEqual(before.rows);
+    const record = await pool.query(
+      "SELECT phase,operation_id FROM browser_sandbox WHERE node_id=$1",
+      [nodeId],
+    );
+    expect(record.rows).toEqual([{ phase: "unknown", operation_id: operationId }]);
+  } finally {
+    await pool.query("DELETE FROM browser_sandbox WHERE node_id=$1", [nodeId]);
+  }
+});

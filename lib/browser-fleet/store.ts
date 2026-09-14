@@ -51,7 +51,7 @@ import {
 } from "./publication";
 import { sealBrowserSandboxKey } from "./sandbox-credentials";
 import { cancelInvalidManualSandboxStart } from "./sandbox-dispatch";
-import { registerBrowserSandbox } from "./sandbox-lifecycle";
+import { registerBrowserSandbox, type SandboxLifecycle } from "./sandbox-lifecycle";
 import { enqueueManualBrowserSandboxStart } from "./sandbox-outbox";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
 
@@ -156,14 +156,27 @@ export async function listBrowserNodes(actorId: string) {
   if (!owner || owner.banned || !hasPermission(owner.role, "settings:manage"))
     throw new Error("owner_revoked");
   const result = await getDatabase().execute(
-    sql`SELECT id, name, gateway_origin, status, document FROM browser_fleet_node WHERE owner_id = ${actorId} ORDER BY created_at DESC LIMIT 50`,
+    sql`SELECT n.id, n.name, n.gateway_origin, n.status, n.document,
+      s.phase AS sandbox_phase, extract(epoch FROM s.updated_at) * 1000 AS sandbox_updated_at
+      FROM browser_fleet_node n LEFT JOIN browser_sandbox s ON s.node_id = n.id
+      WHERE n.owner_id = ${actorId} ORDER BY n.created_at DESC LIMIT 50`,
   );
-  return (result.rows as NodeRow[]).map((n) => ({
+  return (
+    result.rows as (NodeRow & {
+      sandbox_phase: SandboxLifecycle["phase"] | null;
+      sandbox_updated_at: string | number | null;
+    })[]
+  ).map((n) => ({
     id: n.id,
     name: n.name,
     gatewayOrigin: n.gateway_origin,
     status: n.status,
     ...publicState(n.document),
+    // Stored lifecycle evidence only: listing must never inspect/resume compute
+    // or reveal provider session/operation IDs and encrypted runtime keys.
+    sandbox: n.sandbox_phase
+      ? { phase: n.sandbox_phase, updatedAt: Number(n.sandbox_updated_at) }
+      : null,
   }));
 }
 export type OwnerResult = {
