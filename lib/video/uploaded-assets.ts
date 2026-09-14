@@ -6,10 +6,11 @@ import { extname, join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-import { eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 
 import { type Database, getDatabase } from "@/lib/db/client";
 import { evidence } from "@/lib/db/schema";
+import { persistUploadedEvidence, type UploadEvidenceStore } from "@/lib/evidence/persist-upload";
 import { VercelPrivateBlobEvidenceStore } from "@/lib/evidence/vercel-private-blob";
 
 import type { VideoProject } from "./contracts";
@@ -46,6 +47,7 @@ export async function prepareUploadedVideoAssets(
   actorId: string,
   rightsEvidenceRef: string,
   database: Database = getDatabase(),
+  store?: UploadEvidenceStore,
 ): Promise<UploadedVideoSourceAsset[]> {
   if (files.length > maximumAssetCount)
     throw new Error(`一次最多上传 ${maximumAssetCount} 个营销素材。`);
@@ -58,32 +60,19 @@ export async function prepareUploadedVideoAssets(
     const metadata = validateUploadedVideoSourceAsset(file);
     const data = new Uint8Array(await file.arrayBuffer());
     const sha256 = createHash("sha256").update(data).digest("hex");
-    const evidenceId = `evidence-${sha256}`;
-    const [existing] = await database
-      .select({ id: evidence.id })
-      .from(evidence)
-      .where(eq(evidence.sha256, sha256))
-      .limit(1);
-    const assetRef = existing?.id ?? evidenceId;
-    if (!existing) {
-      const privateAsset = await new VercelPrivateBlobEvidenceStore().put({
-        evidenceId,
+    const assetRef = await persistUploadedEvidence(
+      {
+        actorId,
         filename: `marketing-${sha256}${metadata.extensions[0]}`,
-        contentType: file.type,
-        body: new Blob([data], { type: file.type }),
-      });
-      await database.insert(evidence).values({
-        id: evidenceId,
-        classification: "restricted",
-        blobKey: privateAsset.pathname,
         contentType: file.type,
         sha256,
         sizeBytes: data.byteLength,
         sourceLabel: `marketing-upload:${metadata.mediaType}`,
-        uploadedByType: "human",
-        uploadedById: actorId,
-      });
-    }
+        body: new Blob([data], { type: file.type }),
+      },
+      database,
+      store,
+    );
     stored.push({ assetRef, mediaType: metadata.mediaType, rightsEvidenceRef });
   }
   return stored;

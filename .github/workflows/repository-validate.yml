@@ -135,3 +135,7 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/test-video-workspace-access-postgres.ts
         env:
           VIDEO_ACCESS_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+      - name: Verify evidence upload provenance and receipt concurrency with PostgreSQL
+        run: node --conditions=react-server --import tsx scripts/test-evidence-upload-postgres.ts
+        env:
+          EVIDENCE_UPLOAD_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test

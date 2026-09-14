@@ -275,7 +275,7 @@ export const evidence = pgTable(
   },
   (table) => [
     uniqueIndex("evidence_blob_key_uidx").on(table.blobKey),
-    uniqueIndex("evidence_sha256_uidx").on(table.sha256),
+    index("evidence_sha256_idx").on(table.sha256),
     check("evidence_size_nonnegative", sql`${table.sizeBytes} >= 0`),
     check("evidence_uploader_nonempty", sql`length(btrim(${table.uploadedById})) > 0`),
   ],
