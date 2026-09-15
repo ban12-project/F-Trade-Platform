@@ -76,6 +76,7 @@ import { uploadProductDocument } from "@/lib/product/upload-document-client";
 import type { ProductCatalogDetail, ProductCatalogEntry } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
 import { useWorkspaceDirty } from "./dirty-state";
+import { ProductCatalogImport } from "./product-catalog-import";
 import {
   emptyProduct,
   ProductFields,
@@ -870,6 +871,7 @@ export function ProductPanel({
             <PlusIcon />
             手动录入
           </TabsTrigger>
+          <TabsTrigger value="catalog">目录批量导入</TabsTrigger>
           <TabsTrigger value="records">记录 {entries.length}</TabsTrigger>
         </TabsList>
         <TabsContent value="agent">
@@ -882,6 +884,14 @@ export function ProductPanel({
         </TabsContent>
         <TabsContent value="manual">
           <ProductDraftForm projectId={projectId} evidenceOptions={evidenceOptions} />
+        </TabsContent>
+        <TabsContent value="catalog">
+          <ProductCatalogImport
+            key={projectId}
+            projectId={projectId}
+            modelConfigs={agentModelConfigs}
+            onOpenDraft={() => setTab("records")}
+          />
         </TabsContent>
         <TabsContent value="records">
           <div className="flex flex-col gap-3">

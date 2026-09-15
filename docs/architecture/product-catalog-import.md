@@ -1,6 +1,6 @@
 # 工作台目录批量导入
 
-Issue #340，父项 #268 / #26。本文描述待实现的契约，不能作为功能交付或验收证据。
+Issue #340，父项 #268 / #26。实现进行中；数据库回归已通过，完整浏览器与实际模型验收尚未完成。
 
 现有页面把整份资料交给单产品抽取；CLI 才有目录候选发现与逐条抽取。
 工作台必须让用户上传目录、查看独立候选、选择最多 20 条记录，并逐条生成待审草稿。
@@ -44,4 +44,24 @@ Issue #340，父项 #268 / #26。本文描述待实现的契约，不能作为�
 - 实际参考文件/模型运行另作受控验收，缺失字段可按已有授权使用独立 MOCK 来源补充；
   模拟审批、内容、询盘与商机结果不能冒充真实工厂审批或渠道投递。
 
-实现完成后应把本文的待实现说明替换为实际文件、迁移和可复现测试证据。
+## 当前实现与验证
+
+- `lib/db/product-catalog-schema.ts` 与迁移 `0040` 保存目录、候选和尝试历史。
+- `lib/product/catalog-import-store.ts` 提供权限、并发领取、租约及事务写入边界。
+- `workflows/product-catalog-import.ts` 每批最多并行两条；Action 位于
+  `lib/actions/product-catalog.ts`，页面位于 `components/workspace/product-catalog-import.tsx`。
+- `scripts/test-catalog-import-contracts.ts` 验证客户端提交契约。
+- `scripts/test-catalog-import-postgres.ts` 在允许列表中的本机测试库验证 20 条独立待审草稿、
+  重复编号/页码、并发领取、部分失败重试、过期任务隔离、会话/账号/项目成员权限撤销、
+  归档项目拒绝以及无来源事实拒绝。使用合成 Blob 适配器与合成模型结果，不调用实际模型。
+  清理仅针对本次合成记录；在同一事务临时禁用审计删除保护并恢复，失败则回滚。
+- 当前 TypeScript、Turbopack 编译检查和打开目录入口后的浏览器错误检查通过。
+  实际参考 PDF 已完成私有上传与回执创建；本机系统 Python 缺少转换器导致首次解析失败，
+  正在使用项目虚拟环境验证页面重试。此项不构成成功解析或 20 条实际抽取的证据。
+
+本地数据库回归命令（必须使用专用本机合成测试库）：
+
+```sh
+DOCUMENT_UPLOAD_TEST_DATABASE_URL=postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_browser_test \
+  node --conditions=react-server --import tsx scripts/test-catalog-import-postgres.ts
+```

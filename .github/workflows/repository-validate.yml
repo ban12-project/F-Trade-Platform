@@ -64,7 +64,7 @@ jobs:
         run: pnpm test:product-agent-evidence
 
       - name: Test catalog discovery and physical PDF page provenance
-        run: pnpm exec tsx scripts/test-catalog-candidates.ts && pnpm test:catalog-preflight && pnpm test:local-ocr
+        run: pnpm exec tsx scripts/test-catalog-candidates.ts && pnpm exec tsx scripts/test-catalog-import-contracts.ts && pnpm test:catalog-preflight && pnpm test:local-ocr
 
       - name: Run synthetic Product Agent control ablation
         run: pnpm eval:product-safety-ablation
@@ -141,5 +141,9 @@ jobs:
           EVIDENCE_UPLOAD_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
       - name: Verify document direct upload bounds and authorization with PostgreSQL
         run: node --conditions=react-server --import tsx scripts/test-document-upload-postgres.ts
+        env:
+          DOCUMENT_UPLOAD_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+      - name: Verify catalog batch retries, fencing and review-only persistence with PostgreSQL
+        run: node --conditions=react-server --import tsx scripts/test-catalog-import-postgres.ts
         env:
           DOCUMENT_UPLOAD_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
