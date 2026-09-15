@@ -6,6 +6,7 @@ import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { auth } from "@/lib/auth";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
+import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import {
   PRODUCT_STREAM_PROMPT_HASH,
   PRODUCT_STREAM_PROMPT_VERSION,
@@ -18,7 +19,6 @@ import {
   persistProductStreamDraft,
   startProductStreamRun,
 } from "@/lib/product/stream-store";
-import { prepareUploadedProductAgentDocument } from "@/lib/product/uploaded-document";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export const maxDuration = 120;
@@ -36,26 +36,26 @@ export async function POST(request: Request) {
     return Response.json({ error: "仅管理员可运行流式产品导入。" }, { status: 403 });
   try {
     const data = await readProductStreamForm(request);
-    const uploaded = data.get("document");
+    const receiptId = data.get("receiptId");
+    if (data.get("document") instanceof File) throw new Error("请通过私有直传上传文件。");
     const parsed = productAgentRunFormSchema.parse({
       ...Object.fromEntries(data),
-      hasUpload: uploaded instanceof File && uploaded.size > 0,
+      hasUpload: Boolean(receiptId),
     });
     const projectId = z.uuid("项目标识无效。").parse(data.get("projectId"));
     await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
     const config = await resolveProductAgentModelConfig(parsed.modelConfigId, parsed.model);
     const model = createProductAgentModel(config);
-    const source =
-      uploaded instanceof File && uploaded.size > 0
-        ? (await prepareUploadedProductAgentDocument(uploaded, session.user.id)).source
-        : {
-            record_id: randomUUID(),
-            source_ref: z.string().min(1).parse(parsed.sourceRef),
-            evidence_refs: [z.string().min(1).parse(parsed.evidenceRef)],
-            source_text: parsed.sourceText,
-            image_availability: "none" as const,
-            image_refs: [],
-          };
+    const source = receiptId
+      ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
+      : {
+          record_id: randomUUID(),
+          source_ref: z.string().min(1).parse(parsed.sourceRef),
+          evidence_refs: [z.string().min(1).parse(parsed.evidenceRef)],
+          source_text: parsed.sourceText,
+          image_availability: "none" as const,
+          image_refs: [],
+        };
     request.signal.throwIfAborted();
     const identity = { actorId: session.user.id, sessionId: session.session.id, projectId };
     const run = await startProductStreamRun(identity, source, {

@@ -598,6 +598,36 @@ export const workspaceProjectItem = pgTable(
  * browser chooses only the receipt ID; ownership and the exact pathname are
  * bound by the authenticated signing route and verified completion callback.
  */
+export const productDocumentUploadReceipt = pgTable(
+  "product_document_upload_receipt",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => workspaceProject.id, { onDelete: "cascade" }),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    purpose: text("purpose").notNull(),
+    blobPath: text("blob_path").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    evidenceId: text("evidence_id").references(() => evidence.id, { onDelete: "restrict" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("product_document_upload_path_uidx").on(table.blobPath),
+    index("product_document_upload_expiry_idx").on(table.expiresAt),
+    check(
+      "product_document_upload_size",
+      sql`${table.sizeBytes} > 0 AND ${table.sizeBytes} <= 26214400`,
+    ),
+    check("product_document_upload_purpose", sql`${table.purpose} IN ('evidence', 'agent')`),
+  ],
+);
+
 export const videoUploadReceipt = pgTable(
   "video_upload_receipt",
   {

@@ -10,8 +10,8 @@ import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-con
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
+import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { EvidenceLocatedProductAgent } from "@/lib/product/evidence-located-agent";
-import { prepareUploadedProductAgentDocument } from "@/lib/product/uploaded-document";
 import { createProductAgentDraft } from "@/lib/products";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
@@ -47,10 +47,12 @@ export async function runProductAgentAction(
         ? undefined
         : z.uuid("项目标识无效。").parse(rawProjectId);
     if (projectId) await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
-    const uploaded = formData.get("document");
+    const receiptId = formData.get("receiptId");
+    if (formData.get("document") instanceof File) throw new Error("请通过私有直传上传文件。");
+    if (receiptId && !projectId) throw new Error("上传资料必须绑定项目。");
     const source =
-      uploaded instanceof File && uploaded.size > 0
-        ? (await prepareUploadedProductAgentDocument(uploaded, session.user.id)).source
+      receiptId && projectId
+        ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
         : (() => {
             const parsed = productAgentRunFormSchema.safeParse({
               ...Object.fromEntries(formData),

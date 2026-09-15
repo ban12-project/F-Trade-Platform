@@ -71,6 +71,8 @@ import {
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { productAgentRunFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
 import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
+import { documentUploadFormSchema } from "@/lib/product/document-upload-contracts";
+import { uploadProductDocument } from "@/lib/product/upload-document-client";
 import type { ProductCatalogDetail, ProductCatalogEntry } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
 import { useWorkspaceDirty } from "./dirty-state";
@@ -93,9 +95,22 @@ function EvidenceLibrary({
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(
-    uploadProductEvidenceAction,
+    async (previous: typeof initialProductEvidenceActionState, file: File) => {
+      try {
+        const receiptId = await uploadProductDocument(file, projectId, "evidence");
+        const data = new FormData();
+        data.set("projectId", projectId);
+        data.set("receiptId", receiptId);
+        return await uploadProductEvidenceAction(previous, data);
+      } catch {
+        return { status: "error" as const, message: "文件上传失败，请检查文件与项目权限后重试。" };
+      }
+    },
     initialProductEvidenceActionState,
   );
+  const form = useForm<z.infer<typeof documentUploadFormSchema>>({
+    resolver: zodResolver(documentUploadFormSchema),
+  });
   useEffect(() => {
     if (state.status === "success") router.refresh();
   }, [router, state.status]);
@@ -108,41 +123,56 @@ function EvidenceLibrary({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={action} className="space-y-3">
-          <input type="hidden" name="projectId" value={projectId} />
-          <Field>
-            <FieldLabel htmlFor="project-evidence-document">证据文件</FieldLabel>
-            <Input
-              id="project-evidence-document"
-              name="document"
-              type="file"
-              accept=".pdf,.csv,.xls,.xlsx"
-              required
-            />
-            <FieldDescription>
-              支持 PDF、CSV、XLS、XLSX，最大 25MB；文件保存在私有存储。
-            </FieldDescription>
-          </Field>
-          <Button type="submit" variant="outline" className="min-h-11 w-full" disabled={pending}>
-            {pending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <FileUpIcon data-icon="inline-start" />
-            )}
-            保存到项目证据库
-          </Button>
-          {state.message ? (
-            <p
-              aria-live="polite"
-              className={
-                state.status === "error"
-                  ? "text-sm text-destructive"
-                  : "text-sm text-muted-foreground"
-              }
-            >
-              {state.message}
-            </p>
-          ) : null}
+        <form
+          onSubmit={form.handleSubmit(({ document }) => startTransition(() => action(document)))}
+        >
+          <FieldGroup>
+            <Field data-invalid={Boolean(form.formState.errors.document)}>
+              <FieldLabel htmlFor="project-evidence-document">证据文件</FieldLabel>
+              <Controller
+                control={form.control}
+                name="document"
+                render={({ field }) => (
+                  <Input
+                    id="project-evidence-document"
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    type="file"
+                    accept=".pdf,.csv,.xls,.xlsx"
+                    required
+                    disabled={pending}
+                    aria-invalid={Boolean(form.formState.errors.document)}
+                    onChange={(event) => field.onChange(event.target.files?.[0])}
+                  />
+                )}
+              />
+              <FieldDescription>
+                支持 PDF、CSV、XLS、XLSX，最大 25 MiB；文件保存在私有存储。
+              </FieldDescription>
+              <FieldError errors={[form.formState.errors.document]} />
+            </Field>
+            <Button type="submit" variant="outline" className="min-h-11 w-full" disabled={pending}>
+              {pending ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <FileUpIcon data-icon="inline-start" />
+              )}
+              保存到项目证据库
+            </Button>
+            {state.message ? (
+              <p
+                aria-live="polite"
+                className={
+                  state.status === "error"
+                    ? "text-sm text-destructive"
+                    : "text-sm text-muted-foreground"
+                }
+              >
+                {state.message}
+              </p>
+            ) : null}
+          </FieldGroup>
         </form>
       </CardContent>
       <CardFooter>
@@ -291,8 +321,10 @@ function ProductAgentForm({
     initialProductAgentActionState,
   );
   const stream = useProductStream();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const state = canStream ? stream.state : actionState;
-  const pending = canStream ? stream.pending : actionPending;
+  const pending = uploading || (canStream ? stream.pending : actionPending);
   const usableConfigs = modelConfigs.filter(
     (item) => item.apiKeyConfigured || item.authTokenConfigured,
   );
@@ -339,18 +371,26 @@ function ProductAgentForm({
       router.refresh();
     }
   }, [emptyAgent, initialChoice, form, router, state.status]);
-  function submit(values: AgentValues) {
-    const data = new FormData();
-    data.set("projectId", projectId);
-    data.set("modelConfigId", values.modelConfigId);
-    data.set("model", values.model);
-    data.set("sourceRef", values.sourceRef ?? "");
-    data.set("evidenceRef", values.evidenceRef ?? "");
-    data.set("sourceText", values.sourceText);
-    const file = fileRef.current?.files?.[0];
-    if (file) data.set("document", file);
-    if (canStream) void stream.start(data);
-    else startTransition(() => action(data));
+  async function submit(values: AgentValues) {
+    setUploadError("");
+    setUploading(true);
+    try {
+      const data = new FormData();
+      data.set("projectId", projectId);
+      data.set("modelConfigId", values.modelConfigId);
+      data.set("model", values.model);
+      data.set("sourceRef", values.sourceRef ?? "");
+      data.set("evidenceRef", values.evidenceRef ?? "");
+      data.set("sourceText", values.sourceText);
+      const file = fileRef.current?.files?.[0];
+      if (file) data.set("receiptId", await uploadProductDocument(file, projectId, "agent"));
+      if (canStream) void stream.start(data);
+      else startTransition(() => action(data));
+    } catch {
+      setUploadError("文件上传失败，请检查格式、大小与项目权限后重试。");
+    } finally {
+      setUploading(false);
+    }
   }
   const choiceItems = Object.fromEntries(choices.map((choice) => [choice.value, choice.label]));
   return (
@@ -363,6 +403,11 @@ function ProductAgentForm({
       </CardHeader>
       <CardContent>
         <form id="product-agent-import" onSubmit={form.handleSubmit(submit)}>
+          {uploadError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {uploadError}
+            </p>
+          ) : null}
           <FieldGroup>
             {choices.length ? (
               <Field

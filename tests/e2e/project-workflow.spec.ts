@@ -95,6 +95,44 @@ test("streamed product fields remain review-only and keep a draft link after fai
 }) => {
   const runId = "00000000-0000-4000-8000-000000000117";
   const productId = "00000000-0000-4000-8000-000000000118";
+  const sourceBytes = Buffer.from("Product name,Synthetic streamed clutch");
+  let receiptId = "";
+  let uploaded = false;
+  // This test exercises the browser transport and stream display with synthetic services.
+  // Real signing, authorization and private readback have separate integration coverage.
+  await page.route("**/api/product-documents/upload", async (route) => {
+    const request = route.request().postDataJSON();
+    const payload = JSON.parse(request.payload.clientPayload);
+    expect(payload).toMatchObject({
+      projectId: "00000000-0000-4000-8000-000000000202",
+      purpose: "agent",
+      originalFilename: "synthetic.csv",
+      contentType: "text/csv",
+      sizeBytes: sourceBytes.length,
+    });
+    receiptId = payload.receiptId;
+    await route.fulfill({
+      json: {
+        presignedUrlPayload: {
+          delegationToken: `${Buffer.from(JSON.stringify({ storeId: "synthetic" })).toString("base64url")}.synthetic`,
+          signature: "synthetic",
+          params: {},
+        },
+      },
+    });
+  });
+  await page.route("https://vercel.com/api/blob/**", async (route) => {
+    expect(route.request().method()).toBe("PUT");
+    expect(route.request().postDataBuffer()).toEqual(sourceBytes);
+    uploaded = true;
+    await route.fulfill({
+      json: {
+        url: "https://synthetic.private.blob.vercel-storage.com/synthetic.csv",
+        pathname: "synthetic.csv",
+        contentType: "text/csv",
+      },
+    });
+  });
   const events = [
     { type: "stage", stage: "generating" },
     { type: "draft", productId, version: 2 },
@@ -122,8 +160,14 @@ test("streamed product fields remain review-only and keep a draft link after fai
     { type: "error", code: "run_failed", message: "生成已停止；已保存的字段仍需人工审核。" },
     { type: "stage", stage: "failed" },
   ];
-  await page.route("**/api/product-agent/stream", (route) =>
-    route.fulfill({
+  await page.route("**/api/product-agent/stream", (route) => {
+    expect(uploaded).toBe(true);
+    expect(receiptId).not.toBe("");
+    const body = route.request().postData() ?? "";
+    expect(body).toContain(receiptId);
+    expect(body).not.toContain("filename=");
+    expect(body).not.toContain(sourceBytes.toString());
+    return route.fulfill({
       contentType: "application/x-ndjson",
       body:
         events
@@ -131,14 +175,14 @@ test("streamed product fields remain review-only and keep a draft link after fai
             JSON.stringify({ protocol: "product-agent.v1", runId, sequence: index + 1, ...event }),
           )
           .join("\n") + "\n",
-    }),
-  );
+    });
+  });
   await page.goto("/testing/project-workflow?panel=product");
   await page.waitForLoadState("networkidle");
   await page.getByLabel("产品资料", { exact: true }).setInputFiles({
     name: "synthetic.csv",
     mimeType: "text/csv",
-    buffer: Buffer.from("Product name,Synthetic streamed clutch"),
+    buffer: sourceBytes,
   });
   await page.getByRole("button", { name: "生成待审核草稿", exact: true }).click();
   const progress = page.getByRole("region", { name: "生成字段状态" });
