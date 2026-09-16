@@ -31,11 +31,14 @@ export interface ProductAgentRequest {
   model: LanguageModel;
   source: ProductAgentSource;
   timeout_ms?: number;
+  /** Internal retry cue. Never supplied by browser input or source material. */
+  repair_invalid_output?: boolean;
 }
 
 export interface ProductAgentRunMetadata {
   prompt_version: string;
   prompt_hash: string;
+  validation_retry?: boolean;
 }
 
 export interface ProductAgentResult {
@@ -419,7 +422,12 @@ export function finalizeProductAgentDraft(
 }
 
 export class AiSdkProductAgent implements ProductAgent {
-  async run({ model, source, timeout_ms }: ProductAgentRequest): Promise<ProductAgentResult> {
+  async run({
+    model,
+    source,
+    timeout_ms,
+    repair_invalid_output,
+  }: ProductAgentRequest): Promise<ProductAgentResult> {
     validateProductAgentSource(source);
     const promptText = JSON.stringify({
       record_id: source.record_id,
@@ -443,6 +451,12 @@ export class AiSdkProductAgent implements ProductAgent {
         ],
       },
     ];
+    if (repair_invalid_output)
+      messages.push({
+        role: "user",
+        content:
+          "The previous attempt failed contract or source validation. Rebuild the JSON from the supplied labelled excerpts. The field_evidence keys must exactly equal the paths of fields actually present in product, specifications and commercial: remove entries for omitted facts. Omit unsupported facts rather than filling missing fields. A draft containing only a sourced internal_sku is valid and expected when other labels are absent. Preserve the supplied identity and evidence_refs. Return only JSON; all original constraints still apply.",
+      });
     const result = await generateText({
       model,
       instructions: PRODUCT_AGENT_SYSTEM_PROMPT,
@@ -459,6 +473,7 @@ export class AiSdkProductAgent implements ProductAgent {
       metadata: {
         prompt_version: PRODUCT_AGENT_PROMPT_VERSION,
         prompt_hash: PRODUCT_AGENT_PROMPT_HASH,
+        ...(repair_invalid_output ? { validation_retry: true } : {}),
       },
     };
   }

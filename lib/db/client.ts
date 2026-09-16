@@ -4,10 +4,16 @@ import { drizzle as postgresDrizzle } from "drizzle-orm/node-postgres";
 import { Pool as PostgresPool } from "pg";
 
 import * as facebookRuntimeSchema from "./facebook-runtime-schema";
+import * as productCatalogSchema from "./product-catalog-schema";
 import * as productMediaSchema from "./product-media-schema";
 import * as coreSchema from "./schema";
 
-const schema = { ...coreSchema, ...productMediaSchema, ...facebookRuntimeSchema };
+const schema = {
+  ...coreSchema,
+  ...productMediaSchema,
+  ...facebookRuntimeSchema,
+  ...productCatalogSchema,
+};
 
 function requireDatabaseUrl() {
   const value = process.env.DATABASE_URL;
