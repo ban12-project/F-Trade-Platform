@@ -50,3 +50,9 @@ with tempfile.TemporaryDirectory() as directory:
     else:
         raise AssertionError('Symlink source must be rejected')
 print('PASS isolated image context, secret/reference exclusion, no overwrite and symlink guards')
+
+# Also validate the actual Dockerfile against the allowlist, so a packaging edit
+# cannot leave a green synthetic test while making the real helper unusable.
+with tempfile.TemporaryDirectory() as directory:
+    module.prepare_context(Path(__file__).resolve().parents[1], Path(directory) / 'context')
+print('PASS repository Dockerfile and governed module packaging')
