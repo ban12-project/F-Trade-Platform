@@ -21,7 +21,9 @@ SIZE = re.compile(r"^Size:(?: .*)?$")
 def tsv_lines(tsv):
     groups = defaultdict(list)
     try:
-        for row in csv.DictReader(io.StringIO(tsv), delimiter="\t"):
+        # Tesseract emits literal TSV tokens, not CSV-quoted fields. A stray quote
+        # recognized inside an image must never consume subsequent physical rows.
+        for row in csv.DictReader(io.StringIO(tsv), delimiter="\t", quoting=csv.QUOTE_NONE):
             if row["level"] != "5" or not row["text"].strip():
                 continue
             word = {key: int(row[key]) for key in ("left", "top", "width", "height")}
@@ -185,7 +187,10 @@ def recover_kit_labels(tsv, image_path=None, ocr_crop=None):
     if re.search(r"\bbrake(?:\s*(?:disc|disk|pad|rotor)s?)?\b|制动盘|刹车片|刹车盘",
                  " ".join(line["text"] for line in lines), re.I):
         return None
-    candidates = [line for line in lines if line["text"].startswith("Kit No.: ")]
+    # A damaged label may identify a region to reread, never an accepted value.
+    # Acceptance still requires the complete literal label from that region.
+    candidates = [line for line in lines
+                  if re.match(r"^Kit\b", line["text"]) and re.search(r"\d", line["text"])]
     clean = [line for line in candidates
              if KIT_LABEL.fullmatch(line["text"]) and line["confidence"] >= 60]
     if not clean or len(candidates) > 30:

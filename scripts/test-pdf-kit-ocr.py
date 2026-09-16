@@ -90,6 +90,17 @@ parsed = tsv_lines(out.getvalue())
 assert len(parsed) == 1 and parsed[0]['text'] == 'Part No.: SYN-001'
 assert parsed[0]['left'] == 100 and parsed[0]['confidence'] == 95
 
+# Tesseract does not quote TSV fields. Literal quote tokens cannot swallow rows.
+raw = '\t'.join(keys) + '\n'
+for index, token in enumerate(['"', 'Kit No.: 9999 999 991', '"noise',
+                               'Kit No.: 9999 999 992', '"']):
+    raw += '\t'.join(map(str, [5, 1, index + 1, 1, 1, 10, 20 + index * 30,
+                               200, 10, 95, token])) + '\n'
+parsed = tsv_lines(raw)
+assert [item['text'] for item in parsed] == ['"', 'Kit No.: 9999 999 991',
+                                            '"noise', 'Kit No.: 9999 999 992', '"']
+assert all('\n' not in item['text'] for item in parsed)
+
 # Independent labels remain useful even when component ownership is ambiguous.
 from pdf_kit_ocr import recover_kit_labels
 labels = [line('Kit No.: 9999 999 990', 10, 20),
@@ -131,3 +142,18 @@ if '--native-pdf' in sys.argv:
             rejected = recover_kit_labels(tsv(damaged), path, lambda _: output)
             assert '9999 999 992' not in rejected and rejected.count('Kit No.:') == 2
     print('PASS bounded kit-label reread preserves label type and rejects ambiguous/low-confidence output')
+
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / 'synthetic.png'
+        Image.new('RGB', (700, 700), 'white').save(path)
+        for damaged_label in ['Kit 9999 999 992', 'Kit ia 9999 999 992']:
+            sample = [labels[0], line(damaged_label, 10, 200)]
+            assert '9999 999 992' not in recover_kit_labels(tsv(sample))
+            recovered = recover_kit_labels(tsv(sample), path, lambda _: tsv([
+                line('Kit No.: 9999 999 992', 0, 0)]))
+            assert recovered.count('Kit No.:') == 2
+            for rejected_label in [damaged_label, 'Part No.: 9999 999 992']:
+                rejected = recover_kit_labels(tsv(sample), path, lambda _: tsv([
+                    line(rejected_label, 0, 0)]))
+                assert '9999 999 992' not in rejected
+    print('PASS raw TSV quote isolation and image-confirmed damaged-label reread')
