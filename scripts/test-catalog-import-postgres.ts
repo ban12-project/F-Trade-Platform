@@ -305,7 +305,12 @@ void (async () => {
         poisoned.draft.product.product_name = "Invented unsupported fact";
         await assert.rejects(completeCatalogCandidate(id, poisoned, db));
       }
-      assert.equal(await completeCatalogCandidate(id, result(item.source), db), true);
+      const output = result(item.source);
+      if (index === 4) {
+        output.draft.product = {};
+        output.draft.field_evidence = {};
+      }
+      assert.equal(await completeCatalogCandidate(id, output, db), true);
       assert.equal(await completeCatalogCandidate(id, result(item.source), db), false);
     }
     const partial = await catalogImportView(lookup, identity, db);
@@ -326,11 +331,20 @@ void (async () => {
       .where(inArray(aggregateRecord.id, productIds));
     assert.equal(saved.length, 20);
     assert.ok(saved.every((row) => row.state === "PRODUCT_REVIEW_REQUIRED"));
+    assert.ok(
+      saved.every(
+        (row) => typeof (row.payload.product as Record<string, unknown>).internal_sku === "string",
+      ),
+    );
     const audits = await db
       .select()
       .from(auditEvent)
       .where(inArray(auditEvent.aggregateId, productIds));
     assert.equal(audits.length, 20);
+    assert.equal(
+      audits.filter((row) => row.metadata.catalog_identifier_preserved === true).length,
+      1,
+    );
     assert.ok(
       audits.every((row) => row.metadata.original_evidence_id === work.original.evidenceId),
     );

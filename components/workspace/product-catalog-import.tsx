@@ -61,6 +61,8 @@ const failures: Record<CatalogFailureCode, string> = {
   SOURCE_UNAVAILABLE: "无法读取或核验原件，请重新上传。",
   PREPROCESS_FAILED: "目录解析失败，可重试或更换可提取文字的文件。",
   MODEL_FAILED: "抽取未通过，请检查模型配置后重试。",
+  MODEL_CONFIG_UNAVAILABLE: "模型配置不可用，请在账号与工具中检查配置。",
+  MODEL_OUTPUT_REJECTED: "模型输出未通过格式或来源校验，未保存草稿。可以重试或更换模型。",
   ACCESS_REVOKED: "登录或项目权限已失效，请恢复权限后重试。",
   DISPATCH_FAILED: "后台任务未能启动，请重试。",
   ATTEMPT_EXPIRED: "任务已超时，可以安全重试。",
@@ -388,6 +390,26 @@ export function ProductCatalogImport({
                           }
                         >
                           清空选择
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            pending || !available.some((candidate) => candidate.status === "failed")
+                          }
+                          onClick={() =>
+                            selection.setValue(
+                              "candidateIds",
+                              available
+                                .filter((candidate) => candidate.status === "failed")
+                                .slice(0, maximumCatalogBatchRecords)
+                                .map((candidate) => candidate.id),
+                              { shouldValidate: true },
+                            )
+                          }
+                        >
+                          选择失败记录
                         </Button>
                       </div>
                       <Table>

@@ -21,6 +21,7 @@ import { assertAndLinkProjectEvidence, assertWorkspaceProjectAccess } from "../w
 import type { ProductAgentResult } from "./agent";
 import { finalizeProductAgentDraft } from "./agent";
 import { discoverCatalogCandidates } from "./catalog-candidates";
+import { preserveCatalogDraftIdentity } from "./catalog-draft-identity";
 import {
   type CatalogFailureCode,
   type CatalogImportView,
@@ -435,8 +436,9 @@ export async function completeCatalogCandidate(
     if (!context?.candidate || context.attempt.status !== "running") return false;
     const { row, candidate, identity } = context;
     const source = prepareProductAgentEvidenceSource(candidate.source);
+    const identityDraft = preserveCatalogDraftIdentity(result.draft, source, candidate.identifier);
     const validated = finalizeProductAgentDraft(
-      { ...result.draft, evidence_refs: source.evidence_refs },
+      { ...identityDraft.draft, evidence_refs: source.evidence_refs },
       source,
     );
     assertProductAgentEvidenceLocations(validated, source, finalizeProductAgentDraft);
@@ -452,6 +454,7 @@ export async function completeCatalogCandidate(
         catalog_candidate_id: candidate.id,
         catalog_attempt_id: attemptId,
         original_evidence_id: row.evidenceId,
+        catalog_identifier_preserved: identityDraft.preserved,
       },
       row.projectId,
     );

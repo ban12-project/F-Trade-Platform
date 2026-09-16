@@ -4,6 +4,7 @@ import { extname, join } from "node:path";
 import { get } from "@vercel/blob";
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
+import { isRejectedCatalogOutput, runCatalogProductAgent } from "@/lib/product/catalog-agent";
 import type { CatalogFailureCode } from "@/lib/product/catalog-import-contracts";
 import {
   CatalogAccessError,
@@ -14,7 +15,6 @@ import {
 } from "@/lib/product/catalog-import-store";
 import { preprocessProductAgentDocument } from "@/lib/product/document-source";
 import { verifyDocumentUploadBytes } from "@/lib/product/document-upload-bytes";
-import { EvidenceLocatedProductAgent } from "@/lib/product/evidence-located-agent";
 
 async function processAttempt(attemptId: string) {
   "use step";
@@ -24,10 +24,11 @@ async function processAttempt(attemptId: string) {
     const work = await claimCatalogAttempt(attemptId);
     if (!work) return;
     if (work.source) {
-      failureCode = "MODEL_FAILED";
+      failureCode = "MODEL_CONFIG_UNAVAILABLE";
       if (!work.modelConfigId || !work.model) throw new Error("Missing model selection");
       const config = await resolveProductAgentModelConfig(work.modelConfigId, work.model);
-      const result = await new EvidenceLocatedProductAgent().run({
+      failureCode = "MODEL_FAILED";
+      const result = await runCatalogProductAgent({
         model: createProductAgentModel(config),
         timeout_ms: 75_000,
         source: work.source,
@@ -60,9 +61,47 @@ async function processAttempt(attemptId: string) {
     }
   } catch (error) {
     // Persist a bounded code, never provider errors, original text or storage paths.
+    const providerStatus =
+      error &&
+      typeof error === "object" &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number" &&
+      error.statusCode >= 400 &&
+      error.statusCode <= 599
+        ? error.statusCode
+        : undefined;
+    const rejectedOutput = failureCode === "MODEL_FAILED" && isRejectedCatalogOutput(error);
+    const errorKind =
+      error instanceof Error &&
+      [
+        "Error",
+        "NoOutputGeneratedError",
+        "NoObjectGeneratedError",
+        "APICallError",
+        "RetryError",
+        "AbortError",
+        "TimeoutError",
+        "TypeError",
+      ].includes(error.constructor.name)
+        ? error.constructor.name
+        : "Other";
     await failCatalogAttempt(
       attemptId,
-      error instanceof CatalogAccessError ? "ACCESS_REVOKED" : failureCode,
+      error instanceof CatalogAccessError
+        ? "ACCESS_REVOKED"
+        : rejectedOutput
+          ? "MODEL_OUTPUT_REJECTED"
+          : failureCode,
+    );
+    console.warn(
+      JSON.stringify({
+        event: "catalog_import_attempt_failed",
+        attemptId,
+        failureCode,
+        rejectedOutput,
+        errorKind,
+        providerStatus,
+      }),
     );
   } finally {
     if (directory) await rm(directory, { recursive: true, force: true });
