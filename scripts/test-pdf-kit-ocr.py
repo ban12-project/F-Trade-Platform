@@ -89,3 +89,45 @@ for token, x, confidence in [('noise', 10, 0), ('Part', 100, 95), ('No.:', 140, 
 parsed = tsv_lines(out.getvalue())
 assert len(parsed) == 1 and parsed[0]['text'] == 'Part No.: SYN-001'
 assert parsed[0]['left'] == 100 and parsed[0]['confidence'] == 95
+
+# Independent labels remain useful even when component ownership is ambiguous.
+from pdf_kit_ocr import recover_kit_labels
+labels = [line('Kit No.: 9999 999 990', 10, 20),
+          line('Kit No.:', 10, 200),
+          line('Kit No.: 999 999 9991', 10, 380),
+          line('Part No.: SYN-UNOWNED', 100, 250),
+          line('Type No.: DAMAGED', 100, 270, confidence=0)]
+assert recover_kit_captions(tsv(labels)) is None
+label_text = recover_kit_labels(tsv(labels))
+assert label_text is not None
+assert label_text.count('Kit No.:') == 2
+assert 'Kit No.: 999 999 9991' in label_text
+assert 'Part No.' not in label_text and 'Type No.' not in label_text and 'Size:' not in label_text
+assert 'component associations were not recovered' in label_text
+assert recover_kit_labels(tsv(labels + [line('Brake Disc', 1, 1)])) is None
+assert recover_kit_labels('not tsv') is None
+assert recover_kit_labels(tsv([line('Kit No.: 9999 999 990', 10, 20, confidence=0)])) is None
+assert recover_kit_labels(tsv([line(f'Kit No.: 9999 999 {900+i}', 10, 20+i*30) for i in range(31)])) is None
+assert recover_kit_labels(tsv([line('Part No.: 9999 999 990', 10, 20)])) is None
+assert recover_kit_labels(tsv([line('Kit Ne.: 9999 999 990', 10, 20)])) is None
+print('PASS independent kit labels survive blank/damaged component rows without transferring facts')
+
+if '--native-pdf' in sys.argv:
+    damaged = labels + [line('Kit No.: damaged 999 992', 10, 560, confidence=30)]
+    damaged[-1]['height'] = 30
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / 'synthetic.png'
+        Image.new('RGB', (700, 700), 'white').save(path)
+        calls = []
+        def reread(crop):
+            calls.append(crop.size)
+            return tsv([line('Kit No.: 9999 999 992', 0, 0)])
+        recovered = recover_kit_labels(tsv(damaged), path, reread)
+        assert 'Kit No.: 9999 999 992' in recovered and len(calls) == 1
+        assert calls[0][1] == 42  # Only the bounded title line, not its component row.
+        for output in ['not tsv', tsv([line('Part No.: 9999 999 992', 0, 0)]),
+                       tsv([line('Kit No.: 9999 999 992', 0, 0, confidence=20)]),
+                       tsv([line('Kit No.: 9999 999 992', 0, 0), line('Kit No.: 9999 999 993', 0, 20)])]:
+            rejected = recover_kit_labels(tsv(damaged), path, lambda _: output)
+            assert '9999 999 992' not in rejected and rejected.count('Kit No.:') == 2
+    print('PASS bounded kit-label reread preserves label type and rejects ambiguous/low-confidence output')

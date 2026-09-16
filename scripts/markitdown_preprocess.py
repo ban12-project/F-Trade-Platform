@@ -158,7 +158,7 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
             # Only explicit kit pages receive the additional sparse/coordinate pass.
             # All other document layouts keep the existing OCR behavior.
             if re.search(r"Kit No\.:", text) and re.search(r"Part No\.:", text):
-                from pdf_kit_ocr import recover_kit_captions, refine_caption_lines
+                from pdf_kit_ocr import recover_kit_captions, recover_kit_labels, refine_caption_lines
 
                 sparse_prefix = Path(directory) / f"kit-{number}"
                 subprocess.run(
@@ -186,13 +186,20 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                         lines, sparse_prefix.with_suffix(".png"), ocr_crop,
                     ),
                 )
+                if recovered is None:
+                    # Broken/blank component rows must not hide independent titles.
+                    # This fallback supplies no component associations or facts.
+                    recovered = recover_kit_labels(
+                        sparse.stdout, sparse_prefix.with_suffix(".png"), ocr_crop,
+                    )
+                kit_number = r"(?:\d{4}[ \t]+\d{3}[ \t]+\d{3}|\d{3}[ \t]+\d{3}[ \t]+\d{4})"
                 original_ids = {
-                    " ".join(parts) for parts in re.findall(
-                        r"^\s*Kit\s+No\.?\s*:\s*(\d{4})[ \t]+(\d{3})[ \t]+(\d{3})[ \t]*$",
+                    " ".join(identifier.split()) for identifier in re.findall(
+                        rf"^\s*Kit\s+No\.?\s*:\s*({kit_number})[ \t]*$",
                         text, re.MULTILINE | re.IGNORECASE,
                     )
                 }
-                recovered_ids = set(re.findall(r"Kit No\.: (\d{4} \d{3} \d{3})", recovered or ""))
+                recovered_ids = set(re.findall(rf"Kit No\.: ({kit_number})", recovered or ""))
                 if recovered is not None and original_ids <= recovered_ids:
                     # Retain the initial OCR for audit without rediscovering its
                     # incomplete paragraphs as duplicate product records.
