@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm exec biome ci --changed --since="${{ github.event.pull_request.base.sha }}"
+            pnpm exec biome ci --no-errors-on-unmatched --changed --since="${{ github.event.pull_request.base.sha }}"
           else
             pnpm check:ci
           fi
