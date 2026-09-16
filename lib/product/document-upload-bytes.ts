@@ -42,6 +42,15 @@ export async function verifyDocumentUploadBytes(
   const prefix = bytes.subarray(0, 8);
   let valid = false;
   if (isImage) {
+    if (contentType === "image/png") {
+      // libvips can decode an APNG's default frame without reporting all frames.
+      // Reject the animation control chunk before accepting the original container.
+      for (let offset = 8; offset + 12 <= bytes.length; ) {
+        if (bytes.toString("ascii", offset + 4, offset + 8) === "acTL")
+          throw new Error("产品图片不能包含多帧或动画。");
+        offset += bytes.readUInt32BE(offset) + 12;
+      }
+    }
     const expectedFormat = contentType === "image/png" ? "png" : "jpeg";
     const decoder = sharp(bytes, { limitInputPixels: 25_000_000, failOn: "warning" });
     const metadata = await decoder.metadata();

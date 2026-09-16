@@ -12,11 +12,12 @@ Gate 01 provides an authenticated original-image link. Delivery checks project m
 
 ## Observed validation
 
-- Image regression: purpose/type/path/size limits, full PNG/JPEG decoding, truncated files, duplicate/excess receipts and bounded stream cancellation passed.
+- Image regression: purpose/type/path/size limits, full PNG/JPEG decoding, truncated files, APNG animation-control chunks, duplicate/excess receipts and bounded stream cancellation passed.
 - PostgreSQL regression: owner/project/purpose isolation, repeated claims, changed bytes, preview isolation, membership revocation during reads, missing/false confirmation, explicit simulated confirmation, refusal and no-image approval passed.
 - Streaming SDK regression: both image/no-image requests deliver the expected bytes, retain incremental output and reject truncated final output.
 - Existing product field-evidence and A–D synthetic domain regressions passed. These domain fixtures remain distinct from real-image acceptance.
 - All 37 repository validation checks and Drizzle migration consistency passed.
+- Node 24.21.0 / pnpm 11.24.0 isolated production build and production fixture/anonymous-access checks passed, with Cache Components and React Compiler enabled. The initial successful build used the global Node 26; it was repeated under the declared Node 24 runtime.
 - TypeScript passed. Fresh browser console, Next runtime errors and compilation issues were empty after installation completed.
 
 An actual browser test uploaded a 1,597,903-byte rasterized page from an authorized reference PDF plus an independent MOCK CSV. Expectations were frozen before invoking the saved model. The model completed and matched the four expected text fields exactly; it did not add fitment or dimensional facts from the image. The largest observed mutation request was 1,082 bytes, not the image body.

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { crc32 } from "node:zlib";
 import sharp from "sharp";
 import { verifyDocumentUploadBytes } from "../lib/product/document-upload-bytes";
 import { documentUploadPayloadSchema } from "../lib/product/document-upload-contracts";
@@ -21,6 +22,20 @@ async function run() {
       sizeBytes: bytes.length,
     };
     assert.equal(documentUploadPayloadSchema.parse(payload).purpose, "agent_image");
+    if (format === "png") {
+      const animation = Buffer.alloc(20);
+      animation.writeUInt32BE(8, 0);
+      animation.write("acTL", 4);
+      animation.writeUInt32BE(2, 8);
+      animation.writeUInt32BE(0, 12);
+      animation.writeUInt32BE(crc32(animation.subarray(4, 16)), 16);
+      const animated = Buffer.concat([bytes.subarray(0, 33), animation, bytes.subarray(33)]);
+      await assert.rejects(
+        verifyDocumentUploadBytes(new Blob([animated]).stream(), "animated.png", animated.length),
+        /多帧或动画/,
+      );
+    }
+
     assert.deepEqual(
       (
         await verifyDocumentUploadBytes(
