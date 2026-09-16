@@ -318,6 +318,9 @@ function ProductAgentForm({
   evidenceOptions: EvidenceOption[];
 }) {
   const router = useRouter();
+  const textEvidenceOptions = evidenceOptions.filter(
+    (option) => !option.contentType.startsWith("image/"),
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const [actionState, action, actionPending] = useActionState(
@@ -525,7 +528,7 @@ function ProductAgentForm({
                   <Select
                     value={field.value ?? ""}
                     onValueChange={(value) => field.onChange(value ?? "")}
-                    disabled={!evidenceOptions.length}
+                    disabled={!textEvidenceOptions.length}
                   >
                     <SelectTrigger
                       id="agent-evidence"
@@ -533,13 +536,13 @@ function ProductAgentForm({
                       aria-invalid={!!form.formState.errors.evidenceRef}
                     >
                       <SelectValue>
-                        {evidenceOptions.find((option) => option.id === field.value)?.sourceLabel ??
-                          "选择已上传证据"}
+                        {textEvidenceOptions.find((option) => option.id === field.value)
+                          ?.sourceLabel ?? "选择已上传证据"}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {evidenceOptions.map((option) => (
+                        {textEvidenceOptions.map((option) => (
                           <SelectItem key={option.id} value={option.id}>
                             {option.sourceLabel} · {option.id.slice(-8)}
                           </SelectItem>
