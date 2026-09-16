@@ -18,6 +18,7 @@ for (const [label, identifier] of [
   ["编号", "999999XD99999"],
   ["编号", "999999XC99999S"],
   ["Kit No.", "9999 999 999"],
+  ["Kit No.", "999 999 9999"],
   ["Part No.", "RYC-SYN001"],
   ["Internal SKU", "999XDC999"],
 ]) {
@@ -35,6 +36,8 @@ for (const text of [
   "OE: RYC-SYN999",
   "Component No.: RYC-SYN999",
   "Part No.: 9999 999 999",
+  "Part No.: 999 999 9999",
+  "Kit No.: 9999 999 9999",
   "Kit No.: 9999 999 999\nProduct: brake disc",
   "| OE | Component No. |\n| --- | --- |\n| RYC-SYN001 | 999999XD99999 |",
   "Part No.: RYC-SYN001\nPart No.: RYC-SYN002",
@@ -67,3 +70,12 @@ assert.equal(spatialKit.length, 1);
 assert.match(spatialKit[0]!.source.source_text, /Component 1 source/);
 assert.match(spatialKit[0]!.source.source_text, /Size: 1\*2/);
 assert.match(spatialKit[0]!.source.evidence_refs[0]!, /pdf-page=2/);
+
+const labelsOnly = discover(
+  "<!-- f-trade:pdf-page=4 -->\nOriginal OCR (unverified):\n> Kit No.: 999 999 9999\n> Part No.: SYN-UNOWNED\n\nKit No.: 999 999 9999\nSource kit label (unverified OCR); component associations were not recovered.",
+);
+assert.equal(labelsOnly.length, 1);
+assert.equal(labelsOnly[0]?.identifier, "999 999 9999");
+assert.equal(labelsOnly[0]?.review_status, "source_review_required");
+assert.ok(!labelsOnly[0]?.source.source_text.includes("Part No."));
+assert.match(labelsOnly[0]?.source.evidence_refs[0] ?? "", /pdf-page=4/);

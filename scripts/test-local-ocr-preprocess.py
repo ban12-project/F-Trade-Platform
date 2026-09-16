@@ -263,3 +263,15 @@ with patch.object(MODULE, 'executable', side_effect=lambda name: name), patch.ob
     result = MODULE.local_pdf_ocr(Path('synthetic.pdf'))
     assert result == MODULE.pdf_page_text(1, baseline)
 print('PASS selective kit OCR recovery and no-lost-identifier fallback')
+
+# Blank headings and damaged component rows may recover titles only, with raw OCR retained.
+from unittest.mock import patch
+import pdf_kit_ocr
+baseline = 'Kit No.: 9999 999 990\n\nKit No.:\nPart No.: SYN-UNOWNED'
+with patch.object(MODULE, 'executable', side_effect=lambda name: name), patch.object(MODULE, 'pdf_page_count', return_value=1), patch.object(MODULE.subprocess, 'run', side_effect=kit_run), patch.object(pdf_kit_ocr, 'recover_kit_captions', return_value=None):
+    result = MODULE.local_pdf_ocr(Path('synthetic.pdf'))
+    assert '> Part No.: SYN-UNOWNED' in result
+    assert 'component associations were not recovered' in result
+    assert 'Component 1 source' not in result
+    assert result.count('\nKit No.: 9999 999 990') == 1
+print('PASS label-only OCR fallback preserves the original without inventing component ownership')

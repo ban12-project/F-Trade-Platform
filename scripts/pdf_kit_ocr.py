@@ -2,7 +2,8 @@
 
 Input is Tesseract TSV. This does not validate OCR against the original image,
 interpret component numbers as OE, or promote component sizes to kit dimensions.
-Ambiguous/missing row anchors reject the entire page instead of guessing ownership.
+Caption recovery rejects ambiguous row ownership. A separate label-only fallback
+never associates component captions with a kit.
 """
 from __future__ import annotations
 
@@ -164,3 +165,57 @@ def refine_caption_lines(lines, image_path, ocr_crop):
                                       'confidence': readings[0]['confidence'],
                                       'top': bounds[1], 'bottom': bounds[3]}
     return [replacements.get(id(line), line) for line in lines]
+
+
+# Preserve the literal grouping of explicitly labelled ten-digit identifiers.
+# The second form is unusual but is not silently rewritten into the first.
+KIT_LABEL = re.compile(r"^Kit No\.: (?:\d{4} \d{3} \d{3}|\d{3} \d{3} \d{4})$")
+
+
+def recover_kit_labels(tsv, image_path=None, ocr_crop=None):
+    """Recover independent kit labels, never their ambiguous component ownership.
+
+    A blank/damaged heading does not invalidate other literal headings. Damaged
+    values can only be reread from their own bounded image region; no neighboring
+    number supplies characters. Original OCR must still be retained by the caller.
+    """
+    from statistics import median
+
+    lines = tsv_lines(tsv)
+    if re.search(r"\bbrake(?:\s*(?:disc|disk|pad|rotor)s?)?\b|制动盘|刹车片|刹车盘",
+                 " ".join(line["text"] for line in lines), re.I):
+        return None
+    candidates = [line for line in lines if line["text"].startswith("Kit No.: ")]
+    clean = [line for line in candidates
+             if KIT_LABEL.fullmatch(line["text"]) and line["confidence"] >= 60]
+    if not clean or len(candidates) > 30:
+        return None
+    height = median(line["bottom"] - line["top"] for line in clean)
+    blocks = []
+    retries = 0
+    for line in candidates:
+        if (line["confidence"] < 60 or not KIT_LABEL.fullmatch(line["text"])
+                or line["bottom"] - line["top"] > height * 1.5):
+            if image_path is None or ocr_crop is None or retries >= 20:
+                continue
+            if not any(abs(line["left"] - peer["left"]) <= height for peer in clean):
+                continue
+            from PIL import Image
+
+            retries += 1
+            with Image.open(image_path) as image:
+                bounds = (max(0, line["left"] - 5), max(0, line["top"] - 5),
+                          min(image.width, line["right"] + 10),
+                          min(image.height, int(line["top"] + height + 6)))
+                if bounds[0] >= bounds[2] or bounds[1] >= bounds[3]:
+                    continue
+                with image.crop(bounds) as crop:
+                    with crop.resize((crop.width * 2, crop.height * 2)) as enlarged:
+                        readings = tsv_lines(ocr_crop(enlarged))
+            if (len(readings) != 1 or readings[0]["confidence"] < 60
+                    or not KIT_LABEL.fullmatch(readings[0]["text"])):
+                continue
+            line = {**line, "text": readings[0]["text"]}
+        blocks.append(line["text"] + "\nSource kit label (unverified OCR); "
+                      "component associations were not recovered.")
+    return "\n\n".join(blocks) or None

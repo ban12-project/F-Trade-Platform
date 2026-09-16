@@ -17,7 +17,10 @@ function identifierValue(label: string, value: string) {
   const normalized = value.trim().replace(/\s+/g, " ");
   if (!LABEL.test(label.trim())) return undefined;
   if (IDENTIFIER.test(normalized)) return normalized;
-  if (/^kit\s+no\.?$/i.test(label.trim()) && /^\d{4} \d{3} \d{3}$/.test(normalized)) {
+  if (
+    /^kit\s+no\.?$/i.test(label.trim()) &&
+    /^(?:\d{4} \d{3} \d{3}|\d{3} \d{3} \d{4})$/.test(normalized)
+  ) {
     return normalized;
   }
   return undefined;
