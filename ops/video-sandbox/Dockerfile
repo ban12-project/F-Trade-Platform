@@ -12,6 +12,6 @@ RUN apt-get update \
   && ffmpeg -hide_banner -encoders 2>&1 | grep -q ' aac ' \
   && rm -rf /var/lib/apt/lists/*
 
-COPY scripts/markitdown_preprocess.py scripts/pdf_catalog_layout.py /opt/f-trade/
+COPY scripts/markitdown_preprocess.py scripts/pdf_catalog_layout.py scripts/pdf_kit_ocr.py /opt/f-trade/
 
 WORKDIR /vercel/sandbox

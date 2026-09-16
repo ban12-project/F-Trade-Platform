@@ -154,7 +154,51 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                 check=True, capture_output=True, text=True,
             )
             number = int(image.stem.rsplit("-", 1)[1])
-            text_parts.append(pdf_page_text(number, result.stdout))
+            text = result.stdout
+            # Only explicit kit pages receive the additional sparse/coordinate pass.
+            # All other document layouts keep the existing OCR behavior.
+            if re.search(r"Kit No\.:", text) and re.search(r"Part No\.:", text):
+                from pdf_kit_ocr import recover_kit_captions, refine_caption_lines
+
+                sparse_prefix = Path(directory) / f"kit-{number}"
+                subprocess.run(
+                    [pdftoppm, "-f", str(number), "-l", str(number), "-singlefile",
+                     "-r", "300", "-png", str(path), str(sparse_prefix)],
+                    check=True, capture_output=True, text=True,
+                )
+                sparse = subprocess.run(
+                    [tesseract, str(sparse_prefix.with_suffix(".png").resolve()), "stdout",
+                     "-l", language, "--psm", "11", "tsv"],
+                    check=True, capture_output=True, text=True,
+                )
+                def ocr_crop(crop):
+                    crop_path = Path(directory) / "caption.png"
+                    crop.save(crop_path)
+                    return subprocess.run(
+                        [tesseract, str(crop_path.resolve()), "stdout", "-l", language,
+                         "--psm", "7", "tsv"],
+                        check=True, capture_output=True, text=True,
+                    ).stdout
+
+                recovered = recover_kit_captions(
+                    sparse.stdout,
+                    refine=lambda lines: refine_caption_lines(
+                        lines, sparse_prefix.with_suffix(".png"), ocr_crop,
+                    ),
+                )
+                original_ids = {
+                    " ".join(parts) for parts in re.findall(
+                        r"^\s*Kit\s+No\.?\s*:\s*(\d{4})[ \t]+(\d{3})[ \t]+(\d{3})[ \t]*$",
+                        text, re.MULTILINE | re.IGNORECASE,
+                    )
+                }
+                recovered_ids = set(re.findall(r"Kit No\.: (\d{4} \d{3} \d{3})", recovered or ""))
+                if recovered is not None and original_ids <= recovered_ids:
+                    # Retain the initial OCR for audit without rediscovering its
+                    # incomplete paragraphs as duplicate product records.
+                    original = "\n".join("> " + line for line in text.splitlines())
+                    text = "Original OCR (unverified):\n" + original + "\n\n" + recovered
+            text_parts.append(pdf_page_text(number, text))
     return "\n\n".join(text_parts).strip()
 
 

@@ -59,3 +59,11 @@ assert.throws(
 );
 assert.equal(discover("Part No.: RYC-SYN999\n\nPart No.: RYC-SYN999").length, 2);
 console.log("PASS synthetic catalog identifier, duplicate and location regressions");
+
+const spatialKit = discover(
+  "<!-- f-trade:pdf-page=2 -->\nOriginal OCR (unverified):\n> Kit No.: 9999 999 990\n> Part No.: SYN-COMP\n\nKit No.: 9999 999 990\nComponent 1 source [ocr-pixels=100,70,210,120]: Part No.: SYN-COMP / Type No.: MOCK-TYPE / Size: 1*2",
+);
+assert.equal(spatialKit.length, 1);
+assert.match(spatialKit[0]!.source.source_text, /Component 1 source/);
+assert.match(spatialKit[0]!.source.source_text, /Size: 1\*2/);
+assert.match(spatialKit[0]!.source.evidence_refs[0]!, /pdf-page=2/);

@@ -231,3 +231,35 @@ if "--local-ocr" in sys.argv:
         assert "SYNTHETIC SCAN" in pages[1][1]
         assert pages[2] == (3, "")
     print("PASS real Poppler/Tesseract mixed PDF integration with a blank page")
+
+# Coordinate recovery is selective, preserves original OCR, and cannot lose IDs.
+import csv
+kit_tsv = io.StringIO()
+keys = ['level', 'page_num', 'block_num', 'par_num', 'line_num', 'left', 'top', 'width', 'height', 'conf', 'text']
+writer = csv.DictWriter(kit_tsv, fieldnames=keys, delimiter='\t')
+writer.writeheader()
+for index, (text, x, y) in enumerate([
+    ('Kit No.: 9999 999 990', 10, 20), ('Part No.: SYN-COMP', 100, 70),
+    ('Type No.: MOCK-TYPE', 100, 90), ('Size: 1*2', 100, 110),
+]):
+    writer.writerow(dict(level=5, page_num=1, block_num=index + 1, par_num=1,
+                         line_num=1, left=x, top=y, width=110, height=10, conf=95, text=text))
+baseline = 'Kit No.: 9999 999 990\n\nPart No.: SYN-COMP\nType No.: MOCK-TYPE\nSize: 1*2'
+commands = []
+def kit_run(args, **kwargs):
+    commands.append(args)
+    if args[0] == 'pdftoppm':
+        name = str(args[-1]) + ('.png' if '-singlefile' in args else '-1.png')
+        Path(name).touch()
+        return SimpleNamespace(stdout='')
+    return SimpleNamespace(stdout=kit_tsv.getvalue() if args[-1] == 'tsv' else baseline)
+with patch.object(MODULE, 'executable', side_effect=lambda name: name), patch.object(MODULE, 'pdf_page_count', return_value=1), patch.object(MODULE.subprocess, 'run', side_effect=kit_run):
+    result = MODULE.local_pdf_ocr(Path('synthetic.pdf'))
+    assert '> Kit No.: 9999 999 990' in result
+    assert 'Component 1 source [ocr-pixels=' in result
+    assert any('-singlefile' in command and '300' in command for command in commands)
+    # Reject a recovery that drops an identifier from the initial pass.
+    baseline += '\n\nKIT No: 9999  999\t991'
+    result = MODULE.local_pdf_ocr(Path('synthetic.pdf'))
+    assert result == MODULE.pdf_page_text(1, baseline)
+print('PASS selective kit OCR recovery and no-lost-identifier fallback')
