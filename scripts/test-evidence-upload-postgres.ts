@@ -166,7 +166,11 @@ void (async () => {
     let reads = 0;
     const readBlob: typeof get = async () => {
       reads++;
-      return { statusCode: 200, stream: image.stream() } as Awaited<ReturnType<typeof get>>;
+      return {
+        statusCode: 200,
+        blob: { contentType: image.type },
+        stream: image.stream(),
+      } as Awaited<ReturnType<typeof get>>;
     };
     const claim = (i: number) =>
       claimCompletedVideoUploads(
