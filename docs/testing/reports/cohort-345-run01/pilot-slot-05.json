@@ -1,0 +1,19 @@
+{
+  "run_id": "cohort-345-run01-pilot-slot-05",
+  "slot_id": "pilot-slot-05",
+  "cohort": "A",
+  "status": "failed",
+  "started_at": "2026-09-16T06:22:08.270Z",
+  "completed_at": "2026-09-16T06:22:51.612Z",
+  "metrics": {
+    "sourced_field_recognition": 0.55,
+    "oe_preservation": 0,
+    "vehicle_fidelity": 1,
+    "blocking_missing_detection": 1,
+    "review_elapsed_seconds": 0
+  },
+  "revision_rounds": 0,
+  "ready": false,
+  "notes": "Independent MOCK CSV supplement with a manually checked source identifier; saved model and actual browser. Automated simulated review only. Expected-empty blocker recall is 1; zero review time means review was not performed. Image cohorts use authorized source page images, not isolated product photos.",
+  "failure_issue_url": "https://github.com/ban12-project/F-Trade-Platform/issues/347"
+}

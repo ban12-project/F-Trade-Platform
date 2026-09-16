@@ -1,0 +1,18 @@
+{
+  "run_id": "cohort-345-run01-pilot-slot-15",
+  "slot_id": "pilot-slot-15",
+  "cohort": "C",
+  "status": "passed",
+  "started_at": "2026-09-16T06:27:20.249Z",
+  "completed_at": "2026-09-16T06:35:12.891Z",
+  "metrics": {
+    "sourced_field_recognition": 1,
+    "oe_preservation": 1,
+    "vehicle_fidelity": 1,
+    "blocking_missing_detection": 1,
+    "review_elapsed_seconds": 11
+  },
+  "revision_rounds": 0,
+  "ready": true,
+  "notes": "Independent MOCK CSV supplement with a manually checked source identifier; saved model and actual browser. Automated simulated review only. Expected-empty blocker recall is 1; zero review time means review was not performed. Image cohorts use authorized source page images, not isolated product photos."
+}
