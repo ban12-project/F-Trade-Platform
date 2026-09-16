@@ -13,6 +13,10 @@ import {
   workspaceProjectItem,
 } from "@/lib/db/schema";
 import type { productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
+import {
+  insertProductSourceImages,
+  listProductSourceImages,
+} from "@/lib/product/source-image-store";
 import type { ProductApproval, ProductDraft } from "@/lib/product/verification";
 import {
   approveProductDraft,
@@ -40,6 +44,7 @@ export type ProductCatalogDetail = ProductCatalogEntry & {
   version: number;
   draft: ProductDraft;
   approvalId: string | null;
+  sourceImages: { evidenceId: string }[];
 };
 
 export type ProductCatalogDashboard = {
@@ -223,9 +228,10 @@ export async function createProductAgentDraft(
   actorId: string,
   metadata: Record<string, unknown>,
   projectId?: string,
+  sourceImageRefs: readonly string[] = [],
 ) {
   return getDatabase().transaction((tx) =>
-    insertProductAgentDraft(tx, draft, actorId, metadata, projectId),
+    insertProductAgentDraft(tx, draft, actorId, metadata, projectId, sourceImageRefs),
   );
 }
 
@@ -236,6 +242,7 @@ export async function insertProductAgentDraft(
   actorId: string,
   metadata: Record<string, unknown>,
   projectId?: string,
+  sourceImageRefs: readonly string[] = [],
 ) {
   if (draft.verification_status !== "review_required")
     throw new Error("Product Agent output must require Gate 01 review.");
@@ -279,6 +286,7 @@ export async function insertProductAgentDraft(
       role: "product_source",
       relation: "owned",
     });
+  await insertProductSourceImages(tx, id, projectId, actorId, sourceImageRefs);
   await tx.insert(approval).values({
     id: approvalId,
     aggregateId: id,
@@ -462,6 +470,7 @@ export async function getProductCatalogDetail(
     version: row.version,
     draft: row.payload as unknown as ProductDraft,
     approvalId: approvalRow?.id ?? null,
+    sourceImages: await listProductSourceImages(productId, database),
   };
 }
 
@@ -527,6 +536,14 @@ export async function decideProductCatalogReview(
     if (!pendingApproval) throw new Error("未找到待处理的 Gate 01 审核请求。");
     if (pendingApproval.id !== input.approvalId)
       throw new Error("审核请求已变更，请刷新并重新审核当前版本。");
+
+    const sourceImages = await listProductSourceImages(aggregate.id, tx);
+    if (
+      input.decision === "approved" &&
+      sourceImages.length &&
+      input.imageConsistencyConfirmed !== "true"
+    )
+      throw new Error("请先核对原始产品图片，并明确确认与当前产品一致。无法确认时请退回。");
 
     const productApproval: ProductApproval = {
       approval_id: pendingApproval.id,
@@ -620,6 +637,11 @@ export async function decideProductCatalogReview(
         decision: input.decision,
         approval_id: pendingApproval.id,
         reviewed_version: aggregate.version,
+        source_image_refs: sourceImages.map((image) => image.evidenceId),
+        image_consistency_confirmed:
+          input.decision === "approved" &&
+          sourceImages.length > 0 &&
+          input.imageConsistencyConfirmed === "true",
       },
       occurredAt: now,
     });

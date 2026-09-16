@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { documentContentType, maximumProductDocumentBytes } from "./document-upload-contracts";
+import {
+  maximumProductImageBytes,
+  productImageContentType,
+  productImageFilenameSchema,
+} from "./source-image-contracts";
 
 /** Enforce the bound while reading, including dishonest or absent Blob metadata. */
 export async function verifyDocumentUploadBytes(
@@ -13,7 +19,9 @@ export async function verifyDocumentUploadBytes(
     expectedSize > maximumProductDocumentBytes
   )
     throw new Error("文件大小超出限制。");
-  const contentType = documentContentType(filename);
+  const isImage = productImageFilenameSchema.safeParse(filename).success;
+  if (isImage && expectedSize > maximumProductImageBytes) throw new Error("图片超过 5 MiB 限制。");
+  const contentType = isImage ? productImageContentType(filename) : documentContentType(filename);
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let length = 0;
@@ -33,7 +41,26 @@ export async function verifyDocumentUploadBytes(
   const bytes = Buffer.concat(chunks, length);
   const prefix = bytes.subarray(0, 8);
   let valid = false;
-  if (contentType === "application/pdf") valid = prefix.subarray(0, 5).toString() === "%PDF-";
+  if (isImage) {
+    if (contentType === "image/png") {
+      // libvips can decode an APNG's default frame without reporting all frames.
+      // Reject the animation control chunk before accepting the original container.
+      for (let offset = 8; offset + 12 <= bytes.length; ) {
+        if (bytes.toString("ascii", offset + 4, offset + 8) === "acTL")
+          throw new Error("产品图片不能包含多帧或动画。");
+        offset += bytes.readUInt32BE(offset) + 12;
+      }
+    }
+    const expectedFormat = contentType === "image/png" ? "png" : "jpeg";
+    const decoder = sharp(bytes, { limitInputPixels: 25_000_000, failOn: "warning" });
+    const metadata = await decoder.metadata();
+    if (metadata.format !== expectedFormat || (metadata.pages ?? 1) !== 1)
+      throw new Error("图片类型不匹配或包含多帧。");
+    // Decode every pixel to reject truncated/corrupt files, but preserve the original bytes.
+    await decoder.stats();
+    valid = true;
+  } else if (contentType === "application/pdf")
+    valid = prefix.subarray(0, 5).toString() === "%PDF-";
   else if (contentType === "application/vnd.ms-excel")
     valid = prefix.equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
   else if (contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

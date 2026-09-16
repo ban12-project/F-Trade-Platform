@@ -11,6 +11,7 @@ import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
+import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
 import { EvidenceLocatedProductAgent } from "@/lib/product/evidence-located-agent";
 import { createProductAgentDraft } from "@/lib/products";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
@@ -50,7 +51,7 @@ export async function runProductAgentAction(
     const receiptId = formData.get("receiptId");
     if (formData.get("document") instanceof File) throw new Error("请通过私有直传上传文件。");
     if (receiptId && !projectId) throw new Error("上传资料必须绑定项目。");
-    const source =
+    const baseSource =
       receiptId && projectId
         ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
         : (() => {
@@ -69,6 +70,12 @@ export async function runProductAgentAction(
               image_refs: [],
             };
           })();
+    const source = await attachClaimedProductImages(
+      baseSource,
+      formData.getAll("imageReceiptId"),
+      projectId,
+      session.user.id,
+    );
     if (projectId)
       await assertAndLinkProjectEvidence(projectId, source.evidence_refs, session.user.id);
     const result = await new EvidenceLocatedProductAgent().run({
@@ -87,6 +94,7 @@ export async function runProductAgentAction(
         evidence_mode: "bounded_location",
       },
       projectId,
+      source.image_refs,
     );
     revalidatePath("/workspace", "layout");
     if (projectId) revalidatePath(`/workspace/${projectId}`);

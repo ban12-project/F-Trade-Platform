@@ -331,13 +331,19 @@ async function testReviewSnapshot() {
     const tx = {
       select() {
         let isRun = false;
+        let isImage = false;
         const query = {
           from(table: Parameters<typeof getTableName>[0]) {
             isRun = getTableName(table) === "product_agent_stream_run";
+            isImage = getTableName(table) === "product_source_image";
             return query;
           },
           where() {
             return query;
+          },
+          async orderBy() {
+            assert.equal(isImage, true);
+            return [];
           },
           async for(mode: string) {
             assert.equal(mode, "update");
@@ -421,7 +427,13 @@ async function testReviewSnapshot() {
     assert.deepEqual(
       valid.writes.find((write) => write.values.action === "product_gate_01_decided")?.values
         .metadata,
-      { decision, approval_id: approvalId, reviewed_version: 3 },
+      {
+        decision,
+        approval_id: approvalId,
+        reviewed_version: 3,
+        source_image_refs: [],
+        image_consistency_confirmed: false,
+      },
     );
   }
   const generating = await exercise(current, completeDraft, {

@@ -7,6 +7,7 @@ import {
   documentUploadPath,
   documentUploadPayloadSchema,
 } from "./document-upload-contracts";
+import { productImageContentType } from "./source-image-contracts";
 
 export async function uploadProductDocument(
   file: File,
@@ -18,7 +19,10 @@ export async function uploadProductDocument(
     projectId,
     purpose,
     originalFilename: file.name,
-    contentType: documentContentType(file.name),
+    contentType:
+      purpose === "agent_image"
+        ? productImageContentType(file.name)
+        : documentContentType(file.name),
     sizeBytes: file.size,
   });
   await uploadPresigned(documentUploadPath(payload), file, {

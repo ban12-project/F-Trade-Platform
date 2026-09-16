@@ -624,7 +624,10 @@ export const productDocumentUploadReceipt = pgTable(
       "product_document_upload_size",
       sql`${table.sizeBytes} > 0 AND ${table.sizeBytes} <= 26214400`,
     ),
-    check("product_document_upload_purpose", sql`${table.purpose} IN ('evidence', 'agent')`),
+    check(
+      "product_document_upload_purpose",
+      sql`${table.purpose} IN ('evidence', 'agent', 'agent_image')`,
+    ),
   ],
 );
 
@@ -984,5 +987,26 @@ export const productAgentStreamRun = pgTable(
       "product_agent_stream_status",
       sql`${table.status} IN ('running', 'completed', 'failed', 'interrupted')`,
     ),
+  ],
+);
+
+/** Immutable visual context, deliberately separate from engineering field evidence. */
+export const productSourceImage = pgTable(
+  "product_source_image",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => aggregateRecord.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => workspaceProject.id, { onDelete: "cascade" }),
+    evidenceId: text("evidence_id")
+      .notNull()
+      .references(() => evidence.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("product_source_image_product_evidence_uidx").on(table.productId, table.evidenceId),
   ],
 );

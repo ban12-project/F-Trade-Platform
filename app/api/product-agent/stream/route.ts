@@ -7,6 +7,7 @@ import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-con
 import { auth } from "@/lib/auth";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
+import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
 import {
   PRODUCT_STREAM_PROMPT_HASH,
   PRODUCT_STREAM_PROMPT_VERSION,
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
     const config = await resolveProductAgentModelConfig(parsed.modelConfigId, parsed.model);
     const model = createProductAgentModel(config);
-    const source = receiptId
+    const baseSource = receiptId
       ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
       : {
           record_id: randomUUID(),
@@ -56,6 +57,12 @@ export async function POST(request: Request) {
           image_availability: "none" as const,
           image_refs: [],
         };
+    const source = await attachClaimedProductImages(
+      baseSource,
+      data.getAll("imageReceiptId"),
+      projectId,
+      session.user.id,
+    );
     request.signal.throwIfAborted();
     const identity = { actorId: session.user.id, sessionId: session.session.id, projectId };
     const run = await startProductStreamRun(identity, source, {

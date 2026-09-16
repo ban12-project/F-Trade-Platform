@@ -154,3 +154,7 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/test-video-upload-reconciliation-postgres.ts
         env:
           DOCUMENT_UPLOAD_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+      - name: Verify private source images and Gate 01 confirmation
+        run: node --conditions=react-server --import tsx scripts/test-product-source-images-postgres.ts
+        env:
+          DOCUMENT_UPLOAD_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
