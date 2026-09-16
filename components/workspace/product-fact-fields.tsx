@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { kitContentValues, type ProductCatalogForm } from "@/lib/product/catalog-form-schema";
+import { isProductEvidenceLocationRef } from "@/lib/product/retained-evidence";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
 
@@ -207,6 +208,8 @@ function EvidenceInput({
 }) {
   const error = form.formState.errors[name];
   const options = useContext(EvidenceOptionsContext);
+  const originalRef = form.formState.defaultValues?.[name];
+  const retainedRef = isProductEvidenceLocationRef(originalRef) ? originalRef : undefined;
   return (
     <Field data-invalid={Boolean(error)}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
@@ -217,7 +220,7 @@ function EvidenceInput({
           <Select
             value={field.value}
             onValueChange={(value) => field.onChange(value ?? "")}
-            disabled={disabled || !options.length}
+            disabled={disabled || (!options.length && !retainedRef)}
           >
             <SelectTrigger
               id={id}
@@ -228,11 +231,14 @@ function EvidenceInput({
               <SelectValue>
                 {options.find((option) => option.id === field.value)
                   ? `${options.find((option) => option.id === field.value)!.sourceLabel} · ${field.value.slice(-8)}`
-                  : "选择已上传证据"}
+                  : field.value === retainedRef && retainedRef
+                    ? "保留原字段证据"
+                    : "选择已上传证据"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
+                {retainedRef ? <SelectItem value={retainedRef}>保留原字段证据</SelectItem> : null}
                 {options.map((option) => (
                   <SelectItem key={option.id} value={option.id}>
                     {option.sourceLabel} · {option.classification} · {option.id.slice(-8)}
@@ -243,7 +249,7 @@ function EvidenceInput({
           </Select>
         )}
       />
-      {!options.length ? (
+      {!options.length && !retainedRef ? (
         <FieldDescription>先通过智能导入上传资料，系统持久化后才能选择。</FieldDescription>
       ) : null}
       <FieldError errors={[error]} />

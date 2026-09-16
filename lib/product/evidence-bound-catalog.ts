@@ -1,15 +1,17 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq, type InferInsertModel, sql } from "drizzle-orm";
+import { and, eq, type InferInsertModel, inArray, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
   approval,
   auditEvent,
+  user,
   workflowEvent,
   workspaceProject,
   workspaceProjectItem,
+  workspaceProjectMember,
 } from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
@@ -19,6 +21,7 @@ import {
   type ProductCatalogForm,
   productCatalogFormSchema,
 } from "./catalog-form-schema";
+import { partitionRevisionEvidence } from "./retained-evidence";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
 export type EvidenceBoundProductCatalogInput = ProductCatalogForm;
@@ -345,19 +348,49 @@ export async function reviseEvidenceBoundProductCatalogDraft(
   const approvalId = randomUUID();
   return getDatabase().transaction(async (tx) => {
     const draft = buildEvidenceBoundProductCatalogDraft(input, productId);
-    await assertAndLinkProjectEvidence(projectId, draft.evidence_refs, actorId, tx);
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,
         state: aggregateRecord.state,
         version: aggregateRecord.version,
+        payload: aggregateRecord.payload,
       })
       .from(aggregateRecord)
+      .innerJoin(
+        workspaceProjectItem,
+        and(
+          eq(workspaceProjectItem.aggregateId, aggregateRecord.id),
+          eq(workspaceProjectItem.projectId, projectId),
+        ),
+      )
+      .innerJoin(
+        workspaceProject,
+        and(
+          eq(workspaceProject.id, workspaceProjectItem.projectId),
+          eq(workspaceProject.kind, "marketing"),
+          eq(workspaceProject.status, "active"),
+        ),
+      )
+      .innerJoin(
+        workspaceProjectMember,
+        and(
+          eq(workspaceProjectMember.projectId, workspaceProject.id),
+          eq(workspaceProjectMember.userId, actorId),
+          inArray(workspaceProjectMember.role, ["owner", "editor"]),
+        ),
+      )
+      .innerJoin(user, and(eq(user.id, workspaceProjectMember.userId), eq(user.banned, false)))
       .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!aggregate) throw new Error("产品草稿不存在。");
+    if (!aggregate) throw new Error("产品草稿不存在，或无权在当前项目修订。");
     if (aggregate.state !== "PRODUCT_REVISION_REQUIRED")
       throw new Error("该产品当前不处于待修订状态。");
+    const revisionEvidence = partitionRevisionEvidence(
+      reviewProductDraft(aggregate.payload),
+      draft,
+    );
+    if (revisionEvidence.uploaded.length)
+      await assertAndLinkProjectEvidence(projectId, revisionEvidence.uploaded, actorId, tx);
 
     assertTransition({
       eventId,
@@ -411,6 +444,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
       subjectId: productId,
       metadata: {
         approval_id: approvalId,
+        retained_evidence_location_count: revisionEvidence.retained.length,
         blocking_field_count: draft.blocking_missing_fields.length,
         field_evidence_count: Object.keys(draft.field_evidence).length,
         evidence_ref_count: draft.evidence_refs.length,
