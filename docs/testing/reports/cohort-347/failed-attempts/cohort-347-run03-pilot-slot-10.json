@@ -1,0 +1,19 @@
+{
+  "run_id": "cohort-347-run03-pilot-slot-10",
+  "slot_id": "pilot-slot-10",
+  "cohort": "B",
+  "status": "failed",
+  "started_at": "2026-09-16T07:10:16.408Z",
+  "completed_at": "2026-09-16T07:11:51.245Z",
+  "metrics": {
+    "sourced_field_recognition": 0,
+    "oe_preservation": 0,
+    "vehicle_fidelity": 0,
+    "blocking_missing_detection": 0,
+    "review_elapsed_seconds": 0
+  },
+  "revision_rounds": 0,
+  "ready": false,
+  "failure_issue_url": "https://github.com/ban12-project/F-Trade-Platform/issues/348",
+  "notes": "Browser file input was empty and source-text validation displayed before any stream request. No model run; a fresh unchanged-input attempt is recorded separately. Underlying timing cause remains unproven."
+}

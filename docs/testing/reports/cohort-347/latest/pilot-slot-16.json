@@ -1,0 +1,18 @@
+{
+  "run_id": "cohort-347-run03-pilot-slot-16",
+  "slot_id": "pilot-slot-16",
+  "cohort": "D",
+  "status": "passed",
+  "started_at": "2026-09-16T07:18:32.919Z",
+  "completed_at": "2026-09-16T07:23:28.732Z",
+  "metrics": {
+    "sourced_field_recognition": 1,
+    "oe_preservation": 1,
+    "vehicle_fidelity": 1,
+    "blocking_missing_detection": 1,
+    "review_elapsed_seconds": 16
+  },
+  "revision_rounds": 1,
+  "ready": true,
+  "notes": "Unchanged frozen reference identifier and independent MOCK CSV; saved model, actual browser and simulated Gate only. No real human/factory approval. Full-field revisions explicitly rebound original evidence as a documented workaround for #349. Review timing is automation, not a human benchmark. Earlier failed model/browser attempts remain in the report."
+}
