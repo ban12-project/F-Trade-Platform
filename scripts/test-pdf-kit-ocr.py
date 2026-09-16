@@ -49,6 +49,7 @@ for mutation in ['label', 'confidence', 'overlap', 'missing_type', 'orphan', 'du
     if mutation == 'two_columns': bad[7]['left'] = 500
     assert recover_kit_captions(tsv(bad)) is None, mutation
 assert recover_kit_captions('not tsv') is None
+assert recover_kit_captions(tsv(fixture + [line('Brake Disc', 10, 1)])) is None
 print('PASS scanned kit spatial isolation, literal captions, missing-heading and damaged-OCR guards')
 
 # The native PDF CI environment includes Pillow. Exercise crop failure and label

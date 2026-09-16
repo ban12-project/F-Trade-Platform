@@ -53,6 +53,8 @@ def tsv_lines(tsv):
 def recover_kit_captions(tsv, refine=None):
     """Return bounded literal component paragraphs, or None; never partial recovery."""
     lines = tsv_lines(tsv)
+    if re.search(r"\bbrake(?:\s*(?:disc|disk|pad|rotor)s?)?\b|制动盘|刹车片|刹车盘", " ".join(line["text"] for line in lines), re.I):
+        return None
     if refine is not None:
         lines = refine(lines)
     kits = [line for line in lines if KIT.fullmatch(line["text"])]

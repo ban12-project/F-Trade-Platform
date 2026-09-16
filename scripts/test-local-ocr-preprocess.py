@@ -259,7 +259,7 @@ with patch.object(MODULE, 'executable', side_effect=lambda name: name), patch.ob
     assert 'Component 1 source [ocr-pixels=' in result
     assert any('-singlefile' in command and '300' in command for command in commands)
     # Reject a recovery that drops an identifier from the initial pass.
-    baseline += '\n\nKit No.: 9999 999 991'
+    baseline += '\n\nKIT No: 9999  999\t991'
     result = MODULE.local_pdf_ocr(Path('synthetic.pdf'))
     assert result == MODULE.pdf_page_text(1, baseline)
 print('PASS selective kit OCR recovery and no-lost-identifier fallback')

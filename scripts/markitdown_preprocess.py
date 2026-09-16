@@ -186,7 +186,12 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                         lines, sparse_prefix.with_suffix(".png"), ocr_crop,
                     ),
                 )
-                original_ids = set(re.findall(r"Kit No\.: (\d{4} \d{3} \d{3})", text))
+                original_ids = {
+                    " ".join(parts) for parts in re.findall(
+                        r"^\s*Kit\s+No\.?\s*:\s*(\d{4})[ \t]+(\d{3})[ \t]+(\d{3})[ \t]*$",
+                        text, re.MULTILINE | re.IGNORECASE,
+                    )
+                }
                 recovered_ids = set(re.findall(r"Kit No\.: (\d{4} \d{3} \d{3})", recovered or ""))
                 if recovered is not None and original_ids <= recovered_ids:
                     # Retain the initial OCR for audit without rediscovering its
