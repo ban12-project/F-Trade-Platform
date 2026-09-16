@@ -1,0 +1,19 @@
+{
+  "run_id": "cohort-345-run01-pilot-slot-20",
+  "slot_id": "pilot-slot-20",
+  "cohort": "D",
+  "status": "failed",
+  "started_at": "2026-09-16T06:29:00.096Z",
+  "completed_at": "2026-09-16T06:29:30.111Z",
+  "metrics": {
+    "sourced_field_recognition": 0,
+    "oe_preservation": 0,
+    "vehicle_fidelity": 0,
+    "blocking_missing_detection": 0,
+    "review_elapsed_seconds": 0
+  },
+  "revision_rounds": 0,
+  "ready": false,
+  "notes": "Browser navigation timed out before upload; no receipt or stream run. Metrics scored 0 for unavailable output; review not performed.",
+  "failure_issue_url": "https://github.com/ban12-project/F-Trade-Platform/issues/348"
+}
