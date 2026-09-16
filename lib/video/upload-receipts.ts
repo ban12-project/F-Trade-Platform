@@ -4,9 +4,10 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { get } from "@vercel/blob";
 import { and, eq, inArray } from "drizzle-orm";
-
-import { type Database, getDatabase } from "@/lib/db/client";
-import { evidence, videoUploadReceipt, workspaceProject } from "@/lib/db/schema";
+import { hasPermission } from "@/lib/authz";
+import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
+import { evidence, user, videoUploadReceipt, workspaceProject } from "@/lib/db/schema";
+import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 
 import {
   claimVideoUploadReceiptsSchema,
@@ -22,6 +23,20 @@ import type { UploadedVideoSourceAsset } from "./uploaded-assets";
 const imageUploadLifetimeMs = 15 * 60 * 1_000;
 const videoUploadLifetimeMs = 60 * 60 * 1_000;
 
+async function authorizeUpload(tx: DatabaseTransaction, actorId: string, projectId: string) {
+  const [actor] = await tx.select().from(user).where(eq(user.id, actorId)).for("share");
+  if (!actor || actor.banned || !hasPermission(actor.role, "video:write"))
+    throw new Error("无权上传营销素材。");
+  const [project] = await tx
+    .select()
+    .from(workspaceProject)
+    .where(eq(workspaceProject.id, projectId))
+    .for("update");
+  if (project?.kind !== "marketing" || project.status !== "active")
+    throw new Error("只能向进行中的产品营销项目上传视频素材。");
+  await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
+}
+
 export async function issueVideoUploadReceipt(
   input: VideoPresignedUploadPayload,
   actorId: string,
@@ -33,13 +48,7 @@ export async function issueVideoUploadReceipt(
       (input.contentType.startsWith("video/") ? videoUploadLifetimeMs : imageUploadLifetimeMs),
   );
   await database.transaction(async (tx) => {
-    const [project] = await tx
-      .select({ kind: workspaceProject.kind, status: workspaceProject.status })
-      .from(workspaceProject)
-      .where(eq(workspaceProject.id, input.projectId))
-      .for("update");
-    if (!project || project.kind !== "marketing" || project.status !== "active")
-      throw new Error("只能向进行中的产品营销项目上传视频素材。");
+    await authorizeUpload(tx, actorId, input.projectId);
     const [existing] = await tx
       .select()
       .from(videoUploadReceipt)
@@ -52,6 +61,7 @@ export async function issueVideoUploadReceipt(
         existing.blobPath === blobPath &&
         existing.contentType === input.contentType &&
         existing.sizeBytes === input.sizeBytes &&
+        existing.originalFilename === input.originalFilename &&
         existing.rightsEvidenceRef === input.rightsEvidenceRef;
       if (!sameReceipt || existing.status === "failed")
         throw new Error("上传回执已被占用或不可重用。");
@@ -80,42 +90,39 @@ export async function completeVideoUploadReceipt(
   database: Database = getDatabase(),
 ) {
   const tokenPayload = completedVideoUploadTokenSchema.parse(tokenPayloadInput);
-  if (
-    blob.pathname !== tokenPayload.blobPath ||
-    blob.contentType !== tokenPayload.contentType ||
-    blob.size !== tokenPayload.sizeBytes
-  ) {
-    await database
-      .update(videoUploadReceipt)
-      .set({ status: "failed", failureCode: "completion_mismatch" })
-      .where(eq(videoUploadReceipt.id, tokenPayload.receiptId));
-    throw new Error("上传完成信息与签名约束不一致。");
-  }
-  const [current] = await database
-    .select()
-    .from(videoUploadReceipt)
-    .where(eq(videoUploadReceipt.id, tokenPayload.receiptId))
-    .limit(1);
-  if (
-    current &&
-    ["uploaded", "claimed"].includes(current.status) &&
-    current.ownerId === tokenPayload.actorId &&
-    current.blobPath === tokenPayload.blobPath
-  )
-    return;
-  const [updated] = await database
-    .update(videoUploadReceipt)
-    .set({ status: "uploaded", uploadedAt: new Date(), failureCode: null })
-    .where(
-      and(
-        eq(videoUploadReceipt.id, tokenPayload.receiptId),
-        eq(videoUploadReceipt.ownerId, tokenPayload.actorId),
-        eq(videoUploadReceipt.blobPath, tokenPayload.blobPath),
-        eq(videoUploadReceipt.status, "issued"),
-      ),
+  await database.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(videoUploadReceipt)
+      .where(eq(videoUploadReceipt.id, tokenPayload.receiptId))
+      .for("update");
+    if (
+      !current ||
+      current.ownerId !== tokenPayload.actorId ||
+      current.projectId !== tokenPayload.projectId ||
+      current.blobPath !== tokenPayload.blobPath ||
+      current.contentType !== tokenPayload.contentType ||
+      current.sizeBytes !== tokenPayload.sizeBytes ||
+      current.rightsEvidenceRef !== tokenPayload.rightsEvidenceRef ||
+      current.originalFilename !== tokenPayload.originalFilename
     )
-    .returning({ id: videoUploadReceipt.id });
-  if (!updated) throw new Error("上传回执不存在、已过期或已经完成。");
+      throw new Error("上传回调与服务端回执不匹配。");
+    // A late or malformed callback must never invalidate already claimed evidence.
+    if (
+      blob.pathname !== current.blobPath ||
+      blob.contentType !== current.contentType ||
+      blob.size !== current.sizeBytes
+    )
+      throw new Error("上传完成信息与签名约束不一致。");
+    if (current.status === "claimed") return;
+    if (current.status === "failed" || current.expiresAt.getTime() <= Date.now())
+      throw new Error("上传回执已过期或失效。");
+    if (current.status === "uploaded") return;
+    await tx
+      .update(videoUploadReceipt)
+      .set({ status: "uploaded", uploadedAt: new Date(), failureCode: null })
+      .where(eq(videoUploadReceipt.id, current.id));
+  });
 }
 
 function matchesFileSignature(contentType: string, prefix: Uint8Array) {
@@ -123,9 +130,12 @@ function matchesFileSignature(contentType: string, prefix: Uint8Array) {
   if (contentType === "image/jpeg")
     return prefix[0] === 0xff && prefix[1] === 0xd8 && prefix[2] === 0xff;
   if (contentType === "image/png")
-    return prefix
-      .slice(0, 8)
-      .every((value, index) => value === [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][index]);
+    return (
+      prefix.length >= 8 &&
+      prefix
+        .slice(0, 8)
+        .every((value, index) => value === [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][index])
+    );
   if (contentType === "image/webp")
     return ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP";
   if (contentType === "video/mp4" || contentType === "video/quicktime")
@@ -133,21 +143,33 @@ function matchesFileSignature(contentType: string, prefix: Uint8Array) {
   return false;
 }
 
-async function hashPrivateBlob(pathname: string, contentType: string, readBlob: typeof get) {
+async function hashPrivateBlob(
+  pathname: string,
+  contentType: string,
+  expectedSize: number,
+  readBlob: typeof get,
+) {
   const result = await readBlob(pathname, { access: "private", useCache: false });
-  if (!result || result.statusCode !== 200 || !result.stream)
+  if (result?.statusCode !== 200 || !result.stream || result.blob.contentType !== contentType) {
+    await result?.stream?.cancel().catch(() => undefined);
     throw new Error("无法读取刚上传的私有素材。");
+  }
   const hash = createHash("sha256");
   const reader = result.stream.getReader();
   const prefix: number[] = [];
   let sizeBytes = 0;
-  while (true) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    const value = chunk.value;
-    sizeBytes += value.byteLength;
-    hash.update(value);
-    for (const byte of value) if (prefix.length < 32) prefix.push(byte);
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      sizeBytes += chunk.value.byteLength;
+      if (sizeBytes > expectedSize) throw new Error("素材大小超过上传签名约束。");
+      hash.update(chunk.value);
+      prefix.push(...chunk.value.subarray(0, Math.max(0, 32 - prefix.length)));
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
   if (!matchesFileSignature(contentType, Uint8Array.from(prefix)))
     throw new Error("素材文件内容与声明类型不一致。");
@@ -163,9 +185,9 @@ export async function claimCompletedVideoUploads(
   readBlob: typeof get = get,
 ): Promise<UploadedVideoSourceAsset[]> {
   const receiptIds = claimVideoUploadReceiptsSchema.parse(receiptIdsInput);
-  let rows = [] as Array<typeof videoUploadReceipt.$inferSelect>;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    rows = await database
+  const rows = await database.transaction(async (tx) => {
+    await authorizeUpload(tx, actorId, projectId);
+    return tx
       .select()
       .from(videoUploadReceipt)
       .where(
@@ -175,13 +197,7 @@ export async function claimCompletedVideoUploads(
           eq(videoUploadReceipt.projectId, projectId),
         ),
       );
-    if (
-      rows.length === receiptIds.length &&
-      rows.every((row) => row.status === "uploaded" || row.status === "claimed")
-    )
-      break;
-    if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 200));
-  }
+  });
   if (
     rows.length !== receiptIds.length ||
     rows.some((row) => row.rightsEvidenceRef !== rightsEvidenceRef)
@@ -202,20 +218,29 @@ export async function claimCompletedVideoUploads(
       });
       continue;
     }
-    if (row.status !== "uploaded") throw new Error("素材上传尚未完成，请稍后重试。");
-    const verified = await hashPrivateBlob(row.blobPath, row.contentType, readBlob);
+    if (!["issued", "uploaded"].includes(row.status)) throw new Error("上传回执不可认领。");
+    const verified = await hashPrivateBlob(row.blobPath, row.contentType, row.sizeBytes, readBlob);
     if (verified.sizeBytes !== row.sizeBytes) throw new Error("素材大小与上传签名不一致。");
     const evidenceId = `evidence-${randomUUID()}`;
     let resolvedEvidenceId = evidenceId;
     await database.transaction(async (tx) => {
+      await authorizeUpload(tx, actorId, projectId);
       const [current] = await tx
         .select()
         .from(videoUploadReceipt)
         .where(eq(videoUploadReceipt.id, row.id))
         .for("update");
-      if (!current || !["uploaded", "claimed"].includes(current.status))
+      if (
+        !current ||
+        !["issued", "uploaded", "claimed"].includes(current.status) ||
+        current.expiresAt.getTime() <= Date.now() ||
+        current.ownerId !== actorId ||
+        current.projectId !== projectId ||
+        current.rightsEvidenceRef !== rightsEvidenceRef
+      )
         throw new Error("素材上传状态已发生变化。");
       if (current.status === "claimed" && current.evidenceId) {
+        if (current.sha256 !== verified.sha256) throw new Error("素材在并发核验时发生变化。");
         resolvedEvidenceId = current.evidenceId;
         return;
       }
@@ -237,6 +262,7 @@ export async function claimCompletedVideoUploads(
           sha256: verified.sha256,
           evidenceId: resolvedEvidenceId,
           claimedAt: new Date(),
+          uploadedAt: current.uploadedAt ?? new Date(),
         })
         .where(eq(videoUploadReceipt.id, row.id));
     });
