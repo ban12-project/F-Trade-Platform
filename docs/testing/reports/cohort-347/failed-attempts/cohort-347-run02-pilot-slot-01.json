@@ -1,0 +1,19 @@
+{
+  "run_id": "cohort-347-run02-pilot-slot-01",
+  "slot_id": "pilot-slot-01",
+  "cohort": "A",
+  "status": "failed",
+  "started_at": "2026-09-16T06:56:01.102Z",
+  "completed_at": "2026-09-16T06:56:32.569Z",
+  "metrics": {
+    "sourced_field_recognition": 0,
+    "oe_preservation": 0,
+    "vehicle_fidelity": 0,
+    "blocking_missing_detection": 0,
+    "review_elapsed_seconds": 0
+  },
+  "revision_rounds": 0,
+  "ready": false,
+  "failure_issue_url": "https://github.com/ban12-project/F-Trade-Platform/issues/347",
+  "notes": "Provider rejected oneOf schema before emitting fields; retained failed draft. Corrected to supported anyOf; no source or expected values changed."
+}

@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { MockLanguageModelV4 } from "ai/test";
 import { prepareProductAgentEvidenceSource } from "../lib/product/evidence-locations";
+import { productStreamFields } from "../lib/product/stream-contract";
 import { streamProductProposals } from "../lib/product/stream-model";
+import { productStreamModelProposalSchema } from "../lib/product/stream-model-schema";
+import {
+  emptyProductStreamDraft,
+  validateProductStreamProposal,
+} from "../lib/product/stream-validation";
 
 type Part =
   Awaited<ReturnType<MockLanguageModelV4["doStream"]>>["stream"] extends ReadableStream<infer T>
@@ -35,6 +41,58 @@ const finish: Part = {
 };
 
 async function verify() {
+  for (const field of productStreamFields) {
+    assert.equal(
+      productStreamModelProposalSchema.safeParse({ field, value: null, evidenceRef: null }).success,
+      true,
+    );
+  }
+  for (const [field, value] of [
+    ["product.oe_numbers", "000-MOCK-OE"],
+    ["specifications.kit_contents", ["clutch disc", "pressure plate"]],
+    ["commercial.sample_available", "false"],
+    ["commercial.moq", 1.5],
+    ["specifications.clutch_diameter_mm", 0],
+  ])
+    assert.equal(
+      productStreamModelProposalSchema.safeParse({ field, value, evidenceRef: "mock-ref" }).success,
+      false,
+    );
+  const typedSource = prepareProductAgentEvidenceSource({
+    record_id: "synthetic-typed-stream",
+    source_ref: "source-synthetic-typed",
+    evidence_refs: ["evidence-synthetic-typed"],
+    source_text: "OE: 000-MOCK-OE\nKit contents: clutch disc, pressure plate\nSample available: no",
+    image_availability: "none",
+    image_refs: [],
+  });
+  let draft = emptyProductStreamDraft(typedSource);
+  for (const [index, field, value] of [
+    [0, "product.oe_numbers", ["000-MOCK-OE"]],
+    [1, "specifications.kit_contents", ["clutch_disc", "pressure_plate"]],
+    [2, "commercial.sample_available", false],
+  ] as const) {
+    const candidate = { field, value, evidenceRef: typedSource.evidence_locations[index]?.ref };
+    assert.equal(productStreamModelProposalSchema.safeParse(candidate).success, true);
+    const validated = validateProductStreamProposal(draft, candidate, typedSource);
+    assert.equal(validated.status, "source_validated");
+    if (validated.status === "source_validated") draft = validated.draft;
+  }
+  assert.deepEqual(draft.product.oe_numbers, ["000-MOCK-OE"]);
+  assert.deepEqual(draft.specifications?.kit_contents, ["clutch_disc", "pressure_plate"]);
+  assert.equal(draft.commercial?.sample_available, false);
+  const unsupported = {
+    field: "specifications.kit_contents",
+    value: ["release_bearing"],
+    evidenceRef: typedSource.evidence_locations[1]?.ref,
+  };
+  assert.equal(productStreamModelProposalSchema.safeParse(unsupported).success, true);
+  assert.equal(
+    validateProductStreamProposal(emptyProductStreamDraft(typedSource), unsupported, typedSource)
+      .status,
+    "invalid",
+  );
+
   for (const withImage of [false, true])
     for (const truncated of [false, true]) {
       const imageBytes = Buffer.from(
@@ -110,7 +168,13 @@ async function verify() {
           imageBytes,
         );
       assert.equal(model.doStreamCalls.length, 1);
-      assert.equal(model.doStreamCalls[0]?.responseFormat?.type, "json");
+      const format = model.doStreamCalls[0]?.responseFormat;
+      assert.equal(format?.type, "json");
+      if (format?.type === "json") {
+        const schema = JSON.stringify(format.schema);
+        assert.ok(schema.includes('"anyOf"'));
+        assert.ok(!schema.includes('"oneOf"'), "The saved provider rejects oneOf");
+      }
     }
   console.log(
     "PASS actual AI SDK array parsing emits before completion and rejects truncated final output",
