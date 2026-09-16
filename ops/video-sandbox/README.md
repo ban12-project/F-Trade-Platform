@@ -15,10 +15,22 @@ Function before FFmpeg runs.
    token with `vercel env pull .env.local`.
 2. Authenticate Docker to `vcr.vercel.com` with username `oidc` and the
    `VERCEL_OIDC_TOKEN` as password.
-3. From the repository root, build with
-   `docker buildx build -f ops/video-sandbox/Dockerfile . --push` and an immutable
-   release tag in the linked project's VCR namespace. The repository-root context
-   is required so the governed MarkItDown wrapper can be copied into the image.
+3. Create a source-only context with the checked-in helper. It copies only the
+   Dockerfile and its three governed Python modules; it rejects symlinks,
+   existing output directories, and changed COPY/ADD inputs. Do not use the
+   repository root as the build context.
+
+   ```sh
+   image_context_parent=$(mktemp -d)
+   python3 scripts/prepare-document-image-context.py "$image_context_parent/context"
+   docker buildx build --platform linux/amd64 \
+     -f "$image_context_parent/context/ops/video-sandbox/Dockerfile" \
+     -t "vcr.vercel.com/<team>/<project>/<repository>:<immutable-release-tag>" \
+     "$image_context_parent/context" --push
+   ```
+
+   Remove the temporary context after the build. No environment files, reference
+   documents, application database files, or dependency directories belong in it.
 4. Resolve the pushed image digest and set `VIDEO_SANDBOX_IMAGE` to
    `repository@sha256:...` in Preview and Production.
 

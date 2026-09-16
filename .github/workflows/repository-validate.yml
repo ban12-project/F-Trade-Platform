@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm exec biome ci --changed --since="${{ github.event.pull_request.base.sha }}"
+            pnpm exec biome ci --no-errors-on-unmatched --changed --since="${{ github.event.pull_request.base.sha }}"
           else
             pnpm check:ci
           fi
@@ -90,6 +90,9 @@ jobs:
 
       - name: Install validation dependencies
         run: python -m pip install -r requirements-dev.txt
+
+      - name: Check isolated document image context
+        run: python scripts/test-document-image-context.py
 
       - name: Test native PDF physical pages
         run: python scripts/test-local-ocr-preprocess.py --native-pdf --local-ocr && python scripts/test-pdf-catalog-layout.py --native-pdf && python scripts/test-pdf-kit-ocr.py --native-pdf
