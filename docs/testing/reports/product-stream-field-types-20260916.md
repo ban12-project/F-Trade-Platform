@@ -69,6 +69,8 @@ approval/rejection counts, exact revision counts, and explicit image-confirmatio
 - Added regressions reject string OE, human-readable kit output, string booleans and invalid numeric
   types; valid canonical values remain subject to independent labelled-source checks.
 - TypeScript passed; changed-file Biome check has no errors (existing warnings remain).
+- Node 24.21.0 / pnpm 11.24.0 production build and production fixture/anonymous-access boundaries
+  passed at `cb47f49`, with Cache Components and React Compiler enabled.
 - Next.js Turbopack compilation probe returned no issues; runtime probe returned no errors. The
   authenticated agent-browser session rendered the import UI and exposed its React tree.
 - All **37** temporary private objects from these follow-ups were deleted. Every uncached read after
