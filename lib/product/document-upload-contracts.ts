@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  maximumProductImageBytes,
+  productImageContentType,
+  productImageFilenameSchema,
+} from "./source-image-contracts";
 
 export const maximumProductDocumentBytes = 25 * 1024 * 1024;
 export const documentUploadTypes = {
@@ -41,21 +46,30 @@ export const documentUploadPayloadSchema = z
   .object({
     receiptId: z.uuid(),
     projectId: z.uuid(),
-    purpose: z.enum(["evidence", "agent"]),
-    originalFilename: documentFilenameSchema,
-    contentType: z.enum(Object.values(documentUploadTypes)),
+    purpose: z.enum(["evidence", "agent", "agent_image"]),
+    originalFilename: z.union([documentFilenameSchema, productImageFilenameSchema]),
+    contentType: z.enum([...Object.values(documentUploadTypes), "image/png", "image/jpeg"]),
     sizeBytes: z.number().int().min(1).max(maximumProductDocumentBytes, "文件不能超过 25 MiB。"),
   })
   .strict()
-  .refine((value) => value.contentType === documentContentType(value.originalFilename), {
-    message: "文件类型与扩展名不一致。",
-  });
+  .refine(
+    (value) =>
+      value.purpose === "agent_image"
+        ? productImageFilenameSchema.safeParse(value.originalFilename).success &&
+          value.sizeBytes <= maximumProductImageBytes &&
+          value.contentType === productImageContentType(value.originalFilename)
+        : documentFilenameSchema.safeParse(value.originalFilename).success &&
+          value.contentType === documentContentType(value.originalFilename),
+    {
+      message: "文件类型与扩展名不一致。",
+    },
+  );
 export type DocumentUploadPayload = z.infer<typeof documentUploadPayloadSchema>;
 export const documentUploadClaimSchema = z
   .object({
     receiptId: z.uuid(),
     projectId: z.uuid(),
-    purpose: z.enum(["evidence", "agent"]),
+    purpose: z.enum(["evidence", "agent", "agent_image"]),
   })
   .strict();
 

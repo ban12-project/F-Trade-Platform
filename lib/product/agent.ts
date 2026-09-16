@@ -444,8 +444,8 @@ export class AiSdkProductAgent implements ProductAgent {
         content: [
           { type: "text", text: promptText },
           ...(source.image_inputs ?? []).map((input) => ({
-            type: "image" as const,
-            image: Buffer.from(input.data_base64, "base64"),
+            type: "file" as const,
+            data: Buffer.from(input.data_base64, "base64"),
             mediaType: input.media_type,
           })),
         ],

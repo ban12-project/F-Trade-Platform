@@ -35,50 +35,83 @@ const finish: Part = {
 };
 
 async function verify() {
-  for (const truncated of [false, true]) {
-    let output!: ReadableStreamDefaultController<Part>;
-    const model = new MockLanguageModelV4({
-      doStream: async () => ({
-        stream: new ReadableStream<Part>({
-          start(controller) {
-            output = controller;
-            controller.enqueue({ type: "stream-start", warnings: [] });
-            controller.enqueue({ type: "text-start", id: "text" });
-            controller.enqueue({
-              type: "text-delta",
-              id: "text",
-              delta: `{"elements":[${JSON.stringify(proposal)},{"field":`,
-            });
-          },
+  for (const withImage of [false, true])
+    for (const truncated of [false, true]) {
+      const imageBytes = Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6pAAAAABJRU5ErkJggg==",
+        "base64",
+      );
+      const testedSource = withImage
+        ? {
+            ...source,
+            image_availability: "real_product_image" as const,
+            image_refs: ["evidence-synthetic-image"],
+            image_inputs: [
+              {
+                ref: "evidence-synthetic-image",
+                media_type: "image/png" as const,
+                data_base64: imageBytes.toString("base64"),
+              },
+            ],
+          }
+        : source;
+      let output!: ReadableStreamDefaultController<Part>;
+      const model = new MockLanguageModelV4({
+        doStream: async () => ({
+          stream: new ReadableStream<Part>({
+            start(controller) {
+              output = controller;
+              controller.enqueue({ type: "stream-start", warnings: [] });
+              controller.enqueue({ type: "text-start", id: "text" });
+              controller.enqueue({
+                type: "text-delta",
+                id: "text",
+                delta: `{"elements":[${JSON.stringify(proposal)},{"field":`,
+              });
+            },
+          }),
         }),
-      }),
-    });
-    const iterator = streamProductProposals({ model, source, signal: AbortSignal.timeout(5000) });
-    const first = await iterator.next();
-    assert.deepEqual(first.value, proposal);
-    assert.equal(first.done, false, "The first proposal must arrive before provider completion");
-    output.enqueue({
-      type: "text-delta",
-      id: "text",
-      delta: truncated
-        ? '"product.product_type"'
-        : JSON.stringify(nextProposal).slice('{"field":'.length) + "]}",
-    });
-    output.enqueue({ type: "text-end", id: "text" });
-    output.enqueue(finish);
-    output.close();
-    if (truncated)
-      await assert.rejects(async () => {
-        for await (const _ of iterator) {
-        }
       });
-    else {
-      assert.deepEqual((await iterator.next()).value, nextProposal);
-      assert.equal((await iterator.next()).done, true);
+      const iterator = streamProductProposals({
+        model,
+        source: testedSource,
+        signal: AbortSignal.timeout(5000),
+      });
+      const first = await iterator.next();
+      assert.deepEqual(first.value, proposal);
+      assert.equal(first.done, false, "The first proposal must arrive before provider completion");
+      output.enqueue({
+        type: "text-delta",
+        id: "text",
+        delta: truncated
+          ? '"product.product_type"'
+          : JSON.stringify(nextProposal).slice('{"field":'.length) + "]}",
+      });
+      output.enqueue({ type: "text-end", id: "text" });
+      output.enqueue(finish);
+      output.close();
+      if (truncated)
+        await assert.rejects(async () => {
+          for await (const _ of iterator) {
+          }
+        });
+      else {
+        assert.deepEqual((await iterator.next()).value, nextProposal);
+        assert.equal((await iterator.next()).done, true);
+      }
+      const sentImages =
+        model.doStreamCalls[0]?.prompt.flatMap((message) =>
+          message.role === "user" ? message.content.filter((part) => part.type === "file") : [],
+        ) ?? [];
+      assert.equal(sentImages.length, withImage ? 1 : 0);
+      if (withImage)
+        assert.deepEqual(
+          Buffer.from((sentImages[0]!.data as { type: "data"; data: Uint8Array }).data),
+          imageBytes,
+        );
+      assert.equal(model.doStreamCalls.length, 1);
+      assert.equal(model.doStreamCalls[0]?.responseFormat?.type, "json");
     }
-    assert.equal(model.doStreamCalls.length, 1);
-    assert.equal(model.doStreamCalls[0]?.responseFormat?.type, "json");
-  }
   console.log(
     "PASS actual AI SDK array parsing emits before completion and rejects truncated final output",
   );

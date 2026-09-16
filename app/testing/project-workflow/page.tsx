@@ -128,6 +128,7 @@ const syntheticAgentModels: ProductAgentModelSettings[] = [
   },
 ];
 const syntheticProductDetail: ProductCatalogDetail = {
+  sourceImages: [],
   version: 1,
   id: syntheticProduct.id,
   state: "PRODUCT_REVIEW_REQUIRED",

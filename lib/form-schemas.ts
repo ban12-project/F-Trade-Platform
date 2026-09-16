@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { productImageFilesSchema } from "./product/source-image-contracts";
 
 export const emailSchema = z
   .string()
@@ -65,6 +66,7 @@ export const productReviewFormSchema = z
       .refine((value) => Number.isSafeInteger(Number(value)), "审核版本无效。"),
     approvalId: z.uuid("审核请求标识无效，请刷新后重试。"),
     decision: z.enum(["approved", "rejected"]),
+    imageConsistencyConfirmed: z.enum(["true", "false"]).optional(),
     evidenceRef: privateReference,
     notes: z.string().trim().max(2_000, "审核备注不能超过 2000 个字符。"),
   })
@@ -86,6 +88,7 @@ export const productAgentRunFormSchema = z
     evidenceRef: privateReference.optional().or(z.literal("")),
     sourceText: z.string().trim().max(120_000, "资料文本不能超过 120000 个字符。"),
     hasUpload: z.boolean(),
+    imageFiles: productImageFilesSchema.optional(),
   })
   .superRefine((value, context) => {
     if (value.hasUpload) return;

@@ -72,6 +72,7 @@ import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-con
 import { productAgentRunFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
 import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
 import { documentUploadFormSchema } from "@/lib/product/document-upload-contracts";
+import { productImageFilesSchema } from "@/lib/product/source-image-contracts";
 import { uploadProductDocument } from "@/lib/product/upload-document-client";
 import type { ProductCatalogDetail, ProductCatalogEntry } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
@@ -231,7 +232,8 @@ function ProductDraftForm({
     const data = new FormData();
     data.set("projectId", projectId);
     if (detail) data.set("productId", detail.id);
-    for (const [key, value] of Object.entries(values)) data.set(key, value);
+    for (const [key, value] of Object.entries(values))
+      if (value !== undefined) data.set(key, value);
     startTransition(() => action(data));
   }
   return (
@@ -317,6 +319,7 @@ function ProductAgentForm({
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
   const [actionState, action, actionPending] = useActionState(
     runProductAgentAction,
     initialProductAgentActionState,
@@ -338,6 +341,7 @@ function ProductAgentForm({
       evidenceRef: "",
       sourceText: "",
       hasUpload: false,
+      imageFiles: [] as File[],
     }),
     [defaultConfig?.id, defaultConfig?.model],
   );
@@ -369,6 +373,7 @@ function ProductAgentForm({
       form.reset(emptyAgent);
       setSelectedChoice(initialChoice);
       if (fileRef.current) fileRef.current.value = "";
+      if (imageRef.current) imageRef.current.value = "";
       router.refresh();
     }
   }, [emptyAgent, initialChoice, form, router, state.status]);
@@ -376,6 +381,7 @@ function ProductAgentForm({
     setUploadError("");
     setUploading(true);
     try {
+      const images = productImageFilesSchema.parse(Array.from(imageRef.current?.files ?? []));
       const data = new FormData();
       data.set("projectId", projectId);
       data.set("modelConfigId", values.modelConfigId);
@@ -385,6 +391,8 @@ function ProductAgentForm({
       data.set("sourceText", values.sourceText);
       const file = fileRef.current?.files?.[0];
       if (file) data.set("receiptId", await uploadProductDocument(file, projectId, "agent"));
+      for (const image of images)
+        data.append("imageReceiptId", await uploadProductDocument(image, projectId, "agent_image"));
       if (canStream) void stream.start(data);
       else startTransition(() => action(data));
     } catch {
@@ -475,6 +483,29 @@ function ProductAgentForm({
                 }
               />
               <FieldDescription>原始文件只进入 Private Blob，最大 25MB。</FieldDescription>
+            </Field>
+            <Field data-invalid={!!form.formState.errors.imageFiles}>
+              <FieldLabel htmlFor="agent-images">实物图片（可选）</FieldLabel>
+              <Input
+                ref={imageRef}
+                id="agent-images"
+                aria-invalid={!!form.formState.errors.imageFiles}
+                onChange={(event) =>
+                  form.setValue("imageFiles", Array.from(event.target.files ?? []), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                type="file"
+                multiple
+                accept=".png,.jpg,.jpeg"
+                disabled={pending}
+              />
+              <FieldError errors={[form.formState.errors.imageFiles]} />
+              <FieldDescription>
+                最多 4 张，每张 5
+                MiB，仅用于当前单个产品的外观核验。图片不补全工程事实，也不代表营销授权；无图可继续。
+              </FieldDescription>
             </Field>
             <Field data-invalid={!!form.formState.errors.sourceRef}>
               <FieldLabel htmlFor="agent-source">来源引用</FieldLabel>
@@ -642,7 +673,8 @@ function ProductReview({
   function submit(values: ReviewValues) {
     const data = new FormData();
     data.set("projectId", projectId);
-    for (const [key, value] of Object.entries(values)) data.set(key, value);
+    for (const [key, value] of Object.entries(values))
+      if (value !== undefined) data.set(key, value);
     startTransition(() => action(data));
   }
   const facts = (["product", "specifications", "commercial"] as const).flatMap((section) =>
@@ -697,6 +729,33 @@ function ProductReview({
             : "无自动阻塞项，仍需人工核对。"}
         </CardFooter>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>原始实物图片</CardTitle>
+          <CardDescription>
+            核对外观与当前产品是否一致；图片不能证明尺寸、OE 或材料，也不能替代营销素材授权。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {detail.sourceImages.length ? (
+            <div className="flex flex-col gap-2">
+              {detail.sourceImages.map((image, index) => (
+                <LinkButton
+                  key={image.evidenceId}
+                  variant="outline"
+                  href={`/api/product-source-images/${detail.id}/${image.evidenceId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  查看原始图片 {index + 1}
+                </LinkButton>
+              ))}
+            </div>
+          ) : (
+            <p>未提供实物图片。后续内容可使用文字排版，不能以生成图补充产品事实。</p>
+          )}
+        </CardContent>
+      </Card>
       {canDecide ? (
         <Card>
           <CardHeader>
@@ -736,6 +795,40 @@ function ProductReview({
                   />
                   <FieldError errors={[form.formState.errors.decision]} />
                 </Field>
+                {detail.sourceImages.length ? (
+                  <Field>
+                    <FieldLabel htmlFor="product-image-confirmation">图片一致性</FieldLabel>
+                    <Controller
+                      control={form.control}
+                      name="imageConsistencyConfirmed"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value ?? "false"}
+                          onValueChange={field.onChange}
+                          items={{
+                            false: "尚未确认或不一致",
+                            true: "已核对全部原始图片，与当前产品一致",
+                          }}
+                        >
+                          <SelectTrigger id="product-image-confirmation">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="false">尚未确认或不一致</SelectItem>
+                              <SelectItem value="true">
+                                已核对全部原始图片，与当前产品一致
+                              </SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <FieldDescription>
+                      批准前必须确认；无法确认时请退回并说明原因。
+                    </FieldDescription>
+                  </Field>
+                ) : null}
                 <Field data-invalid={!!form.formState.errors.evidenceRef}>
                   <FieldLabel htmlFor="product-review-evidence">审核证据</FieldLabel>
                   <Controller

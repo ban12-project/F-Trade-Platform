@@ -4,7 +4,7 @@ import { type ProductAgentSource, validateProductAgentSource } from "./agent";
 import type { ProductAgentEvidenceLocatedSource } from "./evidence-locations";
 import { productStreamProposalSchema } from "./stream-contract";
 
-export const PRODUCT_STREAM_PROMPT_VERSION = "1.0.1";
+export const PRODUCT_STREAM_PROMPT_VERSION = "1.0.2";
 export const PRODUCT_STREAM_PROMPT = `Extract product field proposals from the supplied evidence-location excerpts.
 Return a JSON object with an elements array. Each element must contain exactly field, value, and evidenceRef and must be complete.
 Emit each field at most once. Emit a proposal as soon as you identify its explicit source support.
@@ -31,10 +31,27 @@ export async function* streamProductProposals(input: {
   const result = streamText({
     model: input.model,
     instructions: PRODUCT_STREAM_PROMPT,
-    prompt: JSON.stringify({
-      candidate_identifier: input.source.candidate_identifier,
-      source_text: `<untrusted-source-text>\n${input.source.source_text}\n</untrusted-source-text>`,
-    }),
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              image_availability: input.source.image_availability,
+              image_refs: input.source.image_refs,
+              candidate_identifier: input.source.candidate_identifier,
+              source_text: `<untrusted-source-text>\n${input.source.source_text}\n</untrusted-source-text>`,
+            }),
+          },
+          ...(input.source.image_inputs ?? []).map((image) => ({
+            type: "file" as const,
+            data: Buffer.from(image.data_base64, "base64"),
+            mediaType: image.media_type,
+          })),
+        ],
+      },
+    ],
     output: Output.array({ element: productStreamProposalSchema }),
     abortSignal: input.signal,
     maxOutputTokens: 8000,

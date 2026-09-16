@@ -288,6 +288,13 @@
       "when": 1789466994900,
       "tag": "0040_dazzling_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789537226380,
+      "tag": "0041_product_source_images",
+      "breakpoints": true
     }
   ]
 }

@@ -81,6 +81,7 @@ export async function startProductStreamRun(
       identity.actorId,
       { ...modelMetadata, stream_run_id: runId },
       identity.projectId,
+      source.image_refs,
     );
     await tx.insert(productAgentStreamRun).values({
       id: runId,
