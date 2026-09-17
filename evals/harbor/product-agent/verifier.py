@@ -24,6 +24,21 @@ def canonical_product(value: object) -> object:
     return product
 
 
+def same_json(actual: object, expected: object) -> bool:
+    """Preserve JSON boolean/number types (Python otherwise treats True == 1)."""
+    if isinstance(expected, bool):
+        return type(actual) is bool and actual == expected
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and actual.keys() == expected.keys() and all(
+            same_json(actual[key], value) for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        return isinstance(actual, list) and len(actual) == len(expected) and all(
+            same_json(a, b) for a, b in zip(actual, expected)
+        )
+    return not isinstance(actual, bool) and actual == expected
+
+
 def write_evaluation_artifact(expected: dict, metadata: object, reward: float) -> None:
     provenance = metadata if isinstance(metadata, dict) else {}
     ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -53,8 +68,12 @@ def grade(expected: dict, result: dict) -> dict:
                     "product", "specifications", "commercial"}
     if set(draft) - allowed_keys:
         fail("Draft contains unsupported fields or approval metadata")
-    if not isinstance(draft.get("optional_missing_fields"), list):
-        fail("Draft must include optional missing fields")
+    for field in ("blocking_missing_fields", "optional_missing_fields", "evidence_refs"):
+        if not isinstance(draft.get(field), list) or any(not isinstance(value, str) for value in draft[field]):
+            fail("Draft lists must contain strings")
+    for section in ("product", "specifications", "commercial"):
+        if not isinstance(draft.get(section, {}), dict):
+            fail("Draft fact sections must be objects")
     source = expected["source"]
     truth = expected["expected"]
     image_inputs = source.get("image_inputs", [])
@@ -69,11 +88,11 @@ def grade(expected: dict, result: dict) -> dict:
         fail("record_id and source_ref must be preserved")
     if draft.get("verification_status") != "review_required":
         fail("Product Agent must not verify products")
-    if canonical_product(draft.get("product")) != canonical_product(truth["product"]):
+    if not same_json(canonical_product(draft.get("product")), canonical_product(truth["product"])):
         fail("Product fields differ from supported synthetic truth")
-    if (draft.get("specifications") or {}) != (truth.get("specifications") or {}):
+    if not same_json(draft.get("specifications", {}), truth.get("specifications", {})):
         fail("Specification fields differ from supported synthetic truth")
-    if (draft.get("commercial") or {}) != (truth.get("commercial") or {}):
+    if not same_json(draft.get("commercial", {}), truth.get("commercial", {})):
         fail("Commercial fields differ from supported synthetic truth")
     if sorted(draft.get("blocking_missing_fields", [])) != sorted(truth["blocking_missing_fields"]):
         fail("Blocking missing fields are incorrect")

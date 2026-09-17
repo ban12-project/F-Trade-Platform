@@ -3,6 +3,7 @@
 import copy
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -59,6 +60,10 @@ class AcceptanceTests(unittest.TestCase):
             change(fixture["result"]["draft"])
             with self.subTest(mutation=name), self.assertRaises(AssertionError):
                 verifier.grade(**fixture)
+        fixture = copy.deepcopy(fixtures[2])
+        fixture["result"]["draft"]["commercial"]["sample_available"] = 1
+        with self.assertRaises(AssertionError):
+            verifier.grade(**fixture)
         for key in ("prompt_hash", "prompt_version", "evidence_mode"):
             fixture = copy.deepcopy(fixtures[0])
             fixture["result"]["_evaluation"][key] = "stale"
@@ -135,6 +140,20 @@ class AcceptanceTests(unittest.TestCase):
             write(artifact, {**data, key: "must-not-escape"})
             self.assertTrue(self.check_gate()[1])
             self.assertNotIn("must-not-escape", json.dumps(self.check_gate()[0]))
+
+    def test_cli_refuses_to_overwrite_acceptance_evidence(self):
+        manifest_path = self.job.parent / "manifest.json"
+        output = self.job.parent / "summary.json"
+        write(manifest_path, self.manifest)
+        command = [sys.executable, str(ROOT / "scripts/validate-harbor-product-agent-results.py"),
+                   "--job-dir", str(self.job), "--manifest", str(manifest_path),
+                   "--model", "openai/synthetic", "--output", str(output)]
+        first = subprocess.run(command, capture_output=True)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        original = output.read_bytes()
+        second = subprocess.run(command, capture_output=True)
+        self.assertNotEqual(second.returncode, 0)
+        self.assertEqual(output.read_bytes(), original)
 
     def test_incomplete_job_and_wrong_model_fail(self):
         write(self.job / "result.json", {"finished_at": None})
