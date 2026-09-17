@@ -17,6 +17,8 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   command -v websockify
   test -f /usr/share/novnc/core/rfb.js
   test -x /root/.cache/camoufox/camoufox-bin
+  test -s /root/.cache/camoufox/GeoLite2-City.mmdb
+  node --input-type=module -e '"'"'import { getGeolocation } from "camoufox-js/dist/locale.js"; await getGeolocation("8.8.8.8");'"'"'
   node --check /opt/ftrade/watchdog.mjs
   node --check /app/server.js
   node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
@@ -32,6 +34,7 @@ docker run -d --name "$name" --network none --read-only \
   --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
   --tmpfs /data:rw,nosuid,nodev,size=64m,mode=700 \
   -e "FTRADE_LEASE_DEADLINE=$deadline" \
+  -e BROWSER_IDLE_TIMEOUT_MS=900000 \
   -e CAMOFOX_CRASH_REPORT_ENABLED=false -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true \
   -e CAMOFOX_PROFILE_DIR=/data/profiles -e CAMOFOX_UPLOADS_DIR=/data/uploads \
   -e CAMOFOX_COOKIES_DIR=/data/cookies -e CAMOFOX_TRACES_DIR=/data/traces \
@@ -46,6 +49,20 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 test "$ready" = true
+# HTTP health can pass before Firefox starts. Create a real page without external traffic.
+docker exec "$name" node --input-type=module -e '
+  import assert from "node:assert/strict";
+  const response = await fetch("http://127.0.0.1:9377/tabs", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ userId: "synthetic-image-smoke", sessionKey: "startup", trace: false }),
+    signal: AbortSignal.timeout(30000),
+  });
+  assert.equal(response.status, 200);
+  assert.ok((await response.json()).tabId);
+  const health = await (await fetch("http://127.0.0.1:9377/health")).json();
+  assert.equal(health.browserConnected, true);
+  assert.equal(health.activeTabs, 1);
+'
 docker exec "$name" node -e 'require("node:fs").writeFileSync("/tmp/ftrade-lease",String(Date.now()+2000),{mode:0o600})'
 timeout 35 docker wait "$name" >/dev/null
 test "$(docker inspect --format '{{.State.Running}}' "$name")" = false
