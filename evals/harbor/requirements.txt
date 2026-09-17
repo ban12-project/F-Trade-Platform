@@ -1,0 +1,2 @@
+# https://github.com/harbor-framework/harbor/releases/tag/v0.23.0
+harbor==0.23.0

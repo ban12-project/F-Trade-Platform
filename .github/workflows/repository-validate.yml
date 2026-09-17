@@ -60,6 +60,9 @@ jobs:
       - name: Test Product Agent incremental validation
         run: pnpm test:product-stream && pnpm exec tsx scripts/test-product-intake-diagnostics.ts
 
+      - name: Test Harbor acceptance gate and synthetic expectations
+        run: pnpm test:harbor
+
       - name: Test Product Agent evidence locations
         run: pnpm test:product-agent-evidence
 
@@ -162,3 +165,31 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/test-product-revision-evidence-postgres.ts
         env:
           DOCUMENT_UPLOAD_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+
+  harbor-compatibility:
+    name: harbor-compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - uses: astral-sh/setup-uv@v7
+      - run: uv tool install --python 3.12 --constraints evals/harbor/requirements.txt harbor
+      - run: pnpm eval:harbor:prepare
+      - name: Verify released task schema and adapter API
+        run: uv run --python 3.12 --no-project --with-requirements evals/harbor/requirements.txt python scripts/test-harbor-framework.py
+      - name: Validate the real model job configuration without credentials
+        run: harbor run -p /tmp/f-trade-harbor-product-agent -a evals.harbor.product_agent.f_trade_product_agent:FTradeProductAgent -m openai/synthetic -k 3 --dry-run
+      - name: Build isolated synthetic evaluation image
+        run: docker build -f evals/harbor/product-agent/Dockerfile -t f-trade-product-agent-eval:latest .
+      - name: Verify container execution and artifact collection with oracle fixtures
+        run: python3 scripts/test-harbor-container-smoke.py

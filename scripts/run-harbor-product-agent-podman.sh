@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
+
 model=${HARBOR_MODEL:?Set HARBOR_MODEL to the evaluation provider/model.}
 
 if ! command -v podman >/dev/null 2>&1; then
@@ -8,13 +10,17 @@ if ! command -v podman >/dev/null 2>&1; then
   exit 1
 fi
 if ! podman info >/dev/null 2>&1; then
-  echo "Podman is not reachable. Start its machine, then export the Docker-compatible DOCKER_HOST socket." >&2
+  echo "Podman is not reachable. Start its machine." >&2
   exit 1
 fi
-if [ -z "${DOCKER_HOST:-}" ]; then
-  echo "Set DOCKER_HOST to Podman's Docker-compatible API socket before running Harbor." >&2
-  exit 1
-fi
+# Harbor 0.23.0 has a native Podman environment; no Docker socket shim is required.
+python_version=$(harbor --version)
+case "$python_version" in
+  0.23.0) ;;
+  *) echo "Install the pinned Harbor version from evals/harbor/requirements.txt." >&2; exit 1 ;;
+esac
+job_name="product-agent-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+dataset=${HARBOR_DATASET_DIR:-/tmp/f-trade-harbor-product-agent}
 case "$model" in
   openai/*)
     : "${HARBOR_OPENAI_API_KEY:?Set HARBOR_OPENAI_API_KEY for this evaluation.}"
@@ -41,9 +47,15 @@ case "$model" in
     ;;
 esac
 
+podman build --ignorefile evals/harbor/product-agent/Dockerfile.dockerignore -f evals/harbor/product-agent/Dockerfile -t f-trade-product-agent-eval:latest .
 pnpm eval:harbor:prepare
-harbor run -p /tmp/f-trade-harbor-product-agent \
+status=0
+harbor run -p "$dataset" -e podman --job-name "$job_name" \
   -a evals.harbor.product_agent.f_trade_product_agent:FTradeProductAgent \
   -m "$model" -k 3 --yes \
   --ae "HARBOR_MODEL=$HARBOR_MODEL" \
-  "$@"
+  "$@" || status=$?
+python3 scripts/validate-harbor-product-agent-results.py \
+  --job-dir "jobs/$job_name" --manifest "$dataset/acceptance-manifest.json" \
+  --model "$model" --output "harbor-artifacts/$job_name.json"
+exit "$status"

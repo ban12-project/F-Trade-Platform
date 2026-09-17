@@ -141,8 +141,11 @@ pnpm seed:admins -- --emails admin1@example.com,admin2@example.com --confirm
 ### Harbor Product Agent 评测
 
 `pnpm eval:harbor:prepare` 会在临时目录生成 20 个仅含 synthetic 数据的 Harbor 任务。
-本机使用 Podman 时，先启动 Podman machine，并把其 Docker 兼容 API socket 设置为
-`DOCKER_HOST`；并为目标 provider 设置专用的 `HARBOR_*` 评测凭据。Harbor 使用专用 runner，
+评测框架使用 [harbor-framework/harbor 0.23.0](https://github.com/harbor-framework/harbor/releases/tag/v0.23.0)，
+版本固定在 `evals/harbor/requirements.txt`。安装命令为
+`uv tool install --python 3.12 --constraints evals/harbor/requirements.txt harbor`。
+本机使用 Podman 时，先启动 Podman machine、安装可用的 Compose frontend，并为目标 provider 设置
+专用的 `HARBOR_*` 评测凭据；runner 使用原生 `-e podman`，自动构建镜像和验收本次 job。Harbor 使用专用 runner，
 不会读取应用数据库、已保存的模型配置或 `MODEL_CONFIG_ENCRYPTION_KEY`。例如：
 
 ```bash
@@ -151,6 +154,10 @@ HARBOR_OPENAI_COMPATIBLE_BASE_URL=https://gateway.example.test/v1 \
 HARBOR_OPENAI_COMPATIBLE_API_KEY=local-evaluation-key \
 pnpm eval:harbor:podman
 ```
+
+`pnpm test:harbor` 验证 20 个固定 synthetic 样例、字段级证据与失败门禁，不调用模型。
+真实模型验收必须另跑 20×3 次，且全部通过；oracle 容器冒烟测试不算模型验收。
+范围、命令和结果解释见 [Harbor 验收说明](docs/testing/harbor-agent-evals.md)。
 
 Issue #48 的 PDF 只能作为本机授权测试输入，不能提交、镜像复制或上传到 Harbor artifact。
 Product Agent 会先使用 MarkItDown 的本地 `convert_local()` 将允许的 PDF、Office 和文本格式转为
