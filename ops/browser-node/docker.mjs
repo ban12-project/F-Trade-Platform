@@ -113,7 +113,8 @@ export function containerSpec(nodeId, run, imageId, deadline) {
         "MAX_TABS_PER_SESSION=4",
         "MAX_TABS_GLOBAL=4",
         "MAX_CONCURRENT_PER_USER=1",
-        "BROWSER_IDLE_TIMEOUT_MS=0",
+        // Upstream schedules setTimeout directly: zero races first-page creation.
+        "BROWSER_IDLE_TIMEOUT_MS=900000",
         "SESSION_TIMEOUT_MS=900000",
         "TAB_INACTIVITY_MS=900000",
         "PROXY_STRATEGY=round_robin",

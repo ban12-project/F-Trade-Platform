@@ -53,6 +53,8 @@ test("each account gets a stable distinct volume; runs get fresh containers", ()
 test("browser runtime cannot access the host Docker socket or choose a mount", () => {
   const { body } = containerSpec(nodeId, run, "sha256:reviewed", Date.now() + 60_000);
   assert.equal(body.HostConfig.Privileged, undefined);
+  assert.equal(body.HostConfig.ReadonlyRootfs, true);
+  assert.ok(body.Env.includes("BROWSER_IDLE_TIMEOUT_MS=900000"));
   assert.deepEqual(body.HostConfig.CapDrop, ["ALL"]);
   assert.equal(body.HostConfig.Mounts.length, 1);
   assert.equal(body.HostConfig.Mounts[0].Type, "volume");
