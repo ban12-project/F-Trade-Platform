@@ -20,7 +20,7 @@ export function createBoundedRfqReply(
   const window = assessReplyWindow(policy, inbound, now);
   if (!window.automatedReplyAllowed)
     throw new Error("Automated RFQ reply is outside the allowed reply window");
-  if (!(missingField in TEMPLATE_BY_FIELD))
+  if (!Object.hasOwn(TEMPLATE_BY_FIELD, missingField))
     throw new Error("RFQ reply requires human handling for this field");
   const field = missingField as SupportedField;
   return {
