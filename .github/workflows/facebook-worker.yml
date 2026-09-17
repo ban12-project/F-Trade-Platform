@@ -6,6 +6,7 @@ on:
       - "lib/social/**"
       - "lib/browser-fleet/**"
       - "ops/browser-node/**"
+      - "scripts/test-rfq-reply-policy.ts"
       - "scripts/test-facebook-publication-postgres.ts"
       - "scripts/test-facebook-inbound-postgres.ts"
       - "scripts/test-browser-inbox-postgres.ts"
@@ -80,10 +81,14 @@ jobs:
             lib/social/facebook-inbound-store.ts
             scripts/test-facebook-inbound-postgres.ts
             lib/social/facebook-worker-protocol.ts
+            lib/social/rfq-reply-policy.ts
+            scripts/test-rfq-reply-policy.ts
             lib/social/job-store.ts
             scripts/test-facebook-publication-postgres.ts
           )
           pnpm exec biome ci "${files[@]}"
+      - name: Bounded RFQ reply templates
+        run: pnpm test:rfq-reply-policy
       - name: Application typecheck
         run: pnpm typecheck
       - name: Install synthetic Chromium runtime
