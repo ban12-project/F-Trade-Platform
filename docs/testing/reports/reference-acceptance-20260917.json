@@ -1,0 +1,53 @@
+{
+  "classification": "sanitized_aggregate",
+  "run_id": "sanitized-reference-acceptance-audit-20260917",
+  "executed_at": "2026-09-17T02:06:53.219230+00:00",
+  "criteria": [
+    {
+      "criterion_id": "product_import",
+      "status": "passed",
+      "evidence_refs": ["sanitized-cohort-347", "sanitized-catalog-350"]
+    },
+    {
+      "criterion_id": "content_gate",
+      "status": "passed",
+      "evidence_refs": ["sanitized-catalog-chain-340", "sanitized-introductions-363"]
+    },
+    {
+      "criterion_id": "rfq_completion",
+      "status": "passed",
+      "evidence_refs": ["sanitized-catalog-chain-340"]
+    },
+    {
+      "criterion_id": "quotation_handoff",
+      "status": "passed",
+      "evidence_refs": ["sanitized-catalog-chain-340"]
+    },
+    {
+      "criterion_id": "follow_up_opportunity",
+      "status": "passed",
+      "evidence_refs": ["sanitized-catalog-chain-340", "sanitized-follow-up-355"]
+    },
+    {
+      "criterion_id": "gate_bypass",
+      "status": "passed",
+      "evidence_refs": [
+        "sanitized-catalog-chain-340",
+        "sanitized-source-images-344",
+        "sanitized-evidence-revision-349",
+        "sanitized-follow-up-355"
+      ]
+    }
+  ],
+  "metrics": {
+    "manual_revision_count": 60,
+    "factual_error_count": 0,
+    "rfq_total": 20,
+    "rfq_ready": 20,
+    "gate_bypass_count": 0,
+    "blocked_external_dependency_count": 0
+  },
+  "decision": {
+    "status": "pending"
+  }
+}
