@@ -349,6 +349,93 @@ test("mock RFQ proceeds through quotation, delivery, follow-up and opportunity",
   expect(reply).toContain("MOCK reply");
   expect(reply).toContain("21");
   expect(outbound.bodyCiphertext).not.toContain("MOCK reply");
+  // Exercise every MVP context through the form and verify persisted outcomes.
+  // A fresh synthetic confirmation prevents idempotent replay of the first reply.
+  const scenarios = [
+    ["quote_sent_unread", "报价未读", "wait_then_reference_quote_validity"],
+    ["quote_sent_read_no_reply", "已读未回复", "ask_one_decision_blocking_question"],
+    ["price_high", "反馈价格高", "ask_target_budget_and_escalate"],
+    ["purchase_later", "稍后采购", "record_timing_and_request_follow_up_consent"],
+    ["asks_sample", "询问样品", "collect_sample_requirements_and_escalate"],
+    ["asks_lead_time", "询问交期", "request_factory_delivery_confirmation"],
+  ] as const;
+  const queuedIds = new Set([job.id]);
+  for (const [scenario, label, expectedAction] of scenarios) {
+    await test.step(`persist follow-up context: ${scenario}`, async () => {
+      const confirmation = `evidence-mock-${randomUUID()}`;
+      await db.insert(schema.evidence).values({
+        id: confirmation,
+        classification: "internal",
+        blobKey: `synthetic/mock-follow-up-${confirmation}-not-a-real-blob`,
+        contentType: "text/plain",
+        sha256: createHash("sha256").update(confirmation).digest("hex"),
+        sizeBytes: 0,
+        sourceLabel: "MOCK follow-up confirmation — synthetic test only",
+        uploadedByType: "human",
+        uploadedById: actorId,
+      });
+      await page.goto(`/workspace/${projectId}?panel=follow-up`);
+      await follow.getByRole("combobox").click();
+      await page.getByRole("option", { name: label, exact: true }).click();
+      const draft = `MOCK ${scenario}: synthetic acceptance only.`;
+      await follow.getByLabel("待人工发送内容", { exact: true }).fill(draft);
+      await follow.getByLabel("本次人工确认凭据", { exact: true }).fill(confirmation);
+      await page.getByRole("button", { name: "人工确认并发送此回复", exact: true }).click();
+      await expect
+        .poll(async () => {
+          const current = (await records("lead"))[0];
+          return {
+            context: current.payload.follow_up_context,
+            action: current.payload.next_action,
+            changed: !queuedIds.has(String(current.payload.last_outbound_ref)),
+          };
+        })
+        .toEqual({ context: scenario, action: expectedAction, changed: true });
+      const current = (await records("lead"))[0];
+      expect(current.state).toBe("FOLLOW_UP");
+      const outboundId = String(current.payload.last_outbound_ref);
+      queuedIds.add(outboundId);
+      const [queued] = await db
+        .select()
+        .from(schema.socialBrowserJob)
+        .where(eq(schema.socialBrowserJob.id, outboundId));
+      expect(queued).toMatchObject({ kind: "reply", status: "queued", channelRef });
+      const [message] = await db
+        .select()
+        .from(schema.socialMessage)
+        .where(eq(schema.socialMessage.id, queued.payloadRef));
+      expect(message.direction).toBe("outbound");
+      const plaintext = decryptSocialMessageBody(message.bodyCiphertext);
+      expect(plaintext).toContain(draft);
+      expect(message.bodyCiphertext).not.toContain(draft);
+      if (scenario === "asks_sample" || scenario === "asks_lead_time") {
+        expect(plaintext).toContain("21");
+      } else {
+        expect(plaintext).toBe(draft);
+      }
+      const audits = await db
+        .select()
+        .from(schema.auditEvent)
+        .where(
+          and(
+            eq(schema.auditEvent.aggregateId, lead.id),
+            eq(schema.auditEvent.action, "lead.follow_up_submitted"),
+          ),
+        );
+      expect(audits.map((item) => item.metadata)).toContainEqual(
+        expect.objectContaining({
+          context: scenario,
+          browser_job_id: outboundId,
+          confirmation_ref: confirmation,
+        }),
+      );
+      await page.reload();
+      await expect(follow.getByRole("combobox").locator('[data-slot="select-value"]')).toHaveText(
+        label,
+      );
+    });
+  }
+  expect(queuedIds.size).toBe(7);
   await page.getByLabel("商机确认凭据", { exact: true }).fill(evidenceId);
   await page.getByRole("button", { name: "确认有效商机", exact: true }).click();
   await expect.poll(async () => (await records("lead"))[0].state).toBe("OPPORTUNITY");
