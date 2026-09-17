@@ -12,6 +12,7 @@ import {
   documentUploadPath,
   documentUploadPayloadSchema,
 } from "./document-upload-contracts";
+import { logProductIntakeFailure } from "./intake-diagnostics";
 
 async function lockAuthorizedProject(tx: DatabaseTransaction, projectId: string, actorId: string) {
   // Membership changes lock this same project row. Recheck after taking that lock.
@@ -70,14 +71,22 @@ export async function claimDocumentUpload(
       ),
     );
   if (!row || row.expiresAt.getTime() <= Date.now()) throw new Error("上传回执无效或已过期。");
-  const blob = await readBlob(row.blobPath, { access: "private", useCache: false });
+  const blob = await readBlob(row.blobPath, { access: "private", useCache: false }).catch(
+    (error: unknown) => {
+      logProductIntakeFailure("private_blob_read", error);
+      throw error;
+    },
+  );
   if (!blob || blob.statusCode !== 200 || !blob.stream || blob.blob.contentType !== row.contentType)
     throw new Error("无法核验私有文件，请重新上传。");
   const verified = await verifyDocumentUploadBytes(
     blob.stream,
     row.originalFilename,
     row.sizeBytes,
-  );
+  ).catch((error: unknown) => {
+    logProductIntakeFailure("private_blob_read", error);
+    throw error;
+  });
   const evidenceId = await database.transaction(async (tx) => {
     await lockAuthorizedProject(tx, row.projectId, actorId);
     const [current] = await tx

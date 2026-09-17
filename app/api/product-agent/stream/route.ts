@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
+import { logProductIntakeFailure, type ProductIntakeStage } from "@/lib/product/intake-diagnostics";
 import {
   PRODUCT_STREAM_PROMPT_HASH,
   PRODUCT_STREAM_PROMPT_VERSION,
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (session?.user.role !== "admin")
     return Response.json({ error: "仅管理员可运行流式产品导入。" }, { status: 403 });
+  let stage: ProductIntakeStage = "input";
   try {
     const data = await readProductStreamForm(request);
     const receiptId = data.get("receiptId");
@@ -44,9 +46,12 @@ export async function POST(request: Request) {
       hasUpload: Boolean(receiptId),
     });
     const projectId = z.uuid("项目标识无效。").parse(data.get("projectId"));
+    stage = "project_access";
     await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
+    stage = "model_config";
     const config = await resolveProductAgentModelConfig(parsed.modelConfigId, parsed.model);
     const model = createProductAgentModel(config);
+    stage = "document";
     const baseSource = receiptId
       ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
       : {
@@ -57,12 +62,14 @@ export async function POST(request: Request) {
           image_availability: "none" as const,
           image_refs: [],
         };
+    stage = "images";
     const source = await attachClaimedProductImages(
       baseSource,
       data.getAll("imageReceiptId"),
       projectId,
       session.user.id,
     );
+    stage = "start_run";
     request.signal.throwIfAborted();
     const identity = { actorId: session.user.id, sessionId: session.session.id, projectId };
     const run = await startProductStreamRun(identity, source, {
@@ -96,7 +103,8 @@ export async function POST(request: Request) {
     return productStreamResponse(events, controller, async () => {
       await finishProductStreamRun(identity, run.runId, "interrupted");
     });
-  } catch {
+  } catch (error) {
+    logProductIntakeFailure(stage, error);
     return Response.json(
       { error: "无法开始生成，请检查项目权限、证据和模型配置。" },
       { status: 400 },
