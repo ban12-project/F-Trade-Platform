@@ -15,6 +15,15 @@ runtime=/var/lib/ftrade-sandbox
 install -d -m 700 "$runtime"
 exec 9>"$runtime/start.lock"
 flock -x 9
+# Private reviewed configuration persists across starts of this same managed VM.
+# Never accept a symlink or silently change ownership of existing configuration.
+facebook_config="$runtime/facebook"
+if ! test -e "$facebook_config" && ! test -L "$facebook_config"; then
+  install -d -m 700 "$facebook_config"
+fi
+test -d "$facebook_config"
+test ! -L "$facebook_config"
+test "$(stat -c '%a:%u' "$facebook_config")" = '700:0'
 env_file="$runtime/runtime.env"
 key_file="$runtime/node-key"
 if test -n "$staged"; then env_file="$staged.env"; key_file="$staged.key"; fi

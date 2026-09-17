@@ -18,6 +18,7 @@ import {
   loginProfileForRun,
   loginScopes,
 } from "./login.mjs";
+import { managedFacebookEnvironment } from "./managed-facebook.mjs";
 import { readPublicationMedia } from "./media.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
 import { stagePublicationUpload } from "./upload.mjs";
@@ -53,6 +54,10 @@ if (image.Config?.Labels?.["io.ftrade.lease-watchdog"] !== "1")
 // Resolve the local tag once. Platform payloads cannot choose images, mounts,
 // shell commands, host ports, or a Docker API endpoint.
 const imageId = image.Id;
+Object.assign(
+  process.env,
+  await managedFacebookEnvironment(process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR, nodeId),
+);
 const loginProfiles = await loadLoginProfiles(process.env.FACEBOOK_LOGIN_PROFILES_FILE);
 if (loginProfiles.size && image.Config?.Labels?.["io.ftrade.login-fill"] !== "1")
   throw new Error("reviewed_login_image_required");
