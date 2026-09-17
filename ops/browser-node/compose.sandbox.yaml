@@ -27,6 +27,7 @@ services:
       BROWSER_NODE_ACCESS_KEY_FILE: /run/secrets/node-key
       BROWSER_IMAGE: ${BROWSER_IMAGE:?Set the reviewed local browser image ID}
       BROWSER_NODE_ON_DEMAND: "1"
+      BROWSER_MANAGED_FACEBOOK_CONFIG_DIR: /run/facebook-config
       BROWSER_NODE_IDLE_MS: "30000"
       MAX_RUNNING_BROWSERS: "1"
       HOST_RESERVE_MB: "1024"
@@ -36,6 +37,12 @@ services:
       - type: bind
         source: /var/lib/ftrade-sandbox/node-key
         target: /run/secrets/node-key
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /var/lib/ftrade-sandbox/facebook
+        target: /run/facebook-config
         read_only: true
         bind:
           create_host_path: false

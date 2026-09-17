@@ -268,3 +268,23 @@ Agent 仅向匹配的 interactive 运行注入非凭据页面配置。人工接�
 
 新增的浏览器回归覆盖上传后文案重置及隐藏旧编辑器；这是合成页面执行器回归，
 不等于生产节点已启用自动发布。真实受众设置、附件输入选择及发布回执契约仍须单独接入并验收。
+
+### Managed Sandbox private Facebook configuration
+
+A reviewed Sandbox template containing this runtime can load node-specific Facebook configuration from `/var/lib/ftrade-sandbox/facebook`. The startup script creates this directory as root with mode `0700`; Compose mounts it read-only at `/run/facebook-config` inside the Agent. An empty directory retains interactive-only operation. Missing directories, symlinks, permissive ownership/modes, invalid manifests and conflicting legacy adapter environment settings fail startup rather than silently changing capabilities.
+
+Provision only while the node has no running or unknown leases. Use the existing authorized Sandbox administration channel, never a task payload, public repository, template snapshot, or browser form. Place private files owned by root with mode `0600` in this directory. Write the selected profile files first and atomically rename `manifest.json` last:
+
+```json
+{
+  "version": 1,
+  "nodeId": "00000000-0000-4000-8000-000000000001",
+  "publish": false,
+  "inbox": false,
+  "login": false
+}
+```
+
+The example node ID is synthetic and all capabilities are disabled. The real `nodeId` must equal the node encoded in the Agent access key. Enabled switches select fixed filenames only: `publication.json` uses the existing publication-profile array schema, `inbox.json` the inbox-profile array schema, and `login.json` the saved-login profile array schema documented above. Disabled files are not loaded. Each selected file is limited to 64 KB and 1–16 entries; existing loaders still enforce reviewed selectors, account/channel scope, duplicate rejection and expiry. The loader cannot select arbitrary adapter code. Private files remain in this dedicated VM across ordinary stops/starts; provision them again if the VM is replaced. Never include them in a reusable template.
+
+Start a fresh operation after provisioning and verify the node's reported capabilities and expiring scopes before queuing a test. Updating files does not change a running Agent; stop through the platform and start a new operation. To disable automation, set all manifest switches to false before that new start. Login configuration only enables the existing explicitly requested, once-per-interactive-run saved-credential fill flow; it does not bypass 2FA or checkpoints. This provisioning support does not implement DM reply execution and is not evidence of real Facebook automation acceptance.

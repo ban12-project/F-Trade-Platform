@@ -101,6 +101,10 @@ assert agent["container_name"] == "ftrade-browser-agent"
 assert agent["labels"]["io.ftrade.role"] == "agent"
 assert agent["environment"]["BROWSER_NODE_ON_DEMAND"] == "1"
 assert agent["environment"]["BROWSER_NODE_IDLE_MS"] == "30000"
+assert agent["environment"]["BROWSER_MANAGED_FACEBOOK_CONFIG_DIR"] == "/run/facebook-config"
+facebook = next(v for v in agent["volumes"] if v["target"] == "/run/facebook-config")
+assert facebook["source"] == "/var/lib/ftrade-sandbox/facebook"
+assert facebook["read_only"] and not facebook.get("bind", {}).get("create_host_path", False)
 assert "BROWSER_NODE_ACCESS_KEY" not in agent["environment"]
 key = next(v for v in agent["volumes"] if v["target"] == "/run/secrets/node-key")
 assert key["read_only"] and not key.get("bind", {}).get("create_host_path", False)

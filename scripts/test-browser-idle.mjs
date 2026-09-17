@@ -32,7 +32,7 @@ test("invalid deployment settings fail instead of silently staying resident", ()
 });
 
 test("actual Agent exits after an empty queue in on-demand mode", { timeout: 30000 }, async () => {
-  const { mkdtemp, writeFile, readFile, rm } = await import("node:fs/promises");
+  const { mkdir, mkdtemp, writeFile, readFile, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
   const { execFileSync, spawn } = await import("node:child_process");
@@ -48,6 +48,7 @@ test("actual Agent exits after an empty queue in on-demand mode", { timeout: 300
   let browserRecoverySeen = false;
   let child, broker, docker;
   try {
+    await mkdir(join(dir, "facebook"), { mode: 0o700 });
     const config = join(dir, "cert.cnf");
     await writeFile(
       config,
@@ -81,6 +82,7 @@ test("actual Agent exits after an empty queue in on-demand mode", { timeout: 300
         for await (const chunk of req) chunks.push(chunk);
         const body = JSON.parse(Buffer.concat(chunks).toString());
         operations.push(body.operation);
+        if (body.operation === "recover") assert.deepEqual(body.capabilities, ["interactive"]);
         res.setHeader("Content-Type", "application/json");
         res.end(
           JSON.stringify(
@@ -126,6 +128,7 @@ test("actual Agent exits after an empty queue in on-demand mode", { timeout: 300
         GATEWAY_PORT: "0",
         BROWSER_NODE_ON_DEMAND: "1",
         BROWSER_NODE_IDLE_MS: "1000",
+        BROWSER_MANAGED_FACEBOOK_CONFIG_DIR: join(dir, "facebook"),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

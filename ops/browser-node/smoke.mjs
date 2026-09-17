@@ -17,6 +17,7 @@ for (const path of [
   "./lease.mjs",
   "./idle.mjs",
   "./login.mjs",
+  "./managed-facebook.mjs",
   "./media.mjs",
   "./publication.mjs",
   "./upload.mjs",
