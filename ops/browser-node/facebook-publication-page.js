@@ -4,7 +4,9 @@ function inspectPage(profile, action) {
   if (Date.now() >= Date.parse(profile.expiresAt)) throw new Error("facebook_profile_expired");
   if (location.origin !== "https://www.facebook.com") throw new Error("facebook_origin_changed");
   const visible = (element) =>
-    !!element.getClientRects().length && getComputedStyle(element).visibility !== "hidden";
+    !element.closest('[aria-hidden="true"], [inert]') &&
+    !!element.getClientRects().length &&
+    getComputedStyle(element).visibility !== "hidden";
   const all = (root, selector, requireVisible = true) =>
     [...root.querySelectorAll(selector)].filter((element) => !requireVisible || visible(element));
   const one = (root, selector, requireVisible = true) => {

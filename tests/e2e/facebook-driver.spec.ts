@@ -45,6 +45,8 @@ for (const mode of [
   "wrong_attachment",
   "transit_expiry",
   "extra_file_input",
+  "upload_replaces_composer",
+  "hidden_duplicate_composer",
 ] as const) {
   test(`Camofox DOM driver ${mode} using intercepted synthetic HTML`, async ({ page, context }) => {
     // Every request is intercepted; no Facebook request or account is used.
@@ -56,7 +58,9 @@ for (const mode of [
     const format =
       mode === "video"
         ? "video"
-        : ["image", "wrong_attachment", "extra_file_input"].includes(mode)
+        : ["image", "wrong_attachment", "extra_file_input", "upload_replaces_composer"].includes(
+              mode,
+            )
           ? "image"
           : "text";
     const sha256 = "a".repeat(64);
@@ -86,7 +90,13 @@ for (const mode of [
       if (endpoint.endsWith("/type")) {
         expect(body.submit).toBe(false);
         expect(body.pressEnter).toBe(false);
-        await page.locator(String(body.selector)).fill(String(body.text));
+        const target = page.locator(String(body.selector));
+        if (body.mode === "keyboard") await target.pressSequentially(String(body.text));
+        else {
+          expect(body.mode).toBe("fill");
+          expect(body.text).toBe("");
+          await target.fill(String(body.text));
+        }
         return Response.json({ ok: true });
       }
       if (endpoint.endsWith("/upload")) {
@@ -96,6 +106,22 @@ for (const mode of [
           mimeType: format === "video" ? "video/mp4" : "image/png",
           buffer: Buffer.from("SYNTHETIC media"),
         });
+        if (mode === "upload_replaces_composer")
+          await page.locator("#composer").evaluate((element) => {
+            const stale = element.cloneNode(true) as HTMLElement;
+            const field = stale.querySelector("textarea");
+            if (!field) throw new Error("synthetic_textbox_missing");
+            field.value = "SYNTHETIC stale text must not be submitted";
+            const wrapper = document.createElement("div");
+            wrapper.setAttribute("aria-hidden", "true");
+            wrapper.append(stale);
+            element.before(wrapper);
+            // The active composer survives with a reset field, as in a fresh
+            // Facebook media composer. Its post handler is retained.
+            const active = element.querySelector("textarea");
+            if (!active) throw new Error("synthetic_textbox_missing");
+            active.value = "";
+          });
         if (mode === "wrong_attachment")
           await page.locator(".filename").evaluate((element) => {
             element.textContent = "wrong.png";
@@ -131,6 +157,13 @@ for (const mode of [
           await page.locator("#identity").evaluate((element) => {
             element.setAttribute("href", "https://www.facebook.com/different-owner");
           });
+        if (mode === "hidden_duplicate_composer")
+          await page.locator("#composer").evaluate((element) => {
+            const wrapper = document.createElement("div");
+            wrapper.setAttribute("aria-hidden", "true");
+            wrapper.append(element.cloneNode(true));
+            element.before(wrapper);
+          });
         if (mode === "duplicate_composer")
           await page.locator("#composer").evaluate((element) => {
             element.after(element.cloneNode(true));
@@ -141,7 +174,13 @@ for (const mode of [
         receipts.push(receipt);
       },
     });
-    const success = ["text", "image", "video"].includes(mode);
+    const success = [
+      "text",
+      "image",
+      "video",
+      "upload_replaces_composer",
+      "hidden_duplicate_composer",
+    ].includes(mode);
     expect(result).toBe(success ? "completed" : mode === "transit_expiry" ? "unknown" : "failed");
     expect(await page.locator("#clicks").textContent()).toBe(success ? "1" : "0");
     expect(receipts).toHaveLength(success || mode === "transit_expiry" ? 1 : 0);

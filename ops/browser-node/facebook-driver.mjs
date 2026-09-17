@@ -139,16 +139,6 @@ export function createFacebookDriver(input, browserRequest) {
     async prepare(session, payload, upload) {
       await evaluate(session, { kind: "open" });
       await evaluate(session, { kind: "inspect" });
-      await json(
-        await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/type`, {
-          userId: session.accountId,
-          selector: `${profile.selectors.composer} ${profile.selectors.textbox}`,
-          text: payload.text,
-          mode: "fill",
-          submit: false,
-          pressEnter: false,
-        }),
-      );
       if (upload) {
         await evaluate(session, { kind: "upload-check" });
         const attached = await json(
@@ -159,6 +149,29 @@ export function createFacebookDriver(input, browserRequest) {
         );
         if (!attached.ok || attached.attached?.length !== 1 || attached.attached[0] !== upload.path)
           throw new Error("facebook_upload_failed");
+      }
+      // Upload may replace the composer and discard its earlier text. Recheck
+      // the active composer after attaching, then type into that composer only.
+      await evaluate(session, { kind: "inspect" });
+      const active =
+        ':not([aria-hidden="true"]):not([aria-hidden="true"] *):not([inert]):not([inert] *)';
+      const selector = `${profile.selectors.composer}${active} ${profile.selectors.textbox}${active}`;
+      // React contenteditable fields can duplicate fill(text). Clear first,
+      // then use real keyboard events; the final preview still must match.
+      for (const [mode, text] of [
+        ["fill", ""],
+        ["keyboard", payload.text],
+      ]) {
+        await json(
+          await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/type`, {
+            userId: session.accountId,
+            selector,
+            text,
+            mode,
+            submit: false,
+            pressEnter: false,
+          }),
+        );
       }
       session.expected = {
         kind: "publish",
