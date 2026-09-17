@@ -22,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.provider }}-product-agent-eval
     timeout-minutes: 60
+    env:
+      PYTHONPATH: .
+      HARBOR_JOB_NAME: product-agent-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -34,15 +37,19 @@ jobs:
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
       - name: Run deterministic Product Agent safety tests
-        run: pnpm exec playwright test tests/e2e/product-agent.spec.ts
+        run: pnpm exec playwright test tests/e2e/product-agent.spec.ts && pnpm test:harbor && pnpm test:product-agent-evidence
       - name: Set up Harbor
         uses: astral-sh/setup-uv@v7
       - name: Install Harbor
-        run: uv tool install harbor
+        run: uv tool install --python 3.12 --constraints evals/harbor/requirements.txt harbor
       - name: Build Product Agent evaluation image
         run: docker build -f evals/harbor/product-agent/Dockerfile -t f-trade-product-agent-eval:latest .
       - name: Prepare synthetic Harbor tasks
         run: pnpm eval:harbor:prepare
+      - name: Validate Harbor task and adapter compatibility
+        run: |
+          uv run --python 3.12 --no-project --with-requirements evals/harbor/requirements.txt python scripts/test-harbor-framework.py
+          harbor run -p /tmp/f-trade-harbor-product-agent -a evals.harbor.product_agent.f_trade_product_agent:FTradeProductAgent -m openai/synthetic -k 3 --dry-run
       - name: Run Product Agent evaluation
         env:
           HARBOR_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -83,7 +90,7 @@ jobs:
           esac
           harbor run -p /tmp/f-trade-harbor-product-agent \
             -a evals.harbor.product_agent.f_trade_product_agent:FTradeProductAgent \
-            -m "$HARBOR_MODEL_INPUT" -k 3 --yes \
+            -m "$HARBOR_MODEL_INPUT" -k 3 --yes --job-name "$HARBOR_JOB_NAME" \
             --ae "HARBOR_MODEL=$HARBOR_MODEL_INPUT" \
             "$@"
       - name: Validate and sanitize Harbor results
@@ -91,7 +98,12 @@ jobs:
         env:
           HARBOR_MODEL: ${{ inputs.model }}
           HARBOR_PROVIDER: ${{ inputs.provider }}
-        run: python scripts/validate-harbor-product-agent-results.py
+        run: >-
+          python scripts/validate-harbor-product-agent-results.py
+          --job-dir "jobs/$HARBOR_JOB_NAME"
+          --manifest /tmp/f-trade-harbor-product-agent/acceptance-manifest.json
+          --model "$HARBOR_MODEL"
+          --output harbor-artifacts/product-agent-summary.json
       - name: Upload sanitized Harbor summary
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7

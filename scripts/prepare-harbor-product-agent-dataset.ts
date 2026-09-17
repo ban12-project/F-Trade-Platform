@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { basename, dirname, parse, resolve } from "node:path";
 
 import { productAgentEvalCases } from "../evals/harbor/product-agent/cases";
+import { evaluationExpectation } from "../evals/harbor/product-agent/expectations";
 
 const datasetDirectoryName = "f-trade-harbor-product-agent";
 const defaultRoot = resolve("/tmp", datasetDirectoryName);
@@ -53,7 +54,7 @@ async function main() {
       "Run the F-Trade Product Agent against the supplied source file.\n",
     );
     await write(
-      resolve(taskRoot, "input/source.json"),
+      resolve(taskRoot, "environment/input/source.json"),
       `${JSON.stringify(item.source, null, 2)}\n`,
     );
     await write(
@@ -62,8 +63,31 @@ async function main() {
     );
     await cp(resolve(templateRoot, "verifier.py"), resolve(taskRoot, "tests/verifier.py"));
     await cp(resolve(templateRoot, "test.sh"), resolve(taskRoot, "tests/test.sh"));
-    await write(resolve(taskRoot, "tests/expected.json"), `${JSON.stringify(item, null, 2)}\n`);
+    await write(
+      resolve(taskRoot, "tests/expected.json"),
+      `${JSON.stringify(evaluationExpectation(item), null, 2)}\n`,
+    );
   }
+  await write(
+    resolve(root, "acceptance-manifest.json"),
+    `${JSON.stringify(
+      {
+        harbor_version: "0.23.0",
+        repetitions: 3,
+        tasks: productAgentEvalCases.map((item) => {
+          const expected = evaluationExpectation(item);
+          return {
+            id: item.id,
+            prompt_version: expected.prompt_version,
+            prompt_hash: expected.prompt_hash,
+            expectation_hash: expected.expectation_hash,
+          };
+        }),
+      },
+      null,
+      2,
+    )}\n`,
+  );
   await write(
     resolve(root, "dataset.toml"),
     `version = "1.0.0"\nname = "f-trade-product-agent"\ndescription = "Synthetic Product Agent safety evaluation dataset"\n`,

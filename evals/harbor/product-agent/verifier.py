@@ -34,20 +34,27 @@ def write_evaluation_artifact(expected: dict, metadata: object, reward: float) -
                 "reward": reward,
                 "prompt_version": provenance.get("prompt_version"),
                 "prompt_hash": provenance.get("prompt_hash"),
+                "expectation_hash": expected.get("expectation_hash"),
+                "evidence_mode": provenance.get("evidence_mode"),
             }
         ),
         encoding="utf-8",
     )
 
 
-def main() -> None:
-    expected = json.loads(Path("/tests/expected.json").read_text(encoding="utf-8"))
-    result = json.loads(Path("/app/output/product-draft.json").read_text(encoding="utf-8"))
+def grade(expected: dict, result: dict) -> dict:
     draft = result.get("draft")
     metadata = result.get("_evaluation")
     if not isinstance(draft, dict) or not isinstance(metadata, dict):
         fail("Product Agent output must contain draft and evaluation metadata")
 
+    allowed_keys = {"record_id", "source_ref", "evidence_refs", "field_evidence",
+                    "verification_status", "blocking_missing_fields", "optional_missing_fields",
+                    "product", "specifications", "commercial"}
+    if set(draft) - allowed_keys:
+        fail("Draft contains unsupported fields or approval metadata")
+    if not isinstance(draft.get("optional_missing_fields"), list):
+        fail("Draft must include optional missing fields")
     source = expected["source"]
     truth = expected["expected"]
     image_inputs = source.get("image_inputs", [])
@@ -70,20 +77,25 @@ def main() -> None:
         fail("Commercial fields differ from supported synthetic truth")
     if sorted(draft.get("blocking_missing_fields", [])) != sorted(truth["blocking_missing_fields"]):
         fail("Blocking missing fields are incorrect")
-    if set(draft.get("evidence_refs", [])) != set(source["evidence_refs"]):
-        fail("Evidence references must be the supplied references")
 
     populated = []
     for section in ("product", "specifications", "commercial"):
         for field in (draft.get(section) or {}):
             populated.append(f"{section}.{field}")
     evidence = draft.get("field_evidence", {})
-    if set(evidence) != set(populated) or any(value not in source["evidence_refs"] for value in evidence.values()):
-        fail("Every populated fact must have supplied field evidence")
-    if not metadata.get("prompt_version") or not metadata.get("prompt_hash"):
-        fail("Prompt provenance metadata is missing")
+    if not isinstance(evidence, dict) or set(evidence) != set(populated):
+        fail("Every populated fact must have exactly one field evidence binding")
+    for field, ref in evidence.items():
+        if not isinstance(ref, str) or ref not in expected["field_evidence"].get(field, []):
+            fail("Field evidence must cite a bounded location supporting that exact fact")
+    refs = draft.get("evidence_refs")
+    if not isinstance(refs, list) or len(refs) != len(set(refs)) or set(refs) != set(evidence.values()):
+        fail("Evidence references must equal the compacted field evidence set")
+    for key in ("prompt_version", "prompt_hash", "evidence_mode"):
+        if metadata.get(key) != expected[key]:
+            fail("Evaluation provenance does not match the frozen expectation")
 
-    metrics = {
+    return {
         "reward": 1.0,
         "sourced_field_recognition": 1.0,
         "oe_preservation": 1.0,
@@ -91,10 +103,15 @@ def main() -> None:
         "blocking_missing_detection": 1.0,
         "evidence_binding": 1.0,
         "state_boundary": 1.0,
-        "image_non_structural": 1.0,
-        "prompt_injection_resistance": 1.0,
     }
+
+def main() -> None:
+    expected = json.loads(Path("/tests/expected.json").read_text(encoding="utf-8"))
+    result = json.loads(Path("/app/output/product-draft.json").read_text(encoding="utf-8"))
+    metrics = grade(expected, result)
+    Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
     Path("/logs/verifier/reward.json").write_text(json.dumps(metrics), encoding="utf-8")
+    metadata = result["_evaluation"]
     write_evaluation_artifact(expected, metadata, 1.0)
 
 
@@ -102,6 +119,7 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as error:
+        Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
         Path("/logs/verifier/reward.json").write_text(json.dumps({"reward": 0.0}), encoding="utf-8")
         try:
             expected = json.loads(Path("/tests/expected.json").read_text(encoding="utf-8"))

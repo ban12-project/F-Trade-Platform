@@ -62,3 +62,7 @@ next-env.d.ts
 
 # Reproducible synthetic review outputs, uploaded by CI only.
 artifacts/browser-fleet-review/
+
+# Local Harbor jobs can include provider connection configuration.
+jobs/
+harbor-artifacts/
