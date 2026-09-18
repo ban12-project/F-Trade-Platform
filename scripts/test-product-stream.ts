@@ -16,6 +16,58 @@ const source: ProductAgentSource = {
 const runId = "00000000-0000-4000-8000-000000000118";
 
 async function verify() {
+  for (const scenario of ["empty", "unsupported", "ambiguous", "supported"] as const) {
+    const outcomes: string[] = [];
+    const writes: ProductDraft[] = [];
+    const output: ProductStreamEvent[] = [];
+    const testSource = {
+      ...source,
+      source_text:
+        scenario === "unsupported"
+          ? "| product_name | oe_numbers | Application |\n| --- | --- | --- |\n| MOCK kit | MOCK-001 | MOCK application |"
+          : scenario === "ambiguous"
+            ? "| Model | Application |\n| --- | --- |\n| MOCK vehicle | MOCK application |"
+            : "Product name: MOCK kit\nOE: MOCK-001",
+    };
+    for await (const event of runProductStream({
+      runId,
+      source: testSource,
+      signal: new AbortController().signal,
+      async *proposals(located) {
+        if (scenario === "empty") return;
+        yield {
+          field: scenario === "ambiguous" ? "product.vehicle_model" : "product.product_name",
+          value: scenario === "ambiguous" ? "MOCK vehicle" : "MOCK kit",
+          evidenceRef: located.evidence_locations[0]?.ref,
+        };
+        if (scenario === "supported")
+          yield {
+            field: "product.oe_numbers",
+            value: ["MOCK-001"],
+            evidenceRef: located.evidence_locations[1]?.ref,
+          };
+      },
+      async persist(draft) {
+        writes.push(draft);
+        return { productId: source.record_id, version: writes.length };
+      },
+      async finish(status) {
+        outcomes.push(status);
+      },
+    }))
+      output.push(productStreamEventSchema.parse(event));
+    const success = scenario === "supported";
+    assert.deepEqual(outcomes, [success ? "completed" : "failed"]);
+    assert.equal(writes.length, success ? 2 : 0);
+    assert.equal(
+      output.some((event) => event.type === "error" && event.code === "no_accepted_fields"),
+      !success,
+    );
+    if (success) {
+      assert.equal(writes.at(-1)?.product.product_name, "MOCK kit");
+      assert.deepEqual(writes.at(-1)?.product.oe_numbers, ["MOCK-001"]);
+    }
+  }
   const saved: ProductDraft[] = [];
   const terminal: string[] = [];
   const events: ProductStreamEvent[] = [];
