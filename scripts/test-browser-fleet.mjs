@@ -356,3 +356,47 @@ test("saved login waiting ends after interruption or expiry without inventing a 
     "Read projection must not mutate account state",
   );
 });
+
+test("reopening a stopped or expired interactive run queues recovery demand without releasing its lease", () => {
+  for (const reason of ["stop", "lease", "deadline"]) {
+    const state = fixture();
+    const original = enqueue(state);
+    claim(state);
+    const now = 2000;
+    if (reason === "stop") requestStop(state, original);
+    if (reason === "lease") original.leaseUntil = now;
+    if (reason === "deadline") original.deadline = now;
+    const next = enqueue(state, "a", "interactive", now);
+    assert.notEqual(next.id, original.id, reason);
+    assert.equal(next.status, "queued");
+    assert.equal(enqueue(state, "a", "interactive", now + 1).id, next.id);
+    assert.equal(state.runs.length, 2);
+    assert.equal(claim(state, now + 1), null, "old lease still blocks allocation");
+    finishRun(state, original.id, "failed", true, now + 2);
+    assert.equal(
+      claim(state, now + 3)?.id,
+      next.id,
+      "only confirmed shutdown releases the account",
+    );
+  }
+});
+
+test("reopening an expired queued interactive request produces fresh demand", () => {
+  const state = fixture();
+  const old = enqueue(state);
+  const now = old.createdAt + 900000;
+  const next = enqueue(state, "a", "interactive", now);
+  assert.notEqual(next.id, old.id);
+  sweep(state, now);
+  assert.equal(old.status, "failed");
+  assert.equal(claim(state, now + 1)?.id, next.id);
+});
+
+test("reopening a healthy interactive run still coalesces", () => {
+  const state = fixture();
+  const original = enqueue(state);
+  assert.equal(enqueue(state).id, original.id);
+  claim(state);
+  assert.equal(enqueue(state, "a", "interactive", 2000).id, original.id);
+  assert.equal(state.runs.length, 1);
+});

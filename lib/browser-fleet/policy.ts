@@ -131,6 +131,15 @@ export function enqueueRun(
     (r) =>
       r.accountId === input.accountId &&
       r.kind === input.kind &&
+      // A fresh manual request must be able to wake a stopped managed VM so its
+      // Agent can recover old containers. Retain the old lease until recovery;
+      // claimRun still prevents overlapping browsers for the same account.
+      (input.kind !== "interactive" ||
+        input.jobRef ||
+        (!r.stopRequested &&
+          (r.status === "queued"
+            ? now - r.createdAt < 900_000
+            : r.leaseUntil > now && r.deadline > now))) &&
       (input.jobRef ? r.jobRef === input.jobRef : r.status === "queued" || isLive(r)),
   );
   if (duplicate) return duplicate;

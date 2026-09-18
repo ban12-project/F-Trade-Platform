@@ -479,14 +479,32 @@ async function testDispatchAuthorization(
     }),
     "superseded",
   );
-  const nextStarts = await Promise.all(
+  // Provider stop does not release a stale interactive lease. Reopening must
+  // queue fresh demand so Agent recovery can confirm the old browser stopped.
+  const stale = retired.rows[0].document as FleetState;
+  const oldRun = stale.runs[0];
+  oldRun.status = "quarantined";
+  oldRun.stopRequested = true;
+  oldRun.leaseUntil = Date.now() - 1000;
+  oldRun.deadline = Date.now() - 1000;
+  await database.execute(
+    sql`UPDATE browser_fleet_node SET document=${JSON.stringify(stale)}::jsonb WHERE id=${nodeId}`,
+  );
+  const reopened = await Promise.all(
     Array.from({ length: 12 }, () =>
-      database.transaction((tx) => enqueueManualBrowserSandboxStart(tx, nodeId)),
+      ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner),
     ),
   );
-  const nextWinners = nextStarts.filter((value) => value !== null);
-  assert.equal(nextWinners.length, 1, "queued work after stop creates one durable next start");
-  const nextOperation = nextWinners[0].operationId;
+  assert.equal(new Set(reopened.map((value) => value.runId)).size, 1);
+  assert.notEqual(reopened[0].runId, oldRun.id);
+  const recoveredDemand = await database.execute(sql`SELECT n.document, s.operation_id,
+    (SELECT count(*)::integer FROM browser_sandbox_outbox o WHERE o.operation_id=s.operation_id) AS outbox_count
+    FROM browser_fleet_node n JOIN browser_sandbox s ON s.node_id=n.id WHERE n.id=${nodeId}`);
+  const nextState = recoveredDemand.rows[0].document as FleetState;
+  assert.equal(nextState.runs.find((item) => item.id === oldRun.id)?.status, "quarantined");
+  assert.equal(nextState.runs.filter((item) => item.status === "queued").length, 1);
+  assert.equal(recoveredDemand.rows[0].outbox_count, 1);
+  const nextOperation = recoveredDemand.rows[0].operation_id as string;
   assert.notEqual(nextOperation, operationId);
   const nextClaim = await database.transaction((tx) =>
     claimManualSandboxDispatch(tx, nodeId, nextOperation),
