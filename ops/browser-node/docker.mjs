@@ -142,6 +142,9 @@ export function containerSpec(nodeId, run, imageId, deadline) {
           // separate profile path. Keep runtime metadata ephemeral; account
           // storage is checkpointed by the persistence plugin into /data.
           "/root/.camoufox": "rw,nosuid,nodev,size=16m,mode=700",
+          // Firefox 152 also writes runtime metadata here before its control
+          // connection becomes ready. This is not the persisted account profile.
+          "/root/camoufox": "rw,nosuid,nodev,size=16m,mode=700",
         },
         Mounts: [{ Type: "volume", Source: volume, Target: "/data" }],
         NetworkMode: name,

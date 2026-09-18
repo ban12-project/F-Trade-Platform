@@ -32,6 +32,7 @@ deadline=$(( $(date +%s) * 1000 + 70000 ))
 docker run -d --name "$name" --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
   --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
+  --tmpfs /root/camoufox:rw,nosuid,nodev,size=16m,mode=700 \
   --tmpfs /data:rw,nosuid,nodev,size=64m,mode=700 \
   -e "FTRADE_LEASE_DEADLINE=$deadline" \
   -e BROWSER_IDLE_TIMEOUT_MS=900000 \
