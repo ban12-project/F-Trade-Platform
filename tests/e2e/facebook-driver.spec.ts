@@ -40,6 +40,11 @@ composer.querySelector('button').onclick=()=>{const count=document.querySelector
 
 for (const mode of [
   "text",
+  "post_link_hover",
+  "post_link_hover_receipt",
+  "post_link_hover_detached",
+  "post_link_unresolved",
+  "post_author_changed",
   "image",
   "video",
   "identity_changed",
@@ -92,7 +97,7 @@ for (const mode of [
               const dialog = document.createElement("section");
               dialog.id = "privacy";
               dialog.innerHTML =
-                '<input id="only-me" type="radio"><input id="default" type="checkbox" checked><button id="done">Done</button>';
+                '<label>Only me<input id="only-me" type="radio"></label><input id="default" type="checkbox" checked><button id="done">Done</button>';
               document.body.append(dialog);
               const option = dialog.querySelector<HTMLInputElement>("#only-me");
               const checkbox = dialog.querySelector<HTMLInputElement>("#default");
@@ -126,7 +131,41 @@ for (const mode of [
             input.type = "file";
             document.body.prepend(input);
           });
+        if (mode.startsWith("post_"))
+          await page.evaluate((scenario) => {
+            const composer = document.querySelector<HTMLElement>("#composer");
+            const submit = composer?.querySelector("button");
+            if (!composer || !submit) throw new Error("fixture missing");
+            submit.addEventListener("click", () => {
+              const author = document.querySelector<HTMLAnchorElement>("article .author");
+              const link = document.querySelector<HTMLAnchorElement>("article .permalink");
+              if (!author || !link) throw new Error("fixture missing");
+              author.href +=
+                scenario === "post_author_changed"
+                  ? "?id=wrong"
+                  : "?__cft__[0]=tracking&__tn__=tracking";
+              link.href = "https://www.facebook.com/profile.php#placeholder";
+              link.onmouseenter = () => {
+                if (scenario !== "post_link_unresolved")
+                  link.href =
+                    "https://www.facebook.com/synthetic/posts/1/?__cft__[0]=tracking&__tn__=tracking";
+              };
+              composer.hidden = true;
+            });
+          }, mode);
         return Response.json({ tabId: "synthetic-tab", url: profile.url });
+      }
+      if (endpoint.endsWith("/navigate")) {
+        expect([profile.url, profile.identityHref]).toContain(body.url);
+        await page.evaluate((url) => history.replaceState(null, "", url), String(body.url));
+        return Response.json({ ok: true });
+      }
+      if (endpoint === "/act") {
+        expect(body.kind).toBe("hover");
+        await page.locator(String(body.selector)).hover();
+        if (mode === "post_link_hover_detached")
+          return Response.json({ code: "element_not_actionable" }, { status: 422 });
+        return Response.json({ ok: true });
       }
       if (endpoint.endsWith("/evaluate")) {
         const expression = String(body.expression);
@@ -187,15 +226,19 @@ for (const mode of [
     let authorized = 0;
     const scopedProfile = {
       ...profile,
+      resolvePostLinks: mode.startsWith("post_"),
+      ...(mode === "post_link_hover_receipt" ? { receiptUrl: profile.identityHref } : {}),
       selectors: {
         ...profile.selectors,
+        ...(mode === "post_link_hover_receipt" ? { receiptIdentity: "#identity" } : {}),
         ...(mode.startsWith("composer_identity") ? { composerIdentity: "#composer-identity" } : {}),
       },
       ...(mode.startsWith("audience_selection") || mode === "audience_default_changed"
         ? {
             audienceSelection: {
               dialog: "#privacy",
-              option: "#only-me",
+              option: "input[type=radio]",
+              optionLabel: "Only me",
               defaultCheckbox: "#default",
               confirm: "#done",
             },
@@ -254,6 +297,9 @@ for (const mode of [
     });
     const success = [
       "text",
+      "post_link_hover",
+      "post_link_hover_receipt",
+      "post_link_hover_detached",
       "image",
       "video",
       "upload_replaces_composer",
@@ -261,11 +307,20 @@ for (const mode of [
       "audience_selection",
       "composer_identity_tracking",
     ].includes(mode);
-    const uncertain = ["transit_expiry", "audience_transit_change"].includes(mode);
+    const uncertain = [
+      "transit_expiry",
+      "audience_transit_change",
+      "post_link_unresolved",
+      "post_author_changed",
+    ].includes(mode);
     expect(result).toBe(success ? "completed" : uncertain ? "unknown" : "failed");
-    expect(await page.locator("#clicks").textContent()).toBe(success ? "1" : "0");
+    expect(await page.locator("#clicks").textContent()).toBe(
+      success || mode.startsWith("post_") ? "1" : "0",
+    );
     expect(receipts).toHaveLength(success || uncertain ? 1 : 0);
     if (uncertain) expect(receipts[0].outcome).toBe("unknown");
+    if (mode === "post_link_hover")
+      expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/synthetic/posts/1");
     expect(requests.some((url) => url.endsWith("/click"))).toBe(false);
     if (["wrong_attachment", "extra_file_input"].includes(mode)) expect(authorized).toBe(0);
   });
@@ -281,4 +336,29 @@ test("DOM profiles require a current review and fixed Facebook origin", () => {
   expect(() =>
     validateFacebookProfile({ ...profile, identityHref: "https://www.facebook.com/" }),
   ).toThrow();
+});
+
+test("text-only reviewed profiles reject media before browser navigation", async () => {
+  let requests = 0;
+  const driver = createFacebookDriver({ ...profile, textOnly: true }, async () => {
+    requests++;
+    throw new Error("must not navigate");
+  });
+  await expect(
+    driver.open(
+      {
+        kind: "publish",
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
+        publication: {
+          accountRef: profile.accountRef,
+          channelRef: profile.channelRef,
+          text: "SYNTHETIC",
+          format: "video",
+        },
+      },
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow("facebook_profile_format_unreviewed");
+  expect(requests).toBe(0);
 });
