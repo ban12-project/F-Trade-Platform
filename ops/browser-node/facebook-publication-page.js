@@ -16,33 +16,154 @@ function inspectPage(profile, action) {
   };
   const enabled = (element) =>
     !element.disabled && element.getAttribute("aria-disabled") !== "true";
-  const identity = one(document, profile.selectors.identity);
-  if (identity.href !== profile.identityHref) throw new Error("facebook_identity_changed");
+  // Remove only observed Facebook navigation tracking. Preserve identity queries.
+  const identityHref = (href) => {
+    const url = new URL(href);
+    url.searchParams.delete("__tn__");
+    for (const part of url.search.slice(1).split("&")) {
+      const key = decodeURIComponent(part.split("=")[0]);
+      if (/^__cft__\[\d+\]$/.test(key)) url.searchParams.delete(key);
+    }
+    return url.href;
+  };
+  if (
+    action.kind.startsWith("audience-") &&
+    !["audience-open", "audience-applied"].includes(action.kind)
+  ) {
+    const selection = profile.audienceSelection;
+    if (!selection) throw new Error("facebook_audience_selection_unconfigured");
+    const dialogs = all(document, selection.dialog);
+    if (action.kind === "audience-picker-ready" && !dialogs.length) return false;
+    const dialog = one(document, selection.dialog);
+    const options = all(dialog, selection.option).filter((element) => {
+      if (!selection.optionLabel) return true;
+      const labels = [...(element.labels ?? [])].map((label) => label.innerText.trim());
+      return labels.length === 1 && labels[0] === selection.optionLabel;
+    });
+    if (action.kind === "audience-picker-ready" && !options.length) return false;
+    if (options.length !== 1) throw new Error("facebook_control_ambiguous");
+    const option = options[0];
+    const defaultCheckbox = one(dialog, selection.defaultCheckbox);
+    const checked = (element) =>
+      element.checked === true || element.getAttribute("aria-checked") === "true";
+    if (action.kind === "audience-picker-ready") return true;
+    if (action.kind === "audience-select") {
+      if (!enabled(option)) throw new Error("facebook_audience_disabled");
+      if (!checked(option)) option.click();
+      return true;
+    }
+    const selected = checked(option) && !checked(defaultCheckbox);
+    if (action.kind === "audience-selection-ready") return selected;
+    if (action.kind !== "audience-confirm" || !selected)
+      throw new Error("facebook_audience_selection_changed");
+    const confirm = one(dialog, selection.confirm);
+    if (!enabled(confirm)) throw new Error("facebook_audience_disabled");
+    confirm.click();
+    return true;
+  }
+  const composers = all(document, profile.selectors.composer);
+  if (action.kind === "composer-closed") return composers.length === 0;
+  if (["composer-ready", "audience-applied"].includes(action.kind)) {
+    if (!composers.length) return false;
+    const composer = one(document, profile.selectors.composer);
+    const textboxes = all(composer, profile.selectors.textbox);
+    if (textboxes.length > 1) throw new Error("facebook_control_ambiguous");
+    if (textboxes.length !== 1) return false;
+    if (profile.selectors.composerIdentity) {
+      const identities = all(composer, profile.selectors.composerIdentity);
+      if (identities.length > 1) throw new Error("facebook_control_ambiguous");
+      if (!identities.length) return false;
+    }
+    if (action.kind === "audience-applied") {
+      const audiences = all(composer, profile.selectors.audience);
+      if (audiences.length > 1) throw new Error("facebook_control_ambiguous");
+      return audiences.length === 1 && audiences[0].innerText.trim() === profile.audienceText;
+    }
+    return true;
+  }
+  const identitySelector =
+    profile.receiptUrl && location.href === profile.receiptUrl
+      ? profile.selectors.receiptIdentity
+      : profile.selectors.identity;
+  if (action.kind === "identity-ready") {
+    const identities = all(document, identitySelector);
+    if (identities.length > 1) throw new Error("facebook_control_ambiguous");
+    return identities.length === 1;
+  }
+  const identity =
+    profile.selectors.composerIdentity && composers.length
+      ? one(one(document, profile.selectors.composer), profile.selectors.composerIdentity)
+      : one(document, identitySelector);
+  if (identityHref(identity.href) !== identityHref(profile.identityHref))
+    throw new Error("facebook_identity_changed");
   if (action.kind === "identity")
     return { accountRef: profile.accountRef, channelRef: profile.channelRef };
-  if (action.kind === "posts") {
+  if (action.kind === "posts-ready") return all(document, profile.selectors.postsReady).length > 0;
+  if (["posts", "post-count"].includes(action.kind)) {
     const posts = all(document, profile.selectors.post);
     if (posts.length > 100) throw new Error("facebook_post_scan_limit");
-    return posts.map((post) => {
-      const author = one(post, profile.selectors.postAuthor);
-      const link = one(post, profile.selectors.postLink);
-      return {
-        accountRef: author.href === profile.identityHref ? profile.accountRef : null,
-        channelRef: profile.channelRef,
-        text: one(post, profile.selectors.postText).innerText,
-        externalPublicationRef: link.href,
-      };
-    });
+    if (action.kind === "post-count") return posts.length;
+    return posts
+      .filter(
+        (post) =>
+          action.text === undefined ||
+          one(post, profile.selectors.postText).innerText === action.text,
+      )
+      .map((post) => {
+        const author = one(post, profile.selectors.postAuthor);
+        const link = one(post, profile.selectors.postLink);
+        return {
+          accountRef:
+            identityHref(author.href) === identityHref(profile.identityHref)
+              ? profile.accountRef
+              : null,
+          channelRef: profile.channelRef,
+          text: one(post, profile.selectors.postText).innerText,
+          externalPublicationRef: (() => {
+            const url = new URL(identityHref(link.href));
+            if (
+              url.origin !== "https://www.facebook.com" ||
+              url.username ||
+              url.password ||
+              url.hash ||
+              !(
+                /^\/[^/]+\/posts\/[^/]+\/?$/.test(url.pathname) ||
+                /^\/(reel|videos)\/\d+\/?$/.test(url.pathname) ||
+                (url.pathname === "/permalink.php" &&
+                  url.searchParams.has("story_fbid") &&
+                  url.searchParams.has("id"))
+              )
+            )
+              return null;
+            url.pathname = url.pathname.replace(/\/$/, "");
+            return url.href;
+          })(),
+        };
+      });
   }
   if (action.kind === "open") {
     if (!all(document, profile.selectors.composer).length) {
-      const button = one(document, profile.selectors.openComposer);
+      const buttons = all(document, profile.selectors.openComposer).filter(
+        (element) =>
+          !profile.openComposerText || element.innerText.trim() === profile.openComposerText,
+      );
+      if (buttons.length !== 1) throw new Error("facebook_control_ambiguous");
+      const button = buttons[0];
       if (!enabled(button)) throw new Error("facebook_composer_disabled");
       button.click();
     }
     return true;
   }
   const composer = one(document, profile.selectors.composer);
+  const audience = one(composer, profile.selectors.audience);
+  if (action.kind === "audience-open") {
+    if (audience.innerText.trim() === profile.audienceText) return false;
+    if (!enabled(audience)) throw new Error("facebook_audience_disabled");
+    audience.click();
+    return true;
+  }
+  if (audience.innerText.trim() !== profile.audienceText)
+    throw new Error("facebook_audience_changed");
   const textbox = one(composer, profile.selectors.textbox);
   const submit = one(composer, profile.selectors.submit);
   const attachments = all(composer, profile.selectors.attachmentName);

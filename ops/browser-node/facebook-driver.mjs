@@ -10,6 +10,7 @@ const selectors = [
   "composer",
   "textbox",
   "submit",
+  "audience",
   "fileInput",
   "attachmentName",
   "post",
@@ -30,6 +31,12 @@ export function validateFacebookProfile(value, now = Date.now()) {
     !/^evidence-[a-z0-9_-]{3,120}$/i.test(value.reviewRef ?? "")
   )
     throw new Error("facebook_profile_unreviewed");
+  if (
+    typeof value.audienceText !== "string" ||
+    !value.audienceText.trim() ||
+    value.audienceText.length > 100
+  )
+    throw new Error("facebook_profile_audience_missing");
   const reviewed = Date.parse(value.reviewedAt);
   const expires = Date.parse(value.expiresAt);
   if (
@@ -60,6 +67,65 @@ export function validateFacebookProfile(value, now = Date.now()) {
         value.selectors[key].length > 500 ||
         value.selectors[key].includes(","),
     )
+  )
+    throw new Error("facebook_profile_selector_invalid");
+  if (
+    value.selectors.composerIdentity !== undefined &&
+    (typeof value.selectors.composerIdentity !== "string" ||
+      !value.selectors.composerIdentity.trim() ||
+      value.selectors.composerIdentity.length > 500)
+  )
+    throw new Error("facebook_profile_selector_invalid");
+  if (
+    value.openComposerText !== undefined &&
+    (typeof value.openComposerText !== "string" ||
+      !value.openComposerText.trim() ||
+      value.openComposerText.length > 200)
+  )
+    throw new Error("facebook_profile_selector_invalid");
+  if (
+    value.audienceSelection !== undefined &&
+    ["dialog", "option", "defaultCheckbox", "confirm"].some(
+      (key) =>
+        typeof value.audienceSelection?.[key] !== "string" ||
+        !value.audienceSelection[key].trim() ||
+        value.audienceSelection[key].length > 500,
+    )
+  )
+    throw new Error("facebook_profile_audience_selection_invalid");
+  if (
+    value.audienceSelection?.optionLabel !== undefined &&
+    (typeof value.audienceSelection.optionLabel !== "string" ||
+      !value.audienceSelection.optionLabel.trim() ||
+      value.audienceSelection.optionLabel.length > 100)
+  )
+    throw new Error("facebook_profile_audience_selection_invalid");
+  if (value.resolvePostLinks !== undefined && typeof value.resolvePostLinks !== "boolean")
+    throw new Error("facebook_profile_selector_invalid");
+  if (value.textOnly !== undefined && typeof value.textOnly !== "boolean")
+    throw new Error("facebook_profile_format_invalid");
+  if (value.receiptUrl !== undefined) {
+    const receipt = new URL(value.receiptUrl);
+    if (
+      receipt.href !== value.identityHref ||
+      typeof value.selectors.receiptIdentity !== "string" ||
+      !value.selectors.receiptIdentity.trim() ||
+      value.selectors.receiptIdentity.length > 500
+    )
+      throw new Error("facebook_profile_receipt_scope_invalid");
+  }
+  if (
+    value.selectors.postHover !== undefined &&
+    (typeof value.selectors.postHover !== "string" ||
+      !value.selectors.postHover.trim() ||
+      value.selectors.postHover.length > 500)
+  )
+    throw new Error("facebook_profile_selector_invalid");
+  if (
+    value.selectors.postsReady !== undefined &&
+    (typeof value.selectors.postsReady !== "string" ||
+      !value.selectors.postsReady.trim() ||
+      value.selectors.postsReady.length > 500)
   )
     throw new Error("facebook_profile_selector_invalid");
   return structuredClone(value);
@@ -103,8 +169,72 @@ export function createFacebookDriver(input, browserRequest) {
     if (!result.ok) throw new Error("facebook_evaluation_failed");
     return result.result;
   };
+  const waitFor = async (session, kind) => {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      if (await evaluate(session, { kind })) return;
+      await delay(250, undefined, { signal: session.signal });
+    }
+    throw new Error("facebook_composer_transition_timeout");
+  };
+  const navigate = async (session, url) => {
+    const response = await json(
+      await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/navigate`, {
+        userId: session.accountId,
+        url,
+      }),
+    );
+    if (!response.ok) throw new Error("facebook_navigation_invalid");
+    await waitFor(session, "identity-ready");
+    await evaluate(session, { kind: "identity" });
+  };
+  const readPosts = async (session, text) => {
+    if (profile.receiptUrl && !session.readingReceipts) {
+      await navigate(session, profile.receiptUrl);
+      session.readingReceipts = true;
+    }
+    if (profile.selectors.postsReady) await waitFor(session, "posts-ready");
+    const resolveLinks = async () => {
+      if (!profile.resolvePostLinks) return;
+      const count = await evaluate(session, { kind: "post-count" });
+      for (let index = 0; index < count; index++) {
+        const response = await browserRequest("/act", {
+          kind: "hover",
+          targetId: session.tabId,
+          userId: session.accountId,
+          selector: `${profile.selectors.post} >> nth=${index} >> ${profile.selectors.postHover ?? profile.selectors.postLink}`,
+        });
+        // Facebook can replace the timestamp during hover. A read-only hover
+        // may then time out after resolving the href; the page validation below
+        // must still prove a real permalink. Never retry a publication click.
+        if (response.status === 422) {
+          const failure = await response.clone().json();
+          if (failure.code !== "element_not_actionable")
+            throw new Error("facebook_permalink_hover_failed");
+        } else if (!(await json(response)).ok) {
+          throw new Error("facebook_permalink_hover_failed");
+        }
+      }
+    };
+    if (text === undefined) return evaluate(session, { kind: "posts" });
+    await resolveLinks();
+    for (let attempt = 0; attempt < 20; attempt++) {
+      if (attempt === 5) await resolveLinks();
+      try {
+        const posts = await evaluate(session, { kind: "posts", text });
+        if (posts.every((post) => post.externalPublicationRef !== null)) return posts;
+      } catch (error) {
+        // Reading can race the timestamp replacement. Retry observations only;
+        // every successful observation still validates identity and exact DOM.
+        if (attempt === 19 || session.signal.aborted) throw error;
+      }
+      await delay(250, undefined, { signal: session.signal });
+    }
+    throw new Error("facebook_permalink_unresolved");
+  };
   return {
     async open(run, signal) {
+      if (profile.textOnly && run.publication?.format !== "text")
+        throw new Error("facebook_profile_format_unreviewed");
       if (
         run.accountRef !== profile.accountRef ||
         run.channelRef !== profile.channelRef ||
@@ -130,14 +260,34 @@ export function createFacebookDriver(input, browserRequest) {
         expected: null,
       };
     },
-    identity: (session) => evaluate(session, { kind: "identity" }),
+    async identity(session) {
+      await waitFor(session, "identity-ready");
+      return evaluate(session, { kind: "identity" });
+    },
     async existingPublicationRefs(session) {
-      const posts = await evaluate(session, { kind: "posts" });
-      session.baseline = new Set(posts.map((post) => post.externalPublicationRef));
+      const posts = await readPosts(session);
+      session.baseline = new Set(posts.map((post) => post.externalPublicationRef).filter(Boolean));
+      session.existingTexts = new Set(
+        posts.filter((post) => post.accountRef === profile.accountRef).map((post) => post.text),
+      );
       return [...session.baseline];
     },
     async prepare(session, payload, upload) {
+      if (session.existingTexts?.has(payload.text))
+        throw new Error("facebook_matching_post_already_exists");
+      if (session.readingReceipts) {
+        await navigate(session, profile.url);
+        session.readingReceipts = false;
+      }
       await evaluate(session, { kind: "open" });
+      await waitFor(session, "composer-ready");
+      if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
+        await waitFor(session, "audience-picker-ready");
+        await evaluate(session, { kind: "audience-select" });
+        await waitFor(session, "audience-selection-ready");
+        await evaluate(session, { kind: "audience-confirm" });
+        await waitFor(session, "audience-applied");
+      }
       await evaluate(session, { kind: "inspect" });
       if (upload) {
         await evaluate(session, { kind: "upload-check" });
@@ -191,8 +341,9 @@ export function createFacebookDriver(input, browserRequest) {
       });
     },
     async observe(session, payload, signal) {
+      if (profile.receiptUrl) await waitFor(session, "composer-closed");
       for (let attempt = 0; attempt < 20; attempt++) {
-        const posts = await evaluate(session, { kind: "posts" });
+        const posts = await readPosts(session, payload.text);
         const matches = posts.filter(
           (post) =>
             post.accountRef === profile.accountRef &&

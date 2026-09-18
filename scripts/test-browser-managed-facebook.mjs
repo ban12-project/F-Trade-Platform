@@ -25,6 +25,7 @@ const profile = (inbox = false) => ({
   expiresAt: new Date(Date.now() + 3600000).toISOString(),
   url: inbox ? "https://www.facebook.com/messages/" : "https://www.facebook.com/",
   identityHref: "https://www.facebook.com/synthetic-account",
+  ...(!inbox ? { audienceText: "Only me" } : {}),
   selectors: Object.fromEntries(
     (inbox
       ? [
@@ -51,6 +52,7 @@ const profile = (inbox = false) => ({
           "composer",
           "textbox",
           "submit",
+          "audience",
           "fileInput",
           "attachmentName",
           "post",
