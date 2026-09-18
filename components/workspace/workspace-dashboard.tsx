@@ -8,9 +8,8 @@ import {
   InboxIcon,
   ShieldCheckIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Empty,
@@ -58,11 +57,11 @@ function TaskRows({ tasks, empty }: { tasks: WorkspaceTaskSummary[]; empty: stri
                 {task.actionLabel ?? (task.priority === "review" ? "审核" : "处理")}
               </Badge>
             </div>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
+            <p className="mt-1 break-words text-sm text-muted-foreground">
               {task.projectTitle} · {task.detail}
             </p>
           </div>
-          <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
+          <ArrowRightIcon className="workspace-task-arrow size-4 shrink-0 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
         </Link>
       ))}
     </div>
@@ -95,7 +94,7 @@ export function WorkspaceDashboard({
   const pendingCount = tasks.length + inbound.length;
   return (
     <WorkspaceDirtyProvider>
-      <main id="main-content" className="min-h-screen bg-muted/30 pb-24">
+      <main id="main-content" tabIndex={-1} className="workspace-page bg-muted/30">
         <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-xl">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
             <div>
@@ -112,24 +111,39 @@ export function WorkspaceDashboard({
           </div>
         </header>
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
-          <aside className="hidden lg:block">
-            <nav aria-label="工作台栏目" className="sticky top-24 flex flex-col gap-1">
-              <Button render={<a href="#my-tasks" />} variant="ghost" className="justify-start">
+          <aside className="min-w-0">
+            <nav
+              aria-label="工作台栏目"
+              className="flex flex-wrap gap-1 lg:sticky lg:top-24 lg:flex-col"
+            >
+              <a
+                href="#my-tasks"
+                className={buttonVariants({ variant: "ghost", className: "justify-start" })}
+              >
                 <InboxIcon data-icon="inline-start" />
                 我的待办
-              </Button>
-              <Button render={<a href="#approvals" />} variant="ghost" className="justify-start">
+              </a>
+              <a
+                href="#approvals"
+                className={buttonVariants({ variant: "ghost", className: "justify-start" })}
+              >
                 <ShieldCheckIcon data-icon="inline-start" />
                 待审批
-              </Button>
-              <Button render={<a href="#follow-ups" />} variant="ghost" className="justify-start">
+              </a>
+              <a
+                href="#follow-ups"
+                className={buttonVariants({ variant: "ghost", className: "justify-start" })}
+              >
                 <Clock3Icon data-icon="inline-start" />
                 到期跟进
-              </Button>
-              <Button render={<a href="#pipeline" />} variant="ghost" className="justify-start">
+              </a>
+              <a
+                href="#pipeline"
+                className={buttonVariants({ variant: "ghost", className: "justify-start" })}
+              >
                 <GitBranchIcon data-icon="inline-start" />
                 项目 / 线索 Pipeline
-              </Button>
+              </a>
             </nav>
           </aside>
           <div className="min-w-0 space-y-8">
@@ -149,7 +163,7 @@ export function WorkspaceDashboard({
                 </Card>
               ))}
             </section>
-            <section id="my-tasks" className="scroll-mt-24">
+            <section id="my-tasks" tabIndex={-1} className="scroll-mt-24">
               <Card>
                 <CardHeader>
                   <CardTitle role="heading" aria-level={2}>
@@ -169,7 +183,7 @@ export function WorkspaceDashboard({
               </Card>
             </section>
             <div className="grid gap-6 xl:grid-cols-2">
-              <section id="approvals" className="scroll-mt-24">
+              <section id="approvals" tabIndex={-1} className="scroll-mt-24">
                 <Card className="h-full">
                   <CardHeader>
                     <CardTitle role="heading" aria-level={2}>
@@ -182,7 +196,7 @@ export function WorkspaceDashboard({
                   </CardContent>
                 </Card>
               </section>
-              <section id="follow-ups" className="scroll-mt-24">
+              <section id="follow-ups" tabIndex={-1} className="scroll-mt-24">
                 <Card className="h-full">
                   <CardHeader>
                     <CardTitle role="heading" aria-level={2}>
@@ -196,13 +210,26 @@ export function WorkspaceDashboard({
                 </Card>
               </section>
             </div>
-            <section id="pipeline" className="scroll-mt-24">
+            <section id="pipeline" tabIndex={-1} className="scroll-mt-24">
               <div className="mb-3">
                 <h2 className="text-lg font-semibold tracking-tight">项目 / 线索 Pipeline</h2>
                 <p className="text-sm text-muted-foreground">
                   选择项目后直接进入当前步骤；营销成果与销售线索的跨项目关系在此汇总。
                 </p>
               </div>
+              {!pipeline.length ? (
+                <Empty className="rounded-xl border bg-background">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <GitBranchIcon />
+                    </EmptyMedia>
+                    <EmptyTitle>还没有项目</EmptyTitle>
+                    <EmptyDescription>
+                      使用底部“新建项目”开始；创建后会引导你完成第一项业务步骤。
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : null}
               <div className="grid gap-3 md:grid-cols-2">
                 {pipeline.map((item) => (
                   <Link
@@ -210,7 +237,7 @@ export function WorkspaceDashboard({
                     href={`/workspace/${item.id}`}
                     className="rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
-                    <Card className="h-full transition-[transform,box-shadow] duration-[120ms] hover:-translate-y-0.5 hover:shadow-md">
+                    <Card className="workspace-pipeline-card h-full transition-[transform,box-shadow] duration-[120ms] hover:-translate-y-0.5 hover:shadow-md">
                       <CardHeader>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">

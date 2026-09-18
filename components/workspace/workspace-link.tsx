@@ -1,19 +1,32 @@
 "use client";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
 import type { ComponentProps } from "react";
+import { cn } from "@/lib/utils";
 import { useWorkspaceDirtyState } from "./dirty-state";
 
 type Props = Omit<ComponentProps<typeof Link>, "href" | "onNavigate"> & {
   href: string;
   onFollow?: () => void;
 };
-export function WorkspaceLink({ href, onFollow, ...props }: Props) {
+function NavigationProgress() {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden="true"
+      className="workspace-link-progress"
+      data-pending={pending || undefined}
+    />
+  );
+}
+
+export function WorkspaceLink({ href, onFollow, children, className, ...props }: Props) {
   const router = useRouter();
   const { dirty, requestNavigation } = useWorkspaceDirtyState();
   return (
     <Link
       {...props}
+      className={cn("workspace-link", className)}
       href={href}
       onNavigate={(event) => {
         if (!dirty) {
@@ -27,6 +40,9 @@ export function WorkspaceLink({ href, onFollow, ...props }: Props) {
           else router.push(href, { scroll: props.scroll });
         });
       }}
-    />
+    >
+      {children}
+      <NavigationProgress />
+    </Link>
   );
 }

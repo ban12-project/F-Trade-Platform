@@ -3,7 +3,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckSquareIcon, FolderOpenIcon, PlusIcon, SaveIcon, Settings2Icon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { type ReactNode, startTransition, useActionState, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  startTransition,
+  useActionState,
+  useEffect,
+  useId,
+  useState,
+} from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
@@ -46,12 +54,14 @@ type DockPanel = "projects" | "tasks" | "tools" | null;
 const initialState: WorkspaceActionState = { status: "idle", message: "" };
 
 function DockPanelContent({
+  id,
   title,
   description,
   children,
   open,
   onOpenChange,
 }: {
+  id: string;
   title: string;
   description: string;
   children: ReactNode;
@@ -62,18 +72,24 @@ function DockPanelContent({
   if (mobile)
     return (
       <Drawer open={open} onOpenChange={onOpenChange} showSwipeHandle>
-        <DrawerContent>
+        <DrawerContent id={id} className="h-[85dvh]">
           <DrawerHeader>
             <DrawerTitle>{title}</DrawerTitle>
             <DrawerDescription>{description}</DrawerDescription>
           </DrawerHeader>
           <div className="min-h-0 flex-1">{children}</div>
+          <div className="shrink-0 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <DrawerClose render={<Button variant="outline" className="w-full" />}>
+              关闭{title}
+            </DrawerClose>
+          </div>
         </DrawerContent>
       </Drawer>
     );
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
+        id={id}
         side="right"
         showOverlay={false}
         className="bottom-24 top-20 h-auto gap-0 rounded-l-2xl border-y bg-popover/95 backdrop-blur-xl sm:max-w-md"
@@ -109,6 +125,14 @@ export function WorkspaceActionDock({
 }) {
   const router = useRouter();
   const params = useParams();
+  const id = useId();
+  const projectsPanelId = `${id}-projects`;
+  const tasksPanelId = `${id}-tasks`;
+  const toolsPanelId = `${id}-tools`;
+  const createDialogId = `${id}-create`;
+  const titleInputId = `${id}-title`;
+  const titleErrorId = `${id}-title-error`;
+  const kindLabelId = `${id}-kind-label`;
   const activeProjectId =
     typeof params.projectId === "string" ? params.projectId : initialActiveProjectId;
   const { requestNavigation, discardVersion } = useWorkspaceDirtyState();
@@ -154,22 +178,28 @@ export function WorkspaceActionDock({
       <nav
         aria-label="工作台操作"
         data-testid="workspace-action-dock"
-        className="fixed bottom-[calc(.75rem+env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1 rounded-2xl border bg-background/90 p-1.5 shadow-lg backdrop-blur-xl md:bottom-6"
+        className="workspace-dock rounded-2xl border bg-background/90 shadow-lg backdrop-blur-xl"
       >
         <Button
           aria-label="项目"
-          className="min-h-11 min-w-11"
+          aria-haspopup="dialog"
+          aria-expanded={panel === "projects"}
+          aria-controls={panel === "projects" ? projectsPanelId : undefined}
+          className="h-auto min-h-11 min-w-11 flex-col gap-1 px-2 py-2 sm:flex-row sm:py-0"
           variant="ghost"
           onClick={() => setPanel("projects")}
         >
           <FolderOpenIcon data-icon="inline-start" />
-          <span aria-hidden="true" className="hidden sm:inline">
+          <span aria-hidden="true" className="text-xs sm:text-sm">
             项目
           </span>
         </Button>
         <Button
           aria-label="新建项目"
-          className="min-h-11 min-w-11"
+          aria-haspopup="dialog"
+          aria-expanded={createOpen}
+          aria-controls={createOpen ? createDialogId : undefined}
+          className="h-auto min-h-11 min-w-11 flex-col gap-1 px-2 py-2 sm:flex-row sm:py-0"
           variant="ghost"
           onClick={() => {
             setPanel(null);
@@ -177,32 +207,43 @@ export function WorkspaceActionDock({
           }}
         >
           <PlusIcon data-icon="inline-start" />
-          <span aria-hidden="true" className="hidden sm:inline">
+          <span aria-hidden="true" className="text-xs sm:text-sm">
             新建项目
           </span>
         </Button>
         <Button
           aria-label={`待办${tasks.length ? `，${tasks.length} 项` : ""}`}
-          className="min-h-11 min-w-11"
+          aria-haspopup="dialog"
+          aria-expanded={panel === "tasks"}
+          aria-controls={panel === "tasks" ? tasksPanelId : undefined}
+          className="h-auto min-h-11 min-w-11 flex-col gap-1 px-2 py-2 sm:flex-row sm:py-0"
           variant="ghost"
           onClick={() => setPanel("tasks")}
         >
           <CheckSquareIcon data-icon="inline-start" />
-          <span aria-hidden="true" className="hidden sm:inline">
+          <span aria-hidden="true" className="flex items-center gap-1 text-xs sm:text-sm">
             待办
+            {tasks.length ? (
+              <Badge variant="secondary" className="tabular-nums">
+                {tasks.length}
+              </Badge>
+            ) : null}
           </span>
-          {tasks.length ? <Badge variant="secondary">{tasks.length}</Badge> : null}
         </Button>
         {settingsPanel ? (
           <Button
             aria-label="账号与工具"
-            className="min-h-11 min-w-11"
+            aria-haspopup="dialog"
+            aria-expanded={panel === "tools"}
+            aria-controls={panel === "tools" ? toolsPanelId : undefined}
+            className="h-auto min-h-11 min-w-11 flex-col gap-1 px-2 py-2 sm:flex-row sm:py-0"
             variant="ghost"
             onClick={() => setPanel("tools")}
           >
             <Settings2Icon data-icon="inline-start" />
-            <span aria-hidden="true" className="hidden sm:inline">
-              账号与工具
+            <span aria-hidden="true" className="text-xs sm:text-sm">
+              <span className="sm:hidden">工具</span>
+              <span className="hidden sm:inline">账号与工具</span>
             </span>
           </Button>
         ) : null}
@@ -219,6 +260,7 @@ export function WorkspaceActionDock({
         ) : null}
       </nav>
       <DockPanelContent
+        id={projectsPanelId}
         title="项目"
         description="切换项目后直接进入当前业务步骤。"
         open={panel === "projects"}
@@ -232,6 +274,7 @@ export function WorkspaceActionDock({
                 className: "justify-start",
               })}
               href={basePath}
+              aria-current={!activeProjectId ? "page" : undefined}
               onFollow={() => setPanel(null)}
             >
               工作台
@@ -260,6 +303,7 @@ export function WorkspaceActionDock({
         </ScrollArea>
       </DockPanelContent>
       <DockPanelContent
+        id={tasksPanelId}
         title="跨项目待办"
         description="按优先级汇总，打开后直接定位到所属项目步骤和记录。"
         open={panel === "tasks"}
@@ -303,6 +347,7 @@ export function WorkspaceActionDock({
       </DockPanelContent>
       {settingsPanel ? (
         <DockPanelContent
+          id={toolsPanelId}
           title="工具与账号"
           description="管理团队、模型、渠道和账号边界。"
           open={panel === "tools"}
@@ -314,30 +359,38 @@ export function WorkspaceActionDock({
         </DockPanelContent>
       ) : null}
       <Dialog open={createOpen} onOpenChange={changeCreateOpen}>
-        <DialogContent>
+        <DialogContent id={createDialogId}>
           <DialogHeader>
             <DialogTitle>新建项目</DialogTitle>
             <DialogDescription>创建后立即进入项目的第一项待处理步骤。</DialogDescription>
           </DialogHeader>
-          <form className="min-h-0 overflow-y-auto" onSubmit={form.handleSubmit(submit)}>
+          <form
+            className="min-h-0 overflow-y-auto"
+            noValidate
+            aria-busy={pending}
+            onSubmit={form.handleSubmit(submit)}
+          >
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.title}>
-                <FieldLabel htmlFor="workspace-title">项目名称</FieldLabel>
+                <FieldLabel htmlFor={titleInputId}>项目名称</FieldLabel>
                 <Input
-                  id="workspace-title"
+                  id={titleInputId}
+                  required
                   placeholder="例如：离合器新品推广"
                   aria-invalid={!!form.formState.errors.title}
+                  aria-describedby={form.formState.errors.title ? titleErrorId : undefined}
                   {...form.register("title")}
                 />
-                <FieldError>{form.formState.errors.title?.message}</FieldError>
+                <FieldError id={titleErrorId}>{form.formState.errors.title?.message}</FieldError>
               </Field>
               <Field>
-                <FieldLabel>项目类型</FieldLabel>
+                <FieldLabel id={kindLabelId}>项目类型</FieldLabel>
                 <Controller
                   control={form.control}
                   name="kind"
                   render={({ field }) => (
                     <ToggleGroup
+                      aria-labelledby={kindLabelId}
                       value={[field.value]}
                       onValueChange={(value) => value[0] && field.onChange(value[0])}
                       variant="outline"
@@ -355,8 +408,11 @@ export function WorkspaceActionDock({
               </Button>
             </FieldGroup>
           </form>
+          <p role="status" className="sr-only">
+            {pending ? "正在创建项目，请勿重复提交。" : ""}
+          </p>
           {state.status === "error" ? (
-            <p className="text-sm text-destructive" aria-live="polite">
+            <p className="text-sm text-destructive" role="alert">
               {state.message}
             </p>
           ) : null}

@@ -111,7 +111,7 @@ function ProjectWorkspaceFrameInner({
     requestNavigation(() => router.push("/workspace"));
   }
   return (
-    <main id="main-content" className="min-h-screen bg-muted/30 pb-24">
+    <main id="main-content" tabIndex={-1} className="workspace-page bg-muted/30">
       <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
@@ -150,7 +150,7 @@ export function ProjectWorkspaceFrame(props: ProjectWorkspaceFrameProps) {
 }
 
 export function ProjectWorkspaceTitle({ project }: { project: WorkspaceProjectSummary }) {
-  return <h1 className="truncate text-lg font-semibold tracking-tight">{project.title}</h1>;
+  return <h1 className="break-words text-lg font-semibold tracking-tight">{project.title}</h1>;
 }
 
 export function ProjectWorkspaceBadges({ project }: { project: WorkspaceProjectSummary }) {
@@ -173,7 +173,7 @@ export function ProjectWorkspaceBody({
 }) {
   return (
     <div className="mx-auto max-w-[96rem] px-4 py-5 sm:px-6">
-      <nav aria-label="项目阶段" className="overflow-x-auto pb-2">
+      <nav aria-label="项目阶段" className="overflow-x-auto overscroll-x-contain p-2">
         {navigation}
       </nav>
       <section
@@ -205,7 +205,7 @@ export function ProjectStageNavigation({
             <GuardedLink
               href={href}
               current={item.id === activeStage}
-              className={`flex min-h-14 w-40 flex-col justify-center rounded-xl border px-3 outline-none transition-[background-color,border-color,transform] duration-[120ms] active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/50 ${item.id === activeStage ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+              className={`workspace-stage-link flex min-h-14 w-40 flex-col justify-center rounded-xl border px-3 outline-none transition-[background-color,border-color,transform] duration-[120ms] active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/50 ${item.id === activeStage ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
             >
               <span className="text-xs opacity-75">步骤 {index + 1}</span>
               <span className="text-sm font-medium">{item.label}</span>
@@ -231,7 +231,7 @@ export function ProjectStageDetails({ stage, panel }: { stage: ProjectStage; pan
           <CardDescription>批准、发送、发布和业务认定都需要明确的人工操作。</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-17rem)] min-h-[32rem]">
+          <ScrollArea className="workspace-details-scroll">
             <div className="p-4 sm:p-5">{panel}</div>
           </ScrollArea>
         </CardContent>
@@ -321,7 +321,7 @@ export function ProjectStageTasks({
             待处理事项
           </CardTitle>
           <CardDescription>
-            先处理这里的下一动作；也可以在右侧新建或查看本步骤的业务记录。
+            先处理这里的下一动作；也可以在详情区新建或查看本步骤的业务记录。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -335,18 +335,18 @@ export function ProjectStageTasks({
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{task.title}</p>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">{task.detail}</p>
+                    <p className="mt-1 break-words text-sm text-muted-foreground">{task.detail}</p>
                   </div>
                   <Badge variant={task.priority === "review" ? "default" : "secondary"}>
                     {task.actionLabel ?? "打开"}
                   </Badge>
-                  <ArrowRightIcon className="size-4 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
+                  <ArrowRightIcon className="workspace-task-arrow size-4 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
                 </GuardedLink>
               ))}
             </div>
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              本步骤暂无待处理事项，可在右侧创建或查看业务记录。
+              本步骤暂无待处理事项，可在详情区创建或查看业务记录。
             </p>
           )}
         </CardContent>
