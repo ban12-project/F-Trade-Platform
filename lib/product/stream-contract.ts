@@ -69,7 +69,7 @@ export const productStreamEventSchema = z.discriminatedUnion("type", [
   z.strictObject({
     ...envelope,
     type: z.literal("error"),
-    code: z.enum(["run_failed", "interrupted"]),
+    code: z.enum(["run_failed", "interrupted", "no_accepted_fields"]),
     message: z.string().max(500),
   }),
 ]);

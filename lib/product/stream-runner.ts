@@ -48,6 +48,7 @@ export async function* runProductStream(
       yield event({ type: "field", field, status: "waiting", value: null, evidenceRef: null });
     yield event({ type: "stage", stage: "generating" });
     let count = 0;
+    let acceptedCount = 0;
     const seen = new Set<string>();
     for await (const proposal of dependencies.proposals(source)) {
       dependencies.signal.throwIfAborted();
@@ -57,6 +58,7 @@ export async function* runProductStream(
       if (checked.status === "source_validated") {
         const saved = await dependencies.persist(checked.draft);
         draft = checked.draft;
+        acceptedCount++;
         yield event({ type: "draft", ...saved });
       }
       yield event({ type: "field", ...checked.proposal, status: checked.status });
@@ -71,6 +73,18 @@ export async function* runProductStream(
           value: null,
           evidenceRef: null,
         });
+    }
+    if (acceptedCount === 0) {
+      await dependencies.finish("failed");
+      finished = true;
+      yield event({
+        type: "error",
+        code: "no_accepted_fields",
+        message:
+          "未提取到可由来源验证的字段，本次导入未成功。请检查资料内容、表头和字段证据后重试。CSV 可使用：Product name、Product type、Internal SKU、OE、Application、Vehicle brand、Vehicle model；不支持 product_name 等下划线表头。空草稿保留用于核查，不能用于发布或报价。",
+      });
+      yield event({ type: "stage", stage: "failed" });
+      return;
     }
     await dependencies.finish("completed");
     finished = true;
