@@ -10,6 +10,7 @@ const selectors = [
   "composer",
   "textbox",
   "submit",
+  "audience",
   "fileInput",
   "attachmentName",
   "post",
@@ -30,6 +31,12 @@ export function validateFacebookProfile(value, now = Date.now()) {
     !/^evidence-[a-z0-9_-]{3,120}$/i.test(value.reviewRef ?? "")
   )
     throw new Error("facebook_profile_unreviewed");
+  if (
+    typeof value.audienceText !== "string" ||
+    !value.audienceText.trim() ||
+    value.audienceText.length > 100
+  )
+    throw new Error("facebook_profile_audience_missing");
   const reviewed = Date.parse(value.reviewedAt);
   const expires = Date.parse(value.expiresAt);
   if (
@@ -62,6 +69,23 @@ export function validateFacebookProfile(value, now = Date.now()) {
     )
   )
     throw new Error("facebook_profile_selector_invalid");
+  if (
+    value.selectors.composerIdentity !== undefined &&
+    (typeof value.selectors.composerIdentity !== "string" ||
+      !value.selectors.composerIdentity.trim() ||
+      value.selectors.composerIdentity.length > 500)
+  )
+    throw new Error("facebook_profile_selector_invalid");
+  if (
+    value.audienceSelection !== undefined &&
+    ["dialog", "option", "defaultCheckbox", "confirm"].some(
+      (key) =>
+        typeof value.audienceSelection?.[key] !== "string" ||
+        !value.audienceSelection[key].trim() ||
+        value.audienceSelection[key].length > 500,
+    )
+  )
+    throw new Error("facebook_profile_audience_selection_invalid");
   return structuredClone(value);
 }
 
@@ -103,6 +127,13 @@ export function createFacebookDriver(input, browserRequest) {
     if (!result.ok) throw new Error("facebook_evaluation_failed");
     return result.result;
   };
+  const waitFor = async (session, kind) => {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      if (await evaluate(session, { kind })) return;
+      await delay(250, undefined, { signal: session.signal });
+    }
+    throw new Error("facebook_composer_transition_timeout");
+  };
   return {
     async open(run, signal) {
       if (
@@ -138,6 +169,14 @@ export function createFacebookDriver(input, browserRequest) {
     },
     async prepare(session, payload, upload) {
       await evaluate(session, { kind: "open" });
+      await waitFor(session, "composer-ready");
+      if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
+        await waitFor(session, "audience-picker-ready");
+        await evaluate(session, { kind: "audience-select" });
+        await waitFor(session, "audience-selection-ready");
+        await evaluate(session, { kind: "audience-confirm" });
+        await waitFor(session, "composer-ready");
+      }
       await evaluate(session, { kind: "inspect" });
       if (upload) {
         await evaluate(session, { kind: "upload-check" });

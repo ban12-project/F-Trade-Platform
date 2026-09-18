@@ -16,8 +16,50 @@ function inspectPage(profile, action) {
   };
   const enabled = (element) =>
     !element.disabled && element.getAttribute("aria-disabled") !== "true";
-  const identity = one(document, profile.selectors.identity);
-  if (identity.href !== profile.identityHref) throw new Error("facebook_identity_changed");
+  // Facebook adds this navigation-only query to the composer author link.
+  // Preserve every other path/query component, especially profile.php?id.
+  const identityHref = (href) => {
+    const url = new URL(href);
+    url.searchParams.delete("__tn__");
+    return url.href;
+  };
+  if (action.kind.startsWith("audience-") && action.kind !== "audience-open") {
+    const selection = profile.audienceSelection;
+    if (!selection) throw new Error("facebook_audience_selection_unconfigured");
+    const dialogs = all(document, selection.dialog);
+    if (action.kind === "audience-picker-ready" && !dialogs.length) return false;
+    const dialog = one(document, selection.dialog);
+    const option = one(dialog, selection.option);
+    const defaultCheckbox = one(dialog, selection.defaultCheckbox);
+    const checked = (element) =>
+      element.checked === true || element.getAttribute("aria-checked") === "true";
+    if (action.kind === "audience-picker-ready") return true;
+    if (action.kind === "audience-select") {
+      if (!enabled(option)) throw new Error("facebook_audience_disabled");
+      if (!checked(option)) option.click();
+      return true;
+    }
+    const selected = checked(option) && !checked(defaultCheckbox);
+    if (action.kind === "audience-selection-ready") return selected;
+    if (action.kind !== "audience-confirm" || !selected)
+      throw new Error("facebook_audience_selection_changed");
+    const confirm = one(dialog, selection.confirm);
+    if (!enabled(confirm)) throw new Error("facebook_audience_disabled");
+    confirm.click();
+    return true;
+  }
+  const composers = all(document, profile.selectors.composer);
+  if (action.kind === "composer-ready") {
+    if (!composers.length) return false;
+    one(document, profile.selectors.composer);
+    return true;
+  }
+  const identity =
+    profile.selectors.composerIdentity && composers.length
+      ? one(one(document, profile.selectors.composer), profile.selectors.composerIdentity)
+      : one(document, profile.selectors.identity);
+  if (identityHref(identity.href) !== identityHref(profile.identityHref))
+    throw new Error("facebook_identity_changed");
   if (action.kind === "identity")
     return { accountRef: profile.accountRef, channelRef: profile.channelRef };
   if (action.kind === "posts") {
@@ -27,7 +69,10 @@ function inspectPage(profile, action) {
       const author = one(post, profile.selectors.postAuthor);
       const link = one(post, profile.selectors.postLink);
       return {
-        accountRef: author.href === profile.identityHref ? profile.accountRef : null,
+        accountRef:
+          identityHref(author.href) === identityHref(profile.identityHref)
+            ? profile.accountRef
+            : null,
         channelRef: profile.channelRef,
         text: one(post, profile.selectors.postText).innerText,
         externalPublicationRef: link.href,
@@ -43,6 +88,15 @@ function inspectPage(profile, action) {
     return true;
   }
   const composer = one(document, profile.selectors.composer);
+  const audience = one(composer, profile.selectors.audience);
+  if (action.kind === "audience-open") {
+    if (audience.innerText.trim() === profile.audienceText) return false;
+    if (!enabled(audience)) throw new Error("facebook_audience_disabled");
+    audience.click();
+    return true;
+  }
+  if (audience.innerText.trim() !== profile.audienceText)
+    throw new Error("facebook_audience_changed");
   const textbox = one(composer, profile.selectors.textbox);
   const submit = one(composer, profile.selectors.submit);
   const attachments = all(composer, profile.selectors.attachmentName);

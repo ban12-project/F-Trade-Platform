@@ -143,11 +143,11 @@ CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose �
 
 ### 显式配置的 Facebook 页面驱动
 
-`facebook-adapter.mjs` 可作为 `BROWSER_TASK_ADAPTER` 的本地绝对路径。启用前必须配置 `FACEBOOK_DOM_PROFILES_FILE` 指向私有 JSON 文件；文件为 1–16 项数组，每项有 `version: 1`、`channelRef`、`accountRef`、`reviewRef`（`evidence-` 开头的审核引用）、ISO 时间 `reviewedAt` / `expiresAt`（最长 30 天）、固定 Facebook 页面 `url`、精确当前身份链接 `identityHref` 和 `selectors`。选择器键为 `identity`、`openComposer`、`composer`、`textbox`、`submit`、`fileInput`、`attachmentName`、`post`、`postAuthor`、`postText`、`postLink`。身份必须是当前操作身份，而非页面上任意作者链接。审核引用是运维声明，不是服务端自动证明页面契约已审核。
+`facebook-adapter.mjs` 可作为 `BROWSER_TASK_ADAPTER` 的本地绝对路径。启用前必须配置 `FACEBOOK_DOM_PROFILES_FILE` 指向私有 JSON 文件；文件为 1–16 项数组，每项有 `version: 1`、`channelRef`、`accountRef`、`reviewRef`（`evidence-` 开头的审核引用）、ISO 时间 `reviewedAt` / `expiresAt`（最长 30 天）、固定 Facebook 页面 `url`、精确当前身份链接 `identityHref` 和 `selectors`。发布配置还必须包含经审核的 `audienceText`（与受众控件可见文字完全一致）。选择器键为 `identity`、`openComposer`、`composer`、`textbox`、`submit`、`audience`、`fileInput`、`attachmentName`、`post`、`postAuthor`、`postText`、`postLink`。身份必须是当前操作身份，而非页面上任意作者链接。审核引用是运维声明，不是服务端自动证明页面契约已审核。
 
 不提供声称适用于真实 Facebook 的默认选择器。配置应在获授权环境中核对唯一控件、身份链接、附件名称及帖子凭证，存于 VPS 私有配置并挂载给 Agent；不得放账号资料或私密页面证据进 Git。缺少配置、重复账号、过期审核、错误来源或歧义控件均拒绝执行。节点注册声明配置覆盖的账号及到期时间，平台在调度、领取、媒体读取和最终授权时限制范围。未声明范围的旧自定义适配器保持原有授权账号范围；它仍是受信任代码，不是安全沙箱。
 
-驱动使用固定上游的 create/type/upload/evaluate 接口。最终点击在一次页面执行中重新核对身份、正文、附件、唯一按钮、配置有效期和授权截止时间；只执行一次 DOM click，不调用可能回退重试的通用 click API。上游 upload 选择全局第一个文件输入，因此这里要求整个页面恰好一个文件输入且属于已核对编辑器。浏览器与 Agent 必须在同一 VPS 使用宿主时钟。不得通过本驱动的 type/evaluate 输入保存密码；上游这些接口可能记录参数，保存密码仅允许通过下文独立登录插件路径。
+驱动使用固定上游的 create/type/upload/evaluate 接口。最终点击在一次页面执行中重新核对身份、受众、正文、附件、唯一按钮、配置有效期和授权截止时间；只执行一次 DOM click，不调用可能回退重试的通用 click API。上游 upload 选择全局第一个文件输入，因此这里要求整个页面恰好一个文件输入且属于已核对编辑器。浏览器与 Agent 必须在同一 VPS 使用宿主时钟。不得通过本驱动的 type/evaluate 输入保存密码；上游这些接口可能记录参数，保存密码仅允许通过下文独立登录插件路径。
 
 `tests/e2e/facebook-driver.spec.ts` 的 9 项 Chromium 测试拦截全部网络，仅使用合成 HTML 与 Camofox API 桥接，覆盖文本/图片/视频、身份变化、重复编辑器、错误附件、传输途中授权过期和额外文件输入。它验证实际 DOM 操作与拒绝路径，不证明真实 Facebook 接受合成 click、页面选择器长期稳定或实际 Camofox 媒体上传成功。默认能力保持人工交互，真实账号验收另行执行。
 
@@ -288,3 +288,5 @@ Provision only while the node has no running or unknown leases. Use the existing
 The example node ID is synthetic and all capabilities are disabled. The real `nodeId` must equal the node encoded in the Agent access key. Enabled switches select fixed filenames only: `publication.json` uses the existing publication-profile array schema, `inbox.json` the inbox-profile array schema, and `login.json` the saved-login profile array schema documented above. Disabled files are not loaded. Each selected file is limited to 64 KB and 1–16 entries; existing loaders still enforce reviewed selectors, account/channel scope, duplicate rejection and expiry. The loader cannot select arbitrary adapter code. Private files remain in this dedicated VM across ordinary stops/starts; provision them again if the VM is replaced. Never include them in a reusable template.
 
 Start a fresh operation after provisioning and verify the node's reported capabilities and expiring scopes before queuing a test. Updating files does not change a running Agent; stop through the platform and start a new operation. To disable automation, set all manifest switches to false before that new start. Login configuration only enables the existing explicitly requested, once-per-interactive-run saved-credential fill flow; it does not bypass 2FA or checkpoints. This provisioning support does not implement DM reply execution and is not evidence of real Facebook automation acceptance.
+
+发布受众必须在编辑器预检与最终点击的同一次页面执行中匹配 `audienceText`；控件缺失、歧义或文字改变均拒绝点击。缺少受众声明的旧发布配置必须重新审核后补齐，不能默认沿用 Facebook 当前受众。合成测试覆盖授权期间与最终点击前受众变化，但不能替代真实账号受众与回执验收。
