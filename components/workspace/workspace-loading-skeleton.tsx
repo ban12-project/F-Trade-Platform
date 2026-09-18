@@ -15,8 +15,11 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
         aria-busy="true"
         aria-label={project ? "项目工作区" : "工作台"}
       >
-        <header aria-hidden="true" className="sticky top-0 z-10 border-b bg-background/90">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
+        <header className="sticky top-0 z-10 border-b bg-background/90">
+          <div
+            aria-hidden="true"
+            className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6"
+          >
             <div className="space-y-2">
               <Skeleton className="h-3 w-16" />
               <Skeleton className="h-6 w-32" />

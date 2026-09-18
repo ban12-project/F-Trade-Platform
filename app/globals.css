@@ -281,7 +281,12 @@ html {
   top: calc(50% + (env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 2);
   left: calc(50% + (env(safe-area-inset-left) - env(safe-area-inset-right)) / 2);
   max-height: calc(100vh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+@supports (height: 100dvh) {
+  [data-slot="dialog-content"] {
+    max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
 }
 
 [data-slot="dialog-content"][data-close-button="true"] > [data-slot="dialog-header"] {
@@ -309,8 +314,13 @@ html {
 @media (min-width: 48rem) {
   .workspace-details-scroll {
     height: calc(100vh - 17rem);
-    height: calc(100dvh - 17rem);
     min-height: 20rem;
+  }
+
+  @supports (height: 100dvh) {
+    .workspace-details-scroll {
+      height: calc(100dvh - 17rem);
+    }
   }
 }
 

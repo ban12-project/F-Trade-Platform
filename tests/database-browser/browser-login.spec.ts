@@ -154,7 +154,28 @@ test("saved password fill uses the actual owner action and never returns credent
     }),
   );
   await page.goto("/workspace/browsers");
-  await page.getByRole("button", { name: "接入登录 / 2FA", exact: true }).click();
+  const connect = page.getByRole("button", { name: "接入登录 / 2FA", exact: true });
+  await expect(connect).toBeVisible();
+  await expect(page.getByRole("main")).toHaveAttribute("id", "main-content");
+  // The final run row must remain above the dock even at the end of the document.
+  // Trial clicks verify hit testing without issuing an extra ticket or forcing a click.
+  for (const viewport of [
+    { width: 320, height: 640 },
+    { width: 390, height: 844 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect
+      .poll(async () => {
+        const target = await connect.boundingBox();
+        const dock = await page.getByTestId("workspace-action-dock").boundingBox();
+        return Boolean(target && dock && target.y >= 0 && target.y + target.height <= dock.y);
+      })
+      .toBe(true);
+    await connect.click({ trial: true });
+  }
+  await connect.click();
   const viewer = page.frameLocator('iframe[title="账号登录与两步验证"]');
   await expect(viewer.locator("body")).toHaveAttribute("data-ticket", /.+/);
   const ticket = await viewer.locator("body").getAttribute("data-ticket");

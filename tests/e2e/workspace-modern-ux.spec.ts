@@ -136,11 +136,7 @@ test("small mobile dialogs stay within the viewport and keep submission reachabl
       .poll(async () => {
         const box = await dialog.boundingBox();
         return Boolean(
-          box &&
-            box.x >= 0 &&
-            box.y >= 0 &&
-            box.x + box.width <= 320 &&
-            box.y + box.height <= 400,
+          box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 320 && box.y + box.height <= 400,
         );
       })
       .toBe(true);
