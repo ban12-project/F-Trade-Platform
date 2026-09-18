@@ -98,41 +98,48 @@ function inspectPage(profile, action) {
     throw new Error("facebook_identity_changed");
   if (action.kind === "identity")
     return { accountRef: profile.accountRef, channelRef: profile.channelRef };
+  if (action.kind === "posts-ready") return all(document, profile.selectors.postsReady).length > 0;
   if (["posts", "post-count"].includes(action.kind)) {
     const posts = all(document, profile.selectors.post);
     if (posts.length > 100) throw new Error("facebook_post_scan_limit");
     if (action.kind === "post-count") return posts.length;
-    return posts.map((post) => {
-      const author = one(post, profile.selectors.postAuthor);
-      const link = one(post, profile.selectors.postLink);
-      return {
-        accountRef:
-          identityHref(author.href) === identityHref(profile.identityHref)
-            ? profile.accountRef
-            : null,
-        channelRef: profile.channelRef,
-        text: one(post, profile.selectors.postText).innerText,
-        externalPublicationRef: (() => {
-          const url = new URL(identityHref(link.href));
-          if (
-            url.origin !== "https://www.facebook.com" ||
-            url.username ||
-            url.password ||
-            url.hash ||
-            !(
-              /^\/[^/]+\/posts\/[^/]+\/?$/.test(url.pathname) ||
-              /^\/(reel|videos)\/\d+\/?$/.test(url.pathname) ||
-              (url.pathname === "/permalink.php" &&
-                url.searchParams.has("story_fbid") &&
-                url.searchParams.has("id"))
+    return posts
+      .filter(
+        (post) =>
+          action.text === undefined ||
+          one(post, profile.selectors.postText).innerText === action.text,
+      )
+      .map((post) => {
+        const author = one(post, profile.selectors.postAuthor);
+        const link = one(post, profile.selectors.postLink);
+        return {
+          accountRef:
+            identityHref(author.href) === identityHref(profile.identityHref)
+              ? profile.accountRef
+              : null,
+          channelRef: profile.channelRef,
+          text: one(post, profile.selectors.postText).innerText,
+          externalPublicationRef: (() => {
+            const url = new URL(identityHref(link.href));
+            if (
+              url.origin !== "https://www.facebook.com" ||
+              url.username ||
+              url.password ||
+              url.hash ||
+              !(
+                /^\/[^/]+\/posts\/[^/]+\/?$/.test(url.pathname) ||
+                /^\/(reel|videos)\/\d+\/?$/.test(url.pathname) ||
+                (url.pathname === "/permalink.php" &&
+                  url.searchParams.has("story_fbid") &&
+                  url.searchParams.has("id"))
+              )
             )
-          )
-            return null;
-          url.pathname = url.pathname.replace(/\/$/, "");
-          return url.href;
-        })(),
-      };
-    });
+              return null;
+            url.pathname = url.pathname.replace(/\/$/, "");
+            return url.href;
+          })(),
+        };
+      });
   }
   if (action.kind === "open") {
     if (!all(document, profile.selectors.composer).length) {

@@ -40,6 +40,7 @@ composer.querySelector('button').onclick=()=>{const count=document.querySelector
 
 for (const mode of [
   "text",
+  "baseline_duplicate",
   "post_link_hover",
   "post_link_hover_receipt",
   "post_link_hover_detached",
@@ -81,6 +82,7 @@ for (const mode of [
     const sha256 = "a".repeat(64);
     const path = `/tmp/ftrade-uploads/${sha256}.${format === "video" ? "mp4" : "png"}`;
     const requests: string[] = [];
+    let postReadFailures = 0;
     const browserRequest = async (endpoint: string, body: Record<string, unknown> = {}) => {
       requests.push(endpoint);
       if (endpoint === "/tabs") {
@@ -131,6 +133,14 @@ for (const mode of [
             input.type = "file";
             document.body.prepend(input);
           });
+        if (mode === "baseline_duplicate")
+          await page.evaluate((owner) => {
+            const post = document.createElement("article");
+            post.innerHTML =
+              '<a class="author">Author</a><p class="copy">SYNTHETIC approved copy</p><a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Old link</a>';
+            post.querySelector("a")?.setAttribute("href", owner);
+            document.body.append(post);
+          }, profile.identityHref);
         if (mode.startsWith("post_"))
           await page.evaluate((scenario) => {
             const composer = document.querySelector<HTMLElement>("#composer");
@@ -169,6 +179,13 @@ for (const mode of [
       }
       if (endpoint.endsWith("/evaluate")) {
         const expression = String(body.expression);
+        if (
+          mode === "post_link_hover_detached" &&
+          expression.includes('"kind":"posts"') &&
+          (await page.locator("article").count()) &&
+          postReadFailures++ === 0
+        )
+          return Response.json({ error: "synthetic transition" }, { status: 500 });
         if (mode === "transit_expiry" && expression.includes('"kind":"publish"')) {
           // Move only the page clock beyond the authorization during transport.
           await page.clock.install({ time: new Date(Date.now() + 60000) });

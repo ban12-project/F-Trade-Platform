@@ -121,6 +121,13 @@ export function validateFacebookProfile(value, now = Date.now()) {
       value.selectors.postHover.length > 500)
   )
     throw new Error("facebook_profile_selector_invalid");
+  if (
+    value.selectors.postsReady !== undefined &&
+    (typeof value.selectors.postsReady !== "string" ||
+      !value.selectors.postsReady.trim() ||
+      value.selectors.postsReady.length > 500)
+  )
+    throw new Error("facebook_profile_selector_invalid");
   return structuredClone(value);
 }
 
@@ -180,12 +187,14 @@ export function createFacebookDriver(input, browserRequest) {
     await waitFor(session, "identity-ready");
     await evaluate(session, { kind: "identity" });
   };
-  const readPosts = async (session) => {
+  const readPosts = async (session, text) => {
     if (profile.receiptUrl && !session.readingReceipts) {
       await navigate(session, profile.receiptUrl);
       session.readingReceipts = true;
     }
-    if (profile.resolvePostLinks) {
+    if (profile.selectors.postsReady) await waitFor(session, "posts-ready");
+    const resolveLinks = async () => {
+      if (!profile.resolvePostLinks) return;
       const count = await evaluate(session, { kind: "post-count" });
       for (let index = 0; index < count; index++) {
         const response = await browserRequest("/act", {
@@ -205,10 +214,19 @@ export function createFacebookDriver(input, browserRequest) {
           throw new Error("facebook_permalink_hover_failed");
         }
       }
-    }
+    };
+    if (text === undefined) return evaluate(session, { kind: "posts" });
+    await resolveLinks();
     for (let attempt = 0; attempt < 20; attempt++) {
-      const posts = await evaluate(session, { kind: "posts" });
-      if (posts.every((post) => post.externalPublicationRef !== null)) return posts;
+      if (attempt === 5) await resolveLinks();
+      try {
+        const posts = await evaluate(session, { kind: "posts", text });
+        if (posts.every((post) => post.externalPublicationRef !== null)) return posts;
+      } catch (error) {
+        // Reading can race the timestamp replacement. Retry observations only;
+        // every successful observation still validates identity and exact DOM.
+        if (attempt === 19 || session.signal.aborted) throw error;
+      }
       await delay(250, undefined, { signal: session.signal });
     }
     throw new Error("facebook_permalink_unresolved");
@@ -248,10 +266,15 @@ export function createFacebookDriver(input, browserRequest) {
     },
     async existingPublicationRefs(session) {
       const posts = await readPosts(session);
-      session.baseline = new Set(posts.map((post) => post.externalPublicationRef));
+      session.baseline = new Set(posts.map((post) => post.externalPublicationRef).filter(Boolean));
+      session.existingTexts = new Set(
+        posts.filter((post) => post.accountRef === profile.accountRef).map((post) => post.text),
+      );
       return [...session.baseline];
     },
     async prepare(session, payload, upload) {
+      if (session.existingTexts?.has(payload.text))
+        throw new Error("facebook_matching_post_already_exists");
       if (session.readingReceipts) {
         await navigate(session, profile.url);
         session.readingReceipts = false;
@@ -320,7 +343,7 @@ export function createFacebookDriver(input, browserRequest) {
     async observe(session, payload, signal) {
       if (profile.receiptUrl) await waitFor(session, "composer-closed");
       for (let attempt = 0; attempt < 20; attempt++) {
-        const posts = await readPosts(session);
+        const posts = await readPosts(session, payload.text);
         const matches = posts.filter(
           (post) =>
             post.accountRef === profile.accountRef &&
