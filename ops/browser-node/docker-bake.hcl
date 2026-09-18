@@ -40,6 +40,10 @@ target "camofox" {
   inherits = ["common"]
   context = "ops/browser-node/upstream"
   dockerfile = "Dockerfile.ci"
+  args = {
+    CAMOUFOX_VERSION = "152.0.4"
+    CAMOUFOX_RELEASE = "beta.30"
+  }
   cache-from = ["type=gha,scope=ftrade-camofox-${ARCH}"]
   cache-to = ["type=gha,scope=ftrade-camofox-${ARCH},mode=max"]
 }

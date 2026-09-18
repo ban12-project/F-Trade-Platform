@@ -68,7 +68,7 @@ BROWSER_DOMAIN=browser-a.example
 
 没有 `SOCIAL_WORKER_*` 或逐账号代理变量：平台保存的固定代理在租约开始时按需下发，浏览器自己的访问密钥和临时 VNC 密码由节点生成。主 Key 支持 Secret 文件注入（Agent 的 `BROWSER_NODE_ACCESS_KEY_FILE`），示例 `.env` 本身仍是明文，权限控制不是加密。
 
-`build-browser.sh` 固定 Camofox 源提交 e5a36f5cd0332fde6597de474329a308a53a0716，并构建附带看门狗的本地镜像。基础镜像、包源仍可能变化，正式部署应审核并按镜像 digest 固定供应链。Agent 仅使用启动时已存在的本地镜像 ID，平台任务不能指定任意镜像或挂载。
+`build-browser.sh` 固定 Camofox 源提交 79d425be26743883a06613eaa3be5e38e7ab5409，并构建附带看门狗的本地镜像。基础镜像、包源仍可能变化，正式部署应审核并按镜像 digest 固定供应链。Agent 仅使用启动时已存在的本地镜像 ID，平台任务不能指定任意镜像或挂载。
 
 另一台 VPS 重复部署步骤，但在平台创建另一个节点/Key。不要复制第一台的 `node-state` 或账号会话卷。同机运行多个 Agent 还需独立 Compose 项目名、Agent 9400 端口与反向代理配置；更简单的是一台 VPS 一个 Agent 管理多个独立账号容器。
 
@@ -95,7 +95,7 @@ pnpm typecheck
 
 CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose 校验与 Agent 镜像构建。真实浏览器镜像、真实代理、HTTPS/noVNC、FB 登录/2FA、重启恢复及压力测试必须在试运行 VPS 验收，合成测试不能替代这些验收。
 
-依据：PostgreSQL 行锁 https://www.postgresql.org/docs/current/explicit-locking.html；Docker socket 权限 https://docs.docker.com/engine/security/；Camofox 固定源 https://github.com/jo-inc/camofox-browser/tree/e5a36f5cd0332fde6597de474329a308a53a0716。
+依据：PostgreSQL 行锁 https://www.postgresql.org/docs/current/explicit-locking.html；Docker socket 权限 https://docs.docker.com/engine/security/；Camofox 固定源 https://github.com/jo-inc/camofox-browser/tree/79d425be26743883a06613eaa3be5e38e7ab5409。
 
 ## 发布队列与节点预留（#322 迭代中）
 

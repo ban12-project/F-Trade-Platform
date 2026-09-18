@@ -1,24 +1,26 @@
-# CamoFox v1.16.0 upgrade validation
+# CamoFox stable upgrade validation
 
-Issue: #378. Candidate: jo-inc/camofox-browser at `79d425be26743883a06613eaa3be5e38e7ab5409` (v1.16.0), paired upstream with Camoufox `152.0.4-beta.28`, camoufox-js `0.11.5`, and Playwright `1.59.1`.
+Issue: #378. Source: jo-inc/camofox-browser `79d425be26743883a06613eaa3be5e38e7ab5409` (v1.16.0). All project build entry points select official stable Camoufox `152.0.4-beta.30`; the upstream lockfile supplies camoufox-js 0.11.5 and Playwright 1.59.1.
 
-The candidate was built in an isolated, credential-free Vercel Sandbox. The image reports Camoufox 152.0.4-beta.28. The existing account environment was not modified.
+## Startup failure and isolation
 
-## Evidence
+Initial isolated Vercel Sandbox and GitHub amd64/arm64 image checks failed when creating a real page under a read-only root filesystem. HTTP health succeeded, but page creation returned HTTP 500 after 30 seconds. Merely redirecting XDG cache/config directories did not fix this. Both beta.28 and beta.30 reproduced the failure.
 
-- 22 browser-node tests passed using Node 24 with the project's tsx loader.
-- The login plugin contract passed against the exact release source archive.
-- Agent image, browser image, required VNC tools, and preloaded GeoIP database built successfully.
-- The read-only, network-disabled real-page startup check failed in Vercel Sandbox. HTTP health alone succeeded, but creation of an actual page timed out.
-- GitHub image CI failed on both amd64 and arm64. The amd64 log independently records the same 30-second page creation timeout. Other required application checks passed on the initial candidate.
-- Direct server diagnostics reproduced HTTP 500 with `tab create timed out after 30000ms`. This occurred on an empty synthetic session before any Facebook access.
+Further tests in a fresh, credential-free Vercel Sandbox established:
 
-- Setting writable temporary XDG cache/config directories removed dconf warnings but did not resolve page creation. The browser process launches, then the automation connection remains unavailable. Debug output also reports a missing `glxtest` executable; its causal role is not established.
+- Official Python client 0.5.6 with Playwright 1.60 and stable beta.30 opened pages in both headless and headed modes.
+- Node Playwright 1.59.1 and 1.60.0 both opened pages in both modes.
+- camoufox-js 0.11.5 with the service's Linux, humanization, and cache launch options opened pages outside Docker.
+- The same Node client, browser bundle, and launch options passed inside a writable Docker container, but failed under a read-only root filesystem.
+- A writable-container filesystem audit identified `/root/camoufox` among newly written paths.
+- Adding only a 16 MiB tmpfs at `/root/camoufox` made both minimal and service-style launches pass while retaining the read-only root filesystem and default container security settings.
 
-- A second isolated image replaced only the browser binary with official Camoufox `152.0.4-beta.30`, verified against release asset SHA-256 `5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672`. It reproduced the same HTTP 500 and 30-second page creation timeout with writable temporary XDG directories.
+The runtime now provides that bounded ephemeral directory, alongside the existing `/root/.camoufox` directory needed by the previous browser. Account storage remains in its existing `/data` volume. The image startup check exercises the new mount. Full candidate image CI must pass before rollout.
 
-## Decision
+22 browser-node tests passed after the runtime change. The login plugin contract previously passed against the exact CamoFox release archive.
 
-Do not merge or deploy the candidate until real browser startup and image checks pass. The result does not establish whether upgrading resolves Messenger encrypted-history PIN restore failures: that test has not yet been reached.
+## PIN acceptance remains separate
 
-Keep the existing persistence setting unchanged during version isolation. Its `indexedDB: false` setting means IndexedDB is not included in storage-state checkpoints; this is a separate persistence consideration, not evidence that the user's PIN changed or is incorrect.
+The production account environment was not changed during isolation. Successful blank-page creation does not prove Messenger PIN recovery. After the reviewed image is ready, production validation must verify authenticated Messenger history restoration without resetting secure storage.
+
+Keep `indexedDB: false` unchanged while isolating the version change. It means IndexedDB is not included in storage-state checkpoints; this is a separate persistence consideration, not evidence that the PIN changed or is incorrect.
