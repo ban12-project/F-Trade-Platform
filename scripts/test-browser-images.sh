@@ -27,7 +27,16 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
 
 # No Facebook/proxy/account is used. Test server startup and independent lease expiry.
 name="ftrade-image-smoke-${ARCH}-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
-trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+cleanup_browser() {
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    # This container uses synthetic data and no credentials.
+    docker logs --tail 100 "$name" >&2 || true
+  fi
+  docker rm -f "$name" >/dev/null 2>&1 || true
+  exit "$status"
+}
+trap cleanup_browser EXIT
 deadline=$(( $(date +%s) * 1000 + 70000 ))
 docker run -d --name "$name" --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
