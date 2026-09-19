@@ -52,13 +52,14 @@ blob-report/
 /.swc
 
 # Authorized local catalog references must never be committed or uploaded.
-docs/reference/*.pdf
+docs/reference/*
 .vercel
 .env*.local
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*
 
 # Reproducible synthetic review outputs, uploaded by CI only.
 artifacts/browser-fleet-review/
