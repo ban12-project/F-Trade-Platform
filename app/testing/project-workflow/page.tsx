@@ -87,7 +87,7 @@ const syntheticProduct = {
   factOptions: [
     {
       path: "product.product_name",
-      label: "product.product_name",
+      label: "产品名称",
       value: "Verified clutch kit",
       evidenceRef: "evidence-product-001",
     },

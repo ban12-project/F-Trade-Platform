@@ -4,7 +4,9 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
+import type { Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
+import { listProjectPublicationData } from "../../lib/social/publication-store";
 import { authSecret, databaseURL } from "../../playwright.database.config";
 
 const connectionString = process.env.BROWSER_FLEET_UI_TEST_DATABASE_URL ?? databaseURL;
@@ -147,4 +149,45 @@ test("stale displayed preview cannot create a publication; refreshed preview con
       return saved?.textConfirmation?.contentVersion;
     })
     .toBe(2);
+});
+
+test("older unknown results stay addressable and cannot reappear as publish candidates", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+  await context.addCookies([
+    {
+      name: "better-auth.session_token",
+      value: encodeURIComponent(`${token}.${signature}`),
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  const older = randomUUID();
+  await db.insert(schema.socialPublication).values(
+    Array.from({ length: 52 }, (_, index) => ({
+      id: index === 0 ? older : randomUUID(),
+      projectId,
+      channelRef,
+      accountRef,
+      contentRef,
+      format: "text",
+      confirmationRef: `synthetic-history-${index}`,
+      status: index === 0 ? "unknown" : "paused",
+      createdAt: new Date(Date.now() + index * 1000),
+    })),
+  );
+  const data = await listProjectPublicationData(projectId, db as unknown as Database);
+  expect(data.publications.some((item) => item.id === older)).toBe(true);
+  expect(data.candidates).toHaveLength(0);
+  expect(
+    data.publications.every((item) => !("textConfirmation" in item) && !("browserJobId" in item)),
+  ).toBe(true);
+  await page.goto(`/workspace/${projectId}/records/publication/${older}`);
+  const detail = page.getByRole("region", { name: "发布详情与审批" });
+  await expect(detail.getByText("结果待人工核对", { exact: true })).toBeVisible();
+  await expect(detail.locator("#publication-confirmation")).toHaveCount(0);
 });

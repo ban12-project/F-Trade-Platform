@@ -1,5 +1,7 @@
 import "server-only";
 import { type ReactNode, Suspense } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { hasPermission } from "@/lib/authz";
 import {
   getProjectContentCatalogDetail,
@@ -7,6 +9,7 @@ import {
   listProjectContentCatalogEntries,
   listReadyProductContentSources,
 } from "@/lib/content/store";
+import { listProductEvidencePreviews } from "@/lib/product/evidence-preview";
 import { getProductVideoReadiness, listProductMediaAssets } from "@/lib/product/media-store";
 import { getProjectProductCatalogDetail, listProjectProductCatalogEntries } from "@/lib/products";
 import {
@@ -18,6 +21,7 @@ import { listProjectRfqEntries } from "@/lib/sales/store";
 import { listProjectPublicationData } from "@/lib/social/publication-store";
 import { listProjectMarketingVideoEntries } from "@/lib/video/store";
 import { listProjectEvidenceOptions } from "@/lib/workspace/access";
+import { workspaceCreateHref, workspaceRecordHref } from "@/lib/workspace/navigation";
 import { readWorkspaceModelSettings } from "@/lib/workspace/read-model";
 import { listProjectReadyProductReferences } from "@/lib/workspace/store";
 import { DeliveryPanel, LeadPanel, PublicationPanel, QuotationPanel } from "./closing-panels";
@@ -27,6 +31,7 @@ import { ProductPanel } from "./product-panel";
 import { VideoStageEntry } from "./project-workspace";
 import { ReadOnlyRecordList, RecordSelection } from "./record-selection";
 import { ProductReferencePanel, RfqPanel } from "./sales-panels";
+import { WorkspaceLink } from "./workspace-link";
 import { WorkspacePanelSkeleton } from "./workspace-loading-skeleton";
 
 async function ProductMedia({
@@ -52,6 +57,24 @@ async function ProductMedia({
     />
   );
 }
+async function ContentPublication({
+  projectId,
+  contentId,
+}: {
+  projectId: string;
+  contentId: string;
+}) {
+  const data = await listProjectPublicationData(projectId);
+  return (
+    <PublicationPanel
+      projectId={projectId}
+      candidates={data.candidates.filter((item) => item.id === contentId)}
+      channels={data.channels}
+      publications={data.publications.filter((item) => item.contentRef === contentId)}
+    />
+  );
+}
+
 export async function ProjectStagePanel({
   projectId,
   actorId,
@@ -103,11 +126,12 @@ export async function ProjectStagePanel({
   );
   switch (stage) {
     case "product": {
-      const [entries, detail, settings, evidenceOptions] = await Promise.all([
+      const [entries, detail, settings, evidenceOptions, sourceDocuments] = await Promise.all([
         listProjectProductCatalogEntries(projectId),
         selectedId ? getProjectProductCatalogDetail(projectId, selectedId) : null,
         readWorkspaceModelSettings(),
         listProjectEvidenceOptions(projectId, actorId),
+        selectedId ? listProductEvidencePreviews(projectId, selectedId, actorId) : [],
       ]);
       if (!canWrite && !selectedId) return readonlyList(entries, "产品资料");
       const canReview = canWrite && hasPermission(role, "product:review");
@@ -119,9 +143,36 @@ export async function ProjectStagePanel({
             entries={entries}
             detail={detail}
             canReview={canReview}
+            mode={mode === "create" ? "create" : "collection"}
             agentModelConfigs={settings}
             evidenceOptions={evidenceOptions}
-          />
+            sourceDocuments={sourceDocuments}
+          >
+            {detail?.state === "PRODUCT_READY" && canWrite ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>产品已核实，可以制作内容</CardTitle>
+                  <CardDescription>
+                    使用当前产品已有的事实开始图文，之后再审核具体文案。
+                  </CardDescription>
+                </CardHeader>
+                <CardFooter>
+                  <Button
+                    render={
+                      <WorkspaceLink
+                        href={workspaceCreateHref(projectId, "content", {
+                          kind: "product",
+                          id: detail.id,
+                        })}
+                      />
+                    }
+                  >
+                    制作图文内容
+                  </Button>
+                </CardFooter>
+              </Card>
+            ) : null}
+          </ProductPanel>
           {detail?.state === "PRODUCT_READY" ? (
             <Suspense fallback={<WorkspacePanelSkeleton label="正在加载产品素材" />}>
               <ProductMedia projectId={projectId} productId={detail.id} canReview={canReview} />
@@ -147,10 +198,27 @@ export async function ProjectStagePanel({
           projectId={projectId}
           entries={entries}
           products={sources}
+          mode={mode === "create" || selectedProductId ? "create" : "collection"}
           copyCandidates={copyCandidates}
           detail={detail}
           canReview={canWrite && hasPermission(role, "content:review")}
-        />,
+        >
+          {detail ? (
+            <Button
+              variant="outline"
+              render={
+                <WorkspaceLink href={workspaceRecordHref(projectId, "product", detail.productId)} />
+              }
+            >
+              查看来源产品
+            </Button>
+          ) : null}
+          {detail && ["CONTENT_APPROVED", "CONTENT_PUBLISHED"].includes(detail.state) ? (
+            <Suspense fallback={<WorkspacePanelSkeleton label="正在加载当前内容的发布状态" />}>
+              <ContentPublication projectId={projectId} contentId={detail.id} />
+            </Suspense>
+          ) : null}
+        </ContentPanel>,
         selectedId ?? selectedProductId,
       );
     }

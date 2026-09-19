@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -56,6 +55,9 @@ import {
 } from "@/lib/product/catalog-import-contracts";
 import { documentUploadFormSchema } from "@/lib/product/document-upload-contracts";
 import { uploadProductDocument } from "@/lib/product/upload-document-client";
+import { workspaceRecordHref } from "@/lib/workspace/navigation";
+import { useWorkspaceDirty } from "./dirty-state";
+import { WorkspaceLink as Link } from "./workspace-link";
 
 const failures: Record<CatalogFailureCode, string> = {
   SOURCE_UNAVAILABLE: "无法读取或核验原件，请重新上传。",
@@ -88,17 +90,25 @@ function isWorking(view: CatalogImportView | null) {
 export function ProductCatalogImport({
   projectId,
   modelConfigs,
-  onOpenDraft,
+  source,
+  onDraftDirty,
+  onBusyChange,
 }: {
   projectId: string;
   modelConfigs: ProductAgentModelSettings[];
-  onOpenDraft: () => void;
+  source?: { file?: File; clear: () => void };
+  onDraftDirty?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
   const [view, setView] = useState<CatalogImportView | null>(null);
   const [restoring, setRestoring] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => {
+    onBusyChange?.(pending);
+    return () => onBusyChange?.(false);
+  }, [pending, onBusyChange]);
   const fileRef = useRef<HTMLInputElement>(null);
   const usable = modelConfigs.filter(
     (config) => config.apiKeyConfigured || config.authTokenConfigured,
@@ -125,6 +135,18 @@ export function ProductCatalogImport({
       model: defaultConfig?.model ?? "",
     },
   });
+  const sourceFile = source?.file;
+  const hasSharedSource = source !== undefined;
+  useEffect(() => {
+    if (sourceFile) uploadForm.setValue("document", sourceFile);
+    else if (hasSharedSource) uploadForm.reset();
+  }, [sourceFile, hasSharedSource, uploadForm]);
+  const dirty = selection.formState.isDirty;
+  useWorkspaceDirty("catalog-selection", dirty);
+  useEffect(() => {
+    onDraftDirty?.(dirty);
+    return () => onDraftDirty?.(false);
+  }, [dirty, onDraftDirty]);
   const selected = useWatch({ control: selection.control, name: "candidateIds" });
   const modelConfigId = useWatch({ control: selection.control, name: "modelConfigId" });
   const model = useWatch({ control: selection.control, name: "model" });
@@ -189,7 +211,8 @@ export function ProductCatalogImport({
       const receiptId = await uploadProductDocument(values.document, projectId, "agent");
       if (accept(await intakeProductCatalogAction({ projectId, receiptId }))) {
         uploadForm.reset();
-        selection.setValue("candidateIds", []);
+        source?.clear();
+        selection.reset({ ...selection.getValues(), candidateIds: [] });
         if (fileRef.current) fileRef.current.value = "";
       }
     } catch {
@@ -203,7 +226,8 @@ export function ProductCatalogImport({
     setPending(true);
     setError("");
     try {
-      if (accept(await selectProductCatalogAction(values))) selection.setValue("candidateIds", []);
+      if (accept(await selectProductCatalogAction(values)))
+        selection.reset({ ...values, candidateIds: [] });
     } catch {
       setError("无法提交抽取任务，请重试。");
     } finally {
@@ -241,19 +265,29 @@ export function ProductCatalogImport({
           <FieldGroup>
             <Field data-invalid={Boolean(uploadForm.formState.errors.document)}>
               <FieldLabel htmlFor="catalog-document">产品目录文件</FieldLabel>
-              <Input
-                id="catalog-document"
-                ref={fileRef}
-                type="file"
-                accept=".pdf,.csv,.xls,.xlsx"
-                disabled={pending || restoring || working}
-                aria-invalid={Boolean(uploadForm.formState.errors.document)}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) uploadForm.setValue("document", file, { shouldValidate: true });
-                  else uploadForm.resetField("document");
-                }}
-              />
+              {!source ? (
+                <Input
+                  id="catalog-document"
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.csv,.xls,.xlsx"
+                  disabled={pending || restoring || working}
+                  aria-invalid={Boolean(uploadForm.formState.errors.document)}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file)
+                      uploadForm.setValue("document", file, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      });
+                    else uploadForm.resetField("document");
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {sourceFile ? `所选文件：${sourceFile.name}` : "请先在上方选择产品目录文件。"}
+                </p>
+              )}
               <FieldDescription>
                 支持 PDF、CSV 和 Excel，最大 25 MiB。解析进度可在刷新后恢复。
               </FieldDescription>
@@ -332,8 +366,12 @@ export function ProductCatalogImport({
                           if (choice) {
                             selection.setValue("modelConfigId", choice.configId, {
                               shouldValidate: true,
+                              shouldDirty: true,
                             });
-                            selection.setValue("model", choice.model, { shouldValidate: true });
+                            selection.setValue("model", choice.model, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
                           }
                         }}
                       >
@@ -374,7 +412,7 @@ export function ProductCatalogImport({
                               available
                                 .slice(0, maximumCatalogBatchRecords)
                                 .map((candidate) => candidate.id),
-                              { shouldValidate: true },
+                              { shouldValidate: true, shouldDirty: true },
                             )
                           }
                         >
@@ -386,7 +424,10 @@ export function ProductCatalogImport({
                           size="sm"
                           disabled={pending || !selected.length}
                           onClick={() =>
-                            selection.setValue("candidateIds", [], { shouldValidate: true })
+                            selection.setValue("candidateIds", [], {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            })
                           }
                         >
                           清空选择
@@ -405,7 +446,7 @@ export function ProductCatalogImport({
                                 .filter((candidate) => candidate.status === "failed")
                                 .slice(0, maximumCatalogBatchRecords)
                                 .map((candidate) => candidate.id),
-                              { shouldValidate: true },
+                              { shouldValidate: true, shouldDirty: true },
                             )
                           }
                         >
@@ -442,7 +483,7 @@ export function ProductCatalogImport({
                                       checked
                                         ? [...selected, candidate.id]
                                         : selected.filter((id) => id !== candidate.id),
-                                      { shouldValidate: true },
+                                      { shouldValidate: true, shouldDirty: true },
                                     )
                                   }
                                 />
@@ -473,8 +514,11 @@ export function ProductCatalogImport({
                                     size="sm"
                                     render={
                                       <Link
-                                        onClick={onOpenDraft}
-                                        href={`/workspace/${projectId}?panel=product&item=${candidate.productId}`}
+                                        href={workspaceRecordHref(
+                                          projectId,
+                                          "product",
+                                          candidate.productId,
+                                        )}
                                       />
                                     }
                                   >

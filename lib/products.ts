@@ -45,6 +45,7 @@ export type ProductCatalogDetail = ProductCatalogEntry & {
   draft: ProductDraft;
   approvalId: string | null;
   sourceImages: { evidenceId: string }[];
+  reviewNotes?: string | null;
 };
 
 export type ProductCatalogDashboard = {
@@ -459,7 +460,7 @@ export async function getProductCatalogDetail(
     .limit(1);
   if (!row) return null;
   const [approvalRow] = await database
-    .select({ id: approval.id, status: approval.status })
+    .select({ id: approval.id, status: approval.status, notes: approval.notes })
     .from(approval)
     .where(and(eq(approval.aggregateId, productId), eq(approval.gate, "gate_01_truth")))
     .orderBy(desc(approval.requestedAt), desc(approval.createdAt))
@@ -470,6 +471,7 @@ export async function getProductCatalogDetail(
     version: row.version,
     draft: row.payload as unknown as ProductDraft,
     approvalId: approvalRow?.id ?? null,
+    reviewNotes: approvalRow?.notes ?? null,
     sourceImages: await listProductSourceImages(productId, database),
   };
 }

@@ -337,7 +337,21 @@ test("publication link selects its approved payload and unavailable targets cann
   ]);
   await page.goto(`/workspace/${id}?panel=publication&item=${publicationId}`);
   await expect(panel.getByText("synthetic-chosen-channel", { exact: false })).toBeVisible();
-  await expect(panel.getByText("unknown", { exact: true })).toBeVisible();
+  await expect(panel.getByText("结果待人工核对", { exact: true })).toBeVisible();
+  await expect(panel.getByText(/系统不会自动重试/)).toBeVisible();
+  await expect(panel.locator("#publication-confirmation")).toHaveCount(0);
+  for (const [status, label] of [
+    ["failed", "发布失败"],
+    ["paused", "发布已暂停"],
+    ["published", "已发布"],
+  ]) {
+    await db
+      .update(schema.socialPublication)
+      .set({ status })
+      .where(eq(schema.socialPublication.id, publicationId));
+    await page.reload();
+    await expect(panel.getByText(label, { exact: true })).toBeVisible();
+  }
   await expect(panel.getByText("synthetic-other-post", { exact: false })).toHaveCount(0);
   await expect(panel.getByText("Other synthetic payload", { exact: true })).toHaveCount(0);
   await page.goto(`/workspace/${id}?panel=publication&item=${randomUUID()}`);

@@ -11,9 +11,15 @@ import {
   ShieldCheckIcon,
   XCircleIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useActionState, useEffect, useEffectEvent, useState } from "react";
+import {
+  type ReactNode,
+  startTransition,
+  useActionState,
+  useEffect,
+  useEffectEvent,
+  useState,
+} from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -29,6 +35,7 @@ import {
 } from "@/components/ui/card";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -70,8 +77,10 @@ import type {
   ReadyProductContentSource,
 } from "@/lib/content/store";
 import { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
-import { workspaceRecordHref } from "@/lib/workspace/navigation";
-import { useWorkspaceDirty } from "./dirty-state";
+import { productFactLabels } from "@/lib/product/fact-labels";
+import { workspaceCreateHref, workspaceRecordHref } from "@/lib/workspace/navigation";
+import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
+import { WorkspaceLink as Link } from "./workspace-link";
 
 const contentTypes = [
   ["product", "产品推广"],
@@ -85,7 +94,7 @@ function stateLabel(state: string) {
   return (
     (
       {
-        CONTENT_REVIEW_REQUIRED: "待 Gate 01",
+        CONTENT_REVIEW_REQUIRED: "待人工审核",
         CONTENT_REVISION_REQUIRED: "待修订",
         CONTENT_APPROVED: "已批准",
         CONTENT_PUBLISHED: "已发布",
@@ -203,10 +212,13 @@ function ContentDraftForm({
             <FilePenLineIcon />
           </EmptyMedia>
           <EmptyTitle>当前项目没有已核验产品</EmptyTitle>
-          <EmptyDescription>
-            先在“产品资料”节点完成 Gate 01，内容不能引用其他项目或草稿产品。
-          </EmptyDescription>
+          <EmptyDescription>先核实产品资料，再使用有来源的事实制作内容。</EmptyDescription>
         </EmptyHeader>
+        <EmptyContent>
+          <Button render={<Link href={`/workspace/products?project=${projectId}`} />}>
+            查看产品资料
+          </Button>
+        </EmptyContent>
       </Empty>
     );
   return (
@@ -222,7 +234,7 @@ function ContentDraftForm({
         >
           <FieldGroup>
             <Field data-invalid={!!form.formState.errors.productId}>
-              <FieldLabel>产品</FieldLabel>
+              <FieldLabel htmlFor="content-source-product">产品</FieldLabel>
               <Controller
                 control={form.control}
                 name="productId"
@@ -244,7 +256,7 @@ function ContentDraftForm({
                     }}
                     disabled={revising}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="content-source-product" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -262,7 +274,7 @@ function ContentDraftForm({
               <FieldError errors={[form.formState.errors.productId]} />
             </Field>
             <Field>
-              <FieldLabel>内容类型</FieldLabel>
+              <FieldLabel htmlFor="content-kind">内容类型</FieldLabel>
               <Controller
                 control={form.control}
                 name="contentType"
@@ -272,7 +284,7 @@ function ContentDraftForm({
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="content-kind" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -289,7 +301,7 @@ function ContentDraftForm({
               />
             </Field>
             <Field data-invalid={!!form.formState.errors.factPath}>
-              <FieldLabel>允许引用的产品事实</FieldLabel>
+              <FieldLabel htmlFor="content-source-fact">允许引用的产品事实</FieldLabel>
               <Controller
                 control={form.control}
                 name="factPath"
@@ -301,7 +313,7 @@ function ContentDraftForm({
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="content-source-fact" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -379,6 +391,14 @@ function ContentDraftForm({
           )}
           {revising ? "提交修订并送审" : "创建待审内容"}
         </Button>
+        {saveState.status === "success" && saveState.contentId && !revising ? (
+          <Button
+            render={<Link href={workspaceRecordHref(projectId, "content", saveState.contentId)} />}
+            variant="outline"
+          >
+            打开内容草稿
+          </Button>
+        ) : null}
         {aiState.message ? (
           <p className="text-sm text-muted-foreground" aria-live="polite">
             {aiState.message}
@@ -447,7 +467,19 @@ function ContentReview({
       <div className="flex flex-wrap gap-2">
         <Badge variant="secondary">{stateLabel(detail.state)}</Badge>
         <Badge variant="outline">{contentTypeLabel(detail.contentType)}</Badge>
+        <Badge variant="outline">第 {detail.version} 版</Badge>
       </div>
+      {detail.state.endsWith("REVISION_REQUIRED") ? (
+        <Alert>
+          <AlertTitle>根据审核意见修订</AlertTitle>
+          <AlertDescription>
+            {detail.reviewNotes || "这条记录已退回，请核对来源后修改并重新送审。"}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {detail.state === "CONTENT_REVISION_REQUIRED" && product ? (
+        <ContentDraftForm projectId={projectId} products={[product]} detail={detail} />
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle>{detail.content.hook}</CardTitle>
@@ -473,7 +505,9 @@ function ContentReview({
             <TableBody>
               {detail.content.product_facts.map((fact) => (
                 <TableRow key={fact.field}>
-                  <TableCell className="font-mono text-xs">{fact.field}</TableCell>
+                  <TableCell className="whitespace-normal">
+                    {productFactLabels[fact.field] ?? fact.field}
+                  </TableCell>
                   <TableCell className="whitespace-normal break-words">
                     {fact.value}
                     <span className="mt-1 block font-mono text-xs text-muted-foreground">
@@ -489,7 +523,7 @@ function ContentReview({
       {canDecide ? (
         <Card>
           <CardHeader>
-            <CardTitle>Gate 01 内容审核</CardTitle>
+            <CardTitle>内容审核决定</CardTitle>
             <CardDescription>
               审核版本 {detail.version}。批准不等于发布；请先明确选择。
             </CardDescription>
@@ -498,7 +532,7 @@ function ContentReview({
             <form id="content-review" onSubmit={form.handleSubmit(submit)}>
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.decision}>
-                  <FieldLabel>决定</FieldLabel>
+                  <FieldLabel htmlFor="content-review-decision">决定</FieldLabel>
                   <Controller
                     control={form.control}
                     name="decision"
@@ -509,6 +543,7 @@ function ContentReview({
                         onValueChange={field.onChange}
                       >
                         <SelectTrigger
+                          id="content-review-decision"
                           className="w-full"
                           aria-invalid={!!form.formState.errors.decision}
                         >
@@ -575,15 +610,16 @@ function ContentReview({
             ) : null}
           </CardFooter>
         </Card>
-      ) : (
+      ) : detail.state === "CONTENT_REVIEW_REQUIRED" ? (
         <Alert>
           <ShieldCheckIcon />
-          <AlertTitle>{canReview ? "当前无需审核" : "等待管理员审核"}</AlertTitle>
-          <AlertDescription>审核仍在内容面板内完成，不需要跳转到通用审核节点。</AlertDescription>
+          <AlertTitle>{canReview ? "审核请求需要核对" : "等待审核者检查内容"}</AlertTitle>
+          <AlertDescription>
+            {canReview
+              ? "当前内容没有有效的待审请求，请核对记录状态。"
+              : "由有内容审核权限的项目编辑者核对当前版本，批准后再确认发布。"}
+          </AlertDescription>
         </Alert>
-      )}
-      {detail.state === "CONTENT_REVISION_REQUIRED" && product ? (
-        <ContentDraftForm projectId={projectId} products={[product]} detail={detail} />
       ) : null}
     </div>
   );
@@ -655,6 +691,14 @@ function ContentCopy({
           <CopyIcon data-icon="inline-start" />
           复制为新草稿
         </Button>
+        {state.status === "success" && state.contentId ? (
+          <Button
+            render={<Link href={workspaceRecordHref(projectId, "content", state.contentId)} />}
+            variant="outline"
+          >
+            打开复制的内容草稿
+          </Button>
+        ) : null}
         {state.message ? (
           <p
             className={
@@ -678,6 +722,8 @@ export function ContentPanel({
   copyCandidates,
   detail,
   canReview,
+  mode = "create",
+  children,
 }: {
   projectId: string;
   products: ReadyProductContentSource[];
@@ -685,10 +731,18 @@ export function ContentPanel({
   copyCandidates: ContentCopyCandidate[];
   detail: ContentCatalogDetail | null;
   canReview: boolean;
+  mode?: "create" | "collection";
+  children?: ReactNode;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState(detail ? "records" : "create");
+  const { requestNavigation } = useWorkspaceDirtyState();
+  const tab = searchParams.get("method") === "copy" ? "copy" : "create";
+  function setTab(value: string) {
+    const query = new URLSearchParams(searchParams.toString());
+    query.set("method", value);
+    requestNavigation(() => window.history.pushState(null, "", `${pathname}?${query}`));
+  }
   function href(item: string) {
     if (pathname.startsWith("/workspace/")) return workspaceRecordHref(projectId, "content", item);
     const params = new URLSearchParams(searchParams.toString());
@@ -696,73 +750,65 @@ export function ContentPanel({
     params.set("item", item);
     return `${pathname}?${params}`;
   }
+  if (detail)
+    return (
+      <div className="flex flex-col gap-6">
+        <ContentReview
+          key={`${detail.id}:${detail.version}:${detail.approvalId}`}
+          projectId={projectId}
+          detail={detail}
+          product={products.find((item) => item.id === detail.productId)}
+          canReview={canReview}
+        />
+        {children}
+      </div>
+    );
+  if (mode === "collection" && entries.length)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>内容与发布</CardTitle>
+          <CardDescription>选择一条内容查看草稿、审核和发布结果。</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {entries.map((entry) => (
+            <Button
+              key={entry.id}
+              render={<Link href={href(entry.id)} />}
+              variant="outline"
+              className="h-auto justify-start py-3 text-left"
+            >
+              <span className="flex min-w-0 flex-col gap-1">
+                <span className="break-words">{entry.hook}</span>
+                <span className="text-xs text-muted-foreground">
+                  {entry.productName} · {stateLabel(entry.state)}
+                </span>
+              </span>
+            </Button>
+          ))}
+        </CardContent>
+        <CardFooter>
+          <Button render={<Link href={workspaceCreateHref(projectId, "content")} />}>
+            制作图文内容
+          </Button>
+        </CardFooter>
+      </Card>
+    );
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">营销内容</Badge>
-          <Badge variant="outline">渠道未自动发布</Badge>
-        </div>
+        <h2 className="text-xl font-semibold">制作图文内容</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          从当前项目的 Product Ready 事实创建、审核和修订营销内容。
+          选择已核实的产品事实，完成文案后提交人工审核。
         </p>
       </div>
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full">
-          <TabsTrigger value="create">
-            <PlusIcon />
-            新建
-          </TabsTrigger>
-          <TabsTrigger value="records">记录 {entries.length}</TabsTrigger>
-          <TabsTrigger value="copy">
-            <CopyIcon />
-            复制
-          </TabsTrigger>
+        <TabsList className="w-full" aria-label="内容制作方式">
+          <TabsTrigger value="create">从产品制作</TabsTrigger>
+          <TabsTrigger value="copy">复制已有内容</TabsTrigger>
         </TabsList>
         <TabsContent value="create">
           <ContentDraftForm projectId={projectId} products={products} />
-        </TabsContent>
-        <TabsContent value="records">
-          <div className="flex flex-col gap-3">
-            {entries.length ? (
-              entries.map((entry) => (
-                <Button
-                  key={entry.id}
-                  render={<Link href={href(entry.id)} />}
-                  variant={detail?.id === entry.id ? "secondary" : "outline"}
-                  className="h-auto justify-start py-3 text-left"
-                >
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="truncate font-medium">
-                      {entry.productName} · {contentTypeLabel(entry.contentType)}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {stateLabel(entry.state)} · {entry.hook}
-                    </span>
-                  </span>
-                </Button>
-              ))
-            ) : (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <FilePenLineIcon />
-                  </EmptyMedia>
-                  <EmptyTitle>当前项目还没有内容</EmptyTitle>
-                  <EmptyDescription>从已核验产品创建第一条待审内容。</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
-            {detail ? (
-              <ContentReview
-                key={`${detail.id}:${detail.version}:${detail.approvalId}`}
-                projectId={projectId}
-                detail={detail}
-                product={products.find((item) => item.id === detail.productId)}
-                canReview={canReview}
-              />
-            ) : null}
-          </div>
         </TabsContent>
         <TabsContent value="copy">
           <ContentCopy projectId={projectId} candidates={copyCandidates} />

@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { z } from "zod";
 import contentSchema from "@/contracts/content/content.schema.json";
@@ -15,6 +14,7 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import type { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
+import { productFactLabels } from "@/lib/product/fact-labels";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
@@ -63,6 +63,7 @@ export type ContentCatalogDetail = ContentCatalogEntry & {
   version: number;
   content: ContentRecord;
   approvalId: string | null;
+  reviewNotes?: string | null;
 };
 
 export type ContentCatalogDashboard = {
@@ -104,7 +105,7 @@ function presentFactOptions(product: ProductReady): ReadyProductContentSource["f
       const evidenceRef = product.field_evidence[path];
       if (!evidenceRef || value === undefined || value === null || value === "") return [];
       const text = Array.isArray(value) ? value.join(", ") : String(value);
-      return [{ path, label: path, value: text, evidenceRef }];
+      return [{ path, label: productFactLabels[path] ?? path, value: text, evidenceRef }];
     }),
   );
 }
@@ -645,7 +646,7 @@ export async function getContentCatalogDetail(
     .limit(1);
   if (!row) return null;
   const [approvalRow] = await database
-    .select({ id: approval.id, status: approval.status })
+    .select({ id: approval.id, status: approval.status, notes: approval.notes })
     .from(approval)
     .where(and(eq(approval.aggregateId, contentId), eq(approval.gate, "gate_01_truth")))
     .orderBy(desc(approval.requestedAt), desc(approval.createdAt))
@@ -657,6 +658,7 @@ export async function getContentCatalogDetail(
         version: row.version,
         content: row.payload as ContentRecord,
         approvalId: approvalRow?.id ?? null,
+        reviewNotes: approvalRow?.notes ?? null,
       }
     : null;
 }
