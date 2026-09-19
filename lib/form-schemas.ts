@@ -185,6 +185,15 @@ export const contentAgentRequestSchema = contentDraftFormSchema.pick({
 });
 
 const optionalRfqText = z.string().trim().max(240, "字段不能超过 240 个字符。");
+export const rfqReadyFormSchema = z.object({
+  projectId: z.uuid("项目标识无效。").optional().or(z.literal("")),
+  rfqId: z.uuid("询盘标识无效。"),
+  evidenceRef: z
+    .string()
+    .trim()
+    .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写有效的需求确认凭据。"),
+});
+
 export const rfqFormSchema = z.object({
   leadId: z.uuid("入站线索标识无效。").optional().or(z.literal("")),
   customerName: optionalRfqText,

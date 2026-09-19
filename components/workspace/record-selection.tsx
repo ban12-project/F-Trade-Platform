@@ -50,15 +50,19 @@ export function ReadOnlyRecordList({
   projectId,
   stage,
   entries,
+  canWrite = false,
 }: {
   projectId: string;
   stage: string;
   entries: Array<{ id: string; label: string }>;
+  canWrite?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3">
       <p role="status" className="text-sm text-muted-foreground">
-        当前为只读视图。选择记录查看详情，写入或审核由项目编辑者处理。
+        {canWrite
+          ? "选择记录查看当前进展并继续处理。"
+          : "当前为只读视图。选择记录查看详情，写入或审核由项目编辑者处理。"}
       </p>
       {entries.length ? (
         entries.map((entry) => (

@@ -76,6 +76,7 @@ export type QuotationEntry = {
   productId: string;
   approvalId: string | null;
   approvalStatus: "pending" | "approved" | "rejected" | null;
+  reviewNotes?: string | null;
 };
 export type LeadTimelineMessage = {
   id: string;
@@ -91,6 +92,7 @@ export type LeadEntry = {
   createdAt: Date;
   lead: LeadRecord;
   timeline: LeadTimelineMessage[];
+  timelineTruncated?: boolean;
   replyAvailable: boolean;
   confirmedDelivery: ConfirmedDelivery | null;
 };
@@ -101,6 +103,7 @@ export type DeliveryConfirmationEntry = {
   confirmation: Record<string, any>;
   approvalId: string | null;
   approvalStatus: "pending" | "approved" | "rejected" | null;
+  reviewNotes?: string | null;
 };
 
 function quoteFromValues(value: QuotationDraftValues) {
@@ -1156,16 +1159,27 @@ async function latestApprovals(
   database: Database,
 ) {
   if (!ids.length)
-    return new Map<string, { id: string; status: "pending" | "approved" | "rejected" }>();
+    return new Map<
+      string,
+      { id: string; status: "pending" | "approved" | "rejected"; notes: string | null }
+    >();
   const rows = await database
-    .select({ id: approval.id, aggregateId: approval.aggregateId, status: approval.status })
+    .select({
+      id: approval.id,
+      aggregateId: approval.aggregateId,
+      status: approval.status,
+      notes: approval.notes,
+    })
     .from(approval)
     .where(and(inArray(approval.aggregateId, ids), eq(approval.gate, gate)))
     .orderBy(desc(approval.requestedAt));
-  const result = new Map<string, { id: string; status: "pending" | "approved" | "rejected" }>();
+  const result = new Map<
+    string,
+    { id: string; status: "pending" | "approved" | "rejected"; notes: string | null }
+  >();
   for (const row of rows)
     if (!result.has(row.aggregateId))
-      result.set(row.aggregateId, { id: row.id, status: row.status });
+      result.set(row.aggregateId, { id: row.id, status: row.status, notes: row.notes });
   return result;
 }
 
@@ -1202,6 +1216,7 @@ export async function listProjectQuotations(
       productId: payload.product_id ?? "",
       approvalId: item?.id ?? null,
       approvalStatus: item?.status ?? null,
+      reviewNotes: item?.notes ?? null,
     };
   });
 }
@@ -1210,6 +1225,7 @@ export async function listProjectLeads(
   projectId: string,
   actorId: string,
   database: Database = getDatabase(),
+  options: { timelineLeadId?: string } = {},
 ): Promise<LeadEntry[]> {
   await assertWorkspaceProjectAccess(projectId, actorId, "view", database);
   const rows = await database
@@ -1249,11 +1265,13 @@ export async function listProjectLeads(
   // A payload reference is not an authorization boundary. Do not even fetch message
   // ciphertext unless the conversation is reciprocally bound to an authorized lead.
   const conversationIds = parsedRows.flatMap(({ record, lead }) =>
-    lead.conversation_ref && linkedConversations.has(`${lead.conversation_ref}:${record.id}`)
+    record.id === options.timelineLeadId &&
+    lead.conversation_ref &&
+    linkedConversations.has(`${lead.conversation_ref}:${record.id}`)
       ? [lead.conversation_ref]
       : [],
   );
-  const messages = conversationIds.length
+  const recentMessages = conversationIds.length
     ? await database
         .select({
           id: socialMessage.id,
@@ -1270,9 +1288,10 @@ export async function listProjectLeads(
             gt(socialMessage.expiresAt, new Date()),
           ),
         )
-        .orderBy(socialMessage.receivedAt)
-        .limit(200)
+        .orderBy(desc(socialMessage.receivedAt), desc(socialMessage.id))
+        .limit(201)
     : [];
+  const messages = recentMessages.slice(0, 200).reverse();
   const messageIds = messages.map((message) => message.id);
   const jobs = messageIds.length
     ? await database
@@ -1294,13 +1313,34 @@ export async function listProjectLeads(
           payload: aggregateRecord.payload,
         })
         .from(aggregateRecord)
+        .innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
         .where(
           and(
+            eq(workspaceProjectItem.projectId, projectId),
+            eq(workspaceProjectItem.role, "delivery_confirmation"),
+            eq(workspaceProjectItem.relation, "owned"),
             inArray(aggregateRecord.id, deliveryIds),
             eq(aggregateRecord.type, "delivery_confirmation"),
           ),
         )
     : [];
+  const rfqIds = parsedRows.flatMap(({ lead }) => (lead.rfq_ref ? [lead.rfq_ref] : []));
+  const ownedRfqs = rfqIds.length
+    ? await database
+        .select({ id: aggregateRecord.id })
+        .from(workspaceProjectItem)
+        .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
+        .where(
+          and(
+            eq(workspaceProjectItem.projectId, projectId),
+            eq(workspaceProjectItem.role, "sales_rfq"),
+            eq(workspaceProjectItem.relation, "owned"),
+            eq(aggregateRecord.type, "rfq"),
+            inArray(aggregateRecord.id, rfqIds),
+          ),
+        )
+    : [];
+  const ownedRfqIds = new Set(ownedRfqs.map((rfq) => rfq.id));
   const deliveries = new Map(
     deliveryRows.flatMap((row) => {
       try {
@@ -1310,8 +1350,19 @@ export async function listProjectLeads(
         return row.state === "DELIVERY_CONFIRMATION_CONFIRMED" &&
           validUntil &&
           Date.parse(validUntil) > Date.now() &&
-          Number.isInteger(days)
-          ? [[row.id, { id: row.id, leadTimeDays: days!, validUntil }] as const]
+          Number.isInteger(days) &&
+          confirmation.related_entity_type === "rfq"
+          ? [
+              [
+                row.id,
+                {
+                  id: row.id,
+                  leadTimeDays: days!,
+                  validUntil,
+                  rfqId: confirmation.related_entity_id,
+                },
+              ] as const,
+            ]
           : [];
       } catch {
         return [];
@@ -1327,9 +1378,19 @@ export async function listProjectLeads(
       replyAvailable: Boolean(
         lead.conversation_ref && linkedConversations.has(`${lead.conversation_ref}:${record.id}`),
       ),
-      confirmedDelivery: lead.delivery_confirmation_ref
-        ? (deliveries.get(lead.delivery_confirmation_ref) ?? null)
-        : null,
+      confirmedDelivery: (() => {
+        const delivery = lead.delivery_confirmation_ref
+          ? deliveries.get(lead.delivery_confirmation_ref)
+          : undefined;
+        return delivery && ownedRfqIds.has(delivery.rfqId) && delivery.rfqId === lead.rfq_ref
+          ? {
+              id: delivery.id,
+              leadTimeDays: delivery.leadTimeDays,
+              validUntil: delivery.validUntil,
+            }
+          : null;
+      })(),
+      timelineTruncated: record.id === options.timelineLeadId && recentMessages.length > 200,
       timeline: messages
         .filter(
           (message) =>
@@ -1395,6 +1456,7 @@ export async function listProjectDeliveryConfirmations(
       confirmation: record.payload,
       approvalId: item?.id ?? null,
       approvalStatus: item?.status ?? null,
+      reviewNotes: item?.notes ?? null,
     };
   });
 }

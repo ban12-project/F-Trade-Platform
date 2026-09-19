@@ -46,12 +46,17 @@ test("rejected content exposes revision in the content step", async ({ page }) =
   await expect(detail.getByRole("button", { name: "提交修订并送审" })).toBeVisible();
 });
 
-test("sales demand confirmation includes RFQ and product references", async ({ page }) => {
+test("sales demand detail links its actual customer and quotation", async ({ page }) => {
   await page.goto("/testing/project-workflow?kind=sales&panel=rfq");
   const detail = page.getByRole("region", { name: /详情与审批/ });
-  await expect(detail.getByText("录入询盘", { exact: true })).toBeVisible();
-  await expect(detail.getByText("添加产品引用", { exact: true })).toBeVisible();
-  await expect(detail.getByText("Verified clutch kit")).toBeVisible();
+  await expect(detail.getByText("客户需求", { exact: true })).toBeVisible();
+  await expect(detail.getByRole("link", { name: "打开人工报价", exact: true })).toHaveAttribute(
+    "href",
+    /records\/quotation\/00000000-0000-4000-8000-000000000603$/,
+  );
+  await expect(detail.getByRole("navigation", { name: "客户相关记录" })).toContainText(
+    "Synthetic Buyer · 客户会话",
+  );
 });
 
 test("sales quotation stays explicitly human controlled", async ({ page }) => {
@@ -64,7 +69,7 @@ test("sales quotation stays explicitly human controlled", async ({ page }) => {
 test("follow-up shows the authorized timeline and explicit human send", async ({ page }) => {
   await page.goto("/testing/project-workflow?kind=sales&panel=follow-up");
   const detail = page.getByRole("region", { name: /详情与审批/ });
-  await expect(detail.getByText("授权消息时间线", { exact: true })).toBeVisible();
+  await expect(detail.getByText("客户会话", { exact: true })).toBeVisible();
   await expect(detail.getByText("Synthetic buyer asks for the verified lead time.")).toBeVisible();
   await expect(detail.getByRole("button", { name: "人工确认并发送此回复" })).toBeEnabled();
   await detail.getByRole("combobox", { name: "当前场景" }).click();
@@ -241,4 +246,42 @@ test("product stream rejects cross-origin and unauthenticated requests", async (
   });
   expect(unauthenticated.status()).toBe(403);
   expect(await unauthenticated.json()).toEqual({ error: "仅管理员可运行流式产品导入。" });
+});
+
+test("customer quotation revision preserves its reason, validation and unsaved mobile draft", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/testing/project-workflow?kind=sales&panel=quotation&state=quote-revision");
+  const panel = page.getByRole("region", { name: "报价详情与审批" });
+  const form = panel.locator("#quotation-00000000-0000-4000-8000-000000000603");
+  await expect(panel.getByText("MOCK: 请核对付款条件后再次送审。", { exact: true })).toBeVisible();
+  await form.getByLabel("单价", { exact: true }).fill("-1");
+  await panel.getByRole("button", { name: "提交修订并再次送审", exact: true }).click();
+  await expect(form.getByText("单价必须是正数，最多四位小数。", { exact: true })).toBeVisible();
+  await expect(form.getByLabel("单价", { exact: true })).toHaveAttribute("aria-invalid", "true");
+  await form.getByLabel("单价", { exact: true }).fill("13.25");
+  await panel
+    .getByRole("navigation", { name: "客户相关记录" })
+    .getByRole("link", { name: /Synthetic Buyer · 500/ })
+    .click();
+  const dialog = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await expect(form.getByLabel("单价", { exact: true })).toHaveValue("13.25");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("customer delivery is optional and an ineligible opportunity is explained", async ({
+  page,
+}) => {
+  await page.goto("/testing/project-workflow?kind=sales&panel=follow-up");
+  const panel = page.getByRole("region", { name: /详情与审批/ });
+  const delivery = panel.getByRole("link", { name: "查看交期确认", exact: true });
+  await expect(delivery).toHaveCount(0);
+  await panel.getByRole("button", { name: "客户询问交期或样品", exact: true }).click();
+  await expect(delivery).toBeVisible();
+  await expect(panel.getByText(/当前有效交期为 21 天/)).toBeVisible();
+  await expect(panel.getByRole("button", { name: "确认有效商机", exact: true })).toHaveCount(0);
+  await expect(panel.getByText(/商机尚待确认：/)).toBeVisible();
 });
