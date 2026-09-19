@@ -34,8 +34,10 @@ export function workspaceCreateHref(
   source?: { kind: "product" | "rfq" | "lead"; id: string },
 ) {
   const path =
-    kind === "video" ? `/workspace/${projectId}/video` : `/workspace/${projectId}/new/${kind}`;
-  return source ? `${path}?${source.kind}=${source.id}` : path;
+    kind === "video"
+      ? `/workspace/${projectId}/video?new=1`
+      : `/workspace/${projectId}/new/${kind}`;
+  return source ? `${path}${kind === "video" ? "&" : "?"}${source.kind}=${source.id}` : path;
 }
 export function workspaceTaskHref(
   task: WorkspaceTaskSummary,

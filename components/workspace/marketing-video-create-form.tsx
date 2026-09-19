@@ -58,6 +58,7 @@ import {
   type InternetMediaSearchActionState,
   searchInternetVideoMediaAction,
 } from "@/lib/actions/marketing-video";
+import { productFactLabels } from "@/lib/product/fact-labels";
 import { cn } from "@/lib/utils";
 import { createMarketingVideoUiFormSchema } from "@/lib/video/edit-contracts";
 import type { ReadyVideoProductMediaOption } from "@/lib/video/product-media-sources";
@@ -68,7 +69,9 @@ import {
   videoPresignedUploadPayloadSchema,
   videoUploadBlobPath,
 } from "@/lib/video/upload-contracts";
+import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
+import { WorkspaceLink } from "./workspace-link";
 
 type CreateValues = z.infer<typeof createMarketingVideoUiFormSchema>;
 type VideoProduct = ReadyVideoProductSource & { mediaOptions?: ReadyVideoProductMediaOption[] };
@@ -115,7 +118,7 @@ export function MarketingVideoCreateForm({
     createMarketingVideoDraftAction,
     initialMarketingVideoActionState,
   );
-  const firstProduct = products[0];
+  const firstProduct = products.length === 1 ? products[0] : undefined;
   const firstHasMedia = Boolean(firstProduct?.mediaOptions?.length);
   const form = useForm<CreateValues>({
     resolver: zodResolver(createMarketingVideoUiFormSchema),
@@ -123,8 +126,8 @@ export function MarketingVideoCreateForm({
       projectId,
       productId: firstProduct?.id ?? "",
       factPath: firstProduct?.factOptions[0]?.value ?? "",
-      objective: "Create a concise product inquiry video",
-      targetAudience: "Overseas automotive parts distributors",
+      objective: "展示已核实产品，引导客户咨询",
+      targetAudience: "海外汽车零部件经销商",
       platform: "facebook",
       sourceMode: firstHasMedia ? "product_media" : "upload",
       productMediaIds: firstHasMedia ? initialMediaIds(firstProduct) : [],
@@ -135,8 +138,7 @@ export function MarketingVideoCreateForm({
   });
   const sourceMode = form.watch("sourceMode");
   const selectedProductId = form.watch("productId");
-  const selectedProduct =
-    products.find((product) => product.id === selectedProductId) ?? firstProduct;
+  const selectedProduct = products.find((product) => product.id === selectedProductId);
   const mediaOptions = selectedProduct?.mediaOptions ?? [];
   const internetSearchQueryField = form.register("internetSearchQuery", {
     onChange: () => {
@@ -154,7 +156,7 @@ export function MarketingVideoCreateForm({
     setHasFiles(false);
     setUploadProgress(0);
     router.refresh();
-  }, [form, router, state.status]);
+  }, [form, router, state]);
 
   function selectSourceMode(value: string[]) {
     const next = value[0] as CreateValues["sourceMode"] | undefined;
@@ -299,7 +301,15 @@ export function MarketingVideoCreateForm({
     return (
       <Alert>
         <AlertTitle>需要已核验产品</AlertTitle>
-        <AlertDescription>先在“产品资料”节点完成产品事实审核，再创建营销视频。</AlertDescription>
+        <AlertDescription>
+          先完成产品事实审核，再创建营销视频。
+          <WorkspaceLink
+            className="underline underline-offset-4"
+            href={`/workspace/products?project=${projectId}`}
+          >
+            查看本项目产品资料
+          </WorkspaceLink>
+        </AlertDescription>
       </Alert>
     );
   }
@@ -316,6 +326,44 @@ export function MarketingVideoCreateForm({
       <CardContent>
         <form id="create-marketing-video" onSubmit={form.handleSubmit(submit)}>
           <FieldGroup>
+            <Field data-invalid={Boolean(form.formState.errors.productId)}>
+              <FieldLabel htmlFor="video-create-product">已核验产品</FieldLabel>
+              <Controller
+                control={form.control}
+                name="productId"
+                render={({ field }) => (
+                  <Select
+                    disabled={products.length === 1}
+                    items={Object.fromEntries(
+                      products.map((product) => [
+                        product.id,
+                        `${product.productName} · ${product.internalSku}`,
+                      ]),
+                    )}
+                    value={field.value}
+                    onValueChange={(value) => selectProduct(value, field.onChange)}
+                  >
+                    <SelectTrigger
+                      id="video-create-product"
+                      aria-invalid={Boolean(form.formState.errors.productId)}
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="选择已核实产品" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {products.map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.productName} · {product.internalSku}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldError>{form.formState.errors.productId?.message}</FieldError>
+            </Field>
             <Field>
               <FieldLabel>素材来源</FieldLabel>
               <Controller
@@ -326,7 +374,7 @@ export function MarketingVideoCreateForm({
                     value={[field.value]}
                     onValueChange={selectSourceMode}
                     variant="outline"
-                    className="grid grid-cols-3"
+                    className="grid grid-cols-1 sm:grid-cols-3"
                   >
                     <ToggleGroupItem value="product_media" disabled={!mediaOptions.length}>
                       <FilmIcon />
@@ -344,43 +392,12 @@ export function MarketingVideoCreateForm({
                 )}
               />
               <FieldDescription>
-                {mediaOptions.length
-                  ? `当前产品有 ${mediaOptions.length} 个可复用媒体。`
-                  : "当前产品没有审核通过且仍在授权期内的可复用媒体。"}
+                {!selectedProduct
+                  ? "先选择已核实产品，再选择素材来源。"
+                  : mediaOptions.length
+                    ? `当前产品有 ${mediaOptions.length} 个可复用媒体。`
+                    : "当前产品没有审核通过且仍在授权期内的可复用媒体。"}
               </FieldDescription>
-            </Field>
-            <Field data-invalid={Boolean(form.formState.errors.productId)}>
-              <FieldLabel>已核验产品</FieldLabel>
-              <Controller
-                control={form.control}
-                name="productId"
-                render={({ field }) => (
-                  <Select
-                    items={Object.fromEntries(
-                      products.map((product) => [
-                        product.id,
-                        `${product.productName} · ${product.internalSku}`,
-                      ]),
-                    )}
-                    value={field.value}
-                    onValueChange={(value) => selectProduct(value, field.onChange)}
-                  >
-                    <SelectTrigger aria-label="已核验产品" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.productName} · {product.internalSku}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError>{form.formState.errors.productId?.message}</FieldError>
             </Field>
             <Field data-invalid={Boolean(form.formState.errors.factPath)}>
               <FieldLabel>字幕可引用的事实</FieldLabel>
@@ -390,7 +407,10 @@ export function MarketingVideoCreateForm({
                 render={({ field }) => (
                   <Select
                     items={Object.fromEntries(
-                      (selectedProduct?.factOptions ?? []).map((fact) => [fact.value, fact.label]),
+                      (selectedProduct?.factOptions ?? []).map((fact) => [
+                        fact.value,
+                        productFactLabels[fact.value] ?? fact.label,
+                      ]),
                     )}
                     value={field.value}
                     onValueChange={(value) => value && field.onChange(value)}
@@ -402,7 +422,7 @@ export function MarketingVideoCreateForm({
                       <SelectGroup>
                         {selectedProduct?.factOptions.map((fact) => (
                           <SelectItem key={fact.value} value={fact.value}>
-                            {fact.label}
+                            {productFactLabels[fact.value] ?? fact.label}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -527,8 +547,7 @@ export function MarketingVideoCreateForm({
                     }}
                   />
                   <FieldDescription>
-                    素材以精确路径预签名 URL 直传私有 Blob；超过 100MB 自动分片。图片不超过
-                    20MB，视频必须小于 1GB，源视频最长 120 秒。
+                    图片不超过 20MB，视频小于 1GB、最长 120 秒。上传后仅供项目成员使用。
                   </FieldDescription>
                 </Field>
                 <Field data-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}>
@@ -691,6 +710,14 @@ export function MarketingVideoCreateForm({
           <p className="text-sm text-destructive" aria-live="polite">
             {uploadError}
           </p>
+        ) : null}
+        {state.status === "success" && state.videoId ? (
+          <WorkspaceLink
+            href={workspaceRecordHref(projectId, "video", state.videoId)}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            打开新建的剪辑稿
+          </WorkspaceLink>
         ) : null}
         {state.message ? (
           <p

@@ -73,8 +73,9 @@ test("project workspace exposes categories, records and a primary detail region"
 test("video production has a dedicated editor route", async ({ page }) => {
   await page.goto("/testing/video-workspace");
   await expect(page.getByRole("heading", { name: "视频编辑器" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "素材、预览与时间线" })).toBeVisible();
-  await expect(page.getByText("复制其他项目剪辑")).toBeVisible();
+  await expect(page.getByLabel("成片时长（秒）")).toHaveCount(2);
+  await expect(page.getByText("复制其他项目剪辑")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "返回内容与发布" })).toBeVisible();
 });
 
 for (const empty of [false, true]) {

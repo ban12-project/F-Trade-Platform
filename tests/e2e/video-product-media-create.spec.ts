@@ -11,6 +11,12 @@ test("marketing video creation reuses approved ProductMedia without repeating ri
 
   await page.goto("/testing/video-product-media-create");
   await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("combobox", { name: "已核验产品", exact: true })).toContainText(
+    "选择已核实产品",
+  );
+  await page.getByRole("combobox", { name: "已核验产品", exact: true }).click();
+  await page.getByRole("option", { name: "Verified clutch kit · SYN-901", exact: true }).click();
+  await page.getByRole("button", { name: "复用产品媒体", exact: true }).click();
 
   await expect(page.getByRole("button", { name: "复用产品媒体" })).toHaveAttribute(
     "aria-pressed",
