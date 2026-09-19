@@ -70,18 +70,23 @@ export const salesStages: ProjectStage[] = [
 export function projectStages(kind: ProjectKind) {
   return kind === "marketing" ? marketingStages : salesStages;
 }
+export function taskProjectStage(task: Pick<WorkspaceTaskSummary, "nodeKind" | "taskType">) {
+  if (task.nodeKind !== "lead") return task.nodeKind;
+  return task.taskType === "opportunity"
+    ? "opportunity"
+    : task.taskType === "follow_up"
+      ? "follow-up"
+      : task.taskType === "rfq"
+        ? "rfq"
+        : "inbound";
+}
 export function requestedProjectStage(
   kind: ProjectKind,
   panel?: string,
   taskType?: WorkspaceTaskSummary["taskType"],
 ) {
   if (projectStages(kind).some((stage) => stage.id === panel)) return panel;
-  if (kind === "sales" && panel === "lead")
-    return taskType === "opportunity"
-      ? "opportunity"
-      : taskType === "follow_up"
-        ? "follow-up"
-        : "inbound";
+  if (kind === "sales" && panel === "lead") return taskProjectStage({ nodeKind: "lead", taskType });
   return undefined;
 }
 export function defaultProjectStage(
@@ -90,31 +95,27 @@ export function defaultProjectStage(
   records: StageRecord[],
   hasPublication: boolean,
 ) {
+  const next = tasks.find((task) =>
+    projectStages(kind).some((stage) => stage.id === taskProjectStage(task)),
+  );
+  if (next) return taskProjectStage(next);
   if (kind === "marketing") {
-    const next = tasks.find((task) =>
-      marketingStages.some((stage) => stage.panelKind === task.nodeKind),
-    );
-    return (
-      next?.nodeKind ??
-      (hasPublication
-        ? "publication"
-        : records.some((row) => row.type === "video")
-          ? "video"
-          : records.some((row) => row.type === "content")
-            ? "content"
-            : "product")
-    );
+    return hasPublication
+      ? "publication"
+      : records.some((row) => row.type === "video")
+        ? "video"
+        : records.some((row) => row.type === "content")
+          ? "content"
+          : "product";
   }
-  return records.some((row) => row.type === "lead" && row.state === "OPPORTUNITY")
-    ? "opportunity"
-    : records.some(
-          (row) =>
-            row.type === "delivery_confirmation" && row.state === "DELIVERY_CONFIRMATION_PENDING",
-        )
-      ? "delivery"
-      : records.some((row) => row.type === "lead")
-        ? "follow-up"
-        : records.some((row) => row.type === "quotation")
-          ? "quotation"
-          : "rfq";
+  const hasState = (...states: string[]) => records.some((row) => states.includes(row.state));
+  if (hasState("DELIVERY_CONFIRMATION_PENDING")) return "delivery";
+  if (hasState("QUOTE_REVIEW_REQUIRED", "QUOTE_REVISION_REQUIRED", "QUOTE_APPROVED"))
+    return "quotation";
+  if (hasState("RFQ_COLLECTING", "LEAD_RECEIVED")) return "rfq";
+  if (hasState("RFQ_READY", "QUOTE_DRAFT")) return "quotation";
+  if (hasState("FOLLOW_UP")) return "follow-up";
+  if (hasState("OPPORTUNITY")) return "opportunity";
+  if (records.some((row) => row.type === "quotation")) return "quotation";
+  return "inbound";
 }

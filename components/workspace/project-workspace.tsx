@@ -8,6 +8,7 @@ import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
+import { taskProjectStage } from "@/lib/workspace/stages";
 import type { WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
 import { useWorkspaceDirtyState, WorkspaceDirtyProvider } from "./dirty-state";
 import { WorkspaceLink } from "./workspace-link";
@@ -289,15 +290,7 @@ export function ProjectStageTasks({
   basePath?: string;
 }) {
   const projectTasks = tasks.filter((task) => task.projectId === projectId);
-  const stageTasks = projectTasks.filter(
-    (task) =>
-      task.nodeKind === stage.panelKind &&
-      (stage.id === "opportunity"
-        ? task.taskType === "opportunity"
-        : stage.id === "follow-up"
-          ? task.taskType === "follow_up"
-          : true),
-  );
+  const stageTasks = projectTasks.filter((task) => taskProjectStage(task) === stage.id);
 
   return (
     <div className="min-w-0 space-y-5">

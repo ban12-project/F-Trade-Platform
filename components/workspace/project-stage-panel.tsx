@@ -1,5 +1,5 @@
 import "server-only";
-import { Suspense } from "react";
+import { type ReactNode, Suspense } from "react";
 import { hasPermission } from "@/lib/authz";
 import {
   getProjectContentCatalogDetail,
@@ -25,6 +25,7 @@ import { ContentPanel } from "./content-panel";
 import { ProductMediaPanel } from "./product-media-panel";
 import { ProductPanel } from "./product-panel";
 import { VideoStageEntry } from "./project-workspace";
+import { RecordSelection } from "./record-selection";
 import { ProductReferencePanel, RfqPanel } from "./sales-panels";
 import { WorkspacePanelSkeleton } from "./workspace-loading-skeleton";
 
@@ -57,13 +58,20 @@ export async function ProjectStagePanel({
   role,
   stage,
   selectedId,
+  selectedLeadId,
 }: {
   projectId: string;
   actorId: string;
   role: string | null | undefined;
   stage: string;
   selectedId?: string;
+  selectedLeadId?: string;
 }) {
+  const selection = (found: boolean, children: ReactNode, id = selectedId) => (
+    <RecordSelection projectId={projectId} stage={stage} selectedId={id} found={found}>
+      {children}
+    </RecordSelection>
+  );
   switch (stage) {
     case "product": {
       const [entries, detail, settings, evidenceOptions] = await Promise.all([
@@ -73,7 +81,8 @@ export async function ProjectStagePanel({
         listProjectEvidenceOptions(projectId, actorId),
       ]);
       const canReview = hasPermission(role, "product:review");
-      return (
+      return selection(
+        Boolean(detail),
         <div className="flex flex-col gap-6">
           <ProductPanel
             projectId={projectId}
@@ -88,7 +97,7 @@ export async function ProjectStagePanel({
               <ProductMedia projectId={projectId} productId={detail.id} canReview={canReview} />
             </Suspense>
           ) : null}
-        </div>
+        </div>,
       );
     }
     case "content": {
@@ -98,7 +107,8 @@ export async function ProjectStagePanel({
         listCrossProjectContentCandidates(projectId, actorId),
         selectedId ? getProjectContentCatalogDetail(projectId, selectedId) : null,
       ]);
-      return (
+      return selection(
+        Boolean(detail),
         <ContentPanel
           projectId={projectId}
           entries={entries}
@@ -106,7 +116,7 @@ export async function ProjectStagePanel({
           copyCandidates={copyCandidates}
           detail={detail}
           canReview={hasPermission(role, "content:review")}
-        />
+        />,
       );
     }
     case "video": {
@@ -119,13 +129,29 @@ export async function ProjectStagePanel({
         />
       );
     }
-    case "publication":
-      return (
+    case "publication": {
+      const data = await listProjectPublicationData(projectId);
+      const publication = data.publications.find((entry) => entry.id === selectedId);
+      const contentId = publication?.contentRef ?? selectedId;
+      const candidates = selectedId
+        ? data.candidates.filter((entry) => entry.id === contentId)
+        : data.candidates;
+      const publications = selectedId
+        ? data.publications.filter(
+            (entry) => entry.id === selectedId || entry.contentRef === selectedId,
+          )
+        : data.publications;
+      return selection(
+        candidates.length > 0 || publications.length > 0,
         <PublicationPanel
+          key={selectedId ?? "all"}
           projectId={projectId}
-          {...(await listProjectPublicationData(projectId))}
-        />
+          candidates={candidates}
+          channels={data.channels}
+          publications={publications}
+        />,
       );
+    }
     case "rfq": {
       const [entries, leads, available, linked] = await Promise.all([
         listProjectRfqEntries(projectId),
@@ -133,11 +159,28 @@ export async function ProjectStagePanel({
         listReadyProductContentSources(),
         listProjectReadyProductReferences(projectId),
       ]);
-      return (
+      const lead = leads.find((entry) => entry.id === selectedLeadId);
+      const linkedRfq = selectedLeadId
+        ? entries.find((entry) => entry.formValues.leadId === selectedLeadId)
+        : undefined;
+      const rfqId = selectedId ?? linkedRfq?.id;
+      const found = selectedId
+        ? entries.some((entry) => entry.id === selectedId)
+        : Boolean(linkedRfq || lead?.state === "LEAD_RECEIVED");
+      return selection(
+        found,
         <div className="flex flex-col gap-6">
-          <RfqPanel projectId={projectId} entries={entries} selectedId={selectedId} leads={leads} />
+          <RfqPanel
+            key={`${rfqId ?? "new"}:${selectedLeadId ?? ""}`}
+            projectId={projectId}
+            entries={entries}
+            selectedId={rfqId}
+            selectedLeadId={selectedLeadId}
+            leads={leads}
+          />
           <ProductReferencePanel projectId={projectId} available={available} linked={linked} />
-        </div>
+        </div>,
+        selectedId ?? selectedLeadId,
       );
     }
     case "quotation": {
@@ -146,36 +189,45 @@ export async function ProjectStagePanel({
         listProjectRfqEntries(projectId),
         listProjectReadyProductReferences(projectId),
       ]);
-      return (
+      const selected = selectedId ? entries.filter((entry) => entry.id === selectedId) : entries;
+      return selection(
+        selected.length > 0,
         <QuotationPanel
           projectId={projectId}
-          entries={entries}
+          entries={selected}
+          showCreateForm={!selectedId}
           rfqs={rfqs}
           products={products}
           canReview={hasPermission(role, "quotation:review")}
-        />
+        />,
       );
     }
-    case "delivery":
-      return (
+    case "delivery": {
+      const entries = await listProjectDeliveryConfirmations(projectId);
+      const selected = selectedId ? entries.filter((entry) => entry.id === selectedId) : entries;
+      return selection(
+        selected.length > 0,
         <DeliveryPanel
           projectId={projectId}
-          entries={await listProjectDeliveryConfirmations(projectId)}
+          entries={selected}
           canReview={hasPermission(role, "delivery:review")}
-        />
+        />,
       );
+    }
     case "inbound":
     case "follow-up":
     case "opportunity": {
       const leads = await listProjectLeads(projectId, actorId);
-      return (
-        <LeadPanel
-          projectId={projectId}
-          entries={
-            stage === "opportunity" ? leads.filter((entry) => entry.state === "OPPORTUNITY") : leads
-          }
-        />
-      );
+      const visible = selectedId
+        ? leads.filter((entry) => entry.id === selectedId)
+        : stage === "opportunity"
+          ? leads.filter(
+              (entry) =>
+                entry.state === "OPPORTUNITY" ||
+                (entry.state === "FOLLOW_UP" && entry.lead.score_band === "HOT"),
+            )
+          : leads;
+      return selection(visible.length > 0, <LeadPanel projectId={projectId} entries={visible} />);
     }
     default:
       throw new Error("Unsupported project stage");

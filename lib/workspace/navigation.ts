@@ -1,3 +1,4 @@
+import { taskProjectStage } from "./stages";
 import type { WorkspaceTaskSummary } from "./store";
 
 export function workspaceTaskHref(
@@ -8,5 +9,6 @@ export function workspaceTaskHref(
   if (task.nodeKind === "video" && basePath === canonicalProjectPath) {
     return `${canonicalProjectPath}/video?item=${task.id}`;
   }
-  return `${basePath}?panel=${task.nodeKind}&item=${task.id}`;
+  const itemKey = task.nodeKind === "lead" && task.taskType === "rfq" ? "lead" : "item";
+  return `${basePath}?panel=${taskProjectStage(task)}&${itemKey}=${task.id}`;
 }
