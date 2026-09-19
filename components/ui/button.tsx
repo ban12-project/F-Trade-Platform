@@ -53,6 +53,7 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
+      data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
       nativeButton={render ? false : nativeButton}
       render={render}
@@ -69,7 +70,14 @@ function LinkButton({
   size = "default",
   ...props
 }: LinkButtonProps) {
-  return <Link className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  return (
+    <Link
+      data-slot="button"
+      data-size={size}
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  );
 }
 
 export { Button, buttonVariants, LinkButton };

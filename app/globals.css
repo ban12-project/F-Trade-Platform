@@ -19,13 +19,13 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.5 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.439 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -39,13 +39,12 @@
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
 }
 
 body {
   margin: 0;
   min-height: 100svh;
-  overflow-x: hidden;
   background: var(--background);
   color: var(--foreground);
   touch-action: manipulation;
@@ -53,7 +52,8 @@ body {
 }
 
 html {
-  scroll-padding-top: 4rem;
+  scroll-padding-top: 6rem;
+  scroll-padding-bottom: calc(7rem + env(safe-area-inset-bottom));
 }
 
 @theme inline {
@@ -100,6 +100,7 @@ html {
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -117,7 +118,7 @@ html {
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.87 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -130,7 +131,7 @@ html {
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.87 0 0);
 }
 
 @layer base {
@@ -145,12 +146,19 @@ html {
   }
 }
 
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   [data-slot="button"],
+  [class~="group/button"],
   [data-slot="input"],
   [data-slot="select-trigger"],
   [data-slot="toggle-group-item"] {
+    min-width: 2.75rem;
     min-height: 2.75rem;
+  }
+
+  [data-slot="input"],
+  [data-slot="textarea"] {
+    font-size: max(1rem, 16px);
   }
 }
 
@@ -174,32 +182,41 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
+  /* Limit motion overrides to UI, not authored video/composition content. */
+  html,
+  [data-slot],
+  [data-slot]::before,
+  [data-slot]::after,
+  [class~="group/button"],
+  .motion-landing-enter,
+  .workspace-stage-link,
+  .workspace-task-arrow,
+  .workspace-pipeline-card,
+  .workspace-link-progress {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
 
   .motion-landing-enter {
     transform: none;
-    transition: opacity 200ms var(--ease-out);
   }
 
-  [data-slot="sheet-content"] {
-    transform: none !important;
-    transition: opacity 200ms var(--ease-out) !important;
-  }
-
-  [data-slot="drawer-popup"] {
-    transform: none !important;
-    transition: opacity 200ms var(--ease-out) !important;
-  }
-
-  [data-slot="tooltip-content"] {
-    transform: none !important;
-    transition: opacity 125ms var(--ease-out) !important;
+  /* Do not unset layout transforms on centered dialogs or positioned popups. */
+  [class~="group/button"],
+  .workspace-stage-link,
+  .workspace-task-arrow,
+  .workspace-pipeline-card {
+    scale: none !important;
+    translate: none !important;
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
+  [data-slot="dialog-content"],
   [data-slot="sheet-content"],
   [data-slot="drawer-popup"],
   nav,
@@ -210,9 +227,149 @@ html {
 }
 
 @media (prefers-contrast: more) {
+  :root,
+  .dark {
+    --muted-foreground: var(--foreground);
+    --border: var(--foreground);
+    --input: var(--foreground);
+  }
+
+  [data-slot="dialog-content"],
   [data-slot="sheet-content"],
   [data-slot="drawer-popup"] {
     border-color: var(--foreground);
     background: var(--background);
+  }
+}
+
+/* Outlines remain visible when forced-colors mode suppresses box shadows. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.workspace-page {
+  min-width: 0;
+  min-height: 100svh;
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  padding-left: env(safe-area-inset-left);
+}
+
+.workspace-page > header {
+  padding-top: env(safe-area-inset-top);
+}
+
+.workspace-dock {
+  position: fixed;
+  right: calc(0.75rem + env(safe-area-inset-right));
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  left: calc(0.75rem + env(safe-area-inset-left));
+  z-index: 20;
+  display: flex;
+  width: max-content;
+  max-width: calc(100% - 1.5rem - env(safe-area-inset-left) - env(safe-area-inset-right));
+  align-items: center;
+  gap: 0.25rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin-inline: auto;
+  padding: 0.375rem;
+}
+
+[data-slot="dialog-content"] {
+  top: calc(50% + (env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 2);
+  left: calc(50% + (env(safe-area-inset-left) - env(safe-area-inset-right)) / 2);
+  max-height: calc(100vh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+@supports (height: 100dvh) {
+  [data-slot="dialog-content"] {
+    max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+
+[data-slot="dialog-content"][data-close-button="true"] > [data-slot="dialog-header"] {
+  padding-right: 2.5rem;
+}
+
+.workspace-details-scroll {
+  height: auto;
+  min-height: 0;
+}
+
+@media (max-width: 47.999rem) {
+  /* Base UI supplies inline overflow. Only the mobile details region opts out
+     to keep the document as the vertical scrolling surface. */
+  .workspace-details-scroll > [data-slot="scroll-area-viewport"] {
+    height: auto;
+    overflow: visible !important;
+  }
+
+  .workspace-details-scroll > [data-slot="scroll-area-scrollbar"] {
+    display: none;
+  }
+}
+
+@media (min-width: 48rem) {
+  .workspace-details-scroll {
+    height: calc(100vh - 17rem);
+    min-height: 20rem;
+  }
+
+  @supports (height: 100dvh) {
+    .workspace-details-scroll {
+      height: calc(100dvh - 17rem);
+    }
+  }
+}
+
+.workspace-link {
+  position: relative;
+}
+
+.workspace-link-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.workspace-link-progress[data-pending="true"] {
+  opacity: 1;
+  transition: opacity 120ms var(--ease-out) 100ms;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"],
+  [data-slot="drawer-overlay"] {
+    backdrop-filter: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  [data-slot="button"],
+  [class~="group/button"],
+  [data-slot="input"],
+  [data-slot="select-trigger"],
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="drawer-popup"] {
+    border: 1px solid ButtonText;
+  }
+
+  [aria-current="step"],
+  [aria-current="page"] {
+    border-color: Highlight;
   }
 }
