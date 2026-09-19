@@ -8,7 +8,9 @@ import {
   aggregateRecord,
   approval,
   auditEvent,
+  socialChannelControl,
   socialPublication,
+  user,
   workspaceProject,
   workspaceProjectItem,
   workspaceProjectMember,
@@ -17,8 +19,14 @@ import type { ProductReady } from "@/lib/product/verification";
 import { assertWorkspaceProjectAccess } from "./access";
 
 import { createWorkspaceProjectSchema } from "./contracts";
+import {
+  deriveWorkspacePipeline,
+  deriveWorkspaceTasks,
+  type WorkspaceTaskSnapshot,
+} from "./task-model";
 
 export type WorkspaceProjectSummary = {
+  memberRole?: "owner" | "editor" | "viewer";
   id: string;
   title: string;
   kind: "marketing" | "sales";
@@ -41,15 +49,29 @@ export type WorkspaceTaskSummary = {
     | "delivery";
   title: string;
   detail: string;
-  priority: "review" | "complete";
+  priority: "attention" | "overdue" | "review" | "complete";
+  state?: "actionable" | "waiting" | "processing" | "attention" | "scheduled";
+  responsibleLabel?: string;
+  source?: { kind: "product" | "rfq"; id: string };
   createdAt: Date;
   dueAt?: Date;
   actionLabel?: string;
-  taskType?: "approval" | "follow_up" | "publication" | "rfq" | "opportunity";
+  taskType?:
+    | "approval"
+    | "follow_up"
+    | "publication"
+    | "rfq"
+    | "opportunity"
+    | "revision"
+    | "create"
+    | "send"
+    | "processing";
 };
 export type WorkspacePipelineSummary = WorkspaceProjectSummary & {
   currentStage: string;
   nextAction: string;
+  currentStageId?: string;
+  nextActionHref?: string;
   recordCount: number;
   publishedCount: number;
   leadCount: number;
@@ -63,6 +85,7 @@ export async function listWorkspaceProjects(
 ): Promise<WorkspaceProjectSummary[]> {
   return database
     .select({
+      memberRole: workspaceProjectMember.role,
       id: workspaceProject.id,
       title: workspaceProject.title,
       kind: workspaceProject.kind,
@@ -80,21 +103,89 @@ export async function listWorkspaceProjects(
     .orderBy(desc(workspaceProject.updatedAt));
 }
 
-function taskTitle(type: string, payload: Record<string, unknown>) {
-  if (type === "product") {
-    const product = payload.product as Record<string, unknown> | undefined;
-    return typeof product?.product_name === "string" ? product.product_name : "产品资料待审核";
-  }
-  if (type === "content") return typeof payload.hook === "string" ? payload.hook : "营销内容待审核";
-  if (type === "video")
-    return typeof payload.objective === "string" ? payload.objective : "营销视频待审核";
-  if (type === "quotation") return "人工报价等待 Gate 02";
-  if (type === "delivery_confirmation") return "交期等待 Gate 03";
-  if (type === "lead") return payload.score_band === "HOT" ? "确认有效商机" : "客户跟进到期";
-  const product = payload.product as Record<string, unknown> | undefined;
-  return typeof product?.product_type === "string"
-    ? `询盘：${product.product_type}`
-    : "询盘资料待补充";
+/** Load authorized data once, then derive all next-action surfaces from the same snapshot. */
+export async function readWorkspaceTaskSnapshot(
+  actorId: string,
+  database: Database = getDatabase(),
+  projectId?: string,
+): Promise<WorkspaceTaskSnapshot> {
+  const projects = await database
+    .select({
+      id: workspaceProject.id,
+      title: workspaceProject.title,
+      kind: workspaceProject.kind,
+      status: workspaceProject.status,
+      updatedAt: workspaceProject.updatedAt,
+      memberRole: workspaceProjectMember.role,
+      appRole: user.role,
+    })
+    .from(workspaceProjectMember)
+    .innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectMember.projectId))
+    .innerJoin(user, eq(user.id, workspaceProjectMember.userId))
+    .where(
+      and(
+        eq(workspaceProjectMember.userId, actorId),
+        projectId ? eq(workspaceProject.id, projectId) : undefined,
+      ),
+    );
+  const ids = projects.map((project) => project.id);
+  if (!ids.length)
+    return { projects: [], records: [], approvals: [], publications: [], hasActiveChannel: false };
+  const [records, approvals, publications, channels] = await Promise.all([
+    database
+      .select({
+        id: aggregateRecord.id,
+        projectId: workspaceProjectItem.projectId,
+        type: aggregateRecord.type,
+        state: aggregateRecord.state,
+        version: aggregateRecord.version,
+        payload: aggregateRecord.payload,
+        relation: workspaceProjectItem.relation,
+        createdAt: aggregateRecord.createdAt,
+        updatedAt: aggregateRecord.updatedAt,
+      })
+      .from(workspaceProjectItem)
+      .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
+      .where(inArray(workspaceProjectItem.projectId, ids)),
+    database
+      .select({
+        id: approval.id,
+        aggregateId: approval.aggregateId,
+        gate: approval.gate,
+        status: approval.status,
+        requestedAt: approval.requestedAt,
+        createdAt: approval.createdAt,
+      })
+      .from(approval)
+      .innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, approval.aggregateId))
+      .where(
+        and(
+          inArray(workspaceProjectItem.projectId, ids),
+          eq(workspaceProjectItem.relation, "owned"),
+        ),
+      ),
+    database
+      .select({
+        id: socialPublication.id,
+        projectId: socialPublication.projectId,
+        contentRef: socialPublication.contentRef,
+        status: socialPublication.status,
+        createdAt: socialPublication.createdAt,
+      })
+      .from(socialPublication)
+      .where(inArray(socialPublication.projectId, ids)),
+    database
+      .select({ id: socialChannelControl.id })
+      .from(socialChannelControl)
+      .where(
+        and(
+          eq(socialChannelControl.enabled, true),
+          eq(socialChannelControl.circuitStatus, "active"),
+        ),
+      )
+      .limit(1),
+  ]);
+  return { projects, records, approvals, publications, hasActiveChannel: channels.length > 0 };
 }
 
 export async function listWorkspaceTasks(
@@ -102,371 +193,17 @@ export async function listWorkspaceTasks(
   database: Database = getDatabase(),
   projectId?: string,
 ): Promise<WorkspaceTaskSummary[]> {
-  const visibleProjects = await database
-    .select({ id: workspaceProjectMember.projectId })
-    .from(workspaceProjectMember)
-    .where(
-      and(
-        eq(workspaceProjectMember.userId, actorId),
-        projectId ? eq(workspaceProjectMember.projectId, projectId) : undefined,
-      ),
-    );
-  const projectIds = visibleProjects.map((project) => project.id);
-  if (!projectIds.length) return [];
-  const reviewRowsQuery = database
-    .select({
-      id: aggregateRecord.id,
-      type: aggregateRecord.type,
-      payload: aggregateRecord.payload,
-      createdAt: approval.requestedAt,
-      projectId: workspaceProject.id,
-      projectTitle: workspaceProject.title,
-      role: workspaceProjectItem.role,
-    })
-    .from(approval)
-    .innerJoin(aggregateRecord, eq(aggregateRecord.id, approval.aggregateId))
-    .innerJoin(
-      workspaceProjectItem,
-      and(
-        eq(workspaceProjectItem.aggregateId, aggregateRecord.id),
-        eq(workspaceProjectItem.relation, "owned"),
-      ),
-    )
-    .innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
-    .where(
-      and(
-        eq(approval.status, "pending"),
-        inArray(workspaceProject.id, projectIds),
-        inArray(workspaceProjectItem.role, [
-          "product_source",
-          "marketing_content",
-          "marketing_video",
-          "sales_quotation",
-          "delivery_confirmation",
-        ]),
-      ),
-    )
-    .orderBy(desc(approval.requestedAt));
-  const rfqRowsQuery = database
-    .select({
-      id: aggregateRecord.id,
-      payload: aggregateRecord.payload,
-      createdAt: aggregateRecord.createdAt,
-      projectId: workspaceProject.id,
-      projectTitle: workspaceProject.title,
-    })
-    .from(workspaceProjectItem)
-    .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-    .innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
-    .where(
-      and(
-        inArray(workspaceProject.id, projectIds),
-        eq(workspaceProjectItem.role, "sales_rfq"),
-        eq(workspaceProjectItem.relation, "owned"),
-        eq(aggregateRecord.state, "RFQ_COLLECTING"),
-      ),
-    )
-    .orderBy(desc(aggregateRecord.createdAt));
-  const leadRowsQuery = database
-    .select({
-      id: aggregateRecord.id,
-      payload: aggregateRecord.payload,
-      createdAt: aggregateRecord.createdAt,
-      projectId: workspaceProject.id,
-      projectTitle: workspaceProject.title,
-    })
-    .from(workspaceProjectItem)
-    .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-    .innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
-    .where(
-      and(
-        inArray(workspaceProject.id, projectIds),
-        eq(workspaceProjectItem.role, "sales_lead"),
-        eq(workspaceProjectItem.relation, "owned"),
-        inArray(aggregateRecord.state, ["LEAD_RECEIVED", "FOLLOW_UP"]),
-      ),
-    )
-    .orderBy(desc(aggregateRecord.updatedAt));
-  const publicationRowsQuery = database
-    .select({
-      id: aggregateRecord.id,
-      type: aggregateRecord.type,
-      payload: aggregateRecord.payload,
-      createdAt: aggregateRecord.createdAt,
-      projectId: workspaceProject.id,
-      projectTitle: workspaceProject.title,
-    })
-    .from(workspaceProjectItem)
-    .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-    .innerJoin(workspaceProject, eq(workspaceProject.id, workspaceProjectItem.projectId))
-    .where(
-      and(
-        inArray(workspaceProject.id, projectIds),
-        inArray(workspaceProjectItem.role, ["marketing_content", "marketing_video"]),
-        inArray(aggregateRecord.state, ["CONTENT_APPROVED", "VIDEO_APPROVED"]),
-      ),
-    )
-    .orderBy(desc(aggregateRecord.updatedAt));
-  const [reviewRows, rfqRows, leadRows, publicationRows] = await Promise.all([
-    reviewRowsQuery,
-    rfqRowsQuery,
-    leadRowsQuery,
-    publicationRowsQuery,
-  ]);
-  const publicationStates = publicationRows.length
-    ? await database
-        .select({
-          id: socialPublication.id,
-          contentRef: socialPublication.contentRef,
-          status: socialPublication.status,
-          createdAt: socialPublication.createdAt,
-        })
-        .from(socialPublication)
-        .where(
-          inArray(
-            socialPublication.contentRef,
-            publicationRows.map((row) => row.id),
-          ),
-        )
-        .orderBy(desc(socialPublication.createdAt))
-    : [];
-  const latestPublicationByContent = new Map<string, { id: string; status: string }>();
-  for (const publication of publicationStates)
-    if (!latestPublicationByContent.has(publication.contentRef))
-      latestPublicationByContent.set(publication.contentRef, publication);
-  const seenReviewIds = new Set<string>();
-  const reviewTasks = reviewRows.flatMap((row): WorkspaceTaskSummary[] => {
-    if (seenReviewIds.has(row.id)) return [];
-    seenReviewIds.add(row.id);
-    const nodeKind =
-      row.type === "product"
-        ? "product"
-        : row.type === "content"
-          ? "content"
-          : row.type === "video"
-            ? "video"
-            : row.type === "quotation"
-              ? "quotation"
-              : row.type === "delivery_confirmation"
-                ? "delivery"
-                : null;
-    if (!nodeKind) return [];
-    const detail =
-      row.type === "quotation"
-        ? "等待管理员完成 Gate 02"
-        : row.type === "delivery_confirmation"
-          ? "等待管理员完成 Gate 03"
-          : "等待人工审核";
-    return [
-      {
-        id: row.id,
-        projectId: row.projectId,
-        projectTitle: row.projectTitle,
-        nodeKind,
-        title: taskTitle(row.type, row.payload),
-        detail,
-        actionLabel:
-          row.type === "quotation"
-            ? "审核人工报价"
-            : row.type === "delivery_confirmation"
-              ? "确认交期"
-              : "完成审核",
-        priority: "review",
-        taskType: "approval",
-        createdAt: row.createdAt,
-      },
-    ];
-  });
-  const rfqTasks = rfqRows.map((row): WorkspaceTaskSummary => {
-    const missing =
-      (row.payload.missing_fields as unknown[] | undefined)?.filter(
-        (item): item is string => typeof item === "string",
-      ).length ?? 0;
-    return {
-      id: row.id,
-      projectId: row.projectId,
-      projectTitle: row.projectTitle,
-      nodeKind: "rfq",
-      title: taskTitle("rfq", row.payload),
-      detail: missing ? `还缺 ${missing} 项资料` : "等待提交为完整询盘",
-      priority: "complete",
-      taskType: "rfq",
-      createdAt: row.createdAt,
-    };
-  });
-  const leadTasks = leadRows.map((row): WorkspaceTaskSummary => {
-    const received = row.payload.status === "received";
-    const due =
-      typeof row.payload.next_follow_up_at === "string" &&
-      !Number.isNaN(Date.parse(row.payload.next_follow_up_at))
-        ? new Date(row.payload.next_follow_up_at)
-        : undefined;
-    const hot = row.payload.score_band === "HOT";
-    return {
-      id: row.id,
-      projectId: row.projectId,
-      projectTitle: row.projectTitle,
-      nodeKind: "lead",
-      title: received ? "入站线索等待 RFQ" : taskTitle("lead", row.payload),
-      detail: received
-        ? "消息已归属项目，等待业务人员录入询盘"
-        : hot
-          ? "规则评分已达 HOT，等待人工认定"
-          : due
-            ? `计划跟进：${due.toLocaleString("zh-CN")}`
-            : "等待下一次人工跟进",
-      actionLabel: received ? "录入 RFQ" : hot ? "确认有效商机" : "继续跟进",
-      priority: hot ? "review" : "complete",
-      taskType: received ? "rfq" : hot ? "opportunity" : "follow_up",
-      createdAt: row.createdAt,
-      ...(due ? { dueAt: due } : {}),
-    };
-  });
-  const publicationTasks = publicationRows.flatMap((row): WorkspaceTaskSummary[] => {
-    const publication = latestPublicationByContent.get(row.id);
-    if (publication && ["submitted", "published"].includes(publication.status)) return [];
-    const needsResolution =
-      publication && ["unknown", "failed", "paused"].includes(publication.status);
-    return [
-      {
-        id: publication?.id ?? row.id,
-        projectId: row.projectId,
-        projectTitle: row.projectTitle,
-        nodeKind: "publication",
-        title: needsResolution
-          ? "发布已暂停，等待人工核对"
-          : row.type === "video"
-            ? "已批准视频等待发布确认"
-            : taskTitle("content", row.payload),
-        detail: needsResolution
-          ? "平台结果不确定或执行失败；禁止自动重试"
-          : "需要逐帖人工确认后提交受控发布",
-        actionLabel: needsResolution ? "核对发布状态" : "确认并提交发布",
-        priority: "review",
-        taskType: "publication",
-        createdAt: row.createdAt,
-      },
-    ];
-  });
-  return [...reviewTasks, ...publicationTasks, ...rfqTasks, ...leadTasks].sort((left, right) =>
-    left.priority === right.priority
-      ? right.createdAt.getTime() - left.createdAt.getTime()
-      : left.priority === "review"
-        ? -1
-        : 1,
+  return deriveWorkspaceTasks(
+    await readWorkspaceTaskSnapshot(actorId, database, projectId),
+    new Date(),
   );
 }
-
 export async function listWorkspacePipeline(
   actorId: string,
   database: Database = getDatabase(),
 ): Promise<WorkspacePipelineSummary[]> {
-  const projects = await listWorkspaceProjects(actorId, database);
-  if (!projects.length) return [];
-  const rowsQuery = database
-    .select({
-      projectId: workspaceProjectItem.projectId,
-      type: aggregateRecord.type,
-      state: aggregateRecord.state,
-      payload: aggregateRecord.payload,
-    })
-    .from(workspaceProjectItem)
-    .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-    .where(
-      inArray(
-        workspaceProjectItem.projectId,
-        projects.map((project) => project.id),
-      ),
-    );
-  const publishedQuery = database
-    .select({ projectId: workspaceProjectItem.projectId, contentRef: socialPublication.contentRef })
-    .from(socialPublication)
-    .innerJoin(
-      workspaceProjectItem,
-      eq(workspaceProjectItem.aggregateId, socialPublication.contentRef),
-    )
-    .where(
-      and(
-        inArray(
-          workspaceProjectItem.projectId,
-          projects.map((project) => project.id),
-        ),
-        eq(socialPublication.status, "published"),
-      ),
-    );
-  const [rows, published] = await Promise.all([rowsQuery, publishedQuery]);
-  const marketingByPublication = new Map(
-    published.map((item) => [item.contentRef, item.projectId]),
-  );
-  const projectNames = new Map(projects.map((project) => [project.id, project.title]));
-  return projects.map((project) => {
-    const records = rows.filter((row) => row.projectId === project.id);
-    const publicationCount = published.filter((row) => row.projectId === project.id).length;
-    const leadRecords = records.filter((row) => row.type === "lead");
-    const opportunityCount = leadRecords.filter((row) => row.state === "OPPORTUNITY").length;
-    const sourcePublicationRef = leadRecords
-      .map((row) => row.payload.source_publication_ref)
-      .find((value): value is string => typeof value === "string");
-    const relatedMarketingProjectId = sourcePublicationRef
-      ? marketingByPublication.get(sourcePublicationRef)
-      : undefined;
-    const stateSet = new Set(records.map((row) => row.state));
-    const currentStage =
-      project.kind === "marketing"
-        ? publicationCount
-          ? "已有发布成果"
-          : stateSet.has("VIDEO_APPROVED") || stateSet.has("CONTENT_APPROVED")
-            ? "等待发布"
-            : stateSet.has("VIDEO_DRAFT") || stateSet.has("VIDEO_REVIEW_REQUIRED")
-              ? "内容 / 视频"
-              : "产品事实"
-        : opportunityCount
-          ? "有效商机"
-          : stateSet.has("DELIVERY_CONFIRMATION_PENDING") ||
-              stateSet.has("DELIVERY_CONFIRMATION_CONFIRMED")
-            ? "交期确认"
-            : leadRecords.length
-              ? "跟进"
-              : stateSet.has("QUOTE_SENT") ||
-                  stateSet.has("QUOTE_APPROVED") ||
-                  stateSet.has("QUOTE_REVIEW_REQUIRED")
-                ? "报价"
-                : stateSet.has("RFQ_READY") || stateSet.has("RFQ_COLLECTING")
-                  ? "RFQ"
-                  : "入站线索";
-    const nextAction =
-      project.kind === "marketing"
-        ? publicationCount
-          ? "查看成果与入站转化"
-          : currentStage === "等待发布"
-            ? "确认发布结果"
-            : currentStage === "内容 / 视频"
-              ? "继续制作并提审"
-              : "补全并审核产品事实"
-        : opportunityCount
-          ? "维护有效商机"
-          : currentStage === "交期确认"
-            ? "完成 Gate 03"
-            : currentStage === "跟进"
-              ? "执行下一次人工跟进"
-              : currentStage === "报价"
-                ? "完成报价审核或发送"
-                : currentStage === "RFQ"
-                  ? "补全 RFQ"
-                  : "处理入站线索";
-    return {
-      ...project,
-      currentStage,
-      nextAction,
-      recordCount: records.length,
-      publishedCount: publicationCount,
-      leadCount: leadRecords.length,
-      opportunityCount,
-      ...(relatedMarketingProjectId
-        ? { relatedMarketingProjectTitle: projectNames.get(relatedMarketingProjectId) }
-        : {}),
-    };
-  });
+  const snapshot = await readWorkspaceTaskSnapshot(actorId, database);
+  return deriveWorkspacePipeline(snapshot, deriveWorkspaceTasks(snapshot, new Date()));
 }
 
 export async function createWorkspaceProject(
@@ -506,11 +243,12 @@ export async function getWorkspaceProject(
   projectId: string,
   actorId: string,
   database: Database = getDatabase(),
-): Promise<WorkspaceProjectSummary | null> {
+): Promise<(WorkspaceProjectSummary & { memberRole: "owner" | "editor" | "viewer" }) | null> {
   // Missing and inaccessible projects have the same read result. Keep membership
   // in the query itself; do not catch database failures as if they were 404s.
   const [row] = await database
     .select({
+      memberRole: workspaceProjectMember.role,
       id: workspaceProject.id,
       title: workspaceProject.title,
       kind: workspaceProject.kind,

@@ -25,6 +25,7 @@ import type {
   WorkspaceProjectSummary,
   WorkspaceTaskSummary,
 } from "@/lib/workspace/store";
+import { isActionableTask, taskStateLabel } from "@/lib/workspace/task-model";
 import { WorkspaceDirtyProvider } from "./dirty-state";
 import { InboundRoutingList } from "./inbound-routing-list";
 import { WorkspaceLink as Link } from "./workspace-link";
@@ -56,6 +57,7 @@ function TaskRows({ tasks, empty }: { tasks: WorkspaceTaskSummary[]; empty: stri
               <Badge variant={task.priority === "review" ? "default" : "secondary"}>
                 {task.actionLabel ?? (task.priority === "review" ? "审核" : "处理")}
               </Badge>
+              {task.state ? <Badge variant="outline">{taskStateLabel(task)}</Badge> : null}
             </div>
             <p className="mt-1 break-words text-sm text-muted-foreground">
               {task.projectTitle} · {task.detail}
@@ -81,17 +83,21 @@ export function WorkspaceDashboard({
   inbound?: InboundRoutingSummary[];
   currentTime: number;
 }) {
-  const approvals = tasks.filter(
+  const actionable = tasks.filter(isActionableTask);
+  const waiting = tasks.filter((task) => task.state === "waiting");
+  const processing = tasks.filter((task) => task.state === "processing");
+  const scheduled = tasks.filter((task) => task.state === "scheduled");
+  const approvals = actionable.filter(
     (task) =>
       task.taskType === "approval" ||
       task.taskType === "publication" ||
       task.taskType === "opportunity",
   );
-  const due = tasks.filter(
+  const due = actionable.filter(
     (task) => task.taskType === "follow_up" && (!task.dueAt || task.dueAt.getTime() <= currentTime),
   );
   const opportunities = pipeline.reduce((count, item) => count + item.opportunityCount, 0);
-  const pendingCount = tasks.length + inbound.length;
+  const pendingCount = actionable.length + inbound.length;
   return (
     <WorkspaceDirtyProvider>
       <main id="main-content" tabIndex={-1} className="workspace-page bg-muted/30">
@@ -149,8 +155,8 @@ export function WorkspaceDashboard({
           <div className="min-w-0 space-y-8">
             <section aria-label="工作台摘要" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {[
-                ["我的待办", pendingCount, "跨项目下一动作"],
-                ["待审批", approvals.length, "人工 Gate 与发布"],
+                ["我的待办", pendingCount, "当前有权限处理的事项"],
+                ["待审批", approvals.length, "可由我审核或确认"],
                 ["到期跟进", due.length, "需要业务人员处理"],
                 ["有效商机", opportunities, "已由人工确认"],
               ].map(([label, value, detail]) => (
@@ -176,12 +182,35 @@ export function WorkspaceDashboard({
                 <CardContent>
                   <InboundRoutingList items={inbound} projects={projects} />
                   <TaskRows
-                    tasks={tasks.slice(0, 8)}
+                    tasks={actionable}
                     empty={inbound.length ? "没有其他项目待办" : "当前没有待办"}
                   />
                 </CardContent>
               </Card>
             </section>
+            {[
+              { id: "waiting", label: "等待他人", tasks: waiting },
+              { id: "processing", label: "系统处理中", tasks: processing },
+              { id: "scheduled", label: "已安排的跟进", tasks: scheduled },
+            ]
+              .filter((group) => group.tasks.length)
+              .map((group) => (
+                <section key={group.id} id={group.id} className="scroll-mt-24">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle role="heading" aria-level={2}>
+                        {group.label}
+                      </CardTitle>
+                      <CardDescription>
+                        这些事项不计入我的待办，状态变化后会重新归类。
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <TaskRows tasks={group.tasks} empty="暂无记录" />
+                    </CardContent>
+                  </Card>
+                </section>
+              ))}
             <div className="grid gap-6 xl:grid-cols-2">
               <section id="approvals" tabIndex={-1} className="scroll-mt-24">
                 <Card className="h-full">
@@ -192,7 +221,7 @@ export function WorkspaceDashboard({
                     <CardDescription>Gate 01、Gate 02、Gate 03 与逐帖发布确认。</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <TaskRows tasks={approvals.slice(0, 6)} empty="当前没有待审批事项" />
+                    <TaskRows tasks={approvals} empty="当前没有待审批事项" />
                   </CardContent>
                 </Card>
               </section>
@@ -205,7 +234,7 @@ export function WorkspaceDashboard({
                     <CardDescription>评分只决定建议优先级，不自动认定商机。</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <TaskRows tasks={due.slice(0, 6)} empty="当前没有到期跟进" />
+                    <TaskRows tasks={due} empty="当前没有到期跟进" />
                   </CardContent>
                 </Card>
               </section>
@@ -232,16 +261,17 @@ export function WorkspaceDashboard({
               ) : null}
               <div className="grid gap-3 md:grid-cols-2">
                 {pipeline.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={`/workspace/${item.id}`}
-                    className="rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
+                  <div key={item.id}>
                     <Card className="workspace-pipeline-card h-full transition-[transform,box-shadow] duration-[120ms] hover:-translate-y-0.5 hover:shadow-md">
                       <CardHeader>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <CardTitle className="truncate">{item.title}</CardTitle>
+                            <Link
+                              href={`/workspace/${item.id}`}
+                              className="rounded outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                            >
+                              <CardTitle className="truncate">{item.title}</CardTitle>
+                            </Link>
                             <CardDescription>
                               {item.kind === "marketing" ? "营销项目" : "销售项目"} ·{" "}
                               {item.currentStage}
@@ -253,10 +283,13 @@ export function WorkspaceDashboard({
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        <p className="text-sm">
+                        <Link
+                          href={item.nextActionHref ?? `/workspace/${item.id}`}
+                          className="block rounded text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
                           <span className="text-muted-foreground">下一动作：</span>
                           {item.nextAction}
-                        </p>
+                        </Link>
                         <div className="flex flex-wrap gap-2 text-xs">
                           <Badge variant="outline">{item.recordCount} 条记录</Badge>
                           {item.publishedCount ? (
@@ -276,7 +309,7 @@ export function WorkspaceDashboard({
                         ) : null}
                       </CardContent>
                     </Card>
-                  </Link>
+                  </div>
                 ))}
               </div>
             </section>

@@ -51,7 +51,20 @@ class FakeDatabase {
     this.maximum = Math.max(this.maximum, this.active);
     await new Promise<void>((resolve) => setImmediate(resolve));
     this.active--;
-    if (query.table === "workspace_project_member") return this.visible ? [{ id: projectId }] : [];
+    if (query.table === "workspace_project_member")
+      return this.visible
+        ? [
+            {
+              id: projectId,
+              title: "Synthetic project",
+              kind: "marketing",
+              status: "active",
+              updatedAt: new Date("2026-09-04T00:00:00Z"),
+              memberRole: "owner",
+              appRole: "admin",
+            },
+          ]
+        : [];
     if (query.table === "workspace_project")
       return [
         {
@@ -74,15 +87,21 @@ async function main() {
   assert.equal(
     scoped.maximum,
     4,
-    "Independent review, RFQ, lead, and publication queries must overlap",
+    "Independent records, approvals, publications and channel readiness reads must overlap",
   );
-  assert.equal(scoped.queries.length, 5, "One membership query and four independent task reads");
+  assert.equal(
+    scoped.queries.length,
+    5,
+    "One authorized project read and four independent snapshot reads",
+  );
   assert.ok(scoped.queries[0]?.params.includes(actorId), "Membership must be filtered by actor");
   assert.ok(
     scoped.queries[0]?.params.includes(projectId),
     "Project pages must scope the membership read",
   );
-  for (const query of scoped.queries.slice(1))
+  for (const query of scoped.queries
+    .slice(1)
+    .filter((query) => query.table !== "social_channel_control"))
     assert.ok(
       query.params.includes(projectId),
       "Every task query must retain the authorized project filter",
@@ -100,9 +119,9 @@ async function main() {
   assert.ok(!all.queries[0]?.params.includes(projectId));
   const pipeline = new FakeDatabase();
   await listWorkspacePipeline(actorId, pipeline.asDatabase());
-  assert.equal(pipeline.maximum, 2, "Pipeline records and published outcomes must overlap");
+  assert.equal(pipeline.maximum, 4, "Pipeline must derive from the same parallel snapshot reads");
   console.log(
-    "PASS deterministic query concurrency: tasks 4-way, pipeline 2-way; project and actor authorization filters retained",
+    "PASS deterministic query concurrency: shared snapshot 4-way; project and actor authorization filters retained",
   );
 }
 void main();

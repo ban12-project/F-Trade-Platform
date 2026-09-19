@@ -40,3 +40,39 @@ export function RecordSelection({
     </div>
   );
 }
+
+export function ReadOnlyRecordList({
+  projectId,
+  stage,
+  entries,
+}: {
+  projectId: string;
+  stage: string;
+  entries: Array<{ id: string; label: string }>;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <p role="status" className="text-sm text-muted-foreground">
+        当前为只读视图。选择记录查看详情，写入或审核由项目编辑者处理。
+      </p>
+      {entries.length ? (
+        entries.map((entry) => (
+          <WorkspaceLink
+            key={entry.id}
+            href={`/workspace/${projectId}?panel=${stage}&item=${entry.id}`}
+            className={buttonVariants({ variant: "outline", className: "justify-start" })}
+          >
+            {entry.label}
+          </WorkspaceLink>
+        ))
+      ) : (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>当前还没有记录</EmptyTitle>
+            <EmptyDescription>等待项目编辑者创建后即可查看。</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+    </div>
+  );
+}
