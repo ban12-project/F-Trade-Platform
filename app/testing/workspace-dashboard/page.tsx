@@ -63,6 +63,25 @@ const tasks: WorkspaceTaskSummary[] = [
     dueAt: new Date("2026-09-03T01:00:00Z"),
   },
 ];
+for (const [id, state, title, detail] of [
+  ["721", "waiting", "等待审核者核实产品", "等待有审核权限的项目编辑者"],
+  ["722", "processing", "发布等待平台回执", "系统处理中，尚未确认发布成功"],
+  ["723", "scheduled", "客户跟进已安排", "明天跟进，不计入今日待办"],
+] as const) {
+  tasks.push({
+    id: `00000000-0000-4000-8000-000000000${id}`,
+    projectId: projects[0]!.id,
+    projectTitle: projects[0]!.title,
+    nodeKind: "publication",
+    title,
+    detail,
+    state,
+    priority: "complete",
+    actionLabel: "查看状态",
+    taskType: "publication",
+    createdAt: new Date("2026-09-03T00:00:00Z"),
+  });
+}
 const pipeline: WorkspacePipelineSummary[] = [
   {
     ...projects[0]!,

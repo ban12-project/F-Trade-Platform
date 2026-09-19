@@ -5,8 +5,11 @@ import { WorkspaceLoadingSkeleton } from "@/components/workspace/workspace-loadi
 import { requirePermission } from "@/lib/auth-guard";
 import { hasPermission } from "@/lib/authz";
 import { listUnassignedInboundConversations } from "@/lib/social/inbound-routing-store";
-import { readWorkspaceProjects, readWorkspaceTasks } from "@/lib/workspace/read-model";
-import { listWorkspacePipeline } from "@/lib/workspace/store";
+import {
+  readWorkspacePipeline,
+  readWorkspaceProjects,
+  readWorkspaceTasks,
+} from "@/lib/workspace/read-model";
 
 async function WorkspaceContent() {
   await connection();
@@ -14,7 +17,7 @@ async function WorkspaceContent() {
   const [projects, tasks, pipeline, inbound] = await Promise.all([
     readWorkspaceProjects(session.user.id),
     readWorkspaceTasks(session.user.id),
-    listWorkspacePipeline(session.user.id),
+    readWorkspacePipeline(session.user.id),
     hasPermission(session.user.role, "sales:write")
       ? listUnassignedInboundConversations()
       : Promise.resolve([]),

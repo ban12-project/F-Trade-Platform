@@ -142,7 +142,8 @@ export function InboundRoutingList({
   projects: WorkspaceProjectSummary[];
 }) {
   const salesProjects = projects.filter(
-    (project) => project.kind === "sales" && project.status === "active",
+    (project) =>
+      project.kind === "sales" && project.status === "active" && project.memberRole !== "viewer",
   );
   if (!items.length) return null;
   return (

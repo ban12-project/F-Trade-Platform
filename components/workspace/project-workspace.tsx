@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
 import { taskProjectStage } from "@/lib/workspace/stages";
 import type { WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
+import { isActionableTask, taskStateLabel } from "@/lib/workspace/task-model";
 import { useWorkspaceDirtyState, WorkspaceDirtyProvider } from "./dirty-state";
 import { WorkspaceLink } from "./workspace-link";
 
@@ -292,6 +293,7 @@ export function ProjectStageTasks({
   const projectTasks = tasks.filter((task) => task.projectId === projectId);
   const stageTasks = projectTasks.filter((task) => taskProjectStage(task) === stage.id);
 
+  const actionableCount = stageTasks.filter(isActionableTask).length;
   return (
     <div className="min-w-0 space-y-5">
       <Card>
@@ -304,7 +306,13 @@ export function ProjectStageTasks({
               </CardTitle>
               <p className="mt-2 text-sm text-muted-foreground">{stage.description}</p>
             </div>
-            <Badge>{stageTasks.length ? `${stageTasks.length} 项待处理` : "当前无待办"}</Badge>
+            <Badge>
+              {actionableCount
+                ? `${actionableCount} 项可处理`
+                : stageTasks.length
+                  ? "正在等待"
+                  : "当前无待办"}
+            </Badge>
           </div>
         </CardHeader>
       </Card>
@@ -328,6 +336,11 @@ export function ProjectStageTasks({
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{task.title}</p>
+                    {task.state ? (
+                      <span className="text-xs text-muted-foreground">
+                        {taskStateLabel(task)} · {task.responsibleLabel}
+                      </span>
+                    ) : null}
                     <p className="mt-1 break-words text-sm text-muted-foreground">{task.detail}</p>
                   </div>
                   <Badge variant={task.priority === "review" ? "default" : "secondary"}>

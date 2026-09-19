@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import delivery from "../../data/fixtures/delivery-confirmation-pending.synthetic.json";
+import productReady from "../../data/fixtures/product-ready.synthetic.json";
 import quotation from "../../data/fixtures/quotation-review-required.synthetic.json";
 import rfq from "../../data/fixtures/rfq-draft.synthetic.json";
 import * as schema from "../../lib/db/schema";
@@ -121,6 +122,7 @@ test.beforeAll(async () => {
   });
 });
 test.beforeEach(async ({ context, baseURL }) => {
+  await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, actorId));
   const signature = createHmac("sha256", authSecret).update(token).digest("base64");
   await context.addCookies([
     {
@@ -332,4 +334,186 @@ test("publication link selects its approved payload and unavailable targets cann
   await page.goto(`/workspace/${id}?panel=publication&item=${randomUUID()}`);
   await expect(panel.getByText("这条记录已不可用", { exact: true })).toBeVisible();
   await expect(panel.locator("#publication-confirmation")).toHaveCount(0);
+});
+
+test("review tasks respect application role, project role and archival without changing approval gates", async ({
+  page,
+}) => {
+  const id = await project();
+  const quote = await record(
+    id,
+    "quotation",
+    "QUOTE_REVIEW_REQUIRED",
+    quotation,
+    "sales_quotation",
+  );
+  await approval(quote, "gate_02_quote");
+  const href = `/workspace/${id}?panel=quotation&item=${quote}`;
+  const actionable = page.locator("#my-tasks").locator(`a[href="${href}"]`);
+  const waiting = page.locator("#waiting").locator(`a[href="${href}"]`);
+  await page.goto("/workspace");
+  await expect(actionable).toBeVisible();
+  await db.update(schema.user).set({ role: "user" }).where(eq(schema.user.id, actorId));
+  await page.reload();
+  await expect(actionable).toHaveCount(0);
+  await expect(waiting).toBeVisible();
+  await waiting.click();
+  const panel = page.getByRole("complementary", { name: "报价详情与审批" });
+  await expect(panel.locator(`#quote-decision-${quote}`)).toHaveCount(0);
+  await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, actorId));
+  await db
+    .update(schema.workspaceProjectMember)
+    .set({ role: "viewer" })
+    .where(eq(schema.workspaceProjectMember.projectId, id));
+  await page.goto("/workspace");
+  await expect(actionable).toHaveCount(0);
+  await expect(waiting).toBeVisible();
+  await waiting.click();
+  await expect(panel.getByText("当前为只读视图。请由项目编辑者处理写入或审核。")).toBeVisible();
+  await page.goto(`/workspace/${id}?panel=quotation`);
+  await panel.getByRole("link", { name: `人工报价 ${quote.slice(0, 8)}` }).click();
+  await expect(panel.getByText("当前为只读视图。请由项目编辑者处理写入或审核。")).toBeVisible();
+  await expect(panel.locator(`#quote-decision-${quote}`)).toHaveCount(0);
+  await db
+    .update(schema.workspaceProjectMember)
+    .set({ role: "editor" })
+    .where(eq(schema.workspaceProjectMember.projectId, id));
+  await page.goto("/workspace");
+  await expect(actionable).toBeVisible();
+  await db
+    .update(schema.workspaceProject)
+    .set({ status: "archived" })
+    .where(eq(schema.workspaceProject.id, id));
+  await page.reload();
+  await expect(actionable).toHaveCount(0);
+  await expect(waiting).toHaveCount(0);
+});
+
+test("unused ready product and RFQ tasks open the intended creation context", async ({ page }) => {
+  const marketing = await project("marketing");
+  await record(
+    marketing,
+    "product",
+    "PRODUCT_READY",
+    {
+      ...productReady,
+      product: { ...productReady.product, product_name: "SYNTHETIC unrelated source" },
+    },
+    "product_source",
+  );
+  const product = await record(
+    marketing,
+    "product",
+    "PRODUCT_READY",
+    {
+      ...productReady,
+      product: { ...productReady.product, product_name: "SYNTHETIC chosen source" },
+    },
+    "product_source",
+  );
+  await page.goto("/workspace");
+  await page
+    .locator("#my-tasks")
+    .locator(`a[href="/workspace/${marketing}?panel=content&product=${product}"]`)
+    .click();
+  const contentPanel = page.getByRole("complementary", { name: "营销内容详情与审批" });
+  await contentPanel.getByRole("combobox").first().click();
+  await expect(page.getByRole("option", { name: /SYNTHETIC chosen source/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByRole("option", { name: /SYNTHETIC unrelated source/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  const sales = await project();
+  const request = await record(sales, "rfq", "RFQ_READY", rfq, "sales_rfq");
+  await db.insert(schema.workspaceProjectItem).values({
+    id: randomUUID(),
+    projectId: sales,
+    aggregateId: product,
+    role: "product_reference",
+    relation: "reference",
+  });
+  await page.goto("/workspace");
+  await page
+    .locator("#my-tasks")
+    .locator(`a[href="/workspace/${sales}?panel=quotation&rfq=${request}"]`)
+    .click();
+  const quotePanel = page.getByRole("complementary", { name: "报价详情与审批" });
+  await expect(quotePanel.locator("#quotation-new")).toBeVisible();
+  await quotePanel.getByRole("combobox").first().click();
+  await expect(page.getByRole("option")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("option")).toHaveText("clutch_kit · 500");
+});
+
+test("revisions, scheduled follow-ups and pending publication receipts have distinct task states", async ({
+  page,
+}) => {
+  const sales = await project();
+  const revised = await record(
+    sales,
+    "quotation",
+    "QUOTE_REVISION_REQUIRED",
+    quotation,
+    "sales_quotation",
+  );
+  const planned = await record(
+    sales,
+    "lead",
+    "FOLLOW_UP",
+    {
+      status: "follow_up",
+      score_band: "COLD",
+      score: 10,
+      score_reasons: [],
+      next_action: "synthetic-follow-up",
+      next_follow_up_at: new Date(Date.now() + 86_400_000).toISOString(),
+    },
+    "sales_lead",
+  );
+  const marketing = await project("marketing");
+  const content = await record(
+    marketing,
+    "content",
+    "CONTENT_APPROVED",
+    { hook: "SYNTHETIC receipt", body: "Synthetic only" },
+    "marketing_content",
+  );
+  const publication = randomUUID();
+  await db.insert(schema.socialPublication).values({
+    id: publication,
+    projectId: marketing,
+    channelRef: "synthetic-task-states",
+    accountRef: "synthetic-account",
+    contentRef: content,
+    format: "text",
+    confirmationRef: "synthetic-task-states",
+    status: "submitted",
+  });
+  const revisionHref = `/workspace/${sales}?panel=quotation&item=${revised}`;
+  const receiptHref = `/workspace/${marketing}?panel=publication&item=${publication}`;
+  await page.goto("/workspace");
+  await expect(page.locator("#my-tasks").locator(`a[href="${revisionHref}"]`)).toContainText(
+    "修订人工报价",
+  );
+  await expect(
+    page
+      .locator("#scheduled")
+      .locator(`a[href="/workspace/${sales}?panel=follow-up&item=${planned}"]`),
+  ).toBeVisible();
+  await expect(page.locator("#processing").locator(`a[href="${receiptHref}"]`)).toBeVisible();
+  await expect(page.locator("#my-tasks").locator(`a[href="${receiptHref}"]`)).toHaveCount(0);
+  await page.goto(`/workspace/${sales}`);
+  await expect(page.getByRole("link", { name: /报价/ }).first()).toHaveAttribute(
+    "aria-current",
+    "step",
+  );
+  await db
+    .update(schema.socialPublication)
+    .set({ status: "unknown" })
+    .where(eq(schema.socialPublication.id, publication));
+  await page.goto("/workspace");
+  await expect(page.locator("#my-tasks").locator(`a[href="${receiptHref}"]`)).toContainText(
+    "需要排查",
+  );
+  await expect(page.locator("#processing").locator(`a[href="${receiptHref}"]`)).toHaveCount(0);
 });

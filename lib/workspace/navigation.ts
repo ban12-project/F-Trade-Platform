@@ -9,6 +9,8 @@ export function workspaceTaskHref(
   if (task.nodeKind === "video" && basePath === canonicalProjectPath) {
     return `${canonicalProjectPath}/video?item=${task.id}`;
   }
+  if (task.source)
+    return `${basePath}?panel=${taskProjectStage(task)}&${task.source.kind}=${task.source.id}`;
   const itemKey = task.nodeKind === "lead" && task.taskType === "rfq" ? "lead" : "item";
   return `${basePath}?panel=${taskProjectStage(task)}&${itemKey}=${task.id}`;
 }

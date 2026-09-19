@@ -39,6 +39,7 @@ import { createWorkspaceProjectAction, type WorkspaceActionState } from "@/lib/a
 import { createWorkspaceProjectSchema } from "@/lib/workspace/contracts";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
+import { isActionableTask, taskStateLabel } from "@/lib/workspace/task-model";
 import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
 import { WorkspaceLink } from "./workspace-link";
 
@@ -120,6 +121,7 @@ export function WorkspaceActionDock({
   const params = useParams();
   const id = useId();
   const projectsPanelId = `${id}-projects`;
+  const actionableCount = tasks.filter(isActionableTask).length;
   const tasksPanelId = `${id}-tasks`;
   const toolsPanelId = `${id}-tools`;
   const createDialogId = `${id}-create`;
@@ -205,7 +207,7 @@ export function WorkspaceActionDock({
           </span>
         </Button>
         <Button
-          aria-label={`待办${tasks.length ? `，${tasks.length} 项` : ""}`}
+          aria-label={`待办${actionableCount ? `，${actionableCount} 项` : ""}`}
           aria-haspopup="dialog"
           aria-expanded={panel === "tasks"}
           aria-controls={panel === "tasks" ? tasksPanelId : undefined}
@@ -216,9 +218,9 @@ export function WorkspaceActionDock({
           <CheckSquareIcon data-icon="inline-start" />
           <span aria-hidden="true" className="flex items-center gap-1 text-xs sm:text-sm">
             待办
-            {tasks.length ? (
+            {actionableCount ? (
               <Badge variant="secondary" className="tabular-nums">
-                {tasks.length}
+                {actionableCount}
               </Badge>
             ) : null}
           </span>
@@ -309,7 +311,7 @@ export function WorkspaceActionDock({
                 const target = workspaceTaskHref(task, `${basePath}/${task.projectId}`);
                 return (
                   <WorkspaceLink
-                    key={`${task.priority}-${task.id}`}
+                    key={`${task.projectId}-${task.taskType}-${task.id}`}
                     data-target={target}
                     className={buttonVariants({
                       variant: "outline",
@@ -321,7 +323,11 @@ export function WorkspaceActionDock({
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="flex items-center gap-2">
                         <Badge variant={task.priority === "review" ? "default" : "secondary"}>
-                          {task.priority === "review" ? "审核" : "补全"}
+                          {task.state
+                            ? taskStateLabel(task)
+                            : task.priority === "review"
+                              ? "审核"
+                              : "补全"}
                         </Badge>
                         <span className="truncate font-medium">{task.title}</span>
                       </span>

@@ -25,6 +25,7 @@ import { requirePermission } from "@/lib/auth-guard";
 import { listWorkspaceProjectMembers } from "@/lib/workspace/access";
 import {
   readDefaultProjectStage,
+  readLegacyLeadTaskType,
   readWorkspaceProject,
   readWorkspaceTasks,
 } from "@/lib/workspace/read-model";
@@ -35,7 +36,13 @@ export const prefetch = "partial";
 
 type Props = {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ panel?: string; item?: string; lead?: string }>;
+  searchParams: Promise<{
+    panel?: string;
+    item?: string;
+    lead?: string;
+    product?: string;
+    rfq?: string;
+  }>;
 };
 async function Members({ projectId, actorId }: { projectId: string; actorId: string }) {
   return (
@@ -79,23 +86,34 @@ const readStage = cache(async (params: Props["params"], searchParams: Props["sea
   ]);
   let selectedId = z.uuid().safeParse(query.item).success ? query.item : undefined;
   let selectedLeadId = z.uuid().safeParse(query.lead).success ? query.lead : undefined;
-  const legacyTask =
+  const selectedProductId = z.uuid().safeParse(query.product).success ? query.product : undefined;
+  const selectedRfqId = z.uuid().safeParse(query.rfq).success ? query.rfq : undefined;
+  const legacyTaskType =
     project.kind === "sales" && query.panel === "lead" && selectedId
-      ? (await readWorkspaceTasks(session.user.id, projectId)).find(
-          (task) => task.id === selectedId,
-        )
+      ? await readLegacyLeadTaskType(session.user.id, projectId, selectedId)
       : undefined;
-  if (legacyTask?.nodeKind === "lead" && legacyTask.taskType === "rfq") {
+  if (legacyTaskType === "rfq") {
     selectedLeadId = selectedId;
     selectedId = undefined;
   }
   const activeStage =
-    requestedProjectStage(project.kind, query.panel, legacyTask?.taskType) ??
+    requestedProjectStage(project.kind, query.panel, legacyTaskType) ??
     (await readDefaultProjectStage(project, session.user.id));
   const stages = projectStages(project.kind);
   const stage = stages.find((candidate) => candidate.id === activeStage);
   if (!stage) notFound();
-  return { projectId, session, project, selectedId, selectedLeadId, activeStage, stages, stage };
+  return {
+    projectId,
+    session,
+    project,
+    selectedId,
+    selectedLeadId,
+    selectedProductId,
+    selectedRfqId,
+    activeStage,
+    stages,
+    stage,
+  };
 });
 
 async function Title({ params }: Pick<Props, "params">) {
@@ -132,16 +150,23 @@ async function StageTasks({ params, searchParams }: Props) {
   );
 }
 async function Details({ params, searchParams }: Props) {
-  const { projectId, session, activeStage, stage, selectedId, selectedLeadId } = await readStage(
-    params,
-    searchParams,
-  );
+  const {
+    projectId,
+    session,
+    project,
+    activeStage,
+    stage,
+    selectedId,
+    selectedLeadId,
+    selectedProductId,
+    selectedRfqId,
+  } = await readStage(params, searchParams);
   return (
     <ProjectStageDetails
       stage={stage}
       panel={
         <Suspense
-          key={`${projectId}:${activeStage}:${selectedId ?? ""}:${selectedLeadId ?? ""}`}
+          key={`${projectId}:${activeStage}:${selectedId ?? ""}:${selectedLeadId ?? ""}:${selectedProductId ?? ""}:${selectedRfqId ?? ""}`}
           fallback={<WorkspacePanelSkeleton label={`正在加载${stage.label}详情`} />}
         >
           <ProjectStagePanel
@@ -151,6 +176,9 @@ async function Details({ params, searchParams }: Props) {
             stage={activeStage}
             selectedId={selectedId}
             selectedLeadId={selectedLeadId}
+            selectedProductId={selectedProductId}
+            selectedRfqId={selectedRfqId}
+            canWrite={project.memberRole !== "viewer" && project.status === "active"}
           />
         </Suspense>
       }

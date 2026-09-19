@@ -1,51 +1,50 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
 import { cache } from "react";
 import { listStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
-import { getDatabase } from "@/lib/db/client";
-import { aggregateRecord, socialPublication, workspaceProjectItem } from "@/lib/db/schema";
 import { defaultProjectStage } from "./stages";
 import {
   getWorkspaceProject,
   listWorkspaceProjects,
-  listWorkspaceTasks,
+  readWorkspaceTaskSnapshot,
   type WorkspaceProjectSummary,
 } from "./store";
+import { deriveWorkspacePipeline, deriveWorkspaceTasks, leadTaskType } from "./task-model";
 
-// Deduplicate only inside a single RSC request. Do not use a cross-user persistent cache here.
+// Request-local only. Never persist another actor's records, permissions or time-based tasks in a shared cache.
 export const readWorkspaceProjects = cache((actorId: string) => listWorkspaceProjects(actorId));
-export const readWorkspaceTasks = cache((actorId: string, projectId?: string) =>
-  listWorkspaceTasks(actorId, undefined, projectId),
+const readWorkspaceWork = cache(async (actorId: string) => {
+  const snapshot = await readWorkspaceTaskSnapshot(actorId);
+  const tasks = deriveWorkspaceTasks(snapshot, new Date());
+  return { snapshot, tasks, pipeline: deriveWorkspacePipeline(snapshot, tasks) };
+});
+export const readWorkspaceTasks = cache(async (actorId: string, projectId?: string) => {
+  const { tasks } = await readWorkspaceWork(actorId);
+  return projectId ? tasks.filter((task) => task.projectId === projectId) : tasks;
+});
+export const readWorkspacePipeline = cache(
+  async (actorId: string) => (await readWorkspaceWork(actorId)).pipeline,
 );
 export const readWorkspaceProject = cache((projectId: string, actorId: string) =>
   getWorkspaceProject(projectId, actorId),
 );
 export const readWorkspaceModelSettings = cache(() => listStoredProductAgentModelSettings());
 
-// Called only after readWorkspaceProject has authenticated project membership.
-// Explicit ?panel= navigation never calls this lightweight entry-point fallback.
 export async function readDefaultProjectStage(project: WorkspaceProjectSummary, actorId: string) {
-  const tasks = await readWorkspaceTasks(actorId, project.id);
-  if (tasks.length) return defaultProjectStage(project.kind, tasks, [], false);
-  const database = getDatabase();
-  const [records, publications] = await Promise.all([
-    database
-      .select({ type: aggregateRecord.type, state: aggregateRecord.state })
-      .from(workspaceProjectItem)
-      .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-      .where(
-        and(
-          eq(workspaceProjectItem.projectId, project.id),
-          eq(workspaceProjectItem.relation, "owned"),
-        ),
-      ),
-    project.kind === "marketing"
-      ? database
-          .select({ id: socialPublication.id })
-          .from(socialPublication)
-          .where(eq(socialPublication.projectId, project.id))
-          .limit(1)
-      : Promise.resolve([]),
-  ]);
-  return defaultProjectStage(project.kind, tasks, records, publications.length > 0);
+  const summary = (await readWorkspacePipeline(actorId)).find((item) => item.id === project.id);
+  return summary?.currentStageId ?? defaultProjectStage(project.kind, [], [], false);
 }
+
+// Legacy links keep their meaning after their original task is completed or deduplicated.
+export const readLegacyLeadTaskType = cache(
+  async (actorId: string, projectId: string, leadId: string) => {
+    const { snapshot } = await readWorkspaceWork(actorId);
+    const record = snapshot.records.find(
+      (row) =>
+        row.projectId === projectId &&
+        row.id === leadId &&
+        row.type === "lead" &&
+        row.relation === "owned",
+    );
+    return record ? leadTaskType(record) : undefined;
+  },
+);
