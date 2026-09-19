@@ -1234,17 +1234,24 @@ export async function listProjectLeads(
     })();
     return parsed ? [{ record, lead: parsed }] : [];
   });
-  const conversationIds = parsedRows.flatMap(({ lead }) =>
+  const requestedConversationIds = parsedRows.flatMap(({ lead }) =>
     lead.conversation_ref ? [lead.conversation_ref] : [],
   );
-  const conversations = conversationIds.length
+  const conversations = requestedConversationIds.length
     ? await database
         .select({ id: socialConversation.id, leadId: socialConversation.leadId })
         .from(socialConversation)
-        .where(inArray(socialConversation.id, conversationIds))
+        .where(inArray(socialConversation.id, requestedConversationIds))
     : [];
   const linkedConversations = new Set(
     conversations.map((conversation) => `${conversation.id}:${conversation.leadId}`),
+  );
+  // A payload reference is not an authorization boundary. Do not even fetch message
+  // ciphertext unless the conversation is reciprocally bound to an authorized lead.
+  const conversationIds = parsedRows.flatMap(({ record, lead }) =>
+    lead.conversation_ref && linkedConversations.has(`${lead.conversation_ref}:${record.id}`)
+      ? [lead.conversation_ref]
+      : [],
   );
   const messages = conversationIds.length
     ? await database
@@ -1324,7 +1331,11 @@ export async function listProjectLeads(
         ? (deliveries.get(lead.delivery_confirmation_ref) ?? null)
         : null,
       timeline: messages
-        .filter((message) => message.conversationId === lead.conversation_ref)
+        .filter(
+          (message) =>
+            message.conversationId === lead.conversation_ref &&
+            linkedConversations.has(`${message.conversationId}:${record.id}`),
+        )
         .map((message) => ({
           id: message.id,
           direction: message.direction === "outbound" ? "outbound" : "inbound",
