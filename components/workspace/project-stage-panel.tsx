@@ -62,6 +62,7 @@ export async function ProjectStagePanel({
   selectedProductId,
   selectedRfqId,
   canWrite,
+  mode,
 }: {
   projectId: string;
   actorId: string;
@@ -72,6 +73,7 @@ export async function ProjectStagePanel({
   selectedProductId?: string;
   selectedRfqId?: string;
   canWrite: boolean;
+  mode?: "record" | "create";
 }) {
   const readonlyList = (entries: Array<{ id: string }>, label: string) => (
     <ReadOnlyRecordList
@@ -135,7 +137,7 @@ export async function ProjectStagePanel({
         listCrossProjectContentCandidates(projectId, actorId),
         selectedId ? getProjectContentCatalogDetail(projectId, selectedId) : null,
       ]);
-      if (!canWrite && !selectedId) return readonlyList(entries, "营销内容");
+      if (!canWrite && !selectedId && !selectedProductId) return readonlyList(entries, "营销内容");
       const sources = selectedProductId
         ? products.filter((product) => product.id === selectedProductId)
         : products;
@@ -209,7 +211,13 @@ export async function ProjectStagePanel({
           <RfqPanel
             key={`${rfqId ?? "new"}:${selectedLeadId ?? ""}`}
             projectId={projectId}
-            entries={entries}
+            entries={
+              mode === "create" && !rfqId
+                ? []
+                : selectedId
+                  ? entries.filter((entry) => entry.id === selectedId)
+                  : entries
+            }
             selectedId={rfqId}
             selectedLeadId={selectedLeadId}
             leads={leads}
@@ -225,7 +233,7 @@ export async function ProjectStagePanel({
         listProjectRfqEntries(projectId),
         listProjectReadyProductReferences(projectId),
       ]);
-      if (!canWrite && !selectedId) return readonlyList(entries, "人工报价");
+      if (!canWrite && !selectedId && !selectedRfqId) return readonlyList(entries, "人工报价");
       const selected = selectedId ? entries.filter((entry) => entry.id === selectedId) : entries;
       const quoteRfqs = selectedRfqId
         ? rfqs.filter((rfq) => rfq.id === selectedRfqId && rfq.state === "RFQ_READY")

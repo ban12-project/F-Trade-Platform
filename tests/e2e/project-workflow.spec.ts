@@ -4,7 +4,7 @@ test("Product Agent keeps saved models selectable in the product step", async ({
   await page.goto("/testing/project-workflow?panel=product");
   await page.waitForLoadState("networkidle");
   const model = page
-    .getByRole("complementary")
+    .getByRole("region", { name: /详情与审批/ })
     .getByRole("combobox", { name: "模型", exact: true });
   await expect(model).toContainText("日常产品导入 · gpt-5-mini");
   await model.click();
@@ -41,14 +41,14 @@ test("product Gate 01 submits the displayed revision and approval request", asyn
 
 test("rejected content exposes revision in the content step", async ({ page }) => {
   await page.goto("/testing/project-workflow?panel=content&state=content-revision");
-  const detail = page.getByRole("complementary");
+  const detail = page.getByRole("region", { name: /详情与审批/ });
   await expect(detail.getByText("修订内容草稿")).toBeVisible();
   await expect(detail.getByRole("button", { name: "提交修订并送审" })).toBeVisible();
 });
 
 test("sales demand confirmation includes RFQ and product references", async ({ page }) => {
   await page.goto("/testing/project-workflow?kind=sales&panel=rfq");
-  const detail = page.getByRole("complementary");
+  const detail = page.getByRole("region", { name: /详情与审批/ });
   await expect(detail.getByText("录入询盘", { exact: true })).toBeVisible();
   await expect(detail.getByText("添加产品引用", { exact: true })).toBeVisible();
   await expect(detail.getByText("Verified clutch kit")).toBeVisible();
@@ -56,14 +56,14 @@ test("sales demand confirmation includes RFQ and product references", async ({ p
 
 test("sales quotation stays explicitly human controlled", async ({ page }) => {
   await page.goto("/testing/project-workflow?kind=sales&panel=quotation");
-  const detail = page.getByRole("complementary");
+  const detail = page.getByRole("region", { name: /详情与审批/ });
   await expect(detail.getByText("创建人工报价", { exact: true })).toBeVisible();
   await expect(detail.getByRole("button", { name: /自动报价/ })).toHaveCount(0);
 });
 
 test("follow-up shows the authorized timeline and explicit human send", async ({ page }) => {
   await page.goto("/testing/project-workflow?kind=sales&panel=follow-up");
-  const detail = page.getByRole("complementary");
+  const detail = page.getByRole("region", { name: /详情与审批/ });
   await expect(detail.getByText("授权消息时间线", { exact: true })).toBeVisible();
   await expect(detail.getByText("Synthetic buyer asks for the verified lead time.")).toBeVisible();
   await expect(detail.getByRole("button", { name: "人工确认并发送此回复" })).toBeEnabled();
@@ -74,20 +74,20 @@ test("follow-up shows the authorized timeline and explicit human send", async ({
 
 test("publication waits for explicit confirmation and platform receipt", async ({ page }) => {
   await page.goto("/testing/project-workflow?panel=publication");
-  const detail = page.getByRole("complementary");
+  const detail = page.getByRole("region", { name: /详情与审批/ });
   await expect(detail.getByText("确认并提交发布", { exact: true })).toBeVisible();
   await expect(detail.getByText("平台回执前不会显示为已发布", { exact: false })).toBeVisible();
   await expect(detail.getByRole("button", { name: "确认并提交此条发布" })).toBeDisabled();
 });
 
-test("desktop detail region is viewport-bound and scrolls internally", async ({ page }) => {
+test("editor uses the main document width and appears before related tasks", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 600 });
   await page.goto("/testing/project-workflow?panel=product");
-  const detail = page.getByRole("complementary");
-  await expect(detail.locator('[data-slot="scroll-area-viewport"]')).toHaveCSS(
-    "overflow-y",
-    "scroll",
-  );
+  const detail = page.getByRole("region", { name: /详情与审批/ });
+  expect((await detail.boundingBox())?.width).toBeGreaterThan(800);
+  await expect(detail.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0);
+  const tasks = page.getByRole("complementary", { name: "相关任务" });
+  expect((await detail.boundingBox())!.y).toBeLessThan((await tasks.boundingBox())!.y);
 });
 
 for (const zeroAccepted of [false, true]) {
@@ -212,7 +212,7 @@ for (const zeroAccepted of [false, true]) {
     }
     await expect(page.getByRole("link", { name: "打开已保存草稿（新窗口）" })).toHaveAttribute(
       "href",
-      `/workspace/00000000-0000-4000-8000-000000000202?panel=product&item=${productId}`,
+      `/workspace/00000000-0000-4000-8000-000000000202/records/product/${productId}`,
     );
     await expect(
       page.getByText(

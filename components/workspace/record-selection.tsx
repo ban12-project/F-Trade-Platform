@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  isWorkspaceRecordKind,
+  workspaceCollection,
+  workspaceRecordHref,
+} from "@/lib/workspace/navigation";
 import { WorkspaceLink } from "./workspace-link";
 
 export function RecordSelection({
@@ -20,10 +25,10 @@ export function RecordSelection({
   return (
     <div className="flex flex-col gap-4">
       <WorkspaceLink
-        href={`/workspace/${projectId}?panel=${stage}`}
+        href={`/workspace/${workspaceCollection(stage)}?project=${projectId}`}
         className={buttonVariants({ variant: "outline", className: "self-start" })}
       >
-        返回本步骤全部记录
+        返回记录列表
       </WorkspaceLink>
       {found ? (
         children
@@ -59,7 +64,11 @@ export function ReadOnlyRecordList({
         entries.map((entry) => (
           <WorkspaceLink
             key={entry.id}
-            href={`/workspace/${projectId}?panel=${stage}&item=${entry.id}`}
+            href={workspaceRecordHref(
+              projectId,
+              isWorkspaceRecordKind(stage) ? stage : "lead",
+              entry.id,
+            )}
             className={buttonVariants({ variant: "outline", className: "justify-start" })}
           >
             {entry.label}

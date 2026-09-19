@@ -137,3 +137,45 @@ test("unauthenticated and invalid sessions cannot read project data", async ({
   await expect(page).toHaveURL(/\/auth$/);
   await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
 });
+
+for (const target of ["products", "content", "customers"]) {
+  test(`${target} has an immediate page title on hard and soft navigation`, async ({
+    page,
+    baseURL,
+  }) => {
+    const heading = { products: "产品资料", content: "内容与发布", customers: "客户与询盘" }[
+      target
+    ];
+    await instant(
+      page,
+      async () => {
+        await page.goto(`/workspace/${target}`);
+        await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+      },
+      { baseURL },
+    );
+    await page.goto("/workspace");
+    await instant(page, async () => {
+      await page
+        .getByRole("navigation", { name: "主要导航" })
+        .getByRole("link", { name: heading, exact: true })
+        .click();
+      await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    });
+  });
+}
+for (const route of ["new/product", `records/product/${randomUUID()}`]) {
+  test(`${route.split("/")[0]} keeps the project shell on direct navigation`, async ({
+    page,
+    baseURL,
+  }) => {
+    await instant(
+      page,
+      async () => {
+        await page.goto(`/workspace/${projectId}/${route}`);
+        await expect(page.getByTestId("project-back-link")).toBeVisible();
+      },
+      { baseURL },
+    );
+  });
+}

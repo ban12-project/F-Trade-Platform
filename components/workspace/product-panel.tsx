@@ -15,7 +15,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -76,6 +75,7 @@ import { productImageFilesSchema } from "@/lib/product/source-image-contracts";
 import { uploadProductDocument } from "@/lib/product/upload-document-client";
 import type { ProductCatalogDetail, ProductCatalogEntry } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
+import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
 import { ProductCatalogImport } from "./product-catalog-import";
 import {
@@ -580,7 +580,7 @@ function ProductAgentForm({
         {canStream && state.productId ? (
           <LinkButton
             variant="outline"
-            href={`/workspace/${projectId}?panel=product&item=${state.productId}`}
+            href={workspaceRecordHref(projectId, "product", state.productId!)}
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -939,6 +939,7 @@ export function ProductPanel({
   const searchParams = useSearchParams();
   const [tab, setTab] = useState(detail ? "records" : "agent");
   function href(item: string) {
+    if (pathname.startsWith("/workspace/")) return workspaceRecordHref(projectId, "product", item);
     const params = new URLSearchParams(searchParams.toString());
     params.set("panel", "product");
     params.set("item", item);

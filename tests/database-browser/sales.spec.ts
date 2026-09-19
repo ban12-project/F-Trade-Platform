@@ -253,7 +253,7 @@ test("mock RFQ proceeds through quotation, delivery, follow-up and opportunity",
   await page.reload();
   // Streaming SSR may temporarily stage another copy under a hidden S:* container.
   // Scope to the accessible panel, never select an arbitrary first duplicate.
-  const quotationDetails = page.getByRole("complementary", { name: "报价详情与审批" });
+  const quotationDetails = page.getByRole("region", { name: "报价详情与审批" });
   const send = quotationDetails.locator(`form#quote-send-${draft.id}`);
   await expect(send).toHaveCount(1);
   await expect(send).toBeVisible();

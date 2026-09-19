@@ -24,7 +24,7 @@ const task: WorkspaceTaskSummary = {
   priority: "review",
   createdAt: new Date("2026-09-04T00:00:00Z"),
 };
-assert.equal(workspaceTaskHref(task), `/workspace/${task.projectId}?panel=content&item=${task.id}`);
+assert.equal(workspaceTaskHref(task), `/workspace/${task.projectId}/records/content/${task.id}`);
 assert.equal(
   workspaceTaskHref({ ...task, nodeKind: "video" }),
   `/workspace/${task.projectId}/video?item=${task.id}`,
