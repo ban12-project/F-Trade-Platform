@@ -154,17 +154,27 @@ test("shared intake keeps the chosen file across methods and protects abandoning
   });
   await page.goto("/testing/project-workflow?panel=product");
   const file = page.getByLabel("产品资料", { exact: true });
+  await expect(file).toBeEnabled();
   await file.setInputFiles({
     name: "synthetic-shared.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("Product name,SKU\nSYNTHETIC,MOCK-401\n"),
   });
+  await expect(page.getByText("已选择：synthetic-shared.csv", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "产品目录", exact: true }).click();
   await expect(page).toHaveURL(/method=catalog/);
-  await expect(page.getByText("所选文件：synthetic-shared.csv", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("tabpanel", { name: "产品目录", exact: true })
+      .getByText("所选文件：synthetic-shared.csv", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.getByRole("tab", { name: "单个产品", exact: true }).click();
-  await expect(page.getByText("所选文件：synthetic-shared.csv", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("tabpanel", { name: "单个产品", exact: true })
+      .getByText("所选文件：synthetic-shared.csv", { exact: true }),
+  ).toBeVisible();
   expect(await file.evaluate((element: HTMLInputElement) => element.files?.[0]?.name)).toBe(
     "synthetic-shared.csv",
   );

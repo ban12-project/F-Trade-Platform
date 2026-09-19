@@ -1126,7 +1126,7 @@ export function ProductPanel({
                   render={({ field }) => (
                     <Input
                       id="product-source-file"
-                      disabled={importBusy}
+                      disabled={importBusy || !intakeForm.formState.isReady}
                       type="file"
                       accept=".pdf,.csv,.xls,.xlsx"
                       ref={(element) => {
