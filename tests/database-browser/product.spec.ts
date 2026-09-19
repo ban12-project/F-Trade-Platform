@@ -13,6 +13,8 @@ import { encryptStoredSecret } from "../../lib/security/encrypted-secret";
 import { recordControlledPublicationResult } from "../../lib/social/publication-store";
 import { authSecret, databaseURL, modelConfigKey } from "../../playwright.database.config";
 
+// Streaming may retain hidden previous trees; visible controls identify the current editor.
+// Database assertions independently verify identity, permissions, versions, evidence and writes.
 const pool = new Pool({ connectionString: databaseURL });
 const db = drizzle(pool, { schema });
 const actorId = `synthetic-browser-${randomUUID()}`;
@@ -208,7 +210,7 @@ test("authenticated browser reviews a mock product and its content through real 
   ]);
   await page.goto(path);
   await page.getByRole("tab", { name: "手动录入" }).click();
-  const form = page.locator("form#create-product");
+  const form = page.locator("form#create-product").filter({ visible: true });
   await form.getByLabel("产品名称", { exact: true }).fill(productName);
   await form.getByLabel("内部编号", { exact: true }).fill(sku);
   await form.getByLabel("OE / OEM 编号", { exact: true }).fill("MOCK-OE-BROWSER");
@@ -263,8 +265,10 @@ test("authenticated browser reviews a mock product and its content through real 
   expect(missingSource.headers()["x-content-type-options"]).toBe("nosniff");
   await db.update(schema.user).set({ role: "user" }).where(eq(schema.user.id, actorId));
   await page.reload();
-  await expect(page.getByText("等待审核者核实产品", { exact: true })).toBeVisible();
-  await expect(page.locator("form#product-review")).toHaveCount(0);
+  await expect(
+    page.getByText("等待审核者核实产品", { exact: true }).filter({ visible: true }),
+  ).toBeVisible();
+  await expect(page.locator("form#product-review").filter({ visible: true })).toHaveCount(0);
   await db
     .update(schema.workspaceProjectMember)
     .set({ role: "viewer" })
@@ -276,7 +280,9 @@ test("authenticated browser reviews a mock product and its content through real 
     );
   await page.reload();
   await expect(
-    page.getByText("当前为只读视图。请由项目编辑者处理写入或审核。", { exact: true }),
+    page
+      .getByText("当前为只读视图。请由项目编辑者处理写入或审核。", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
   await expect(original).toBeEnabled();
   await db
@@ -290,7 +296,7 @@ test("authenticated browser reviews a mock product and its content through real 
     );
   await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, actorId));
   await page.reload();
-  const review = page.locator("form#product-review");
+  const review = page.locator("form#product-review").filter({ visible: true });
   await review.getByRole("combobox").first().click();
   await page.getByRole("option", { name: "退回产品事实", exact: true }).click();
   await review.getByLabel("审核证据", { exact: true }).click();
@@ -299,9 +305,11 @@ test("authenticated browser reviews a mock product and its content through real 
     .locator("#product-review-notes")
     .fill("Synthetic source reference revision exercise.");
   await page.getByRole("button", { name: "退回产品事实", exact: true }).click();
-  await expect(page.locator("form#revise-product")).toBeVisible();
+  await expect(page.locator("form#revise-product").filter({ visible: true })).toBeVisible();
   await expect(
-    page.getByText("Synthetic source reference revision exercise.", { exact: true }),
+    page
+      .getByText("Synthetic source reference revision exercise.", { exact: true })
+      .filter({ visible: true }),
   ).toBeVisible();
   await page
     .locator("form#revise-product")
@@ -341,8 +349,8 @@ test("authenticated browser reviews a mock product and its content through real 
     )
     .toBe("PRODUCT_READY");
   await page.reload();
-  await expect(page.getByText("已核验", { exact: true })).toBeVisible();
-  await expect(page.locator("form#product-review")).toHaveCount(0);
+  await expect(page.getByText("已核验", { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.locator("form#product-review").filter({ visible: true })).toHaveCount(0);
 
   const [ready] = await db
     .select()
@@ -409,7 +417,7 @@ test("authenticated browser reviews a mock product and its content through real 
 
   await page.getByRole("button", { name: "制作图文内容", exact: true }).click();
   await expect(page).toHaveURL(`/workspace/${projectId}/new/content?product=${created.id}`);
-  const contentForm = page.locator("form#create-content");
+  const contentForm = page.locator("form#create-content").filter({ visible: true });
   await contentForm.getByRole("combobox").nth(2).click();
   await page.getByRole("option", { name: "OE 编号", exact: true }).click();
   const contentBody =
@@ -429,7 +437,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.getByRole("button", { name: "创建待审内容", exact: true }).click();
   const savedContentResponse = await contentResponse;
   expect(savedContentResponse.ok()).toBe(true);
-  await expect(page.getByText(/内容草稿已创建/)).toBeVisible();
+  await expect(page.getByText(/内容草稿已创建/).filter({ visible: true })).toBeVisible();
   // A successful save must settle, rather than continually refreshing on new product props.
   await page.waitForLoadState("networkidle", { timeout: 5_000 });
   const contentQuery = () =>
@@ -461,12 +469,12 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.approval.aggregateId, contentDraft.id));
   expect(contentApproval.status).toBe("pending");
   await page.getByRole("button", { name: "打开内容草稿", exact: true }).click();
-  const contentReview = page.locator("form#content-review");
+  const contentReview = page.locator("form#content-review").filter({ visible: true });
   const staleContext = await browser.newContext({ baseURL });
   await staleContext.addCookies(await context.cookies());
   const stalePage = await staleContext.newPage();
   await stalePage.goto(`/workspace/${projectId}?panel=content&item=${contentDraft.id}`);
-  const staleReview = stalePage.locator("form#content-review");
+  const staleReview = stalePage.locator("form#content-review").filter({ visible: true });
   await staleReview.getByRole("combobox").click();
   await stalePage.getByRole("option", { name: "批准营销内容", exact: true }).click();
   await staleReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
@@ -480,7 +488,11 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.getByRole("button", { name: "退回营销内容", exact: true }).click();
   await expect.poll(async () => (await contentQuery())[0].state).toBe("CONTENT_REVISION_REQUIRED");
   const revisedBody = `${contentBody} Revision checked in the synthetic workflow.`;
-  await page.locator("form#revise-content").getByLabel("正文", { exact: true }).fill(revisedBody);
+  await page
+    .locator("form#revise-content")
+    .filter({ visible: true })
+    .getByLabel("正文", { exact: true })
+    .fill(revisedBody);
   await page.getByRole("button", { name: "提交修订并送审", exact: true }).click();
   await expect.poll(async () => (await contentQuery())[0].state).toBe("CONTENT_REVIEW_REQUIRED");
   const [revisedContent] = await contentQuery();
@@ -517,7 +529,9 @@ test("authenticated browser reviews a mock product and its content through real 
     ),
   ).rejects.toThrow("审核请求已更新");
   await stalePage.getByRole("button", { name: "批准营销内容", exact: true }).click();
-  await expect(stalePage.getByText(/内容已更新|审核请求已更新/)).toBeVisible();
+  await expect(
+    stalePage.getByText(/内容已更新|审核请求已更新/).filter({ visible: true }),
+  ).toBeVisible();
   expect((await contentQuery())[0]).toEqual(revisedContent);
   expect(
     await db
@@ -552,8 +566,8 @@ test("authenticated browser reviews a mock product and its content through real 
   expect((await contentReviewResponse).ok()).toBe(true);
   await expect.poll(async () => (await contentQuery())[0].state).toBe("CONTENT_APPROVED");
   await page.reload();
-  await expect(page.getByText("已批准", { exact: true })).toBeVisible();
-  await expect(page.locator("form#content-review")).toHaveCount(0);
+  await expect(page.getByText("已批准", { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.locator("form#content-review").filter({ visible: true })).toHaveCount(0);
   const [approvedContent] = await contentQuery();
   expect(approvedContent.version).toBe(4);
   expect(approvedContent.payload).toEqual({
@@ -604,14 +618,16 @@ test("authenticated browser reviews a mock product and its content through real 
 
   // Continue from this exact content into confirmation and a synthetic platform result.
   await page.setViewportSize({ width: 390, height: 844 });
-  const publicationForm = page.locator("#publication-confirmation");
+  const publicationForm = page.locator("#publication-confirmation").filter({ visible: true });
   await expect(publicationForm).toBeVisible();
   await expect(publicationForm.getByText(revisedBody, { exact: true })).toBeVisible();
   await publicationForm
     .getByLabel("逐帖人工确认凭据")
     .fill("evidence-synthetic-journey-confirmation");
   await page.getByRole("button", { name: "确认并提交此条发布", exact: true }).click();
-  await expect(page.getByText("等待平台回执", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("等待平台回执", { exact: true }).filter({ visible: true }),
+  ).toBeVisible();
   await expect(publicationForm).toHaveCount(0);
   await expect(page.getByText("已发布", { exact: true })).toHaveCount(0);
   const [submitted] = await db
@@ -693,7 +709,7 @@ test("authenticated browser reviews a mock product and its content through real 
     .from(schema.aggregateRecord)
     .where(eq(schema.aggregateRecord.id, targetA.id));
   await page.goto(`/workspace/${projectId}?panel=content&item=${targetA.id}`);
-  await expect(page.locator("form#content-review")).toBeVisible();
+  await expect(page.locator("form#content-review").filter({ visible: true })).toBeVisible();
   await page.getByRole("link", { name: "返回记录列表", exact: true }).click();
   await expect(page).toHaveURL(`/workspace/content?project=${projectId}`);
   await page
@@ -701,7 +717,7 @@ test("authenticated browser reviews a mock product and its content through real 
     .getByRole("link", { name: /MOCK switching B/ })
     .click();
   await expect(page).toHaveURL(new RegExp(`/records/content/${targetB.id}$`));
-  const switchingReview = page.locator("form#content-review");
+  const switchingReview = page.locator("form#content-review").filter({ visible: true });
   await switchingReview.getByRole("combobox").click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
   await switchingReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
