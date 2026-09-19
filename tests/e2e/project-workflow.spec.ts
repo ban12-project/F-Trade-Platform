@@ -18,7 +18,7 @@ test("product Gate 01 submits the displayed revision and approval request", asyn
   await page.waitForLoadState("networkidle");
   const detail = page.getByRole("region", { name: "当前阶段", exact: true });
   await expect(detail.getByText("产品事实与证据")).toBeVisible();
-  await expect(detail.getByText("Gate 01 决定", { exact: true })).toBeVisible();
+  await expect(detail.getByText("产品核实决定", { exact: true })).toBeVisible();
   await expect(detail.getByText(/审核版本 1/)).toBeVisible();
   await expect(detail.getByRole("button", { name: "请先选择决定" })).toBeDisabled();
   await detail.getByRole("combobox").filter({ hasText: "请选择审核决定" }).press("ArrowDown");
@@ -75,9 +75,9 @@ test("follow-up shows the authorized timeline and explicit human send", async ({
 test("publication waits for explicit confirmation and platform receipt", async ({ page }) => {
   await page.goto("/testing/project-workflow?panel=publication");
   const detail = page.getByRole("region", { name: /详情与审批/ });
-  await expect(detail.getByText("确认并提交发布", { exact: true })).toBeVisible();
+  await expect(detail.getByText("尚无可发布内容", { exact: true })).toBeVisible();
   await expect(detail.getByText("平台回执前不会显示为已发布", { exact: false })).toBeVisible();
-  await expect(detail.getByRole("button", { name: "确认并提交此条发布" })).toBeDisabled();
+  await expect(detail.locator("#publication-confirmation")).toHaveCount(0);
 });
 
 test("editor uses the main document width and appears before related tasks", async ({ page }) => {

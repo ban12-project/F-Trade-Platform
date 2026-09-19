@@ -113,9 +113,9 @@ test("catalog browser selects 20 independent records, restores progress and retr
   });
   await page.goto("/testing/project-workflow?panel=product");
   await page.waitForLoadState("networkidle");
-  await page.getByRole("tab", { name: "目录批量导入" }).click();
+  await page.getByRole("tab", { name: "产品目录" }).click();
   await page
-    .getByLabel("产品目录文件")
+    .getByLabel("产品资料", { exact: true })
     .setInputFiles({ name: "synthetic.csv", mimeType: "text/csv", buffer: source });
   await page.getByRole("button", { name: "上传并解析目录" }).click();
   await expect(page.getByRole("checkbox")).toHaveCount(21);
@@ -127,16 +127,73 @@ test("catalog browser selects 20 independent records, restores progress and retr
   await expect(page.getByText("抽取未通过，请检查模型配置后重试。", { exact: true })).toBeVisible();
   await page.reload();
   await page.waitForLoadState("networkidle");
-  await page.getByRole("tab", { name: "目录批量导入" }).click();
+  await page.getByRole("tab", { name: "产品目录" }).click();
   await expect(page.getByRole("button", { name: "查看草稿" })).toHaveCount(19);
   await page.getByRole("button", { name: "选择失败记录", exact: true }).click();
   await page.getByRole("button", { name: "生成 1 条待审核草稿" }).click();
   await expect(page.getByRole("button", { name: "查看草稿" })).toHaveCount(20);
   await expect(page.getByRole("button", { name: "查看草稿" }).first()).toHaveAttribute(
     "href",
-    `/workspace/${projectId}?panel=product&item=${candidates[0]?.id}`,
+    `/workspace/${projectId}/records/product/${candidates[0]?.id}`,
   );
   expect(submissions).toBe(2);
   expect(candidates[0]?.attempts).toBe(2);
   expect(candidates[1]?.attempts).toBe(1);
+});
+
+test("shared intake keeps the chosen file across methods and protects abandoning it on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/testing/project-workflow?**", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await route.fulfill({
+      contentType: "text/x-component",
+      body: '0:{"a":"$@1","f":"","b":"synthetic"}\n1:{"status":"success","view":null}\n',
+    });
+  });
+  await page.goto("/testing/project-workflow?panel=product");
+  const file = page.getByLabel("产品资料", { exact: true });
+  await expect(file).toBeEnabled();
+  await file.setInputFiles({
+    name: "synthetic-shared.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Product name,SKU\nSYNTHETIC,MOCK-401\n"),
+  });
+  await expect(page.getByText("已选择：synthetic-shared.csv", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "产品目录", exact: true }).click();
+  await expect(page).toHaveURL(/method=catalog/);
+  await expect(
+    page
+      .getByRole("tabpanel", { name: "产品目录", exact: true })
+      .getByText("所选文件：synthetic-shared.csv", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await page.getByRole("tab", { name: "单个产品", exact: true }).click();
+  await expect(
+    page
+      .getByRole("tabpanel", { name: "单个产品", exact: true })
+      .getByText("所选文件：synthetic-shared.csv", { exact: true }),
+  ).toBeVisible();
+  expect(await file.evaluate((element: HTMLInputElement) => element.files?.[0]?.name)).toBe(
+    "synthetic-shared.csv",
+  );
+  await page.getByRole("tab", { name: "手动录入", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await page.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "单个产品", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("tab", { name: "手动录入", exact: true }).click();
+  await page.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
+  await expect(page).toHaveURL(/method=manual/);
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "手动录入", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("tab", { name: "单个产品", exact: true }).click();
+  await expect(page.getByText("所选文件：synthetic-shared.csv", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

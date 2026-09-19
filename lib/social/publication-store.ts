@@ -176,11 +176,25 @@ export async function listProjectPublicationData(
   const projectRecordIds = projectRecords.map(({ record }) => record.id);
   const publications = projectRecordIds.length
     ? await database
-        .select()
+        .select({
+          id: socialPublication.id,
+          projectId: socialPublication.projectId,
+          contentRef: socialPublication.contentRef,
+          format: socialPublication.format,
+          channelRef: socialPublication.channelRef,
+          accountRef: socialPublication.accountRef,
+          externalPublicationRef: socialPublication.externalPublicationRef,
+          status: socialPublication.status,
+          createdAt: socialPublication.createdAt,
+        })
         .from(socialPublication)
-        .where(inArray(socialPublication.contentRef, projectRecordIds))
+        .where(
+          and(
+            eq(socialPublication.projectId, projectId),
+            inArray(socialPublication.contentRef, projectRecordIds),
+          ),
+        )
         .orderBy(desc(socialPublication.createdAt))
-        .limit(50)
     : [];
   const publishedRefs = new Set(
     publications

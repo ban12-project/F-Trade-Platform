@@ -55,6 +55,8 @@ test("new work exposes its controlled dialog and restores keyboard focus on Esca
   });
   await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  // Keyboard press does not wait for an initially disabled trigger to become enabled.
+  await expect(trigger).toBeEnabled();
   await trigger.focus();
   await trigger.press("Enter");
   const dialog = page.getByRole("dialog", { name: "开始新工作", exact: true });

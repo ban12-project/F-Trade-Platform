@@ -79,13 +79,16 @@ import type {
   QuotationEntry,
 } from "@/lib/sales/closing-store";
 import type { RfqEntry } from "@/lib/sales/store";
+import { publicationProgress } from "@/lib/social/publication-presentation";
 import type {
   PublicationCandidate,
   PublicationChannel,
   PublicationEntry,
 } from "@/lib/social/publication-store";
+import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProductReference } from "@/lib/workspace/store";
 import { useWorkspaceDirty } from "./dirty-state";
+import { WorkspaceLink } from "./workspace-link";
 
 function Message({ status, message }: { status: string; message: string }) {
   return message ? (
@@ -1153,13 +1156,20 @@ export function PublicationPanel({
       confirmationRef: "",
     },
   });
+  useWorkspaceDirty(
+    `publication-${projectId}`,
+    form.formState.isDirty && state.status !== "success",
+  );
   const selected = candidates.find((item) => item.id === form.watch("contentRef"));
   const [channelKey, setChannelKey] = useState(
     channels[0] ? `${channels[0].channelRef}\u001f${channels[0].accountRef}` : "",
   );
   useEffect(() => {
-    if (state.status === "success") router.refresh();
-  }, [router, state.status]);
+    if (state.status === "success") {
+      form.reset(form.getValues());
+      router.refresh();
+    }
+  }, [form, router, state.status]);
   function submit(value: z.infer<typeof publicationConfirmationFormSchema>) {
     if (!selected) return;
     const data = new FormData();
@@ -1178,137 +1188,179 @@ export function PublicationPanel({
           人工确认只提交一次发布任务；平台回执前不会显示为已发布，未知或失败结果会暂停渠道且不自动重试。
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>确认并提交发布</CardTitle>
-          <CardDescription>
-            核对最终载荷、渠道与账户。本次确认只授权这一条内容，不会授权后续自动发布。
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form id="publication-confirmation" onSubmit={form.handleSubmit(submit)}>
-            <FieldGroup>
-              <Field>
-                <FieldLabel>已批准内容或视频</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="contentRef"
-                  render={({ field }) => (
-                    <Select
-                      items={Object.fromEntries(candidates.map((item) => [item.id, item.title]))}
-                      value={field.value}
-                      onValueChange={(value) => {
-                        const item = candidates.find((candidate) => candidate.id === value);
-                        field.onChange(value);
-                        if (item) {
-                          form.setValue("format", item.format);
-                          form.setValue("previewDigest", item.previewDigest);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="没有可发布内容" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {candidates.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.title}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-              {selected ? (
-                <Alert>
-                  <AlertTitle>最终载荷预览</AlertTitle>
-                  <AlertDescription>{selected.preview}</AlertDescription>
-                </Alert>
+      {publications.map((item) => {
+        const progress = publicationProgress(item.status);
+        return (
+          <Card key={item.id}>
+            <CardHeader>
+              <CardTitle>{progress.label}</CardTitle>
+              <CardDescription>
+                {item.channelRef} · {item.accountRef}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              <p className="text-sm">{progress.detail}</p>
+              {item.externalPublicationRef ? (
+                <p className="break-all text-sm">发布凭证：{item.externalPublicationRef}</p>
               ) : null}
-              <Field>
-                <FieldLabel>已启用渠道</FieldLabel>
-                <Select
-                  items={Object.fromEntries(
-                    channels.map((item) => [
-                      `${item.channelRef}\u001f${item.accountRef}`,
-                      `${item.channelRef} · ${item.accountRef}`,
-                    ]),
-                  )}
-                  value={channelKey}
-                  onValueChange={(value) => {
-                    if (!value) return;
-                    const channel = channels.find(
-                      (item) => `${item.channelRef}\u001f${item.accountRef}` === value,
-                    );
-                    setChannelKey(value);
-                    if (channel) {
-                      form.setValue("channelRef", channel.channelRef);
-                      form.setValue("accountRef", channel.accountRef);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="没有已启用渠道" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {channels.map((item) => {
-                        const key = `${item.channelRef}\u001f${item.accountRef}`;
-                        return (
-                          <SelectItem key={key} value={key}>
-                            {item.channelRef} · {item.accountRef}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="publication-confirmation-ref">逐帖人工确认凭据</FieldLabel>
-                <Input id="publication-confirmation-ref" {...form.register("confirmationRef")} />
-                <FieldDescription>使用脱敏引用；重复提交同一凭据只会返回原任务。</FieldDescription>
-              </Field>
-            </FieldGroup>
-          </form>
-        </CardContent>
-        <CardFooter className="flex-col items-stretch gap-3">
-          <Button
-            form="publication-confirmation"
-            type="submit"
-            disabled={pending || !candidates.length || !channels.length}
-          >
-            {pending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
-            确认并提交此条发布
-          </Button>
-          <Message {...state} />
-        </CardFooter>
-      </Card>
-      {publications.length ? (
+            </CardContent>
+            <CardFooter>
+              <Button
+                variant="outline"
+                render={
+                  <WorkspaceLink
+                    href={workspaceRecordHref(
+                      projectId,
+                      item.format === "video" ? "video" : "content",
+                      item.contentRef,
+                    )}
+                  />
+                }
+              >
+                查看发布内容
+              </Button>
+            </CardFooter>
+          </Card>
+        );
+      })}
+      {candidates.length ? (
         <Card>
           <CardHeader>
-            <CardTitle>最近发布记录</CardTitle>
+            <CardTitle>确认并提交发布</CardTitle>
+            <CardDescription>
+              核对最终载荷、渠道与账户。本次确认只授权这一条内容，不会授权后续自动发布。
+            </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {publications.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between gap-3 rounded-lg border p-3"
-              >
-                <span className="min-w-0 truncate text-sm">
-                  {item.channelRef}
-                  {item.externalPublicationRef
-                    ? ` · ${item.externalPublicationRef}`
-                    : " · 等待平台回执"}
-                </span>
-                <Badge variant="outline">{item.status}</Badge>
-              </div>
-            ))}
+          <CardContent>
+            {!channels.length ? (
+              <Alert className="mb-4">
+                <AlertTitle>等待渠道管理员启用发布</AlertTitle>
+                <AlertDescription>
+                  当前没有可用渠道，请由管理员在账号与管理中核对授权和渠道状态。
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            <form id="publication-confirmation" onSubmit={form.handleSubmit(submit)}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="publication-content">已批准内容或视频</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name="contentRef"
+                    render={({ field }) => (
+                      <Select
+                        items={Object.fromEntries(candidates.map((item) => [item.id, item.title]))}
+                        value={field.value}
+                        onValueChange={(value) => {
+                          const item = candidates.find((candidate) => candidate.id === value);
+                          field.onChange(value);
+                          if (item) {
+                            form.setValue("format", item.format);
+                            form.setValue("previewDigest", item.previewDigest);
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="publication-content" className="w-full">
+                          <SelectValue placeholder="没有可发布内容" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {candidates.map((item) => (
+                              <SelectItem key={item.id} value={item.id}>
+                                {item.title}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                {selected ? (
+                  <Alert>
+                    <AlertTitle>最终载荷预览</AlertTitle>
+                    <AlertDescription>{selected.preview}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <Field>
+                  <FieldLabel htmlFor="publication-channel">已启用渠道</FieldLabel>
+                  <Select
+                    items={Object.fromEntries(
+                      channels.map((item) => [
+                        `${item.channelRef}\u001f${item.accountRef}`,
+                        `${item.channelRef} · ${item.accountRef}`,
+                      ]),
+                    )}
+                    value={channelKey}
+                    onValueChange={(value) => {
+                      if (!value) return;
+                      const channel = channels.find(
+                        (item) => `${item.channelRef}\u001f${item.accountRef}` === value,
+                      );
+                      setChannelKey(value);
+                      if (channel) {
+                        form.setValue("channelRef", channel.channelRef);
+                        form.setValue("accountRef", channel.accountRef);
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="publication-channel" className="w-full">
+                      <SelectValue placeholder="没有已启用渠道" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {channels.map((item) => {
+                          const key = `${item.channelRef}\u001f${item.accountRef}`;
+                          return (
+                            <SelectItem key={key} value={key}>
+                              {item.channelRef} · {item.accountRef}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field data-invalid={!!form.formState.errors.confirmationRef}>
+                  <FieldLabel htmlFor="publication-confirmation-ref">逐帖人工确认凭据</FieldLabel>
+                  <Input
+                    id="publication-confirmation-ref"
+                    aria-invalid={!!form.formState.errors.confirmationRef}
+                    {...form.register("confirmationRef")}
+                  />
+                  <FieldError errors={[form.formState.errors.confirmationRef]} />
+                  <FieldDescription>
+                    使用脱敏引用；重复提交同一凭据只会返回原任务。
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
+            </form>
           </CardContent>
+          <CardFooter className="flex-col items-stretch gap-3">
+            <Button
+              form="publication-confirmation"
+              type="submit"
+              disabled={pending || !candidates.length || !channels.length}
+            >
+              {pending ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <SendIcon data-icon="inline-start" />
+              )}
+              确认并提交此条发布
+            </Button>
+            <Message {...state} />
+          </CardFooter>
         </Card>
+      ) : !publications.length ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>尚无可发布内容</EmptyTitle>
+            <EmptyDescription>
+              完成当前内容的人工审核后，再核对渠道与最终文案并确认发布。
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
     </div>
   );
