@@ -282,8 +282,10 @@ test("delivery task isolates its confirmation and unknown IDs never fall back to
   await expect(panel.locator(`#delivery-${other}`)).toHaveCount(0);
   for (const stage of ["quotation", "delivery", "follow-up", "rfq"]) {
     await page.goto(`/workspace/${id}?panel=${stage}&item=${randomUUID()}`);
-    await expect(page.getByText("这条记录已不可用", { exact: true })).toBeVisible();
-    await expect(page.getByRole("region", { name: /详情与审批/ }).locator("form")).toHaveCount(0);
+    // Streaming may retain hidden previous regions; assert the accessible details only.
+    const currentDetails = page.getByRole("region", { name: /详情与审批/ });
+    await expect(currentDetails.getByText("这条记录已不可用", { exact: true })).toBeVisible();
+    await expect(currentDetails.locator("form")).toHaveCount(0);
   }
 });
 
