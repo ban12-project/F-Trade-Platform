@@ -4,7 +4,7 @@ import { ArrowLeftIcon, ArrowRightIcon, FilmIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { MouseEvent, ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { LinkButton } from "@/components/ui/button";
+import { buttonVariants, LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
 import { taskProjectStage } from "@/lib/workspace/stages";
@@ -64,9 +64,9 @@ export function VideoStageEntry({
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle>视频制作</CardTitle>
+            <CardTitle>按需制作视频</CardTitle>
             <CardDescription>
-              选择素材、生成 AI 剪辑初稿、预览、修改并提交成片审核。
+              视频是可选内容形式。图文可独立发布；需要视频时，再选择授权素材制作并审核。
             </CardDescription>
           </div>
           <FilmIcon className="size-5 text-muted-foreground" />
@@ -77,10 +77,13 @@ export function VideoStageEntry({
           <Badge variant="outline">{count} 个版本</Badge>
           {pendingReview ? <Badge>{pendingReview} 个待审核</Badge> : null}
         </div>
-        <LinkButton href={`/workspace/${projectId}/video`} className="w-full">
-          进入视频编辑器
+        <WorkspaceLink
+          href={`/workspace/${projectId}/video`}
+          className={buttonVariants({ className: "w-full" })}
+        >
+          查看视频与新建
           <ArrowRightIcon data-icon="inline-end" />
-        </LinkButton>
+        </WorkspaceLink>
       </CardContent>
     </Card>
   );

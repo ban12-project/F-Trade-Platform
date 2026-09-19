@@ -7,15 +7,14 @@ import {
   CopyIcon,
   DownloadIcon,
   FilmIcon,
-  PlusIcon,
   SaveIcon,
   ScissorsIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button, LinkButton } from "@/components/ui/button";
+import { Button, buttonVariants, LinkButton } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -53,6 +52,7 @@ import {
   reviewMarketingVideoAction,
   saveMarketingVideoDraftAction,
 } from "@/lib/actions/marketing-video";
+import { productFactLabels } from "@/lib/product/fact-labels";
 import {
   type MarketingVideoDraft,
   marketingVideoDraftSchema,
@@ -63,9 +63,11 @@ import type {
   MarketingVideoEditorEntry,
   ReadyVideoProductSource,
 } from "@/lib/video/store";
+import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { MarketingVideoCreateForm } from "./marketing-video-create-form";
+import { WorkspaceLink } from "./workspace-link";
 
-function stateLabel(state: string) {
+export function videoStateLabel(state: string) {
   return (
     (
       {
@@ -80,10 +82,10 @@ function stateLabel(state: string) {
 }
 
 const abcdRoleLabels = {
-  attention: "Attention 抓注意",
-  branding: "Branding 露品牌",
-  connection: "Connection 建联系",
-  direction: "Direction 给行动",
+  attention: "吸引注意",
+  branding: "呈现品牌",
+  connection: "建立联系",
+  direction: "引导行动",
 } as const;
 const motionPresetLabels = {
   punch_in: "快速推进",
@@ -143,7 +145,7 @@ function ClipEditor({
               <div className="flex flex-col gap-1">
                 <CardTitle className="text-sm">片段 {index + 1}</CardTitle>
                 <CardDescription>
-                  {clip.mediaType === "image" ? "图片" : "视频"} · {clip.assetRef.slice(0, 20)}…
+                  {clip.mediaType === "image" ? "图片素材" : "视频素材"}
                 </CardDescription>
               </div>
               <div className="flex gap-1">
@@ -172,7 +174,7 @@ function ClipEditor({
             <CardContent>
               <FieldGroup>
                 <Field>
-                  <FieldLabel>ABCD 节拍</FieldLabel>
+                  <FieldLabel>片段用途</FieldLabel>
                   <div className="flex flex-wrap gap-1.5">
                     {clip.abcdRoles.map((role) => (
                       <Badge key={role} variant="outline">
@@ -181,7 +183,7 @@ function ClipEditor({
                     ))}
                   </div>
                   <FieldDescription>
-                    AI 可以让同一素材承担多个节拍，但整条视频必须覆盖 ABCD。
+                    整条视频应包含吸引注意、呈现品牌、建立联系和引导行动；同一片段可承担多个用途。
                   </FieldDescription>
                 </Field>
                 <Field>
@@ -321,7 +323,7 @@ function ClipEditor({
                     <NativeSelectOption value="verified_fact">核验事实</NativeSelectOption>
                   </NativeSelect>
                   <FieldDescription>
-                    事实字幕由服务端读取当前 ProductReady 值，不能手工改写。
+                    事实字幕引用当前已核实的产品资料；修改事实请回到产品资料核实。
                   </FieldDescription>
                 </Field>
                 {clip.caption.kind === "creative" ? (
@@ -357,12 +359,12 @@ function ClipEditor({
                     >
                       {factOptions.map((fact) => (
                         <NativeSelectOption key={fact.field} value={fact.field}>
-                          {fact.field} · {fact.value}
+                          {productFactLabels[fact.field] ?? fact.field} · {fact.value}
                         </NativeSelectOption>
                       ))}
                     </NativeSelect>
                     <FieldDescription>
-                      成片使用服务端保存的核验值，不接受浏览器提交事实文字。
+                      成片使用已核实的产品事实，字幕中的事实文字不能直接改写。
                     </FieldDescription>
                   </Field>
                 ) : null}
@@ -391,7 +393,7 @@ function EditVideo({
   const [draft, setDraft] = useState(entry.draft);
   const [message, setMessage] = useState("");
   const [reviewEvidence, setReviewEvidence] = useState("");
-  const dirty = JSON.stringify(draft) !== JSON.stringify(entry.draft);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(entry.draft) || Boolean(reviewEvidence);
   const durationMs = marketingVideoDurationMs(draft);
   const editable = ["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(entry.state);
   const processing =
@@ -404,13 +406,6 @@ function EditVideo({
     return () => onDirtyChange(false);
   }, [dirty, onDirtyChange]);
   useEffect(() => {
-    const warn = (event: BeforeUnloadEvent) => {
-      if (dirty) event.preventDefault();
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
-  useEffect(() => {
     if (!processing) return;
     const timer = window.setInterval(() => router.refresh(), 3_000);
     return () => window.clearInterval(timer);
@@ -419,7 +414,10 @@ function EditVideo({
     startAction(async () => {
       const result = await action();
       setMessage(result.message);
-      if (result.status === "success") router.refresh();
+      if (result.status === "success") {
+        setReviewEvidence("");
+        router.refresh();
+      }
     });
   }
   function validatedDraft() {
@@ -433,14 +431,14 @@ function EditVideo({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">{stateLabel(entry.state)}</Badge>
+        <Badge variant="secondary">{videoStateLabel(entry.state)}</Badge>
         {processing ? <Badge>后台处理中</Badge> : null}
         {entry.privateTestOnly ? <Badge variant="outline">仅限私有测试</Badge> : null}
         <Badge variant="outline">{entry.draft.platform}</Badge>
         <Badge variant="outline">最长 15 秒</Badge>
       </div>
       <div>
-        <h3 className="font-medium">{entry.productName}</h3>
+        <h2 className="font-medium">{entry.productName}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{entry.objective}</p>
       </div>
       {entry.previewAssetRef ? (
@@ -575,6 +573,11 @@ function EditVideo({
           </AlertDescription>
         </Alert>
       ) : null}
+      {entry.state === "VIDEO_REVIEW_REQUIRED" && !canReview && !entry.privateTestOnly ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          等待有审核权限的项目编辑者检查成片。审核通过不会自动发布。
+        </p>
+      ) : null}
       {entry.state === "VIDEO_REVIEW_REQUIRED" && canReview && !entry.privateTestOnly ? (
         <Card>
           <CardHeader>
@@ -645,6 +648,7 @@ export function MarketingVideoPanel({
   copyCandidates,
   canReview,
   selectedId,
+  mode,
   onDirtyChange,
 }: {
   projectId: string;
@@ -653,105 +657,96 @@ export function MarketingVideoPanel({
   copyCandidates: MarketingVideoCopyCandidate[];
   canReview: boolean;
   selectedId?: string;
+  mode: "record" | "create";
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const [activeId, setActiveId] = useState(
-    selectedId && entries.some((entry) => entry.id === selectedId)
-      ? selectedId
-      : (entries[0]?.id ?? "new"),
-  );
-  const [copyId, setCopyId] = useState(copyCandidates[0]?.id ?? "");
+  const [copyId, setCopyId] = useState(copyCandidates.length === 1 ? copyCandidates[0].id : "");
   const [copyMessage, setCopyMessage] = useState("");
   const [copyPending, startCopy] = useTransition();
   const router = useRouter();
-  const active = useMemo(() => entries.find((entry) => entry.id === activeId), [activeId, entries]);
-  useEffect(() => {
-    if (activeId !== "new" && !entries.some((entry) => entry.id === activeId))
-      setActiveId(entries[0]?.id ?? "new");
-  }, [activeId, entries]);
+  const active = mode === "record" ? entries.find((entry) => entry.id === selectedId) : undefined;
+  const [copiedId, setCopiedId] = useState("");
   return (
     <div className="flex flex-col gap-4">
-      <ToggleGroup
-        value={[activeId]}
-        onValueChange={(value) => value[0] && setActiveId(value[0])}
-        variant="outline"
-        className="w-full flex-wrap justify-start"
-      >
-        <ToggleGroupItem value="new">
-          <PlusIcon data-icon="inline-start" />
-          新建
-        </ToggleGroupItem>
-        {entries.map((entry, index) => (
-          <ToggleGroupItem key={entry.id} value={entry.id}>
-            视频 {entries.length - index}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
       {active ? (
         <EditVideo
+          key={active.id}
           projectId={projectId}
           entry={active}
           canReview={canReview}
           onDirtyChange={onDirtyChange}
         />
-      ) : (
+      ) : mode === "create" ? (
         <MarketingVideoCreateForm projectId={projectId} products={products} />
-      )}
-      <Card>
-        <CardHeader>
-          <CardTitle>复制其他项目剪辑</CardTitle>
-          <CardDescription>复制素材编排为独立草稿，不继承预览与审核状态。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {copyCandidates.length ? (
-            <Field>
-              <FieldLabel>源剪辑</FieldLabel>
-              <Select
-                items={Object.fromEntries(
-                  copyCandidates.map((item) => [
-                    item.id,
-                    item.projectTitle + " · " + item.productName + " · " + item.objective,
-                  ]),
-                )}
-                value={copyId}
-                onValueChange={(value) => value && setCopyId(value)}
+      ) : null}
+      {mode === "create" && copyCandidates.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>复制其他项目剪辑</CardTitle>
+            <CardDescription>复制素材编排为独立草稿，不继承预览与审核状态。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {copyCandidates.length ? (
+              <Field>
+                <FieldLabel htmlFor="video-copy-source">源剪辑</FieldLabel>
+                <Select
+                  items={Object.fromEntries(
+                    copyCandidates.map((item) => [
+                      item.id,
+                      item.projectTitle + " · " + item.productName + " · " + item.objective,
+                    ]),
+                  )}
+                  value={copyId}
+                  onValueChange={(value) => value && setCopyId(value)}
+                >
+                  <SelectTrigger id="video-copy-source" className="w-full">
+                    <SelectValue placeholder="选择要复制的剪辑稿" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {copyCandidates.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.projectTitle} · {item.productName} · {item.objective}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : (
+              <p className="text-sm text-muted-foreground">其他项目暂无可复制剪辑。</p>
+            )}
+          </CardContent>
+          <CardFooter className="flex-col items-stretch gap-3">
+            <Button
+              variant="outline"
+              disabled={copyPending || !copyId}
+              onClick={() =>
+                startCopy(async () => {
+                  const result = await copyMarketingVideoDraftAction(projectId, copyId);
+                  setCopyMessage(result.message);
+                  if (result.status === "success") {
+                    setCopiedId(result.videoId ?? "");
+                    router.refresh();
+                  }
+                })
+              }
+            >
+              <CopyIcon data-icon="inline-start" />
+              复制为新剪辑稿
+            </Button>
+            {copiedId ? (
+              <WorkspaceLink
+                href={workspaceRecordHref(projectId, "video", copiedId)}
+                className={buttonVariants({ variant: "outline" })}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {copyCandidates.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.projectTitle} · {item.productName} · {item.objective}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-          ) : (
-            <p className="text-sm text-muted-foreground">其他项目暂无可复制剪辑。</p>
-          )}
-        </CardContent>
-        <CardFooter className="flex-col items-stretch gap-3">
-          <Button
-            variant="outline"
-            disabled={copyPending || !copyId}
-            onClick={() =>
-              startCopy(async () => {
-                const result = await copyMarketingVideoDraftAction(projectId, copyId);
-                setCopyMessage(result.message);
-                if (result.status === "success") router.refresh();
-              })
-            }
-          >
-            <CopyIcon data-icon="inline-start" />
-            复制为新剪辑稿
-          </Button>
-          {copyMessage ? <p className="text-sm text-muted-foreground">{copyMessage}</p> : null}
-        </CardFooter>
-      </Card>
+                打开复制的剪辑稿
+              </WorkspaceLink>
+            ) : null}
+            {copyMessage ? <p className="text-sm text-muted-foreground">{copyMessage}</p> : null}
+          </CardFooter>
+        </Card>
+      ) : null}
     </div>
   );
 }

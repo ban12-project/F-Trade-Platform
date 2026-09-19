@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { VideoWorkspace } from "@/components/workspace/video-workspace";
 import type { MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
+import { resolveVideoSelection, type VideoSelectionQuery } from "@/lib/video/workspace-selection";
 
 const projectId = "00000000-0000-4000-8000-000000000721";
 const videoId = "00000000-0000-4000-8000-000000000401";
@@ -78,7 +79,7 @@ function entry(state: "draft" | "review" | "approved"): MarketingVideoEditorEntr
 async function VideoWorkspaceFixture({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string }>;
+  searchParams: Promise<VideoSelectionQuery & { state?: string; viewer?: string }>;
 }) {
   const query = await searchParams;
   const state = query.state === "review" || query.state === "approved" ? query.state : "draft";
@@ -91,7 +92,12 @@ async function VideoWorkspaceFixture({
       entries={[current]}
       copyCandidates={[]}
       canReview
-      selectedId={current.id}
+      canWrite={query.viewer !== "1"}
+      selection={resolveVideoSelection(
+        "new" in query || "item" in query || "product" in query ? query : { item: current.id },
+        [current.id],
+        products.map((product) => product.id),
+      )}
     />
   );
 }
@@ -99,7 +105,7 @@ async function VideoWorkspaceFixture({
 export default function VideoWorkspaceTestingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string }>;
+  searchParams: Promise<VideoSelectionQuery & { state?: string; viewer?: string }>;
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (

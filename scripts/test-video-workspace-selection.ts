@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { resolveVideoSelection as resolve } from "../lib/video/workspace-selection";
+import { workspaceCreateHref, workspaceRecordHref } from "../lib/workspace/navigation";
 
 const a = "00000000-0000-4000-8000-000000000401",
   b = "00000000-0000-4000-8000-000000000402",
@@ -22,3 +23,10 @@ for (const query of [
 assert.equal(resolve({ item: b }, [a], [product]).mode, "unavailable");
 assert.equal(resolve({ product }, [a], []).mode, "unavailable");
 console.log("Synthetic video selection: explicit new/source/record and no fallback passed.");
+
+assert.equal(workspaceCreateHref(a, "video"), `/workspace/${a}/video?new=1`);
+assert.equal(
+  workspaceCreateHref(a, "video", { kind: "product", id: product }),
+  `/workspace/${a}/video?new=1&product=${product}`,
+);
+assert.equal(workspaceRecordHref(a, "video", b), `/workspace/${a}/video?item=${b}`);
