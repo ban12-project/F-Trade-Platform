@@ -2,9 +2,15 @@ import { expect, test } from "@playwright/test";
 
 const navigationFixture = "/testing/workspace-navigation";
 
-test("skip link transfers keyboard focus into the workspace main landmark", async ({ page }) => {
+test("skip link transfers keyboard focus into the workspace main landmark", async ({
+  page,
+  browserName,
+}) => {
   await page.goto("/testing/workspace-dashboard");
-  await page.keyboard.press("Tab");
+  // macOS Safari uses Option-Tab for links unless full keyboard navigation is enabled.
+  await page.keyboard.press(
+    browserName === "webkit" && process.platform === "darwin" ? "Alt+Tab" : "Tab",
+  );
   const skip = page.getByRole("link", { name: "跳到主要内容" });
   await expect(skip).toBeFocused();
   await skip.press("Enter");
@@ -16,6 +22,13 @@ test("streaming keeps a main target and a text-bearing status outside its busy s
   page,
 }) => {
   await page.goto(navigationFixture);
+  // Confirm hydration through an actual interaction before testing a client-side transition.
+  // Otherwise slower engines can follow the SSR anchor as a full document navigation.
+  await page.getByRole("button", { name: "项目", exact: true }).click();
+  const projects = page.getByRole("dialog", { name: "项目", exact: true });
+  await expect(projects).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(projects).toBeHidden();
   const click = page.getByRole("link", { name: "切换测试页面" }).click({ noWaitAfter: true });
   const status = page.getByRole("status", { name: "正在加载项目工作区" });
   await expect(status).toBeVisible();

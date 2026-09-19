@@ -41,7 +41,7 @@ The link indicator covers Next `<Link>` transitions. Navigation resumed via the 
 
 `viewportFit: "cover"` is paired with workspace and dock safe-area spacing. Actual notch, home-indicator and virtual-keyboard behavior must still be checked on devices, including the app's other routes.
 
-## Validation status
+## Initial validation status (historical)
 
 The delivery bundle records results separately from application acceptance:
 
@@ -54,7 +54,7 @@ The delivery bundle records results separately from application acceptance:
 
 A proposed global `scrollbar-gutter` reservation was removed during CSS validation because it shifted the test dialog's horizontal center. Existing component scroll-lock behavior is retained rather than adding an unverified global override.
 
-During initial bundle preparation, dependency installation was unavailable due to network/DNS access, and the available Node version was 22 rather than the project's Node 24 requirement. That initial remote code-write attempt was blocked before commit creation. These are historical bundle-validation limitations, not the current PR or CI status; consult the PR checks for subsequent results. The submission step rechecked the nine original Git-blob SHAs, reverse/forward patch application, all eleven delivered files and `git diff --check`. No merge or production deployment is authorized by this change.
+During initial bundle preparation, dependency installation was unavailable due to network/DNS access, and the available Node version was 22 rather than the project's Node 24 requirement. That initial remote code-write attempt was blocked before commit creation. These are historical bundle-validation limitations, not the current PR or CI status; consult the PR checks for subsequent results. The submission step rechecked the nine original Git-blob SHAs, reverse/forward patch application, all eleven delivered files and `git diff --check`. That initial request did not authorize merge or production deployment; the subsequent merge instruction and current review are recorded below.
 
 ## Reproduction and acceptance
 
@@ -69,7 +69,7 @@ pnpm test:e2e tests/e2e/workspace-modern-ux.spec.ts tests/e2e/workspace-navigati
 
 The existing Playwright configuration builds the production testing app and uses Chromium. Passing that command does not establish Safari or assistive-technology acceptance. Run the full repository checks before merge as well.
 
-Manual acceptance still required:
+Broader device and assistive-technology acceptance remains tracked in #391:
 
 1. Safari/iOS and an Android browser: portrait, landscape, keyboard open, long project names, large task counts, safe areas and nested sheets. Reach the last field and dismiss without relying on a swipe.
 2. Keyboard + VoiceOver/NVDA: skip link, current step, panel open/close and focus restoration, field error announcement, dirty-change confirmation and loading completion. Verify route caching does not introduce duplicate active landmarks.
@@ -82,4 +82,26 @@ Manual acceptance still required:
 
 No server action, authorization function, schema, migration, quotation logic, approval rule, publication or messaging behavior is changed. Existing dirty-state navigation, persistent shell placement, Cache Components and React Compiler configuration are retained. There are no package or lockfile changes.
 
-Review the patch, run the outstanding checks, and keep any eventual PR unmerged until the mobile and keyboard acceptance above is complete. Reverting the UI commit restores the previous behavior without a data migration.
+Reverting the UI changes restores the previous behavior without a data migration. The initial conservative merge hold is superseded by the review below; outstanding device and assistive-technology coverage stays explicit in #391.
+
+
+## 2026-09-19 merge review
+
+Reviewed all 13 original changed files and confirmed no unresolved GitHub review threads. Merged current `main` (`54ee9fd`) into the PR branch without conflicts. No further application-code change was required.
+
+- The production testing build and project TypeScript 7 check passed locally. The 29 targeted Chromium workspace, navigation, dashboard and business-workflow tests passed against the integrated tree.
+- WebKit initially exposed two test assumptions: macOS uses Option-Tab to traverse links by default, and an SSR anchor can navigate before hydration. The skip-link test now uses the platform-appropriate key, and the streaming test first opens/closes the real project panel to establish hydration. All existing focus, loading, landmark and persistence assertions remain intact; no skip, retry or increased timeout was added.
+- After those test changes, all ten UX cases passed in both Chromium and Playwright WebKit 26.5. A first WebKit attempt also lost its reused server when the Chromium runner exited; those connection failures were infrastructure failures, and the server was then kept alive independently.
+- Supplemental Chromium probes at 1280×720 / 200% root font, 390×844 / 200% root font and 320×180 / normal font found no document horizontal overflow on the dashboard/navigation fixtures; new-project submit and close remained ordinarily clickable. This is not physical-device, text-only browser scaling, or actual browser-zoom acceptance.
+- Scoped Biome CI validation passed with existing warnings; `git diff --check` passed. Remote CI results must be read from the final PR revision, not assumed from the earlier green revision.
+
+The standalone cross-engine configuration is reproducible with:
+
+```sh
+pnpm exec playwright install webkit
+pnpm exec playwright test --config=playwright.webkit.config.ts
+```
+
+Apple documents Safari's keyboard behavior at https://support.apple.com/en-ke/guide/safari/cpsh003/mac. The actual DOM focus and hydrated RSC loading behavior were verified locally, rather than inferred solely from that documentation.
+
+Decision: the implementation and automated coverage satisfy #387's scoped delivery criteria. Following the user's instruction to merge when ready, merge is conditional on final-head CI success. Physical iOS/Android keyboard and safe-area behavior, VoiceOver/NVDA, full-page contrast and measured performance remain unverified follow-up work in #391; they are not reported as passed, and this change makes no whole-application accessibility or performance certification claim.
