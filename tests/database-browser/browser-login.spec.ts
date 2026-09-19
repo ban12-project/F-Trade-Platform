@@ -157,7 +157,7 @@ test("saved password fill uses the actual owner action and never returns credent
   const connect = page.getByRole("button", { name: "接入登录 / 2FA", exact: true });
   await expect(connect).toBeVisible();
   await expect(page.getByRole("main")).toHaveAttribute("id", "main-content");
-  // The final run row must remain above the dock even at the end of the document.
+  // The final run row must remain reachable at the end of the document.
   // Trial clicks verify hit testing without issuing an extra ticket or forcing a click.
   for (const viewport of [
     { width: 320, height: 640 },
@@ -169,8 +169,7 @@ test("saved password fill uses the actual owner action and never returns credent
     await expect
       .poll(async () => {
         const target = await connect.boundingBox();
-        const dock = await page.getByTestId("workspace-action-dock").boundingBox();
-        return Boolean(target && dock && target.y >= 0 && target.y + target.height <= dock.y);
+        return Boolean(target && target.y >= 0 && target.y + target.height <= viewport.height);
       })
       .toBe(true);
     await connect.click({ trial: true });

@@ -232,7 +232,7 @@ test("authenticated browser reviews a mock product and its content through real 
   // Navigate using the actual record link after the action refreshes the page.
   await page.getByRole("tab", { name: "记录 1", exact: true }).click();
   await page.getByRole("button", { name: new RegExp(sku) }).click();
-  await expect(page).toHaveURL(new RegExp(`item=${created.id}`));
+  await expect(page).toHaveURL(new RegExp(`/records/product/${created.id}$`));
   const review = page.locator("form#product-review");
   await review.getByRole("combobox").first().click();
   await page.getByRole("option", { name: "退回产品事实", exact: true }).click();
@@ -592,7 +592,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.goto(`/workspace/${projectId}?panel=content&item=${targetA.id}`);
   await expect(page.locator("form#content-review")).toBeVisible();
   await page.getByRole("button", { name: /MOCK switching B/ }).click();
-  await expect(page).toHaveURL(new RegExp(`item=${targetB.id}`));
+  await expect(page).toHaveURL(new RegExp(`/records/content/${targetB.id}$`));
   const switchingReview = page.locator("form#content-review");
   await switchingReview.getByRole("combobox").click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();

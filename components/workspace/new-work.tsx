@@ -43,6 +43,8 @@ const intents = [
 const NewWorkContext = createContext<{
   start: (intent: NewWorkIntent | null) => void;
   ready: boolean;
+  dialogId: string;
+  open: boolean;
 } | null>(null);
 const ProjectDataContext = createContext<((projects: WorkspaceProjectSummary[]) => void) | null>(
   null,
@@ -113,6 +115,7 @@ function NewProjectForm({
           <Input
             id={inputId}
             {...form.register("title")}
+            required
             placeholder={kind === "marketing" ? "例如：离合器产品推广" : "例如：海外经销商询盘"}
             aria-invalid={!!form.formState.errors.title}
             aria-describedby={`${inputId}-error`}
@@ -137,8 +140,10 @@ function NewWorkDialog({
   projects,
   onClose,
   onStart,
+  dialogId,
 }: {
   intent: NewWorkIntent;
+  dialogId: string;
   projects: WorkspaceProjectSummary[];
   onClose: () => void;
   onStart: (projectId: string, intent: NewWorkIntent) => void;
@@ -172,7 +177,11 @@ function NewWorkDialog({
         if (!open && !creating) changeSelection(onClose);
       }}
     >
-      <DialogContent showCloseButton={!creating} className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent
+        id={dialogId}
+        showCloseButton={!creating}
+        className="max-h-[90dvh] overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle>开始新工作</DialogTitle>
           <DialogDescription>先选要做的事，再确认资料属于哪个项目。</DialogDescription>
@@ -264,6 +273,7 @@ export function NewWorkProvider({
 }) {
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
+  const dialogId = useId();
   const [loadedProjects, setProjects] = useState(projects);
   const [intent, setIntent] = useState<NewWorkIntent | null>(null);
   const [destination, setDestination] = useState<string | null>(null);
@@ -274,7 +284,9 @@ export function NewWorkProvider({
   }, [destination, intent, requestNavigation, router]);
   return (
     <ProjectDataContext value={setProjects}>
-      <NewWorkContext value={{ start: setIntent, ready: loadedProjects !== undefined }}>
+      <NewWorkContext
+        value={{ start: setIntent, ready: loadedProjects !== undefined, dialogId, open: !!intent }}
+      >
         <Suspense fallback={null}>
           <NewWorkRouteReset />
         </Suspense>
@@ -282,6 +294,7 @@ export function NewWorkProvider({
         {intent ? (
           <NewWorkDialog
             intent={intent}
+            dialogId={dialogId}
             projects={loadedProjects ?? []}
             onClose={() => setIntent(null)}
             onStart={(projectId, intent) => {
@@ -313,6 +326,9 @@ export function NewWorkButton({
   return (
     <Button
       className="min-h-11"
+      aria-haspopup="dialog"
+      aria-expanded={context?.open ?? false}
+      aria-controls={context?.open ? context.dialogId : undefined}
       variant={variant}
       onClick={() => {
         onOpen?.();
