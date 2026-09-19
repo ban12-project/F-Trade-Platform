@@ -1,5 +1,11 @@
 import type { WorkspaceTaskSummary } from "./store";
-export type ProjectStage = { id: string; panelKind: string; label: string; description: string };
+export type ProjectStage = {
+  id: string;
+  panelKind: string;
+  label: string;
+  description: string;
+  href?: string;
+};
 export type ProjectKind = "marketing" | "sales";
 export type StageRecord = { type: string; state: string };
 export const marketingStages: ProjectStage[] = [

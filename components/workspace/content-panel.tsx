@@ -16,7 +16,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useActionState, useEffect, useEffectEvent, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +70,7 @@ import type {
   ReadyProductContentSource,
 } from "@/lib/content/store";
 import { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
+import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
 
 const contentTypes = [
@@ -690,6 +690,7 @@ export function ContentPanel({
   const searchParams = useSearchParams();
   const [tab, setTab] = useState(detail ? "records" : "create");
   function href(item: string) {
+    if (pathname.startsWith("/workspace/")) return workspaceRecordHref(projectId, "content", item);
     const params = new URLSearchParams(searchParams.toString());
     params.set("panel", "content");
     params.set("item", item);

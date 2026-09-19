@@ -359,9 +359,9 @@ def check_database_baseline() -> None:
         if required not in invitation_actions:
             raise AssertionError(f"Invitation Server Action contract is missing: {required}")
 
-    workspace_action_dock = (ROOT / "components/workspace/workspace-action-dock.tsx").read_text(encoding="utf-8")
+    workspace_new_work = (ROOT / "components/workspace/new-work.tsx").read_text(encoding="utf-8")
     for required in ("useForm", "zodResolver", "createWorkspaceProjectAction", "FieldError"):
-        if required not in workspace_action_dock:
+        if required not in workspace_new_work:
             raise AssertionError(f"Workspace project form contract is missing: {required}")
     workspace_loading = (ROOT / "components/workspace/workspace-loading-skeleton.tsx").read_text(encoding="utf-8")
     for required in ("WorkspaceLoadingSkeleton", "Skeleton", "工作台"):
@@ -374,7 +374,7 @@ def check_database_baseline() -> None:
     for forbidden in ("workspaceCanvasDocument", '"workspace_canvas_document"', "videoCanvasDocument", '"video_canvas_document"'):
         if forbidden in workspace_schema:
             raise AssertionError(f"Retired project canvas persistence remains in the active schema: {forbidden}")
-    for route in (ROOT / "app/workspace/page.tsx", ROOT / "app/workspace/[projectId]/page.tsx", ROOT / "app/workspace/[projectId]/video/page.tsx"):
+    for route in (ROOT / "app/workspace/page.tsx", ROOT / "components/workspace/project-page.tsx", ROOT / "app/workspace/[projectId]/video/page.tsx"):
         source = route.read_text(encoding="utf-8")
         if "@/components/workspace/workspace-loading-skeleton" not in source:
             raise AssertionError(f"Workspace route does not reuse the shared loading UI: {route}")

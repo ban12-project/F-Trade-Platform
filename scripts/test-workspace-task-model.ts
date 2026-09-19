@@ -99,7 +99,7 @@ for (const [state, type, kind] of [
   assert.equal(task.state, "actionable");
 }
 const ready = snapshot([record("PRODUCT_READY")]);
-assert.equal(workspaceTaskHref(tasks(ready)[0]), "/workspace/p?panel=content&product=r");
+assert.equal(workspaceTaskHref(tasks(ready)[0]), "/workspace/p/new/content?product=r");
 assert.equal(
   tasks(
     snapshot([...ready.records, record("CONTENT_APPROVED", "content", "c", { product_id: "r" })]),
@@ -111,7 +111,7 @@ const sales = snapshot([
   { ...record("PRODUCT_READY", "product", "product"), relation: "reference" },
 ]);
 sales.projects = [{ ...project, kind: "sales" }];
-assert.equal(workspaceTaskHref(tasks(sales)[0]), "/workspace/p?panel=quotation&rfq=rfq");
+assert.equal(workspaceTaskHref(tasks(sales)[0]), "/workspace/p/new/quotation?rfq=rfq");
 assert.equal(tasks({ ...sales, records: [sales.records[0]] })[0].actionLabel, "关联已核实产品");
 const quote = record("QUOTE_REVIEW_REQUIRED", "quotation", "quote", { rfq_id: "rfq" });
 assert.equal(
@@ -147,7 +147,7 @@ for (const [status, expected] of [
   const output = tasks(data);
   assert.equal(output[0]?.state ?? "none", expected);
   if (status !== "published")
-    assert.equal(workspaceTaskHref(output[0]), "/workspace/p?panel=publication&item=pub");
+    assert.equal(workspaceTaskHref(output[0]), "/workspace/p/records/publication/pub");
 }
 const blockedPublication = snapshot([record("CONTENT_APPROVED", "content", "c")]);
 blockedPublication.hasActiveChannel = false;

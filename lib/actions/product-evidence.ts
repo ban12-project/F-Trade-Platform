@@ -23,7 +23,7 @@ export async function uploadProductEvidenceAction(
       { receiptId: formData.get("receiptId"), projectId, purpose: "evidence" },
       session.user.id,
     );
-    revalidatePath(`/workspace/${projectId}`);
+    revalidatePath("/workspace", "layout");
     return { status: "success", message: "证据已持久化并加入当前项目，可在字段选择器中使用。" };
   } catch (error) {
     return {

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
-
+import { Suspense } from "react";
 import { WorkspaceDashboard } from "@/components/workspace/workspace-dashboard";
+import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import type {
   WorkspacePipelineSummary,
@@ -112,15 +113,32 @@ const inbound: InboundRoutingSummary[] = [
   },
 ];
 
-export default function WorkspaceDashboardTestingPage() {
+async function Content({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string; empty?: string }>;
+}) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
+  const query = await searchParams;
   return (
-    <WorkspaceDashboard
-      projects={projects}
-      tasks={tasks}
-      pipeline={pipeline}
-      inbound={inbound}
-      currentTime={new Date("2026-09-04T00:00:00Z").getTime()}
-    />
+    <WorkspaceShell projects={query.empty ? [] : projects}>
+      <WorkspaceDashboard
+        projects={query.empty ? [] : projects}
+        tasks={query.empty ? [] : tasks}
+        pipeline={query.empty ? [] : pipeline}
+        inbound={query.empty ? [] : inbound}
+        view={query.view}
+        basePath="/testing/workspace-dashboard"
+        currentTime={new Date("2026-09-04T00:00:00Z").getTime()}
+      />
+    </WorkspaceShell>
+  );
+}
+
+export default function Page(props: { searchParams: Promise<{ view?: string; empty?: string }> }) {
+  return (
+    <Suspense>
+      <Content {...props} />
+    </Suspense>
   );
 }

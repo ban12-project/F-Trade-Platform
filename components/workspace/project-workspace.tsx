@@ -6,7 +6,6 @@ import type { MouseEvent, ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
 import { taskProjectStage } from "@/lib/workspace/stages";
 import type { WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
@@ -14,7 +13,13 @@ import { isActionableTask, taskStateLabel } from "@/lib/workspace/task-model";
 import { useWorkspaceDirtyState, WorkspaceDirtyProvider } from "./dirty-state";
 import { WorkspaceLink } from "./workspace-link";
 
-export type ProjectStage = { id: string; panelKind: string; label: string; description: string };
+export type ProjectStage = {
+  id: string;
+  panelKind: string;
+  label: string;
+  description: string;
+  href?: string;
+};
 
 function shouldUseNativeNavigation(event: MouseEvent<HTMLElement>) {
   return (
@@ -39,7 +44,7 @@ function GuardedLink({
   current?: boolean;
 }) {
   return (
-    <WorkspaceLink href={href} aria-current={current ? "step" : undefined} className={className}>
+    <WorkspaceLink href={href} aria-current={current ? "page" : undefined} className={className}>
       {children}
     </WorkspaceLink>
   );
@@ -175,15 +180,17 @@ export function ProjectWorkspaceBody({
 }) {
   return (
     <div className="mx-auto max-w-[96rem] px-4 py-5 sm:px-6">
-      <nav aria-label="项目阶段" className="overflow-x-auto overscroll-x-contain p-2">
+      <nav aria-label="项目栏目" className="overflow-x-auto overscroll-x-contain p-2">
         {navigation}
       </nav>
       <section
         aria-label="当前阶段"
-        className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,34rem)]"
+        className="mt-4 grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_18rem]"
       >
-        {tasks}
         {details}
+        <aside aria-label="相关任务" className="min-w-0">
+          {tasks}
+        </aside>
       </section>
     </div>
   );
@@ -199,46 +206,39 @@ export function ProjectStageNavigation({
   basePath: string;
 }) {
   return (
-    <ol className="flex min-w-max items-stretch gap-1">
-      {stages.map((item, index) => {
-        const href = `${basePath}?panel=${item.id}`;
-        return (
-          <li key={item.id} className="flex items-center">
-            <GuardedLink
-              href={href}
-              current={item.id === activeStage}
-              className={`workspace-stage-link flex min-h-14 w-40 flex-col justify-center rounded-xl border px-3 outline-none transition-[background-color,border-color,transform] duration-[120ms] active:scale-[0.98] focus-visible:ring-3 focus-visible:ring-ring/50 ${item.id === activeStage ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
-            >
-              <span className="text-xs opacity-75">步骤 {index + 1}</span>
-              <span className="text-sm font-medium">{item.label}</span>
-            </GuardedLink>
-            {index < stages.length - 1 ? (
-              <ArrowRightIcon className="mx-1 size-4 text-muted-foreground" aria-hidden="true" />
-            ) : null}
-          </li>
-        );
-      })}
-    </ol>
+    <ul className="flex min-w-max items-center gap-2">
+      {stages.map((item) => (
+        <li key={item.id}>
+          <GuardedLink
+            href={item.href ?? `${basePath}?panel=${item.id}`}
+            current={item.id === activeStage}
+            className={`workspace-stage-link flex min-h-10 items-center rounded-lg border px-3 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${item.id === activeStage ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+          >
+            {item.label}
+          </GuardedLink>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 export function ProjectStageDetails({ stage, panel }: { stage: ProjectStage; panel: ReactNode }) {
   return (
-    <aside aria-label={`${stage.label}详情与审批`} className="min-w-0">
+    <section aria-label={`${stage.label}详情与审批`} className="min-w-0">
       <Card className="overflow-hidden">
         <CardHeader className="border-b">
           <CardTitle role="heading" aria-level={2}>
             {stage.label}
           </CardTitle>
-          <CardDescription>批准、发送、发布和业务认定都需要明确的人工操作。</CardDescription>
+          <CardDescription>{stage.description}</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="workspace-details-scroll">
+          <div className="workspace-details-content">
             <div className="p-4 sm:p-5">{panel}</div>
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
-    </aside>
+    </section>
   );
 }
 
@@ -300,7 +300,7 @@ export function ProjectStageTasks({
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardDescription>当前步骤</CardDescription>
+              <CardDescription>当前栏目</CardDescription>
               <CardTitle role="heading" aria-level={2} className="mt-1">
                 {stage.label}
               </CardTitle>
@@ -321,9 +321,7 @@ export function ProjectStageTasks({
           <CardTitle role="heading" aria-level={2}>
             待处理事项
           </CardTitle>
-          <CardDescription>
-            先处理这里的下一动作；也可以在详情区新建或查看本步骤的业务记录。
-          </CardDescription>
+          <CardDescription>这里汇总当前栏目相关的下一动作。</CardDescription>
         </CardHeader>
         <CardContent>
           {stageTasks.length ? (
@@ -352,7 +350,7 @@ export function ProjectStageTasks({
             </div>
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              本步骤暂无待处理事项，可在详情区创建或查看业务记录。
+              本栏目暂无待处理事项，可在详情区创建或查看业务记录。
             </p>
           )}
         </CardContent>

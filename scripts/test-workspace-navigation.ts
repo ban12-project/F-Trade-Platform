@@ -62,11 +62,11 @@ assert.equal(
 );
 assert.equal(
   workspaceTaskHref({ ...task, nodeKind: "lead", taskType: "rfq" }),
-  "/workspace/project?panel=rfq&lead=task",
+  "/workspace/project/new/rfq?lead=task",
 );
 assert.equal(
   workspaceTaskHref({ ...task, nodeKind: "lead", taskType: "opportunity" }),
-  "/workspace/project?panel=opportunity&item=task",
+  "/workspace/project/records/lead/task",
 );
 assert.equal(
   defaultProjectStage("sales", [], [{ type: "quotation", state: "QUOTE_DRAFT" }], false),
@@ -108,7 +108,7 @@ for (const path of [
   "components/workspace/workspace-dashboard.tsx",
 ])
   assert.doesNotMatch(source(path), /WorkspaceActionDock/);
-const page = source("app/workspace/[projectId]/page.tsx");
+const page = source("components/workspace/project-page.tsx");
 assert.match(page, /StageTasks/);
 assert.match(page, /ProjectStagePanel/);
 assert.doesNotMatch(

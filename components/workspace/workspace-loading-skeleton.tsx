@@ -39,9 +39,9 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
             />
           ) : (
             <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {["first", "second", "third", "fourth"].map((key) => (
-                  <Skeleton key={key} className="h-28 rounded-xl" />
+              <div className="flex flex-wrap gap-2">
+                {["actionable", "waiting", "processing", "scheduled"].map((key) => (
+                  <Skeleton key={key} className="h-9 w-24 rounded-lg" />
                 ))}
               </div>
               <Skeleton className="h-80 rounded-xl" />
@@ -54,21 +54,6 @@ export function WorkspaceLoadingSkeleton({ project = false }: { project?: boolea
         </div>
       </main>
     </>
-  );
-}
-
-export function WorkspaceDockSkeleton() {
-  return (
-    <div
-      aria-label="正在加载工作台操作"
-      role="status"
-      className="workspace-dock rounded-2xl border bg-background"
-    >
-      <span className="sr-only">正在加载工作台操作</span>
-      {["projects", "create", "tasks", "tools"].map((key) => (
-        <Skeleton key={key} aria-hidden="true" className="h-12 w-14 sm:h-11 sm:w-20" />
-      ))}
-    </div>
   );
 }
 
@@ -102,10 +87,10 @@ export function ProjectBadgesSkeleton() {
 
 export function ProjectStageNavigationSkeleton() {
   return (
-    <div role="status" aria-label="正在加载项目阶段" className="flex min-w-max gap-2">
-      <span className="sr-only">正在加载项目阶段</span>
+    <div role="status" aria-label="正在加载项目栏目" className="flex min-w-max gap-2">
+      <span className="sr-only">正在加载项目栏目</span>
       {["first", "second", "third", "fourth"].map((key) => (
-        <Skeleton key={key} aria-hidden="true" className="h-14 w-40 rounded-xl" />
+        <Skeleton key={key} aria-hidden="true" className="h-10 w-24 rounded-lg" />
       ))}
     </div>
   );

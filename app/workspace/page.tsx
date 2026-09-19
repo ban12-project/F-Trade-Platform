@@ -11,7 +11,9 @@ import {
   readWorkspaceTasks,
 } from "@/lib/workspace/read-model";
 
-async function WorkspaceContent() {
+type Props = { searchParams: Promise<{ view?: string }> };
+export const prefetch = "partial";
+async function WorkspaceContent({ searchParams }: Props) {
   await connection();
   const session = await requirePermission("workspace:view");
   const [projects, tasks, pipeline, inbound] = await Promise.all([
@@ -29,13 +31,14 @@ async function WorkspaceContent() {
       pipeline={pipeline}
       inbound={inbound}
       currentTime={Date.now()}
+      view={(await searchParams).view}
     />
   );
 }
-export default function WorkspacePage() {
+export default function WorkspacePage(props: Props) {
   return (
     <Suspense fallback={<WorkspaceLoadingSkeleton />}>
-      <WorkspaceContent />
+      <WorkspaceContent {...props} />
     </Suspense>
   );
 }

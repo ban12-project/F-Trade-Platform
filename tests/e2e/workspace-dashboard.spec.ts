@@ -2,13 +2,15 @@ import { expect, test } from "@playwright/test";
 
 test("workspace prioritizes tasks and pipeline without a canvas", async ({ page }) => {
   await page.goto("/testing/workspace-dashboard");
-  await expect(page.getByRole("heading", { name: "工作台" })).toBeVisible();
-  await expect(page.getByText("先处理下一动作，再进入对应项目步骤。")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "我的待办" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "待审批" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "到期跟进" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "项目 / 线索 Pipeline" })).toBeVisible();
-  await expect(page.getByText("来源营销项目：Synthetic launch")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今日任务" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "主要导航" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "我可处理" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "项目概况" })).toBeVisible();
+  await expect(page.getByRole("link").filter({ hasText: "批准内容等待发布" })).toHaveCount(1);
+  await page.getByRole("link", { name: /等待他人/ }).click();
+  await expect(page.getByRole("link").filter({ hasText: "等待审核者核实产品" })).toBeVisible();
+  await expect(page.getByRole("link").filter({ hasText: "批准内容等待发布" })).toHaveCount(0);
+  await page.goBack();
   const videoTask = page.getByRole("link").filter({ hasText: "营销视频等待成片审核" }).first();
   await expect(videoTask).toHaveAttribute(
     "href",
@@ -38,21 +40,21 @@ test("unassigned inbound offers explicit create and link decisions without custo
   await expect(page.getByRole("option", { name: "Synthetic distributor" })).toBeVisible();
 });
 
-test("project workspace exposes guided steps, records and a right detail region", async ({
+test("project workspace exposes categories, records and a primary detail region", async ({
   page,
 }) => {
   await page.goto("/testing/project-workspace");
-  await expect(page.getByRole("navigation", { name: "项目阶段" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /步骤 1 产品事实/ })).toHaveAttribute(
+  await expect(page.getByRole("navigation", { name: "项目栏目" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "产品事实", exact: true })).toHaveAttribute(
     "aria-current",
-    "step",
+    "page",
   );
   await expect(page.getByRole("heading", { name: "待处理事项" })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "产品事实详情与审批" })).toBeVisible();
-  await page.getByRole("link", { name: /步骤 2 内容/ }).click();
+  await expect(page.getByRole("region", { name: "产品事实详情与审批" })).toBeVisible();
+  await page.getByRole("link", { name: /^内容$/ }).click();
   await expect(page).toHaveURL(/panel=content/);
   await expect(page).not.toHaveURL(/view=records/);
-  await expect(page.getByRole("complementary", { name: "内容详情与审批" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "内容详情与审批" })).toBeVisible();
   await page.getByRole("button", { name: "成员 2" }).click();
   await expect(page.getByText("成员关系独立于项目创建者", { exact: false })).toBeVisible();
   await expect(page.getByText("Synthetic Viewer")).toBeVisible();
@@ -74,3 +76,27 @@ test("video production has a dedicated editor route", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "素材、预览与时间线" })).toBeVisible();
   await expect(page.getByText("复制其他项目剪辑")).toBeVisible();
 });
+
+for (const empty of [false, true]) {
+  test(`mobile first viewport has a usable start action with ${empty ? "no records" : "existing tasks"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/testing/workspace-dashboard${empty ? "?empty=1" : ""}`);
+    const start = page.getByRole("button", { name: "开始新工作", exact: true });
+    await expect(start).toBeEnabled();
+    const bounds = await start.boundingBox();
+    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    expect(bounds!.y + bounds!.height).toBeLessThan(844);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      390,
+    );
+    await start.click();
+    await expect(page.getByRole("dialog", { name: "开始新工作" })).toBeVisible();
+    if (empty) await expect(page.getByLabel("项目名称")).toBeVisible();
+    else {
+      await expect(page.getByLabel("归属项目")).toHaveValue("00000000-0000-4000-8000-000000000701");
+      await expect(page.getByLabel("项目名称")).toHaveCount(0);
+    }
+  });
+}

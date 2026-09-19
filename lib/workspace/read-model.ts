@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { listStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
+import { deriveWorkspaceLibrary } from "./library-model";
 import { defaultProjectStage } from "./stages";
 import {
   getWorkspaceProject,
@@ -47,4 +48,8 @@ export const readLegacyLeadTaskType = cache(
     );
     return record ? leadTaskType(record) : undefined;
   },
+);
+
+export const readWorkspaceLibrary = cache(async (actorId: string) =>
+  deriveWorkspaceLibrary((await readWorkspaceWork(actorId)).snapshot),
 );
