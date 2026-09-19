@@ -57,7 +57,7 @@
     "test:quotation": "tsx scripts/test-quotation-handoff.ts",
     "test:delivery": "tsx scripts/test-delivery-confirmation.ts",
     "test:rfq": "tsx scripts/test-rfq-completeness.ts",
-    "test:sales": "tsx scripts/test-sales-clarification.ts",
+    "test:sales": "tsx scripts/test-sales-clarification.ts && tsx scripts/test-sales-journey.ts",
     "test:scoring": "tsx scripts/test-lead-scoring.ts",
     "test:cadence": "tsx scripts/test-follow-up-cadence.ts",
     "test:content-gate": "tsx scripts/test-content-gate.ts",

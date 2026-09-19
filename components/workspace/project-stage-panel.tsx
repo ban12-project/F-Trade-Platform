@@ -1,4 +1,5 @@
 import "server-only";
+import { redirect } from "next/navigation";
 import { type ReactNode, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,12 +13,7 @@ import {
 import { listProductEvidencePreviews } from "@/lib/product/evidence-preview";
 import { getProductVideoReadiness, listProductMediaAssets } from "@/lib/product/media-store";
 import { getProjectProductCatalogDetail, listProjectProductCatalogEntries } from "@/lib/products";
-import {
-  listProjectDeliveryConfirmations,
-  listProjectLeads,
-  listProjectQuotations,
-} from "@/lib/sales/closing-store";
-import { listProjectRfqEntries } from "@/lib/sales/store";
+import { readSalesJourney } from "@/lib/sales/journey-store";
 import { listProjectPublicationData } from "@/lib/social/publication-store";
 import { listProjectMarketingVideoEntries } from "@/lib/video/store";
 import { listProjectEvidenceOptions } from "@/lib/workspace/access";
@@ -30,6 +26,7 @@ import { ProductMediaPanel } from "./product-media-panel";
 import { ProductPanel } from "./product-panel";
 import { VideoStageEntry } from "./project-workspace";
 import { ReadOnlyRecordList, RecordSelection } from "./record-selection";
+import { SalesContext } from "./sales-context";
 import { ProductReferencePanel, RfqPanel } from "./sales-panels";
 import { WorkspaceLink } from "./workspace-link";
 import { WorkspacePanelSkeleton } from "./workspace-loading-skeleton";
@@ -102,6 +99,7 @@ export async function ProjectStagePanel({
     <ReadOnlyRecordList
       projectId={projectId}
       stage={stage}
+      canWrite={canWrite}
       entries={entries.map((entry) => ({
         id: entry.id,
         label: `${label} ${entry.id.slice(0, 8)}`,
@@ -257,96 +255,138 @@ export async function ProjectStagePanel({
         />,
       );
     }
-    case "rfq": {
-      const [entries, leads, available, linked] = await Promise.all([
-        listProjectRfqEntries(projectId),
-        listProjectLeads(projectId, actorId),
-        listReadyProductContentSources(),
-        listProjectReadyProductReferences(projectId),
-      ]);
-      if (!canWrite && !selectedId && !selectedLeadId) return readonlyList(entries, "客户询盘");
-      const lead = leads.find((entry) => entry.id === selectedLeadId);
-      const linkedRfq = selectedLeadId
-        ? entries.find((entry) => entry.formValues.leadId === selectedLeadId)
-        : undefined;
-      const rfqId = selectedId ?? linkedRfq?.id;
-      const found = selectedId
-        ? entries.some((entry) => entry.id === selectedId)
-        : Boolean(linkedRfq || lead?.state === "LEAD_RECEIVED");
-      return selection(
-        found,
-        <div className="flex flex-col gap-6">
+    case "rfq":
+    case "quotation":
+    case "delivery":
+    case "inbound":
+    case "follow-up":
+    case "opportunity": {
+      const isLead = ["inbound", "follow-up", "opportunity"].includes(stage);
+      const data = await readSalesJourney(projectId, actorId, isLead ? selectedId : undefined);
+      const context = (kind: "rfq" | "quotation" | "lead" | "delivery", id?: string) =>
+        id ? (
+          <SalesContext
+            projectId={projectId}
+            records={data.records}
+            kind={kind}
+            id={id}
+            canWrite={canWrite}
+            hideContinuation={mode === "create"}
+          />
+        ) : null;
+      if (stage === "rfq") {
+        if (!canWrite && !selectedId && !selectedLeadId) return readonlyList(data.rfqs, "客户需求");
+        const lead = data.leads.find((entry) => entry.id === selectedLeadId);
+        const linked = selectedLeadId
+          ? data.rfqs.filter((entry) => entry.formValues.leadId === selectedLeadId)
+          : [];
+        if (mode === "create" && selectedLeadId && linked.length === 1) {
+          redirect(workspaceRecordHref(projectId, "rfq", linked[0].id));
+        }
+        const rfqId = selectedId ?? (linked.length === 1 ? linked[0].id : undefined);
+        return selection(
+          selectedId
+            ? data.rfqs.some((entry) => entry.id === selectedId)
+            : linked.length > 0 || lead?.state === "LEAD_RECEIVED",
           <RfqPanel
             key={`${rfqId ?? "new"}:${selectedLeadId ?? ""}`}
             projectId={projectId}
             entries={
-              mode === "create" && !rfqId
-                ? []
-                : selectedId
-                  ? entries.filter((entry) => entry.id === selectedId)
-                  : entries
+              selectedLeadId && linked.length > 1
+                ? linked
+                : mode === "create" && !rfqId
+                  ? []
+                  : data.rfqs
             }
             selectedId={rfqId}
-            selectedLeadId={selectedLeadId}
-            leads={leads}
-          />
-          <ProductReferencePanel projectId={projectId} available={available} linked={linked} />
-        </div>,
-        selectedId ?? selectedLeadId,
-      );
-    }
-    case "quotation": {
-      const [entries, rfqs, products] = await Promise.all([
-        listProjectQuotations(projectId),
-        listProjectRfqEntries(projectId),
-        listProjectReadyProductReferences(projectId),
-      ]);
-      if (!canWrite && !selectedId && !selectedRfqId) return readonlyList(entries, "人工报价");
-      const selected = selectedId ? entries.filter((entry) => entry.id === selectedId) : entries;
-      const quoteRfqs = selectedRfqId
-        ? rfqs.filter((rfq) => rfq.id === selectedRfqId && rfq.state === "RFQ_READY")
-        : rfqs;
-      return selection(
-        selectedRfqId ? quoteRfqs.length > 0 : selected.length > 0,
-        <QuotationPanel
-          projectId={projectId}
-          entries={selectedRfqId ? [] : selected}
-          showCreateForm={!selectedId}
-          rfqs={quoteRfqs}
-          products={products}
-          canReview={canWrite && hasPermission(role, "quotation:review")}
-        />,
-        selectedId ?? selectedRfqId,
-      );
-    }
-    case "delivery": {
-      const entries = await listProjectDeliveryConfirmations(projectId);
-      if (!canWrite && !selectedId) return readonlyList(entries, "交期确认");
-      const selected = selectedId ? entries.filter((entry) => entry.id === selectedId) : entries;
-      return selection(
-        selected.length > 0,
-        <DeliveryPanel
-          projectId={projectId}
-          entries={selected}
-          canReview={canWrite && hasPermission(role, "delivery:review")}
-        />,
-      );
-    }
-    case "inbound":
-    case "follow-up":
-    case "opportunity": {
-      const leads = await listProjectLeads(projectId, actorId);
-      if (!canWrite && !selectedId) return readonlyList(leads, "客户线索");
+            selectedLeadId={linked.length > 1 ? undefined : selectedLeadId}
+            mode={linked.length > 1 ? "collection" : mode === "create" ? "create" : "collection"}
+            leads={data.leads}
+          >
+            {context(rfqId ? "rfq" : "lead", rfqId ?? selectedLeadId)}
+          </RfqPanel>,
+          selectedId ?? selectedLeadId,
+        );
+      }
+      if (stage === "quotation") {
+        if (!canWrite && !selectedId && !selectedRfqId)
+          return readonlyList(data.quotations, "人工报价");
+        const [products, available] = await Promise.all([
+          listProjectReadyProductReferences(projectId),
+          !selectedId ? listReadyProductContentSources() : [],
+        ]);
+        const quoteRfqs = selectedRfqId
+          ? data.rfqs.filter((entry) => entry.id === selectedRfqId && entry.state === "RFQ_READY")
+          : data.rfqs;
+        const selected = selectedId
+          ? data.quotations.filter((entry) => entry.id === selectedId)
+          : mode === "create" || selectedRfqId
+            ? []
+            : data.quotations;
+        return selection(
+          selectedRfqId ? quoteRfqs.length > 0 : selected.length > 0,
+          <div className="space-y-6">
+            {context(selectedId ? "quotation" : "rfq", selectedId ?? selectedRfqId)}
+            <QuotationPanel
+              projectId={projectId}
+              entries={selected}
+              showCreateForm={
+                !selectedId && (mode === "create" || Boolean(selectedRfqId) || !selected.length)
+              }
+              rfqs={quoteRfqs}
+              products={products}
+              canReview={canWrite && hasPermission(role, "quotation:review")}
+              collection={!selectedId && !selectedRfqId && mode !== "create"}
+            />
+            {!selectedId && (mode === "create" || selectedRfqId || !selected.length) ? (
+              <ProductReferencePanel
+                projectId={projectId}
+                available={available}
+                linked={products}
+              />
+            ) : null}
+          </div>,
+          selectedId ?? selectedRfqId,
+        );
+      }
+      if (stage === "delivery") {
+        if (!selectedId) return readonlyList(data.deliveries, "交期确认");
+        const entries = data.deliveries.filter((entry) => entry.id === selectedId);
+        return selection(
+          entries.length > 0,
+          <div className="space-y-6">
+            {context("delivery", selectedId)}
+            <DeliveryPanel
+              projectId={projectId}
+              entries={entries}
+              canReview={canWrite && hasPermission(role, "delivery:review")}
+            />
+          </div>,
+        );
+      }
       const visible = selectedId
-        ? leads.filter((entry) => entry.id === selectedId)
+        ? data.leads.filter((entry) => entry.id === selectedId)
         : stage === "opportunity"
-          ? leads.filter(
+          ? data.leads.filter(
               (entry) =>
                 entry.state === "OPPORTUNITY" ||
                 (entry.state === "FOLLOW_UP" && entry.lead.score_band === "HOT"),
             )
-          : leads;
-      return selection(visible.length > 0, <LeadPanel projectId={projectId} entries={visible} />);
+          : data.leads;
+      if (!selectedId) return readonlyList(visible, "客户会话");
+      return selection(
+        visible.length > 0,
+        <div className="space-y-6">
+          {context("lead", selectedId)}
+          <LeadPanel
+            projectId={projectId}
+            entries={visible}
+            deliveries={data.deliveries.filter((item) =>
+              visible.some((entry) => entry.lead.delivery_confirmation_ref === item.id),
+            )}
+          />
+        </div>,
+      );
     }
     default:
       throw new Error("Unsupported project stage");

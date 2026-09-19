@@ -182,6 +182,8 @@ test("HOT task opens its candidate, including legacy links, without unrelated le
   await page.goto(`/workspace/${id}?panel=lead&item=${hot}`);
   await expect(panel.locator(`#follow-up-${hot}`)).toBeVisible();
   await page.goto(`/workspace/${id}?panel=opportunity`);
+  await expect(panel.locator("form")).toHaveCount(0);
+  await panel.getByRole("link", { name: `客户会话 ${hot.slice(0, 8)}`, exact: true }).click();
   await expect(panel.locator(`#follow-up-${hot}`)).toBeVisible();
   await expect(panel.locator(`#follow-up-${other}`)).toHaveCount(0);
 });
@@ -212,6 +214,7 @@ test("quotation tasks and default entry survive existing leads and target the se
     "page",
   );
   await page
+    .getByRole("region", { name: "报价详情与审批" })
     .locator(`a[href="/workspace/${id}/records/quotation/${chosen}"]`)
     .filter({ visible: true })
     .click();
@@ -241,18 +244,14 @@ test("new lead task opens RFQ creation with that lead selected and reopens its e
   const panel = page.getByRole("region", { name: "需求确认详情与审批" });
   const form = panel.locator("#create-rfq");
   await expect(form).toBeVisible();
-  await expect(form.getByRole("combobox", { name: "来源入站线索（可选）" })).toContainText(
-    "已选择入站线索",
+  await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toContainText(
+    `客户会话 ${received.slice(0, 8)}`,
   );
-  await form.getByRole("combobox", { name: "来源入站线索（可选）" }).click();
-  await expect(
-    page.getByRole("option", { name: `入站线索 ${received.slice(0, 8)}`, exact: true }),
-  ).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Escape");
+  await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toBeDisabled();
   await page.goto(`/workspace/${id}?panel=lead&item=${received}`);
   await expect(form).toBeVisible();
-  await expect(form.getByRole("combobox", { name: "来源入站线索（可选）" })).toContainText(
-    "已选择入站线索",
+  await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toContainText(
+    `客户会话 ${received.slice(0, 8)}`,
   );
   const linked = await record(
     id,
@@ -478,9 +477,10 @@ test("unused ready product and RFQ tasks open the intended creation context", as
     .click();
   const quotePanel = page.getByRole("region", { name: "报价详情与审批" });
   await expect(quotePanel.locator("#quotation-new")).toBeVisible();
-  await quotePanel.getByRole("combobox").first().click();
-  await expect(page.getByRole("option")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("option")).toHaveText("clutch_kit · 500");
+  await expect(quotePanel.getByRole("combobox", { name: "客户需求", exact: true })).toBeDisabled();
+  await expect(quotePanel.getByRole("combobox", { name: "客户需求", exact: true })).toContainText(
+    "Synthetic Buyer · 500",
+  );
 });
 
 test("revisions, scheduled follow-ups and pending publication receipts have distinct task states", async ({

@@ -6,7 +6,8 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
-import { rfqFormSchema } from "@/lib/form-schemas";
+import { rfqFormSchema, rfqReadyFormSchema } from "@/lib/form-schemas";
+import { rfqMissingLabel } from "@/lib/sales/journey";
 import { createRfq, reviseRfq, submitRfqReady } from "@/lib/sales/store";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
@@ -41,7 +42,7 @@ export async function createRfqAction(
     return {
       status: "success",
       message: result.draft.missing_fields.length
-        ? `询盘已保存，还需补充：${result.draft.missing_fields.join("、")}。`
+        ? `询盘已保存，还需补充：${result.draft.missing_fields.map(rfqMissingLabel).join("、")}。`
         : "询盘已保存，可提交人工报价交接。",
       rfqId: result.id,
     };
@@ -56,15 +57,11 @@ export async function submitRfqReadyAction(
 ): Promise<SalesActionState> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || !hasPermission(session.user.role, "sales:write"))
-    return { status: "error", message: "无权提交 RFQ。" };
-  const rfqId = formData.get("rfqId");
-  const evidenceRef = formData.get("evidenceRef");
-  if (
-    typeof rfqId !== "string" ||
-    typeof evidenceRef !== "string" ||
-    !/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i.test(evidenceRef)
-  )
-    return { status: "error", message: "RFQ 或证据引用无效。" };
+    return { status: "error", message: "无权确认客户需求。" };
+  const parsed = rfqReadyFormSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success)
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "询盘或确认凭据无效。" };
+  const { rfqId, evidenceRef } = parsed.data;
   try {
     const projectId = projectIdFrom(formData);
     if (projectId)
@@ -73,10 +70,16 @@ export async function submitRfqReadyAction(
     revalidatePath("/workspace", "layout");
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return result.state === "RFQ_READY"
-      ? { status: "success", message: "RFQ 已 Ready，可由人工创建报价草稿。", rfqId }
-      : { status: "error", message: `RFQ 仍缺少：${result.missingFields.join("、")}。` };
+      ? { status: "success", message: "需求已确认完整，可以创建人工报价。", rfqId }
+      : {
+          status: "error",
+          message: `需求仍缺少：${result.missingFields.map(rfqMissingLabel).join("、")}。`,
+        };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法提交 RFQ。" };
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法确认客户需求。",
+    };
   }
 }
 
@@ -103,7 +106,7 @@ export async function reviseRfqAction(
     return {
       status: "success",
       message: result.draft.missing_fields.length
-        ? `询盘已更新，还需补充：${result.draft.missing_fields.join("、")}。`
+        ? `询盘已更新，还需补充：${result.draft.missing_fields.map(rfqMissingLabel).join("、")}。`
         : "询盘信息已完整，可以提交报价交接。",
       rfqId,
     };

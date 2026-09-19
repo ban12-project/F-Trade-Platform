@@ -15,7 +15,7 @@ import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -25,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Empty,
   EmptyDescription,
@@ -78,6 +79,7 @@ import type {
   LeadEntry,
   QuotationEntry,
 } from "@/lib/sales/closing-store";
+import { productTypeLabel, salesNextActionLabels, salesStateLabels } from "@/lib/sales/journey";
 import type { RfqEntry } from "@/lib/sales/store";
 import { publicationProgress } from "@/lib/social/publication-presentation";
 import type {
@@ -85,7 +87,7 @@ import type {
   PublicationChannel,
   PublicationEntry,
 } from "@/lib/social/publication-store";
-import { workspaceRecordHref } from "@/lib/workspace/navigation";
+import { workspaceCreateHref, workspaceRecordHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProductReference } from "@/lib/workspace/store";
 import { useWorkspaceDirty } from "./dirty-state";
 import { WorkspaceLink } from "./workspace-link";
@@ -101,21 +103,7 @@ function Message({ status, message }: { status: string; message: string }) {
   ) : null;
 }
 function stateLabel(state: string) {
-  return (
-    (
-      {
-        QUOTE_REVIEW_REQUIRED: "等待 Gate 02",
-        QUOTE_REVISION_REQUIRED: "待修订",
-        QUOTE_APPROVED: "Gate 02 已批准",
-        QUOTE_SENT: "已发送",
-        FOLLOW_UP: "跟进中",
-        OPPORTUNITY: "有效商机",
-        DELIVERY_CONFIRMATION_PENDING: "等待 Gate 03",
-        DELIVERY_CONFIRMATION_CONFIRMED: "交期已确认",
-        DELIVERY_CONFIRMATION_REJECTED: "交期被拒绝",
-      } as Record<string, string>
-    )[state] ?? state
-  );
+  return salesStateLabels[state] ?? "查看记录";
 }
 
 type QuoteValues = z.infer<typeof quotationDraftFormSchema>;
@@ -152,8 +140,8 @@ function QuotationForm({
           projectId,
           quotationId: "",
           evidenceRef: "",
-          rfqId: rfqs[0]?.id ?? "",
-          productId: products[0]?.id ?? "",
+          rfqId: rfqs.length === 1 ? rfqs[0].id : "",
+          productId: products.length === 1 ? products[0].id : "",
           unitPrice: "",
           currency: "USD",
           moq: "",
@@ -168,7 +156,7 @@ function QuotationForm({
       form.reset(form.getValues());
       router.refresh();
     }
-  }, [form, router, state.status]);
+  }, [form, router, state]);
   function submit(value: QuoteValues) {
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item);
@@ -185,30 +173,36 @@ function QuotationForm({
       <CardContent>
         <form id={`quotation-${entry?.id ?? "new"}`} onSubmit={form.handleSubmit(submit)}>
           <FieldGroup>
-            <Field>
-              <FieldLabel>RFQ Ready</FieldLabel>
+            <Field data-invalid={!!form.formState.errors.rfqId}>
+              <FieldLabel htmlFor={`quotation-rfq-${entry?.id ?? "new"}`}>客户需求</FieldLabel>
               <Controller
                 control={form.control}
                 name="rfqId"
                 render={({ field }) => (
                   <Select
+                    disabled={Boolean(entry) || rfqs.length === 1}
                     items={Object.fromEntries(
                       rfqs.map((item) => [
                         item.id,
-                        `${item.productType} · ${item.quantity ?? "数量待补"}`,
+                        `${item.formValues.customerName || productTypeLabel(item.productType)} · ${item.quantity ?? "数量待补"}`,
                       ]),
                     )}
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="选择 RFQ Ready" />
+                    <SelectTrigger
+                      aria-invalid={!!form.formState.errors.rfqId}
+                      id={`quotation-rfq-${entry?.id ?? "new"}`}
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="选择已确认需求" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
                         {rfqs.map((item) => (
                           <SelectItem key={item.id} value={item.id}>
-                            {item.productType} · {item.quantity}
+                            {item.formValues.customerName || productTypeLabel(item.productType)} ·{" "}
+                            {item.quantity}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -216,9 +210,10 @@ function QuotationForm({
                   </Select>
                 )}
               />
+              <FieldError errors={[form.formState.errors.rfqId]} />
             </Field>
-            <Field>
-              <FieldLabel>Product Ready 引用</FieldLabel>
+            <Field data-invalid={!!form.formState.errors.productId}>
+              <FieldLabel htmlFor={`quotation-product-${entry?.id ?? "new"}`}>报价产品</FieldLabel>
               <Controller
                 control={form.control}
                 name="productId"
@@ -233,7 +228,11 @@ function QuotationForm({
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger
+                      aria-invalid={!!form.formState.errors.productId}
+                      id={`quotation-product-${entry?.id ?? "new"}`}
+                      className="w-full"
+                    >
                       <SelectValue placeholder="选择已核验产品" />
                     </SelectTrigger>
                     <SelectContent>
@@ -248,6 +247,7 @@ function QuotationForm({
                   </Select>
                 )}
               />
+              <FieldError errors={[form.formState.errors.productId]} />
             </Field>
             <FieldSet>
               <FieldLegend>人工商业条款</FieldLegend>
@@ -262,37 +262,45 @@ function QuotationForm({
                   />
                   <FieldError errors={[form.formState.errors.unitPrice]} />
                 </Field>
-                <Field>
+                <Field data-invalid={!!form.formState.errors.currency}>
                   <FieldLabel htmlFor={`currency-${entry?.id ?? "new"}`}>币种</FieldLabel>
                   <Input
                     id={`currency-${entry?.id ?? "new"}`}
                     maxLength={3}
                     {...form.register("currency")}
+                    aria-invalid={!!form.formState.errors.currency}
                   />
+                  <FieldError errors={[form.formState.errors.currency]} />
                 </Field>
-                <Field>
+                <Field data-invalid={!!form.formState.errors.moq}>
                   <FieldLabel htmlFor={`moq-${entry?.id ?? "new"}`}>MOQ</FieldLabel>
                   <Input
                     id={`moq-${entry?.id ?? "new"}`}
                     inputMode="numeric"
                     {...form.register("moq")}
+                    aria-invalid={!!form.formState.errors.moq}
                   />
+                  <FieldError errors={[form.formState.errors.moq]} />
                 </Field>
-                <Field>
+                <Field data-invalid={!!form.formState.errors.leadTimeDays}>
                   <FieldLabel htmlFor={`lead-time-${entry?.id ?? "new"}`}>交期（天）</FieldLabel>
                   <Input
                     id={`lead-time-${entry?.id ?? "new"}`}
                     inputMode="numeric"
                     {...form.register("leadTimeDays")}
+                    aria-invalid={!!form.formState.errors.leadTimeDays}
                   />
+                  <FieldError errors={[form.formState.errors.leadTimeDays]} />
                 </Field>
-                <Field>
+                <Field data-invalid={!!form.formState.errors.paymentTerms}>
                   <FieldLabel htmlFor={`terms-${entry?.id ?? "new"}`}>付款条件</FieldLabel>
                   <Textarea
                     id={`terms-${entry?.id ?? "new"}`}
                     rows={3}
                     {...form.register("paymentTerms")}
+                    aria-invalid={!!form.formState.errors.paymentTerms}
                   />
+                  <FieldError errors={[form.formState.errors.paymentTerms]} />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.evidenceRef}>
                   <FieldLabel htmlFor={`quotation-source-${entry?.id ?? "new"}`}>
@@ -309,13 +317,15 @@ function QuotationForm({
                   </FieldDescription>
                   <FieldError errors={[form.formState.errors.evidenceRef]} />
                 </Field>
-                <Field>
+                <Field data-invalid={!!form.formState.errors.validityDays}>
                   <FieldLabel htmlFor={`validity-${entry?.id ?? "new"}`}>有效期（天）</FieldLabel>
                   <Input
                     id={`validity-${entry?.id ?? "new"}`}
                     inputMode="numeric"
                     {...form.register("validityDays")}
+                    aria-invalid={!!form.formState.errors.validityDays}
                   />
+                  <FieldError errors={[form.formState.errors.validityDays]} />
                 </Field>
               </FieldGroup>
             </FieldSet>
@@ -333,9 +343,17 @@ function QuotationForm({
           ) : (
             <HandCoinsIcon data-icon="inline-start" />
           )}
-          {entry ? "提交修订并再次送审" : "创建报价并提交 Gate 02"}
+          {entry ? "提交修订并再次送审" : "创建报价并提交审核"}
         </Button>
         <Message {...state} />
+        {state.status === "success" && state.id && !entry ? (
+          <WorkspaceLink
+            href={workspaceRecordHref(projectId, "quotation", state.id)}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            打开人工报价
+          </WorkspaceLink>
+        ) : null}
       </CardFooter>
     </Card>
   );
@@ -355,9 +373,13 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
       notes: "",
     },
   });
+  useWorkspaceDirty(`quote-decision-${entry.id}`, form.formState.isDirty);
   useEffect(() => {
-    if (state.status === "success") router.refresh();
-  }, [router, state.status]);
+    if (state.status === "success") {
+      form.reset(form.getValues());
+      router.refresh();
+    }
+  }, [form, router, state]);
   function submit(value: z.infer<typeof quotationDecisionFormSchema>) {
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item);
@@ -366,7 +388,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Gate 02 报价审核</CardTitle>
+        <CardTitle>人工报价审核</CardTitle>
         <CardDescription>
           审核版本 {entry.version}。请核对全部人工商业条款，系统不会预选批准。
         </CardDescription>
@@ -375,7 +397,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
         <form id={`quote-decision-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
           <FieldGroup>
             <Field data-invalid={!!form.formState.errors.decision}>
-              <FieldLabel>决定</FieldLabel>
+              <FieldLabel htmlFor={`quote-decision-${entry.id}-decision`}>决定</FieldLabel>
               <Controller
                 control={form.control}
                 name="decision"
@@ -385,8 +407,12 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="请选择 Gate 02 决定" />
+                    <SelectTrigger
+                      aria-invalid={!!form.formState.errors.decision}
+                      id={`quote-decision-${entry.id}-decision`}
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="请选择审核决定" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -399,15 +425,24 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
               />
               <FieldError errors={[form.formState.errors.decision]} />
             </Field>
-            <Field>
+            <Field data-invalid={!!form.formState.errors.evidenceRef}>
               <FieldLabel htmlFor={`quote-evidence-${entry.id}`}>审核证据</FieldLabel>
-              <Input id={`quote-evidence-${entry.id}`} {...form.register("evidenceRef")} />
+              <Input
+                id={`quote-evidence-${entry.id}`}
+                {...form.register("evidenceRef")}
+                aria-invalid={!!form.formState.errors.evidenceRef}
+              />
+              <FieldError errors={[form.formState.errors.evidenceRef]} />
             </Field>
             <Field data-invalid={!!form.formState.errors.notes}>
               <FieldLabel htmlFor={`quote-notes-${entry.id}`}>
                 备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
               </FieldLabel>
-              <Textarea id={`quote-notes-${entry.id}`} {...form.register("notes")} />
+              <Textarea
+                id={`quote-notes-${entry.id}`}
+                {...form.register("notes")}
+                aria-invalid={!!form.formState.errors.notes}
+              />
               <FieldError errors={[form.formState.errors.notes]} />
             </Field>
           </FieldGroup>
@@ -444,9 +479,13 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
     resolver: zodResolver(quotationSendFormSchema),
     defaultValues: { projectId, quotationId: entry.id, channelRef: "", externalRef: "" },
   });
+  useWorkspaceDirty(`quote-send-${entry.id}`, form.formState.isDirty);
   useEffect(() => {
-    if (state.status === "success") router.refresh();
-  }, [router, state.status]);
+    if (state.status === "success") {
+      form.reset(form.getValues());
+      router.refresh();
+    }
+  }, [form, router, state]);
   function submit(value: z.infer<typeof quotationSendFormSchema>) {
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item);
@@ -463,21 +502,25 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
       <CardContent>
         <form id={`quote-send-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
           <FieldGroup>
-            <Field>
+            <Field data-invalid={!!form.formState.errors.channelRef}>
               <FieldLabel htmlFor={`send-channel-${entry.id}`}>发送渠道</FieldLabel>
               <Input
                 id={`send-channel-${entry.id}`}
                 placeholder="sanitized-whatsapp"
                 {...form.register("channelRef")}
+                aria-invalid={!!form.formState.errors.channelRef}
               />
+              <FieldError errors={[form.formState.errors.channelRef]} />
             </Field>
-            <Field>
+            <Field data-invalid={!!form.formState.errors.externalRef}>
               <FieldLabel htmlFor={`send-ref-${entry.id}`}>外部发送凭证</FieldLabel>
               <Input
                 id={`send-ref-${entry.id}`}
                 placeholder="evidence-message-001"
                 {...form.register("externalRef")}
+                aria-invalid={!!form.formState.errors.externalRef}
               />
+              <FieldError errors={[form.formState.errors.externalRef]} />
             </Field>
           </FieldGroup>
         </form>
@@ -488,6 +531,14 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
           核验凭证并登记已发送
         </Button>
         <Message {...state} />
+        {state.status === "success" && state.id ? (
+          <WorkspaceLink
+            href={workspaceRecordHref(projectId, "lead", state.id)}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            继续客户跟进
+          </WorkspaceLink>
+        ) : null}
       </CardFooter>
     </Card>
   );
@@ -500,6 +551,7 @@ export function QuotationPanel({
   entries,
   canReview,
   showCreateForm = true,
+  collection = false,
 }: {
   projectId: string;
   rfqs: RfqEntry[];
@@ -507,65 +559,128 @@ export function QuotationPanel({
   entries: QuotationEntry[];
   canReview: boolean;
   showCreateForm?: boolean;
+  collection?: boolean;
 }) {
   const ready = rfqs.filter((entry) => entry.state === "RFQ_READY");
-  const revision = entries.find((entry) => entry.state === "QUOTE_REVISION_REQUIRED");
+  if (collection && entries.length)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>人工报价</CardTitle>
+          <CardDescription>选择对应客户的报价继续处理。</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {entries.map((entry) => (
+            <WorkspaceLink
+              key={entry.id}
+              href={workspaceRecordHref(projectId, "quotation", entry.id)}
+              className={buttonVariants({
+                variant: "outline",
+                className: "h-auto justify-start whitespace-normal py-3",
+              })}
+            >
+              {entry.quotation.quote.currency} {entry.quotation.quote.unit_price} ·{" "}
+              {stateLabel(entry.state)} · {entry.id.slice(0, 8)}
+            </WorkspaceLink>
+          ))}
+        </CardContent>
+        <CardFooter>
+          <WorkspaceLink
+            href={workspaceCreateHref(projectId, "quotation")}
+            className={buttonVariants({})}
+          >
+            创建人工报价
+          </WorkspaceLink>
+        </CardFooter>
+      </Card>
+    );
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">人工报价</Badge>
-          <Badge variant="outline">Gate 02 受控</Badge>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          报价由人填写、由管理员审核，并且必须有外部发送凭证。
-        </p>
-      </div>
-      {revision ? (
-        <QuotationForm
-          key={revision.id}
-          projectId={projectId}
-          rfqs={ready}
-          products={products}
-          entry={revision}
-        />
-      ) : showCreateForm ? (
-        <QuotationForm key="new" projectId={projectId} rfqs={ready} products={products} />
+      {showCreateForm ? (
+        ready.length && products.length ? (
+          <QuotationForm key="new" projectId={projectId} rfqs={ready} products={products} />
+        ) : (
+          <Alert>
+            <AlertTitle>{!ready.length ? "先确认客户需求" : "先添加报价产品"}</AlertTitle>
+            <AlertDescription>
+              {!ready.length
+                ? "客户需求确认完整后，才能填写正式报价。"
+                : "在下方引用已核实产品后，即可填写人工商业条款。"}
+            </AlertDescription>
+            {!ready.length ? (
+              <WorkspaceLink
+                href={`/workspace/customers?project=${projectId}`}
+                className={buttonVariants({ variant: "outline" })}
+              >
+                查看客户需求
+              </WorkspaceLink>
+            ) : null}
+          </Alert>
+        )
       ) : null}
       {entries.map((entry) => (
-        <Card key={entry.id}>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-2">
-              <div>
+        <div key={entry.id} className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap justify-between gap-2">
                 <CardTitle>
                   {entry.quotation.quote.currency} {entry.quotation.quote.unit_price}
                 </CardTitle>
-                <CardDescription>
-                  MOQ {entry.quotation.quote.moq} · 交期 {entry.quotation.quote.lead_time_days} 天 ·
-                  有效 {entry.quotation.quote.validity_days} 天
-                </CardDescription>
+                <Badge variant="outline">
+                  {stateLabel(entry.state)} · 版本 {entry.version}
+                </Badge>
               </div>
-              <Badge variant="outline">{stateLabel(entry.state)}</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">付款条件：{entry.quotation.quote.payment_terms}</p>
-          </CardContent>
-          {canReview && entry.state === "QUOTE_REVIEW_REQUIRED" ? (
-            <CardFooter className="block">
+              <CardDescription>
+                MOQ {entry.quotation.quote.moq} · 交期 {entry.quotation.quote.lead_time_days} 天 ·
+                有效 {entry.quotation.quote.validity_days} 天
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm">付款条件：{entry.quotation.quote.payment_terms}</p>
+            </CardContent>
+          </Card>
+          {entry.state === "QUOTE_REVISION_REQUIRED" ? (
+            <>
+              <Alert
+                variant="destructive"
+                className="*:data-[slot=alert-description]:text-destructive"
+              >
+                <AlertTitle>报价被退回，请按意见修订</AlertTitle>
+                <AlertDescription>
+                  {entry.reviewNotes || "审核备注暂不可用，请与审核者核对需要修改的条款。"}
+                </AlertDescription>
+              </Alert>
+              <QuotationForm
+                key={`${entry.id}:${entry.version}`}
+                projectId={projectId}
+                rfqs={ready}
+                products={products}
+                entry={entry}
+              />
+            </>
+          ) : null}
+          {entry.state === "QUOTE_REVIEW_REQUIRED" ? (
+            canReview && entry.approvalStatus === "pending" && entry.approvalId ? (
               <QuoteDecision
                 key={`${entry.id}:${entry.version}:${entry.approvalId}`}
                 projectId={projectId}
                 entry={entry}
               />
-            </CardFooter>
+            ) : (
+              <Alert>
+                <AlertTitle>{canReview ? "审核请求需核对" : "等待报价审核者处理"}</AlertTitle>
+                <AlertDescription>
+                  {canReview
+                    ? "当前没有有效的待审请求，请刷新或联系项目负责人核对。"
+                    : "有报价审核权限的项目编辑者需核对当前版本的全部人工商业条款。"}
+                </AlertDescription>
+              </Alert>
+            )
           ) : null}
           {entry.state === "QUOTE_APPROVED" ? (
-            <CardFooter className="block">
-              <QuoteSend projectId={projectId} entry={entry} />
-            </CardFooter>
+            <QuoteSend projectId={projectId} entry={entry} />
           ) : null}
-        </Card>
+        </div>
       ))}
     </div>
   );
@@ -619,7 +734,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       form.reset({ ...form.getValues(), draft: "", confirmationRef: "" });
       router.refresh();
     }
-  }, [form, router, state.status]);
+  }, [form, router, state]);
   function submit(value: z.infer<typeof followUpFormSchema>) {
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) {
@@ -640,7 +755,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       <CardContent>
         <form id={`follow-up-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
           <FieldGroup>
-            <Field>
+            <Field data-invalid={!!form.formState.errors.context}>
               <FieldLabel htmlFor={`context-${entry.id}`}>当前场景</FieldLabel>
               <Controller
                 control={form.control}
@@ -651,7 +766,11 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger id={`context-${entry.id}`} className="w-full">
+                    <SelectTrigger
+                      aria-invalid={!!form.formState.errors.context}
+                      id={`context-${entry.id}`}
+                      className="w-full"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -666,6 +785,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                   </Select>
                 )}
               />
+              <FieldError errors={[form.formState.errors.context]} />
             </Field>
             {requiresDeliveryConfirmation ? (
               entry.confirmedDelivery ? (
@@ -674,7 +794,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                     将插入已确认交期：{entry.confirmedDelivery.leadTimeDays} 天
                   </AlertTitle>
                   <AlertDescription>
-                    Gate 03 有效至{" "}
+                    交期确认有效至{" "}
                     {new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(
                       new Date(entry.confirmedDelivery.validUntil),
                     )}
@@ -682,8 +802,11 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Alert variant="destructive">
-                  <AlertTitle>需要有效的 Gate 03</AlertTitle>
+                <Alert
+                  variant="destructive"
+                  className="*:data-[slot=alert-description]:text-destructive"
+                >
+                  <AlertTitle>需要工厂确认交期</AlertTitle>
                   <AlertDescription>
                     请先创建交期确认请求并等待管理员批准；未批准或过期的交期不能进入回复。
                   </AlertDescription>
@@ -714,6 +837,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                       )}
                     />
                     <FieldLabel htmlFor={`${entry.id}-${id}`}>{label}</FieldLabel>
+                    <FieldError errors={[form.formState.errors.triggeredRules]} />
                   </Field>
                 ))}
               </FieldGroup>
@@ -727,7 +851,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                 {...form.register("draft")}
               />
               <FieldDescription>
-                不要在自由文本中填写交期；选择交期或样品场景后，系统只会插入当前有效的 Gate 03
+                不要在自由文本中填写交期；选择交期或样品场景后，系统只会插入当前有效的交期确认
                 结果。
               </FieldDescription>
               <FieldError errors={[form.formState.errors.draft]} />
@@ -744,13 +868,15 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
               </FieldDescription>
               <FieldError errors={[form.formState.errors.confirmationRef]} />
             </Field>
-            <Field>
+            <Field data-invalid={!!form.formState.errors.nextFollowUpAt}>
               <FieldLabel htmlFor={`next-${entry.id}`}>下次跟进时间（可选）</FieldLabel>
               <Input
                 id={`next-${entry.id}`}
                 type="datetime-local"
                 {...form.register("nextFollowUpAt")}
+                aria-invalid={!!form.formState.errors.nextFollowUpAt}
               />
+              <FieldError errors={[form.formState.errors.nextFollowUpAt]} />
             </Field>
           </FieldGroup>
         </form>
@@ -769,7 +895,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
             该线索未关联受控渠道会话，不能从应用内发送。
           </p>
         ) : requiresDeliveryConfirmation && !entry.confirmedDelivery ? (
-          <p className="text-sm text-muted-foreground">等待有效的 Gate 03 后才能发送此场景。</p>
+          <p className="text-sm text-muted-foreground">等待有效的交期确认 后才能发送此场景。</p>
         ) : null}
         <Message {...state} />
       </CardFooter>
@@ -789,10 +915,15 @@ function LeadTimeline({ entry }: { entry: LeadEntry }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>授权消息时间线</CardTitle>
-        <CardDescription>仅当前项目成员可见；消息正文加密保存并按保留策略清理。</CardDescription>
+        <CardTitle>客户会话</CardTitle>
+        <CardDescription>按时间展示当前客户仍在保留期内的最近 200 条消息。</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {entry.timelineTruncated ? (
+          <p className="text-sm text-muted-foreground">
+            更早的消息未在此加载，当前显示最近 200 条。
+          </p>
+        ) : null}
         {entry.timeline.length ? (
           entry.timeline.map((message) => (
             <div
@@ -803,7 +934,7 @@ function LeadTimeline({ entry }: { entry: LeadEntry }) {
                 <span>{message.direction === "outbound" ? "我方回复" : "客户消息"}</span>
                 <span>{statusLabel[message.deliveryStatus]}</span>
               </div>
-              <p className="whitespace-pre-wrap text-sm">{message.body}</p>
+              <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {new Intl.DateTimeFormat("zh-CN", {
                   dateStyle: "medium",
@@ -813,14 +944,26 @@ function LeadTimeline({ entry }: { entry: LeadEntry }) {
             </div>
           ))
         ) : (
-          <p className="text-sm text-muted-foreground">没有仍在保留期内的消息。</p>
+          <p className="text-sm text-muted-foreground">
+            {entry.replyAvailable
+              ? "当前会话没有仍在保留期内的消息。"
+              : "当前记录没有有效关联的客户会话，请核对来源。"}
+          </p>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function LeadActions({ projectId, entry }: { projectId: string; entry: LeadEntry }) {
+function LeadActions({
+  projectId,
+  entry,
+  delivery,
+}: {
+  projectId: string;
+  entry: LeadEntry;
+  delivery?: DeliveryConfirmationEntry;
+}) {
   const router = useRouter();
   const [deliveryState, deliveryAction, deliveryPending] = useActionState(
     requestDeliveryAction,
@@ -830,94 +973,156 @@ function LeadActions({ projectId, entry }: { projectId: string; entry: LeadEntry
     confirmOpportunityAction,
     initialClosingActionState,
   );
-  const [deliveryEvidence, setDeliveryEvidence] = useState("");
-  const [opportunityEvidence, setOpportunityEvidence] = useState("");
+  const deliveryForm = useForm<z.infer<typeof deliveryRequestFormSchema>>({
+    resolver: zodResolver(deliveryRequestFormSchema),
+    defaultValues: { projectId, leadId: entry.id, evidenceRef: "" },
+  });
+  const opportunityForm = useForm<z.infer<typeof opportunityDecisionFormSchema>>({
+    resolver: zodResolver(opportunityDecisionFormSchema),
+    defaultValues: { projectId, leadId: entry.id, evidenceRef: "" },
+  });
+  useWorkspaceDirty(`delivery-request-${entry.id}`, deliveryForm.formState.isDirty);
+  useWorkspaceDirty(`opportunity-${entry.id}`, opportunityForm.formState.isDirty);
   useEffect(() => {
-    if (deliveryState.status === "success" || opportunityState.status === "success")
+    if (deliveryState.status === "success") {
+      deliveryForm.reset();
       router.refresh();
-  }, [deliveryState.status, opportunityState.status, router]);
-  function requestDelivery() {
-    const parsed = deliveryRequestFormSchema.safeParse({
-      projectId,
-      leadId: entry.id,
-      evidenceRef: deliveryEvidence,
-    });
-    if (!parsed.success) return;
-    const data = new FormData();
-    for (const [key, value] of Object.entries(parsed.data)) data.set(key, value);
-    startTransition(() => deliveryAction(data));
-  }
-  function promote() {
-    const parsed = opportunityDecisionFormSchema.safeParse({
-      projectId,
-      leadId: entry.id,
-      evidenceRef: opportunityEvidence,
-    });
-    if (!parsed.success) return;
-    const data = new FormData();
-    for (const [key, value] of Object.entries(parsed.data)) data.set(key, value);
-    startTransition(() => opportunityAction(data));
-  }
+    }
+  }, [deliveryForm, deliveryState, router]);
+  useEffect(() => {
+    if (opportunityState.status === "success") {
+      opportunityForm.reset();
+      router.refresh();
+    }
+  }, [opportunityForm, opportunityState, router]);
   return (
-    <div className="grid gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>申请交期确认</CardTitle>
-          <CardDescription>客户询问交期时创建 Gate 03；未确认值不能进入承诺。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Field>
-            <FieldLabel htmlFor={`delivery-evidence-${entry.id}`}>请求证据</FieldLabel>
-            <Input
-              id={`delivery-evidence-${entry.id}`}
-              value={deliveryEvidence}
-              onChange={(event) => setDeliveryEvidence(event.target.value)}
-            />
-          </Field>
-        </CardContent>
-        <CardFooter className="flex-col items-stretch gap-3">
-          <Button
-            variant="outline"
-            disabled={deliveryPending || !deliveryEvidence}
-            onClick={requestDelivery}
-          >
-            <Clock3Icon data-icon="inline-start" />
-            创建 Gate 03 请求
-          </Button>
+    <div className="space-y-4">
+      <Collapsible
+        defaultOpen={
+          entry.lead.follow_up_context === "asks_lead_time" ||
+          entry.lead.follow_up_context === "asks_sample"
+        }
+        className="rounded-xl border bg-card p-4"
+      >
+        <CollapsibleTrigger render={<Button variant="outline" className="w-full justify-start" />}>
+          <Clock3Icon />
+          客户询问交期或样品
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-4">
+          {delivery &&
+          ["DELIVERY_CONFIRMATION_PENDING", "DELIVERY_CONFIRMATION_CONFIRMED"].includes(
+            delivery.state,
+          ) ? (
+            <div className="space-y-3">
+              <p className="text-sm">
+                {stateLabel(delivery.state)}。
+                {entry.confirmedDelivery
+                  ? `当前有效交期为 ${entry.confirmedDelivery.leadTimeDays} 天。`
+                  : delivery.state === "DELIVERY_CONFIRMATION_CONFIRMED"
+                    ? "本次确认已过期或不再适用于该需求，请联系工厂重新核对。"
+                    : "等待有交期审核权限的项目编辑者核实。"}
+              </p>
+              <WorkspaceLink
+                href={workspaceRecordHref(projectId, "delivery", delivery.id)}
+                className={buttonVariants({ variant: "outline" })}
+              >
+                查看交期确认
+              </WorkspaceLink>
+            </div>
+          ) : (
+            <form
+              className="space-y-4"
+              onSubmit={deliveryForm.handleSubmit((values) => {
+                const data = new FormData();
+                for (const [key, value] of Object.entries(values)) data.set(key, value);
+                startTransition(() => deliveryAction(data));
+              })}
+            >
+              <p className="text-sm text-muted-foreground">
+                客户需要交期或样品时，向工厂申请确认。未经确认的交期不能写入承诺。
+              </p>
+              {delivery?.reviewNotes ? (
+                <p className="text-sm text-destructive">上次未通过：{delivery.reviewNotes}</p>
+              ) : null}
+              <Field data-invalid={!!deliveryForm.formState.errors.evidenceRef}>
+                <FieldLabel htmlFor={`delivery-evidence-${entry.id}`}>请求证据</FieldLabel>
+                <Input
+                  id={`delivery-evidence-${entry.id}`}
+                  {...deliveryForm.register("evidenceRef")}
+                  aria-invalid={!!deliveryForm.formState.errors.evidenceRef}
+                />
+                <FieldError errors={[deliveryForm.formState.errors.evidenceRef]} />
+              </Field>
+              <Button type="submit" variant="outline" disabled={deliveryPending}>
+                申请工厂确认交期
+              </Button>
+            </form>
+          )}
           <Message {...deliveryState} />
-        </CardFooter>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>有效商机</CardTitle>
-          <CardDescription>评分仅是建议；只有 HOT 线索可由业务人员显式确认。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Field>
-            <FieldLabel htmlFor={`opportunity-evidence-${entry.id}`}>商机确认凭据</FieldLabel>
-            <Input
-              id={`opportunity-evidence-${entry.id}`}
-              value={opportunityEvidence}
-              onChange={(event) => setOpportunityEvidence(event.target.value)}
-            />
-          </Field>
-        </CardContent>
-        <CardFooter className="flex-col items-stretch gap-3">
-          <Button
-            disabled={opportunityPending || entry.lead.score_band !== "HOT" || !opportunityEvidence}
-            onClick={promote}
-          >
-            <CheckCircle2Icon data-icon="inline-start" />
-            确认有效商机
-          </Button>
-          <Message {...opportunityState} />
-        </CardFooter>
-      </Card>
+          {deliveryState.status === "success" && deliveryState.id && !delivery ? (
+            <WorkspaceLink
+              href={workspaceRecordHref(projectId, "delivery", deliveryState.id)}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              查看交期确认
+            </WorkspaceLink>
+          ) : null}
+        </CollapsibleContent>
+      </Collapsible>
+      {entry.lead.score_band === "HOT" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>确认有效商机</CardTitle>
+            <CardDescription>
+              当前客户符合评分条件。评分只是建议，请依据本次沟通事实作出确认。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              id={`opportunity-${entry.id}`}
+              onSubmit={opportunityForm.handleSubmit((values) => {
+                const data = new FormData();
+                for (const [key, value] of Object.entries(values)) data.set(key, value);
+                startTransition(() => opportunityAction(data));
+              })}
+            >
+              <Field data-invalid={!!opportunityForm.formState.errors.evidenceRef}>
+                <FieldLabel htmlFor={`opportunity-evidence-${entry.id}`}>商机确认凭据</FieldLabel>
+                <Input
+                  id={`opportunity-evidence-${entry.id}`}
+                  {...opportunityForm.register("evidenceRef")}
+                  aria-invalid={!!opportunityForm.formState.errors.evidenceRef}
+                />
+                <FieldError errors={[opportunityForm.formState.errors.evidenceRef]} />
+              </Field>
+            </form>
+          </CardContent>
+          <CardFooter className="flex-col items-stretch gap-3">
+            <Button type="submit" form={`opportunity-${entry.id}`} disabled={opportunityPending}>
+              <CheckCircle2Icon />
+              确认有效商机
+            </Button>
+            <Message {...opportunityState} />
+          </CardFooter>
+        </Card>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          商机尚待确认：继续记录有证据的客户行为，达到高意向条件后再由业务人员确认。
+        </p>
+      )}
     </div>
   );
 }
 
-export function LeadPanel({ projectId, entries }: { projectId: string; entries: LeadEntry[] }) {
+export function LeadPanel({
+  projectId,
+  entries,
+  deliveries = [],
+}: {
+  projectId: string;
+  entries: LeadEntry[];
+  deliveries?: DeliveryConfirmationEntry[];
+}) {
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -934,19 +1139,34 @@ export function LeadPanel({ projectId, entries }: { projectId: string; entries: 
           <div key={entry.id} className="flex flex-col gap-4">
             <Alert>
               <AlertTitle>
-                {stateLabel(entry.state)} · {entry.lead.score_band ?? "COLD"} {entry.lead.score} 分
+                {stateLabel(entry.state)} ·{" "}
+                {entry.lead.score_band === "HOT"
+                  ? "高意向"
+                  : entry.lead.score_band === "WARM"
+                    ? "有兴趣"
+                    : "待了解"}{" "}
+                {entry.lead.score} 分
               </AlertTitle>
               <AlertDescription>
                 {entry.state === "LEAD_RECEIVED"
-                  ? "消息已安全关联。下一步请进入 RFQ 阶段录入询盘事实。"
-                  : `下一动作：${entry.lead.next_action}${entry.lead.next_follow_up_at ? ` · ${new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.lead.next_follow_up_at))}` : ""}`}
+                  ? "下一步整理客户的产品、数量和目的地需求；相关需求和报价可从上方继续。"
+                  : `下一动作：${salesNextActionLabels[entry.lead.next_action] ?? "查看客户最新消息并决定跟进事项"}${entry.lead.next_follow_up_at ? ` · ${new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.lead.next_follow_up_at))}` : ""}`}
               </AlertDescription>
             </Alert>
             <LeadTimeline entry={entry} />
             {entry.state === "FOLLOW_UP" ? (
               <>
                 <FollowUpForm projectId={projectId} entry={entry} />
-                <LeadActions projectId={projectId} entry={entry} />
+                <LeadActions
+                  projectId={projectId}
+                  entry={entry}
+                  delivery={deliveries.find(
+                    (item) =>
+                      item.id === entry.lead.delivery_confirmation_ref &&
+                      item.confirmation.related_entity_type === "rfq" &&
+                      item.confirmation.related_entity_id === entry.lead.rfq_ref,
+                  )}
+                />
               </>
             ) : null}
           </div>
@@ -987,9 +1207,13 @@ function DeliveryDecision({
       notes: "",
     },
   });
+  useWorkspaceDirty(`delivery-decision-${entry.id}`, form.formState.isDirty);
   useEffect(() => {
-    if (state.status === "success") router.refresh();
-  }, [router, state.status]);
+    if (state.status === "success") {
+      form.reset(form.getValues());
+      router.refresh();
+    }
+  }, [form, router, state]);
   function submit(value: z.infer<typeof deliveryDecisionFormSchema>) {
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item);
@@ -1004,8 +1228,8 @@ function DeliveryDecision({
       <CardContent>
         <form id={`delivery-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
           <FieldGroup>
-            <Field>
-              <FieldLabel>决定</FieldLabel>
+            <Field data-invalid={!!form.formState.errors.decision}>
+              <FieldLabel htmlFor={`delivery-decision-${entry.id}-decision`}>决定</FieldLabel>
               <Controller
                 control={form.control}
                 name="decision"
@@ -1015,8 +1239,12 @@ function DeliveryDecision({
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="请选择 Gate 03 决定" />
+                    <SelectTrigger
+                      aria-invalid={!!form.formState.errors.decision}
+                      id={`delivery-decision-${entry.id}-decision`}
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="请选择交期决定" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -1027,6 +1255,7 @@ function DeliveryDecision({
                   </Select>
                 )}
               />
+              <FieldError errors={[form.formState.errors.decision]} />
             </Field>
             <Field data-invalid={!!form.formState.errors.leadTimeDays}>
               <FieldLabel htmlFor={`confirmed-days-${entry.id}`}>确认交期（天）</FieldLabel>
@@ -1035,21 +1264,28 @@ function DeliveryDecision({
                 inputMode="numeric"
                 disabled={form.watch("decision") !== "confirmed"}
                 {...form.register("leadTimeDays")}
+                aria-invalid={!!form.formState.errors.leadTimeDays}
               />
               <FieldError errors={[form.formState.errors.leadTimeDays]} />
             </Field>
-            <Field>
+            <Field data-invalid={!!form.formState.errors.evidenceRef}>
               <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核证据</FieldLabel>
               <Input
                 id={`delivery-decision-evidence-${entry.id}`}
                 {...form.register("evidenceRef")}
+                aria-invalid={!!form.formState.errors.evidenceRef}
               />
+              <FieldError errors={[form.formState.errors.evidenceRef]} />
             </Field>
             <Field data-invalid={!!form.formState.errors.notes}>
               <FieldLabel htmlFor={`delivery-notes-${entry.id}`}>
                 备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
               </FieldLabel>
-              <Textarea id={`delivery-notes-${entry.id}`} {...form.register("notes")} />
+              <Textarea
+                id={`delivery-notes-${entry.id}`}
+                {...form.register("notes")}
+                aria-invalid={!!form.formState.errors.notes}
+              />
               <FieldError errors={[form.formState.errors.notes]} />
             </Field>
           </FieldGroup>
@@ -1093,7 +1329,7 @@ export function DeliveryPanel({
       <div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary">交期确认</Badge>
-          <Badge variant="outline">Gate 03</Badge>
+          <Badge variant="outline">人工核实</Badge>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
           只有管理员确认且有证据的交期才能用于客户回复。
@@ -1105,9 +1341,38 @@ export function DeliveryPanel({
             <Alert>
               <AlertTitle>{stateLabel(entry.state)}</AlertTitle>
               <AlertDescription>
-                关联线索：{String(entry.confirmation.related_entity_id ?? "未知")}
+                关联客户需求：{String(entry.confirmation.related_entity_id ?? "待核对")}
               </AlertDescription>
             </Alert>
+            {entry.state === "DELIVERY_CONFIRMATION_CONFIRMED" ? (
+              <p className="text-sm">
+                工厂确认交期：{entry.confirmation.result?.confirmed_lead_time_days} 天 · 有效至{" "}
+                {entry.confirmation.result?.valid_until &&
+                Number.isFinite(Date.parse(entry.confirmation.result.valid_until))
+                  ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(
+                      new Date(entry.confirmation.result.valid_until),
+                    )
+                  : "待核对"}
+                。是否可用于回复以当前有效性检查为准。
+              </p>
+            ) : null}
+            {entry.state === "DELIVERY_CONFIRMATION_REJECTED" ? (
+              <Alert
+                variant="destructive"
+                className="*:data-[slot=alert-description]:text-destructive"
+              >
+                <AlertTitle>工厂交期未获确认</AlertTitle>
+                <AlertDescription>
+                  {entry.reviewNotes || "请与审核者核对退回原因。"}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {!canReview && entry.state === "DELIVERY_CONFIRMATION_PENDING" ? (
+              <Alert>
+                <AlertTitle>等待交期审核者处理</AlertTitle>
+                <AlertDescription>由有交期审核权限的项目编辑者向工厂核实后确认。</AlertDescription>
+              </Alert>
+            ) : null}
             {canReview && entry.state === "DELIVERY_CONFIRMATION_PENDING" ? (
               <DeliveryDecision projectId={projectId} entry={entry} />
             ) : null}
@@ -1120,7 +1385,7 @@ export function DeliveryPanel({
               <Clock3Icon />
             </EmptyMedia>
             <EmptyTitle>没有交期确认请求</EmptyTitle>
-            <EmptyDescription>从“跟进与商机”节点依据客户请求发起。</EmptyDescription>
+            <EmptyDescription>在对应客户的跟进页按需申请工厂确认。</EmptyDescription>
           </EmptyHeader>
         </Empty>
       )}
@@ -1169,7 +1434,7 @@ export function PublicationPanel({
       form.reset(form.getValues());
       router.refresh();
     }
-  }, [form, router, state.status]);
+  }, [form, router, state]);
   function submit(value: z.infer<typeof publicationConfirmationFormSchema>) {
     if (!selected) return;
     const data = new FormData();
@@ -1205,20 +1470,16 @@ export function PublicationPanel({
               ) : null}
             </CardContent>
             <CardFooter>
-              <Button
-                variant="outline"
-                render={
-                  <WorkspaceLink
-                    href={workspaceRecordHref(
-                      projectId,
-                      item.format === "video" ? "video" : "content",
-                      item.contentRef,
-                    )}
-                  />
-                }
+              <WorkspaceLink
+                href={workspaceRecordHref(
+                  projectId,
+                  item.format === "video" ? "video" : "content",
+                  item.contentRef,
+                )}
+                className={buttonVariants({ variant: "outline" })}
               >
                 查看发布内容
-              </Button>
+              </WorkspaceLink>
             </CardFooter>
           </Card>
         );
@@ -1242,7 +1503,7 @@ export function PublicationPanel({
             ) : null}
             <form id="publication-confirmation" onSubmit={form.handleSubmit(submit)}>
               <FieldGroup>
-                <Field>
+                <Field data-invalid={!!form.formState.errors.contentRef}>
                   <FieldLabel htmlFor="publication-content">已批准内容或视频</FieldLabel>
                   <Controller
                     control={form.control}
@@ -1260,7 +1521,11 @@ export function PublicationPanel({
                           }
                         }}
                       >
-                        <SelectTrigger id="publication-content" className="w-full">
+                        <SelectTrigger
+                          aria-invalid={!!form.formState.errors.contentRef}
+                          id="publication-content"
+                          className="w-full"
+                        >
                           <SelectValue placeholder="没有可发布内容" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1275,6 +1540,7 @@ export function PublicationPanel({
                       </Select>
                     )}
                   />
+                  <FieldError errors={[form.formState.errors.contentRef]} />
                 </Field>
                 {selected ? (
                   <Alert>

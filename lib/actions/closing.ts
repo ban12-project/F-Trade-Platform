@@ -61,7 +61,7 @@ export async function saveQuotationAction(
     if (!parsed.success) return resultError(parsed.error);
     const saved = await createOrReviseQuotation(parsed.data, actorId);
     refresh(parsed.data.projectId);
-    return { status: "success", message: "报价已保存并提交 Gate 02。", id: saved.id };
+    return { status: "success", message: "报价已保存并提交人工审核。", id: saved.id };
   } catch (error) {
     return resultError(error);
   }
@@ -78,7 +78,7 @@ export async function decideQuotationAction(
     refresh(parsed.data.projectId);
     return {
       status: "success",
-      message: parsed.data.decision === "approved" ? "Gate 02 已批准报价。" : "报价已退回修订。",
+      message: parsed.data.decision === "approved" ? "人工报价已批准。" : "报价已退回修订。",
       id: saved.id,
     };
   } catch (error) {
@@ -97,7 +97,7 @@ export async function sendQuotationAction(
     refresh(parsed.data.projectId);
     return {
       status: "success",
-      message: "外部发送凭证已核验，报价进入已发送并创建跟进线索。",
+      message: "发送凭证已登记，报价进入已发送，可继续客户跟进。",
       id: saved.leadId,
     };
   } catch (error) {
@@ -136,7 +136,7 @@ export async function requestDeliveryAction(
     if (!parsed.success) return resultError(parsed.error);
     const saved = await createDeliveryRequest(parsed.data, actorId);
     refresh(parsed.data.projectId);
-    return { status: "success", message: "已创建 Gate 03 交期确认请求。", id: saved.id };
+    return { status: "success", message: "已提交工厂交期确认请求。", id: saved.id };
   } catch (error) {
     return resultError(error);
   }
@@ -153,7 +153,7 @@ export async function decideDeliveryAction(
     refresh(parsed.data.projectId);
     return {
       status: "success",
-      message: parsed.data.decision === "confirmed" ? "Gate 03 已确认交期。" : "交期确认已拒绝。",
+      message: parsed.data.decision === "confirmed" ? "工厂交期已确认。" : "交期确认已拒绝。",
       id: saved.id,
     };
   } catch (error) {

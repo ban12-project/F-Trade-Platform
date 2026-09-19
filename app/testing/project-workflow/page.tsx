@@ -13,11 +13,18 @@ import {
   ProjectWorkspace,
   VideoStageEntry,
 } from "@/components/workspace/project-workspace";
-import { ProductReferencePanel, RfqPanel } from "@/components/workspace/sales-panels";
+import { SalesContext } from "@/components/workspace/sales-context";
+import { RfqPanel } from "@/components/workspace/sales-panels";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import type { ContentCatalogDetail } from "@/lib/content/store";
 import type { ProductCatalogDetail } from "@/lib/products";
-import type { LeadEntry } from "@/lib/sales/closing-store";
+import type {
+  DeliveryConfirmationEntry,
+  LeadEntry,
+  QuotationEntry,
+} from "@/lib/sales/closing-store";
+import type { SalesRelationRecord } from "@/lib/sales/journey";
+import type { RfqEntry } from "@/lib/sales/store";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
 
 const syntheticMarketingProject: WorkspaceProjectSummary = {
@@ -52,6 +59,9 @@ const syntheticLead: LeadEntry = {
     lead_id: "00000000-0000-4000-8000-000000000601",
     channel_ref: "synthetic-facebook",
     conversation_ref: "synthetic-conversation-001",
+    rfq_ref: "00000000-0000-4000-8000-000000000602",
+    quotation_ref: "00000000-0000-4000-8000-000000000603",
+    delivery_confirmation_ref: "30000000-0000-4000-8000-000000000010",
     status: "follow_up",
     follow_up_context: "quote_sent_read_no_reply",
     score: 35,
@@ -93,6 +103,101 @@ const syntheticProduct = {
     },
   ],
 };
+const syntheticRfq: RfqEntry = {
+  id: "00000000-0000-4000-8000-000000000602",
+  state: "RFQ_READY",
+  createdAt: new Date("2026-09-01T00:00:00Z"),
+  productType: "clutch_kit",
+  quantity: 500,
+  destination: "Synthetic Port",
+  completenessScore: 100,
+  missingFields: [],
+  formValues: {
+    leadId: syntheticLead.id,
+    customerName: "Synthetic Buyer",
+    customerCompany: "MOCK parts",
+    customerCountry: "Synthetic Country",
+    productType: "clutch_kit",
+    oeNumber: "SYN-OE-001",
+    vehicleBrand: "",
+    vehicleModel: "",
+    quantity: "500",
+    destination: "Synthetic Port",
+  },
+};
+const syntheticQuote: QuotationEntry = {
+  id: "00000000-0000-4000-8000-000000000603",
+  version: 2,
+  state: "QUOTE_REVISION_REQUIRED",
+  createdAt: syntheticRfq.createdAt,
+  productId: syntheticProduct.id,
+  approvalId: "00000000-0000-4000-8000-000000000604",
+  approvalStatus: "rejected",
+  reviewNotes: "MOCK: 请核对付款条件后再次送审。",
+  quotation: {
+    handoff_id: "00000000-0000-4000-8000-000000000603",
+    rfq_id: syntheticRfq.id,
+    product_id: syntheticProduct.id,
+    status: "revision_required",
+    quote: {
+      unit_price: 12.5,
+      currency: "USD",
+      moq: 100,
+      lead_time_days: 30,
+      payment_terms: "MOCK terms; synthetic only",
+      validity_days: 30,
+    },
+    created_by_actor_type: "human",
+    created_by_actor_id: "synthetic-reviewer",
+  },
+};
+const syntheticDelivery: DeliveryConfirmationEntry = {
+  id: syntheticLead.confirmedDelivery!.id,
+  state: "DELIVERY_CONFIRMATION_CONFIRMED",
+  createdAt: syntheticRfq.createdAt,
+  approvalId: null,
+  approvalStatus: "approved",
+  confirmation: {
+    related_entity_type: "rfq",
+    related_entity_id: syntheticRfq.id,
+    result: {
+      confirmed_lead_time_days: 21,
+      valid_until: syntheticLead.confirmedDelivery!.validUntil,
+    },
+  },
+};
+const syntheticRelations: SalesRelationRecord[] = [
+  {
+    kind: "lead",
+    id: syntheticLead.id,
+    state: syntheticLead.state,
+    title: "Synthetic Buyer · 客户会话",
+    rfqId: syntheticRfq.id,
+    quotationId: syntheticQuote.id,
+    deliveryId: syntheticDelivery.id,
+  },
+  {
+    kind: "rfq",
+    id: syntheticRfq.id,
+    state: syntheticRfq.state,
+    title: "Synthetic Buyer · 500",
+    leadId: syntheticLead.id,
+  },
+  {
+    kind: "quotation",
+    id: syntheticQuote.id,
+    state: syntheticQuote.state,
+    title: "MOCK 报价 USD 12.5",
+    rfqId: syntheticRfq.id,
+  },
+  {
+    kind: "delivery",
+    id: syntheticDelivery.id,
+    state: syntheticDelivery.state,
+    title: "MOCK 工厂交期确认",
+    rfqId: syntheticRfq.id,
+  },
+];
 const syntheticAgentModels: ProductAgentModelSettings[] = [
   {
     id: "00000000-0000-4000-8000-000000000501",
@@ -267,28 +372,59 @@ async function ProjectWorkflowFixture({
 }) {
   const { state, kind, panel } = await searchParams;
   if (kind === "sales") {
+    const context = (recordKind: SalesRelationRecord["kind"], id: string) => (
+      <SalesContext
+        projectId={syntheticSalesProject.id}
+        records={syntheticRelations}
+        kind={recordKind}
+        id={id}
+        canWrite
+      />
+    );
     const panels = {
       rfq: (
-        <div className="flex flex-col gap-6">
-          <RfqPanel projectId={syntheticSalesProject.id} entries={[]} leads={[syntheticLead]} />
-          <ProductReferencePanel
+        <RfqPanel
+          projectId={syntheticSalesProject.id}
+          entries={[syntheticRfq]}
+          selectedId={syntheticRfq.id}
+          leads={[syntheticLead]}
+        >
+          {context("rfq", syntheticRfq.id)}
+        </RfqPanel>
+      ),
+      quotation: (
+        <div className="space-y-6">
+          {state === "quote-revision" ? context("quotation", syntheticQuote.id) : null}
+          <QuotationPanel
             projectId={syntheticSalesProject.id}
-            available={[syntheticProduct]}
-            linked={[]}
+            rfqs={[syntheticRfq]}
+            products={[{ ...syntheticProduct, id: syntheticProduct.id }]}
+            entries={state === "quote-revision" ? [syntheticQuote] : []}
+            showCreateForm={state !== "quote-revision"}
+            canReview
           />
         </div>
       ),
-      quotation: (
-        <QuotationPanel
-          projectId={syntheticSalesProject.id}
-          rfqs={[]}
-          products={[]}
-          entries={[]}
-          canReview
-        />
+      lead: (
+        <div className="space-y-6">
+          {context("lead", syntheticLead.id)}
+          <LeadPanel
+            projectId={syntheticSalesProject.id}
+            entries={[syntheticLead]}
+            deliveries={[syntheticDelivery]}
+          />
+        </div>
       ),
-      lead: <LeadPanel projectId={syntheticSalesProject.id} entries={[syntheticLead]} />,
-      delivery: <DeliveryPanel projectId={syntheticSalesProject.id} entries={[]} canReview />,
+      delivery: (
+        <div className="space-y-6">
+          {context("delivery", syntheticDelivery.id)}
+          <DeliveryPanel
+            projectId={syntheticSalesProject.id}
+            entries={[syntheticDelivery]}
+            canReview
+          />
+        </div>
+      ),
       opportunity: <LeadPanel projectId={syntheticSalesProject.id} entries={[]} />,
     };
     const active = salesStages.some((stage) => stage.id === panel)

@@ -177,7 +177,7 @@ export async function listRfqEntries(limit = 50): Promise<RfqEntry[]> {
   return rows.flatMap((row) => entryFromRecord(row) ?? []);
 }
 
-export async function listProjectRfqEntries(projectId: string, limit = 50): Promise<RfqEntry[]> {
+export async function listProjectRfqEntries(projectId: string): Promise<RfqEntry[]> {
   const rows = await getDatabase()
     .select({ record: aggregateRecord })
     .from(workspaceProjectItem)
@@ -190,8 +190,7 @@ export async function listProjectRfqEntries(projectId: string, limit = 50): Prom
         eq(aggregateRecord.type, "rfq"),
       ),
     )
-    .orderBy(desc(workspaceProjectItem.createdAt))
-    .limit(limit);
+    .orderBy(desc(workspaceProjectItem.createdAt));
   return rows.flatMap(({ record }) => entryFromRecord(record) ?? []);
 }
 
