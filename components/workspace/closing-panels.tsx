@@ -496,12 +496,14 @@ export function QuotationPanel({
   products,
   entries,
   canReview,
+  showCreateForm = true,
 }: {
   projectId: string;
   rfqs: RfqEntry[];
   products: WorkspaceProductReference[];
   entries: QuotationEntry[];
   canReview: boolean;
+  showCreateForm?: boolean;
 }) {
   const ready = rfqs.filter((entry) => entry.state === "RFQ_READY");
   const revision = entries.find((entry) => entry.state === "QUOTE_REVISION_REQUIRED");
@@ -524,9 +526,9 @@ export function QuotationPanel({
           products={products}
           entry={revision}
         />
-      ) : (
+      ) : showCreateForm ? (
         <QuotationForm key="new" projectId={projectId} rfqs={ready} products={products} />
-      )}
+      ) : null}
       {entries.map((entry) => (
         <Card key={entry.id}>
           <CardHeader>

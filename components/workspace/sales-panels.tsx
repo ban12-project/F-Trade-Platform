@@ -90,10 +90,12 @@ function RfqForm({
   projectId,
   entry,
   leads,
+  selectedLeadId,
 }: {
   projectId: string;
   entry?: RfqEntry;
   leads: LeadEntry[];
+  selectedLeadId?: string;
 }) {
   const router = useRouter();
   const revising = Boolean(entry);
@@ -103,7 +105,9 @@ function RfqForm({
   );
   const form = useForm<RfqValues>({
     resolver: zodResolver(rfqFormSchema),
-    defaultValues: entry ? { ...entry.formValues, evidenceRef: "" } : emptyRfq,
+    defaultValues: entry
+      ? { ...entry.formValues, evidenceRef: "" }
+      : { ...emptyRfq, leadId: selectedLeadId ?? "" },
   });
   useWorkspaceDirty(`rfq-${entry?.id ?? "new"}`, form.formState.isDirty);
   useEffect(() => {
@@ -371,17 +375,21 @@ export function RfqPanel({
   projectId,
   entries,
   selectedId,
+  selectedLeadId,
   leads = [],
 }: {
   projectId: string;
   entries: RfqEntry[];
   selectedId?: string;
+  selectedLeadId?: string;
   leads?: LeadEntry[];
 }) {
   const [activeId, setActiveId] = useState(
     selectedId && entries.some((entry) => entry.id === selectedId)
       ? selectedId
-      : (entries[0]?.id ?? "new"),
+      : selectedLeadId
+        ? "new"
+        : (entries[0]?.id ?? "new"),
   );
   const active = entries.find((entry) => entry.id === activeId);
   return (
@@ -408,7 +416,7 @@ export function RfqPanel({
           <TabsTrigger value="records">询盘 {entries.length}</TabsTrigger>
         </TabsList>
         <TabsContent value="new">
-          <RfqForm projectId={projectId} leads={leads} />
+          <RfqForm projectId={projectId} leads={leads} selectedLeadId={selectedLeadId} />
         </TabsContent>
         <TabsContent value="records">
           <div className="flex flex-col gap-3">

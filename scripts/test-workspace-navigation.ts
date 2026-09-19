@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { workspaceTaskHref } from "../lib/workspace/navigation";
 import { defaultProjectStage, requestedProjectStage } from "../lib/workspace/stages";
 import type { WorkspaceTaskSummary } from "../lib/workspace/store";
 
@@ -7,7 +8,7 @@ assert.equal(requestedProjectStage("marketing", "content"), "content");
 assert.equal(requestedProjectStage("marketing", "quotation"), undefined);
 assert.equal(requestedProjectStage("sales", "lead", "opportunity"), "opportunity");
 assert.equal(requestedProjectStage("sales", "lead", "follow_up"), "follow-up");
-assert.equal(requestedProjectStage("sales", "lead", "rfq"), "inbound");
+assert.equal(requestedProjectStage("sales", "lead", "rfq"), "rfq");
 assert.equal(requestedProjectStage("sales", "delivery"), "delivery");
 assert.equal(defaultProjectStage("marketing", [], [], false), "product");
 assert.equal(
@@ -33,7 +34,40 @@ assert.equal(
   defaultProjectStage("marketing", [task], [{ type: "video", state: "VIDEO_DRAFT" }], true),
   "product",
 );
-assert.equal(defaultProjectStage("sales", [], [], false), "rfq");
+assert.equal(defaultProjectStage("sales", [], [], false), "inbound");
+assert.equal(
+  defaultProjectStage("sales", [], [{ type: "lead", state: "LEAD_RECEIVED" }], false),
+  "rfq",
+);
+assert.equal(
+  defaultProjectStage(
+    "sales",
+    [],
+    [
+      { type: "lead", state: "FOLLOW_UP" },
+      { type: "quotation", state: "QUOTE_REVIEW_REQUIRED" },
+    ],
+    false,
+  ),
+  "quotation",
+);
+assert.equal(
+  defaultProjectStage(
+    "sales",
+    [{ ...task, nodeKind: "quotation", taskType: "approval" }],
+    [{ type: "lead", state: "FOLLOW_UP" }],
+    false,
+  ),
+  "quotation",
+);
+assert.equal(
+  workspaceTaskHref({ ...task, nodeKind: "lead", taskType: "rfq" }),
+  "/workspace/project?panel=rfq&lead=task",
+);
+assert.equal(
+  workspaceTaskHref({ ...task, nodeKind: "lead", taskType: "opportunity" }),
+  "/workspace/project?panel=opportunity&item=task",
+);
 assert.equal(
   defaultProjectStage("sales", [], [{ type: "quotation", state: "QUOTE_DRAFT" }], false),
   "quotation",
@@ -64,7 +98,7 @@ assert.equal(
     ],
     false,
   ),
-  "opportunity",
+  "delivery",
 );
 const source = (path: string) => readFileSync(path, "utf8");
 assert.match(source("app/workspace/layout.tsx"), /WorkspaceShell/);

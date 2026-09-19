@@ -25,11 +25,8 @@ export const readWorkspaceModelSettings = cache(() => listStoredProductAgentMode
 // Called only after readWorkspaceProject has authenticated project membership.
 // Explicit ?panel= navigation never calls this lightweight entry-point fallback.
 export async function readDefaultProjectStage(project: WorkspaceProjectSummary, actorId: string) {
-  const tasks = project.kind === "marketing" ? await readWorkspaceTasks(actorId, project.id) : [];
-  if (tasks.length && project.kind === "marketing") {
-    const next = defaultProjectStage(project.kind, tasks, [], false);
-    if (tasks.some((task) => task.nodeKind === next)) return next;
-  }
+  const tasks = await readWorkspaceTasks(actorId, project.id);
+  if (tasks.length) return defaultProjectStage(project.kind, tasks, [], false);
   const database = getDatabase();
   const [records, publications] = await Promise.all([
     database
