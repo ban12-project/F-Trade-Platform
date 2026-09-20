@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { PublicationReconciliationForm } from "@/components/workspace/publication-reconciliation-form";
 import { initialClosingActionState } from "@/lib/action-states";
 import {
   confirmOpportunityAction,
@@ -1454,7 +1455,7 @@ export function PublicationPanel({
         </p>
       </div>
       {publications.map((item) => {
-        const progress = publicationProgress(item.status);
+        const progress = publicationProgress(item.status, item.humanConfirmed);
         return (
           <Card key={item.id}>
             <CardHeader>
@@ -1465,6 +1466,9 @@ export function PublicationPanel({
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               <p className="text-sm">{progress.detail}</p>
+              {item.status === "unknown" && item.format === "text" ? (
+                <PublicationReconciliationForm projectId={projectId} publicationId={item.id} />
+              ) : null}
               {item.externalPublicationRef ? (
                 <p className="break-all text-sm">发布凭证：{item.externalPublicationRef}</p>
               ) : null}

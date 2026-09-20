@@ -25,6 +25,7 @@ import { testBrowserLogin } from "./test-browser-login-postgres";
 import { testPublicationWakeup } from "./test-browser-publication-wakeup";
 import { testBrowserSandboxOwner } from "./test-browser-sandbox-owner";
 import { testFacebookInbound } from "./test-facebook-inbound-postgres";
+import { testPublicationReconciliation } from "./test-publication-reconciliation-postgres";
 
 async function main() {
   const connectionString = process.env.FACEBOOK_PUBLICATION_TEST_DATABASE_URL;
@@ -914,6 +915,14 @@ async function main() {
         .from(schema.socialPublication)
         .where(eq(schema.socialPublication.id, target.id));
       assert.equal(saved.status, outcome === "published" ? "published" : "unknown");
+      if (outcome === "unknown")
+        await testPublicationReconciliation(database, {
+          actor,
+          projectId,
+          publicationId: target.id,
+          jobId: target.jobId,
+          contentRef: target.contentRef,
+        });
       if (outcome === "published") {
         const [record] = await db
           .select()

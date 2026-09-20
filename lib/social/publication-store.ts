@@ -36,6 +36,7 @@ export type PublicationCandidate = {
 };
 export type PublicationChannel = { channelRef: string; accountRef: string };
 export type PublicationEntry = {
+  humanConfirmed?: boolean;
   id: string;
   projectId: string;
   contentRef: string;
@@ -184,6 +185,7 @@ export async function listProjectPublicationData(
           channelRef: socialPublication.channelRef,
           accountRef: socialPublication.accountRef,
           externalPublicationRef: socialPublication.externalPublicationRef,
+          humanConfirmed: sql<boolean>`EXISTS (SELECT 1 FROM audit_event e WHERE e.subject_id = social_publication.id AND e.action = 'social_publication.reconciled')`,
           status: socialPublication.status,
           createdAt: socialPublication.createdAt,
         })
