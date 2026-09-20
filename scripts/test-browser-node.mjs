@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { once } from "node:events";
+import { EventEmitter, once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import {
+  createConnectionDiagnostics,
+  register as registerDiagnostics,
+} from "../ops/browser-node/diagnostics-plugin/index.js";
 import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/docker.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
 import {
@@ -656,4 +660,117 @@ test("saved login profiles remain private, bounded and interactive-account scope
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("connection diagnostics retain only bounded counters and expire with the run", () => {
+  const page = new EventEmitter();
+  page.isClosed = () => false;
+  const runId = randomUUID();
+  const sessions = new Map([
+    [accountId, { tabGroups: new Map([[runId, new Map([["tab", { page }]])]]) }],
+  ]);
+  let deadline = Date.now() + 60000;
+  const diagnostics = createConnectionDiagnostics({
+    sessions,
+    accountId,
+    runId,
+    leaseDeadline: () => deadline,
+  });
+  diagnostics.attach({ userId: accountId, page });
+  diagnostics.attach({ userId: accountId, page });
+  assert.equal(page.listenerCount("websocket"), 1);
+  const query = { userId: accountId, runId, tabId: "tab" };
+  const socket = new EventEmitter();
+  socket.url = () => "wss://gateway.facebook.com/ws/realtime?token=PRIVATE";
+  page.emit("websocket", socket);
+  const privateFrame = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error("must not inspect frame");
+      },
+    },
+  );
+  socket.emit("framesent", privateFrame);
+  socket.emit("framereceived", privateFrame);
+  socket.emit("socketerror", privateFrame);
+  socket.emit("close");
+  assert.deepEqual(diagnostics.read(query), {
+    version: 1,
+    created: 1,
+    closed: 1,
+    errors: 1,
+    sentFrames: 1,
+    receivedFrames: 1,
+    dropped: 0,
+  });
+  assert.equal(socket.listenerCount("framereceived"), 0);
+  for (const url of [
+    "wss://gateway.facebook.com.evil.invalid/",
+    "ws://gateway.facebook.com/",
+    "invalid",
+  ]) {
+    const other = new EventEmitter();
+    other.url = () => url;
+    page.emit("websocket", other);
+    assert.equal(other.listenerCount("framesent"), 0);
+  }
+  for (let i = 0; i < 128; i++) {
+    const s = new EventEmitter();
+    s.url = socket.url;
+    page.emit("websocket", s);
+    s.emit("close");
+  }
+  assert.equal(diagnostics.read(query).created, 128);
+  assert.equal(diagnostics.read(query).dropped, 1);
+  for (const invalid of [
+    { ...query, userId: randomUUID() },
+    { ...query, runId: randomUUID() },
+    { ...query, tabId: "other" },
+    { ...query, extra: true },
+  ])
+    assert.equal(diagnostics.read(invalid), null);
+  deadline = Date.now() - 1;
+  assert.equal(diagnostics.read(query), null);
+  page.emit("close");
+  assert.equal(page.listenerCount("websocket"), 0);
+});
+
+test("diagnostic routes are absent without interactive opt-in", () => {
+  const previous = process.env.FTRADE_DIAGNOSTIC_KIND;
+  delete process.env.FTRADE_DIAGNOSTIC_KIND;
+  try {
+    registerDiagnostics(
+      {
+        get() {
+          throw new Error("must not expose route");
+        },
+      },
+      {},
+      { enabled: true },
+    );
+  } finally {
+    if (previous !== undefined) process.env.FTRADE_DIAGNOSTIC_KIND = previous;
+  }
+});
+
+test("interactive diagnostics receive account/run scope; publication runtimes do not", () => {
+  const interactive = containerSpec(
+    nodeId,
+    { ...run, kind: "interactive" },
+    "sha256:reviewed",
+    Date.now() + 60000,
+  );
+  assert.ok(interactive.body.Env.includes(`FTRADE_DIAGNOSTIC_ACCOUNT=${accountId}`));
+  assert.ok(interactive.body.Env.includes(`FTRADE_DIAGNOSTIC_RUN=${run.id}`));
+  const publish = containerSpec(
+    nodeId,
+    { ...run, kind: "publish" },
+    "sha256:reviewed",
+    Date.now() + 60000,
+  );
+  assert.equal(
+    publish.body.Env.some((v) => v.startsWith("FTRADE_DIAGNOSTIC_")),
+    false,
+  );
 });

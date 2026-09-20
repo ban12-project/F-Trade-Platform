@@ -310,3 +310,11 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 发布面板对 unknown 文字任务提供人工核对表单。原节点所有者必须重新登录，具有管理、内容审核及项目编辑权限，核对实际账号、完整文案、受众与正式帖子链接，并填写私有 evidence 编号。服务端拒绝仍占用租约的任务、跨项目／跨所有者请求、变化的内容版本或当前 Gate 01，以及冲突的既有确认。
 
 核对事务只确认原任务，更新发布与内容状态并追加 `social_publication.reconciled` 审计；精确重复请求幂等。原节点回执和观察时间不改写，渠道与账号继续保持暂停状态。平台发布时间未知时保持空值，不能用人工确认时间代替。界面标注“已发布（人工核对）”，避免将人工核对描述为平台成功回执。表单确认依赖人的实际核对，不是 Agent 自动验证帖子真实性，也不适用于视频未知结果。
+
+### 私信实时连接诊断
+
+`ftrade-diagnostics` 仅在平台创建的 `interactive` 容器中启用，并要求节点访问密钥。内部接口 `GET /ftrade/connection-diagnostics?userId=…&runId=…&tabId=…` 重新核对运行、账号、标签页及本地租约；该接口不经过公开接管网关。非人工任务、缺失密钥、越权或过期租约均不能读取。
+
+诊断仅保存当前页的 `wss://gateway.facebook.com` WebSocket 创建、关闭、错误及收发帧次数，不读取或保存帧内容、PIN、完整 URL、查询参数、请求头和异常文本。每页最多跟踪 128 个连接，超出计入 dropped，页面关闭后清除。通过 session-created 的 page 事件在首次导航前接入，避免遗漏加载时建立的连接。
+
+创建事件不等于握手成功，收发帧也不等于聊天恢复成功；零计数不能证明连接正常。计数只为排查提供证据，不改变账号、渠道、收件箱同步或安全存储状态。合成 Chromium 测试通过本地拒绝连接的代理验证实际 socket 错误，未连接 Facebook；真实 Messenger 诊断和修复仍需单独验收。
