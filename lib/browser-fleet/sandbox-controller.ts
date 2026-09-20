@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import { getDatabase } from "../db/client";
-import { authorizeManualSandboxStart } from "./sandbox-authorization";
+import { authorizeBrowserSandboxStart } from "./sandbox-authorization";
 import { claimManualSandboxDispatch, recordedBrowserSandboxDispatch } from "./sandbox-dispatch";
 import { bindBrowserSandboxGateway, settleBrowserSandboxOperation } from "./sandbox-lifecycle";
 import { provisionBrowserSandbox } from "./sandbox-provider";
@@ -25,7 +25,7 @@ const dependencies = {
   claim: (nodeId: string, operationId: string) =>
     getDatabase().transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId)),
   authorize: (nodeId: string, operationId: string) =>
-    getDatabase().transaction((tx) => authorizeManualSandboxStart(tx, nodeId, operationId)),
+    getDatabase().transaction((tx) => authorizeBrowserSandboxStart(tx, nodeId, operationId)),
   bind: (nodeId: string, operationId: string, sessionId: string, origin: string) =>
     getDatabase().transaction((tx) =>
       bindBrowserSandboxGateway(tx, nodeId, operationId, sessionId, origin),

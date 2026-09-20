@@ -2,7 +2,7 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 import type { DatabaseExecutor, DatabaseTransaction } from "../db/client";
-import { authorizeManualSandboxStart } from "./sandbox-authorization";
+import { authorizeBrowserSandboxStart } from "./sandbox-authorization";
 
 /** Replay only a successfully recorded session for this exact dispatched
  * operation. This read does not authorize new compute or release credentials.
@@ -31,11 +31,11 @@ export async function claimManualSandboxDispatch(
   nodeId: string,
   operationId: string,
 ) {
-  if (!(await authorizeManualSandboxStart(tx, nodeId, operationId))) {
+  if (!(await authorizeBrowserSandboxStart(tx, nodeId, operationId))) {
     await cancelUnclaimedBrowserSandboxStart(tx, nodeId, operationId);
     return null;
   }
-  // authorizeManualSandboxStart holds node then Sandbox row locks.
+  // authorizeBrowserSandboxStart holds node then Sandbox row locks.
   const rows = await tx.execute(sql`SELECT phase, provider_initialized, dispatch_operation_id
     FROM browser_sandbox WHERE node_id = ${nodeId}`);
   const row = rows.rows[0] as {
@@ -80,6 +80,6 @@ export async function cancelInvalidManualSandboxStart(tx: DatabaseTransaction, n
     WHERE node_id = ${nodeId} AND phase = 'starting' AND operation_kind = 'start'
     AND session_id IS NULL AND dispatch_operation_id IS DISTINCT FROM operation_id FOR UPDATE`);
   const operationId = rows.rows[0]?.operation_id as string | undefined;
-  if (!operationId || (await authorizeManualSandboxStart(tx, nodeId, operationId))) return false;
+  if (!operationId || (await authorizeBrowserSandboxStart(tx, nodeId, operationId))) return false;
   return cancelUnclaimedBrowserSandboxStart(tx, nodeId, operationId);
 }

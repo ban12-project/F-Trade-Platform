@@ -12,6 +12,8 @@ type Mode =
   | "expired"
   | "click_lost"
   | "receipt_lost"
+  | "receipt_once_lost"
+  | "observe_lost"
   | "old_post"
   | "aborted";
 async function scenario(page: Page, mode: Mode, format: "text" | "image" | "video" = "text") {
@@ -68,6 +70,7 @@ async function scenario(page: Page, mode: Mode, format: "text" | "image" | "vide
       if (mode === "click_lost") throw new Error("response_lost_after_click");
     },
     async observe() {
+      if (mode === "observe_lost") throw new Error("private page text must not escape");
       return {
         accountRef,
         channelRef,
@@ -101,6 +104,7 @@ async function scenario(page: Page, mode: Mode, format: "text" | "image" | "vide
     },
     async reportPublication(receipt: Record<string, unknown>) {
       receipts.push(receipt);
+      if (mode === "receipt_once_lost" && receipts.length === 1) throw new Error("response_lost");
       if (mode === "receipt_lost") throw new Error("response_lost");
     },
   });
@@ -134,7 +138,32 @@ for (const mode of ["click_lost", "receipt_lost", "old_post"] as const) {
     const run = await scenario(page, mode);
     expect(run.result).toBe("unknown");
     expect(run.clicks).toBe(1);
-    expect(run.receipts).toHaveLength(1);
+    expect(run.receipts).toHaveLength(mode === "receipt_lost" ? 3 : 1);
+    expect(
+      run.receipts.every((receipt) => JSON.stringify(receipt) === JSON.stringify(run.receipts[0])),
+    ).toBe(true);
     expect(run.receipts[0].outcome).toBe(mode === "receipt_lost" ? "published" : "unknown");
+  });
+}
+
+test("lost receipt response retries the same observation without another click", async ({
+  page,
+}) => {
+  const run = await scenario(page, "receipt_once_lost");
+  expect(run.result).toBe("completed");
+  expect(run.clicks).toBe(1);
+  expect(run.receipts).toHaveLength(2);
+  expect(run.receipts[0]).toEqual(run.receipts[1]);
+});
+for (const [mode, phase] of [
+  ["click_lost", "publish"],
+  ["observe_lost", "observe"],
+  ["old_post", "validate"],
+] as const) {
+  test(`unknown result records only the fixed ${phase} phase`, async ({ page }) => {
+    const run = await scenario(page, mode);
+    expect(run.result).toBe("unknown");
+    expect(run.clicks).toBe(1);
+    expect(run.receipts[0].failureCode).toBe(`publication_${phase}_unknown`);
   });
 }

@@ -1,6 +1,7 @@
 "use server";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
@@ -27,7 +28,18 @@ export async function facebookMediaOptionsAction(projectId: unknown) {
 export async function submitFacebookMediaAction(input: unknown) {
   const actorId = await actor();
   try {
-    return { ok: true as const, ...(await submitFacebookMediaPublication(input, actorId)) };
+    const saved = await submitFacebookMediaPublication(input, actorId);
+    after(async () => {
+      try {
+        const { deliverPublicationSandbox } = await import(
+          "@/lib/browser-fleet/sandbox-workflow-delivery"
+        );
+        await deliverPublicationSandbox(saved.publicationId);
+      } catch {
+        // The committed job is recovered by the authenticated dispatch cron.
+      }
+    });
+    return { ok: true as const, ...saved };
   } catch {
     return {
       ok: false as const,

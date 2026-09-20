@@ -298,3 +298,9 @@ A privately reviewed profile can set `resolvePostLinks: true` when Facebook reso
 `receiptUrl`, when configured, must equal the reviewed account `identityHref` and have a separate `selectors.receiptIdentity`. Baseline and receipt scans use that page; the driver returns to the publishing page and rechecks the acting identity before preparing. After the single publish click it waits for the composer to close before navigating to read the receipt. `selectors.postHover` can target a reviewed timestamp wrapper when the link itself is replaced during hover.
 
 The optional `selectors.postsReady` marks the reviewed profile feed readiness before its baseline is read. The baseline also records existing author/text pairs and refuses an identical text before preparing, even if an old timestamp has not resolved. Receipt resolution applies to the requested text, so unrelated old video placeholders cannot be mistaken for or prevent observation of the new post. Read-only timestamp observations have bounded retries; the publish click is never retried.
+
+### 发布冷启动与回执传输
+
+已确认发布提交后，应用在响应结束后尝试唤醒其绑定的受管节点。每五分钟的认证调度入口也会扫描持久化发布队列，恢复提交后进程中断的情况；扫描只预留原任务、保存启动 outbox，不创建人工交互任务。启动前、取得唯一 dispatch claim 后和释放节点密钥前，分别重新验证节点所有者、明确的未过期发布 scope、账号授权与登录状态、原确认人的当前项目编辑权限、启用的渠道、有效内容确认及 Gate 01。项目归档、未知结果和已披露任务不授权新的冷启动。外部效果仍由原发布授权与租约规则控制。
+
+执行器在成功观察后最多传输同一份回执三次，不重新授权或重复点击。无法确认回执仍为 unknown；已保存的 unknown 不被此次改动覆盖。失败代码仅包含固定阶段 `publication_publish_unknown`、`publication_observe_unknown` 或 `publication_validate_unknown`，不保存异常正文、账号或页面内容。这些阶段诊断与合成回归不能证明既有生产 unknown 已确认，也不等同于真实视频和 DM 验收。

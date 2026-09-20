@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { ZodError } from "zod";
 import type { ClosingActionState } from "@/lib/action-states";
 import { auth } from "@/lib/auth";
@@ -184,6 +185,16 @@ export async function confirmPublicationAction(
     const parsed = publicationConfirmationFormSchema.safeParse(values(formData));
     if (!parsed.success) return resultError(parsed.error);
     const saved = await submitControlledPublication(parsed.data, actorId);
+    after(async () => {
+      try {
+        const { deliverPublicationSandbox } = await import(
+          "@/lib/browser-fleet/sandbox-workflow-delivery"
+        );
+        await deliverPublicationSandbox(saved.id);
+      } catch {
+        // Publication demand is durable; the dispatch cron recovers it.
+      }
+    });
     refresh(parsed.data.projectId);
     return {
       status: "success",
