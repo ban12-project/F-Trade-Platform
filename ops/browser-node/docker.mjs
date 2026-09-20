@@ -96,6 +96,13 @@ export function containerSpec(nodeId, run, imageId, deadline) {
       Labels: labels,
       Env: [
         "NODE_ENV=production",
+        ...(run.kind === "interactive"
+          ? [
+              "FTRADE_DIAGNOSTIC_KIND=interactive",
+              `FTRADE_DIAGNOSTIC_ACCOUNT=${run.accountId}`,
+              `FTRADE_DIAGNOSTIC_RUN=${run.id}`,
+            ]
+          : []),
         "CAMOFOX_BIND_HOST=0.0.0.0",
         "CAMOFOX_PORT=9377",
         `CAMOFOX_ACCESS_KEY=${accessKey}`,

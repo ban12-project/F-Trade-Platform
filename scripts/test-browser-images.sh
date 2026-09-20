@@ -21,6 +21,7 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   node --input-type=module -e '"'"'import { getGeolocation } from "camoufox-js/dist/locale.js"; await getGeolocation("8.8.8.8");'"'"'
   node --check /opt/ftrade/watchdog.mjs
   node --check /app/server.js
+  node --check /app/plugins/ftrade-diagnostics/index.js
   node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
   /root/.cache/camoufox/camoufox-bin --version
 '
