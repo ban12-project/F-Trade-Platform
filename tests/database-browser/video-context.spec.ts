@@ -341,7 +341,9 @@ test("viewer and archived project show read-only controls even for an app admini
       })
       .where(eq(schema.aggregateRecord.id, videoIds[1]));
     await page.goto(`${path}?item=${videoIds[1]}`);
-    await expect(page.getByText("私有预览", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(
+      page.getByText("私有预览", { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
     await expect(page.getByLabel("审核证据")).toHaveCount(0);
   }
 });
