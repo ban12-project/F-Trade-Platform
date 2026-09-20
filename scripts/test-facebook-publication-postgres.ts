@@ -22,6 +22,7 @@ import { digestSocialWorkerPayload } from "../lib/social/worker-protocol";
 import { testBrowserInbox } from "./test-browser-inbox-postgres";
 import { testInboxRoundTrip } from "./test-browser-inbox-roundtrip";
 import { testBrowserLogin } from "./test-browser-login-postgres";
+import { testPublicationWakeup } from "./test-browser-publication-wakeup";
 import { testBrowserSandboxOwner } from "./test-browser-sandbox-owner";
 import { testFacebookInbound } from "./test-facebook-inbound-postgres";
 
@@ -526,6 +527,16 @@ async function main() {
     await testBrowserLogin(database, owner);
     await testBrowserSandboxOwner(database, owner);
     const fleetJob = await fixture();
+    await testPublicationWakeup(database, {
+      nodeId: node.nodeId,
+      accessKey: node.accessKey,
+      actor,
+      projectId,
+      channelRef,
+      accountRef,
+      jobId: fleetJob.jobId,
+      contentRef: fleetJob.contentRef,
+    });
     assert.equal(await claim(), null, "Legacy worker must not claim a node-bound account");
     const request = {
       ...identity,

@@ -3,18 +3,19 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { Database, DatabaseTransaction } from "../db/client";
-import { authorizeManualSandboxStart } from "./sandbox-authorization";
+import { authorizeBrowserSandboxStart } from "./sandbox-authorization";
 import { beginBrowserSandboxStart } from "./sandbox-lifecycle";
 
 /** Called after saving queued demand in the SAME transaction. No provider I/O.
- * Unmanaged nodes and empty/unauthorized demand cannot produce an outbox item.
+ * Accepts independently authorized manual or publication demand. Unmanaged
+ * nodes and empty/unauthorized demand cannot produce an outbox item.
  */
 export async function enqueueManualBrowserSandboxStart(tx: DatabaseTransaction, nodeId: string) {
   if (process.env.BROWSER_SANDBOX_ENABLED !== "1") return null;
   const operation = await beginBrowserSandboxStart(tx, nodeId);
   if (!operation?.operation_id) return null;
   const operationId = operation.operation_id;
-  if (!(await authorizeManualSandboxStart(tx, nodeId, operationId))) {
+  if (!(await authorizeBrowserSandboxStart(tx, nodeId, operationId))) {
     // No dispatch has happened: undo only our newly created intent while still
     // holding the node lock. Existing uncertain operations are never reset.
     await tx.execute(sql`UPDATE browser_sandbox SET phase = 'stopped', operation_id = NULL,

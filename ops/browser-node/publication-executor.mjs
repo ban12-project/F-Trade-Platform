@@ -63,6 +63,7 @@ export function createPublicationExecutor(driver) {
     let authorization;
     let clickStarted = false;
     let session;
+    let phase = "publish";
     try {
       active();
       session = await driver.open(run, signal);
@@ -90,7 +91,9 @@ export function createPublicationExecutor(driver) {
       clickStarted = true;
       await driver.publish(session, authorization);
       active();
+      phase = "observe";
       const observation = await driver.observe(session, payload, signal);
+      phase = "validate";
       if (
         observation.accountRef !== run.accountRef ||
         observation.channelRef !== run.channelRef ||
@@ -101,23 +104,31 @@ export function createPublicationExecutor(driver) {
       if (existingRefs.has(externalPublicationRef))
         throw new Error("publication_reference_not_new");
       // Never turn a lost success receipt into a contradictory unknown receipt.
-      try {
-        await reportPublication({
-          authorizationId: authorization.authorizationId,
-          outcome: "published",
-          externalPublicationRef,
-        });
-        return "completed";
-      } catch {
-        return "unknown";
+      const receipt = {
+        authorizationId: authorization.authorizationId,
+        outcome: "published",
+        externalPublicationRef,
+      };
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await reportPublication(receipt);
+          return "completed";
+        } catch {
+          // Retry only the identical observation. The broker accepts exact
+          // replay even after recording success and requesting browser stop.
+          if (signal.aborted) break;
+        }
       }
+      return "unknown";
     } catch {
       if (authorization && clickStarted) {
         try {
           await reportPublication({
             authorizationId: authorization.authorizationId,
             outcome: "unknown",
-            failureCode: "publication_observation_unknown",
+            // Only fixed phase codes leave the executor; exception messages may
+            // contain private page text, URLs, or transport credentials.
+            failureCode: `publication_${phase}_unknown`,
           });
         } catch {
           /* broker retains unknown until reconciled */

@@ -6,18 +6,20 @@ import type { DatabaseTransaction } from "../db/client";
 import { configuredFacebookKeyring } from "../social/facebook-vault-crypto";
 import type { FleetState } from "./policy";
 import { openBrowserSandboxKey } from "./sandbox-credentials";
+import { hasAuthorizedPublicationDemand } from "./sandbox-publication-demand";
 import { matches } from "./security";
 
 /** Internal dispatch check for manual browser demand. Re-run before provider
  * creation/resume and again before credential release. Never return this value
  * through an Action or serialize it into Workflow history.
- * Background publication/inbox demand requires its own current grant checks.
+ * Publication demand uses separate current grant checks; inbox cannot wake.
  */
-export async function authorizeManualSandboxStart(
+async function authorizeSandboxStart(
   tx: DatabaseTransaction,
   nodeId: string,
   operationId: string,
   now = Date.now(),
+  allowPublication = false,
 ) {
   if (process.env.BROWSER_SANDBOX_ENABLED !== "1") return null;
   const node = await tx.execute(sql`SELECT owner_id, status, document, key_hash
@@ -73,7 +75,11 @@ export async function authorizeManualSandboxStart(
       account.expectedEgressIp
     );
   });
-  if (!demand) return null;
+  if (
+    !demand &&
+    !(allowPublication && (await hasAuthorizedPublicationDemand(tx, nodeId, row.document, now)))
+  )
+    return null;
   const accessKey = openBrowserSandboxKey(
     nodeId,
     managed.access_key_ciphertext,
@@ -81,4 +87,22 @@ export async function authorizeManualSandboxStart(
   );
   if (!matches(accessKey, row.key_hash)) throw new Error("sandbox_key_version_mismatch");
   return { sandboxName: managed.sandbox_name, accessKey };
+}
+
+export function authorizeManualSandboxStart(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  operationId: string,
+  now = Date.now(),
+) {
+  return authorizeSandboxStart(tx, nodeId, operationId, now);
+}
+
+export function authorizeBrowserSandboxStart(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  operationId: string,
+  now = Date.now(),
+) {
+  return authorizeSandboxStart(tx, nodeId, operationId, now, true);
 }
