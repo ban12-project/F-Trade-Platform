@@ -493,7 +493,23 @@ async function ProjectWorkflowFixture({
         projectId={syntheticMarketingProject.id}
         candidates={[]}
         channels={[]}
-        publications={[]}
+        publications={
+          state === "unknown"
+            ? [
+                {
+                  id: "22222222-2222-4222-8222-222222222222",
+                  projectId: syntheticMarketingProject.id,
+                  contentRef: "33333333-3333-4333-8333-333333333333",
+                  format: "text",
+                  channelRef: "synthetic-channel",
+                  accountRef: "synthetic-account",
+                  externalPublicationRef: null,
+                  status: "unknown",
+                  createdAt: new Date("2026-09-20T00:00:00Z"),
+                },
+              ]
+            : []
+        }
       />
     ),
   };

@@ -1,7 +1,12 @@
 /** Presentation only: publishing and retries remain governed by the domain service. */
-export function publicationProgress(status: string) {
+export function publicationProgress(status: string, humanConfirmed = false) {
   switch (status) {
     case "published":
+      if (humanConfirmed)
+        return {
+          label: "已发布（人工核对）",
+          detail: "节点所有者已核对实际帖子并确认结果；原未知回执保留，渠道不会自动恢复。",
+        };
       return { label: "已发布", detail: "已收到平台成功回执，可以查看发布凭证。" };
     case "submitted":
     case "pending":
