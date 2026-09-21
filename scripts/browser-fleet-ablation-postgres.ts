@@ -17,7 +17,7 @@ import {
   listBrowserNodes,
   ownerBrowserCommand,
 } from "../lib/browser-fleet/store";
-import { closeDatabase } from "../lib/db/client";
+import { closeDatabase, type Database } from "../lib/db/client";
 import * as facebookSchema from "../lib/db/facebook-runtime-schema";
 import * as schema from "../lib/db/schema";
 import {
@@ -28,6 +28,7 @@ import {
 } from "../lib/social/facebook-account-store";
 import { signInteractiveEvent } from "../lib/social/facebook-interactive-protocol";
 import { submitFacebookMediaPublication } from "../lib/social/facebook-media-store";
+import { testBrowserLogin } from "./test-browser-login-postgres";
 
 type ClaimResult = {
   run: null | { id: string; leaseId: string; accountId: string };
@@ -360,6 +361,12 @@ type NodeRow = {`,
     await assert.rejects(submitFacebookMediaPublication({}, outsider.id), /account_owner_required/);
     checks.push(
       "legacy encrypted credential store works after migration; disable switch and owner check deny access",
+    );
+    // Reuse the production-broker credential consent tests in this independently
+    // runnable database gate; no real account or browser is contacted.
+    await testBrowserLogin(db as unknown as Database, actor);
+    checks.push(
+      "saved-login consent: wrong session/lease/process, expired or revoked authorization, and concurrent one-use HTTP credential release",
     );
     await mkdir(output, { recursive: true });
     const report = {
