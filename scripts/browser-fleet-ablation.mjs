@@ -364,6 +364,11 @@ try {
   const gatewayVariants = [
     ["full", sources.gateway, 0],
     [
+      "without_admitted_run_origin",
+      replaceOnce(sources.gateway, "origin !== slot.gatewayOrigin", "false"),
+      1,
+    ],
+    [
       "without_ws_origin",
       replaceOnce(sources.gateway, "request.headers.origin !== entry.slot.gatewayOrigin", "false"),
       1,
@@ -397,7 +402,7 @@ try {
     const failed = Number(/# fail (\d+)/.exec(run.stdout)?.[1] ?? -1);
     const passed = Number(/# pass (\d+)/.exec(run.stdout)?.[1] ?? -1);
     assert.equal(failed, expectedFailures, `${name}: ${run.stdout}\n${run.stderr}`);
-    assert.equal(passed + failed, 5);
+    assert.equal(passed + failed, 6);
     assert.equal(run.status, expectedFailures ? 1 : 0);
     report.gateway.push({
       variant: name,
