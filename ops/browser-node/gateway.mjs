@@ -87,7 +87,7 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
         if (typeof input.ticket !== "string" || Object.keys(input).length !== 1) return fail();
         const admission = await nodeCall("admit", { ticket: input.ticket });
         const slot = slots.get(admission.runId);
-        if (!slot?.ready || slot.stopping || slot.expiresAt <= Date.now()) return fail();
+        if (!slot?.ready || slot.stopping || slot.expiresAt <= Date.now() || origin !== slot.gatewayOrigin) return fail();
         const view = randomBytes(32).toString("base64url");
         const ws = randomBytes(32).toString("base64url");
         views.set(view, {

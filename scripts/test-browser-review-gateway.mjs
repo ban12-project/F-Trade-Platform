@@ -195,3 +195,22 @@ test("stopped run closes existing sockets and denies capability assets", async (
     f.close();
   }
 });
+
+test("admission binds Origin to the admitted run, not another slot", async () => {
+  const victim = { run: { id: randomUUID() }, ready: true, stopping: false,
+    expiresAt: Date.now() + 10000, gatewayOrigin: 'https://victim.example', vncPort: 1, vncPassword: 'fixture-only' };
+  const other = { ...victim, run: { id: randomUUID() }, gatewayOrigin: 'https://other.example' };
+  const gateway = createGateway({ appOrigin: 'https://app.example', port: 0,
+    slots: new Map([[victim.run.id, victim], [other.run.id, other]]),
+    nodeCall: async () => ({ runId: victim.run.id }),
+  });
+  try {
+    await once(gateway.server, 'listening');
+    const response = await fetch(`http://127.0.0.1:${gateway.server.address().port}/admit`, {
+      method: 'POST', headers: { Origin: other.gatewayOrigin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket: 'synthetic-valid-victim-ticket' }),
+    });
+    assert.equal(response.status, 403);
+    assert.equal(await response.text(), '');
+  } finally { gateway.close(); }
+});
