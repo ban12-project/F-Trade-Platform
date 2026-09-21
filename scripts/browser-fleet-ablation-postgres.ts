@@ -191,6 +191,47 @@ async function main() {
       actor,
     );
     assert.ok(ticket.connection);
+    const admission = () =>
+      handleBrowserNodeRequest(normal.key, {
+        ...normal.identity,
+        operation: "admit",
+        ticket: ticket.connection!.token,
+      });
+    const savedDocument = (
+      await pool.query("SELECT document FROM browser_fleet_node WHERE id=$1", [normal.nodeId])
+    ).rows[0].document;
+    // Invalid server-side authorization state must fail before consuming the
+    // ticket. Restore only this disposable fixture between negative cases.
+    for (const invalid of ["expired_ticket", "expired_lease", "missing_session"]) {
+      const document = structuredClone(savedDocument);
+      const run = document.runs.find((entry: { id: string }) => entry.id === claimed.run!.id);
+      assert.ok(run);
+      if (invalid === "expired_ticket") run.connectBefore = 0;
+      if (invalid === "expired_lease") run.leaseUntil = 0;
+      if (invalid === "missing_session") run.authSessionId = randomUUID();
+      await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+        normal.nodeId,
+        JSON.stringify(document),
+      ]);
+      try {
+        await assert.rejects(admission, /ticket_invalid/, invalid);
+      } finally {
+        await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+          normal.nodeId,
+          JSON.stringify(savedDocument),
+        ]);
+      }
+    }
+    await assert.rejects(
+      ownerBrowserCommand(
+        { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+        outsider,
+      ),
+      /forbidden/,
+    );
+    checks.push(
+      "actual ticket admission rejects expired ticket/lease and missing owner session; another owner cannot obtain a ticket",
+    );
     await handleBrowserNodeRequest(normal.key, {
       ...normal.identity,
       operation: "admit",
