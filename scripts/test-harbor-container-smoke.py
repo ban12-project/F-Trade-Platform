@@ -66,13 +66,15 @@ with tempfile.TemporaryDirectory(prefix="f-trade-harbor-oracle-") as temporary:
     # knows the synthetic response; the real CLI, SDK, validators and verifier execute.
     for task in dataset.iterdir():
         shutil.rmtree(task / "solution")
+    # Harbor scrubs credential values from artifacts; never use a common word
+    # such as "synthetic", which would also redact task and agent identities.
     subprocess.run([
         "harbor", "run", "-p", str(dataset),
         "-a", "evals.harbor.product_agent.smoke_agent:SmokeProductAgent",
         "-m", "openai-compatible/synthetic", "-k", "1", "-n", "1",
         "-e", args.environment, "--job-name", "adapter-smoke", "--jobs-dir", str(root / "jobs"), "--yes",
         "--ae", "HARBOR_OPENAI_COMPATIBLE_BASE_URL=http://127.0.0.1:8787/v1",
-        "--ae", "HARBOR_OPENAI_COMPATIBLE_API_KEY=synthetic",
+        "--ae", "HARBOR_OPENAI_COMPATIBLE_API_KEY=fixture-key-do-not-use",
     ], check=True, env=env)
     results = list((root / "jobs/adapter-smoke").glob("*/result.json"))
     assert len(results) == 2, "Missing adapter smoke trials"

@@ -22,7 +22,7 @@ class Handler(BaseHTTPRequestHandler):
             for message in body.get("messages", [])
         )
         valid = (self.path == "/v1/chat/completions" and body.get("model") == "synthetic"
-                 and self.headers.get("Authorization") == "Bearer synthetic" and has_image)
+                 and self.headers.get("Authorization") == "Bearer fixture-key-do-not-use" and has_image)
         if not valid:
             self.send_response(400)
             self.end_headers()
