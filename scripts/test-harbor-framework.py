@@ -47,13 +47,13 @@ async def check():
             environment = Environment()
             await agent.setup(environment)
             await agent.run("synthetic", environment, AgentContext())
-            assert environment.calls[0]["env"] == {**keys, "HARBOR_MODEL": f"{provider}/synthetic"}
-            assert "synthetic" not in environment.calls[0]["command"]
+            assert environment.calls[-1]["env"] == {**keys, "HARBOR_MODEL": f"{provider}/synthetic"}
+            assert "synthetic" not in environment.calls[-1]["command"]
             try:
                 await agent.run("synthetic", Environment(23), AgentContext())
                 raise AssertionError("nonzero exit passed")
             except RuntimeError as error:
-                assert str(error) == "Product Agent exited with code 23"
+                assert str(error) == "Product Agent execution failed"
         for model in (None, "openai/", "unknown/model", "openai/synthetic"):
             agent = FTradeProductAgent(Path(directory), model_name=model)
             environment = Environment()

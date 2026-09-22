@@ -33,6 +33,8 @@ with tempfile.TemporaryDirectory(prefix="f-trade-harbor-oracle-") as temporary:
             },
             "_evaluation": {key: expected[key] for key in ("prompt_version", "prompt_hash", "evidence_mode")},
         }
+        result["_evaluation"].update(protocol_version="model-selection-v2", execution_policy="production-catalog", total_timeout_ms=75000, max_corrections=1, attempt_count=1, first_attempt_accepted=True, final_accepted=True, failure=None, output_policy={"mode": "text"}, duration_ms=0)
+        result["_diagnostics"] = {"attempts": [{"number": 1, "correction": False, "duration_ms": 0, "outcome": "accepted", "draft": result["draft"], "responses": [{"text": json.dumps(result["draft"]), "output_mode": "text", "duration_ms": 0}]}]}
         # Oracle solutions exist only in this disposable smoke copy, never in model tasks.
         (task / "solution").mkdir()
         (task / "solution/solve.sh").write_text(

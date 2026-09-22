@@ -76,11 +76,64 @@ class AcceptanceTests(unittest.TestCase):
                 with self.subTest(missing_blocker=fixture["expected"]["id"]), self.assertRaises(AssertionError):
                     verifier.grade(**bad)
 
+    def selection_result(self, fixture):
+        result = copy.deepcopy(fixture["result"])
+        result["_evaluation"].update(protocol_version="model-selection-v2", execution_policy="production-catalog", total_timeout_ms=75000, max_corrections=1, attempt_count=1, first_attempt_accepted=True, final_accepted=True, failure=None, output_policy={"mode": "json"}, duration_ms=25)
+        result["_diagnostics"] = {"attempts": [{"number": 1, "correction": False, "duration_ms": 25, "outcome": "accepted", "draft": result["draft"], "responses": [{"text": json.dumps(result["draft"]), "output_mode": "json", "duration_ms": 20, "usage": {"inputTokens": 11, "outputTokens": 12, "totalTokens": 23}}]}]}
+        return result
+
+    def test_selection_diagnostics_are_independent(self):
+        fixture = fixtures[0]
+        raw = copy.deepcopy(fixture["result"]["draft"])
+        raw["specifications"]["clutch_diameter_mm"] = "240 mm"
+        metric = verifier.diagnose(fixture["expected"], json.dumps(raw))
+        self.assertEqual(metric["contract_valid"], 0)
+        self.assertGreater(metric["fact_recall"], 0)
+        self.assertLess(metric["fact_recall"], 1)
+        self.assertEqual(metric["model_state_boundary"], 1)
+        raw["verification_status"] = "verified"
+        self.assertEqual(verifier.diagnose(fixture["expected"], json.dumps(raw))["model_state_boundary"], 0)
+        raw = copy.deepcopy(fixture["result"]["draft"])
+        raw["field_evidence"]["product.product_name"] = "wrong"
+        metric = verifier.diagnose(fixture["expected"], json.dumps(raw))
+        self.assertEqual(metric["fact_recall"], 1)
+        self.assertLess(metric["evidence_recall"], 1)
+        self.assertEqual(verifier.diagnose(fixture["expected"], "not json")["json_object"], 0)
+
+    def test_selection_correction_and_public_artifacts(self):
+        fixture = fixtures[0]
+        result = self.selection_result(fixture)
+        first = copy.deepcopy(result["_diagnostics"]["attempts"][0])
+        first.update(outcome="contract_or_source", error="must-not-escape")
+        first.pop("draft")
+        first["responses"][0]["text"] = "private bad output must-not-escape"
+        result["_diagnostics"]["attempts"][0].update(number=2, correction=True)
+        result["_diagnostics"]["attempts"].insert(0, first)
+        result["_evaluation"].update(attempt_count=2, first_attempt_accepted=False)
+        report = verifier.evaluate(fixture["expected"], result)
+        self.assertTrue(report["provenance_valid"])
+        self.assertEqual(report["reward"], 1)
+        self.assertEqual(report["first_attempt_pass"], 0)
+        self.assertEqual(report["attempts"][1]["usage"]["total_tokens"], 23)
+        self.assertNotIn("must-not-escape", json.dumps(report))
+        result["_evaluation"]["total_timeout_ms"] = 190000
+        self.assertFalse(verifier.evaluate(fixture["expected"], result)["provenance_valid"])
+
+    def test_selection_acceptance_is_not_manufactured_by_metrics(self):
+        fixture = fixtures[0]
+        result = self.selection_result(fixture)
+        result["draft"]["product"]["oe_numbers"] = ["SYN-INVENTED"]
+        report = verifier.evaluate(fixture["expected"], result)
+        self.assertEqual(report["reward"], 0)
+        self.assertTrue(report["provenance_valid"])
+        result["_evaluation"]["protocol_version"] = "old"
+        self.assertFalse(verifier.evaluate(fixture["expected"], result)["provenance_valid"])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.job = Path(self.temp.name) / "current"
-        self.manifest = {"harbor_version": "0.23.0", "repetitions": 3, "tasks": []}
+        self.manifest = {"protocol_version": "model-selection-v2", "total_timeout_ms": 75000, "max_corrections": 1, "harbor_version": "0.23.0", "repetitions": 3, "tasks": []}
         write(self.job / "result.json", {"finished_at": "2026-09-17T00:00:00Z"})
         for fixture in fixtures:
             expected = fixture["expected"]
@@ -92,11 +145,11 @@ class AcceptanceTests(unittest.TestCase):
                     "task_name": f'f-trade/product-agent-{expected["id"]}',
                     "finished_at": "2026-09-17T00:00:00Z",
                     "exception_info": None,
-                    "agent_info": {"name": gate.AGENT, "version": "1.1.0", "model_info": {"provider": "openai", "name": "synthetic"}},
+                    "agent_info": {"name": gate.AGENT, "version": "1.2.0", "model_info": {"provider": "openai", "name": "synthetic"}},
                     "verifier_result": {"rewards": {"reward": 1.0}},
                 })
                 write(directory / "artifacts/logs/artifacts/product-agent-evaluation.json", {
-                    "synthetic_id": expected["id"], "reward": 1.0,
+                    "synthetic_id": expected["id"], "reward": 1.0, "protocol_version": "model-selection-v2", "provenance_valid": True,
                     "prompt_version": expected["prompt_version"], "prompt_hash": expected["prompt_hash"],
                     "expectation_hash": expected["expectation_hash"], "evidence_mode": "bounded_location",
                     "private_provider_detail": "must-not-escape",

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from harbor.agents.base import BaseAgent
+from harbor.agents.installed.base import BaseInstalledAgent
 
 
-class FTradeProductAgent(BaseAgent):
+class FTradeProductAgent(BaseInstalledAgent):
     """Harbor adapter for the containerized F-Trade Product Agent CLI."""
 
     @staticmethod
@@ -11,9 +11,9 @@ class FTradeProductAgent(BaseAgent):
         return "f-trade-product-agent"
 
     def version(self) -> str | None:
-        return "1.1.0"
+        return "1.2.0"
 
-    async def setup(self, environment) -> None:
+    async def install(self, environment) -> None:
         return None
 
     async def run(self, instruction: str, environment, context) -> None:
@@ -40,7 +40,8 @@ class FTradeProductAgent(BaseAgent):
             if not injected.get(key):
                 raise ValueError(f"Missing selected evaluation credential: {key}")
             env[key] = injected[key]
-        result = await environment.exec(command=command, env=env)
-        if result.return_code != 0:
-            # Provider output may contain private endpoint details; do not echo it.
-            raise RuntimeError(f"Product Agent exited with code {result.return_code}")
+        try:
+            await self.exec_as_agent(environment, command=command, env=env, timeout_sec=90)
+        except RuntimeError:
+            # Harbor's private debug logs may retain diagnostics; public exceptions must not.
+            raise RuntimeError("Product Agent execution failed") from None

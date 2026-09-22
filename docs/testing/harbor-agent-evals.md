@@ -1,5 +1,7 @@
 # Harbor Agent Evals 验收
 
+> 当前模型选型采用 [Product Agent 协议 v2](product-agent-model-selection.md)：生产 75 秒总预算、一次纠错、能力匹配的结构化输出和独立诊断。旧批次报告不可与 v2 合并计算。
+
 研发跟踪：[Issue #369](https://github.com/ban12-project/F-Trade-Platform/issues/369)。用户已确认升级对象是 agent 评测框架，原链接中的 goharbor 容器仓库不属于本仓库的评测依赖。
 
 ## 版本与执行契约
