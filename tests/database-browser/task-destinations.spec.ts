@@ -451,6 +451,7 @@ test("unused ready product and RFQ tasks open the intended creation context", as
   await page.goto("/workspace");
   await page
     .locator("#my-tasks")
+    .filter({ visible: true })
     .locator(`a[href="/workspace/${marketing}/new/content?product=${product}"]`)
     .click();
   const contentPanel = page.getByRole("region", { name: "营销内容详情与审批" });
@@ -473,6 +474,7 @@ test("unused ready product and RFQ tasks open the intended creation context", as
   await page.goto("/workspace");
   await page
     .locator("#my-tasks")
+    .filter({ visible: true })
     .locator(`a[href="/workspace/${sales}/new/quotation?rfq=${request}"]`)
     .click();
   const quotePanel = page.getByRole("region", { name: "报价详情与审批" });
