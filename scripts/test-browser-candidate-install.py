@@ -72,6 +72,23 @@ class CandidateInstallTests(unittest.TestCase):
                     extras.append(entry)
                 with self.assertRaises(ValueError): module.install(*self.fixture(Path(directory), mutate))
 
+    def test_hard_links_are_materialized_and_verified(self):
+        for kind in ['valid','escape','missing','wrong_hash']:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                def mutate(files, manifest, extras):
+                    entry=tarfile.TarInfo('bin/duplicate.cfg'); entry.type=tarfile.LNKTYPE
+                    entry.linkname={'escape':'bin/../outside','missing':'bin/not-yet-present'}.get(kind,'bin/camoufox.cfg')
+                    entry.mode=0o644
+                    extras.append(entry)
+                    manifest['installation']['file_sha256']['duplicate.cfg'] = ('0'*64 if kind=='wrong_hash' else manifest['installation']['file_sha256']['camoufox.cfg'])
+                args=self.fixture(Path(directory),mutate)
+                if kind=='valid':
+                    module.install(*args)
+                    self.assertEqual((args[2]/'duplicate.cfg').read_bytes(),(args[2]/'camoufox.cfg').read_bytes())
+                    self.assertNotEqual((args[2]/'duplicate.cfg').stat().st_ino,(args[2]/'camoufox.cfg').stat().st_ino)
+                else:
+                    with self.assertRaises(ValueError): module.install(*args)
+
     def test_external_identity_and_empty_destination(self):
         for kind in ['sha','commit','destination']:
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:

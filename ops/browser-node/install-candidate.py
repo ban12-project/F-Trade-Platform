@@ -50,8 +50,8 @@ def install(archive, manifest_path, destination, expected_sha, expected_commit):
                 name = PurePosixPath(member.name)
                 if name.is_absolute() or '..' in name.parts or not name.parts or name.parts[0] != 'bin':
                     raise ValueError('Archive path escapes candidate bin')
-                if not (member.isfile() or member.isdir()):
-                    raise ValueError('Candidate links and special files forbidden')
+                if not (member.isfile() or member.isdir() or member.islnk()):
+                    raise ValueError('Candidate symlinks and special files forbidden: ' + member.name)
                 relative = str(PurePosixPath(*name.parts[1:]))
                 target = destination.joinpath(*name.parts[1:])
                 if member.isdir():
@@ -59,14 +59,27 @@ def install(archive, manifest_path, destination, expected_sha, expected_commit):
                     continue
                 if relative not in files or relative in seen:
                     raise ValueError('Unlisted or duplicate candidate file')
-                seen.add(relative)
                 target.parent.mkdir(parents=True, exist_ok=True)
-                with tar.extractfile(member) as source, target.open('xb') as output:
+                if member.islnk():
+                    # GNU tar records duplicate inodes as hard links even with
+                    # --dereference. Copy only an already verified member into
+                    # a fresh regular file, then independently hash this name.
+                    linked = PurePosixPath(member.linkname)
+                    if linked.is_absolute() or '..' in linked.parts or not linked.parts or linked.parts[0] != 'bin':
+                        raise ValueError('Candidate hard link escapes bin')
+                    linked_name = str(PurePosixPath(*linked.parts[1:]))
+                    if linked_name not in seen:
+                        raise ValueError('Candidate hard link target was not verified')
+                    source = destination.joinpath(*linked.parts[1:]).open('rb')
+                else:
+                    source = tar.extractfile(member)
+                with source, target.open('xb') as output:
                     while block := source.read(1024 * 1024):
                         output.write(block)
                 target.chmod(member.mode & 0o777)
                 if digest(target) != files[relative]:
                     raise ValueError('Candidate file hash mismatch: ' + relative)
+                seen.add(relative)
         if proc.wait() != 0:
             raise ValueError('Candidate decompression failed')
     finally:

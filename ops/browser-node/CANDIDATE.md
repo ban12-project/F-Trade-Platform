@@ -22,7 +22,8 @@ Only amd64 is supported by this acceptance entry point.
 The installer checks the external archive hash, source commit, successful
 native build, source checksum agreement, complete file set and each file
 hash, executable/libxul ELF architecture, resources, App.Version, BuildID and
-wrapper metadata. It refuses links, special files, traversal, duplicate files
+wrapper metadata. It materializes tar hard links only from already verified
+members into independently hashed regular files. It refuses symlinks, special files, traversal, duplicate files
 and a nonempty destination. It does not fetch a released browser or repair
 missing candidate files. The original manifest remains in
 `/opt/ftrade/candidate-manifest.json`; image labels record archive hash and
