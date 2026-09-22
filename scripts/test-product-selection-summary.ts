@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { globSync, readFileSync } from "node:fs";
+import { validateSelectionReport } from "../evals/harbor/product-agent/selection-report";
 import { summarizeSelection } from "../evals/harbor/product-agent/selection-summary";
 
 const h = "a".repeat(64);
@@ -105,6 +107,52 @@ assert.equal(
   ).grading?.diagnostic_revision,
   2,
 );
+const current = summarizeSelection(
+  {
+    ...manifest,
+    grading,
+    execution_monitor: { max_event_loop_gap_ms: 5000, max_trial_duration_ms: 80000 },
+  },
+  preflights,
+  reports.map((row) => ({ ...row, report: { ...row.report, diagnostic_revision: 2 } })),
+);
+const published = {
+  ...current,
+  measurement_valid: true,
+  infrastructure_failed: false,
+  execution_health: {
+    valid: true,
+    max_event_loop_gap_ms: 1000,
+    clock_reversed: false,
+    invalid_duration_trials: 0,
+  },
+  finished_at: "2026-09-22T01:00:00Z",
+};
+assert.equal(
+  validateSelectionReport(published).status,
+  "completed",
+  "Low quality remains publishable if the measurement is valid",
+);
+assert.throws(() => validateSelectionReport({ ...published, private_output: "must-not-escape" }));
+assert.throws(() =>
+  validateSelectionReport({
+    ...published,
+    models: [{ ...published.models[0], final_pass_rate: 1 }],
+  }),
+);
+assert.throws(() => validateSelectionReport({ ...published, measurement_valid: false }));
+assert.throws(() => validateSelectionReport({ ...published, diagnostic_only: true }));
+assert.throws(() =>
+  validateSelectionReport({
+    ...published,
+    execution_health: { ...published.execution_health, max_event_loop_gap_ms: 1_700_000 },
+  }),
+);
+assert.throws(() => validateSelectionReport({ ...published, trials: published.trials.slice(1) }));
+assert.throws(() => validateSelectionReport({ ...published, finished_at: "2026-09-21T00:00:00Z" }));
+for (const path of globSync("docs/testing/reports/product-agent-model-selection-*.json")) {
+  validateSelectionReport(JSON.parse(readFileSync(path, "utf8")));
+}
 console.log(
   "PASS selection summary: completeness, provenance, private data, unknown billing and availability",
 );
