@@ -31,7 +31,7 @@ window.addEventListener("message", async (event) => {
       status.textContent = "已连接。请核对代理出口与目标账号后操作。";
     });
     rfb.addEventListener("disconnect", () => {
-      status.textContent = "连接已结束。需要再次操作时请重新排队。";
+      status.textContent = "连接已断开。请立即在平台点击“重新授权连接”；资源已释放时需重新排队。";
     });
   } catch {
     status.textContent = "连接未获授权或已过期，请回到平台重新排队。";

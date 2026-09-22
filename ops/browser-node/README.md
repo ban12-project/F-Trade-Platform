@@ -328,3 +328,7 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 Broker 重新授权现允许原 owner 的同一有效登录 session 为仍有效的交互 run 取得新票。事务内替换票据哈希，签票截止时间不超过租约和 run 截止时间；消费后清空哈希。旧票、被替代的票、并发重放、其他 session 和账号撤销后的取票均拒绝。ticketUsed 保留“曾经完成接入”的含义，不能代替当前票据哈希的一次性校验。
 
 真实 PostgreSQL 17.11 测试使用现有 broker 和完整迁移，新增重授权／并发消费／撤销断言通过；相关协议及网关组件 50 项通过。首次本地类型检查因稀疏检出缺失依赖目录而失败。前端重新取票流程、真实 noVNC 联调及人工／自动化互斥仍未完成；服务端签票成功不是完整接管通过。
+
+平台任务行现在为已接入、仍 running 且未请求停止的交互任务显示“重新授权连接”。按钮再次调用原有服务端 ticket 命令，收到新 token 后以 token 为 key 重建 viewer iframe；不会重复使用已消费票据。断线提示引导用户在资源释放前重新授权，租约、原 owner/session 与网关撤销规则不变。
+
+本地 Next16.3.2/Turbopack 已启动，MCP 的路由与编译检查确认稀疏检出缺少接管页面及组件/工作流依赖，因此未宣称真实 UI 重连通过。完整检出 CI 和候选浏览器联调仍是必要验收。
