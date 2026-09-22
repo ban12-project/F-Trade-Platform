@@ -16,7 +16,7 @@
 
 | 层级 | 执行与覆盖 | 通过含义 |
 | --- | --- | --- |
-| 确定性回归 | `pnpm test:harbor`：20 个样例经过当前生产证据包装器、Python verifier；10 组测试含错误字段位置、整篇引用、虚构/丢失 OE、车型/规格、越权状态、缺失阻断、历史 job、异常/缺失/重复试次、错误模型和旧 provenance | 固定真值与当前实现一致；不证明模型抽取质量 |
+| 确定性回归 | `pnpm test:harbor`：20 个样例经过当前生产证据包装器、Python verifier；11 组测试含错误字段位置、整篇引用、虚构/丢失 OE、车型/规格、越权状态、缺失阻断、历史 job、异常/缺失/重复试次、错误模型和旧 provenance | 固定真值与当前实现一致；不证明模型抽取质量 |
 | 框架兼容性 | `pnpm eval:harbor:prepare` 后，以安装 Harbor 0.23.0 的 Python 执行 `scripts/test-harbor-framework.py`；验证 20 个 Task、四类 provider、凭据边界、非零退出码，再运行真实 CLI `--dry-run` | 发行版 API、task schema 和 job 配置可用；dry-run 仍要求所选容器运行时可响应 |
 | 容器冒烟 | CI 的 `harbor-compatibility` 构建评测镜像，再执行 `python3 scripts/test-harbor-container-smoke.py`；临时副本中的 a-01/c-01 先使用 oracle 各运行一次，再通过实际自定义适配器、CLI、SDK 与容器内合成 HTTP 服务分别验证通过和事实拒绝；检查 reward、纠错次数、用量与 artifact 路径 | 容器/适配器/CLI/verifier/artifact 链路可用；oracle 与 synthetic-smoke 身份不能通过生产模型汇总门禁 |
 | 真实模型 | `pnpm eval:harbor:podman` 或手动 `harbor-product-agent` workflow；20 个固定任务各 3 次，共 60 次 | 只有本次 job 的全部试次通过才算 synthetic 模型评测通过 |

@@ -7,6 +7,10 @@ import { generateText, jsonSchema, Output } from "ai";
 import sharp from "sharp";
 import { z } from "zod";
 import { productAgentEvalCases } from "../evals/harbor/product-agent/cases";
+import {
+  SELECTION_EXECUTION_MONITOR,
+  SelectionExecutionClock,
+} from "../evals/harbor/product-agent/execution-health";
 import { evaluationExpectation } from "../evals/harbor/product-agent/expectations";
 import { summarizeSelection } from "../evals/harbor/product-agent/selection-summary";
 import { createProductAgentModel, type ProductAgentModelConfig } from "../lib/ai/model-provider";
@@ -85,12 +89,22 @@ async function main() {
   execFileSync("git", ["check-ignore", "--quiet", `${root}/private.json`]);
   await mkdir(root, { recursive: false, mode: 0o700 });
   const frozen = productAgentEvalCases.map(evaluationExpectation);
+  const verifier = await readFile(
+    new URL("../evals/harbor/product-agent/verifier.py", import.meta.url),
+  );
+  const verifierPath = `${root}/verifier.py`;
+  await writeFile(verifierPath, verifier, { flag: "wx", mode: 0o600 });
   const manifest = {
     run_id: randomUUID(),
     protocol_version: "model-selection-v2",
     execution: "local-production-policy",
     source_commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
     diagnostic_only: Boolean(dirty),
+    grading: {
+      diagnostic_revision: 2,
+      verifier_sha256: createHash("sha256").update(verifier).digest("hex"),
+    },
+    execution_monitor: SELECTION_EXECUTION_MONITOR,
     started_at: new Date().toISOString(),
     concurrency: config.concurrency,
     repetitions: 3,
@@ -122,6 +136,9 @@ async function main() {
     image_correct: boolean;
     output_mode: string;
   }> = [];
+  const clock = new SelectionExecutionClock(Date.now());
+  const timer = setInterval(() => clock.observe(Date.now()), 1000);
+  timer.unref();
   const image = await sharp({
     create: { width: 128, height: 128, channels: 3, background: { r: 255, g: 0, b: 0 } },
   })
@@ -214,7 +231,7 @@ async function main() {
         execFileSync(
           "python3",
           [
-            "evals/harbor/product-agent/verifier.py",
+            verifierPath,
             "--expected",
             `${root}/expected/${task.id}.json`,
             "--result",
@@ -250,14 +267,22 @@ async function main() {
     }
   }
   await Promise.all(Array.from({ length: config.concurrency }, worker));
+  clock.observe(Date.now());
+  clearInterval(timer);
   const summary = summarizeSelection(manifest, preflights, reports);
+  const health = clock.assess(summary.trials.map((t) => t.report.duration_ms));
+  const measurementValid = health.valid && !infrastructureFailed;
+  const status = measurementValid ? summary.status : "incomplete";
   await writeNew(`${root}/summary.json`, {
     ...summary,
+    status,
+    measurement_valid: measurementValid,
+    execution_health: health,
     finished_at: new Date().toISOString(),
     infrastructure_failed: infrastructureFailed,
   });
-  console.log(JSON.stringify({ output: `${root}/summary.json`, status: summary.status }));
-  if (infrastructureFailed || summary.status === "incomplete") process.exitCode = 1;
+  console.log(JSON.stringify({ output: `${root}/summary.json`, status }));
+  if (!measurementValid || status === "incomplete") process.exitCode = 1;
 }
 main().catch(() => {
   console.error(

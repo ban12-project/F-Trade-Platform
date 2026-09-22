@@ -42,7 +42,9 @@
 pnpm eval:model-selection --config tmp/model-selection/config.json --env-file .env --output tmp/model-selection/new-batch
 ```
 
-父目录必须已存在；输出目录必须全新且被 Git 忽略。正式比较必须从干净提交运行，`--allow-dirty` 仅生成 diagnostic_only 数据。私有文件权限 0600，记录原始响应、拒绝原因及 token；仅 `summary.json` 经逐层白名单汇总可供发布。不要提交或上传 `*-private.json`、端点配置和原始 Harbor jobs。
+macOS 长批次使用 `caffeinate -i pnpm eval:model-selection ...`，只在该命令运行期间防止空闲睡眠。运行器每秒监测事件循环，超过 5 秒停顿、时钟倒退或单试次超过 80 秒（75 秒预算加 5 秒清理容差）会标记测量无效；无效或未完整批次不得排名。
+
+父目录必须已存在；输出目录必须全新且被 Git 忽略。正式比较必须从干净提交运行，`--allow-dirty` 仅生成 diagnostic_only 数据。评分器在运行前复制到批次目录，并记录 SHA-256；诊断 revision 2 要求缺失项数组显式存在，缺省不能冒充空列表。私有文件权限 0600，记录原始响应、拒绝原因及 token；仅 `summary.json` 经逐层白名单汇总可供发布。不要提交或上传 `*-private.json`、端点配置和原始 Harbor jobs。
 
 该本地运行器使用生产策略及 Harbor 的同一 Python verifier，执行方式明确标为 `local-production-policy`，不声称运行了 Harbor 容器。Harbor 使用 `BaseInstalledAgent` 执行容器中的同一 CLI；`reward.json` 包含独立维度。CI 使用 oracle 和容器内合成 HTTP 服务，检查实际容器、生产适配器/CLI/SDK、事实拒绝后的纠错及产物收集，不测模型能力。Harbor 严格 gate 保留完整 60/60 条件，本地选型汇总把“测量完成”和“全量通过”分别表示。
 

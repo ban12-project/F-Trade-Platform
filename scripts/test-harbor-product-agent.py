@@ -100,6 +100,12 @@ class AcceptanceTests(unittest.TestCase):
         self.assertLess(metric["evidence_recall"], 1)
         self.assertEqual(verifier.diagnose(fixture["expected"], "not json")["json_object"], 0)
 
+    def test_absent_blockers_are_not_an_explicit_empty_list(self):
+        expected = fixtures[0]["expected"]
+        self.assertEqual(verifier.diagnose(expected, '{"type":"object","properties":{}}')["model_blockers_exact"], 0)
+        self.assertEqual(verifier.diagnose(expected, '{"blocking_missing_fields":[]}')["model_blockers_exact"], 1)
+        self.assertEqual(verifier.diagnose(expected, '{"blocking_missing_fields":null}')["model_blockers_exact"], 0)
+
     def test_selection_correction_and_public_artifacts(self):
         fixture = fixtures[0]
         result = self.selection_result(fixture)

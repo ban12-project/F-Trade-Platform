@@ -91,6 +91,20 @@ const unavailable = [{ ...preflights[0], available: false, image_correct: false 
 assert.equal(summarizeSelection(manifest, unavailable, []).status, "unavailable");
 assert.equal(summarizeSelection(manifest, unavailable, []).models[0].final_pass_rate, null);
 assert.throws(() => summarizeSelection(manifest, unavailable, reports));
+
+const grading = { diagnostic_revision: 2, verifier_sha256: h };
+assert.throws(
+  () => summarizeSelection({ ...manifest, grading }, preflights, reports),
+  "Mixed or missing grading revision must fail",
+);
+assert.equal(
+  summarizeSelection(
+    { ...manifest, grading },
+    preflights,
+    reports.map((row) => ({ ...row, report: { ...row.report, diagnostic_revision: 2 } })),
+  ).grading?.diagnostic_revision,
+  2,
+);
 console.log(
   "PASS selection summary: completeness, provenance, private data, unknown billing and availability",
 );

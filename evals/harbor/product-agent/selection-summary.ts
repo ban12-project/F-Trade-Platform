@@ -13,6 +13,10 @@ const manifestSchema = z.object({
   execution: z.literal("local-production-policy"),
   source_commit: z.string().regex(/^[a-f0-9]{40}$/),
   diagnostic_only: z.boolean(),
+  grading: z.object({ diagnostic_revision: z.literal(2), verifier_sha256: digest }).optional(),
+  execution_monitor: z
+    .object({ max_event_loop_gap_ms: z.literal(5000), max_trial_duration_ms: z.literal(80000) })
+    .optional(),
   started_at: z.iso.datetime(),
   concurrency: count.min(1).max(8),
   repetitions: z.literal(3),
@@ -59,6 +63,7 @@ const attemptSchema = z.object({
 });
 const reportSchema = z.object({
   synthetic_id: identifier,
+  diagnostic_revision: z.literal(2).optional(),
   protocol_version: z.literal("model-selection-v2"),
   prompt_version: identifier,
   prompt_hash: digest,
@@ -121,6 +126,8 @@ export function summarizeSelection(
     const task = manifest.tasks.find((t) => t.id === entry.id);
     const model = manifest.models.find((m) => m.name === entry.model);
     const report = entry.report;
+    if (manifest.grading && report.diagnostic_revision !== manifest.grading.diagnostic_revision)
+      throw new Error("Mixed diagnostic revisions");
     if (
       !task ||
       !model ||

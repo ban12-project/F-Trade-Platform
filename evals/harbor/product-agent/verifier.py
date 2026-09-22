@@ -200,7 +200,7 @@ def diagnose(expected, text):
         "fact_precision": len(correct) / len(predicted) if predicted else int(parsed),
         "fact_recall": len(correct) / len(truth) if truth else int(parsed),
         "evidence_recall": len(supported) / len(truth) if truth else int(parsed),
-        "model_blockers_exact": int(parsed and same_json(sorted(candidate.get("blocking_missing_fields", [])), sorted(expected["expected"]["blocking_missing_fields"]))) if parsed and isinstance(candidate.get("blocking_missing_fields", []), list) and all(isinstance(x, str) for x in candidate.get("blocking_missing_fields", [])) else 0,
+        "model_blockers_exact": int(parsed and same_json(sorted(candidate.get("blocking_missing_fields", [])), sorted(expected["expected"]["blocking_missing_fields"]))) if parsed and "blocking_missing_fields" in candidate and isinstance(candidate["blocking_missing_fields"], list) and all(isinstance(x, str) for x in candidate["blocking_missing_fields"]) else 0,
         "model_state_boundary": int(parsed and candidate.get("verification_status") == "review_required" and not any(key in candidate for key in ("approval_ref", "approval", "approved", "verified"))),
     }
 
@@ -266,7 +266,7 @@ def evaluate(expected, result):
     valid = valid and mode in ("json_schema", "json", "text")
     reward = int(bool(valid) and strict_pass(expected, result.get("draft"), meta) == 1)
     return {
-        "synthetic_id": expected["id"], "protocol_version": "model-selection-v2",
+        "synthetic_id": expected["id"], "protocol_version": "model-selection-v2", "diagnostic_revision": 2,
         "prompt_version": expected["prompt_version"], "prompt_hash": expected["prompt_hash"],
         "expectation_hash": expected["expectation_hash"], "evidence_mode": expected["evidence_mode"],
         "provenance_valid": bool(valid), "output_mode": mode if mode in ("json_schema", "json", "text") else None,
