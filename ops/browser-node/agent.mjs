@@ -5,10 +5,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
+import { withAutomationControl } from "./control.mjs";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
-import { withAutomationControl } from "./control.mjs";
 import { createIdleExitPolicy } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
@@ -166,7 +166,10 @@ async function stop(slot, outcome = "failed") {
   inputCleanup.catch(() => {});
   slot.stopPromise = (async () => {
     if (!slot.stopped) {
-      const inputStopped = await inputCleanup.then(() => true, () => false);
+      const inputStopped = await inputCleanup.then(
+        () => true,
+        () => false,
+      );
       // Wait for create/start to settle; never acknowledge a slot while a late
       // Docker create could still bring a browser online.
       slot.abort.abort();
@@ -249,7 +252,8 @@ async function launch(slot) {
   for (let i = 0; i < 30; i++) {
     const response = await browserRequest(slot, "/vnc/status");
     const status = await response.json();
-    if (status.enabled === true && status.running === false && status.watcherRunning === false) break;
+    if (status.enabled === true && status.running === false && status.watcherRunning === false)
+      break;
     if (i === 29) throw new Error("vnc_not_ready");
     await sleep(1000, undefined, { signal: slot.abort.signal });
   }
@@ -268,7 +272,10 @@ async function launch(slot) {
   delete slot.spec;
 }
 async function heartbeat(slot) {
-  if (slot.controlFailure) { await stop(slot, "unknown"); return; }
+  if (slot.controlFailure) {
+    await stop(slot, "unknown");
+    return;
+  }
   if (slot.stopping) {
     await stop(slot, slot.outcome ?? "failed");
     return;
@@ -278,7 +285,12 @@ async function heartbeat(slot) {
     await stop(slot, "unknown");
     return;
   }
-  if (slot.ready && !slot.controlPaused && !slot.automationHandoff && Date.now() - slot.egressCheckedAt >= 30_000) {
+  if (
+    slot.ready &&
+    !slot.controlPaused &&
+    !slot.automationHandoff &&
+    Date.now() - slot.egressCheckedAt >= 30_000
+  ) {
     slot.automationHandoff = true;
     try {
       await verifyBrowserEgress(
@@ -291,7 +303,9 @@ async function heartbeat(slot) {
       slot.outcome = "egress_mismatch";
       await stop(slot, slot.outcome);
       return;
-    } finally { slot.automationHandoff = false; }
+    } finally {
+      slot.automationHandoff = false;
+    }
   }
   const renewed = await nodeCall("heartbeat", {
     runId: slot.run.id,
