@@ -38,6 +38,7 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
     );
   }
   function dispose(key, entry) {
+    if (entry.closed) return;
     entry.closed = true;
     entry.slot.disconnectedAt = Date.now();
     for (const request of entry.requests) request.destroy();
@@ -94,6 +95,11 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
           origin !== slot.gatewayOrigin
         )
           return fail();
+        // Fresh broker authorization replaces older capabilities, including
+        // pending handshakes. Late close events must not affect the replacement.
+        for (const [key, entry] of views) {
+          if (entry.slot.run.id === slot.run.id) dispose(key, entry);
+        }
         const view = randomBytes(32).toString("base64url");
         const ws = randomBytes(32).toString("base64url");
         views.set(view, {
@@ -193,6 +199,7 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
         return;
       }
       entry.slot.connected = true;
+      entry.slot.disconnectedAt = null;
       entry.sockets.add(upstream);
       socket.write(
         `HTTP/1.1 101 Switching Protocols\r\n${Object.entries(response.headers)
@@ -203,14 +210,8 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
       if (head.length) upstream.write(head);
       socket.pipe(upstream);
       upstream.pipe(socket);
-      socket.on("close", () => {
-        upstream.destroy();
-        entry.slot.disconnectedAt = Date.now();
-      });
-      upstream.on("close", () => {
-        socket.destroy();
-        entry.slot.disconnectedAt = Date.now();
-      });
+      // Both ends share idempotent disposal, including asset revocation.
+      upstream.on("close", close);
       socket.on("error", close);
       upstream.on("error", close);
     });

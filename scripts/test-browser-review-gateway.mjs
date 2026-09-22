@@ -36,14 +36,18 @@ async function fixture(upgradeDelay = 0) {
     vncPassword: "synthetic",
     vncPort: upstream.address().port,
   };
-  let consumed = false;
+  const consumed = new Set();
   const gateway = createGateway({
     appOrigin: "https://app.example",
     slots: new Map([[slot.run.id, slot]]),
     port: 0,
     nodeCall: async (_operation, { ticket }) => {
-      if (ticket !== "synthetic-one-use-ticket" || consumed) throw new Error("denied");
-      consumed = true;
+      if (
+        !["synthetic-one-use-ticket", "synthetic-fresh-ticket"].includes(ticket) ||
+        consumed.has(ticket)
+      )
+        throw new Error("denied");
+      consumed.add(ticket);
       return { runId: slot.run.id };
     },
   });
@@ -59,13 +63,13 @@ async function fixture(upgradeDelay = 0) {
   });
   assert.equal(result.status, 200);
   const admission = await result.json();
-  function connect(origin = slot.gatewayOrigin) {
+  function connect(origin = slot.gatewayOrigin, capability = admission) {
     let socket;
     let closed = false;
     const req = http.request({
       hostname: "127.0.0.1",
       port,
-      path: admission.websocket,
+      path: capability.websocket,
       headers: {
         Origin: origin,
         Connection: "Upgrade",
@@ -227,5 +231,49 @@ test("admission binds Origin to the admitted run, not another slot", async () =>
     assert.equal(await response.text(), "");
   } finally {
     gateway.close();
+  }
+});
+
+test("fresh broker authorization revokes old tunnel and capabilities before replacement", async () => {
+  const f = await fixture();
+  const first = f.connect();
+  let second;
+  try {
+    assert.equal(await first.connected, true);
+    const response = await fetch(`http://127.0.0.1:${f.port}/admit`, {
+      method: "POST",
+      headers: { Origin: f.slot.gatewayOrigin, "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket: "synthetic-fresh-ticket" }),
+    });
+    assert.equal(response.status, 200);
+    const replacement = await response.json();
+    await delay(50);
+    assert.equal(first.closed, true, "fresh admission must close the old tunnel");
+    assert.notEqual(replacement.websocket, f.admission.websocket);
+    const oldAssets = await fetch(`http://127.0.0.1:${f.port}${f.admission.module}`);
+    assert.equal(oldAssets.status, 403);
+    await oldAssets.text();
+    const replay = f.connect();
+    assert.equal(await replay.connected, false);
+    replay.destroy();
+    second = f.connect(f.slot.gatewayOrigin, replacement);
+    assert.equal(await second.connected, true);
+    await delay(100);
+    assert.equal(first.closed, true);
+    assert.equal(second.closed, false);
+    assert.equal(
+      f.slot.disconnectedAt,
+      null,
+      "old close callbacks must not disconnect replacement",
+    );
+    assert.equal(f.upgrades, 2);
+    f.gateway.closeRun(f.slot.run.id);
+    await delay(50);
+    assert.equal(second.closed, true);
+    assert.equal(typeof f.slot.disconnectedAt, "number");
+  } finally {
+    first.destroy();
+    second?.destroy();
+    f.close();
   }
 });

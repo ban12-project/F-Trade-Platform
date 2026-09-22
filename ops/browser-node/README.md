@@ -318,3 +318,9 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 诊断仅保存当前页的 `wss://gateway.facebook.com` WebSocket 创建、关闭、错误及收发帧次数，不读取或保存帧内容、PIN、完整 URL、查询参数、请求头和异常文本。每页最多跟踪 128 个连接，超出计入 dropped，页面关闭后清除。通过 session-created 的 page 事件在首次导航前接入，避免遗漏加载时建立的连接。
 
 创建事件不等于握手成功，收发帧也不等于聊天恢复成功；零计数不能证明连接正常。计数只为排查提供证据，不改变账号、渠道、收件箱同步或安全存储状态。合成 Chromium 测试通过本地拒绝连接的代理验证实际 socket 错误，未连接 Facebook；真实 Messenger 诊断和修复仍需单独验收。
+
+### Firefox 155 接管网关重授权边界
+
+同一 run 的新 broker 授权到达网关后，网关先撤销旧 HTTP 资源能力、WebSocket 能力和已建立／待握手连接，再返回新能力。连接清理幂等；旧连接的迟到关闭事件不会重新写入当前连接的断线时间，新连接成功后清除旧断线标记。
+
+`node --import tsx --test scripts/test-browser-node.mjs scripts/test-browser-review-gateway.mjs` 当前 32 项通过。新增回归使用真实本地 HTTP/WebSocket 传输与合成 broker 授权；旧实现无法关闭旧连接而失败。此结果仅验证网关连接替换，尚未证明 broker 重新签票、viewer 重连、自动化互斥或真实 noVNC 同会话接管；这些仍是 Firefox 155 完整验收缺口。
