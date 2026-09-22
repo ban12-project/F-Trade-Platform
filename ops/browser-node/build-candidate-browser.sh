@@ -9,10 +9,12 @@ cd "$(dirname "$0")"
 sh prepare-upstream.sh
 test -f "$candidate_dir/candidate.tar.zst"
 test -f "$candidate_dir/candidate-manifest.json"
-docker buildx build --load --platform linux/amd64 \
+# Both stages must share the Docker Engine image store. A selected
+# docker-container builder cannot resolve the first stage loaded there.
+docker buildx build --builder default --load --platform linux/amd64 \
   --build-context "service=$(pwd)/upstream" --build-context "candidate=$candidate_dir" \
   --build-arg "CANDIDATE_SHA256=$CANDIDATE_SHA256" --build-arg "CANDIDATE_COMMIT=$CANDIDATE_COMMIT" \
   -f candidate-base.Dockerfile -t ftrade-camofox-candidate:local .
-docker buildx build --load --platform linux/amd64 \
+docker buildx build --builder default --load --platform linux/amd64 \
   --build-arg BROWSER_BASE_IMAGE=ftrade-camofox-candidate:local \
   -f browser.Dockerfile -t ftrade-browser-candidate:local .
