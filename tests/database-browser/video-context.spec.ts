@@ -255,7 +255,9 @@ test("invalid, conflicting and cross-project video links never select another re
     "new=0",
   ]) {
     await page.goto(`${path}?${query}`);
-    await expect(page.getByText("无法打开指定工作", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText("无法打开指定工作", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByLabel("成片时长（秒）")).toHaveCount(0);
     await expect(page.getByLabel("视频目标")).toHaveCount(0);
     expect(await page.content()).not.toContain(names[3]);
@@ -292,9 +294,9 @@ test("copy opens its returned draft, protects other input, and repeated saves cl
   await expect(page.getByRole("heading", { name: names[2], exact: true })).toBeVisible();
   for (const ctaText of ["Ask our team", "Contact the team"]) {
     await page.getByLabel("最后两秒 CTA").fill(ctaText);
-    await expect(page.getByText("有未保存修改", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("有未保存修改", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "保存", exact: true }).click();
-    await expect(page.getByText("已同步", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("已同步", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
     const [saved] = await db
       .select()
@@ -342,7 +344,7 @@ test("viewer and archived project show read-only controls even for an app admini
       .where(eq(schema.aggregateRecord.id, videoIds[1]));
     await page.goto(`${path}?item=${videoIds[1]}`);
     await expect(
-      page.getByText("私有预览", { exact: true }).filter({ visible: true }),
+      page.getByRole("main").getByText("私有预览", { exact: true }).filter({ visible: true }),
     ).toBeVisible();
     await expect(page.getByLabel("审核证据")).toHaveCount(0);
   }
@@ -353,7 +355,7 @@ test("narrow video creation protects source, return and global navigation", asyn
   await page.goto(`${path}?new=1&product=${productIds[0]}`);
   await expect(page.getByLabel("视频目标")).toHaveValue("展示已核实产品，引导客户咨询");
   await page.getByLabel("视频目标").fill("SYNTHETIC mobile unsaved draft");
-  await expect(page.getByText("有未保存修改", { exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByText("有未保存修改", { exact: true })).toBeVisible();
   for (const link of [
     page.getByRole("link", { name: names[0], exact: true }),
     page.getByRole("link", { name: "返回内容与发布" }),
