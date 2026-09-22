@@ -3,8 +3,10 @@ FROM ${BROWSER_BASE_IMAGE}
 # Proxy-enabled launches require GeoIP before the read-only runtime starts.
 # The pinned downloader does not await file-stream writes. Let its process drain
 # pending filesystem work before a separate process validates the finished file.
-RUN node --input-type=module -e "import { downloadMMDB } from 'camoufox-js/dist/locale.js'; await downloadMMDB();" \
-    && node --input-type=module -e "import { getGeolocation } from 'camoufox-js/dist/locale.js'; await getGeolocation('8.8.8.8');"
+# The pinned library also gates GeoIP on the browser-download flag. Unset it
+# only for these GeoIP-only build processes; the runtime ENV remains enabled.
+RUN env -u PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD node --input-type=module -e "import { downloadMMDB } from 'camoufox-js/dist/locale.js'; await downloadMMDB();" \
+    && env -u PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD node --input-type=module -e "import { getGeolocation } from 'camoufox-js/dist/locale.js'; await getGeolocation('8.8.8.8');"
 LABEL io.ftrade.lease-watchdog="1" io.ftrade.login-fill="1"
 COPY watchdog.mjs /opt/ftrade/watchdog.mjs
 COPY camofox.config.json /app/camofox.config.json
