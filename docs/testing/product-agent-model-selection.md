@@ -46,7 +46,7 @@ macOS 长批次使用 `caffeinate -i pnpm eval:model-selection ...`，只在该�
 
 父目录必须已存在；输出目录必须全新且被 Git 忽略。正式比较必须从干净提交运行，`--allow-dirty` 仅生成 diagnostic_only 数据。评分器在运行前复制到批次目录，并记录 SHA-256；诊断 revision 2 要求缺失项数组显式存在，缺省不能冒充空列表。私有文件权限 0600，记录原始响应、拒绝原因及 token；仅 `summary.json` 经逐层白名单汇总可供发布。不要提交或上传 `*-private.json`、端点配置和原始 Harbor jobs。
 
-发布前执行 `pnpm exec tsx scripts/validate-product-model-selection-report.ts <summary.json>`：它要求完整且测量有效的正式批次，从试次重算统计，验证运行健康，并拒绝未知字段。`test:product-output` 也会复核已提交的选型 JSON 报告。
+发布前执行 `pnpm exec tsx scripts/validate-product-model-selection-report.ts <summary.json>`：它要求完整且测量有效的正式批次，从试次重算统计，验证运行健康，并拒绝未知字段。`test:product-output` 也会复核已提交的选型 JSON 报告。统计表可用 `pnpm exec tsx scripts/render-product-model-selection-report.ts <summary.json> <new-report.md>` 从有效报告生成，输出文件拒绝覆盖；选型解释须在核对错误案例后另行补充。
 
 该本地运行器使用生产策略及 Harbor 的同一 Python verifier，执行方式明确标为 `local-production-policy`，不声称运行了 Harbor 容器。Harbor 使用 `BaseInstalledAgent` 执行容器中的同一 CLI；`reward.json` 包含独立维度。CI 使用 oracle 和容器内合成 HTTP 服务，检查实际容器、生产适配器/CLI/SDK、事实拒绝后的纠错及产物收集，不测模型能力。Harbor 严格 gate 保留完整 60/60 条件，本地选型汇总把“测量完成”和“全量通过”分别表示。
 
