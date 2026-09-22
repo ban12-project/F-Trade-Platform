@@ -322,7 +322,7 @@ test("viewer and archived project show read-only controls even for an app admini
       .set({ status: kind === "archived" ? "archived" : "active" })
       .where(eq(schema.workspaceProject.id, projectId));
     await page.goto(`${path}?item=${videoIds[0]}`);
-    await expect(page.getByText("只读", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("只读", { exact: true })).toBeVisible();
     await expect(page.getByLabel("成片时长（秒）")).toBeDisabled();
     await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeDisabled();
     await expect(page.getByRole("button", { name: "合成预览", exact: true })).toBeDisabled();
