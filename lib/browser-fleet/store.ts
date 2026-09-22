@@ -318,12 +318,16 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
           run.status !== "running" ||
           run.stopRequested ||
           run.leaseUntil <= now + 10_000 ||
-          run.ticketUsed
+          run.deadline <= now ||
+          (run.authSessionId !== null && run.authSessionId !== actor.sessionId)
         )
           throw new Error("browser_not_connectable");
         const token = `${run.id}.${randomBytes(32).toString("base64url")}`;
+        // Reauthorization rotates the capability under the node row lock. The
+        // consumed token remains invalid; ticketUsed records prior admission,
+        // while the current hash is the one-use capability for this attempt.
         run.ticketHash = digest(token);
-        run.connectBefore = Math.min(now + 60_000, run.deadline);
+        run.connectBefore = Math.min(now + 60_000, run.deadline, run.leaseUntil);
         run.authSessionId = actor.sessionId;
         result = {
           connection: { token, origin: row.gateway_origin, expiresAt: run.connectBefore },
@@ -554,7 +558,7 @@ async function nodeOperation(
       !run.ticketHash ||
       run.connectBefore <= now ||
       run.leaseUntil <= now ||
-      run.ticketUsed ||
+      run.deadline <= now ||
       !matches(request.ticket, run.ticketHash) ||
       !(await validSession(tx, run.requestedBy, run.authSessionId, now))
     )

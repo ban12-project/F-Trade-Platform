@@ -246,6 +246,48 @@ async function main() {
       /ticket_invalid/,
     );
     checks.push("real broker retries reuse one lease and interactive tickets consume once");
+    const anotherSession = { ...actor, sessionId: randomUUID() };
+    await db.insert(schema.session).values({
+      id: anotherSession.sessionId,
+      token: randomUUID(),
+      userId: actor.id,
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    await assert.rejects(
+      ownerBrowserCommand(
+        { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+        anotherSession,
+      ),
+      /browser_not_connectable/,
+    );
+    const superseded = await ownerBrowserCommand(
+      { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+      actor,
+    );
+    const fresh = await ownerBrowserCommand(
+      { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+      actor,
+    );
+    assert.ok(fresh.connection && superseded.connection);
+    assert.notEqual(fresh.connection.token, ticket.connection.token);
+    const admitToken = (token: string) =>
+      handleBrowserNodeRequest(normal.key, {
+        ...normal.identity,
+        operation: "admit",
+        ticket: token,
+      });
+    await assert.rejects(admitToken(ticket.connection.token), /ticket_invalid/);
+    await assert.rejects(admitToken(superseded.connection.token), /ticket_invalid/);
+    const simultaneous = await Promise.allSettled([
+      admitToken(fresh.connection.token),
+      admitToken(fresh.connection.token),
+    ]);
+    assert.equal(simultaneous.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(simultaneous.filter((result) => result.status === "rejected").length, 1);
+    await assert.rejects(admitToken(fresh.connection.token), /ticket_invalid/);
+    checks.push(
+      "reauthorization is bound to the original owner session, rotates tokens, rejects old/superseded tokens and admits concurrent replay exactly once",
+    );
     await ownerBrowserCommand(
       {
         operation: "account",
@@ -255,6 +297,13 @@ async function main() {
       },
       actor,
     );
+    await assert.rejects(
+      ownerBrowserCommand(
+        { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+        actor,
+      ),
+      /browser_not_connectable/,
+    );
     const revoked = await handleBrowserNodeRequest(normal.key, {
       ...normal.identity,
       operation: "heartbeat",
@@ -263,7 +312,7 @@ async function main() {
       ready: true,
     });
     assert.equal((revoked as { active?: boolean }).active, false);
-    checks.push("account revocation fences real broker heartbeats");
+    checks.push("account revocation fences real broker heartbeats and reauthorization");
 
     // Use the actual store with just FOR UPDATE removed, forcing all eight SELECTs
     // to finish before any UPDATE. Each trial gets an independent authorized node.

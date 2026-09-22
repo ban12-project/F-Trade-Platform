@@ -324,3 +324,7 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 同一 run 的新 broker 授权到达网关后，网关先撤销旧 HTTP 资源能力、WebSocket 能力和已建立／待握手连接，再返回新能力。连接清理幂等；旧连接的迟到关闭事件不会重新写入当前连接的断线时间，新连接成功后清除旧断线标记。
 
 `node --import tsx --test scripts/test-browser-node.mjs scripts/test-browser-review-gateway.mjs` 当前 32 项通过。新增回归使用真实本地 HTTP/WebSocket 传输与合成 broker 授权；旧实现无法关闭旧连接而失败。此结果仅验证网关连接替换，尚未证明 broker 重新签票、viewer 重连、自动化互斥或真实 noVNC 同会话接管；这些仍是 Firefox 155 完整验收缺口。
+
+Broker 重新授权现允许原 owner 的同一有效登录 session 为仍有效的交互 run 取得新票。事务内替换票据哈希，签票截止时间不超过租约和 run 截止时间；消费后清空哈希。旧票、被替代的票、并发重放、其他 session 和账号撤销后的取票均拒绝。ticketUsed 保留“曾经完成接入”的含义，不能代替当前票据哈希的一次性校验。
+
+真实 PostgreSQL 17.11 测试使用现有 broker 和完整迁移，新增重授权／并发消费／撤销断言通过；相关协议及网关组件 50 项通过。首次本地类型检查因稀疏检出缺失依赖目录而失败。前端重新取票流程、真实 noVNC 联调及人工／自动化互斥仍未完成；服务端签票成功不是完整接管通过。
