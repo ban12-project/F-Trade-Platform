@@ -1,6 +1,17 @@
-import { generateText, type LanguageModel, Output, type UserModelMessage } from "ai";
+import {
+  generateText,
+  jsonSchema,
+  type LanguageModel,
+  type LanguageModelUsage,
+  NoObjectGeneratedError,
+  Output,
+  type UserModelMessage,
+} from "ai";
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
+import { getProductOutputPolicy, type ProductOutputMode } from "../ai/product-output-policy";
 import { compileContract } from "../contracts/validator";
+import { PRODUCT_OUTPUT_SCHEMA } from "./output-contract";
+import { canonicalPackaging } from "./packaging";
 import {
   PRODUCT_AGENT_PROMPT_HASH,
   PRODUCT_AGENT_PROMPT_VERSION,
@@ -27,18 +38,32 @@ export interface ProductAgentImageInput {
   data_base64: string;
 }
 
+export interface ProductModelObservation {
+  text: string;
+  usage?: LanguageModelUsage;
+  duration_ms: number;
+  output_mode: ProductOutputMode;
+  finish_reason?: string;
+}
+
 export interface ProductAgentRequest {
   model: LanguageModel;
   source: ProductAgentSource;
   timeout_ms?: number;
   /** Internal retry cue. Never supplied by browser input or source material. */
   repair_invalid_output?: boolean;
+  /** Internal diagnostic sink; never populated from client input or persisted by default. */
+  observe_model_response?: (observation: ProductModelObservation) => void;
 }
 
 export interface ProductAgentRunMetadata {
   prompt_version: string;
   prompt_hash: string;
   validation_retry?: boolean;
+  output_mode?: ProductOutputMode;
+  output_policy_reason?: string;
+  usage?: LanguageModelUsage;
+  model_duration_ms?: number;
 }
 
 export interface ProductAgentResult {
@@ -65,6 +90,11 @@ function removeNullOptionalFacts(value: unknown): unknown {
       if (fieldEvidence && typeof fieldEvidence === "object" && !Array.isArray(fieldEvidence)) {
         delete (fieldEvidence as Record<string, unknown>)[`${section}.${field}`];
       }
+    }
+  }
+  if (fieldEvidence && typeof fieldEvidence === "object" && !Array.isArray(fieldEvidence)) {
+    for (const [key, ref] of Object.entries(fieldEvidence)) {
+      if (ref === null) delete (fieldEvidence as Record<string, unknown>)[key];
     }
   }
   return draft;
@@ -418,6 +448,9 @@ export function finalizeProductAgentDraft(
 ): ProductDraft {
   const draft = parseProductDraft(removeNullOptionalFacts(value));
   assertSafeDraft(draft, source);
+  if (typeof draft.commercial?.packaging === "string") {
+    draft.commercial.packaging = canonicalPackaging(draft.commercial.packaging);
+  }
   return reviewProductDraft(draft);
 }
 
@@ -427,6 +460,7 @@ export class AiSdkProductAgent implements ProductAgent {
     source,
     timeout_ms,
     repair_invalid_output,
+    observe_model_response,
   }: ProductAgentRequest): Promise<ProductAgentResult> {
     validateProductAgentSource(source);
     const promptText = JSON.stringify({
@@ -457,25 +491,63 @@ export class AiSdkProductAgent implements ProductAgent {
         content:
           "The previous attempt failed contract or source validation. Rebuild the JSON from the supplied labelled excerpts. The field_evidence keys must exactly equal the paths of fields actually present in product, specifications and commercial: remove entries for omitted facts. Omit unsupported facts rather than filling missing fields. A draft containing only a sourced internal_sku is valid and expected when other labels are absent. Preserve the supplied identity and evidence_refs. Return only JSON; all original constraints still apply.",
       });
-    const result = await generateText({
-      model,
-      instructions: PRODUCT_AGENT_SYSTEM_PROMPT,
-      messages,
-      // Some OpenAI-compatible routers reject standard JSON Schema keywords that the
-      // ProductDraft contract needs. We request JSON text and validate it locally with AJV.
-      output: Output.text(),
-      abortSignal: timeout_ms === undefined ? undefined : AbortSignal.timeout(timeout_ms),
-    });
+    const policy = getProductOutputPolicy(model);
+    const modelStarted = Date.now();
+    let observed = false;
+    try {
+      const result = await generateText({
+        model,
+        instructions: PRODUCT_AGENT_SYSTEM_PROMPT,
+        messages,
+        output:
+          policy.mode === "json_schema"
+            ? Output.object({ schema: jsonSchema(PRODUCT_OUTPUT_SCHEMA), name: "product_draft" })
+            : policy.mode === "json"
+              ? Output.json()
+              : Output.text(),
+        abortSignal: timeout_ms === undefined ? undefined : AbortSignal.timeout(timeout_ms),
+      });
 
-    const draft = finalizeProductAgentDraft(parseModelJson(result.output), source);
-    return {
-      draft,
-      metadata: {
-        prompt_version: PRODUCT_AGENT_PROMPT_VERSION,
-        prompt_hash: PRODUCT_AGENT_PROMPT_HASH,
-        ...(repair_invalid_output ? { validation_retry: true } : {}),
-      },
-    };
+      const modelDuration = Date.now() - modelStarted;
+      observed = true;
+      observe_model_response?.({
+        text: result.text,
+        usage: result.usage,
+        duration_ms: modelDuration,
+        output_mode: policy.mode,
+        finish_reason: result.finishReason,
+      });
+      const draft = finalizeProductAgentDraft(
+        typeof result.output === "string" ? parseModelJson(result.output) : result.output,
+        source,
+      );
+      return {
+        draft,
+        metadata: {
+          usage: result.usage,
+          model_duration_ms: modelDuration,
+          output_mode: policy.mode,
+          output_policy_reason: policy.reason,
+          prompt_version: PRODUCT_AGENT_PROMPT_VERSION,
+          prompt_hash: PRODUCT_AGENT_PROMPT_HASH,
+          ...(repair_invalid_output ? { validation_retry: true } : {}),
+        },
+      };
+    } catch (error) {
+      if (NoObjectGeneratedError.isInstance(error)) {
+        if (!observed)
+          observe_model_response?.({
+            text: error.text ?? "",
+            usage: error.usage,
+            duration_ms: Date.now() - modelStarted,
+            output_mode: policy.mode,
+          });
+        throw new Error("Product Agent structured output failed contract validation", {
+          cause: error,
+        });
+      }
+      throw error;
+    }
   }
 }
 
