@@ -31,6 +31,8 @@ def validate(job: Path, manifest: dict, model: str) -> tuple[dict, list[str]]:
         raise ValueError("manifest must contain exactly the 20 synthetic tasks, three attempts each")
     if manifest.get("harbor_version") != "0.23.0":
         raise ValueError("manifest Harbor version is not the pinned version")
+    if manifest.get("protocol_version") != "model-selection-v2" or manifest.get("total_timeout_ms") != 75000 or manifest.get("max_corrections") != 1:
+        raise ValueError("manifest must use the production selection policy")
     for item in tasks:
         if not item.get("prompt_version") or any(
             not re.fullmatch(r"[a-f0-9]{64}", item.get(key, ""))
@@ -74,13 +76,15 @@ def validate(job: Path, manifest: dict, model: str) -> tuple[dict, list[str]]:
         if result.get("exception_info") or not result.get("finished_at"):
             trial_errors.append("trial failed or unfinished")
         info = result.get("agent_info") or {}
-        if info.get("name") != AGENT or info.get("version") != "1.1.0" or info.get("model_info") != {"provider": provider, "name": name}:
+        if info.get("name") != AGENT or info.get("version") != "1.2.0" or info.get("model_info") != {"provider": provider, "name": name}:
             trial_errors.append("agent/model mismatch")
         reward = ((result.get("verifier_result") or {}).get("rewards") or {}).get("reward")
         if type(reward) not in (int, float) or reward != 1 or type(artifact.get("reward")) not in (int, float) or artifact.get("reward") != reward:
             trial_errors.append("reward did not pass or artifact disagrees")
         if any(artifact.get(key) != truth[key] for key in ("prompt_version", "prompt_hash", "expectation_hash")) or artifact.get("evidence_mode") != "bounded_location":
             trial_errors.append("frozen provenance mismatch")
+        if artifact.get("protocol_version") != "model-selection-v2" or artifact.get("provenance_valid") is not True:
+            trial_errors.append("selection protocol/provenance mismatch")
         errors.extend(trial_errors)
         # Never copy raw artifacts, error messages, endpoint data, or unknown identifiers.
         trials.append({

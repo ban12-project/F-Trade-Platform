@@ -1,12 +1,14 @@
 # Harbor Agent Evals 验收
 
+> 当前模型选型采用 [Product Agent 协议 v2](product-agent-model-selection.md)：生产 75 秒总预算、一次纠错、能力匹配的结构化输出和独立诊断。旧批次报告不可与 v2 合并计算。
+
 研发跟踪：[Issue #369](https://github.com/ban12-project/F-Trade-Platform/issues/369)。用户已确认升级对象是 agent 评测框架，原链接中的 goharbor 容器仓库不属于本仓库的评测依赖。
 
 ## 版本与执行契约
 
-2026-09-17 核对 [上游稳定发行版](https://github.com/harbor-framework/harbor/releases/tag/v0.23.0) 和 PyPI，最新稳定版为 **0.23.0**，固定于 `evals/harbor/requirements.txt`。使用 task schema 1.4、自定义 `BaseAgent`、`--ae`、本地目录 `-p`、`--job-name`、原生 `-e podman`；`-t` 用于 registry task，不能直接替代本地 `-p`。
+2026-09-17 核对 [上游稳定发行版](https://github.com/harbor-framework/harbor/releases/tag/v0.23.0) 和 PyPI，最新稳定版为 **0.23.0**，固定于 `evals/harbor/requirements.txt`。使用 task schema 1.4、容器内 CLI 自定义 `BaseInstalledAgent`、`--ae`、本地目录 `-p`、`--job-name`、原生 `-e podman`；`-t` 用于 registry task，不能直接替代本地 `-p`。
 
-生产评测入口是 `EvidenceLocatedProductAgent`。输入先被重建为有标签的行/表格行证据，再由 AI SDK 执行抽取，服务端校验每个事实及其具体证据位置，最后压缩为实际使用的引用集合。不能再要求输出使用整份文档引用，也不能接受只具有合法外观、却不支持对应字段的证据 ID。
+生产评测入口为 `runCatalogProductAgent`，内部使用 `EvidenceLocatedProductAgent`，共享 75 秒总预算并最多纠正一次。输入先被重建为有标签的行/表格行证据，再由 AI SDK 执行抽取，服务端校验每个事实及其具体证据位置，最后压缩为实际使用的引用集合。不能再要求输出使用整份文档引用，也不能接受只具有合法外观、却不支持对应字段的证据 ID。
 
 任务生成器在调用模型前固定事实真值、可支持各字段的证据位置、prompt version/hash 和 expectation hash。所有任务的输入与 hash 均为 synthetic；输入位于 `environment/input/`，预期答案仅位于 `tests/`。镜像构建上下文使用白名单，不包含 `.env`、本地参考资料、jobs 或验收答案。该镜像只承担已预处理的文本/图片抽取，不安装 PDF/OCR 工具。
 
@@ -14,9 +16,9 @@
 
 | 层级 | 执行与覆盖 | 通过含义 |
 | --- | --- | --- |
-| 确定性回归 | `pnpm test:harbor`：20 个样例经过当前生产证据包装器、Python verifier；7 组测试含错误字段位置、整篇引用、虚构/丢失 OE、车型/规格、越权状态、缺失阻断、历史 job、异常/缺失/重复试次、错误模型和旧 provenance | 固定真值与当前实现一致；不证明模型抽取质量 |
+| 确定性回归 | `pnpm test:harbor`：20 个样例经过当前生产证据包装器、Python verifier；11 组测试含错误字段位置、整篇引用、虚构/丢失 OE、车型/规格、越权状态、缺失阻断、历史 job、异常/缺失/重复试次、错误模型和旧 provenance | 固定真值与当前实现一致；不证明模型抽取质量 |
 | 框架兼容性 | `pnpm eval:harbor:prepare` 后，以安装 Harbor 0.23.0 的 Python 执行 `scripts/test-harbor-framework.py`；验证 20 个 Task、四类 provider、凭据边界、非零退出码，再运行真实 CLI `--dry-run` | 发行版 API、task schema 和 job 配置可用；dry-run 仍要求所选容器运行时可响应 |
-| 容器冒烟 | CI 的 `harbor-compatibility` 构建评测镜像，再执行 `python3 scripts/test-harbor-container-smoke.py`；临时副本中的 a-01/c-01 使用 oracle 各运行一次并检查实际 reward 与 artifact 路径 | 容器/verifier/artifact 链路可用；oracle 身份不能通过生产模型汇总门禁 |
+| 容器冒烟 | CI 的 `harbor-compatibility` 构建评测镜像，再执行 `python3 scripts/test-harbor-container-smoke.py`；临时副本中的 a-01/c-01 先使用 oracle 各运行一次，再通过实际自定义适配器、CLI、SDK 与容器内合成 HTTP 服务分别验证通过和事实拒绝；检查 reward、纠错次数、用量与 artifact 路径 | 容器/适配器/CLI/verifier/artifact 链路可用；oracle 与 synthetic-smoke 身份不能通过生产模型汇总门禁 |
 | 真实模型 | `pnpm eval:harbor:podman` 或手动 `harbor-product-agent` workflow；20 个固定任务各 3 次，共 60 次 | 只有本次 job 的全部试次通过才算 synthetic 模型评测通过 |
 
 20 个任务仍按 A–D 各 5 个分配，覆盖 OE/缺失 OE、有图/无图、规格/商业字段；补充 `Fit Model` 原样保留、通用 `Model` 不作车型事实和部件栏不提升为整件规格的情景。05 样例保留提示注入尝试。无标签恶意文字可能被证据预处理排除，因此不再将每次通过都记成“模型抵抗提示注入 100%”。1×1 synthetic 图片也不能证明真实产品视觉识别能力。

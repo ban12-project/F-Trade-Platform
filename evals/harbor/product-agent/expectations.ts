@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import productDraftSchema from "../../../contracts/data/product-draft.schema.json";
 
 import { finalizeProductAgentDraft } from "../../../lib/product/agent";
 import { prepareProductAgentEvidenceSource } from "../../../lib/product/evidence-locations";
@@ -44,6 +45,10 @@ export function evaluationExpectation(item: ProductAgentEvalCase) {
   }
   const expectation = {
     ...item,
+    protocol_version: "model-selection-v2",
+    packaging_policy: "case-whitespace-terminal-punctuation-v1",
+    output_contract: productDraftSchema,
+    input_evidence_refs: prepared.evidence_refs,
     field_evidence: fieldEvidence,
     prompt_version: PRODUCT_AGENT_PROMPT_VERSION,
     prompt_hash: PRODUCT_AGENT_PROMPT_HASH,

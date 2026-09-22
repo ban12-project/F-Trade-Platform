@@ -2,6 +2,7 @@ import { type AnthropicProviderSettings, createAnthropic } from "@ai-sdk/anthrop
 import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderSettings } from "@ai-sdk/google";
 import { createOpenAI, type OpenAIProviderSettings } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
+import { type ProductOutputMode, registerProductOutputPolicy } from "./product-output-policy";
 
 export type SupportedModelProvider = "openai" | "anthropic" | "google" | "openai-compatible";
 
@@ -13,6 +14,7 @@ type ConfigurableProviderSettings =
 /** A Product Agent model is always constructed from a saved provider configuration. */
 export interface ProductAgentModelConfig {
   provider: SupportedModelProvider;
+  outputMode?: ProductOutputMode;
   model: string;
   providerOptions: ConfigurableProviderSettings;
 }
@@ -46,16 +48,23 @@ export function validateProductAgentModelConfig(config: ProductAgentModelConfig)
 
 export function createProductAgentModel(config: ProductAgentModelConfig): LanguageModel {
   validateProductAgentModelConfig(config);
+  const register = (model: LanguageModel) => registerProductOutputPolicy(model, config);
   switch (config.provider) {
     case "openai":
-      return createOpenAI(config.providerOptions as OpenAIProviderSettings)(config.model);
+      return register(createOpenAI(config.providerOptions as OpenAIProviderSettings)(config.model));
     case "openai-compatible":
-      return createOpenAI(config.providerOptions as OpenAIProviderSettings).chat(config.model);
+      return register(
+        createOpenAI(config.providerOptions as OpenAIProviderSettings).chat(config.model),
+      );
     case "anthropic":
-      return createAnthropic(config.providerOptions as AnthropicProviderSettings)(config.model);
+      return register(
+        createAnthropic(config.providerOptions as AnthropicProviderSettings)(config.model),
+      );
     case "google":
-      return createGoogleGenerativeAI(config.providerOptions as GoogleGenerativeAIProviderSettings)(
-        config.model,
+      return register(
+        createGoogleGenerativeAI(config.providerOptions as GoogleGenerativeAIProviderSettings)(
+          config.model,
+        ),
       );
   }
 }

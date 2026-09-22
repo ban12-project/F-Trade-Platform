@@ -63,6 +63,9 @@ jobs:
       - name: Test Harbor acceptance gate and synthetic expectations
         run: pnpm test:harbor
 
+      - name: Test Product Agent structured output and production evaluation policy
+        run: pnpm test:product-output
+
       - name: Test Product Agent evidence locations
         run: pnpm test:product-agent-evidence
 
