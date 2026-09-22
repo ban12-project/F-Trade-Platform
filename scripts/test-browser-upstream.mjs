@@ -41,6 +41,11 @@ try {
     });
   assert.equal(run().status, 0, "Cached exact commit must work without network");
   assert.equal(git("rev-parse", "HEAD"), pin);
+  git("remote", "set-url", "origin", "https://github.com/ban12-project/camofox-browser");
+  assert.equal(run().status, 0, "Actions checkout URL without .git is the same pinned repository");
+  git("remote", "set-url", "origin", "https://github.com/ban12-project/camofox-browser-extra");
+  assert.notEqual(run().status, 0, "Repository name prefixes must not be accepted");
+  git("remote", "set-url", "origin", "https://github.com/ban12-project/camofox-browser.git");
   writeFileSync(join(repo, "fixture"), "SYNTHETIC local edit\n");
   assert.notEqual(run().status, 0, "Dirty source must be preserved and refused");
   assert.equal(readFileSync(join(repo, "fixture"), "utf8"), "SYNTHETIC local edit\n");

@@ -15,7 +15,7 @@ fi
 case "$(git -C upstream remote get-url origin)" in
   https://github.com/jo-inc/camofox-browser.git)
     git -C upstream remote set-url origin https://github.com/ban12-project/camofox-browser.git ;;
-  https://github.com/ban12-project/camofox-browser.git) ;;
+  https://github.com/ban12-project/camofox-browser.git|https://github.com/ban12-project/camofox-browser) ;;
   *) printf '%s\n' 'Unexpected Camofox repository; refusing to replace it.' >&2; exit 1 ;;
 esac
 if [ -n "$(git -C upstream status --porcelain)" ]; then
