@@ -332,3 +332,11 @@ Broker 重新授权现允许原 owner 的同一有效登录 session 为仍有效
 平台任务行现在为已接入、仍 running 且未请求停止的交互任务显示“重新授权连接”。按钮再次调用原有服务端 ticket 命令，收到新 token 后以 token 为 key 重建 viewer iframe；不会重复使用已消费票据。断线提示引导用户在资源释放前重新授权，租约、原 owner/session 与网关撤销规则不变。
 
 本地 Next16.3.2/Turbopack 已启动，MCP 的路由与编译检查确认稀疏检出缺少接管页面及组件/工作流依赖，因此未宣称真实 UI 重连通过。完整检出 CI 和候选浏览器联调仍是必要验收。
+
+### Firefox 155 acceptance branch: controlled input dependency
+
+This branch pins Camofox service `8ac249cf510711996decb00fb478f466fed72916` from the integration fork, based on upstream1.16 commit `79d425be26743883a06613eaa3be5e38e7ab5409` with the same dependency lockfile. Controlled VNC starts without an input listener. Gateway admission must acquire a backend lease before issuing viewer capabilities; disconnect, expiry and revocation close input, and replacement waits for prior cleanup. The access key and release capability stay in the node process. An uncertain grant/release leaves automation paused and causes the agent to stop the affected container.
+
+Periodic browser egress probes pause during manual control. An explicitly authorized saved-login operation first closes/revokes the viewer, waits for cleanup, then fills the login; the user reconnects with a fresh broker ticket. This preserves the login feature without simultaneous manual and automated input.
+
+**Acceptance is incomplete.** HTTP gateway/control tests use a synthetic input backend; real Firefox155 + gateway + broker acceptance remains required. The existing local/Bake image build still selects Firefox152.0.4 and must not be used as Firefox155 candidate evidence. A build path that consumes the verified complete candidate is still required before this branch can be deployed or considered accepted. No release or production deployment is authorized by these tests.

@@ -4,6 +4,7 @@ import { once } from "node:events";
 import http from "node:http";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
+import { withAutomationControl } from "../ops/browser-node/control.mjs";
 import { createGateway } from "../ops/browser-node/gateway.mjs";
 
 async function fixture(upgradeDelay = 0) {
@@ -38,6 +39,7 @@ async function fixture(upgradeDelay = 0) {
   };
   const consumed = new Set();
   const gateway = createGateway({
+    acquireControl: async slot => ({ expiresAt: slot.expiresAt, release: async () => {} }),
     appOrigin: "https://app.example",
     slots: new Map([[slot.run.id, slot]]),
     port: 0,
@@ -212,6 +214,7 @@ test("admission binds Origin to the admitted run, not another slot", async () =>
   };
   const other = { ...victim, run: { id: randomUUID() }, gatewayOrigin: "https://other.example" };
   const gateway = createGateway({
+    acquireControl: async slot => ({ expiresAt: slot.expiresAt, release: async () => {} }),
     appOrigin: "https://app.example",
     port: 0,
     slots: new Map([
@@ -276,4 +279,114 @@ test("fresh broker authorization revokes old tunnel and capabilities before repl
     second?.destroy();
     f.close();
   }
+});
+
+// Real gateway -> backend HTTP calls; synthetic input backend, not Firefox proof.
+async function controlFixture({ delayGrant = false, delayRelease = false, failRelease = false } = {}) {
+  const calls = []; let allowGrant;
+  const barrier = new Promise(resolve => { allowGrant = resolve; });
+  const backend = http.createServer(async (request, response) => {
+    let raw = ''; for await (const chunk of request) raw += chunk;
+    const body = JSON.parse(raw); calls.push({ path: request.url, body, headers: request.headers });
+    assert.equal(request.headers.authorization, 'Bearer backend-only-test-key');
+    assert.equal(request.headers.origin, undefined);
+    if (request.url === '/control/acquire') {
+      if (delayGrant) await barrier;
+      response.setHeader('Content-Type', 'application/json');
+      response.end(JSON.stringify({ owner: body.userId, capability: 'c'.repeat(64), expiresAt: Date.now() + body.ttlMs }));
+    } else {
+      if (delayRelease) await barrier;
+      response.writeHead(failRelease ? 503 : 200, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ released: !failRelease }));
+    }
+  });
+  backend.listen(0, '127.0.0.1'); await once(backend, 'listening');
+  const slot = { run: { id: randomUUID(), accountId: randomUUID() }, apiPort: backend.address().port,
+    accessKey: 'backend-only-test-key', ready: true, stopping: false, expiresAt: Date.now() + 60000,
+    gatewayOrigin: 'https://browser.example', vncPort: 1, vncPassword: 'fixture-only' };
+  const gateway = createGateway({ appOrigin: 'https://app.example', slots: new Map([[slot.run.id, slot]]), port: 0,
+    nodeCall: async () => ({ runId: slot.run.id }) });
+  await once(gateway.server, 'listening');
+  const url = `http://127.0.0.1:${gateway.server.address().port}/admit`;
+  return { slot, gateway, calls, allowGrant,
+    admit: signal => fetch(url, { method: 'POST', headers: { Origin: slot.gatewayOrigin, 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket: 'synthetic' }), signal }),
+    async close() { allowGrant(); await gateway.closeRun(slot.run.id).catch(() => {}); gateway.close(); gateway.server.closeAllConnections(); backend.closeAllConnections(); await new Promise(resolve => backend.close(resolve)); },
+  };
+}
+async function until(predicate) {
+  for (let i = 0; i < 100; i++) { if (predicate()) return; await delay(10); }
+  assert.fail('condition not observed');
+}
+test('gateway waits for backend input grant and keeps control credentials backend-only', async () => {
+  const f = await controlFixture({ delayGrant: true });
+  try {
+    let delivered = false; const pending = f.admit().then(r => { delivered = true; return r; });
+    await until(() => f.calls.length === 1); await delay(30);
+    assert.equal(delivered, false); assert.equal(f.slot.controlPaused, true);
+    f.allowGrant(); const response = await pending; assert.equal(response.status, 200);
+    const text = await response.text(); assert(!text.includes('backend-only-test-key')); assert(!text.includes('c'.repeat(64)));
+    assert.deepEqual(Object.keys(JSON.parse(text)).sort(), ['module', 'password', 'websocket']);
+    await f.gateway.closeRun(f.slot.run.id);
+    assert.equal(f.slot.controlPaused, false);
+    assert.deepEqual(f.calls.map(c => c.path), ['/control/acquire', '/control/release']);
+    assert.deepEqual(f.calls[1].body, { userId: f.slot.run.accountId, capability: 'c'.repeat(64) });
+  } finally { await f.close(); }
+});
+test('run revocation while backend starts releases late grant without admission', async () => {
+  const f = await controlFixture({ delayGrant: true });
+  try {
+    const pending = f.admit(); await until(() => f.calls.length === 1);
+    const stopped = f.gateway.closeRun(f.slot.run.id); f.allowGrant();
+    const response = await pending; assert.equal(response.status, 403); await response.text(); await stopped;
+    assert.equal(f.slot.controlPaused, false); assert.equal(f.calls[1].path, '/control/release');
+  } finally { await f.close(); }
+});
+test('abandoned admission releases backend grant after actual startup', async () => {
+  const f = await controlFixture({ delayGrant: true }); const abort = new AbortController();
+  try {
+    const pending = f.admit(abort.signal); await until(() => f.calls.length === 1);
+    abort.abort(); await assert.rejects(pending); await delay(30); f.allowGrant();
+    await until(() => f.calls.length === 2); await until(() => !f.slot.controlPaused);
+    assert.equal(f.calls[1].path, '/control/release');
+  } finally { await f.close(); }
+});
+test('failed backend release forbids a fresh grant and keeps automation paused', async () => {
+  const f = await controlFixture({ failRelease: true });
+  try {
+    const first = await f.admit(); assert.equal(first.status, 200); await first.text();
+    const second = await f.admit(); assert.equal(second.status, 403); await second.text();
+    assert.equal(f.slot.controlPaused, true); assert.equal(f.slot.controlFailure, true);
+    const third = await f.admit(); assert.equal(third.status, 403); await third.text();
+    assert.equal(f.calls.filter(c => c.path === '/control/acquire').length, 1);
+  } finally { await f.close(); }
+});
+
+test('closeRun waits for release already started by another revocation', async () => {
+  const f = await controlFixture({ delayRelease: true });
+  try {
+    const response = await f.admit(); await response.text();
+    const first = f.gateway.closeRun(f.slot.run.id);
+    await until(() => f.calls.length === 2);
+    let done = false; const second = f.gateway.closeRun(f.slot.run.id).then(() => { done = true; });
+    await delay(30); assert.equal(done, false); assert.equal(f.slot.controlPaused, true);
+    f.allowGrant(); await Promise.all([first, second]); assert.equal(f.slot.controlPaused, false);
+  } finally { await f.close(); }
+});
+
+test('saved automation handoff waits for input cleanup and denies fresh viewers until done', async () => {
+  const f = await controlFixture({ delayRelease: true });
+  try {
+    const response = await f.admit(); await response.text();
+    let executed = false;
+    const operation = withAutomationControl(f.slot, f.gateway, async () => {
+      executed = true; assert.equal(f.slot.controlPaused, false);
+      const denied = await f.admit(); assert.equal(denied.status, 403); await denied.text();
+      return 'filled';
+    });
+    await until(() => f.calls.length === 2); assert.equal(executed, false);
+    assert.equal(f.slot.automationHandoff, true); f.allowGrant();
+    assert.equal(await operation, 'filled'); assert.equal(f.slot.automationHandoff, false);
+    assert.equal(f.calls.filter(c => c.path === '/control/acquire').length, 1);
+    const next = await f.admit(); assert.equal(next.status, 200); await next.text();
+  } finally { await f.close(); }
 });

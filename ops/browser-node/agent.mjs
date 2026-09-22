@@ -8,6 +8,7 @@ import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
+import { withAutomationControl } from "./control.mjs";
 import { createIdleExitPolicy } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
@@ -161,14 +162,16 @@ console.log("browser_node_ready");
 async function stop(slot, outcome = "failed") {
   if (slot.stopPromise) return slot.stopPromise;
   slot.stopping = true;
-  gateway.closeRun(slot.run.id);
+  const inputCleanup = gateway.closeRun(slot.run.id);
+  inputCleanup.catch(() => {});
   slot.stopPromise = (async () => {
     if (!slot.stopped) {
+      const inputStopped = await inputCleanup.then(() => true, () => false);
       // Wait for create/start to settle; never acknowledge a slot while a late
       // Docker create could still bring a browser online.
       slot.abort.abort();
       if (slot.startPromise) await slot.startPromise.catch(() => {});
-      if (slot.apiPort && slot.expiresAt > Date.now()) {
+      if (inputStopped && slot.apiPort && slot.expiresAt > Date.now()) {
         try {
           const response = await fetch(
             `http://127.0.0.1:${slot.apiPort}/sessions/${slot.run.accountId}/storage_state`,
@@ -246,7 +249,7 @@ async function launch(slot) {
   for (let i = 0; i < 30; i++) {
     const response = await browserRequest(slot, "/vnc/status");
     const status = await response.json();
-    if (status.running === true) break;
+    if (status.enabled === true && status.running === false && status.watcherRunning === false) break;
     if (i === 29) throw new Error("vnc_not_ready");
     await sleep(1000, undefined, { signal: slot.abort.signal });
   }
@@ -265,6 +268,7 @@ async function launch(slot) {
   delete slot.spec;
 }
 async function heartbeat(slot) {
+  if (slot.controlFailure) { await stop(slot, "unknown"); return; }
   if (slot.stopping) {
     await stop(slot, slot.outcome ?? "failed");
     return;
@@ -274,7 +278,8 @@ async function heartbeat(slot) {
     await stop(slot, "unknown");
     return;
   }
-  if (slot.ready && Date.now() - slot.egressCheckedAt >= 30_000) {
+  if (slot.ready && !slot.controlPaused && !slot.automationHandoff && Date.now() - slot.egressCheckedAt >= 30_000) {
+    slot.automationHandoff = true;
     try {
       await verifyBrowserEgress(
         (path, body) => browserRequest(slot, path, body),
@@ -286,7 +291,7 @@ async function heartbeat(slot) {
       slot.outcome = "egress_mismatch";
       await stop(slot, slot.outcome);
       return;
-    }
+    } finally { slot.automationHandoff = false; }
   }
   const renewed = await nodeCall("heartbeat", {
     runId: slot.run.id,
@@ -303,7 +308,7 @@ async function heartbeat(slot) {
     slot.ready &&
     slot.run.kind === "interactive" &&
     ((!slot.connected && !pendingConnection && Date.now() - slot.readyAt > 60_000) ||
-      (slot.disconnectedAt && Date.now() - slot.disconnectedAt > 15_000))
+      (slot.disconnectedAt && !slot.automationHandoff && Date.now() - slot.disconnectedAt > 15_000))
   ) {
     await stop(slot, "completed");
     return;
@@ -332,8 +337,7 @@ async function heartbeat(slot) {
       assertActive() {
         if (
           !slot.ready ||
-          !slot.connected ||
-          slot.disconnectedAt ||
+          (!slot.automationHandoff && (!slot.connected || slot.disconnectedAt)) ||
           slot.stopping ||
           slot.abort.signal.aborted ||
           slot.expiresAt <= Date.now()
@@ -357,7 +361,7 @@ async function heartbeat(slot) {
       browserRequest: (path, body) => browserRequest(slot, path, body),
     });
     // Run independently so slow navigation cannot starve other slots' lease heartbeats.
-    slot.loginTask = execute(renewed.loginAuthorization)
+    slot.loginTask = withAutomationControl(slot, gateway, () => execute(renewed.loginAuthorization))
       .then(async (outcome) => {
         if (outcome === "unknown") await stop(slot, "unknown");
       })

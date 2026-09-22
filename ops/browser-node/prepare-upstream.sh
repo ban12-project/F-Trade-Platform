@@ -8,9 +8,16 @@ printf '%s\n' "$PIN" | grep -Eq '^[0-9a-f]{40}$' || {
 }
 if [ ! -d upstream/.git ]; then
   git init upstream
-  git -C upstream remote add origin https://github.com/jo-inc/camofox-browser.git
+  git -C upstream remote add origin https://github.com/ban12-project/camofox-browser.git
 fi
-test "$(git -C upstream remote get-url origin)" = https://github.com/jo-inc/camofox-browser.git
+# This fixed fork commit adds control leases to the pinned upstream 1.16 base.
+# Only migrate the previously documented origin; refuse unrelated repositories.
+case "$(git -C upstream remote get-url origin)" in
+  https://github.com/jo-inc/camofox-browser.git)
+    git -C upstream remote set-url origin https://github.com/ban12-project/camofox-browser.git ;;
+  https://github.com/ban12-project/camofox-browser.git) ;;
+  *) printf '%s\n' 'Unexpected Camofox repository; refusing to replace it.' >&2; exit 1 ;;
+esac
 if [ -n "$(git -C upstream status --porcelain)" ]; then
   printf '%s\n' 'Upstream working tree is dirty; refusing to overwrite it.' >&2
   exit 1

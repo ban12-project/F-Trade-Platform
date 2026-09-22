@@ -107,6 +107,7 @@ export function containerSpec(nodeId, run, imageId, deadline) {
         "CAMOFOX_PORT=9377",
         `CAMOFOX_ACCESS_KEY=${accessKey}`,
         "ENABLE_VNC=1",
+        "CONTROLLED_VNC=1",
         "VNC_BIND=0.0.0.0",
         "VNC_RESOLUTION=1440x900",
         `VNC_PASSWORD=${vncPassword}`,
