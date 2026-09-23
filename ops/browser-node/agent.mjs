@@ -6,9 +6,9 @@ import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
-import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
+import { openEgressCheckedSession, verifyBrowserEgress, waitForBrowserReady } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
-import { createIdleExitPolicy } from "./idle.mjs";
+import { createIdleExitPolicy, viewerGraceExpired } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import {
@@ -17,6 +17,7 @@ import {
   loadLoginProfiles,
   loginProfileForRun,
   loginScopes,
+  loginStopOutcome,
 } from "./login.mjs";
 import { managedFacebookEnvironment } from "./managed-facebook.mjs";
 import { readPublicationMedia } from "./media.mjs";
@@ -231,17 +232,13 @@ async function launch(slot) {
   const details = await docker("GET", `/containers/${created.Id}/json`);
   slot.apiPort = Number(details.NetworkSettings.Ports["9377/tcp"][0].HostPort);
   slot.vncPort = Number(details.NetworkSettings.Ports["6080/tcp"][0].HostPort);
-  for (let i = 0; i < 60; i++) {
-    if (slot.stopping || slot.expiresAt <= Date.now()) throw new Error("start_cancelled");
-    try {
-      const response = await browserRequest(slot, "/health", undefined, 2000);
-      await response.body?.cancel();
-      break;
-    } catch {
-      if (i === 59) throw new Error("browser_start_timeout");
-      await sleep(1000, undefined, { signal: slot.abort.signal });
-    }
-  }
+  await waitForBrowserReady((path, body, timeout) => browserRequest(slot, path, body, timeout), {
+    assertActive() {
+      if (slot.stopping || slot.abort.signal.aborted || slot.expiresAt <= Date.now())
+        throw new Error("start_cancelled");
+    },
+    sleep: (ms) => sleep(ms, undefined, { signal: slot.abort.signal }),
+  });
   slot.egressTabId = await openEgressCheckedSession(
     (path, body) => browserRequest(slot, path, body),
     slot.run,
@@ -307,8 +304,17 @@ async function heartbeat(slot) {
   if (
     slot.ready &&
     slot.run.kind === "interactive" &&
-    ((!slot.connected && !pendingConnection && Date.now() - slot.readyAt > 60_000) ||
-      (slot.disconnectedAt && Date.now() - slot.disconnectedAt > 15_000))
+    viewerGraceExpired(
+      {
+        connected: slot.connected,
+        disconnectedAt: slot.disconnectedAt,
+        readyAt: slot.readyAt,
+        loginTask: Boolean(slot.loginTask),
+        pendingConnection,
+        automatic: loginProfileForRun(loginProfiles, slot.run)?.version === 2,
+      },
+      Date.now(),
+    )
   ) {
     await stop(slot, "completed");
     return;
@@ -323,8 +329,8 @@ async function heartbeat(slot) {
   if (slot.containerId) await renewWatchdog(docker, slot.containerId, slot.expiresAt);
   if (
     slot.ready &&
-    slot.connected &&
-    !slot.disconnectedAt &&
+    (loginProfileForRun(loginProfiles, slot.run)?.version === 2 ||
+      (slot.connected && !slot.disconnectedAt)) &&
     slot.run.kind === "interactive" &&
     renewed.loginAuthorization &&
     !slot.loginTask
@@ -337,8 +343,7 @@ async function heartbeat(slot) {
       assertActive() {
         if (
           !slot.ready ||
-          !slot.connected ||
-          slot.disconnectedAt ||
+          (profile.version !== 2 && (!slot.connected || slot.disconnectedAt)) ||
           slot.stopping ||
           slot.abort.signal.aborted ||
           slot.expiresAt <= Date.now()
@@ -364,9 +369,10 @@ async function heartbeat(slot) {
     // Run independently so slow navigation cannot starve other slots' lease heartbeats.
     slot.loginTask = execute(renewed.loginAuthorization)
       .then(async (outcome) => {
-        if (outcome === "unknown") await stop(slot, "unknown");
+        const reason = loginStopOutcome(profile.version, outcome);
+        if (reason) await stop(slot, reason);
       })
-      .catch(() => stop(slot, "unknown"));
+      .catch(() => stop(slot, loginStopOutcome(profile.version, "unknown")));
   }
 }
 let ticking = false;

@@ -9,6 +9,7 @@ import {
   facebookLoginSecretSchema,
   facebookProxySecretSchema,
 } from "@/lib/social/facebook-account-forms";
+import { updateFacebookLoginCiphertext } from "@/lib/social/facebook-login-credentials";
 import {
   type FacebookMediaSource,
   openFacebookMediaSource,
@@ -27,6 +28,7 @@ import {
 } from "./contracts";
 import { acceptInboxPacket, inboxSigningKey } from "./inbox";
 import {
+  AUTOMATIC_LOGIN_MS,
   bindInstallation,
   claimRun,
   enqueueRun,
@@ -114,6 +116,13 @@ async function validSession(
 async function savedLoginAccount(tx: DatabaseTransaction, row: NodeRow, run: Run, now: number) {
   const state = row.document;
   const account = state.accounts.find((item) => item.id === run.accountId);
+  const automatic = (state.loginFillScopes ?? []).some(
+    (scope) =>
+      scope.automatic === true &&
+      scope.channelRef === account?.channelRef &&
+      scope.accountRef === account?.accountRef &&
+      scope.expiresAt > now + 10000,
+  );
   const scopeExpiry = Math.max(
     0,
     ...(state.loginFillScopes ?? [])
@@ -129,7 +138,7 @@ async function savedLoginAccount(tx: DatabaseTransaction, row: NodeRow, run: Run
     run.requestedBy !== row.owner_id ||
     run.status !== "running" ||
     run.stopRequested ||
-    !run.ticketUsed ||
+    (!automatic && !run.ticketUsed) ||
     run.leaseUntil <= now + 10000 ||
     run.deadline <= now + 10000 ||
     !account?.enabled ||
@@ -301,11 +310,18 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
         throw new Error("run_forbidden");
       if (command.operation === "stop") requestStop(state, run);
       else if (command.operation === "use-saved-login") {
-        await savedLoginAccount(tx, row, run, now);
+        const { account } = await savedLoginAccount(tx, row, run, now);
         if (run.authSessionId !== actor.sessionId || run.savedLogin)
           throw new Error("saved_login_already_requested_or_wrong_session");
         run.savedLogin = {
           id: randomUUID(),
+          automatic: (state.loginFillScopes ?? []).some(
+            (scope) =>
+              scope.automatic === true &&
+              scope.accountRef === account.accountRef &&
+              scope.channelRef === account.channelRef &&
+              scope.expiresAt > now + 10000,
+          ),
           requestedAt: now,
           expiresAt: Math.min(now + 60000, run.leaseUntil, run.deadline),
           claimedAt: null,
@@ -379,14 +395,12 @@ async function grant(
     row.document.accounts.push(account);
   }
   const ring = configuredFacebookKeyring();
-  if (c.clearLogin) account.loginCiphertext = null;
-  else if (c.loginPassword)
-    account.loginCiphertext = encryptFacebookCredential(
-      facebookLoginSecretSchema.parse({ username: c.loginUsername, password: c.loginPassword }),
-      account,
-      "login",
-      ring,
-    );
+  account.loginCiphertext = updateFacebookLoginCiphertext(
+    c,
+    account.loginCiphertext,
+    account,
+    ring,
+  );
   if (c.clearProxy) account.proxyCiphertext = null;
   else if (c.proxyHost)
     account.proxyCiphertext = encryptFacebookCredential(
@@ -566,20 +580,50 @@ async function nodeOperation(
   }
   const run = state.runs.find((r) => r.id === request.runId);
   if (!run || run.leaseId !== request.leaseId) throw new Error("lease_mismatch");
+  if (request.operation === "login-challenge") {
+    await savedLoginAccount(tx, row, run, now);
+    const authorization = run.savedLogin;
+    if (
+      !authorization?.automatic ||
+      authorization.id !== request.authorizationId ||
+      authorization.outcome ||
+      authorization.expiresAt <= now
+    )
+      throw new Error("saved_login_challenge_not_authorized");
+    await savedLoginAccount(tx, row, run, now);
+    const replayed = authorization.challenge === "checkpoint";
+    authorization.challenge = "checkpoint";
+    if (!replayed) await audit(tx, row.owner_id, "browser_credentials.login_checkpoint", run.id);
+    return { recorded: true, replayed };
+  }
   if (request.operation === "login-result") {
     const authorization = run.savedLogin;
     if (
       run.kind !== "interactive" ||
       !authorization ||
       authorization.id !== request.authorizationId ||
-      (authorization.claimedAt === null && request.outcome !== "refused")
+      (authorization.claimedAt === null &&
+        request.outcome !== "refused" &&
+        !(authorization.automatic && ["ready", "unknown"].includes(request.outcome)))
     )
       throw new Error("saved_login_result_not_authorized");
-    if (authorization.outcome && authorization.outcome !== request.outcome)
+    if (request.challenge && (request.outcome !== "refused" || !authorization.automatic))
+      throw new Error("saved_login_challenge_not_authorized");
+    if (
+      authorization.outcome &&
+      (authorization.outcome !== request.outcome || authorization.challenge !== request.challenge)
+    )
       throw new Error("saved_login_result_conflict");
     const replayed = !!authorization.outcome;
     if (!replayed) {
+      if (request.outcome === "ready") {
+        if (!authorization.automatic) throw new Error("automatic_login_required");
+        if (authorization.expiresAt <= now) throw new Error("saved_login_expired");
+        const { account } = await savedLoginAccount(tx, row, run, now);
+        account.authState = "ready";
+      }
       authorization.outcome = request.outcome;
+      authorization.challenge = request.challenge;
       await audit(tx, row.owner_id, `browser_credentials.login_${request.outcome}`, run.id);
     }
     return { recorded: true, replayed };
@@ -598,15 +642,19 @@ async function nodeOperation(
     const credential = facebookLoginSecretSchema.parse(
       decryptFacebookCredential(loginCiphertext, account, "login", configuredFacebookKeyring()),
     );
+    if (!authorization.automatic) {
+      delete credential.totpSecret;
+      delete credential.messengerPin;
+    }
     authorization.claimedAt = now;
     await audit(tx, row.owner_id, "browser_credentials.login_released", run.id);
     return {
       credential,
       authorizationId: authorization.id,
       expiresAt: Math.min(
-        now + 30000,
+        now + (authorization.automatic ? AUTOMATIC_LOGIN_MS : 30000),
         authorization.expiresAt,
-        run.leaseUntil,
+        ...(authorization.automatic ? [] : [run.leaseUntil]),
         run.deadline,
         scopeExpiry,
       ),
@@ -662,6 +710,32 @@ async function nodeOperation(
   )
     requestStop(state, run);
   const renewed = renewRun(state, run.id, request.leaseId, request.ready, now);
+  const loginAccount = state.accounts.find((account) => account.id === run.accountId);
+  if (
+    renewed &&
+    run.kind === "interactive" &&
+    !run.savedLogin &&
+    (state.loginFillScopes ?? []).some(
+      (scope) =>
+        scope.automatic === true &&
+        scope.channelRef === loginAccount?.channelRef &&
+        scope.accountRef === loginAccount?.accountRef &&
+        scope.expiresAt > now + 10000,
+    )
+  ) {
+    try {
+      const { scopeExpiry } = await savedLoginAccount(tx, row, run, now);
+      run.savedLogin = {
+        id: randomUUID(),
+        automatic: true,
+        requestedAt: now,
+        expiresAt: Math.min(now + AUTOMATIC_LOGIN_MS, run.deadline, scopeExpiry),
+        claimedAt: null,
+      };
+    } catch {
+      /* Keep normal heartbeat; missing/revoked credentials never cause a release. */
+    }
+  }
   let loginAuthorization: { id: string; expiresAt: number } | undefined;
   if (
     renewed &&

@@ -205,7 +205,7 @@ test("saved password fill uses the actual owner action and never returns credent
   // Node receipts reach this page through its five-second status refresh.
   // Allow the next refresh plus request latency instead of racing its interval.
   await expect(
-    page.getByText("填充结果未知，本次不再重试。请重新接入后核对。", { exact: true }),
+    page.getByText("登录结果未知，本次不再重试。请重新接入后核对。", { exact: true }),
   ).toBeVisible({ timeout: 15_000 });
   const interrupted = await pool.query("SELECT document FROM browser_fleet_node WHERE id=$1", [
     nodeId,
@@ -226,6 +226,47 @@ test("saved password fill uses the actual owner action and never returns credent
   expect(rows.rows[0].document.accounts[0].authState).toBe("needs_login");
   expect(await page.content()).not.toContain(credential.password);
   expect(await page.content()).not.toContain(credential.username);
+  // Replace this synthetic fixture with an automatic challenge result to verify
+  // the polling UI. Broker authorization/replay rules have separate DB coverage.
+  const challengeState = rows.rows[0].document;
+  Object.assign(challengeState.runs[0], {
+    status: "running",
+    leaseUntil: Date.now() + 90000,
+    deadline: Date.now() + 600000,
+  });
+  Object.assign(challengeState.runs[0].savedLogin, {
+    automatic: true,
+    outcome: undefined,
+    claimedAt: Date.now(),
+    expiresAt: Date.now() + 180000,
+    challenge: "checkpoint",
+  });
+  await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+    nodeId,
+    JSON.stringify(challengeState),
+  ]);
+  await expect(
+    page.getByText("等待人工验证，请接入远程页面；完成后自动继续。", { exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  await expect(
+    page.getByText("请在远程页面完成人机或设备验证，程序将在本次授权有效期内自动继续。", {
+      exact: true,
+    }),
+  ).toBeVisible({ timeout: 15000 });
+  challengeState.runs[0].savedLogin.outcome = "refused";
+  await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+    nodeId,
+    JSON.stringify(challengeState),
+  ]);
+  await expect(
+    page.getByText(
+      "Facebook 要求额外的人机或设备验证。请人工完成验证后重新接入；本次未自动重试。",
+      {
+        exact: true,
+      },
+    ),
+  ).toBeVisible({ timeout: 15_000 });
+  expect(await page.content()).not.toContain(credential.password);
 });
 
 test("owner page reads managed lifecycle changes while cloud provisioning stays disabled", async ({

@@ -7,7 +7,15 @@ import type { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -32,6 +40,10 @@ type Connection = {
 const emptyCredentials = {
   loginUsername: "",
   loginPassword: "",
+  totpSecret: "",
+  messengerPin: "",
+  clearTotp: false,
+  clearPin: false,
   proxyHost: "",
   proxyPort: "",
   proxyUsername: "",
@@ -48,7 +60,7 @@ const stateLabels: Record<string, string> = {
   completed: "已释放",
   failed: "未完成",
   unknown: "结果未知",
-  ready: "已人工确认",
+  ready: "登录已就绪",
   needs_login: "需要登录",
   needs_2fa: "需要 2FA",
   checkpoint: "需要安全验证",
@@ -167,16 +179,28 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
         scope.channelRef === connectedAccount.channelRef &&
         scope.accountRef === connectedAccount.accountRef,
     );
+  const challengeStatus = connectedRun?.savedLoginChallenge
+    ? {
+        checkpoint: connectedRun.savedLoginOutcome
+          ? "Facebook 要求额外的人机或设备验证。请人工完成验证后重新接入；本次未自动重试。"
+          : "请在远程页面完成人机或设备验证，程序将在本次授权有效期内自动继续。",
+        rejected: "Facebook 拒绝了本次验证。请核对账号凭据及验证设置后重新接入。",
+        unsupported_factor: "当前验证方式无法自动处理。请人工完成验证后重新接入。",
+      }[connectedRun.savedLoginChallenge]
+    : null;
   const loginStatus =
-    connectedRun?.savedLoginOutcome === "filled"
-      ? "已填入，请在远程页面完成登录和 2FA。"
-      : connectedRun?.savedLoginOutcome === "refused"
-        ? "未能填入，请在远程页面检查登录表单。"
-        : connectedRun?.savedLoginOutcome === "unknown"
-          ? "填充结果未知，本次不再重试。请重新接入后核对。"
-          : connectedRun?.savedLoginState
-            ? "填充请求已记录，正在等待节点结果。"
-            : "仅填入已保存的账号和密码；请自行检查并提交登录。需要已接入浏览器及有效的登录页面规则。";
+    challengeStatus ??
+    (connectedRun?.savedLoginOutcome === "ready"
+      ? "已自动完成账号身份与 Messenger 恢复验证。"
+      : connectedRun?.savedLoginOutcome === "filled"
+        ? "已填入，请在远程页面完成登录和 2FA。"
+        : connectedRun?.savedLoginOutcome === "refused"
+          ? "登录操作已拒绝，请检查账号状态和登录页面规则。"
+          : connectedRun?.savedLoginOutcome === "unknown"
+            ? "登录结果未知，本次不再重试。请重新接入后核对。"
+            : connectedRun?.savedLoginState
+              ? "填充请求已记录，正在等待节点结果。"
+              : "仅填入已保存的账号和密码；请自行检查并提交登录。需要已接入浏览器及有效的登录页面规则。");
   return (
     <div className="space-y-6">
       <p role="status" className="text-sm text-muted-foreground">
@@ -331,6 +355,8 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
               [
                 ["loginUsername", "Facebook 登录名（可选）"],
                 ["loginPassword", "Facebook 密码（可选，加密保存）"],
+                ["totpSecret", "2FA Base32 密钥（可选，加密保存）"],
+                ["messengerPin", "Messenger PIN（可选，加密保存）"],
                 ["proxyHost", "固定 HTTP 代理主机"],
                 ["proxyPort", "代理端口"],
                 ["proxyUsername", "代理用户名"],
@@ -341,7 +367,11 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                 <FieldLabel htmlFor={`credential-${name}`}>{label}</FieldLabel>
                 <Input
                   id={`credential-${name}`}
-                  type={name.endsWith("Password") ? "password" : "text"}
+                  type={
+                    name.endsWith("Password") || name === "totpSecret" || name === "messengerPin"
+                      ? "password"
+                      : "text"
+                  }
                   autoComplete="off"
                   {...accountForm.register(`credentials.${name}`)}
                   disabled={busy}
@@ -349,6 +379,41 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                 <FieldError errors={[accountForm.formState.errors.credentials?.[name]]} />
               </Field>
             ))}
+            <FieldSet>
+              <FieldLegend>清除已保存的凭据</FieldLegend>
+              <FieldDescription>
+                输入留空会保留原值。勾选后，在保存账号授权时清除。
+              </FieldDescription>
+              {(
+                [
+                  ["clearTotp", "清除已保存的 2FA 密钥"],
+                  ["clearPin", "清除已保存的 Messenger PIN"],
+                  ["clearLogin", "清除全部登录凭据及验证密钥"],
+                ] as const
+              ).map(([name, label]) => (
+                <Field
+                  key={name}
+                  orientation="horizontal"
+                  data-invalid={!!accountForm.formState.errors.credentials?.[name]}
+                >
+                  <Controller
+                    control={accountForm.control}
+                    name={`credentials.${name}`}
+                    render={({ field }) => (
+                      <Checkbox
+                        id={`credential-${name}`}
+                        checked={field.value ?? false}
+                        onCheckedChange={field.onChange}
+                        disabled={busy}
+                        aria-invalid={!!accountForm.formState.errors.credentials?.[name]}
+                      />
+                    )}
+                  />
+                  <FieldLabel htmlFor={`credential-${name}`}>{label}</FieldLabel>
+                  <FieldError errors={[accountForm.formState.errors.credentials?.[name]]} />
+                </Field>
+              ))}
+            </FieldSet>
             <Button type="submit" disabled={busy || !nodes.length}>
               保存账号授权
             </Button>
@@ -465,6 +530,11 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                     key={run.id}
                   >
                     <Badge variant="outline">{stateLabels[run.status] ?? run.status}</Badge>
+                    {run.savedLoginChallenge === "checkpoint" && !run.savedLoginOutcome && (
+                      <span role="status" className="text-sm">
+                        等待人工验证，请接入远程页面；完成后自动继续。
+                      </span>
+                    )}
                     <span className="text-sm">
                       {node.accounts.find((a) => a.id === run.accountId)?.accountRef} · {run.kind}
                     </span>

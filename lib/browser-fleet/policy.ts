@@ -55,7 +55,9 @@ export type Run = {
     requestedAt: number;
     expiresAt: number;
     claimedAt: number | null;
-    outcome?: "filled" | "refused" | "unknown";
+    automatic?: boolean;
+    outcome?: "filled" | "ready" | "refused" | "unknown";
+    challenge?: "checkpoint" | "rejected" | "unsupported_factor";
   };
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
@@ -79,7 +81,12 @@ export type FleetState = {
   installationId: string | null;
   bootId: string | null;
   capabilities: RunKind[];
-  loginFillScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
+  loginFillScopes?: Array<{
+    channelRef: string;
+    accountRef: string;
+    expiresAt: number;
+    automatic?: boolean;
+  }>;
   inboxScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   publicationScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   lastSeenAt: number;
@@ -87,6 +94,9 @@ export type FleetState = {
   runs: Run[];
 };
 export const LEASE_MS = 90_000;
+// Automatic login spans several navigations. Runtime operations still require
+// the independently renewed 90-second lease at every observation/submission.
+export const AUTOMATIC_LOGIN_MS = 180_000;
 export const LIVE_STATUSES: RunStatus[] = ["starting", "running", "stopping", "quarantined"];
 export const isLive = (run: Run) => LIVE_STATUSES.includes(run.status);
 export function initialState(limits: Limits): FleetState {
@@ -374,7 +384,10 @@ export function finishRun(
     }
   }
 }
-function savedLoginOutcome(run: Run, now: number): "filled" | "refused" | "unknown" | null {
+function savedLoginOutcome(
+  run: Run,
+  now: number,
+): "filled" | "ready" | "refused" | "unknown" | null {
   const authorization = run.savedLogin;
   if (!authorization) return null;
   if (authorization.outcome) return authorization.outcome;
@@ -382,9 +395,13 @@ function savedLoginOutcome(run: Run, now: number): "filled" | "refused" | "unkno
     run.status !== "running" || run.stopRequested || run.leaseUntil <= now || run.deadline <= now;
   if (authorization.claimedAt === null)
     return inactive || authorization.expiresAt <= now ? "refused" : null;
-  // Credential validity is at most 30 seconds. Allow the node's 10-second
+  // Allow the node's 10-second
   // result transport timeout, then show uncertainty instead of waiting forever.
-  const receiptDueAt = Math.min(authorization.expiresAt, authorization.claimedAt + 30000) + 10000;
+  const receiptDueAt =
+    Math.min(
+      authorization.expiresAt,
+      authorization.claimedAt + (authorization.automatic ? AUTOMATIC_LOGIN_MS : 30000),
+    ) + 10000;
   return inactive || receiptDueAt <= now ? "unknown" : null;
 }
 export function publicState(state: FleetState, now = Date.now()) {
@@ -403,6 +420,7 @@ export function publicState(state: FleetState, now = Date.now()) {
       return {
         ...r,
         savedLoginOutcome: savedLoginOutcome(run, now),
+        savedLoginChallenge: savedLogin?.challenge ?? null,
         savedLoginState: savedLogin
           ? savedLogin.claimedAt === null
             ? "requested"

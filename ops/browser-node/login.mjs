@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { localDeadline } from "./lease.mjs";
+import { localDeadline, localLoginAuthorizationDeadline } from "./lease.mjs";
+import { runFacebookLoginFlow } from "./login-flow.mjs";
 import { validateLoginProfile } from "./login-plugin/index.js";
 
 export async function loadLoginProfiles(path) {
@@ -31,11 +32,13 @@ export function loginScopes(profiles) {
     channelRef,
     accountRef,
     expiresAt: Date.parse(profile.expiresAt),
+    ...(profile.version === 2 ? { automatic: true } : {}),
   }));
 }
 export function loginProfileForRun(profiles, run) {
   if (run.kind !== "interactive") return null;
   const profile = profiles.get(JSON.stringify([run.channelRef, run.accountRef]))?.profile;
+  if (profile?.version === 2 && profile.automation.accountRef !== run.accountRef) return null;
   return profile && Date.parse(profile.expiresAt) > Date.now()
     ? validateLoginProfile(profile)
     : null;
@@ -45,6 +48,7 @@ export function configureLoginRuntime(spec, run, profile) {
   spec.body.Env.push(
     `FTRADE_ACCOUNT_ID=${run.accountId}`,
     `FTRADE_RUN_ID=${run.id}`,
+    ...(profile.version === 2 ? [`FTRADE_ACCOUNT_REF=${run.accountRef}`] : []),
     "FTRADE_RUN_KIND=interactive",
     `FTRADE_LOGIN_PROFILE_JSON=${JSON.stringify(validateLoginProfile(profile))}`,
   );
@@ -87,13 +91,14 @@ export function createSavedLoginExecutor({
     let release;
     let claimAttempted = false;
     let outcome = "refused";
+    let challenge;
     try {
       if (run.kind !== "interactive" || !notice?.id) throw new Error("login_scope_invalid");
       assertActive();
       validateLoginProfile(profile);
       const status = await json(await browserRequest("/ftrade/login-status"));
       if (
-        status.version !== 1 ||
+        status.version !== profile.version ||
         status.runId !== run.id ||
         status.accountId !== run.accountId ||
         status.reviewRef !== profile.reviewRef ||
@@ -114,50 +119,117 @@ export function createSavedLoginExecutor({
         typeof tab.tabId !== "string" ||
         !tab.tabId ||
         tab.tabId.length > 200 ||
-        tab.url !== profile.url
+        (profile.version === 1
+          ? tab.url !== profile.url
+          : new URL(tab.url).origin !== "https://www.facebook.com")
       )
         throw new Error("login_navigation_invalid");
       // Navigation can take time; recheck egress and connection before releasing a credential.
       await checkEgress();
       assertActive();
-      claimAttempted = true;
-      release = await request("claim-login", {
-        runId: run.id,
-        leaseId: run.leaseId,
-        authorizationId: notice.id,
-      });
-      const credential = release.credential;
-      if (
-        release.authorizationId !== notice.id ||
-        typeof credential?.username !== "string" ||
-        !credential.username ||
-        credential.username.length > 320 ||
-        typeof credential.password !== "string" ||
-        !credential.password ||
-        credential.password.length > 4096
-      )
-        throw new Error("login_release_invalid");
-      const expiresAt = localDeadline(release, release.expiresAt);
+      const acquireCredentials = async () => {
+        if (profile.version === 2) await checkEgress();
+        assertActive();
+        claimAttempted = true;
+        release = await request("claim-login", {
+          runId: run.id,
+          leaseId: run.leaseId,
+          authorizationId: notice.id,
+        });
+        const credential = release.credential;
+        if (
+          release.authorizationId !== notice.id ||
+          typeof credential?.username !== "string" ||
+          !credential.username ||
+          credential.username.length > 320 ||
+          typeof credential.password !== "string" ||
+          !credential.password ||
+          credential.password.length > 4096
+        )
+          throw new Error("login_release_invalid");
+        return credential;
+      };
+      let expiresAt = Math.min(
+        Date.now() + 175000,
+        profile.version === 2 ? notice.expiresAt - 5000 : Date.now() + 30000,
+        Date.parse(profile.expiresAt),
+      );
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error("login_expired");
       assertActive();
       validateLoginProfile(profile);
-      const result = await json(
-        await browserRequest("/ftrade/login-fill", {
+      if (profile.version === 2) {
+        const packet = {
           userId: run.accountId,
           runId: run.id,
           requestId: notice.id,
           tabId: tab.tabId,
-          username: credential.username,
-          password: credential.password,
           expiresAt,
-        }),
-      );
-      outcome = ["filled", "refused"].includes(result.outcome) ? result.outcome : "unknown";
+        };
+        const result = await runFacebookLoginFlow({
+          acquireCredentials: async () => {
+            const credential = await acquireCredentials();
+            packet.expiresAt = Math.min(
+              expiresAt,
+              localLoginAuthorizationDeadline(release, release.expiresAt),
+            );
+            return credential;
+          },
+          deadline: expiresAt,
+          assertActive,
+          onAttention: async (reason) => {
+            const receipt = await request("login-challenge", {
+              runId: run.id,
+              leaseId: run.leaseId,
+              authorizationId: notice.id,
+              challenge: reason,
+            });
+            if (receipt.recorded !== true) throw new Error("challenge_not_recorded");
+            challenge = reason;
+          },
+          observe: async () => json(await browserRequest("/ftrade/login-observe", packet)),
+          submit: async (phase, values) => {
+            await checkEgress();
+            assertActive();
+            return (
+              await json(await browserRequest("/ftrade/login-submit", { ...packet, phase, values }))
+            ).outcome;
+          },
+        });
+        outcome =
+          result.outcome === "ready"
+            ? "ready"
+            : result.outcome === "unknown"
+              ? "unknown"
+              : "refused";
+        if (
+          result.outcome === "attention" &&
+          ["checkpoint", "rejected", "unsupported_factor"].includes(result.reason)
+        )
+          challenge = result.reason;
+      } else {
+        const credential = await acquireCredentials();
+        expiresAt = localDeadline(release, release.expiresAt);
+        const result = await json(
+          await browserRequest("/ftrade/login-fill", {
+            userId: run.accountId,
+            runId: run.id,
+            requestId: notice.id,
+            tabId: tab.tabId,
+            username: credential.username,
+            password: credential.password,
+            expiresAt,
+          }),
+        );
+        outcome = ["filled", "refused"].includes(result.outcome) ? result.outcome : "unknown";
+      }
     } catch {
       outcome = claimAttempted ? "unknown" : "refused";
     } finally {
       if (release?.credential) {
         delete release.credential.username;
         delete release.credential.password;
+        delete release.credential.totpSecret;
+        delete release.credential.messengerPin;
         delete release.credential;
       }
     }
@@ -168,6 +240,7 @@ export function createSavedLoginExecutor({
           leaseId: run.leaseId,
           authorizationId: notice.id,
           outcome,
+          ...(challenge && outcome === "refused" ? { challenge } : {}),
         });
       } catch {
         outcome = "unknown";
@@ -175,4 +248,12 @@ export function createSavedLoginExecutor({
     }
     return outcome;
   };
+}
+
+/** Uncertain automatic observations pause work; they do not establish logout. */
+export function loginStopOutcome(version, outcome) {
+  if (version === 2) return outcome === "ready" ? "completed" : "page_contract_failed";
+  if (outcome === "ready") return "completed";
+  if (outcome === "unknown") return "unknown";
+  return null;
 }

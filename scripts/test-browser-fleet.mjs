@@ -21,6 +21,8 @@ import {
   matches,
   secureOrigin,
 } from "../lib/browser-fleet/security.ts";
+import { loginStopOutcome } from "../ops/browser-node/login.mjs";
+import { runFacebookLoginFlow } from "../ops/browser-node/login-flow.mjs";
 
 function fixture(slots = 1) {
   const state = initialState({ maxBrowsers: slots, memoryBudgetMb: 4096, browserMemoryMb: 2048 });
@@ -399,4 +401,39 @@ test("reopening a healthy interactive run still coalesces", () => {
   claim(state);
   assert.equal(enqueue(state, "a", "interactive", 2000).id, original.id);
   assert.equal(state.runs.length, 1);
+});
+
+test("loading and unknown session observations pause work without declaring logout", async () => {
+  for (const observation of [{ state: "loading", originVerified: true }, { outcome: "unknown" }]) {
+    let time = 0,
+      claims = 0,
+      submissions = 0;
+    const result = await runFacebookLoginFlow({
+      observe: async () => observation,
+      acquireCredentials: async () => {
+        claims++;
+        throw Error("must_not_claim");
+      },
+      submit: async () => {
+        submissions++;
+        return "submitted";
+      },
+      assertActive() {},
+      deadline: 1000,
+      now: () => time,
+      sleep: async (ms) => {
+        time += ms;
+      },
+    });
+    const state = fixture();
+    enqueue(state);
+    const run = claim(state);
+    finishRun(state, run.id, loginStopOutcome(2, result.outcome), true, 1100);
+    assert.equal(claims, 0);
+    assert.equal(submissions, 0);
+    assert.equal(state.accounts[0].authState, "page_contract_failed");
+    assert.equal(run.status, "failed");
+    scheduleInbox(state, 2000, randomUUID);
+    assert.equal(state.runs.filter((r) => r.accountId === "a").length, 1);
+  }
 });
