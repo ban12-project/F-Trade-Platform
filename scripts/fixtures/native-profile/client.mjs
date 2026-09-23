@@ -20,7 +20,10 @@ try {
       signal: AbortSignal.timeout(90000),
     });
     const d = await r.json();
-    if (!r.ok) throw Error(`http_${r.status}`);
+    if (!r.ok) {
+      const reason = JSON.stringify(d).match(/native_profile_[a-z_]+|Browser launch timeout/);
+      throw Error(`http_${r.status}:${reason?.[0] ?? "runtime_request_failed"}`);
+    }
     return d;
   }
   for (let i = 0; i < 60; i++) {
