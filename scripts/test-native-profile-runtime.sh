@@ -11,8 +11,9 @@ cleanup() {
 trap cleanup EXIT
 # This is synthetic storage only. Never point this fixture at an account volume.
 docker volume create "$volume" >/dev/null
-docker run --rm --network none -v "$volume:/data" --entrypoint node "$NATIVE_PROFILE_IMAGE" \
-  --input-type=module -e 'import {initializeNativeProfile} from "/app/ftrade-native-profile.mjs"; await initializeNativeProfile({accountId:"22222222-2222-4222-8222-222222222222",nodeId:"11111111-1111-4111-8111-111111111111",source:"empty"});'
+docker run --rm --network none -v "$volume:/data" \
+  -v "$fixture:/app/plugins/synthetic-profile:ro" --entrypoint node "$NATIVE_PROFILE_IMAGE" \
+  /app/plugins/synthetic-profile/initialize.mjs
 start() {
   local deadline=$(( $(date +%s) * 1000 + 90000 ))
   docker run -d --name "$name" --network none --read-only --init \

@@ -1,4 +1,5 @@
-import { writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const renew = () => writeFileSync("/tmp/ftrade-lease", String(Date.now() + 90000), { mode: 0o600 });
 renew();
@@ -28,6 +29,14 @@ try {
     await new Promise((r) => setTimeout(r, 1000));
   }
   await req("/start", {});
+  const manifest = JSON.parse(readFileSync("/data/native-profile-v1/owner.json", "utf8"));
+  const hash = createHash("sha256").update(manifest.accountId).digest("hex").slice(0, 32);
+  const source = readFileSync(`/data/profiles/${hash}/storage-state.json`);
+  if (
+    !manifest.imported ||
+    createHash("sha256").update(source).digest("hex") !== manifest.legacyDigest
+  )
+    throw Error("migration_manifest_or_original_changed");
   const mode = process.argv[2];
   const userId = "22222222-2222-4222-8222-222222222222";
   const t = await req("/tabs", {
@@ -49,7 +58,10 @@ try {
       passed = true;
       break;
     }
-    if (str.includes("synthetic_failed")) throw Error("fixture_failed");
+    if (str.includes("synthetic_failed")) {
+      const failure = str.match(/synthetic_failed_[a-z_]+/);
+      throw Error(failure?.[0] ?? "fixture_failed");
+    }
     await new Promise((r) => setTimeout(r, 500));
   }
   if (!passed) throw Error("snapshot_not_ready");
