@@ -88,7 +88,9 @@ async function automaticLoginPage({
     const authenticatorPage = () => {
       const current = new URL(location.href);
       const keys = [];
-      current.searchParams.forEach((_value, key) => keys.push(key));
+      current.searchParams.forEach((_value, key) => {
+        keys.push(key);
+      });
       return (
         auto.totp.mode === "facebook-authenticator" &&
         current.origin + current.pathname === auto.totp.url &&
