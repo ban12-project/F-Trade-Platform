@@ -7,6 +7,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { register as registerCompatibility } from "../ops/browser-node/compatibility-plugin/index.js";
 import {
   createConnectionDiagnostics,
   register as registerDiagnostics,
@@ -27,6 +28,29 @@ import {
 import { publicationUploadArchive, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
 
 const nodeId = randomUUID();
+test("browser compatibility hook preserves proxy and unrelated preferences across launches", () => {
+  const events = new EventEmitter();
+  registerCompatibility({}, { events }, { enabled: true });
+  for (const firefoxUserPrefs of [undefined, { "network.http.http2.enabled": true }]) {
+    const proxy = { server: "http://proxy.example:3128" };
+    const options = { proxy, firefoxUserPrefs };
+    events.emit("browser:launching", { options });
+    assert.equal(options.proxy, proxy);
+    assert.equal(options.firefoxUserPrefs["network.http.http2.websockets"], false);
+    if (firefoxUserPrefs) {
+      assert.equal(options.firefoxUserPrefs["network.http.http2.enabled"], true);
+      assert.deepEqual(firefoxUserPrefs, { "network.http.http2.enabled": true });
+    }
+  }
+});
+
+test("browser compatibility plugin is inactive unless enabled", () => {
+  const events = new EventEmitter();
+  registerCompatibility({}, { events });
+  registerCompatibility({}, { events }, { enabled: false });
+  assert.equal(events.listenerCount("browser:launching"), 0);
+});
+
 const accountId = randomUUID();
 const run = {
   id: randomUUID(),
