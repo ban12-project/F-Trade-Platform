@@ -1,5 +1,12 @@
 // biome-ignore lint/correctness/noUnusedVariables: Read as a fixed page program by the plugin.
-function automaticLoginPage({ profile, operation, phase, values, expiresAt, sessionIdentity }) {
+async function automaticLoginPage({
+  profile,
+  operation,
+  phase,
+  values,
+  expiresAt,
+  sessionIdentity,
+}) {
   let attempted = false;
   try {
     const auto = profile.automation;
@@ -78,12 +85,36 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
             : "refused";
       }
     }
+    const authenticatorPage = () => {
+      const current = new URL(location.href);
+      const keys = [];
+      current.searchParams.forEach((_value, key) => keys.push(key));
+      return (
+        auto.totp.mode === "facebook-authenticator" &&
+        current.origin + current.pathname === auto.totp.url &&
+        !current.hash &&
+        keys.every((key) => ["encrypted_context", "flow", "next"].includes(key)) &&
+        new Set(keys).size === keys.length &&
+        (current.searchParams.get("encrypted_context")?.length ?? 0) > 0 &&
+        current.searchParams.get("encrypted_context").length <= 4096 &&
+        current.searchParams.get("flow") === "two_factor_login" &&
+        [null, "", "/", "/messages/"].includes(current.searchParams.get("next")) &&
+        matches(auto.totp.marker).filter(
+          (element) => element.textContent.trim() === "Go to your authentication app",
+        ).length === 1
+      );
+    };
     const states = [];
     for (const attention of ["checkpoint", "rejected"])
       if (matches(auto[attention]).length) states.push(attention);
     if (location.href === profile.url && matches(profile.form).length) states.push("password");
     for (const name of ["totp", "pin"])
-      if (location.href === auto[name].url && matches(auto[name].marker).length) states.push(name);
+      if (
+        name === "totp" && auto.totp.mode === "facebook-authenticator"
+          ? authenticatorPage()
+          : location.href === auto[name].url && matches(auto[name].marker).length
+      )
+        states.push(name);
     const readyRoots = location.href === auto.ready.url ? matches(auto.ready.marker) : [];
     let restored = false;
     if (readyRoots.length === 1 && !matches('[role="dialog"]').length) {
@@ -183,20 +214,47 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
       fill(password, values.password);
     } else {
       if (phase === "pin" && !identityVerified) return "refused";
+      const authenticator = phase === "totp" && auto.totp.mode === "facebook-authenticator";
+      const continueButton = () => {
+        const buttons = matches(auto.totp.submit).filter(
+          (element) => element.textContent.trim() === "Continue",
+        );
+        if (buttons.length !== 1) throw new Error("ambiguous");
+        return buttons[0];
+      };
       const input = one(auto[phase].input);
-      submit = auto[phase].submit === null ? null : one(auto[phase].submit);
+      submit = authenticator
+        ? continueButton()
+        : auto[phase].submit === null
+          ? null
+          : one(auto[phase].submit);
       if (
         overridesForm(submit) ||
         !editable(input) ||
         !["text", "tel", "number", "password"].includes(input.type) ||
         !/^[0-9]{6}$/.test(values.code) ||
         Date.now() >= values.expiresAt ||
-        (submit !== null &&
+        (!authenticator &&
+          submit !== null &&
           !ariaButton(submit) &&
           (!(submit instanceof HTMLButtonElement) || submit.disabled))
       )
         return "refused";
       if (
+        authenticator &&
+        (!authenticatorPage() ||
+          input.name ||
+          !input.form ||
+          input.form.method.toLowerCase() !== "get" ||
+          input.form.action !== location.href ||
+          (input.form.target && input.form.target !== "_self") ||
+          submit.tagName !== "DIV" ||
+          submit.getAttribute("role") !== "button" ||
+          !["-1", "0"].includes(submit.getAttribute("tabindex")))
+      )
+        return "refused";
+      if (
+        !authenticator &&
         input.form &&
         ((input.form.target && input.form.target !== "_self") ||
           input.form.method.toLowerCase() !== "post" ||
@@ -206,6 +264,23 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
         return "refused";
       attempted = true;
       fill(input, values.code);
+      if (authenticator) {
+        const currentUrl = location.href;
+        for (let wait = 0; wait < 30 && !ariaButton(submit); wait++) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          submit = continueButton();
+          if (
+            Date.now() >= Math.min(expiresAt, values.expiresAt) ||
+            location.href !== currentUrl ||
+            !authenticatorPage() ||
+            one(auto.totp.input) !== input ||
+            input.value !== values.code ||
+            overridesForm(submit)
+          )
+            return "unknown";
+        }
+        if (!ariaButton(submit)) return "unknown";
+      }
     }
     if (Date.now() >= expiresAt || location.origin !== "https://www.facebook.com") return "unknown";
     submit?.click();

@@ -42,12 +42,23 @@ export function validateAutomaticProfile(value) {
     throw new Error("automatic_login_profile_invalid");
   for (const phase of ["totp", "pin"])
     if (
-      !exact(value[phase], ["url", "marker", "input", "submit"]) ||
+      !exact(value[phase], [
+        "url",
+        "marker",
+        "input",
+        "submit",
+        ...(phase === "totp" && value[phase]?.mode === "facebook-authenticator" ? ["mode"] : []),
+      ]) ||
       !url(value[phase].url) ||
       !["marker", "input"].every((k) => selector(value[phase][k])) ||
       !(selector(value[phase].submit) || (phase === "pin" && value[phase].submit === null))
     )
       throw new Error("automatic_login_profile_invalid");
+  if (
+    value.totp.mode === "facebook-authenticator" &&
+    value.totp.url !== "https://www.facebook.com/two_step_verification/two_factor/"
+  )
+    throw new Error("automatic_login_profile_invalid");
   if (
     !exact(value.ready, ["url", "marker", "empty", "emptyText", "thread"]) ||
     !url(value.ready.url) ||

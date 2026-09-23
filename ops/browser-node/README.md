@@ -329,7 +329,7 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 - `accountRef`：目标 Facebook 数字账号 ID，必须等于运行绑定账号。
 - `identity: { selector, attribute }`：唯一可见身份元素；属性只允许 `data-account-id`、`data-profile-id` 或可解析为数字账号的同源 `href`。 对没有可见身份元素的 Messenger PIN 页，可审核后使用 `attribute: "facebook-current-user"` 和固定 `selector: 'script[type="application/json"]'`：只解析结构化 `CurrentUserInitialData`，要求所有非匿名记录的 USER_ID/ACCOUNT_ID 与目标账号一致，并由插件逐次核对浏览器会话的 c_user 及可选 i_user。Cookie 值不传给页面或写入结果；缺少 Cookie、冲突记录或切换身份不能确认就绪。解析有节点数、深度和字节上限。
 - `passwordSubmit`：密码登录的唯一提交按钮选择器。
-- `totp: { url, marker, input, submit }`：TOTP 页精确 URL、阶段标记、输入框和按钮。
+- `totp: { url, marker, input, submit }`：TOTP 页精确 URL、阶段标记、输入框和按钮。 对已审核的 Facebook 验证器页面，可增加 `mode: "facebook-authenticator"`，URL 固定为 `/two_step_verification/two_factor/` 的完整 Facebook 地址。此模式只接受唯一的 encrypted_context、flow、next 参数及已知登录流程，核对英文验证器标题与唯一 Continue 按钮，允许输入后最多等待 1.5 秒启用按钮；始终禁用、页面改变或超时均不点击。它只点击审核过的 ARIA 按钮，不原生提交页面上的 GET 表单。其他语言或验证方式须另行审核。
 - `pin: { url, marker, input, submit }`：PIN 对话框契约；输入后自动提交的页面可以将 `submit` 设为 `null`。
 - `ready: { url, marker, empty, emptyText, thread }`：Messenger 就绪页面、唯一列表根节点、列表内的空状态选择器与精确文案、列表内会话项选择器。必须看到唯一空状态或至少一个会话项，两者冲突、只有标题/加载壳或存在可见对话框都不能就绪；必须同时验证当前账号身份。
 - `checkpoint`、`rejected`、`loading`：安全挑战、拒绝及加载状态的选择器。

@@ -18,6 +18,9 @@ for (const mode of [
   "aria-submit",
   "aria-disabled",
   "aria-outside",
+  "authenticator",
+  "authenticator-stuck",
+  "authenticator-wrong-flow",
 ] as const) {
   test(`automatic login contract: ${mode}`, async ({ page }) => {
     const base = "https://www.facebook.com";
@@ -37,6 +40,8 @@ for (const mode of [
         );
         if (mode === "aria-outside") content += button;
       }
+      if (path === "/two_step_verification/two_factor/")
+        content = `<h2>Go to your authentication app</h2><form><input id="code" type="text" autocomplete="off"></form><div role="button" tabindex="-1" aria-disabled="true">Continue</div><div role="button" tabindex="0">Try another way</div><script>document.querySelector('input').oninput=()=>{${mode === "authenticator-stuck" ? "" : "setTimeout(()=>{const b=document.querySelector('[role=button]');b.removeAttribute('aria-disabled');b.tabIndex=0;},100);"}};document.querySelector('[role=button]').onclick=()=>location.href='/messages/';</script>`;
       await route.fulfill({ contentType: "text/html", body: content });
     });
     const profile = {
@@ -71,6 +76,14 @@ for (const mode of [
         selector: 'script[type="application/json"]',
         attribute: "facebook-current-user",
       };
+    if (mode.startsWith("authenticator"))
+      Object.assign(profile.automation.totp, {
+        mode: "facebook-authenticator",
+        url: `${base}/two_step_verification/two_factor/`,
+        marker: "h2",
+        input: "#code",
+        submit: '[role="button"]',
+      });
     validateLoginProfile(profile);
     const accountId = "00000000-0000-4000-8000-000000000001",
       runId = "00000000-0000-4000-8000-000000000002";
@@ -90,6 +103,41 @@ for (const mode of [
       requestId: "00000000-0000-4000-8000-000000000003",
       expiresAt: Date.now() + 30000,
     };
+    if (mode.startsWith("authenticator")) {
+      await page.goto(
+        `${base}/two_step_verification/two_factor/?encrypted_context=synthetic&flow=${mode === "authenticator-wrong-flow" ? "wrong" : "two_factor_login"}&next`,
+      );
+      if (mode === "authenticator")
+        await page.evaluate(() => {
+          Object.defineProperty(URLSearchParams.prototype, "keys", { value: () => ({}) });
+        });
+      const observed = await runtime("observe", { ...packet });
+      expect(observed.state === "totp").toBe(mode !== "authenticator-wrong-flow");
+      const submitted = await runtime("submit", {
+        ...packet,
+        phase: "totp",
+        values: { code: "123456", expiresAt: packet.expiresAt },
+      });
+      expect(submitted.outcome).toBe(
+        mode === "authenticator"
+          ? "submitted"
+          : mode === "authenticator-stuck"
+            ? "unknown"
+            : "refused",
+      );
+      expect(
+        (
+          await runtime("submit", {
+            ...packet,
+            phase: "totp",
+            values: { code: "123456", expiresAt: packet.expiresAt },
+          })
+        ).outcome,
+      ).toBe("refused");
+      if (mode === "authenticator") await expect(page).toHaveURL(`${base}/messages/`);
+      if (mode === "authenticator-wrong-flow") await expect(page.locator("#code")).toHaveValue("");
+      return;
+    }
     if (mode === "ready-shell") {
       await page.goto(`${base}/messages/`);
       await page.locator("#pin").evaluate((el) => el.remove());

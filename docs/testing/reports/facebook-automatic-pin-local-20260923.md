@@ -44,3 +44,17 @@
 真实密码页的提交控件是表单内 `div role="button" tabindex="0"`。代码增加该已观察结构的支持，并通过正常、禁用及表单外按钮拒绝回归。随后本地诊断装载器调用正式 `register`，配置真实账号/运行范围和本地租约文件；`/ftrade/login-status` 返回正确 v2 范围。通过正式 `/ftrade/login-submit` 路由单次提交已保存密码后，真实页面进入 “Go to your authentication app”。
 
 2FA 页面包含每次登录变化的加密上下文 URL、无 name 的输入框和输入前禁用的 Continue 控件；现有静态页面契约尚不能正确执行这一阶段，未提交 TOTP。页面原始结构仅保存在忽略的本地私有文件。平台 broker 和完整端到端验收仍未完成。
+
+
+## 真实 TOTP → Messenger → PIN → ready 复测（同日）
+
+在上述已通过密码验证的会话中，审核了 Facebook 验证器页面并增加专用 `facebook-authenticator` 契约。使用正式 `/ftrade/login-observe`、`/ftrade/login-submit` 插件路由，顺序得到：
+
+- `totp`：首次使用本地密钥生成当前验证码，单次提交返回 `submitted`。
+- Facebook 显示 “You’re logged in. Trust this device?”；模块确认 `identityVerified=true`。没有选择信任设备。
+- 通过模块的 Messenger 导航进入消息页，观察到加载中和 PIN 窗口。
+- PIN 单次提交返回 `submitted`；随后 `state=ready`、`identityVerified=true`、`messengerRestored=true`。
+
+观察阶段曾发现真实页面的 `URLSearchParams.keys()` 返回不可迭代对象；此时尚未提交验证码。改为 `forEach` 后通过，合成测试也覆盖这个行为。动态按钮测试还覆盖输入后启用、持续禁用及错误流程参数拒绝。密钥和验证码均未输出。
+
+这些结果来自同一账号会话的分阶段开发调试，中途为更新模块重启了本地容器，并在各阶段使用新的短期请求。它们证明密码、TOTP、PIN 的真实页面步骤可执行，但不证明一次 `createSavedLoginExecutor` 调用、同一平台授权、同一租约和最终平台回执已全部连通。下一项验收应针对该完整链路，不再重复把各阶段通过记成端到端通过。
