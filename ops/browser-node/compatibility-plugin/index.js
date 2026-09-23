@@ -8,6 +8,8 @@ export function register(_app, ctx, config = {}) {
     options.firefoxUserPrefs = {
       ...options.firefoxUserPrefs,
       "network.http.http2.websockets": false,
+      // MVP1 only uses text Messenger; disable WebRTC's direct UDP paths.
+      "media.peerconnection.enabled": false,
     };
   });
 }

@@ -26,6 +26,9 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
   /root/.cache/camoufox/camoufox-bin --version
 '
+docker run --rm --network none --add-host target.browser.test:127.0.0.1 \
+  -v "$PWD/scripts/fixtures/native-profile/proxy-fail-closed.mjs:/app/proxy-fail-closed.mjs:ro" \
+  --entrypoint node "$browser" /app/proxy-fail-closed.mjs
 
 # No Facebook/proxy/account is used. Test server startup and independent lease expiry.
 name="ftrade-image-smoke-${ARCH}-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
@@ -71,6 +74,7 @@ docker exec "$name" node --input-type=module -e '
   assert.ok(profile, "pinned Playwright Firefox profile must exist");
   const prefs = readFileSync(`/tmp/${profile}/prefs.js`, "utf8");
   assert.match(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
+  assert.match(prefs, /user_pref\("media\.peerconnection\.enabled", false\);/);
 '
 docker exec "$name" node -e 'require("node:fs").writeFileSync("/tmp/ftrade-lease",String(Date.now()+2000),{mode:0o600})'
 timeout 35 docker wait "$name" >/dev/null
@@ -109,6 +113,7 @@ assert agent["pull_policy"] == "never"
 assert agent["container_name"] == "ftrade-browser-agent"
 assert agent["labels"]["io.ftrade.role"] == "agent"
 assert agent["environment"]["BROWSER_NODE_ON_DEMAND"] == "1"
+assert agent["environment"]["BROWSER_NATIVE_PROFILES"] == "0"
 assert agent["environment"]["BROWSER_NODE_IDLE_MS"] == "30000"
 assert agent["environment"]["BROWSER_MANAGED_FACEBOOK_CONFIG_DIR"] == "/run/facebook-config"
 facebook = next(v for v in agent["volumes"] if v["target"] == "/run/facebook-config")
@@ -118,6 +123,20 @@ assert "BROWSER_NODE_ACCESS_KEY" not in agent["environment"]
 key = next(v for v in agent["volumes"] if v["target"] == "/run/secrets/node-key")
 assert key["read_only"] and not key.get("bind", {}).get("create_host_path", False)
 PY
+mode_dir=$(mktemp -d)
+marker="$mode_dir/native-profile.enabled"
+test "$(bash ops/browser-node/native-profile-mode.sh "$mode_dir")" = 0
+printf '1\n' > "$marker"
+chmod 600 "$marker"
+test "$(bash ops/browser-node/native-profile-mode.sh "$mode_dir")" = 1
+chmod 644 "$marker"
+if bash ops/browser-node/native-profile-mode.sh "$mode_dir" >/dev/null; then exit 1; fi
+chmod 600 "$marker"
+rm "$marker"
+ln -s /dev/null "$marker"
+if bash ops/browser-node/native-profile-mode.sh "$mode_dir" >/dev/null; then exit 1; fi
+rm "$marker"
+rmdir "$mode_dir"
 printf 'PASS: %s image pair, runtime startup, watchdog expiry and pull-only Compose\n' "$ARCH"
 
 NATIVE_PROFILE_IMAGE="$browser" bash scripts/test-native-profile-runtime.sh

@@ -24,6 +24,7 @@ fi
 test -d "$facebook_config"
 test ! -L "$facebook_config"
 test "$(stat -c '%a:%u' "$facebook_config")" = '700:0'
+native_profiles=$(bash "$(dirname -- "$0")/native-profile-mode.sh" "$facebook_config")
 env_file="$runtime/runtime.env"
 key_file="$runtime/node-key"
 if test -n "$staged"; then env_file="$staged.env"; key_file="$staged.key"; fi
@@ -36,7 +37,7 @@ done
 compose="$(cd -- "$(dirname -- "$0")" && pwd)/compose.sandbox.yaml"
 config=$(mktemp "$runtime/config.XXXXXX")
 trap 'rm -f "$config"; if test -n "$staged"; then rm -f "$staged.env" "$staged.key"; fi' EXIT
-docker compose --env-file "$env_file" -f "$compose" config --format json >"$config"
+BROWSER_NATIVE_PROFILES="$native_profiles" docker compose --env-file "$env_file" -f "$compose" config --format json >"$config"
 python3 - "$config" "$node_id" "$operation_id" <<'PY'
 import json, re, sys
 with open(sys.argv[1], encoding="utf-8") as handle:

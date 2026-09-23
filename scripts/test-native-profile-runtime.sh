@@ -17,6 +17,8 @@ docker run --rm --network none -v "$volume:/data" \
 start() {
   local deadline=$(( $(date +%s) * 1000 + 90000 ))
   docker run -d --name "$name" --network none --read-only --init \
+    --cap-drop ALL --security-opt no-new-privileges:true \
+    --memory 2g --memory-swap 2g --cpus 2 --pids-limit 256 \
     --tmpfs /tmp:rw,nosuid,nodev,size=512m,mode=1777 \
     --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
     --tmpfs /root/camoufox:rw,nosuid,nodev,size=16m,mode=700 \

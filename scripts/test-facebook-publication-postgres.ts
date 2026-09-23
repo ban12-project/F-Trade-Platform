@@ -21,6 +21,7 @@ import {
 import { digestSocialWorkerPayload } from "../lib/social/worker-protocol";
 import { testBrowserInbox } from "./test-browser-inbox-postgres";
 import { testInboxRoundTrip } from "./test-browser-inbox-roundtrip";
+import { testInboxWakeup } from "./test-browser-inbox-wakeup";
 import { testBrowserLogin } from "./test-browser-login-postgres";
 import { testPublicationWakeup } from "./test-browser-publication-wakeup";
 import { testBrowserSandboxOwner } from "./test-browser-sandbox-owner";
@@ -525,6 +526,12 @@ async function main() {
       identity,
       actor,
     );
+    await testInboxWakeup(database, {
+      nodeId: node.nodeId,
+      accessKey: node.accessKey,
+      channelRef,
+      accountRef,
+    });
     await testBrowserLogin(database, owner);
     await testBrowserSandboxOwner(database, owner);
     const fleetJob = await fixture();

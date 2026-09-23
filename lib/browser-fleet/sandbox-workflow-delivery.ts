@@ -7,7 +7,9 @@ import { getDatabase } from "../db/client";
 import { deliverBrowserSandboxOutbox } from "./sandbox-outbox";
 
 export async function deliverQueuedBrowserSandboxes(nodeId?: string) {
+  const { enqueueDueInboxSandboxes } = await import("./sandbox-inbox-wakeup");
   const { enqueueQueuedPublicationSandboxes } = await import("./sandbox-publication-wakeup");
+  await enqueueDueInboxSandboxes(getDatabase(), nodeId);
   await enqueueQueuedPublicationSandboxes(getDatabase(), nodeId);
   return deliverBrowserSandboxOutbox(
     getDatabase(),

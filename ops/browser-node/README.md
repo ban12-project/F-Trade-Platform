@@ -22,7 +22,7 @@
 
 过期但未确认停止的租约进入隔离状态，仍占用容量，不能仅看 TTL 就重复发任务。Agent 重启先停止自身节点标签的旧容器，再向平台确认恢复。发布结果不明不自动重试，也不会由“容器正常退出”产生发布成功记录。
 
-账号不在线时无法实时接收浏览器私信。开启收件箱适配器后按 `pollSeconds`（至少 300 秒，默认 900 秒，0 停用）轮询，界面显示上次成功检查时间；实际延迟包含排队和启动时间。历史补采完整性取决于 Messenger 会话、可见窗口和适配器，不能保证离线期间所有消息均能恢复。
+账号不在线时无法实时接收浏览器私信。开启收件箱适配器后按 `pollSeconds`（至少 300 秒，默认 900 秒，0 停用）轮询，界面显示上次成功检查时间；实际延迟包含排队和启动时间。托管 Sandbox 停止后，五分钟调度器会在账号 ready、审核范围有效、渠道开启时为到期轮询创建启动意图；启动前和释放密钥前均复核授权。历史补采完整性取决于 Messenger 会话、可见窗口和适配器，不能保证离线期间所有消息均能恢复。生产真实 DM 仍需单独验收。
 
 ## 平台准备
 
@@ -272,6 +272,8 @@ Agent 仅向匹配的 interactive 运行注入非凭据页面配置。人工接�
 ### Managed Sandbox private Facebook configuration
 
 A reviewed Sandbox template containing this runtime can load node-specific Facebook configuration from `/var/lib/ftrade-sandbox/facebook`. The startup script creates this directory as root with mode `0700`; Compose mounts it read-only at `/run/facebook-config` inside the Agent. An empty directory retains interactive-only operation. Missing directories, symlinks, permissive ownership/modes, invalid manifests and conflicting legacy adapter environment settings fail startup rather than silently changing capabilities.
+
+Native Firefox profiles require a separate, explicit Sandbox opt-in. After the account's existing `ftbrowser-<node>-<account>` volume has been backed up and initialized with its reviewed `owner.json`, and while no account run is active, place a root-owned `0600` file named `native-profile.enabled` containing exactly `1` in `/var/lib/ftrade-sandbox/facebook`. The Sandbox startup script reads this persistent marker and passes `BROWSER_NATIVE_PROFILES=1` to the Agent. Missing marker means the mode stays off; a symlink, unexpected owner/mode or any other content aborts startup. The Agent still requires an image labeled `io.ftrade.native-profile=1`, and a missing or wrong account manifest rejects the browser launch. A Sandbox stop/resume keeps this marker; a replacement VM must be migrated and opted in explicitly. Never remove the marker to force a task onto an older JSON snapshot without a separate account-by-account rollback review.
 
 Provision only while the node has no running or unknown leases. Use the existing authorized Sandbox administration channel, never a task payload, public repository, template snapshot, or browser form. Place private files owned by root with mode `0600` in this directory. Write the selected profile files first and atomically rename `manifest.json` last:
 
