@@ -9,7 +9,7 @@
 - 常驻的是轻量 Agent 与 HTTPS 网关，不是所有 Firefox。每个获租约账号启动独立容器/网络，使用账号独立 volume；结束后删除容器和网络，保留 volume。
 - 一次性平台票据换取短期 viewer / WebSocket 能力；不依赖第三方 Cookie，不把节点 Key 或 Camofox API Key 发给前端。VNC 密码是每次运行生成的临时值，只在已授权 iframe 中使用。
 - 内置执行能力仅 `interactive`。`inbox` 周期排队和 `publish` 优先级/未知结果策略已在调度核心实现，但不包含经过真实 Facebook 验证的入站采集、图片/视频发布或自动填入密码执行器。不能把开浏览器等同于完成原 Issue 的业务闭环。
-- 账号密码可加密保存，当前不批量下发，也不自动输入；当前登录/2FA 在远程页面手动完成。验证码、TOTP 种子、恢复码不进入该协议。
+- 账号密码、Base32 TOTP 长期密钥和 Messenger PIN 可按账号加密保存。version 2 登录配置支持按租约自动登录；version 1 保留人工提交的填充流程。详见下文，真实完整自动登录仍待验收。
 - 新节点授权使用独立、带拥有者的记录。旧单账号环境变量和旧 Vault 不会自动变成全量节点授权；在新界面明确授权并保存配置后才能同步。旧 Worker 不得同时操作同一个账号。
 
 ## 资源和队列策略
@@ -221,7 +221,7 @@ CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose �
 
 分页测试使用 Chromium 的真实容器滚动，覆盖四会话／二十消息的跨页合并（十个消息批次）、缺失边界、页面断层、消息冲突、取消及滚动前变化。真实回环 HTTP／PostgreSQL 组合回归也跨页采集，并在首次入库后丢失回执，验证下一轮重扫不会重复落库。页数上限测试首轮夹具仍只有四个会话，未触达上限而失败；修正夹具为一百个会话后，完整 27 项浏览器回归通过，并确认最多 39 次滚动、40 页收集，原失败不记为通过。实际 Camofox、真实平台页面和持久化跨轮游标仍未验证或实现。
 
-### 已保存登录的独立填充边界（按账号显式配置）
+### 已保存登录的独立填充边界（version 1，按账号显式配置）
 
 固定上游通用 `/tabs/:id/type` 会将输入全文交给 `tab:type` 插件事件，其异常还可能包含输入值；因此保存密码不能直接通过该接口执行。新增 `login-plugin/` 作为浏览器镜像内的独立插件，模块随镜像加载，但没有匹配运行的私有登录页面配置时不注册路由。Agent 与人工入口已接通；真实 Camofox 容器及页面契约尚未验证。
 
@@ -318,3 +318,26 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 诊断仅保存当前页的 `wss://gateway.facebook.com` WebSocket 创建、关闭、错误及收发帧次数，不读取或保存帧内容、PIN、完整 URL、查询参数、请求头和异常文本。每页最多跟踪 128 个连接，超出计入 dropped，页面关闭后清除。通过 session-created 的 page 事件在首次导航前接入，避免遗漏加载时建立的连接。
 
 创建事件不等于握手成功，收发帧也不等于聊天恢复成功；零计数不能证明连接正常。计数只为排查提供证据，不改变账号、渠道、收件箱同步或安全存储状态。合成 Chromium 测试通过本地拒绝连接的代理验证实际 socket 错误，未连接 Facebook；真实 Messenger 诊断和修复仍需单独验收。
+
+
+## 自动登录配置 version 2（#423，真实账号待验收）
+
+按 ADR 0002 的 2026-09-23 修订，保存账号时可以同时保存 Base32 TOTP 密钥及六位 Messenger PIN。二者复用账号登录凭据的加密封装与账号/渠道绑定，不另存明文；表单留空保留原值，清除登录会同时移除所有因素。这里的 Base32 是长期密钥，不是短信码或当前六位 OTP。节点本地生成 TOTP，不调用第三方 OTP API。
+
+`FACEBOOK_LOGIN_PROFILES_FILE` 仍是私有页面契约数组。将匹配账号的 profile 设为 `version: 2`，保留 version 1 的全部字段并增加 `automation`：
+
+- `accountRef`：目标 Facebook 数字账号 ID，必须等于运行绑定账号。
+- `identity: { selector, attribute }`：唯一可见身份元素；属性只允许 `data-account-id`、`data-profile-id` 或可解析为数字账号的同源 `href`。
+- `passwordSubmit`：密码登录的唯一提交按钮选择器。
+- `totp: { url, marker, input, submit }`：TOTP 页精确 URL、阶段标记、输入框和按钮。
+- `pin: { url, marker, input, submit }`：PIN 对话框契约；输入后自动提交的页面可以将 `submit` 设为 `null`。
+- `ready: { url, marker }`：Messenger 就绪页面及可见标记，必须同时验证当前账号身份。
+- `checkpoint`、`rejected`、`loading`：安全挑战、拒绝及加载状态的选择器。
+
+所有 URL 必须是 `https://www.facebook.com` 来源，选择器和 URL 必须来自实际页面审核；不能直接将测试夹具选择器用于真实账号。配置仍有最长 30 天有效期，更新后重启 Agent。仅配置因素但未安装匹配 version 2 页面契约不会启用自动提交。模板和 Git 中不得包含真实账号、私有规则或任何凭据。
+
+所有者打开账号后，匹配 version 2 范围的 interactive 运行在就绪心跳中获得一次性授权，不要求先连接 VNC。平台重新检查有效所有者会话、节点/账号绑定、凭据版本、代理出口配置及租约；普通同步、容器环境和日志不包含因素明文。授权和释放期限最多 90 秒，并受租约及配置期限进一步限制。旧版填充运行只获得用户名和密码，不能读取 TOTP/PIN 或回报自动登录就绪。
+
+节点通过专用鉴权插件观察页面并单次提交密码、当前 TOTP 和 PIN。PIN 输入前要求账号身份匹配；就绪要求身份与 Messenger 页面同时匹配。提交后的页面上下文销毁只允许有限重试读取，不重发密码或验证码。缺少因素、挑战、页面不匹配、撤销及未知结果停止本轮；自动拒绝以 `needs_login` 退出并回收容器。只有有效的 `ready` 回执可更新账号登录状态，不能自动解除渠道暂停或授权内容发布。
+
+验证证据：加密因素保留/轮换/清除测试、RFC TOTP 向量、PostgreSQL 无 VNC 授权/并发单次领取/旧版隔离/撤销检查，以及 Chromium 完整执行器密码→TOTP→PIN→Chats 链路。上述浏览器网络全部拦截，尚不证明真实 Facebook DOM、真实账号 2FA 或生产自动登录已通过。
