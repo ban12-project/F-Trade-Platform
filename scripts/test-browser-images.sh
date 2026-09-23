@@ -26,6 +26,9 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
   /root/.cache/camoufox/camoufox-bin --version
 '
+docker run --rm --network none --add-host target.browser.test:127.0.0.1 \
+  -v "$PWD/scripts/fixtures/native-profile/proxy-fail-closed.mjs:/app/proxy-fail-closed.mjs:ro" \
+  --entrypoint node "$browser" /app/proxy-fail-closed.mjs
 
 # No Facebook/proxy/account is used. Test server startup and independent lease expiry.
 name="ftrade-image-smoke-${ARCH}-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
