@@ -171,6 +171,7 @@ test("browser runtime cannot access the host Docker socket or choose a mount", (
   assert.equal(body.HostConfig.Privileged, undefined);
   assert.equal(body.HostConfig.ReadonlyRootfs, true);
   assert.ok(body.Env.includes("BROWSER_IDLE_TIMEOUT_MS=900000"));
+  assert.ok(body.Env.includes("PROXY_PROTOCOL=http"));
   assert.deepEqual(body.HostConfig.CapDrop, ["ALL"]);
   assert.equal(body.HostConfig.Mounts.length, 1);
   assert.equal(body.HostConfig.Mounts[0].Type, "volume");

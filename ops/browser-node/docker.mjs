@@ -133,6 +133,7 @@ export function containerSpec(nodeId, run, imageId, deadline, nativeProfile = fa
         "SESSION_TIMEOUT_MS=900000",
         "TAB_INACTIVITY_MS=900000",
         "PROXY_STRATEGY=round_robin",
+        "PROXY_PROTOCOL=http",
         `PROXY_HOST=${proxy.host}`,
         `PROXY_PORT=${proxy.port}`,
         `PROXY_USERNAME=${proxy.username}`,
