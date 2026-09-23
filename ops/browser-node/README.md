@@ -9,7 +9,7 @@
 - 常驻的是轻量 Agent 与 HTTPS 网关，不是所有 Firefox。每个获租约账号启动独立容器/网络，使用账号独立 volume；结束后删除容器和网络，保留 volume。
 - 一次性平台票据换取短期 viewer / WebSocket 能力；不依赖第三方 Cookie，不把节点 Key 或 Camofox API Key 发给前端。VNC 密码是每次运行生成的临时值，只在已授权 iframe 中使用。
 - 内置执行能力仅 `interactive`。`inbox` 周期排队和 `publish` 优先级/未知结果策略已在调度核心实现，但不包含经过真实 Facebook 验证的入站采集、图片/视频发布或自动填入密码执行器。不能把开浏览器等同于完成原 Issue 的业务闭环。
-- 账号密码、Base32 TOTP 长期密钥和 Messenger PIN 可按账号加密保存。version 2 登录配置支持按租约自动登录；version 1 保留人工提交的填充流程。详见下文，真实完整自动登录仍待验收。
+- 账号密码、Base32 TOTP 长期密钥和 Messenger PIN 可按账号加密保存。version 2 登录配置支持按租约自动登录；version 1 保留人工提交的填充流程。详见下文，本地单轮密码/TOTP/PIN 已验证，生产仍待验收。
 - 新节点授权使用独立、带拥有者的记录。旧单账号环境变量和旧 Vault 不会自动变成全量节点授权；在新界面明确授权并保存配置后才能同步。旧 Worker 不得同时操作同一个账号。
 
 ## 资源和队列策略
@@ -343,4 +343,4 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 
 节点通过专用鉴权插件观察页面并单次提交密码、当前 TOTP 和 PIN。PIN 输入前要求账号身份匹配；就绪要求身份与 Messenger 页面同时匹配。提交后的页面上下文销毁只允许有限重试读取，不重发密码或验证码。缺少因素、凭据拒绝、不支持的验证方式、页面不匹配、撤销及未知结果停止本轮；自动拒绝以 `needs_login` 退出并回收容器。已领取凭据的自动运行可随拒绝回执报告受限枚举 `checkpoint`、`rejected` 或 `unsupported_factor`；平台保存并显示对应处理提示，拒绝任意自由文本及冲突重放。遇到人机或设备验证时，节点先提交受限的 `login-challenge` 回执，界面提示接入远程页面；在本次自动授权剩余时间内只观察页面，人工完成后继续原流程，不重新领取凭据、不重复提交已执行因素、不延长授权。自动任务仍执行时关闭远程查看窗口不会触发查看器断线回收；显式停止、撤销、租约或授权到期仍终止运行。该交接已通过合成执行器、数据库与 UI 测试，真实全流程仍待验收。只有有效的 `ready` 回执可更新账号登录状态，不能自动解除渠道暂停或授权内容发布。
 
-验证证据：加密因素保留/轮换/清除测试、RFC TOTP 向量、PostgreSQL 无 VNC 授权/并发单次领取/旧版隔离/撤销检查，以及 Chromium 完整执行器密码→TOTP→PIN→Chats 链路。合成浏览器网络全部拦截；另有真实本地密码、TOTP、PIN 和 CAPTCHA 人工处理后恢复证据，见 `docs/testing/reports/facebook-automatic-pin-local-20260923.md`。本地正式 broker 的已登录会话→PIN→持久化 ready 续跑已通过；全新会话的一次授权全流程、原运行人工交接及生产部署仍未通过。
+验证证据：加密因素保留/轮换/清除测试、RFC TOTP 向量、PostgreSQL 无 VNC 授权/并发单次领取/旧版隔离/撤销检查，以及 Chromium 完整执行器密码→TOTP→PIN→Chats 链路。合成浏览器网络全部拦截；另有真实本地密码、TOTP、PIN 和 CAPTCHA 人工处理后恢复证据，见 `docs/testing/reports/facebook-automatic-pin-local-20260923.md`。本地正式 broker 的已登录会话→PIN→持久化 ready 续跑，以及需重新认证会话的一次授权密码→TOTP→PIN→持久化 ready 均已通过。后者复用前次 CAPTCHA 会话资料但重新提交全部因素；真实 CAPTCHA 在原运行内人工完成后的续跑及生产部署仍待验收。
