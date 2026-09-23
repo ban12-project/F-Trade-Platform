@@ -489,7 +489,7 @@ export class AiSdkProductAgent implements ProductAgent {
       messages.push({
         role: "user",
         content:
-          "The previous attempt failed contract or source validation. Rebuild the JSON from the supplied labelled excerpts. The field_evidence keys must exactly equal the paths of fields actually present in product, specifications and commercial: remove entries for omitted facts. Omit unsupported facts rather than filling missing fields. A draft containing only a sourced internal_sku is valid and expected when other labels are absent. Preserve the supplied identity and evidence_refs. Return only JSON; all original constraints still apply.",
+          "The previous attempt failed contract or source validation. Rebuild the JSON from the supplied labelled excerpts. The field_evidence keys must exactly equal the paths of fields actually present in product, specifications and commercial: remove entries for omitted facts. Omit unsupported facts rather than filling missing fields. Recheck label ownership: an OE/OEM label inside a component column does not support the selected product's oe_numbers; keep that field absent/null when its own OE cell is empty. A draft containing only a sourced internal_sku is valid and expected when other labels are absent. Preserve the supplied identity and evidence_refs. Return only JSON; all original constraints still apply.",
       });
     const policy = getProductOutputPolicy(model);
     const modelStarted = Date.now();
