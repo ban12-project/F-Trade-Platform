@@ -222,6 +222,10 @@ export function createFacebookDriver(input, browserRequest) {
       try {
         const posts = await evaluate(session, { kind: "posts", text });
         if (posts.every((post) => post.externalPublicationRef !== null)) return posts;
+        // An unrelated old placeholder may never expose a permalink. Keep its
+        // author/text in the duplicate guard and only baseline verified links.
+        // A new post observed by exact text still requires its own permalink.
+        if (resolveExisting && attempt === 19) return posts;
       } catch (error) {
         // Reading can race the timestamp replacement. Retry observations only;
         // every successful observation still validates identity and exact DOM.

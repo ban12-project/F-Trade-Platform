@@ -396,6 +396,9 @@ test("baseline resolves existing post permalinks before publication", async ({ p
             <article><a class="author" href="${profile.identityHref}">Author</a>
             <p class="copy">An older synthetic post</p>
             <a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Time</a></article>
+            <article><a class="author" href="${profile.identityHref}">Author</a>
+            <p class="copy">An unrelated older video</p>
+            <a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Time</a></article>
             <script>document.querySelector('.permalink').onmouseenter = (event) => {
               event.currentTarget.href = '${oldRef}';
             }</script>`,
