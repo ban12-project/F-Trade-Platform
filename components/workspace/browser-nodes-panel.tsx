@@ -7,7 +7,15 @@ import type { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -52,7 +60,7 @@ const stateLabels: Record<string, string> = {
   completed: "已释放",
   failed: "未完成",
   unknown: "结果未知",
-  ready: "已人工确认",
+  ready: "登录已就绪",
   needs_login: "需要登录",
   needs_2fa: "需要 2FA",
   checkpoint: "需要安全验证",
@@ -361,6 +369,41 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                 <FieldError errors={[accountForm.formState.errors.credentials?.[name]]} />
               </Field>
             ))}
+            <FieldSet>
+              <FieldLegend>清除已保存的凭据</FieldLegend>
+              <FieldDescription>
+                输入留空会保留原值。勾选后，在保存账号授权时清除。
+              </FieldDescription>
+              {(
+                [
+                  ["clearTotp", "清除已保存的 2FA 密钥"],
+                  ["clearPin", "清除已保存的 Messenger PIN"],
+                  ["clearLogin", "清除全部登录凭据及验证密钥"],
+                ] as const
+              ).map(([name, label]) => (
+                <Field
+                  key={name}
+                  orientation="horizontal"
+                  data-invalid={!!accountForm.formState.errors.credentials?.[name]}
+                >
+                  <Controller
+                    control={accountForm.control}
+                    name={`credentials.${name}`}
+                    render={({ field }) => (
+                      <Checkbox
+                        id={`credential-${name}`}
+                        checked={field.value ?? false}
+                        onCheckedChange={field.onChange}
+                        disabled={busy}
+                        aria-invalid={!!accountForm.formState.errors.credentials?.[name]}
+                      />
+                    )}
+                  />
+                  <FieldLabel htmlFor={`credential-${name}`}>{label}</FieldLabel>
+                  <FieldError errors={[accountForm.formState.errors.credentials?.[name]]} />
+                </Field>
+              ))}
+            </FieldSet>
             <Button type="submit" disabled={busy || !nodes.length}>
               保存账号授权
             </Button>
