@@ -408,6 +408,8 @@ for (const mode of [
               expiresAt: Date.parse(profile.expiresAt),
             });
           if (path === "/tabs") {
+            if (mode.startsWith("executor-observe-only"))
+              expect(body?.url).toBe(profile.automation.ready.url);
             await page.goto(
               [
                 "executor-ready",
@@ -415,7 +417,9 @@ for (const mode of [
                 "executor-checkpoint-ready",
               ].includes(mode)
                 ? `${base}/messages/`
-                : profile.url,
+                : mode === "executor-observe-only-recovery"
+                  ? profile.automation.ready.url
+                  : profile.url,
             );
             return Response.json({ tabId: "tab", url: page.url() });
           }
@@ -469,7 +473,7 @@ for (const mode of [
           ["pin", { code: "654321", expiresAt: packet.expiresAt }],
         ] as const)
           expect((await runtime("submit", { ...packet, phase, values })).outcome).toBe("refused");
-        await expect(page.locator("#password")).toHaveValue("");
+        await expect(page.locator("#pin-code")).toHaveValue("");
       }
       expect(await execute({ id: packet.requestId, expiresAt: packet.expiresAt })).toBe("refused");
       if (mode === "executor-observe-only-recovery") return;

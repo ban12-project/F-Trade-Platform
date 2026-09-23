@@ -339,7 +339,7 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 - `ready: { url, marker, empty, emptyText, thread }`：Messenger 就绪页面、唯一列表根节点、列表内的空状态选择器与精确文案、列表内会话项选择器。必须看到唯一空状态或至少一个会话项，两者冲突、只有标题/加载壳或存在可见对话框都不能就绪；必须同时验证当前账号身份。
 - `checkpoint`、`rejected`、`loading`：安全挑战、拒绝及加载状态的选择器。
 
-若只有现有 Messenger 会话的就绪页面得到当前复核，可在 version 2 的 `automation` 中显式设置 `mode: "observe-only"`。此模式仍要求账号身份、出口和就绪状态全部通过，允许已验证的 Messenger 页面导航，并可产生零凭据领取的 `ready` 回执；密码、TOTP、PIN 的领取与提交全部拒绝。登录页或 PIN 页出现时，本轮停在需要重新复核的状态，不能把仅就绪页的复核时间当作恢复页面的复核时间。移除该模式前须重新审核完整恢复契约。
+若只有现有 Messenger 会话的就绪页面得到当前复核，可在 version 2 的 `automation` 中显式设置 `mode: "observe-only"`。此模式直接打开已复核的 Messenger 页面，仍要求账号身份、出口和就绪状态全部通过，并可产生零凭据领取的 `ready` 回执；密码、TOTP、PIN 的领取与提交全部拒绝。登录页或 PIN 页出现时，本轮停在需要重新复核的状态，不能把仅就绪页的复核时间当作恢复页面的复核时间。移除该模式前须重新审核完整恢复契约。
 
 所有 URL 必须是 `https://www.facebook.com` 来源，选择器和 URL 必须来自实际页面审核；不能直接将测试夹具选择器用于真实账号。配置仍有最长 30 天有效期，更新后重启 Agent。仅配置因素但未安装匹配 version 2 页面契约不会启用自动提交。模板和 Git 中不得包含真实账号、私有规则或任何凭据。
 

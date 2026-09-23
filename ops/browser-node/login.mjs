@@ -111,7 +111,10 @@ export function createSavedLoginExecutor({
         await browserRequest("/tabs", {
           userId: run.accountId,
           sessionKey: run.id,
-          url: profile.url,
+          url:
+            profile.version === 2 && profile.automation.mode === "observe-only"
+              ? profile.automation.ready.url
+              : profile.url,
           trace: false,
         }),
       );
