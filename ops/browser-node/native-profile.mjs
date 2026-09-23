@@ -105,6 +105,7 @@ export function createNativeProfileRuntime({
   const identity = scope(environment.FTRADE_PROFILE_ACCOUNT_ID, environment.FTRADE_PROFILE_NODE_ID);
   const p = paths(root, identity.accountId);
   let context;
+  let pendingLaunch;
   async function active() {
     const deadline = await leaseDeadline();
     if (!Number.isFinite(deadline) || deadline <= Date.now())
@@ -116,6 +117,31 @@ export function createNativeProfileRuntime({
   }
   return {
     assertAccount,
+    async ensureBrowser(factory, timeoutMs) {
+      await active();
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
+        throw new Error("native_profile_timeout_invalid");
+      // An observation timeout cannot release ownership of a still-running launch.
+      // The watchdog remains the final bound if upstream startup never settles.
+      if (!pendingLaunch) {
+        pendingLaunch = Promise.resolve()
+          .then(factory)
+          .finally(() => {
+            pendingLaunch = null;
+          });
+      }
+      let timer;
+      try {
+        return await Promise.race([
+          pendingLaunch,
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error("native_profile_launch_timeout")), timeoutMs);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
     async launch(options) {
       await active();
       await directory(root);

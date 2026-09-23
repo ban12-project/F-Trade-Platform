@@ -182,3 +182,31 @@ test("opt-in binds every task to the existing account volume, not task payload p
     /upstream_changed/,
   );
 });
+
+test("timed-out observation retains one in-flight native launch until it settles", async (t) => {
+  const f = await fixture(t);
+  const runtime = f.runtime();
+  let complete;
+  let attempts = 0;
+  const factory = () => {
+    attempts++;
+    return new Promise((resolve) => {
+      complete = resolve;
+    });
+  };
+  await assert.rejects(runtime.ensureBrowser(factory, 10), /launch_timeout/);
+  await assert.rejects(runtime.ensureBrowser(factory, 10), /launch_timeout/);
+  assert.equal(attempts, 1);
+  const next = runtime.ensureBrowser(factory, 1000);
+  complete(f.browser);
+  assert.equal(await next, f.browser);
+  assert.equal(attempts, 1);
+  assert.equal(
+    await runtime.ensureBrowser(async () => {
+      attempts++;
+      return f.browser;
+    }, 1000),
+    f.browser,
+  );
+  assert.equal(attempts, 2);
+});

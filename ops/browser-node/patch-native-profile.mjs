@@ -27,6 +27,10 @@ export function patchNativeProfileSource(file, source) {
             "async function getSession(userId, { trace = false } = {}) {\n  nativeProfile?.assertAccount(userId);",
           ],
           [
+            "const launchTimeoutMs = proxyPool?.launchTimeoutMs ?? 60000;",
+            "const launchTimeoutMs = proxyPool?.launchTimeoutMs ?? 60000;\n  if (nativeProfile) return nativeProfile.ensureBrowser(launchBrowserInstance, launchTimeoutMs);",
+          ],
+          [
             "const context = await b.newContext(contextOptions);",
             "const context = nativeProfile ? await nativeProfile.contextFor(key) : await b.newContext(contextOptions);",
           ],
