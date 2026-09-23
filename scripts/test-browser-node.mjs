@@ -15,6 +15,7 @@ import {
 import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/docker.mjs";
 import { waitForBrowserReady } from "../ops/browser-node/egress.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
+import { viewerGraceExpired } from "../ops/browser-node/idle.mjs";
 import {
   configureLoginRuntime,
   loadLoginProfiles,
@@ -29,6 +30,26 @@ import {
 import { publicationUploadArchive, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
 
 const nodeId = randomUUID();
+test("closing a challenge viewer preserves the bounded automatic task only", () => {
+  const state = {
+    automatic: true,
+    connected: false,
+    pendingConnection: false,
+    readyAt: 1,
+    disconnectedAt: 1,
+    loginTask: true,
+  };
+  assert.equal(viewerGraceExpired(state, 100000), false);
+  assert.equal(viewerGraceExpired({ ...state, automatic: false }, 100000), true);
+  assert.equal(viewerGraceExpired({ ...state, loginTask: false }, 100000), true);
+  assert.equal(
+    viewerGraceExpired(
+      { ...state, loginTask: false, disconnectedAt: null, pendingConnection: true },
+      100000,
+    ),
+    false,
+  );
+});
 test("browser startup waits for Firefox prewarm and rechecks cancellation", async () => {
   const ready = { ok: true, engine: "camoufox", browserConnected: true, browserRunning: true };
   const states = [

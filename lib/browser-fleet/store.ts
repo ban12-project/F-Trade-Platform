@@ -580,6 +580,22 @@ async function nodeOperation(
   }
   const run = state.runs.find((r) => r.id === request.runId);
   if (!run || run.leaseId !== request.leaseId) throw new Error("lease_mismatch");
+  if (request.operation === "login-challenge") {
+    await savedLoginAccount(tx, row, run, now);
+    const authorization = run.savedLogin;
+    if (
+      !authorization?.automatic ||
+      authorization.id !== request.authorizationId ||
+      authorization.claimedAt === null ||
+      authorization.outcome ||
+      authorization.expiresAt <= now
+    )
+      throw new Error("saved_login_challenge_not_authorized");
+    const replayed = authorization.challenge === "checkpoint";
+    authorization.challenge = "checkpoint";
+    if (!replayed) await audit(tx, row.owner_id, "browser_credentials.login_checkpoint", run.id);
+    return { recorded: true, replayed };
+  }
   if (request.operation === "login-result") {
     const authorization = run.savedLogin;
     if (
@@ -610,7 +626,7 @@ async function nodeOperation(
         account.authState = "ready";
       }
       authorization.outcome = request.outcome;
-      if (request.challenge) authorization.challenge = request.challenge;
+      authorization.challenge = request.challenge;
       await audit(tx, row.owner_id, `browser_credentials.login_${request.outcome}`, run.id);
     }
     return { recorded: true, replayed };

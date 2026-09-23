@@ -48,6 +48,42 @@ assert.equal((await run([ready])).submissions.length, 0);
 assert.equal((await run([{ state: "ready" }])).result.reason, "ready_unverified");
 assert.equal((await run([{ state: "password", accountMismatch: true }])).submissions.length, 0);
 assert.equal((await run([{ state: "checkpoint" }])).result.outcome, "attention");
+let attentionCalls = 0;
+const handoff = await run(
+  [
+    { state: "password" },
+    { state: "checkpoint" },
+    { state: "checkpoint" },
+    { state: "totp" },
+    { state: "pin" },
+    ready,
+  ],
+  {
+    onAttention: async (reason) => {
+      assert.equal(reason, "checkpoint");
+      attentionCalls++;
+    },
+  },
+);
+assert.equal(handoff.result.outcome, "ready");
+assert.equal(attentionCalls, 1);
+assert.deepEqual(
+  handoff.submissions.map((s) => s.phase),
+  ["password", "totp", "pin"],
+);
+const lostAttention = await run([{ state: "password" }, { state: "checkpoint" }, ready], {
+  onAttention: async () => {
+    throw Error("receipt_lost");
+  },
+});
+assert.equal(lostAttention.result.outcome, "unknown");
+assert.equal(lostAttention.submissions.length, 1);
+const attentionExpired = await run([], {
+  observe: async () => ({ state: "checkpoint", originVerified: true }),
+  onAttention: async () => {},
+});
+assert.equal(attentionExpired.result.outcome, "refused");
+assert.equal(attentionExpired.submissions.length, 0);
 const observationFailure = await run([{ state: "password" }, { outcome: "unknown" }, ready]);
 assert.equal(observationFailure.result.outcome, "unknown");
 assert.equal(observationFailure.submissions.length, 1);

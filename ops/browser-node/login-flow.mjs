@@ -6,6 +6,7 @@ export async function runFacebookLoginFlow({
   observe,
   submit,
   assertActive,
+  onAttention,
   deadline,
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -14,6 +15,7 @@ export async function runFacebookLoginFlow({
   let highest = 0;
   let started = false;
   let unsettledReads = 0;
+  let attentionReported = false;
   const rank = { password: 1, totp: 2, messenger: 3, pin: 4 };
   const active = () => {
     assertActive();
@@ -33,6 +35,14 @@ export async function runFacebookLoginFlow({
         if (observed.identityVerified !== true || observed.messengerRestored !== true)
           return { outcome: "refused", reason: "ready_unverified" };
         return { outcome: "ready" };
+      }
+      if (observed.state === "checkpoint" && onAttention) {
+        if (!attentionReported) {
+          await onAttention("checkpoint");
+          attentionReported = true;
+        }
+        await sleep(Math.min(500, Math.max(0, deadline - now())));
+        continue;
       }
       if (["checkpoint", "rejected", "unsupported_factor"].includes(observed.state))
         return { outcome: "attention", reason: observed.state };

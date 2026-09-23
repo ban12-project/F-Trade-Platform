@@ -86,6 +86,16 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
   z
     .object({
       ...common,
+      operation: z.literal("login-challenge"),
+      runId: id,
+      leaseId: id,
+      authorizationId: id,
+      challenge: z.literal("checkpoint"),
+    })
+    .strict(),
+  z
+    .object({
+      ...common,
       operation: z.literal("login-result"),
       runId: id,
       leaseId: id,

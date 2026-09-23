@@ -8,7 +8,7 @@ import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import { openEgressCheckedSession, verifyBrowserEgress, waitForBrowserReady } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
-import { createIdleExitPolicy } from "./idle.mjs";
+import { createIdleExitPolicy, viewerGraceExpired } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import {
@@ -298,11 +298,17 @@ async function heartbeat(slot) {
   if (
     slot.ready &&
     slot.run.kind === "interactive" &&
-    ((!slot.connected &&
-      !pendingConnection &&
-      !slot.loginTask &&
-      Date.now() - slot.readyAt > 60_000) ||
-      (slot.disconnectedAt && Date.now() - slot.disconnectedAt > 15_000))
+    viewerGraceExpired(
+      {
+        connected: slot.connected,
+        disconnectedAt: slot.disconnectedAt,
+        readyAt: slot.readyAt,
+        loginTask: Boolean(slot.loginTask),
+        pendingConnection,
+        automatic: loginProfileForRun(loginProfiles, slot.run)?.version === 2,
+      },
+      Date.now(),
+    )
   ) {
     await stop(slot, "completed");
     return;

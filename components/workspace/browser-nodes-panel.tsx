@@ -181,7 +181,9 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
     );
   const challengeStatus = connectedRun?.savedLoginChallenge
     ? {
-        checkpoint: "Facebook 要求额外的人机或设备验证。请人工完成验证后重新接入；本次未自动重试。",
+        checkpoint: connectedRun.savedLoginOutcome
+          ? "Facebook 要求额外的人机或设备验证。请人工完成验证后重新接入；本次未自动重试。"
+          : "请在远程页面完成人机或设备验证，程序将在本次授权有效期内自动继续。",
         rejected: "Facebook 拒绝了本次验证。请核对账号凭据及验证设置后重新接入。",
         unsupported_factor: "当前验证方式无法自动处理。请人工完成验证后重新接入。",
       }[connectedRun.savedLoginChallenge]
@@ -528,6 +530,11 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                     key={run.id}
                   >
                     <Badge variant="outline">{stateLabels[run.status] ?? run.status}</Badge>
+                    {run.savedLoginChallenge === "checkpoint" && !run.savedLoginOutcome && (
+                      <span role="status" className="text-sm">
+                        等待人工验证，请接入远程页面；完成后自动继续。
+                      </span>
+                    )}
                     <span className="text-sm">
                       {node.accounts.find((a) => a.id === run.accountId)?.accountRef} · {run.kind}
                     </span>

@@ -28,6 +28,7 @@ for (const mode of [
 ] as const) {
   test(`automatic login contract: ${mode}`, async ({ page }) => {
     const base = "https://www.facebook.com";
+    let humanApproved = false;
     await page.route(`${base}/**`, async (route) => {
       const path = new URL(route.request().url()).pathname;
       let content =
@@ -44,7 +45,7 @@ for (const mode of [
         );
         if (mode === "aria-outside") content += button;
       }
-      if (path === "/two_factor/" && mode === "executor-checkpoint")
+      if (path === "/two_factor/" && mode === "executor-checkpoint" && !humanApproved)
         content = '<div id="checkpoint">Synthetic device approval required</div>';
       if (path === "/two_step_verification/two_factor/")
         content = `<h2>Go to your authentication app</h2><form><input id="code" type="text" autocomplete="off"></form><div role="button" tabindex="-1" aria-disabled="true">Continue</div><div role="button" tabindex="0">Try another way</div><script>document.querySelector('input').oninput=()=>{${mode === "authenticator-stuck" ? "" : "setTimeout(()=>{const b=document.querySelector('[role=button]');b.removeAttribute('aria-disabled');b.tabIndex=0;},100);"}};document.querySelector('[role=button]').onclick=()=>location.href='/messages/';</script>`;
@@ -366,8 +367,15 @@ for (const mode of [
                 messengerPin: "654321",
               },
             };
+          if (operation === "login-challenge") {
+            expect(body.challenge).toBe("checkpoint");
+            expect(body.authorizationId).toBe(packet.requestId);
+            humanApproved = true;
+            await page.goto(`${base}/two_factor/`);
+            return { recorded: true };
+          }
           expect(operation).toBe("login-result");
-          expect(body.challenge).toBe(mode === "executor-checkpoint" ? "checkpoint" : undefined);
+          expect(body.challenge).toBeUndefined();
           calls.push(`result:${body.outcome}`);
           return {};
         },
@@ -394,12 +402,18 @@ for (const mode of [
         },
       });
       const outcome = await execute({ id: packet.requestId, expiresAt: packet.expiresAt });
-      expect(outcome, JSON.stringify(calls)).toBe(
-        mode === "executor-checkpoint" ? "refused" : "ready",
-      );
+      expect(outcome, JSON.stringify(calls)).toBe("ready");
       expect(calls).toEqual(
         mode === "executor-checkpoint"
-          ? ["claim-login", "submit:password", "login-result", "result:refused"]
+          ? [
+              "claim-login",
+              "submit:password",
+              "login-challenge",
+              "submit:totp",
+              "submit:pin",
+              "login-result",
+              "result:ready",
+            ]
           : [
               "claim-login",
               "submit:password",
@@ -410,10 +424,6 @@ for (const mode of [
             ],
       );
       expect(await execute({ id: packet.requestId, expiresAt: packet.expiresAt })).toBe("refused");
-      if (mode === "executor-checkpoint") {
-        expect(await runtime("observe", { ...packet })).toMatchObject({ state: "checkpoint" });
-        return;
-      }
     } else {
       await page.goto(`${base}/login/`);
       if (["aria-disabled", "aria-outside"].includes(mode)) {

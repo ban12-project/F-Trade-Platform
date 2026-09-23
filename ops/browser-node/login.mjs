@@ -159,6 +159,16 @@ export function createSavedLoginExecutor({
           credentials: credential,
           deadline: expiresAt,
           assertActive,
+          onAttention: async (reason) => {
+            const receipt = await request("login-challenge", {
+              runId: run.id,
+              leaseId: run.leaseId,
+              authorizationId: notice.id,
+              challenge: reason,
+            });
+            if (receipt.recorded !== true) throw new Error("challenge_not_recorded");
+            challenge = reason;
+          },
           observe: async () => json(await browserRequest("/ftrade/login-observe", packet)),
           submit: async (phase, values) => {
             await checkEgress();
@@ -209,7 +219,7 @@ export function createSavedLoginExecutor({
           leaseId: run.leaseId,
           authorizationId: notice.id,
           outcome,
-          ...(challenge ? { challenge } : {}),
+          ...(challenge && outcome === "refused" ? { challenge } : {}),
         });
       } catch {
         outcome = "unknown";

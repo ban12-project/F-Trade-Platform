@@ -229,11 +229,31 @@ test("saved password fill uses the actual owner action and never returns credent
   // Replace this synthetic fixture with an automatic challenge result to verify
   // the polling UI. Broker authorization/replay rules have separate DB coverage.
   const challengeState = rows.rows[0].document;
+  Object.assign(challengeState.runs[0], {
+    status: "running",
+    leaseUntil: Date.now() + 90000,
+    deadline: Date.now() + 600000,
+  });
   Object.assign(challengeState.runs[0].savedLogin, {
     automatic: true,
-    outcome: "refused",
+    outcome: undefined,
+    claimedAt: Date.now(),
+    expiresAt: Date.now() + 180000,
     challenge: "checkpoint",
   });
+  await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+    nodeId,
+    JSON.stringify(challengeState),
+  ]);
+  await expect(
+    page.getByText("等待人工验证，请接入远程页面；完成后自动继续。", { exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  await expect(
+    page.getByText("请在远程页面完成人机或设备验证，程序将在本次授权有效期内自动继续。", {
+      exact: true,
+    }),
+  ).toBeVisible({ timeout: 15000 });
+  challengeState.runs[0].savedLogin.outcome = "refused";
   await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
     nodeId,
     JSON.stringify(challengeState),
