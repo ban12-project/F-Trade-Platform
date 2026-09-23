@@ -426,9 +426,15 @@ test("baseline resolves existing post permalinks before publication", async ({ p
     {
       id: randomUUID(),
       accountId: randomUUID(),
+      kind: "publish",
       accountRef: profile.accountRef,
       channelRef: profile.channelRef,
-      publication: { format: "text" },
+      publication: {
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
+        text: "A new synthetic post",
+        format: "text",
+      },
     },
     new AbortController().signal,
   );
