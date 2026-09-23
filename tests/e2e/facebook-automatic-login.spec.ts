@@ -9,6 +9,11 @@ for (const mode of [
   "formaction",
   "formmethod",
   "formtarget",
+  "bootstrap",
+  "bootstrap-cookie-mismatch",
+  "bootstrap-data-mismatch",
+  "bootstrap-switched",
+  "bootstrap-no-cookie",
 ] as const) {
   test(`automatic login contract: ${mode}`, async ({ page }) => {
     const base = "https://www.facebook.com";
@@ -43,6 +48,11 @@ for (const mode of [
         loading: "#loading",
       },
     };
+    if (mode.startsWith("bootstrap"))
+      profile.automation.identity = {
+        selector: 'script[type="application/json"]',
+        attribute: "facebook-current-user",
+      };
     validateLoginProfile(profile);
     const accountId = "00000000-0000-4000-8000-000000000001",
       runId = "00000000-0000-4000-8000-000000000002";
@@ -62,6 +72,57 @@ for (const mode of [
       requestId: "00000000-0000-4000-8000-000000000003",
       expiresAt: Date.now() + 30000,
     };
+    if (mode.startsWith("bootstrap")) {
+      if (mode !== "bootstrap-no-cookie")
+        await page.context().addCookies([
+          {
+            name: "c_user",
+            value: mode === "bootstrap-cookie-mismatch" ? "999999999" : "123456789",
+            url: base,
+          },
+          ...(mode === "bootstrap-switched"
+            ? [{ name: "i_user", value: "999999999", url: base }]
+            : []),
+        ]);
+      await page.goto(`${base}/messages/`);
+      await page.evaluate((wrong) => {
+        const script = document.createElement("script");
+        script.type = "application/json";
+        script.textContent = JSON.stringify({
+          require: [
+            [
+              "CurrentUserInitialData",
+              [],
+              {
+                USER_ID: wrong ? "999999999" : "123456789",
+                ACCOUNT_ID: "123456789",
+              },
+              1,
+            ],
+          ],
+        });
+        document.head.append(script);
+      }, mode === "bootstrap-data-mismatch");
+      const observed = await runtime("observe", { ...packet });
+      expect(observed.identityVerified === true).toBe(mode === "bootstrap");
+      expect(
+        (
+          await runtime("submit", {
+            ...packet,
+            phase: "pin",
+            values: { code: "654321", expiresAt: packet.expiresAt },
+          })
+        ).outcome,
+      ).toBe(mode === "bootstrap" ? "submitted" : "refused");
+      if (mode === "bootstrap")
+        expect(await runtime("observe", { ...packet })).toMatchObject({
+          state: "ready",
+          identityVerified: true,
+          messengerRestored: true,
+        });
+      else await expect(page.locator("#pin-code")).toHaveValue("");
+      return;
+    }
     if (mode === "executor") {
       const calls: string[] = [];
       const run = {

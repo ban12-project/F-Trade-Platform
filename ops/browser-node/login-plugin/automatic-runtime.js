@@ -30,13 +30,33 @@ export function createAutomaticLoginRuntime({
       if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return { outcome: "refused" };
       const page = sessions.get(accountId)?.tabGroups.get(runId)?.get(packet.tabId)?.page;
       if (!page || page.isClosed()) return { outcome: "refused" };
+      const evaluate = async (args) => {
+        let sessionIdentity;
+        if (profile.automation.identity.attribute === "facebook-current-user") {
+          const cookies = await page.context().cookies("https://www.facebook.com/");
+          const users = cookies.filter((cookie) => cookie.name === "c_user");
+          const actors = cookies.filter((cookie) => cookie.name === "i_user");
+          // Pass only comparisons to the page; never expose session cookie values.
+          sessionIdentity = {
+            verified:
+              users.length === 1 &&
+              users[0].value === profile.automation.accountRef &&
+              actors.every((cookie) => cookie.value === profile.automation.accountRef),
+            mismatch:
+              users.some((cookie) => cookie.value !== profile.automation.accountRef) ||
+              actors.some((cookie) => cookie.value !== profile.automation.accountRef) ||
+              users.length > 1,
+          };
+        }
+        return page.evaluate(program, { ...args, sessionIdentity });
+      };
       requestId = packet.requestId;
       if (operation === "observe") {
         // A submitted form can destroy the previous document before observation starts.
         // Retry reads only; never replay a credential submission after navigation.
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
-            return await page.evaluate(program, { profile, operation, expiresAt });
+            return await evaluate({ profile, operation, expiresAt });
           } catch (error) {
             if (
               attempt === 2 ||
@@ -74,7 +94,7 @@ export function createAutomaticLoginRuntime({
         return { outcome: "refused" };
       submitted.add(phase);
       if (phase === "messenger") {
-        const current = await page.evaluate(program, { profile, operation: "observe", expiresAt });
+        const current = await evaluate({ profile, operation: "observe", expiresAt });
         if (
           current.state !== "messenger" ||
           current.identityVerified !== true ||
@@ -87,7 +107,7 @@ export function createAutomaticLoginRuntime({
         });
         return { outcome: "submitted" };
       }
-      const outcome = await page.evaluate(program, {
+      const outcome = await evaluate({
         profile,
         operation: "submit",
         phase,

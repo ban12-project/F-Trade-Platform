@@ -32,7 +32,11 @@ export function validateAutomaticProfile(value) {
     !/^[0-9]{5,30}$/.test(value.accountRef ?? "") ||
     !exact(value.identity, ["selector", "attribute"]) ||
     !selector(value.identity.selector) ||
-    !["data-account-id", "data-profile-id", "href"].includes(value.identity.attribute) ||
+    !["data-account-id", "data-profile-id", "href", "facebook-current-user"].includes(
+      value.identity.attribute,
+    ) ||
+    (value.identity.attribute === "facebook-current-user" &&
+      value.identity.selector !== 'script[type="application/json"]') ||
     !["passwordSubmit", "checkpoint", "rejected", "loading"].every((k) => selector(value[k]))
   )
     throw new Error("automatic_login_profile_invalid");

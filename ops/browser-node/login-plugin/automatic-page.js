@@ -1,5 +1,5 @@
 // biome-ignore lint/correctness/noUnusedVariables: Read as a fixed page program by the plugin.
-function automaticLoginPage({ profile, operation, phase, values, expiresAt }) {
+function automaticLoginPage({ profile, operation, phase, values, expiresAt, sessionIdentity }) {
   let attempted = false;
   try {
     const auto = profile.automation;
@@ -17,26 +17,66 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt }) {
       Date.now() >= Date.parse(profile.expiresAt)
     )
       return operation === "observe" ? { state: "invalid", originVerified: false } : "refused";
-    const identities = matches(auto.identity.selector);
     let identityVerified = false;
-    if (identities.length > 1)
-      return operation === "observe" ? { state: "invalid", originVerified: true } : "refused";
-    if (identities.length === 1) {
-      let identity = identities[0].getAttribute(auto.identity.attribute);
-      if (auto.identity.attribute === "href") {
-        const target = new URL(identity, location.href);
-        if (target.origin !== location.origin) identity = null;
-        else
-          identity =
-            target.pathname === "/profile.php"
-              ? target.searchParams.get("id")
-              : target.pathname.replace(/^\/|\/$/g, "");
-      }
-      identityVerified = identity === auto.accountRef;
-      if (!identityVerified)
+    if (auto.identity.attribute === "facebook-current-user") {
+      if (sessionIdentity?.mismatch)
         return operation === "observe"
           ? { state: "invalid", originVerified: true, accountMismatch: true }
           : "refused";
+      let visited = 0,
+        bytes = 0;
+      const records = [];
+      const walk = (value, depth = 0) => {
+        if (++visited > 200000 || depth > 80) throw new Error("identity_limit");
+        if (Array.isArray(value)) {
+          if (value[0] === "CurrentUserInitialData") {
+            const data = value[2];
+            if (!data || typeof data !== "object") throw new Error("identity_invalid");
+            if (data.USER_ID !== "0" || data.ACCOUNT_ID !== "0") records.push(data);
+          }
+          for (const item of value) walk(item, depth + 1);
+        } else if (value && typeof value === "object") {
+          for (const item of Object.values(value)) walk(item, depth + 1);
+        }
+      };
+      const scripts = document.querySelectorAll(auto.identity.selector);
+      if (scripts.length > 256) throw new Error("identity_limit");
+      for (const script of scripts) {
+        bytes += script.textContent.length;
+        if (bytes > 4000000) throw new Error("identity_limit");
+        if (script.textContent.includes("CurrentUserInitialData"))
+          walk(JSON.parse(script.textContent));
+      }
+      if (
+        records.some(
+          (data) => data.USER_ID !== auto.accountRef || data.ACCOUNT_ID !== auto.accountRef,
+        )
+      )
+        return operation === "observe"
+          ? { state: "invalid", originVerified: true, accountMismatch: true }
+          : "refused";
+      identityVerified = records.length > 0 && sessionIdentity?.verified === true;
+    } else {
+      const identities = matches(auto.identity.selector);
+      if (identities.length > 1)
+        return operation === "observe" ? { state: "invalid", originVerified: true } : "refused";
+      if (identities.length === 1) {
+        let identity = identities[0].getAttribute(auto.identity.attribute);
+        if (auto.identity.attribute === "href") {
+          const target = new URL(identity, location.href);
+          if (target.origin !== location.origin) identity = null;
+          else
+            identity =
+              target.pathname === "/profile.php"
+                ? target.searchParams.get("id")
+                : target.pathname.replace(/^\/|\/$/g, "");
+        }
+        identityVerified = identity === auto.accountRef;
+        if (!identityVerified)
+          return operation === "observe"
+            ? { state: "invalid", originVerified: true, accountMismatch: true }
+            : "refused";
+      }
     }
     const states = [];
     for (const attention of ["checkpoint", "rejected"])
