@@ -7,6 +7,7 @@ for (const mode of [
   "page-contract",
   "executor",
   "executor-ready",
+  "executor-checkpoint-ready",
   "executor-checkpoint",
   "lease-bound",
   "formaction",
@@ -38,7 +39,7 @@ for (const mode of [
           : path === "/two_factor/"
             ? `<div id="totp"><input id="code"><button id="verify">Verify</button></div><script>document.querySelector('button').onclick=()=>location.href='/messages/';</script>`
             : `<a id="identity" data-account-id="123456789">Account</a><div id="pin"><input id="pin-code" type="password"><button id="restore">Restore</button></div><script>document.querySelector('button').onclick=()=>{document.querySelector('#pin').remove();const el=document.createElement('div');el.id='chats';el.innerHTML='<span id="empty">No chats</span>';document.body.append(el);};</script>`;
-      if (mode === "executor-ready")
+      if (mode === "executor-ready" || mode === "executor-checkpoint-ready")
         content =
           '<a id="identity" data-account-id="123456789">Account</a><div id="chats"><span id="empty">No chats</span></div>';
       if (path === "/login/" && mode.startsWith("aria-")) {
@@ -49,6 +50,8 @@ for (const mode of [
         );
         if (mode === "aria-outside") content += button;
       }
+      if (mode === "executor-checkpoint-ready" && !humanApproved)
+        content = '<div id="checkpoint">Synthetic device approval required</div>';
       if (path === "/two_factor/" && mode === "executor-checkpoint" && !humanApproved)
         content = '<div id="checkpoint">Synthetic device approval required</div>';
       if (path === "/two_step_verification/two_factor/")
@@ -343,7 +346,7 @@ for (const mode of [
       else await expect(page.locator("#pin-code")).toHaveValue("");
       return;
     }
-    if (mode === "executor" || mode === "executor-checkpoint" || mode === "executor-ready") {
+    if (mode.startsWith("executor")) {
       profile.expiresAt = new Date(Date.now() + 180000).toISOString();
       packet.expiresAt = Date.now() + 170000;
       const calls: string[] = [];
@@ -377,7 +380,9 @@ for (const mode of [
             expect(body.challenge).toBe("checkpoint");
             expect(body.authorizationId).toBe(packet.requestId);
             humanApproved = true;
-            await page.goto(`${base}/two_factor/`);
+            await page.goto(
+              mode === "executor-checkpoint-ready" ? `${base}/messages/` : `${base}/two_factor/`,
+            );
             return { recorded: true };
           }
           expect(operation).toBe("login-result");
@@ -395,7 +400,11 @@ for (const mode of [
               expiresAt: Date.parse(profile.expiresAt),
             });
           if (path === "/tabs") {
-            await page.goto(mode === "executor-ready" ? `${base}/messages/` : profile.url);
+            await page.goto(
+              ["executor-ready", "executor-checkpoint-ready"].includes(mode)
+                ? `${base}/messages/`
+                : profile.url,
+            );
             return Response.json({ tabId: "tab", url: page.url() });
           }
           if (!body) throw new Error("missing_browser_packet");
@@ -414,26 +423,28 @@ for (const mode of [
       const outcome = await execute({ id: packet.requestId, expiresAt: packet.expiresAt });
       expect(outcome, JSON.stringify(calls)).toBe("ready");
       expect(calls).toEqual(
-        mode === "executor-ready"
-          ? ["login-result", "result:ready"]
-          : mode === "executor-checkpoint"
-            ? [
-                "claim-login",
-                "submit:password",
-                "login-challenge",
-                "submit:totp",
-                "submit:pin",
-                "login-result",
-                "result:ready",
-              ]
-            : [
-                "claim-login",
-                "submit:password",
-                "submit:totp",
-                "submit:pin",
-                "login-result",
-                "result:ready",
-              ],
+        mode === "executor-checkpoint-ready"
+          ? ["login-challenge", "login-result", "result:ready"]
+          : mode === "executor-ready"
+            ? ["login-result", "result:ready"]
+            : mode === "executor-checkpoint"
+              ? [
+                  "claim-login",
+                  "submit:password",
+                  "login-challenge",
+                  "submit:totp",
+                  "submit:pin",
+                  "login-result",
+                  "result:ready",
+                ]
+              : [
+                  "claim-login",
+                  "submit:password",
+                  "submit:totp",
+                  "submit:pin",
+                  "login-result",
+                  "result:ready",
+                ],
       );
       expect(await execute({ id: packet.requestId, expiresAt: packet.expiresAt })).toBe("refused");
     } else {
