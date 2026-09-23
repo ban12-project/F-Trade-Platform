@@ -70,6 +70,12 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt }) {
     };
     const editable = (input) =>
       input instanceof HTMLInputElement && !input.disabled && !input.readOnly && !input.value;
+    // Button overrides can send a checked form to a different destination/method/window.
+    const overridesForm = (button) =>
+      button &&
+      ["formaction", "formmethod", "formtarget", "formenctype", "formnovalidate"].some(
+        (attribute) => button.hasAttribute(attribute),
+      );
     let submit;
     if (phase === "password") {
       const form = one(profile.form),
@@ -79,6 +85,8 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt }) {
       if (
         !(form instanceof HTMLFormElement) ||
         form.method.toLowerCase() !== "post" ||
+        (form.target && form.target !== "_self") ||
+        overridesForm(submit) ||
         !(user instanceof HTMLInputElement) ||
         !["email", "text"].includes(user.type) ||
         !editable(password) ||
@@ -114,6 +122,7 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt }) {
       const input = one(auto[phase].input);
       submit = auto[phase].submit === null ? null : one(auto[phase].submit);
       if (
+        overridesForm(submit) ||
         !editable(input) ||
         !["text", "tel", "number", "password"].includes(input.type) ||
         !/^[0-9]{6}$/.test(values.code) ||
@@ -123,7 +132,9 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt }) {
         return "refused";
       if (
         input.form &&
-        ((submit !== null && submit.form !== input.form) ||
+        ((input.form.target && input.form.target !== "_self") ||
+          input.form.method.toLowerCase() !== "post" ||
+          (submit !== null && submit.form !== input.form) ||
           new URL(input.form.action).origin !== location.origin)
       )
         return "refused";

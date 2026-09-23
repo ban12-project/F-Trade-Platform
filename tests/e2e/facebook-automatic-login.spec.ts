@@ -3,8 +3,14 @@ import { createSavedLoginExecutor } from "../../ops/browser-node/login.mjs";
 import { createAutomaticLoginRuntime } from "../../ops/browser-node/login-plugin/automatic-runtime.js";
 import { validateLoginProfile } from "../../ops/browser-node/login-plugin/index.js";
 
-for (const mode of ["page-contract", "executor"] as const) {
-  test(`automatic login ${mode} submits password, TOTP and PIN once and verifies identity`, async ({
+for (const mode of [
+  "page-contract",
+  "executor",
+  "formaction",
+  "formmethod",
+  "formtarget",
+] as const) {
+  test(`automatic login contract: ${mode}`, async ({
     page,
   }) => {
     const base = "https://www.facebook.com";
@@ -125,6 +131,31 @@ for (const mode of ["page-contract", "executor"] as const) {
       expect(await execute({ id: packet.requestId, expiresAt: packet.expiresAt })).toBe("refused");
     } else {
       await page.goto(`${base}/login/`);
+      if (["formaction", "formmethod", "formtarget"].includes(mode)) {
+        await page.locator("#submit").evaluate((button, attribute) => {
+          button.setAttribute(
+            attribute,
+            attribute === "formaction"
+              ? "https://synthetic-invalid.example/login/"
+              : attribute === "formmethod"
+                ? "get"
+                : "_blank",
+          );
+        }, mode);
+        expect(
+          (
+            await runtime("submit", {
+              ...packet,
+              phase: "password",
+              values: { username: "synthetic", password: "synthetic-password" },
+            })
+          ).outcome,
+        ).toBe("refused");
+        await expect(page.locator("#user")).toHaveValue("");
+        await expect(page.locator("#password")).toHaveValue("");
+        return;
+      }
+
       expect((await runtime("observe", { ...packet })).state).toBe("password");
       expect(
         (
