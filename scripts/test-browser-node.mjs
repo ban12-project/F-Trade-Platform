@@ -16,6 +16,7 @@ import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/
 import { waitForBrowserReady } from "../ops/browser-node/egress.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
 import { viewerGraceExpired } from "../ops/browser-node/idle.mjs";
+import { localDeadline, localLoginAuthorizationDeadline } from "../ops/browser-node/lease.mjs";
 import {
   configureLoginRuntime,
   loadLoginProfiles,
@@ -30,6 +31,15 @@ import {
 import { publicationUploadArchive, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
 
 const nodeId = randomUUID();
+test("automatic authorization preserves 180 seconds without extending container leases", (t) => {
+  t.mock.method(Date, "now", () => 1000000);
+  const response = { serverNow: 2000000, roundTripMs: 100 };
+  assert.equal(localDeadline(response, 2180000), 1084900);
+  assert.equal(localLoginAuthorizationDeadline(response, 2180000), 1174900);
+  assert.equal(localLoginAuthorizationDeadline(response, 2600000), 1174900);
+  assert.equal(localLoginAuthorizationDeadline(response, 2030000), 1024900);
+  assert.throws(() => localLoginAuthorizationDeadline(response, 2005000));
+});
 test("closing a challenge viewer preserves the bounded automatic task only", () => {
   const state = {
     automatic: true,

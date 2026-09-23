@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { localDeadline } from "./lease.mjs";
+import { localDeadline, localLoginAuthorizationDeadline } from "./lease.mjs";
 import { runFacebookLoginFlow } from "./login-flow.mjs";
 import { validateLoginProfile } from "./login-plugin/index.js";
 
@@ -144,7 +144,10 @@ export function createSavedLoginExecutor({
         credential.password.length > 4096
       )
         throw new Error("login_release_invalid");
-      const expiresAt = localDeadline(release, release.expiresAt);
+      const expiresAt =
+        profile.version === 2
+          ? localLoginAuthorizationDeadline(release, release.expiresAt)
+          : localDeadline(release, release.expiresAt);
       assertActive();
       validateLoginProfile(profile);
       if (profile.version === 2) {

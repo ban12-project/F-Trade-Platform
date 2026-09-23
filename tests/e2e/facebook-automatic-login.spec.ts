@@ -340,6 +340,8 @@ for (const mode of [
       return;
     }
     if (mode === "executor" || mode === "executor-checkpoint") {
+      profile.expiresAt = new Date(Date.now() + 180000).toISOString();
+      packet.expiresAt = Date.now() + 170000;
       const calls: string[] = [];
       const run = {
         kind: "interactive",
@@ -393,6 +395,10 @@ for (const mode of [
             return Response.json({ tabId: "tab", url: page.url() });
           }
           if (!body) throw new Error("missing_browser_packet");
+          // The executor must not truncate an automatic grant to the 90-second lease window.
+          // The runtime still separately checks the current, shorter lease on every operation.
+          expect(body.expiresAt).toBeGreaterThan(Date.now() + 90000);
+          expect(body.expiresAt).toBeLessThan(packet.expiresAt);
           if (path === "/ftrade/login-submit") calls.push(`submit:${body.phase}`);
           const observed = await runtime(
             path === "/ftrade/login-observe" ? "observe" : "submit",
