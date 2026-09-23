@@ -249,3 +249,11 @@ export function createSavedLoginExecutor({
     return outcome;
   };
 }
+
+/** Uncertain automatic observations pause work; they do not establish logout. */
+export function loginStopOutcome(version, outcome) {
+  if (version === 2) return outcome === "ready" ? "completed" : "page_contract_failed";
+  if (outcome === "ready") return "completed";
+  if (outcome === "unknown") return "unknown";
+  return null;
+}

@@ -17,6 +17,7 @@ import {
   loadLoginProfiles,
   loginProfileForRun,
   loginScopes,
+  loginStopOutcome,
 } from "./login.mjs";
 import { managedFacebookEnvironment } from "./managed-facebook.mjs";
 import { readPublicationMedia } from "./media.mjs";
@@ -368,11 +369,10 @@ async function heartbeat(slot) {
     // Run independently so slow navigation cannot starve other slots' lease heartbeats.
     slot.loginTask = execute(renewed.loginAuthorization)
       .then(async (outcome) => {
-        if (outcome === "ready") await stop(slot, "completed");
-        if (outcome === "unknown") await stop(slot, "unknown");
-        if (profile.version === 2 && outcome === "refused") await stop(slot, "needs_login");
+        const reason = loginStopOutcome(profile.version, outcome);
+        if (reason) await stop(slot, reason);
       })
-      .catch(() => stop(slot, "unknown"));
+      .catch(() => stop(slot, loginStopOutcome(profile.version, "unknown")));
   }
 }
 let ticking = false;
