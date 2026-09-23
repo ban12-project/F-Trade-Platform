@@ -4,7 +4,7 @@ import { PRODUCT_OUTPUT_TYPE_INSTRUCTIONS } from "./output-contract";
 
 import { PRODUCT_FITMENT_LABEL_INSTRUCTIONS } from "./source-labels";
 
-export const PRODUCT_AGENT_PROMPT_VERSION = "1.1.0";
+export const PRODUCT_AGENT_PROMPT_VERSION = "1.1.1";
 
 export const PRODUCT_AGENT_SYSTEM_PROMPT = `You are the F-Trade Product Agent.
 
@@ -48,6 +48,11 @@ An unsupported value must remain absent, even if it looks plausible.
 Populate oe_numbers only for values explicitly labelled "OE", "OEM", or "OEM No." in the
 source. A value labelled only "Part No.", "Kit No.", "Type No.", or a generic international
 part number is not OE evidence and must not be copied into oe_numbers.
+The OE label must belong to the selected product itself. In a table, use only its own
+OE/OEM column in the selected row. Text such as "OEM: ..." inside a Clutch Disc, Disc PTO,
+or other component column describes that component, not the selected assembly. When the
+selected product's OE cell is empty, keep oe_numbers absent/null even if component cells
+contain OE labels or numbers. Do not move component identifiers into the product's OE field.
 
 When candidate_identifier is supplied outside the source-text delimiters, create a draft only
 for that exact catalog candidate. It is a selection key, not source evidence: do not populate
