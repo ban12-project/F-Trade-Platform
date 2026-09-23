@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import type { FleetState } from "../lib/browser-fleet/policy";
+import { enqueueRun, type FleetState } from "../lib/browser-fleet/policy";
 import {
   authorizeBrowserSandboxStart,
   authorizeManualSandboxStart,
@@ -55,6 +55,25 @@ export async function testInboxWakeup(
     assert.equal((await read()).phase, "stopped", "paused inbound channel cannot wake");
     await db.execute(sql`UPDATE social_channel_control SET circuit_status = 'active',
       pause_reason = NULL WHERE channel_ref = ${channelRef} AND account_ref = ${accountRef}`);
+    const staleRow = await db.execute(
+      sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`,
+    );
+    const withStaleRun = staleRow.rows[0].document as FleetState;
+    const staleRun = enqueueRun(
+      withStaleRun,
+      {
+        id: randomUUID(),
+        accountId: state.accounts[0].id,
+        kind: "inbox",
+        jobRef: null,
+        requestedBy: "scheduler",
+        authSessionId: null,
+      },
+      Date.now(),
+    );
+    staleRun.credentialVersion -= 1;
+    await db.execute(sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(withStaleRun)}::jsonb
+      WHERE id = ${nodeId}`);
     await Promise.all(Array.from({ length: 4 }, () => enqueueDueInboxSandboxes(db, nodeId)));
     const operation = (await read()).operation_id as string;
     assert.ok(operation, "due inbox starts a stopped Sandbox");
@@ -68,6 +87,11 @@ export async function testInboxWakeup(
         .map((run) => run.accountId),
       [state.accounts[0].id],
       "an unbound account cannot piggyback on another account's wakeup",
+    );
+    assert.equal(
+      (queued.rows[0].document as FleetState).runs.find((run) => run.id === staleRun.id)?.status,
+      "failed",
+      "a stale credential version cannot block a fresh due poll",
     );
     assert.equal(
       (await db.execute(sql`SELECT * FROM browser_sandbox_outbox WHERE node_id = ${nodeId}`)).rows

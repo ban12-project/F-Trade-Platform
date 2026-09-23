@@ -32,8 +32,11 @@ export async function enqueueDueInboxSandboxes(db: Database, nodeId?: string) {
       if (state?.version !== 1) return;
       const allowed = await authorizedInboxAccounts(tx, String(node.id), state, Date.now());
       for (const run of state.runs)
-        if (run.kind === "inbox" && run.status === "queued" && !allowed.has(run.accountId))
-          requestStop(state, run);
+        if (run.kind === "inbox" && run.status === "queued") {
+          const account = state.accounts.find((item) => item.id === run.accountId);
+          if (!allowed.has(run.accountId) || account?.credentialVersion !== run.credentialVersion)
+            requestStop(state, run);
+        }
       scheduleInbox(state, Date.now(), randomUUID, allowed);
       await tx.execute(sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(state)}::jsonb
         WHERE id = ${node.id}`);
