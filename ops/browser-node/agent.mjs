@@ -363,6 +363,7 @@ async function heartbeat(slot) {
       .then(async (outcome) => {
         if (outcome === "ready") await stop(slot, "completed");
         if (outcome === "unknown") await stop(slot, "unknown");
+        if (profile.version === 2 && outcome === "refused") await stop(slot, "needs_login");
       })
       .catch(() => stop(slot, "unknown"));
   }

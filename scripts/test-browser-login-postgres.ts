@@ -351,9 +351,143 @@ export async function testBrowserLogin(
   const recovered = (await call({ operation: "sync" })).runs as typeof interrupted;
   assert.equal(recovered.find((run) => run.id === lost.run.id)?.savedLoginOutcome, "filled");
   assert.equal((await state()).accounts[0].authState, "needs_login");
+  // Public RFC test seed and synthetic PIN: never real account material.
+  const totpSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+  const messengerPin = "123456";
+  await ownerBrowserCommand(
+    {
+      operation: "grant",
+      value: {
+        nodeId,
+        channelRef,
+        accountRef,
+        expectedEgressIp: "203.0.113.10",
+        pollSeconds: 0,
+        credentials: {
+          loginUsername: "",
+          loginPassword: "",
+          totpSecret,
+          messengerPin,
+          proxyHost: "",
+          proxyPort: "",
+          proxyUsername: "",
+          proxyPassword: "",
+          clearLogin: false,
+          clearProxy: false,
+        },
+      },
+    },
+    owner,
+  );
+  // A legacy runtime must never receive the newly stored factors or claim readiness.
+  const legacy = await start();
+  await legacy.authorize();
+  const legacyNotice = (await legacy.heartbeat()).loginAuthorization as { id: string };
+  const legacyRequest = {
+    runId: legacy.run.id,
+    leaseId: legacy.run.leaseId,
+    authorizationId: legacyNotice.id,
+  };
+  assert.deepEqual((await call({ operation: "claim-login", ...legacyRequest })).credential, {
+    username,
+    password,
+  });
+  await assert.rejects(
+    () => call({ operation: "login-result", ...legacyRequest, outcome: "ready" }),
+    /automatic_login_required/,
+  );
+  await legacy.finish();
+  await call({
+    operation: "recover",
+    stoppedRunIds: [],
+    capabilities: ["interactive"],
+    loginFillScopes: [{ channelRef, accountRef, expiresAt: Date.now() + 3600000, automatic: true }],
+  });
+  const opened = await ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner);
+  const autoClaim = await call({
+    operation: "claim",
+    requestId: randomUUID(),
+    availableMemoryMb: 4096,
+    localSlots: 1,
+  });
+  const autoRun = autoClaim.run as { id: string; leaseId: string };
+  assert.equal(autoRun.id, opened.runId);
+  const autoHeartbeat = () =>
+    call({ operation: "heartbeat", runId: autoRun.id, leaseId: autoRun.leaseId, ready: true });
+  const autoNotice = (await autoHeartbeat()).loginAuthorization as {
+    id: string;
+    expiresAt: number;
+  };
+  assert.ok(autoNotice?.id, "Reviewed automatic scope grants login without a VNC ticket");
+  assert.equal((await state()).runs.at(-1)?.ticketUsed, false);
+  const autoRequest = {
+    runId: autoRun.id,
+    leaseId: autoRun.leaseId,
+    authorizationId: autoNotice.id,
+  };
+  const autoBaseline = await state();
+  for (const mutate of [
+    (value: FleetState) => {
+      value.accounts[0].credentialVersion++;
+    },
+    (value: FleetState) => {
+      value.accounts[0].enabled = false;
+    },
+    (value: FleetState) => {
+      value.loginFillScopes = [];
+    },
+  ]) {
+    const changed = structuredClone(autoBaseline);
+    mutate(changed);
+    await write(changed);
+    await assert.rejects(() => call({ operation: "claim-login", ...autoRequest }), /saved_login_/);
+  }
+  await write(autoBaseline);
+  const autoResponses = await Promise.all(
+    Array.from({ length: 8 }, () => http({ operation: "claim-login", ...autoRequest })),
+  );
+  assert.equal(autoResponses.filter((response) => response.status === 200).length, 1);
+  for (const response of autoResponses) {
+    const body = await response.json();
+    if (response.status === 200) {
+      assert.deepEqual(body.credential, { username, password, totpSecret, messengerPin });
+      assert.ok(body.expiresAt <= autoNotice.expiresAt && body.expiresAt <= Date.now() + 90000);
+    } else assert.deepEqual(body, { error: "node_request_denied" });
+  }
+  const claimedState = await state();
+  const rotated = structuredClone(claimedState);
+  rotated.accounts[0].credentialVersion++;
+  await write(rotated);
+  await assert.rejects(
+    () => call({ operation: "login-result", ...autoRequest, outcome: "ready" }),
+    /saved_login_/,
+  );
+  assert.notEqual((await state()).accounts[0].authState, "ready");
+  await write(claimedState);
+  const autoReceipt = { operation: "login-result", ...autoRequest, outcome: "ready" };
+  assert.equal((await call(autoReceipt)).replayed, false);
+  assert.equal((await call(autoReceipt)).replayed, true);
+  assert.equal((await state()).accounts[0].authState, "ready");
+  assert.equal((await autoHeartbeat()).loginAuthorization, undefined);
+  for (const secret of [password, totpSecret, messengerPin]) {
+    assert.equal(JSON.stringify(await state()).includes(secret), false);
+    assert.equal(JSON.stringify(await call({ operation: "sync" })).includes(secret), false);
+    const events = await database
+      .select()
+      .from(auditEvent)
+      .where(eq(auditEvent.subjectId, autoRun.id));
+    assert.equal(JSON.stringify(events).includes(secret), false);
+  }
+  await call({
+    operation: "finish",
+    runId: autoRun.id,
+    leaseId: autoRun.leaseId,
+    outcome: "completed",
+    stopped: true,
+  });
   await ownerBrowserCommand({ operation: "revoke", nodeId }, owner);
   assert.equal((await http(lostRequest)).status, 403);
   console.log(
-    "PASS saved login: owner consent, admitted session, current scope/lease, one-use concurrent HTTP release, private metadata and lost-response refusal",
+    "PASS saved login: owner consent, admitted session, current scope/lease, one-use concurrent HTTP release, private metadata, lost-response refusal, automatic factors without VNC and revocation",
   );
 }
