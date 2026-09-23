@@ -22,6 +22,7 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   node --check /opt/ftrade/watchdog.mjs
   node --check /app/server.js
   node --check /app/plugins/ftrade-diagnostics/index.js
+  node --check /app/plugins/ftrade-compatibility/index.js
   node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
   /root/.cache/camoufox/camoufox-bin --version
 '
@@ -54,6 +55,7 @@ test "$ready" = true
 # HTTP health can pass before Firefox starts. Create a real page without external traffic.
 docker exec "$name" node --input-type=module -e '
   import assert from "node:assert/strict";
+  import { readdirSync, readFileSync } from "node:fs";
   const response = await fetch("http://127.0.0.1:9377/tabs", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ userId: "synthetic-image-smoke", sessionKey: "startup", trace: false }),
@@ -64,6 +66,11 @@ docker exec "$name" node --input-type=module -e '
   const health = await (await fetch("http://127.0.0.1:9377/health")).json();
   assert.equal(health.browserConnected, true);
   assert.equal(health.activeTabs, 1);
+  // Check the launched Firefox profile, not just plugin source/config presence.
+  const profile = readdirSync("/tmp").find(name => name.startsWith("playwright_firefoxdev_profile-"));
+  assert.ok(profile, "pinned Playwright Firefox profile must exist");
+  const prefs = readFileSync(`/tmp/${profile}/prefs.js`, "utf8");
+  assert.match(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
 '
 docker exec "$name" node -e 'require("node:fs").writeFileSync("/tmp/ftrade-lease",String(Date.now()+2000),{mode:0o600})'
 timeout 35 docker wait "$name" >/dev/null

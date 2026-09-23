@@ -1,6 +1,7 @@
 {
   "interactive": { "mode": "off" },
   "plugins": {
+    "ftrade-compatibility": { "enabled": true },
     "ftrade-login": { "enabled": true },
     "ftrade-diagnostics": { "enabled": true },
     "youtube": { "enabled": false },
