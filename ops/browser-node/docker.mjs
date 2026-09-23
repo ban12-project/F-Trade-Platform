@@ -55,7 +55,8 @@ function identifier(value) {
   if (!/^[a-f0-9-]{36}$/.test(value)) throw new Error("invalid_runtime_identifier");
   return value;
 }
-export function containerSpec(nodeId, run, imageId, deadline) {
+export function containerSpec(nodeId, run, imageId, deadline, nativeProfile = false) {
+  if (typeof nativeProfile !== "boolean") throw new Error("native_profile_mode_invalid");
   identifier(nodeId);
   identifier(run.id);
   identifier(run.accountId);
@@ -96,6 +97,13 @@ export function containerSpec(nodeId, run, imageId, deadline) {
       Labels: labels,
       Env: [
         "NODE_ENV=production",
+        ...(nativeProfile
+          ? [
+              "FTRADE_NATIVE_PROFILE=1",
+              `FTRADE_PROFILE_NODE_ID=${nodeId}`,
+              `FTRADE_PROFILE_ACCOUNT_ID=${run.accountId}`,
+            ]
+          : []),
         ...(run.kind === "interactive"
           ? [
               "FTRADE_DIAGNOSTIC_KIND=interactive",
