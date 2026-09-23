@@ -10,9 +10,7 @@ for (const mode of [
   "formmethod",
   "formtarget",
 ] as const) {
-  test(`automatic login contract: ${mode}`, async ({
-    page,
-  }) => {
+  test(`automatic login contract: ${mode}`, async ({ page }) => {
     const base = "https://www.facebook.com";
     await page.route(`${base}/**`, async (route) => {
       const path = new URL(route.request().url()).pathname;
