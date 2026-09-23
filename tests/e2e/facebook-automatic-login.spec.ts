@@ -15,17 +15,28 @@ for (const mode of [
   "bootstrap-switched",
   "bootstrap-no-cookie",
   "ready-shell",
+  "aria-submit",
+  "aria-disabled",
+  "aria-outside",
 ] as const) {
   test(`automatic login contract: ${mode}`, async ({ page }) => {
     const base = "https://www.facebook.com";
     await page.route(`${base}/**`, async (route) => {
       const path = new URL(route.request().url()).pathname;
-      const content =
+      let content =
         path === "/login/"
           ? `<form id="login" method="post" action="/login/submit"><input id="user"><input id="password" type="password"><button id="submit">Log in</button></form><script>document.querySelector('form').onsubmit=e=>{e.preventDefault();location.href='/two_factor/';}</script>`
           : path === "/two_factor/"
             ? `<div id="totp"><input id="code"><button id="verify">Verify</button></div><script>document.querySelector('button').onclick=()=>location.href='/messages/';</script>`
             : `<a id="identity" data-account-id="123456789">Account</a><div id="pin"><input id="pin-code" type="password"><button id="restore">Restore</button></div><script>document.querySelector('button').onclick=()=>{document.querySelector('#pin').remove();const el=document.createElement('div');el.id='chats';el.innerHTML='<span id="empty">No chats</span>';document.body.append(el);};</script>`;
+      if (path === "/login/" && mode.startsWith("aria-")) {
+        const button = `<div id="submit" role="button" tabindex="0" ${mode === "aria-disabled" ? 'aria-disabled="true"' : ""} onclick="location.href='/two_factor/'">Log in</div>`;
+        content = content.replace(
+          '<button id="submit">Log in</button>',
+          mode === "aria-outside" ? "" : button,
+        );
+        if (mode === "aria-outside") content += button;
+      }
       await route.fulfill({ contentType: "text/html", body: content });
     });
     const profile = {
@@ -249,6 +260,20 @@ for (const mode of [
       expect(await execute({ id: packet.requestId, expiresAt: packet.expiresAt })).toBe("refused");
     } else {
       await page.goto(`${base}/login/`);
+      if (["aria-disabled", "aria-outside"].includes(mode)) {
+        expect(
+          (
+            await runtime("submit", {
+              ...packet,
+              phase: "password",
+              values: { username: "synthetic", password: "synthetic-password" },
+            })
+          ).outcome,
+        ).toBe("refused");
+        await expect(page.locator("#user")).toHaveValue("");
+        await expect(page.locator("#password")).toHaveValue("");
+        return;
+      }
       if (["formaction", "formmethod", "formtarget"].includes(mode)) {
         await page.locator("#submit").evaluate((button, attribute) => {
           button.setAttribute(

@@ -131,6 +131,14 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
       ["formaction", "formmethod", "formtarget", "formenctype", "formnovalidate"].some(
         (attribute) => button.hasAttribute(attribute),
       );
+    const ariaButton = (element) =>
+      element instanceof HTMLElement &&
+      ["DIV", "SPAN"].includes(element.tagName) &&
+      element.getAttribute("role") === "button" &&
+      element.getAttribute("tabindex") === "0" &&
+      element.getAttribute("aria-disabled") !== "true";
+    const belongsTo = (element, form) =>
+      ariaButton(element) ? element.closest("form") === form : element.form === form;
     let submit;
     if (phase === "password") {
       const form = one(profile.form),
@@ -152,7 +160,7 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
         (user.value && user.value !== values.username) ||
         user.form !== form ||
         password.form !== form ||
-        submit.form !== form
+        !belongsTo(submit, form)
       )
         return "refused";
       const target = new URL(form.action);
@@ -164,9 +172,10 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
       )
         return "refused";
       if (
-        !(submit instanceof HTMLButtonElement || submit instanceof HTMLInputElement) ||
-        submit.disabled ||
-        submit.type !== "submit"
+        !ariaButton(submit) &&
+        (!(submit instanceof HTMLButtonElement || submit instanceof HTMLInputElement) ||
+          submit.disabled ||
+          submit.type !== "submit")
       )
         return "refused";
       attempted = true;
@@ -182,14 +191,16 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
         !["text", "tel", "number", "password"].includes(input.type) ||
         !/^[0-9]{6}$/.test(values.code) ||
         Date.now() >= values.expiresAt ||
-        (submit !== null && (!(submit instanceof HTMLButtonElement) || submit.disabled))
+        (submit !== null &&
+          !ariaButton(submit) &&
+          (!(submit instanceof HTMLButtonElement) || submit.disabled))
       )
         return "refused";
       if (
         input.form &&
         ((input.form.target && input.form.target !== "_self") ||
           input.form.method.toLowerCase() !== "post" ||
-          (submit !== null && submit.form !== input.form) ||
+          (submit !== null && !belongsTo(submit, input.form)) ||
           new URL(input.form.action).origin !== location.origin)
       )
         return "refused";
