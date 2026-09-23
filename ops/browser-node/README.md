@@ -318,3 +318,30 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 诊断仅保存当前页的 `wss://gateway.facebook.com` WebSocket 创建、关闭、错误及收发帧次数，不读取或保存帧内容、PIN、完整 URL、查询参数、请求头和异常文本。每页最多跟踪 128 个连接，超出计入 dropped，页面关闭后清除。通过 session-created 的 page 事件在首次导航前接入，避免遗漏加载时建立的连接。
 
 创建事件不等于握手成功，收发帧也不等于聊天恢复成功；零计数不能证明连接正常。计数只为排查提供证据，不改变账号、渠道、收件箱同步或安全存储状态。合成 Chromium 测试通过本地拒绝连接的代理验证实际 socket 错误，未连接 Facebook；真实 Messenger 诊断和修复仍需单独验收。
+
+## Native Firefox profile 试验接入（#414）
+
+`BROWSER_NATIVE_PROFILES=1` 为节点级显式开关，默认关闭。镜像必须带
+`io.ftrade.native-profile=1` 标签。启用后，所有任务仍挂载同一账号的
+`ftbrowser-<node UUID>-<account UUID>` 卷，但使用其中的 `native-profile-v1/firefox`
+作为原生 Firefox profile；任务不能指定任意路径。缺少初始化记录、账号/节点不匹配、
+源快照改变或 profile 被占用时拒绝启动，不退回临时 profile。
+
+迁移前停止该账号的任务，确认所有访问该卷的容器均已停止，并保留受保护的卷备份。
+在受信任的本机管理环境将**已有**账号卷挂载为 `/data`，使用已审核镜像中的
+`/app/ftrade-native-profile.mjs` 导出的 `initializeNativeProfile`，传入绑定的
+`accountId`、`nodeId` 和 `source: "legacy-json"`。该操作不能由任务调用。
+初始化记录源快照摘要；首次启动导入一次，之后只使用 native profile。
+原 JSON 文件保留，不再由旧 persistence 插件恢复或覆盖。包含 IndexedDB 的旧 JSON
+会拒绝迁移，因为这不能证明其中的加密密钥可恢复。
+
+只有确认不存在旧会话的新账号才可显式选择 `source: "empty"`。不要因登录检查失败、
+CAPTCHA 或网络错误重新初始化。Native 模式关闭了旧 persistence 插件的重置接口；
+重置必须作为单独的人工运维操作，在停止任务并确认备份后执行，不能依赖旧接口清除
+原生状态。回滚时停止容器、关闭开关并恢复已确认的备份；旧 JSON 不包含迁移后的活动，
+因此回滚后必须重新检查会话有效性。
+
+该开关目前仍在验收中。原生 profile 保留不等于网站会话永不失效，尤其不能保证
+session-only Cookie 跨浏览器退出保留。每次任务应先观察账号身份和 Messenger 状态，
+确认失效后才进入有限恢复；这部分任务门控及真实账号连续性尚待完成，不应仅凭本地
+合成存储测试开启生产自动恢复。
