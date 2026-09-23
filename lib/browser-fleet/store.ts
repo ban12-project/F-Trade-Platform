@@ -28,6 +28,7 @@ import {
 } from "./contracts";
 import { acceptInboxPacket, inboxSigningKey } from "./inbox";
 import {
+  AUTOMATIC_LOGIN_MS,
   bindInstallation,
   claimRun,
   enqueueRun,
@@ -588,16 +589,28 @@ async function nodeOperation(
       (authorization.claimedAt === null && request.outcome !== "refused")
     )
       throw new Error("saved_login_result_not_authorized");
-    if (authorization.outcome && authorization.outcome !== request.outcome)
+    if (
+      request.challenge &&
+      (request.outcome !== "refused" ||
+        !authorization.automatic ||
+        authorization.claimedAt === null)
+    )
+      throw new Error("saved_login_challenge_not_authorized");
+    if (
+      authorization.outcome &&
+      (authorization.outcome !== request.outcome || authorization.challenge !== request.challenge)
+    )
       throw new Error("saved_login_result_conflict");
     const replayed = !!authorization.outcome;
     if (!replayed) {
       if (request.outcome === "ready") {
         if (!authorization.automatic) throw new Error("automatic_login_required");
+        if (authorization.expiresAt <= now) throw new Error("saved_login_expired");
         const { account } = await savedLoginAccount(tx, row, run, now);
         account.authState = "ready";
       }
       authorization.outcome = request.outcome;
+      if (request.challenge) authorization.challenge = request.challenge;
       await audit(tx, row.owner_id, `browser_credentials.login_${request.outcome}`, run.id);
     }
     return { recorded: true, replayed };
@@ -626,9 +639,9 @@ async function nodeOperation(
       credential,
       authorizationId: authorization.id,
       expiresAt: Math.min(
-        now + (authorization.automatic ? 90000 : 30000),
+        now + (authorization.automatic ? AUTOMATIC_LOGIN_MS : 30000),
         authorization.expiresAt,
-        run.leaseUntil,
+        ...(authorization.automatic ? [] : [run.leaseUntil]),
         run.deadline,
         scopeExpiry,
       ),
@@ -698,12 +711,12 @@ async function nodeOperation(
     )
   ) {
     try {
-      await savedLoginAccount(tx, row, run, now);
+      const { scopeExpiry } = await savedLoginAccount(tx, row, run, now);
       run.savedLogin = {
         id: randomUUID(),
         automatic: true,
         requestedAt: now,
-        expiresAt: Math.min(now + 90000, run.leaseUntil, run.deadline),
+        expiresAt: Math.min(now + AUTOMATIC_LOGIN_MS, run.deadline, scopeExpiry),
         claimedAt: null,
       };
     } catch {

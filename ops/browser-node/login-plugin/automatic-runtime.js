@@ -50,7 +50,7 @@ export function createAutomaticLoginRuntime({
         packet.tabId.length > 200 ||
         (requestId && requestId !== packet.requestId) ||
         !Number.isFinite(packet.expiresAt) ||
-        packet.expiresAt > Date.now() + 90000
+        packet.expiresAt > Date.now() + 180000
       )
         return { outcome: "refused" };
       const expiresAt = Math.min(packet.expiresAt, leaseDeadline(), Date.parse(profile.expiresAt));
@@ -120,7 +120,7 @@ export function createAutomaticLoginRuntime({
         ["totp", "pin"].includes(phase) &&
         (!/^[0-9]{6}$/.test(packet.values?.code ?? "") ||
           !Number.isFinite(packet.values.expiresAt) ||
-          packet.values.expiresAt > expiresAt)
+          packet.values.expiresAt > packet.expiresAt)
       )
         return { outcome: "refused" };
       submitted.add(phase);

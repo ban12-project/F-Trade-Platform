@@ -179,18 +179,26 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
         scope.channelRef === connectedAccount.channelRef &&
         scope.accountRef === connectedAccount.accountRef,
     );
+  const challengeStatus = connectedRun?.savedLoginChallenge
+    ? {
+        checkpoint: "Facebook 要求额外的人机或设备验证。请人工完成验证后重新接入；本次未自动重试。",
+        rejected: "Facebook 拒绝了本次验证。请核对账号凭据及验证设置后重新接入。",
+        unsupported_factor: "当前验证方式无法自动处理。请人工完成验证后重新接入。",
+      }[connectedRun.savedLoginChallenge]
+    : null;
   const loginStatus =
-    connectedRun?.savedLoginOutcome === "ready"
+    challengeStatus ??
+    (connectedRun?.savedLoginOutcome === "ready"
       ? "已自动完成账号身份与 Messenger 恢复验证。"
       : connectedRun?.savedLoginOutcome === "filled"
         ? "已填入，请在远程页面完成登录和 2FA。"
         : connectedRun?.savedLoginOutcome === "refused"
-          ? "未能填入，请在远程页面检查登录表单。"
+          ? "登录操作已拒绝，请检查账号状态和登录页面规则。"
           : connectedRun?.savedLoginOutcome === "unknown"
-            ? "填充结果未知，本次不再重试。请重新接入后核对。"
+            ? "登录结果未知，本次不再重试。请重新接入后核对。"
             : connectedRun?.savedLoginState
               ? "填充请求已记录，正在等待节点结果。"
-              : "仅填入已保存的账号和密码；请自行检查并提交登录。需要已接入浏览器及有效的登录页面规则。";
+              : "仅填入已保存的账号和密码；请自行检查并提交登录。需要已接入浏览器及有效的登录页面规则。");
   return (
     <div className="space-y-6">
       <p role="status" className="text-sm text-muted-foreground">

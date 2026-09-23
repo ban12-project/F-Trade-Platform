@@ -91,6 +91,7 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       leaseId: id,
       authorizationId: id,
       outcome: z.enum(["filled", "ready", "refused", "unknown"]),
+      challenge: z.enum(["checkpoint", "rejected", "unsupported_factor"]).optional(),
     })
     .strict(),
   z

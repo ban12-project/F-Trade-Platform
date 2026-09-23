@@ -91,6 +91,7 @@ export function createSavedLoginExecutor({
     let release;
     let claimAttempted = false;
     let outcome = "refused";
+    let challenge;
     try {
       if (run.kind !== "interactive" || !notice?.id) throw new Error("login_scope_invalid");
       assertActive();
@@ -173,6 +174,11 @@ export function createSavedLoginExecutor({
             : result.outcome === "unknown"
               ? "unknown"
               : "refused";
+        if (
+          result.outcome === "attention" &&
+          ["checkpoint", "rejected", "unsupported_factor"].includes(result.reason)
+        )
+          challenge = result.reason;
       } else {
         const result = await json(
           await browserRequest("/ftrade/login-fill", {
@@ -203,6 +209,7 @@ export function createSavedLoginExecutor({
           leaseId: run.leaseId,
           authorizationId: notice.id,
           outcome,
+          ...(challenge ? { challenge } : {}),
         });
       } catch {
         outcome = "unknown";

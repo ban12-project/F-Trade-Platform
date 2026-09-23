@@ -22,7 +22,7 @@ export async function runFacebookLoginFlow({
   try {
     active();
     // Bound even a faulty clock/sleep implementation and an endlessly loading page.
-    for (let poll = 0; poll < 120; poll++) {
+    for (let poll = 0; poll < 360; poll++) {
       active();
       const observed = await observe();
       active();

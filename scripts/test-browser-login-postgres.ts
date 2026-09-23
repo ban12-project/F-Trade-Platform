@@ -451,10 +451,20 @@ export async function testBrowserLogin(
     const body = await response.json();
     if (response.status === 200) {
       assert.deepEqual(body.credential, { username, password, totpSecret, messengerPin });
-      assert.ok(body.expiresAt <= autoNotice.expiresAt && body.expiresAt <= Date.now() + 90000);
+      assert.ok(body.expiresAt <= autoNotice.expiresAt && body.expiresAt <= Date.now() + 180000);
     } else assert.deepEqual(body, { error: "node_request_denied" });
   }
   const claimedState = await state();
+  const expiredAutomatic = structuredClone(claimedState);
+  const expiredAuthorization = expiredAutomatic.runs.at(-1)?.savedLogin;
+  assert.ok(expiredAuthorization);
+  expiredAuthorization.expiresAt = Date.now() - 1;
+  await write(expiredAutomatic);
+  await assert.rejects(
+    () => call({ operation: "login-result", ...autoRequest, outcome: "ready" }),
+    /saved_login_expired/,
+  );
+  await write(claimedState);
   const rotated = structuredClone(claimedState);
   rotated.accounts[0].credentialVersion++;
   await write(rotated);
@@ -463,6 +473,25 @@ export async function testBrowserLogin(
     /saved_login_/,
   );
   assert.notEqual((await state()).accounts[0].authState, "ready");
+  await write(claimedState);
+  await assert.rejects(() =>
+    call({ operation: "login-result", ...autoRequest, outcome: "ready", challenge: "checkpoint" }),
+  );
+  const challengeReceipt = {
+    operation: "login-result",
+    ...autoRequest,
+    outcome: "refused",
+    challenge: "checkpoint",
+  };
+  assert.equal((await call(challengeReceipt)).replayed, false);
+  assert.equal((await call(challengeReceipt)).replayed, true);
+  assert.notEqual((await state()).accounts[0].authState, "ready");
+  const challengePublic = (await call({ operation: "sync" })).runs as Array<{
+    savedLoginChallenge: string | null;
+  }>;
+  assert.equal(challengePublic.at(-1)?.savedLoginChallenge, "checkpoint");
+  await assert.rejects(() => call({ ...challengeReceipt, challenge: "rejected" }));
+  await assert.rejects(() => call({ ...challengeReceipt, challenge: "untrusted raw text" }));
   await write(claimedState);
   const autoReceipt = { operation: "login-result", ...autoRequest, outcome: "ready" };
   assert.equal((await call(autoReceipt)).replayed, false);

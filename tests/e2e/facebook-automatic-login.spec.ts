@@ -6,6 +6,8 @@ import { validateLoginProfile } from "../../ops/browser-node/login-plugin/index.
 for (const mode of [
   "page-contract",
   "executor",
+  "executor-checkpoint",
+  "lease-bound",
   "formaction",
   "formmethod",
   "formtarget",
@@ -42,6 +44,8 @@ for (const mode of [
         );
         if (mode === "aria-outside") content += button;
       }
+      if (path === "/two_factor/" && mode === "executor-checkpoint")
+        content = '<div id="checkpoint">Synthetic device approval required</div>';
       if (path === "/two_step_verification/two_factor/")
         content = `<h2>Go to your authentication app</h2><form><input id="code" type="text" autocomplete="off"></form><div role="button" tabindex="-1" aria-disabled="true">Continue</div><div role="button" tabindex="0">Try another way</div><script>document.querySelector('input').oninput=()=>{${mode === "authenticator-stuck" ? "" : "setTimeout(()=>{const b=document.querySelector('[role=button]');b.removeAttribute('aria-disabled');b.tabIndex=0;},100);"}};document.querySelector('[role=button]').onclick=()=>location.href='/messages/';</script>`;
       await route.fulfill({ contentType: "text/html", body: content });
@@ -86,14 +90,16 @@ for (const mode of [
         input: "#code",
         submit: '[role="button"]',
       });
+    if (mode === "lease-bound") profile.expiresAt = new Date(Date.now() + 180000).toISOString();
     validateLoginProfile(profile);
     const accountId = "00000000-0000-4000-8000-000000000001",
       runId = "00000000-0000-4000-8000-000000000002";
+    let leaseUntil = Date.now() + 60000;
     const runtime = createAutomaticLoginRuntime({
       accountId,
       runId,
       profile,
-      leaseDeadline: () => Date.now() + 60000,
+      leaseDeadline: () => leaseUntil,
       sessions: new Map([
         [accountId, { tabGroups: new Map([[runId, new Map([["tab", { page }]])]]) }],
       ]),
@@ -105,6 +111,27 @@ for (const mode of [
       requestId: "00000000-0000-4000-8000-000000000003",
       expiresAt: Date.now() + 30000,
     };
+    if (mode === "lease-bound") {
+      await page.goto(`${base}/messages/`);
+      packet.expiresAt = Date.now() + 170000;
+      expect(await runtime("observe", { ...packet, expiresAt: Date.now() + 181000 })).toMatchObject(
+        { outcome: "refused" },
+      );
+      leaseUntil = Date.now() - 1;
+      expect(await runtime("observe", { ...packet })).toMatchObject({ outcome: "refused" });
+      leaseUntil = Date.now() + 60000;
+      expect(
+        await runtime("submit", {
+          ...packet,
+          phase: "pin",
+          values: { code: "123456", expiresAt: packet.expiresAt },
+        }),
+      ).toMatchObject({ outcome: "submitted" });
+      expect(await runtime("observe", { ...packet })).toMatchObject({ state: "ready" });
+      leaseUntil = Date.now() - 1;
+      expect(await runtime("observe", { ...packet })).toMatchObject({ outcome: "refused" });
+      return;
+    }
     if (mode.startsWith("authenticator")) {
       if (mode === "authenticator-captcha") {
         await page.route("https://www.fbsbx.com/captcha/recaptcha/iframe/**", (route) =>
@@ -311,7 +338,7 @@ for (const mode of [
       else await expect(page.locator("#pin-code")).toHaveValue("");
       return;
     }
-    if (mode === "executor") {
+    if (mode === "executor" || mode === "executor-checkpoint") {
       const calls: string[] = [];
       const run = {
         kind: "interactive",
@@ -340,6 +367,7 @@ for (const mode of [
               },
             };
           expect(operation).toBe("login-result");
+          expect(body.challenge).toBe(mode === "executor-checkpoint" ? "checkpoint" : undefined);
           calls.push(`result:${body.outcome}`);
           return {};
         },
@@ -366,16 +394,26 @@ for (const mode of [
         },
       });
       const outcome = await execute({ id: packet.requestId, expiresAt: packet.expiresAt });
-      expect(outcome, JSON.stringify(calls)).toBe("ready");
-      expect(calls).toEqual([
-        "claim-login",
-        "submit:password",
-        "submit:totp",
-        "submit:pin",
-        "login-result",
-        "result:ready",
-      ]);
+      expect(outcome, JSON.stringify(calls)).toBe(
+        mode === "executor-checkpoint" ? "refused" : "ready",
+      );
+      expect(calls).toEqual(
+        mode === "executor-checkpoint"
+          ? ["claim-login", "submit:password", "login-result", "result:refused"]
+          : [
+              "claim-login",
+              "submit:password",
+              "submit:totp",
+              "submit:pin",
+              "login-result",
+              "result:ready",
+            ],
+      );
       expect(await execute({ id: packet.requestId, expiresAt: packet.expiresAt })).toBe("refused");
+      if (mode === "executor-checkpoint") {
+        expect(await runtime("observe", { ...packet })).toMatchObject({ state: "checkpoint" });
+        return;
+      }
     } else {
       await page.goto(`${base}/login/`);
       if (["aria-disabled", "aria-outside"].includes(mode)) {
