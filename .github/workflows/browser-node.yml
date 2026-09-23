@@ -57,8 +57,14 @@ jobs:
         run: node scripts/test-browser-agent-payload.mjs
       - name: Pinned upstream source cache and refusal checks
         run: node scripts/test-browser-upstream.mjs
+      - name: Sealed candidate installation refuses mismatched artifacts
+        run: python3 scripts/test-browser-candidate-install.py -v
       - name: Real PostgreSQL reservations and migration
         run: node --conditions=react-server --import tsx scripts/test-browser-fleet-postgres.ts
+        env:
+          BROWSER_FLEET_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/browser_fleet_test
+      - name: Candidate gateway broker setup and authorization
+        run: node --conditions=react-server --import tsx scripts/test-browser-candidate-broker.ts
         env:
           BROWSER_FLEET_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/browser_fleet_test
       - name: Application typecheck

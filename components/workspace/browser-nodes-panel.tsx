@@ -468,24 +468,30 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                     <span className="text-sm">
                       {node.accounts.find((a) => a.id === run.accountId)?.accountRef} · {run.kind}
                     </span>
-                    {run.kind === "interactive" && run.status === "running" && !run.ticketUsed && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={busy}
-                        onClick={async () => {
-                          const result = await send({
-                            operation: "ticket",
-                            nodeId: node.id,
-                            runId: run.id,
-                          });
-                          if (result?.connection)
-                            setConnection({ ...result.connection, nodeId: node.id, runId: run.id });
-                        }}
-                      >
-                        接入登录 / 2FA
-                      </Button>
-                    )}
+                    {run.kind === "interactive" &&
+                      run.status === "running" &&
+                      !run.stopRequested && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={busy}
+                          onClick={async () => {
+                            const result = await send({
+                              operation: "ticket",
+                              nodeId: node.id,
+                              runId: run.id,
+                            });
+                            if (result?.connection)
+                              setConnection({
+                                ...result.connection,
+                                nodeId: node.id,
+                                runId: run.id,
+                              });
+                          }}
+                        >
+                          {run.ticketUsed ? "重新授权连接" : "接入登录 / 2FA"}
+                        </Button>
+                      )}
                     {run.kind === "interactive" && (
                       <Button
                         type="button"
@@ -510,7 +516,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
           <CardHeader>
             <CardTitle>独立浏览器接管</CardTitle>
             <CardDescription>
-              连接最长 10 分钟，断开后释放资源。2FA
+              连接最长 10 分钟。断线后可在资源释放前点击“重新授权连接”，取得新票后重连。2FA
               直接在远程页面完成，不上传验证码。退出前请核对账号与固定代理出口。
             </CardDescription>
           </CardHeader>

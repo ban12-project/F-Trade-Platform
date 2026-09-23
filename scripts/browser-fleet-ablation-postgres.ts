@@ -17,7 +17,7 @@ import {
   listBrowserNodes,
   ownerBrowserCommand,
 } from "../lib/browser-fleet/store";
-import { closeDatabase } from "../lib/db/client";
+import { closeDatabase, type Database } from "../lib/db/client";
 import * as facebookSchema from "../lib/db/facebook-runtime-schema";
 import * as schema from "../lib/db/schema";
 import {
@@ -28,6 +28,7 @@ import {
 } from "../lib/social/facebook-account-store";
 import { signInteractiveEvent } from "../lib/social/facebook-interactive-protocol";
 import { submitFacebookMediaPublication } from "../lib/social/facebook-media-store";
+import { testBrowserLogin } from "./test-browser-login-postgres";
 
 type ClaimResult = {
   run: null | { id: string; leaseId: string; accountId: string };
@@ -190,6 +191,47 @@ async function main() {
       actor,
     );
     assert.ok(ticket.connection);
+    const admission = () =>
+      handleBrowserNodeRequest(normal.key, {
+        ...normal.identity,
+        operation: "admit",
+        ticket: ticket.connection!.token,
+      });
+    const savedDocument = (
+      await pool.query("SELECT document FROM browser_fleet_node WHERE id=$1", [normal.nodeId])
+    ).rows[0].document;
+    // Invalid server-side authorization state must fail before consuming the
+    // ticket. Restore only this disposable fixture between negative cases.
+    for (const invalid of ["expired_ticket", "expired_lease", "missing_session"]) {
+      const document = structuredClone(savedDocument);
+      const run = document.runs.find((entry: { id: string }) => entry.id === claimed.run!.id);
+      assert.ok(run);
+      if (invalid === "expired_ticket") run.connectBefore = 0;
+      if (invalid === "expired_lease") run.leaseUntil = 0;
+      if (invalid === "missing_session") run.authSessionId = randomUUID();
+      await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+        normal.nodeId,
+        JSON.stringify(document),
+      ]);
+      try {
+        await assert.rejects(admission, /ticket_invalid/, invalid);
+      } finally {
+        await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+          normal.nodeId,
+          JSON.stringify(savedDocument),
+        ]);
+      }
+    }
+    await assert.rejects(
+      ownerBrowserCommand(
+        { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+        outsider,
+      ),
+      /forbidden/,
+    );
+    checks.push(
+      "actual ticket admission rejects expired ticket/lease and missing owner session; another owner cannot obtain a ticket",
+    );
     await handleBrowserNodeRequest(normal.key, {
       ...normal.identity,
       operation: "admit",
@@ -204,6 +246,48 @@ async function main() {
       /ticket_invalid/,
     );
     checks.push("real broker retries reuse one lease and interactive tickets consume once");
+    const anotherSession = { ...actor, sessionId: randomUUID() };
+    await db.insert(schema.session).values({
+      id: anotherSession.sessionId,
+      token: randomUUID(),
+      userId: actor.id,
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    await assert.rejects(
+      ownerBrowserCommand(
+        { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+        anotherSession,
+      ),
+      /browser_not_connectable/,
+    );
+    const superseded = await ownerBrowserCommand(
+      { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+      actor,
+    );
+    const fresh = await ownerBrowserCommand(
+      { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+      actor,
+    );
+    assert.ok(fresh.connection && superseded.connection);
+    assert.notEqual(fresh.connection.token, ticket.connection.token);
+    const admitToken = (token: string) =>
+      handleBrowserNodeRequest(normal.key, {
+        ...normal.identity,
+        operation: "admit",
+        ticket: token,
+      });
+    await assert.rejects(admitToken(ticket.connection.token), /ticket_invalid/);
+    await assert.rejects(admitToken(superseded.connection.token), /ticket_invalid/);
+    const simultaneous = await Promise.allSettled([
+      admitToken(fresh.connection.token),
+      admitToken(fresh.connection.token),
+    ]);
+    assert.equal(simultaneous.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(simultaneous.filter((result) => result.status === "rejected").length, 1);
+    await assert.rejects(admitToken(fresh.connection.token), /ticket_invalid/);
+    checks.push(
+      "reauthorization is bound to the original owner session, rotates tokens, rejects old/superseded tokens and admits concurrent replay exactly once",
+    );
     await ownerBrowserCommand(
       {
         operation: "account",
@@ -213,6 +297,13 @@ async function main() {
       },
       actor,
     );
+    await assert.rejects(
+      ownerBrowserCommand(
+        { operation: "ticket", nodeId: normal.nodeId, runId: claimed.run.id },
+        actor,
+      ),
+      /browser_not_connectable/,
+    );
     const revoked = await handleBrowserNodeRequest(normal.key, {
       ...normal.identity,
       operation: "heartbeat",
@@ -221,7 +312,7 @@ async function main() {
       ready: true,
     });
     assert.equal((revoked as { active?: boolean }).active, false);
-    checks.push("account revocation fences real broker heartbeats");
+    checks.push("account revocation fences real broker heartbeats and reauthorization");
 
     // Use the actual store with just FOR UPDATE removed, forcing all eight SELECTs
     // to finish before any UPDATE. Each trial gets an independent authorized node.
@@ -360,6 +451,12 @@ type NodeRow = {`,
     await assert.rejects(submitFacebookMediaPublication({}, outsider.id), /account_owner_required/);
     checks.push(
       "legacy encrypted credential store works after migration; disable switch and owner check deny access",
+    );
+    // Reuse the production-broker credential consent tests in this independently
+    // runnable database gate; no real account or browser is contacted.
+    await testBrowserLogin(db as unknown as Database, actor);
+    checks.push(
+      "saved-login consent: wrong session/lease/process, expired or revoked authorization, and concurrent one-use HTTP credential release",
     );
     await mkdir(output, { recursive: true });
     const report = {
