@@ -1,0 +1,11 @@
+# MVP1 publication receipt baseline — 2026-09-24
+
+Issue #383; branch `codex/383-publication-baseline`. This is a read-only production-derived check, not a new publication or a successful application receipt.
+
+In the isolated Vercel Sandbox fork `ftrade-mvp1-acceptance-20260924`, the current reviewed text-only Facebook page contract matched the account identity and found a visible post on the receipt page. The existing `existingPublicationRefs` call returned zero links because it read posts before invoking the contract's hover-based permalink resolution. A read-only hover returned Camofox HTTP 422 (`element_not_actionable`), while the page had already replaced the placeholder with a canonical Facebook post URL. The driver already tolerates that precise 422 during *post-publication* observation, but did not resolve the *pre-publication* baseline.
+
+The driver now applies the same reviewed permalink resolution when reading the baseline, only for profiles that explicitly enable `resolvePostLinks`. It still rejects unexpected hover errors and unresolved links, checks account identity, and never retries the external publication click. The intercepted-browser regression proves an existing placeholder permalink becomes a baseline URL after the tolerated 422 hover response. All 27 Facebook driver scenarios passed in the isolated Playwright suite.
+
+After copying only the revised driver into the fork, the same read-only identity and baseline path returned valid existing publication references (two were visible at that observation). No post body, permalink, account identifier, credentials or proxy secret was exported. The fork was stopped and snapshotted; the source production Sandbox was unchanged.
+
+This addresses a concrete baseline blind spot. It does not explain every prior `unknown` outcome or prove that a newly published post produces and stores an automatic `published` receipt. That still needs a reviewed, authorized text job through the deployed Agent and broker, with a distinct observed permalink and durable app result. The prior human confirmation must remain separate from the original unknown runtime receipt.

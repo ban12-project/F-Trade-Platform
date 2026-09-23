@@ -187,7 +187,7 @@ export function createFacebookDriver(input, browserRequest) {
     await waitFor(session, "identity-ready");
     await evaluate(session, { kind: "identity" });
   };
-  const readPosts = async (session, text) => {
+  const readPosts = async (session, text, resolveExisting = false) => {
     if (profile.receiptUrl && !session.readingReceipts) {
       await navigate(session, profile.receiptUrl);
       session.readingReceipts = true;
@@ -215,7 +215,7 @@ export function createFacebookDriver(input, browserRequest) {
         }
       }
     };
-    if (text === undefined) return evaluate(session, { kind: "posts" });
+    if (text === undefined && !resolveExisting) return evaluate(session, { kind: "posts" });
     await resolveLinks();
     for (let attempt = 0; attempt < 20; attempt++) {
       if (attempt === 5) await resolveLinks();
@@ -265,7 +265,7 @@ export function createFacebookDriver(input, browserRequest) {
       return evaluate(session, { kind: "identity" });
     },
     async existingPublicationRefs(session) {
-      const posts = await readPosts(session);
+      const posts = await readPosts(session, undefined, profile.resolvePostLinks === true);
       session.baseline = new Set(posts.map((post) => post.externalPublicationRef).filter(Boolean));
       session.existingTexts = new Set(
         posts.filter((post) => post.accountRef === profile.accountRef).map((post) => post.text),
