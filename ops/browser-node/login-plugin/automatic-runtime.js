@@ -3,6 +3,33 @@ import pageProgram from "./automatic-program.cjs";
 const program = new Function(`return (${pageProgram});`)();
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 
+async function visibleFacebookCaptcha(page) {
+  const frames = page.frames();
+  if (frames.length > 32) throw new Error("frame_limit");
+  for (const frame of frames) {
+    const url = new URL(frame.url());
+    if (url.origin !== "https://www.fbsbx.com" || url.pathname !== "/captcha/recaptcha/iframe/")
+      continue;
+    let current = frame;
+    let visible = true;
+    for (let depth = 0; current.parentFrame(); depth++) {
+      if (depth >= 4) throw new Error("frame_depth");
+      const element = await current.frameElement();
+      try {
+        if (!(await element.isVisible())) {
+          visible = false;
+          break;
+        }
+      } finally {
+        await element.dispose();
+      }
+      current = current.parentFrame();
+    }
+    if (visible) return true;
+  }
+  return false;
+}
+
 export function createAutomaticLoginRuntime({
   sessions,
   accountId,
@@ -48,7 +75,11 @@ export function createAutomaticLoginRuntime({
               users.length > 1,
           };
         }
-        return page.evaluate(program, { ...args, sessionIdentity });
+        const captchaVisible =
+          profile.automation.totp.mode === "facebook-authenticator" &&
+          new URL(page.url()).pathname === "/two_step_verification/authentication/" &&
+          (await visibleFacebookCaptcha(page));
+        return page.evaluate(program, { ...args, sessionIdentity, captchaVisible });
       };
       requestId = packet.requestId;
       if (operation === "observe") {

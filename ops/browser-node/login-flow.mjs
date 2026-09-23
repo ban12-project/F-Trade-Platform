@@ -13,6 +13,7 @@ export async function runFacebookLoginFlow({
   const attempted = new Set();
   let highest = 0;
   let started = false;
+  let unsettledReads = 0;
   const rank = { password: 1, totp: 2, messenger: 3, pin: 4 };
   const active = () => {
     assertActive();
@@ -25,7 +26,8 @@ export async function runFacebookLoginFlow({
       active();
       const observed = await observe();
       active();
-      if (!observed || observed.originVerified !== true || observed.accountMismatch === true)
+      if (observed?.outcome === "unknown") return { outcome: "unknown", reason: "observation" };
+      if (observed?.originVerified !== true || observed.accountMismatch === true)
         return { outcome: "refused", reason: "page_scope" };
       if (observed.state === "ready") {
         if (observed.identityVerified !== true || observed.messengerRestored !== true)
@@ -35,6 +37,13 @@ export async function runFacebookLoginFlow({
       if (["checkpoint", "rejected", "unsupported_factor"].includes(observed.state))
         return { outcome: "attention", reason: observed.state };
       const phase = observed.state;
+      // Navigation can expose a new document before its form/identity hydrates.
+      // Allow bounded reads only; wrong origins/accounts above still stop immediately.
+      if (phase === "invalid" && unsettledReads++ < 20) {
+        await sleep(Math.min(500, Math.max(0, deadline - now())));
+        continue;
+      }
+      if (phase !== "invalid") unsettledReads = 0;
       if (phase === "loading" || (rank[phase] && attempted.has(phase) && rank[phase] === highest)) {
         await sleep(Math.min(500, Math.max(0, deadline - now())));
         continue;

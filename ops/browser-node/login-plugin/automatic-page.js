@@ -6,6 +6,7 @@ async function automaticLoginPage({
   values,
   expiresAt,
   sessionIdentity,
+  captchaVisible,
 }) {
   let attempted = false;
   try {
@@ -110,6 +111,11 @@ async function automaticLoginPage({
         (element) => element.textContent.trim() === "Go to your authentication app",
       ).length === 1;
     const states = [];
+    if (
+      captchaVisible === true &&
+      authenticatorUrl("/two_step_verification/authentication/", "pre_authentication")
+    )
+      states.push("checkpoint");
     for (const attention of ["checkpoint", "rejected"])
       if (matches(auto[attention]).length) states.push(attention);
     if (location.href === profile.url && matches(profile.form).length) states.push("password");
@@ -142,7 +148,8 @@ async function automaticLoginPage({
           ? "invalid"
           : readyRoots.length > 0 ||
               matches(auto.loading).length ||
-              authenticatorUrl("/two_step_verification/authentication/", "pre_authentication")
+              authenticatorUrl("/two_step_verification/authentication/", "pre_authentication") ||
+              authenticatorUrl("/two_step_verification/two_factor/", "two_factor_login")
             ? "loading"
             : identityVerified
               ? "messenger"

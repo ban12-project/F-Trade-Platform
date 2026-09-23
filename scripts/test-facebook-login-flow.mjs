@@ -48,6 +48,34 @@ assert.equal((await run([ready])).submissions.length, 0);
 assert.equal((await run([{ state: "ready" }])).result.reason, "ready_unverified");
 assert.equal((await run([{ state: "password", accountMismatch: true }])).submissions.length, 0);
 assert.equal((await run([{ state: "checkpoint" }])).result.outcome, "attention");
+const observationFailure = await run([{ state: "password" }, { outcome: "unknown" }, ready]);
+assert.equal(observationFailure.result.outcome, "unknown");
+assert.equal(observationFailure.submissions.length, 1);
+const hydration = await run([
+  { state: "invalid" },
+  { state: "totp" },
+  { state: "invalid" },
+  { state: "invalid" },
+  { state: "messenger", identityVerified: true },
+  ready,
+]);
+assert.equal(hydration.result.outcome, "ready");
+assert.deepEqual(
+  hydration.submissions.map((s) => s.phase),
+  ["totp", "messenger"],
+);
+const unrecognized = await run([
+  { state: "password" },
+  ...Array.from({ length: 21 }, () => ({ state: "invalid" })),
+  ready,
+]);
+assert.equal(unrecognized.result.outcome, "refused");
+assert.equal(unrecognized.submissions.length, 1);
+for (const invalidScope of [{ originVerified: false }, { accountMismatch: true }]) {
+  const stopped = await run([{ state: "password" }, { state: "invalid", ...invalidScope }, ready]);
+  assert.equal(stopped.result.reason, "page_scope");
+  assert.equal(stopped.submissions.length, 1);
+}
 assert.equal((await run([{ state: "pin" }, { state: "password" }])).submissions.length, 1);
 const lost = await run([{ state: "password" }, ready], {
   submit: async () => {

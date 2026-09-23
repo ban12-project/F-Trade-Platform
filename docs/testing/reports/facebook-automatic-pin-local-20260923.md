@@ -71,3 +71,14 @@
 修订后再次执行同一授权范围的完整流程，得到 `password` → 单次密码 `submitted` → `loading`，随后授权窗口内未进入验证码页，结果为 `unknown`。broker 记录一次 claim、一次结果回执，账号仍为 `needs_login`，未错误标记 ready。本轮诊断未记录代理连接错误；请求日志有 Facebook/Instagram 的 `NS_BINDING_ABORTED`，不足以判断根因。不得据此宣称 TOTP 错误或代理正常无疑，也不应自动重放密码。
 
 当前结论：真实分阶段密码、TOTP、PIN 可用；本地完整自动登录仍受 pre-authentication 中间页停留影响，尚未通过。生产部署、真实非空收件箱、跨重启历史恢复及 DM→RFQ 仍不在已验收范围。
+
+
+## CAPTCHA 根因定位与人工验证后恢复（同日）
+
+对之前拒绝运行的持久化会话进行只读复查，没有再次提交密码。新增私有网络诊断仅记录请求主机、路径、类型及开始/结束，不记录查询参数、正文、凭据或验证码。观察到 `www.fbsbx.com/captcha/recaptcha/iframe/` 与 Google reCAPTCHA Enterprise 资源全部完成；截图实际显示 Meta 页面和 “I'm not a robot” 控件。顶层可访问性快照只给出图片和 iframe，不能据此认定页面为空或网络仍在加载。
+
+用户手动完成人机验证后，同一会话进入真实验证器页面。使用已保存密钥生成 TOTP 并单次提交，Facebook 随后显示已登录/信任设备提示；没有选择信任设备。继续自动导航 Messenger、单次提交已保存 PIN，最终运行模块返回 `ready`，且 `identityVerified=true`、`messengerRestored=true`。
+
+修订包括：仅在审核的 pre-authentication 地址检查可见的嵌套 Facebook CAPTCHA frame，将其标为 checkpoint；检查所有祖先 frame 的可见性，隐藏容器不算交互挑战。验证码页面外不扫描 CAPTCHA frame。验证码表单和登录身份异步加载时允许最多 20 次、每次至多 500ms 的只读观察，仍受整体截止时间限制；错误站点或账号立即拒绝。观察器发生未知错误时保留 unknown，不错误降为已明确拒绝。19 项浏览器测试、流程状态机测试、27 项节点测试及固定 Camofox 插件装载/鉴权检查通过。
+
+此次人工验证后的续跑包含开发调试与浏览器重启，使用私有短期运行许可，没有形成同一次正式 broker 授权的连续成功回执。它证明 CAPTCHA 完成后 TOTP/PIN 自动执行可恢复至真实 Messenger ready；**人工验证交接、恢复正式平台运行与 durable ready 回执的整体链路仍待验收**。不能把此前的 unknown 改写为成功，也不能宣称 CAPTCHA 可自动完成。没有发送消息或发布内容。

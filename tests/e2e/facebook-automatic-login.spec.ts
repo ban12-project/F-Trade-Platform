@@ -22,6 +22,7 @@ for (const mode of [
   "authenticator-stuck",
   "authenticator-wrong-flow",
   "authenticator-transition",
+  "authenticator-captcha",
 ] as const) {
   test(`automatic login contract: ${mode}`, async ({ page }) => {
     const base = "https://www.facebook.com";
@@ -105,6 +106,45 @@ for (const mode of [
       expiresAt: Date.now() + 30000,
     };
     if (mode.startsWith("authenticator")) {
+      if (mode === "authenticator-captcha") {
+        await page.route("https://www.fbsbx.com/captcha/recaptcha/iframe/**", (route) =>
+          route.fulfill({ contentType: "text/html", body: "Synthetic human verification" }),
+        );
+        await page.route(`${base}/common/referer_frame.php`, (route) =>
+          route.fulfill({
+            contentType: "text/html",
+            body: '<iframe src="https://www.fbsbx.com/captcha/recaptcha/iframe/"></iframe>',
+          }),
+        );
+        await page.goto(
+          `${base}/two_step_verification/authentication/?encrypted_context=synthetic&flow=pre_authentication&next`,
+        );
+        await page.setContent(
+          `<iframe id="outer" src="${base}/common/referer_frame.php"></iframe>`,
+        );
+        await expect(page.frameLocator("#outer").frameLocator("iframe").locator("body")).toHaveText(
+          "Synthetic human verification",
+        );
+        expect(await runtime("observe", { ...packet })).toMatchObject({
+          state: "checkpoint",
+          messengerRestored: false,
+        });
+        await page.locator("#outer").evaluate((el) => {
+          el.style.display = "none";
+        });
+        expect(await runtime("observe", { ...packet })).toMatchObject({ state: "loading" });
+        await page.locator("#outer").evaluate((el) => {
+          el.style.display = "block";
+        });
+        expect(
+          await runtime("submit", {
+            ...packet,
+            phase: "totp",
+            values: { code: "123456", expiresAt: packet.expiresAt },
+          }),
+        ).toMatchObject({ outcome: "refused" });
+        return;
+      }
       if (mode === "authenticator-transition") {
         await page.goto(
           `${base}/two_step_verification/authentication/?encrypted_context=synthetic&flow=pre_authentication&next`,
@@ -122,6 +162,11 @@ for (const mode of [
             values: { code: "123456", expiresAt: packet.expiresAt },
           }),
         ).toMatchObject({ outcome: "refused" });
+        await page.goto(
+          `${base}/two_step_verification/two_factor/?encrypted_context=synthetic&flow=two_factor_login&next`,
+        );
+        await page.setContent('<img alt="Meta">');
+        expect(await runtime("observe", { ...packet })).toMatchObject({ state: "loading" });
         await page.goto(
           `${base}/two_step_verification/authentication/?encrypted_context=synthetic&flow=wrong&next`,
         );
