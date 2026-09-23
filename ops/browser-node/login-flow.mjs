@@ -3,6 +3,7 @@ import { generateTotp } from "./totp.mjs";
 /** Credential submissions are one-shot. Observation may repeat, submission never does. */
 export async function runFacebookLoginFlow({
   credentials,
+  acquireCredentials,
   observe,
   submit,
   assertActive,
@@ -16,6 +17,7 @@ export async function runFacebookLoginFlow({
   let started = false;
   let unsettledReads = 0;
   let attentionReported = false;
+  let credentialAcquisitionAttempted = false;
   const rank = { password: 1, totp: 2, messenger: 3, pin: 4 };
   const active = () => {
     assertActive();
@@ -60,13 +62,25 @@ export async function runFacebookLoginFlow({
       }
       if (!Object.hasOwn(rank, phase) || rank[phase] < highest)
         return { outcome: "refused", reason: "unexpected_phase" };
+      if (phase !== "messenger" && !credentials && acquireCredentials) {
+        // Only a positively observed recovery phase may release stored factors.
+        // Consume before the request: a lost response must never trigger a second claim.
+        if (credentialAcquisitionAttempted)
+          return { outcome: "unknown", reason: "credential_claim" };
+        credentialAcquisitionAttempted = true;
+        active();
+        credentials = await acquireCredentials(phase);
+        active();
+        if (!credentials || typeof credentials !== "object")
+          return { outcome: "refused", reason: "credential_claim" };
+      }
       let values;
       if (phase === "password") {
-        if (!credentials.username || !credentials.password)
+        if (!credentials?.username || !credentials?.password)
           return { outcome: "needs_credential", reason: "password" };
         values = { username: credentials.username, password: credentials.password };
       } else if (phase === "totp") {
-        if (!credentials.totpSecret) return { outcome: "needs_credential", reason: "totp" };
+        if (!credentials?.totpSecret) return { outcome: "needs_credential", reason: "totp" };
         let otp = generateTotp(credentials.totpSecret, now());
         if (otp.expiresAt - now() < 5000) {
           await sleep(Math.max(0, otp.expiresAt - now()) + 1);
@@ -78,7 +92,7 @@ export async function runFacebookLoginFlow({
         if (observed.identityVerified !== true) return { outcome: "refused", reason: "identity" };
         values = {};
       } else {
-        if (!credentials.messengerPin) return { outcome: "needs_credential", reason: "pin" };
+        if (!credentials?.messengerPin) return { outcome: "needs_credential", reason: "pin" };
         values = { code: credentials.messengerPin, expiresAt: deadline };
       }
       active();
@@ -97,7 +111,10 @@ export async function runFacebookLoginFlow({
     return { outcome: "unknown", reason: "observation_limit" };
   } catch {
     // Exceptions from the browser may contain typed secrets. Never return exception contents.
-    return { outcome: started ? "unknown" : "refused", reason: "execution" };
+    return {
+      outcome: started || credentialAcquisitionAttempted ? "unknown" : "refused",
+      reason: "execution",
+    };
   } finally {
     if (credentials && typeof credentials === "object") {
       delete credentials.password;

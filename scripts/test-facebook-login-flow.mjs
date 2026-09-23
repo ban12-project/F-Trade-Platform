@@ -135,3 +135,45 @@ assert.equal(nearExpiry.submissions.length, 0);
 console.log(
   "PASS bounded login transitions, verified ready, one-shot submissions, cancellation and secret disposal",
 );
+
+let claims = 0;
+const acquireCredentials = async () => {
+  claims++;
+  return {
+    username: "synthetic",
+    password: "synthetic-password",
+    totpSecret: secret,
+    messengerPin: "123456",
+  };
+};
+for (const states of [
+  [ready],
+  [{ state: "checkpoint" }],
+  [{ state: "password", accountMismatch: true }],
+  [{ state: "invalid" }, ready],
+  [{ state: "loading" }, ready],
+  [{ state: "messenger", identityVerified: true }, ready],
+]) {
+  await run(states, { credentials: undefined, acquireCredentials });
+  assert.equal(claims, 0, "session checks and navigation must not acquire factors");
+}
+const lazyRecovery = await run(
+  [{ state: "password" }, { state: "totp" }, { state: "pin" }, ready],
+  {
+    credentials: undefined,
+    acquireCredentials,
+  },
+);
+assert.equal(lazyRecovery.result.outcome, "ready");
+assert.equal(claims, 1);
+const lostClaim = await run([{ state: "password" }, { state: "password" }], {
+  credentials: undefined,
+  acquireCredentials: async () => {
+    claims++;
+    throw Error("lost_release");
+  },
+});
+assert.equal(lostClaim.submissions.length, 0);
+assert.equal(lostClaim.result.outcome, "unknown");
+assert.equal(claims, 2);
+console.log("PASS session-first lazy factor acquisition and no retry after ambiguous release");
