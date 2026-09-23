@@ -1,9 +1,16 @@
 import { readFileSync } from "node:fs";
+import { validateAutomaticProfile } from "./automatic-profile.js";
+import { createAutomaticLoginRuntime } from "./automatic-runtime.js";
 import pageProgram from "./page-program.cjs";
 
 const fillPage = new Function(`return (${pageProgram});`)();
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 export function validateLoginProfile(profile, now = Date.now()) {
+  if (profile?.version === 2) {
+    const { automation, ...legacy } = profile;
+    validateLoginProfile({ ...legacy, version: 1 }, now);
+    return { ...structuredClone(profile), automation: validateAutomaticProfile(automation) };
+  }
   if (
     !profile ||
     Object.keys(profile).sort().join(",") !==
@@ -120,6 +127,40 @@ export function register(app, ctx, config = {}) {
   if (config.enabled !== true || !process.env.FTRADE_LOGIN_PROFILE_JSON) return;
   if (!ctx.config?.accessKey) throw new Error("login_access_key_required");
   const profile = validateLoginProfile(JSON.parse(process.env.FTRADE_LOGIN_PROFILE_JSON));
+  if (profile.version === 2) {
+    const accountId = process.env.FTRADE_ACCOUNT_ID,
+      runId = process.env.FTRADE_RUN_ID;
+    if (
+      !uuid.test(accountId ?? "") ||
+      !uuid.test(runId ?? "") ||
+      process.env.FTRADE_RUN_KIND !== "interactive" ||
+      profile.automation.accountRef !== process.env.FTRADE_ACCOUNT_REF
+    )
+      throw new Error("login_runtime_scope_invalid");
+    const execute = createAutomaticLoginRuntime({
+      sessions: ctx.sessions,
+      accountId,
+      runId,
+      profile,
+      leaseDeadline: () => Number(readFileSync("/tmp/ftrade-lease", "utf8")),
+    });
+    app.get("/ftrade/login-status", ctx.auth(), (_req, res) => {
+      res.set("Cache-Control", "no-store");
+      res.json({
+        version: 2,
+        runId,
+        accountId,
+        reviewRef: profile.reviewRef,
+        expiresAt: Date.parse(profile.expiresAt),
+      });
+    });
+    for (const operation of ["observe", "submit"])
+      app.post(`/ftrade/login-${operation}`, ctx.auth(), async (req, res) => {
+        res.set("Cache-Control", "no-store");
+        res.json(await execute(operation, req.body));
+      });
+    return;
+  }
   const fill = createLoginFill({
     sessions: ctx.sessions,
     accountId: process.env.FTRADE_ACCOUNT_ID,

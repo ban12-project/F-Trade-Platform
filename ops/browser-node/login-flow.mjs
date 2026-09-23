@@ -13,7 +13,7 @@ export async function runFacebookLoginFlow({
   const attempted = new Set();
   let highest = 0;
   let started = false;
-  const rank = { password: 1, totp: 2, pin: 3 };
+  const rank = { password: 1, totp: 2, messenger: 3, pin: 4 };
   const active = () => {
     assertActive();
     if (!Number.isFinite(deadline) || now() >= deadline) throw new Error("login_expired");
@@ -55,6 +55,9 @@ export async function runFacebookLoginFlow({
           otp = generateTotp(credentials.totpSecret, now());
         }
         values = { code: otp.code, expiresAt: Math.min(deadline, otp.expiresAt) };
+      } else if (phase === "messenger") {
+        if (observed.identityVerified !== true) return { outcome: "refused", reason: "identity" };
+        values = {};
       } else {
         if (!credentials.messengerPin) return { outcome: "needs_credential", reason: "pin" };
         values = { code: credentials.messengerPin, expiresAt: deadline };

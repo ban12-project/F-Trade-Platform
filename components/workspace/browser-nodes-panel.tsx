@@ -172,15 +172,17 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
         scope.accountRef === connectedAccount.accountRef,
     );
   const loginStatus =
-    connectedRun?.savedLoginOutcome === "filled"
-      ? "已填入，请在远程页面完成登录和 2FA。"
-      : connectedRun?.savedLoginOutcome === "refused"
-        ? "未能填入，请在远程页面检查登录表单。"
-        : connectedRun?.savedLoginOutcome === "unknown"
-          ? "填充结果未知，本次不再重试。请重新接入后核对。"
-          : connectedRun?.savedLoginState
-            ? "填充请求已记录，正在等待节点结果。"
-            : "仅填入已保存的账号和密码；请自行检查并提交登录。需要已接入浏览器及有效的登录页面规则。";
+    connectedRun?.savedLoginOutcome === "ready"
+      ? "已自动完成账号身份与 Messenger 恢复验证。"
+      : connectedRun?.savedLoginOutcome === "filled"
+        ? "已填入，请在远程页面完成登录和 2FA。"
+        : connectedRun?.savedLoginOutcome === "refused"
+          ? "未能填入，请在远程页面检查登录表单。"
+          : connectedRun?.savedLoginOutcome === "unknown"
+            ? "填充结果未知，本次不再重试。请重新接入后核对。"
+            : connectedRun?.savedLoginState
+              ? "填充请求已记录，正在等待节点结果。"
+              : "仅填入已保存的账号和密码；请自行检查并提交登录。需要已接入浏览器及有效的登录页面规则。";
   return (
     <div className="space-y-6">
       <p role="status" className="text-sm text-muted-foreground">

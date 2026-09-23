@@ -90,7 +90,7 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       runId: id,
       leaseId: id,
       authorizationId: id,
-      outcome: z.enum(["filled", "refused", "unknown"]),
+      outcome: z.enum(["filled", "ready", "refused", "unknown"]),
     })
     .strict(),
   z
@@ -178,6 +178,7 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
               channelRef: reference,
               accountRef: reference,
               expiresAt: z.number().int().positive(),
+              automatic: z.boolean().optional(),
             })
             .strict(),
         )

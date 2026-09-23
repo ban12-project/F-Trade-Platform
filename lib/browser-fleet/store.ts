@@ -115,6 +115,13 @@ async function validSession(
 async function savedLoginAccount(tx: DatabaseTransaction, row: NodeRow, run: Run, now: number) {
   const state = row.document;
   const account = state.accounts.find((item) => item.id === run.accountId);
+  const automatic = (state.loginFillScopes ?? []).some(
+    (scope) =>
+      scope.automatic === true &&
+      scope.channelRef === account?.channelRef &&
+      scope.accountRef === account?.accountRef &&
+      scope.expiresAt > now + 10000,
+  );
   const scopeExpiry = Math.max(
     0,
     ...(state.loginFillScopes ?? [])
@@ -130,7 +137,7 @@ async function savedLoginAccount(tx: DatabaseTransaction, row: NodeRow, run: Run
     run.requestedBy !== row.owner_id ||
     run.status !== "running" ||
     run.stopRequested ||
-    !run.ticketUsed ||
+    (!automatic && !run.ticketUsed) ||
     run.leaseUntil <= now + 10000 ||
     run.deadline <= now + 10000 ||
     !account?.enabled ||
@@ -307,6 +314,13 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
           throw new Error("saved_login_already_requested_or_wrong_session");
         run.savedLogin = {
           id: randomUUID(),
+          automatic: (state.loginFillScopes ?? []).some(
+            (scope) =>
+              scope.automatic === true &&
+              scope.accountRef === run.accountRef &&
+              scope.channelRef === run.channelRef &&
+              scope.expiresAt > now + 10000,
+          ),
           requestedAt: now,
           expiresAt: Math.min(now + 60000, run.leaseUntil, run.deadline),
           claimedAt: null,
@@ -578,6 +592,11 @@ async function nodeOperation(
       throw new Error("saved_login_result_conflict");
     const replayed = !!authorization.outcome;
     if (!replayed) {
+      if (request.outcome === "ready") {
+        if (!authorization.automatic) throw new Error("automatic_login_required");
+        const { account } = await savedLoginAccount(tx, row, run, now);
+        account.authState = "ready";
+      }
       authorization.outcome = request.outcome;
       await audit(tx, row.owner_id, `browser_credentials.login_${request.outcome}`, run.id);
     }
@@ -597,13 +616,17 @@ async function nodeOperation(
     const credential = facebookLoginSecretSchema.parse(
       decryptFacebookCredential(loginCiphertext, account, "login", configuredFacebookKeyring()),
     );
+    if (!authorization.automatic) {
+      delete credential.totpSecret;
+      delete credential.messengerPin;
+    }
     authorization.claimedAt = now;
     await audit(tx, row.owner_id, "browser_credentials.login_released", run.id);
     return {
       credential,
       authorizationId: authorization.id,
       expiresAt: Math.min(
-        now + 30000,
+        now + (authorization.automatic ? 90000 : 30000),
         authorization.expiresAt,
         run.leaseUntil,
         run.deadline,
@@ -661,6 +684,31 @@ async function nodeOperation(
   )
     requestStop(state, run);
   const renewed = renewRun(state, run.id, request.leaseId, request.ready, now);
+  if (
+    renewed &&
+    run.kind === "interactive" &&
+    !run.savedLogin &&
+    (state.loginFillScopes ?? []).some(
+      (scope) =>
+        scope.automatic === true &&
+        scope.channelRef === run.channelRef &&
+        scope.accountRef === run.accountRef &&
+        scope.expiresAt > now + 10000,
+    )
+  ) {
+    try {
+      await savedLoginAccount(tx, row, run, now);
+      run.savedLogin = {
+        id: randomUUID(),
+        automatic: true,
+        requestedAt: now,
+        expiresAt: Math.min(now + 90000, run.leaseUntil, run.deadline),
+        claimedAt: null,
+      };
+    } catch {
+      /* Keep normal heartbeat; missing/revoked credentials never cause a release. */
+    }
+  }
   let loginAuthorization: { id: string; expiresAt: number } | undefined;
   if (
     renewed &&

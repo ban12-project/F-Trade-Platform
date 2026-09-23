@@ -302,7 +302,10 @@ async function heartbeat(slot) {
   if (
     slot.ready &&
     slot.run.kind === "interactive" &&
-    ((!slot.connected && !pendingConnection && Date.now() - slot.readyAt > 60_000) ||
+    ((!slot.connected &&
+      !pendingConnection &&
+      !slot.loginTask &&
+      Date.now() - slot.readyAt > 60_000) ||
       (slot.disconnectedAt && Date.now() - slot.disconnectedAt > 15_000))
   ) {
     await stop(slot, "completed");
@@ -318,8 +321,8 @@ async function heartbeat(slot) {
   if (slot.containerId) await renewWatchdog(docker, slot.containerId, slot.expiresAt);
   if (
     slot.ready &&
-    slot.connected &&
-    !slot.disconnectedAt &&
+    (loginProfileForRun(loginProfiles, slot.run)?.version === 2 ||
+      (slot.connected && !slot.disconnectedAt)) &&
     slot.run.kind === "interactive" &&
     renewed.loginAuthorization &&
     !slot.loginTask
@@ -332,8 +335,7 @@ async function heartbeat(slot) {
       assertActive() {
         if (
           !slot.ready ||
-          !slot.connected ||
-          slot.disconnectedAt ||
+          (profile.version !== 2 && (!slot.connected || slot.disconnectedAt)) ||
           slot.stopping ||
           slot.abort.signal.aborted ||
           slot.expiresAt <= Date.now()
@@ -359,6 +361,7 @@ async function heartbeat(slot) {
     // Run independently so slow navigation cannot starve other slots' lease heartbeats.
     slot.loginTask = execute(renewed.loginAuthorization)
       .then(async (outcome) => {
+        if (outcome === "ready") await stop(slot, "completed");
         if (outcome === "unknown") await stop(slot, "unknown");
       })
       .catch(() => stop(slot, "unknown"));

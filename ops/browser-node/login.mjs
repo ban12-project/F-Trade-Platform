@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { localDeadline } from "./lease.mjs";
+import { runFacebookLoginFlow } from "./login-flow.mjs";
 import { validateLoginProfile } from "./login-plugin/index.js";
 
 export async function loadLoginProfiles(path) {
@@ -31,11 +32,13 @@ export function loginScopes(profiles) {
     channelRef,
     accountRef,
     expiresAt: Date.parse(profile.expiresAt),
+    ...(profile.version === 2 ? { automatic: true } : {}),
   }));
 }
 export function loginProfileForRun(profiles, run) {
   if (run.kind !== "interactive") return null;
   const profile = profiles.get(JSON.stringify([run.channelRef, run.accountRef]))?.profile;
+  if (profile?.version === 2 && profile.automation.accountRef !== run.accountRef) return null;
   return profile && Date.parse(profile.expiresAt) > Date.now()
     ? validateLoginProfile(profile)
     : null;
@@ -45,6 +48,7 @@ export function configureLoginRuntime(spec, run, profile) {
   spec.body.Env.push(
     `FTRADE_ACCOUNT_ID=${run.accountId}`,
     `FTRADE_RUN_ID=${run.id}`,
+    ...(profile.version === 2 ? [`FTRADE_ACCOUNT_REF=${run.accountRef}`] : []),
     "FTRADE_RUN_KIND=interactive",
     `FTRADE_LOGIN_PROFILE_JSON=${JSON.stringify(validateLoginProfile(profile))}`,
   );
@@ -93,7 +97,7 @@ export function createSavedLoginExecutor({
       validateLoginProfile(profile);
       const status = await json(await browserRequest("/ftrade/login-status"));
       if (
-        status.version !== 1 ||
+        status.version !== profile.version ||
         status.runId !== run.id ||
         status.accountId !== run.accountId ||
         status.reviewRef !== profile.reviewRef ||
@@ -114,7 +118,9 @@ export function createSavedLoginExecutor({
         typeof tab.tabId !== "string" ||
         !tab.tabId ||
         tab.tabId.length > 200 ||
-        tab.url !== profile.url
+        (profile.version === 1
+          ? tab.url !== profile.url
+          : new URL(tab.url).origin !== "https://www.facebook.com")
       )
         throw new Error("login_navigation_invalid");
       // Navigation can take time; recheck egress and connection before releasing a credential.
@@ -140,18 +146,47 @@ export function createSavedLoginExecutor({
       const expiresAt = localDeadline(release, release.expiresAt);
       assertActive();
       validateLoginProfile(profile);
-      const result = await json(
-        await browserRequest("/ftrade/login-fill", {
+      if (profile.version === 2) {
+        const packet = {
           userId: run.accountId,
           runId: run.id,
           requestId: notice.id,
           tabId: tab.tabId,
-          username: credential.username,
-          password: credential.password,
           expiresAt,
-        }),
-      );
-      outcome = ["filled", "refused"].includes(result.outcome) ? result.outcome : "unknown";
+        };
+        const result = await runFacebookLoginFlow({
+          credentials: credential,
+          deadline: expiresAt,
+          assertActive,
+          observe: async () => json(await browserRequest("/ftrade/login-observe", packet)),
+          submit: async (phase, values) => {
+            await checkEgress();
+            assertActive();
+            return (
+              await json(await browserRequest("/ftrade/login-submit", { ...packet, phase, values }))
+            ).outcome;
+          },
+        });
+        outcome =
+          result.outcome === "ready"
+            ? "ready"
+            : result.outcome === "unknown"
+              ? "unknown"
+              : "refused";
+      } else {
+        const result = await json(
+          await browserRequest("/ftrade/login-fill", {
+            userId: run.accountId,
+            runId: run.id,
+            requestId: notice.id,
+            tabId: tab.tabId,
+            username: credential.username,
+            password: credential.password,
+            expiresAt,
+          }),
+        );
+        outcome = ["filled", "refused"].includes(result.outcome) ? result.outcome : "unknown";
+      }
     } catch {
       outcome = claimAttempted ? "unknown" : "refused";
     } finally {

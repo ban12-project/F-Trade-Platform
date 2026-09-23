@@ -55,7 +55,8 @@ export type Run = {
     requestedAt: number;
     expiresAt: number;
     claimedAt: number | null;
-    outcome?: "filled" | "refused" | "unknown";
+    automatic?: boolean;
+    outcome?: "filled" | "ready" | "refused" | "unknown";
   };
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
@@ -79,7 +80,12 @@ export type FleetState = {
   installationId: string | null;
   bootId: string | null;
   capabilities: RunKind[];
-  loginFillScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
+  loginFillScopes?: Array<{
+    channelRef: string;
+    accountRef: string;
+    expiresAt: number;
+    automatic?: boolean;
+  }>;
   inboxScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   publicationScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   lastSeenAt: number;
@@ -374,7 +380,10 @@ export function finishRun(
     }
   }
 }
-function savedLoginOutcome(run: Run, now: number): "filled" | "refused" | "unknown" | null {
+function savedLoginOutcome(
+  run: Run,
+  now: number,
+): "filled" | "ready" | "refused" | "unknown" | null {
   const authorization = run.savedLogin;
   if (!authorization) return null;
   if (authorization.outcome) return authorization.outcome;
