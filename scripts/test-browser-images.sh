@@ -119,3 +119,5 @@ key = next(v for v in agent["volumes"] if v["target"] == "/run/secrets/node-key"
 assert key["read_only"] and not key.get("bind", {}).get("create_host_path", False)
 PY
 printf 'PASS: %s image pair, runtime startup, watchdog expiry and pull-only Compose\n' "$ARCH"
+
+NATIVE_PROFILE_IMAGE="$browser" bash scripts/test-native-profile-runtime.sh

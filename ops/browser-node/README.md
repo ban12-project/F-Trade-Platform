@@ -344,3 +344,29 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 节点通过专用鉴权插件观察页面并单次提交密码、当前 TOTP 和 PIN。PIN 输入前要求账号身份匹配；就绪要求身份与 Messenger 页面同时匹配。提交后的页面上下文销毁只允许有限重试读取，不重发密码或验证码。缺少因素、凭据拒绝、不支持的验证方式、页面不匹配、撤销及未知结果停止本轮；自动拒绝以 `needs_login` 退出并回收容器。已领取凭据的自动运行可随拒绝回执报告受限枚举 `checkpoint`、`rejected` 或 `unsupported_factor`；平台保存并显示对应处理提示，拒绝任意自由文本及冲突重放。遇到人机或设备验证时，节点先提交受限的 `login-challenge` 回执，界面提示接入远程页面；在本次自动授权剩余时间内只观察页面，人工完成后继续原流程，不重新领取凭据、不重复提交已执行因素、不延长授权。自动任务仍执行时关闭远程查看窗口不会触发查看器断线回收；显式停止、撤销、租约或授权到期仍终止运行。该交接已通过合成执行器、数据库与 UI 测试，真实全流程仍待验收。只有有效的 `ready` 回执可更新账号登录状态，不能自动解除渠道暂停或授权内容发布。
 
 验证证据：加密因素保留/轮换/清除测试、RFC TOTP 向量、PostgreSQL 无 VNC 授权/并发单次领取/旧版隔离/撤销检查，以及 Chromium 完整执行器密码→TOTP→PIN→Chats 链路。合成浏览器网络全部拦截；另有真实本地密码、TOTP、PIN 和 CAPTCHA 人工处理后恢复证据，见 `docs/testing/reports/facebook-automatic-pin-local-20260923.md`。本地正式 broker 的已登录会话→PIN→持久化 ready 续跑，以及需重新认证会话的一次授权密码→TOTP→PIN→持久化 ready 均已通过。后者复用前次 CAPTCHA 会话资料但重新提交全部因素；真实 CAPTCHA 在原运行内人工完成后的续跑及生产部署仍待验收。
+## Native Firefox profile 试验接入（#414）
+
+`BROWSER_NATIVE_PROFILES=1` 为节点级显式开关，默认关闭。镜像必须带
+`io.ftrade.native-profile=1` 标签。启用后，所有任务仍挂载同一账号的
+`ftbrowser-<node UUID>-<account UUID>` 卷，但使用其中的 `native-profile-v1/firefox`
+作为原生 Firefox profile；任务不能指定任意路径。缺少初始化记录、账号/节点不匹配、
+源快照改变或 profile 被占用时拒绝启动，不退回临时 profile。
+
+迁移前停止该账号的任务，确认所有访问该卷的容器均已停止，并保留受保护的卷备份。
+在受信任的本机管理环境将**已有**账号卷挂载为 `/data`，使用已审核镜像中的
+`/app/ftrade-native-profile.mjs` 导出的 `initializeNativeProfile`，传入绑定的
+`accountId`、`nodeId` 和 `source: "legacy-json"`。该操作不能由任务调用。
+初始化记录源快照摘要；首次启动导入一次，之后只使用 native profile。
+原 JSON 文件保留，不再由旧 persistence 插件恢复或覆盖。包含 IndexedDB 的旧 JSON
+会拒绝迁移，因为这不能证明其中的加密密钥可恢复。
+
+只有确认不存在旧会话的新账号才可显式选择 `source: "empty"`。不要因登录检查失败、
+CAPTCHA 或网络错误重新初始化。Native 模式关闭了旧 persistence 插件的重置接口；
+重置必须作为单独的人工运维操作，在停止任务并确认备份后执行，不能依赖旧接口清除
+原生状态。回滚时停止容器、关闭开关并恢复已确认的备份；旧 JSON 不包含迁移后的活动，
+因此回滚后必须重新检查会话有效性。
+
+该开关目前仍在验收中。原生 profile 保留不等于网站会话永不失效，尤其不能保证
+session-only Cookie 跨浏览器退出保留。每次任务应先观察账号身份和 Messenger 状态，
+确认失效后才进入有限恢复；本地同账号连续性已验证，先观察再领取凭据的执行器及数据库门控也已接入测试；
+组合版本联调和生产接入仍待验收，不应仅凭本地证据开启生产自动恢复。

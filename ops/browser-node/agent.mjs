@@ -54,6 +54,11 @@ if (image.Config?.Labels?.["io.ftrade.lease-watchdog"] !== "1")
 // Resolve the local tag once. Platform payloads cannot choose images, mounts,
 // shell commands, host ports, or a Docker API endpoint.
 const imageId = image.Id;
+const nativeProfileMode = process.env.BROWSER_NATIVE_PROFILES ?? "0";
+if (!["0", "1"].includes(nativeProfileMode)) throw new Error("native_profile_mode_invalid");
+const nativeProfiles = nativeProfileMode === "1";
+if (nativeProfiles && image.Config?.Labels?.["io.ftrade.native-profile"] !== "1")
+  throw new Error("reviewed_native_profile_image_required");
 Object.assign(
   process.env,
   await managedFacebookEnvironment(process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR, nodeId),
@@ -406,7 +411,7 @@ async function tick() {
       result,
       (claim) => {
         const expiresAt = localDeadline(claim, claim.run.leaseUntil);
-        const spec = containerSpec(nodeId, claim.run, imageId, expiresAt);
+        const spec = containerSpec(nodeId, claim.run, imageId, expiresAt, nativeProfiles);
         configureLoginRuntime(spec, claim.run, loginProfileForRun(loginProfiles, claim.run));
         return { expiresAt, spec };
       },
