@@ -14,6 +14,7 @@ for (const mode of [
   "bootstrap-data-mismatch",
   "bootstrap-switched",
   "bootstrap-no-cookie",
+  "ready-shell",
 ] as const) {
   test(`automatic login contract: ${mode}`, async ({ page }) => {
     const base = "https://www.facebook.com";
@@ -24,7 +25,7 @@ for (const mode of [
           ? `<form id="login" method="post" action="/login/submit"><input id="user"><input id="password" type="password"><button id="submit">Log in</button></form><script>document.querySelector('form').onsubmit=e=>{e.preventDefault();location.href='/two_factor/';}</script>`
           : path === "/two_factor/"
             ? `<div id="totp"><input id="code"><button id="verify">Verify</button></div><script>document.querySelector('button').onclick=()=>location.href='/messages/';</script>`
-            : `<a id="identity" data-account-id="123456789">Account</a><div id="pin"><input id="pin-code" type="password"><button id="restore">Restore</button></div><script>document.querySelector('button').onclick=()=>{document.querySelector('#pin').remove();const el=document.createElement('div');el.id='chats';document.body.append(el);};</script>`;
+            : `<a id="identity" data-account-id="123456789">Account</a><div id="pin"><input id="pin-code" type="password"><button id="restore">Restore</button></div><script>document.querySelector('button').onclick=()=>{document.querySelector('#pin').remove();const el=document.createElement('div');el.id='chats';el.innerHTML='<span id="empty">No chats</span>';document.body.append(el);};</script>`;
       await route.fulfill({ contentType: "text/html", body: content });
     });
     const profile = {
@@ -42,7 +43,13 @@ for (const mode of [
         passwordSubmit: "#submit",
         totp: { url: `${base}/two_factor/`, marker: "#totp", input: "#code", submit: "#verify" },
         pin: { url: `${base}/messages/`, marker: "#pin", input: "#pin-code", submit: "#restore" },
-        ready: { url: `${base}/messages/`, marker: "#chats" },
+        ready: {
+          url: `${base}/messages/`,
+          marker: "#chats",
+          empty: "#empty",
+          emptyText: "No chats",
+          thread: "a[data-thread-id]",
+        },
         checkpoint: "#checkpoint",
         rejected: "#rejected",
         loading: "#loading",
@@ -72,6 +79,58 @@ for (const mode of [
       requestId: "00000000-0000-4000-8000-000000000003",
       expiresAt: Date.now() + 30000,
     };
+    if (mode === "ready-shell") {
+      await page.goto(`${base}/messages/`);
+      await page.locator("#pin").evaluate((el) => el.remove());
+      await page.evaluate(() => {
+        const root = document.createElement("nav");
+        root.id = "chats";
+        root.innerHTML = "<h1>Chats</h1>";
+        document.body.append(root);
+      });
+      expect(await runtime("observe", { ...packet })).toMatchObject({
+        state: "loading",
+        messengerRestored: false,
+      });
+      await page.locator("#chats").evaluate((el) => {
+        el.innerHTML += '<span id="empty">Loading</span>';
+      });
+      expect(await runtime("observe", { ...packet })).toMatchObject({
+        state: "loading",
+        messengerRestored: false,
+      });
+      await page.locator("#empty").evaluate((el) => {
+        el.textContent = "No chats";
+      });
+      expect(await runtime("observe", { ...packet })).toMatchObject({
+        state: "ready",
+        messengerRestored: true,
+      });
+      await page.evaluate(() => {
+        const dialog = document.createElement("div");
+        dialog.setAttribute("role", "dialog");
+        dialog.textContent = "Restore chats";
+        document.body.append(dialog);
+      });
+      expect(await runtime("observe", { ...packet })).toMatchObject({
+        state: "loading",
+        messengerRestored: false,
+      });
+      await page.locator('[role="dialog"]').evaluate((el) => el.remove());
+      await page.locator("#chats").evaluate((el) => {
+        el.innerHTML += '<a data-thread-id="synthetic-thread">Conversation</a>';
+      });
+      expect(await runtime("observe", { ...packet })).toMatchObject({
+        state: "loading",
+        messengerRestored: false,
+      });
+      await page.locator("#empty").evaluate((el) => el.remove());
+      expect(await runtime("observe", { ...packet })).toMatchObject({
+        state: "ready",
+        messengerRestored: true,
+      });
+      return;
+    }
     if (mode.startsWith("bootstrap")) {
       if (mode !== "bootstrap-no-cookie")
         await page.context().addCookies([

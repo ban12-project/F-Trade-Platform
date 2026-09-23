@@ -49,9 +49,12 @@ export function validateAutomaticProfile(value) {
     )
       throw new Error("automatic_login_profile_invalid");
   if (
-    !exact(value.ready, ["url", "marker"]) ||
+    !exact(value.ready, ["url", "marker", "empty", "emptyText", "thread"]) ||
     !url(value.ready.url) ||
-    !selector(value.ready.marker)
+    !["marker", "empty", "thread"].every((key) => selector(value.ready[key])) ||
+    typeof value.ready.emptyText !== "string" ||
+    !value.ready.emptyText.trim() ||
+    value.ready.emptyText.length > 200
   )
     throw new Error("automatic_login_profile_invalid");
   return structuredClone(value);

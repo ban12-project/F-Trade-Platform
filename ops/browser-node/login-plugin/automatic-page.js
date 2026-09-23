@@ -82,14 +82,27 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
     for (const attention of ["checkpoint", "rejected"])
       if (matches(auto[attention]).length) states.push(attention);
     if (location.href === profile.url && matches(profile.form).length) states.push("password");
-    for (const name of ["totp", "pin", "ready"])
+    for (const name of ["totp", "pin"])
       if (location.href === auto[name].url && matches(auto[name].marker).length) states.push(name);
+    const readyRoots = location.href === auto.ready.url ? matches(auto.ready.marker) : [];
+    let restored = false;
+    if (readyRoots.length === 1 && !matches('[role="dialog"]').length) {
+      const root = readyRoots[0];
+      const empties = [...root.querySelectorAll(auto.ready.empty)].filter(visible);
+      const threads = [...root.querySelectorAll(auto.ready.thread)].filter(visible);
+      restored =
+        (empties.length === 1 &&
+          threads.length === 0 &&
+          empties[0].textContent.trim() === auto.ready.emptyText) ||
+        (empties.length === 0 && threads.length > 0);
+    }
+    if (restored) states.push("ready");
     const state =
       states.length === 1
         ? states[0]
         : states.length
           ? "invalid"
-          : matches(auto.loading).length
+          : readyRoots.length > 0 || matches(auto.loading).length
             ? "loading"
             : identityVerified
               ? "messenger"
@@ -99,7 +112,7 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
         state,
         originVerified: true,
         identityVerified,
-        messengerRestored: state === "ready" && matches(auto.ready.marker).length === 1,
+        messengerRestored: state === "ready" && restored,
       };
     if (state !== phase || !["password", "totp", "pin"].includes(phase)) return "refused";
     const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;

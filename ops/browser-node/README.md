@@ -331,7 +331,7 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 - `passwordSubmit`：密码登录的唯一提交按钮选择器。
 - `totp: { url, marker, input, submit }`：TOTP 页精确 URL、阶段标记、输入框和按钮。
 - `pin: { url, marker, input, submit }`：PIN 对话框契约；输入后自动提交的页面可以将 `submit` 设为 `null`。
-- `ready: { url, marker }`：Messenger 就绪页面及可见标记，必须同时验证当前账号身份。
+- `ready: { url, marker, empty, emptyText, thread }`：Messenger 就绪页面、唯一列表根节点、列表内的空状态选择器与精确文案、列表内会话项选择器。必须看到唯一空状态或至少一个会话项，两者冲突、只有标题/加载壳或存在可见对话框都不能就绪；必须同时验证当前账号身份。
 - `checkpoint`、`rejected`、`loading`：安全挑战、拒绝及加载状态的选择器。
 
 所有 URL 必须是 `https://www.facebook.com` 来源，选择器和 URL 必须来自实际页面审核；不能直接将测试夹具选择器用于真实账号。配置仍有最长 30 天有效期，更新后重启 Agent。仅配置因素但未安装匹配 version 2 页面契约不会启用自动提交。模板和 Git 中不得包含真实账号、私有规则或任何凭据。
