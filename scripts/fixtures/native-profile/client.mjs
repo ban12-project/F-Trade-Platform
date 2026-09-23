@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 
-const renew = () => writeFileSync("/tmp/ftrade-lease", String(Date.now() + 90000), { mode: 0o600 });
+const renew = () => {
+  writeFileSync("/tmp/ftrade-lease.fixture", String(Date.now() + 90000), { mode: 0o600 });
+  renameSync("/tmp/ftrade-lease.fixture", "/tmp/ftrade-lease");
+};
 renew();
 const heartbeat = setInterval(renew, 10000);
 try {
