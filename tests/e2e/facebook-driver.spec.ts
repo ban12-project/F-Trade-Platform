@@ -379,3 +379,72 @@ test("text-only reviewed profiles reject media before browser navigation", async
   ).rejects.toThrow("facebook_profile_format_unreviewed");
   expect(requests).toBe(0);
 });
+
+test("baseline resolves existing post permalinks before publication", async ({ page, context }) => {
+  const receiptProfile = {
+    ...profile,
+    receiptUrl: profile.identityHref,
+    resolvePostLinks: true,
+    selectors: { ...profile.selectors, receiptIdentity: "#identity", postHover: ".permalink" },
+  };
+  const oldRef = "https://www.facebook.com/synthetic/posts/old";
+  await context.route("**/*", (route) =>
+    [profile.url, profile.identityHref].includes(route.request().url())
+      ? route.fulfill({
+          contentType: "text/html",
+          body: `<!doctype html><a id="identity" href="${profile.identityHref}">Identity</a>
+            <article><a class="author" href="${profile.identityHref}">Author</a>
+            <p class="copy">An older synthetic post</p>
+            <a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Time</a></article>
+            <article><a class="author" href="${profile.identityHref}">Author</a>
+            <p class="copy">An unrelated older video</p>
+            <a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Time</a></article>
+            <script>document.querySelector('.permalink').onmouseenter = (event) => {
+              event.currentTarget.href = '${oldRef}';
+            }</script>`,
+        })
+      : route.abort(),
+  );
+  const calls: string[] = [];
+  const browserRequest = async (endpoint: string, body: Record<string, unknown> = {}) => {
+    calls.push(endpoint);
+    if (endpoint === "/tabs") {
+      await page.goto(String(body.url));
+      return Response.json({ tabId: "synthetic-tab", url: body.url });
+    }
+    if (endpoint.endsWith("/navigate")) {
+      await page.goto(String(body.url));
+      return Response.json({ ok: true });
+    }
+    if (endpoint.endsWith("/evaluate"))
+      return Response.json({ ok: true, result: await page.evaluate(String(body.expression)) });
+    if (endpoint === "/act") {
+      await page.locator(String(body.selector)).hover();
+      return Response.json({ code: "element_not_actionable" }, { status: 422 });
+    }
+    throw new Error("Unapproved browser endpoint");
+  };
+  const driver = createFacebookDriver(receiptProfile, browserRequest);
+  const session = await driver.open(
+    {
+      id: randomUUID(),
+      accountId: randomUUID(),
+      kind: "publish",
+      accountRef: profile.accountRef,
+      channelRef: profile.channelRef,
+      publication: {
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
+        text: "A new synthetic post",
+        format: "text",
+      },
+    },
+    new AbortController().signal,
+  );
+  expect(await driver.identity(session)).toEqual({
+    accountRef: profile.accountRef,
+    channelRef: profile.channelRef,
+  });
+  expect(await driver.existingPublicationRefs(session)).toEqual([oldRef]);
+  expect(calls).toContain("/act");
+});
