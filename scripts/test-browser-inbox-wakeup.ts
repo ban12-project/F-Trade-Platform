@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { FleetState } from "../lib/browser-fleet/policy";
 import {
@@ -32,6 +33,8 @@ export async function testInboxWakeup(
     state.capabilities = ["interactive", "inbox"];
     state.accounts[0].pollSeconds = 900;
     state.accounts[0].nextPollAt = 0;
+    const unbound = { ...state.accounts[0], id: randomUUID(), accountRef: randomUUID() };
+    state.accounts.push(unbound);
     state.inboxScopes = [];
     await db.execute(sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(state)}::jsonb
       WHERE id = ${nodeId}`);
@@ -39,7 +42,10 @@ export async function testInboxWakeup(
     const read = async () =>
       (await db.execute(sql`SELECT * FROM browser_sandbox WHERE node_id = ${nodeId}`)).rows[0];
     assert.equal((await read()).phase, "stopped", "unreviewed inbox cannot wake");
-    const scope = [{ channelRef, accountRef, expiresAt: Date.now() + 3600000 }];
+    const scope = [
+      { channelRef, accountRef, expiresAt: Date.now() + 3600000 },
+      { channelRef, accountRef: unbound.accountRef, expiresAt: Date.now() + 3600000 },
+    ];
     await db.execute(sql`UPDATE browser_fleet_node SET document = jsonb_set(document,
       '{inboxScopes}', ${JSON.stringify(scope)}::jsonb) WHERE id = ${nodeId}`);
     await db.execute(sql`UPDATE social_channel_control SET circuit_status = 'paused',
@@ -53,6 +59,16 @@ export async function testInboxWakeup(
     const operation = (await read()).operation_id as string;
     assert.ok(operation, "due inbox starts a stopped Sandbox");
     assert.equal((await read()).phase, "starting");
+    const queued = await db.execute(
+      sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`,
+    );
+    assert.deepEqual(
+      (queued.rows[0].document as FleetState).runs
+        .filter((run) => run.kind === "inbox" && run.status === "queued")
+        .map((run) => run.accountId),
+      [state.accounts[0].id],
+      "an unbound account cannot piggyback on another account's wakeup",
+    );
     assert.equal(
       (await db.execute(sql`SELECT * FROM browser_sandbox_outbox WHERE node_id = ${nodeId}`)).rows
         .length,

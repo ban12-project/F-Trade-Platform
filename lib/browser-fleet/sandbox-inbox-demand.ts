@@ -4,26 +4,21 @@ import { sql } from "drizzle-orm";
 import type { DatabaseTransaction } from "../db/client";
 import { type FleetState, inboxScopeActive } from "./policy";
 
-/** A stopped Sandbox may poll only a currently enabled, explicitly reviewed
- * account. The queued lease alone is not a grant to start compute. */
-export async function hasAuthorizedInboxDemand(
+/** A stopped Sandbox may poll only currently enabled, explicitly reviewed
+ * accounts. A queued lease alone is not a grant to start compute. */
+export async function authorizedInboxAccounts(
   tx: DatabaseTransaction,
   nodeId: string,
   state: FleetState,
   now: number,
 ) {
-  if (!state.capabilities.includes("inbox") || !state.inboxScopes?.length) return false;
-  for (const run of state.runs) {
-    const account = state.accounts.find((item) => item.id === run.accountId);
+  const allowed = new Set<string>();
+  if (!state.capabilities.includes("inbox") || !state.inboxScopes?.length) return allowed;
+  for (const account of state.accounts) {
     if (
-      run.kind !== "inbox" ||
-      run.status !== "queued" ||
-      run.stopRequested ||
-      run.requestedBy !== "scheduler" ||
-      !account?.enabled ||
+      !account.enabled ||
       account.authState !== "ready" ||
       account.pollSeconds < 300 ||
-      account.credentialVersion !== run.credentialVersion ||
       !account.proxyCiphertext ||
       !account.expectedEgressIp ||
       !inboxScopeActive(state, account, now)
@@ -35,7 +30,26 @@ export async function hasAuthorizedInboxDemand(
       WHERE b.node_id = ${nodeId} AND b.channel_ref = ${account.channelRef}
         AND b.account_ref = ${account.accountRef}
         AND c.enabled = true AND c.circuit_status = 'active' LIMIT 1`);
-    if (rows.rows.length) return true;
+    if (rows.rows.length) allowed.add(account.id);
   }
-  return false;
+  return allowed;
+}
+
+export async function hasAuthorizedInboxDemand(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  state: FleetState,
+  now: number,
+) {
+  const allowed = await authorizedInboxAccounts(tx, nodeId, state, now);
+  return state.runs.some(
+    (run) =>
+      run.kind === "inbox" &&
+      run.status === "queued" &&
+      !run.stopRequested &&
+      run.requestedBy === "scheduler" &&
+      allowed.has(run.accountId) &&
+      state.accounts.find((account) => account.id === run.accountId)?.credentialVersion ===
+        run.credentialVersion,
+  );
 }

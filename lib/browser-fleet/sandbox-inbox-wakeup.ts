@@ -4,8 +4,8 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { Database } from "../db/client";
 import type { FleetState } from "./policy";
-import { scheduleInbox } from "./policy";
-import { hasAuthorizedInboxDemand } from "./sandbox-inbox-demand";
+import { requestStop, scheduleInbox } from "./policy";
+import { authorizedInboxAccounts, hasAuthorizedInboxDemand } from "./sandbox-inbox-demand";
 import { enqueueManualBrowserSandboxStart } from "./sandbox-outbox";
 
 /** Recover due inbox polls after a Sandbox stops. This records only a durable
@@ -30,10 +30,14 @@ export async function enqueueDueInboxSandboxes(db: Database, nodeId?: string) {
         WHERE id = ${node.id} AND status = 'active' FOR UPDATE`);
       const state = result.rows[0]?.document as FleetState | undefined;
       if (state?.version !== 1) return;
-      scheduleInbox(state, Date.now(), randomUUID);
-      if (!(await hasAuthorizedInboxDemand(tx, String(node.id), state, Date.now()))) return;
+      const allowed = await authorizedInboxAccounts(tx, String(node.id), state, Date.now());
+      for (const run of state.runs)
+        if (run.kind === "inbox" && run.status === "queued" && !allowed.has(run.accountId))
+          requestStop(state, run);
+      scheduleInbox(state, Date.now(), randomUUID, allowed);
       await tx.execute(sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(state)}::jsonb
         WHERE id = ${node.id}`);
+      if (!(await hasAuthorizedInboxDemand(tx, String(node.id), state, Date.now()))) return;
       await enqueueManualBrowserSandboxStart(tx, String(node.id));
     });
   }

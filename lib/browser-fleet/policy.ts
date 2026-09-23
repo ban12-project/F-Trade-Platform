@@ -195,11 +195,17 @@ export function sweep(state: FleetState, now: number) {
   const prune = new Set(terminal.slice(0, Math.max(0, terminal.length - 50)).map((r) => r.id));
   state.runs = state.runs.filter((r) => !prune.has(r.id));
 }
-export function scheduleInbox(state: FleetState, now: number, newId: () => string) {
+export function scheduleInbox(
+  state: FleetState,
+  now: number,
+  newId: () => string,
+  allowedAccounts?: ReadonlySet<string>,
+) {
   if (!state.capabilities.includes("inbox")) return;
   for (const a of state.accounts) {
     if (
       !a.enabled ||
+      (allowedAccounts !== undefined && !allowedAccounts.has(a.id)) ||
       !inboxScopeActive(state, a, now) ||
       a.authState !== "ready" ||
       a.pollSeconds === 0 ||
