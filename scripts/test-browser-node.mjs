@@ -13,6 +13,7 @@ import {
   register as registerDiagnostics,
 } from "../ops/browser-node/diagnostics-plugin/index.js";
 import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/docker.mjs";
+import { waitForBrowserReady } from "../ops/browser-node/egress.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
 import {
   configureLoginRuntime,
@@ -28,6 +29,62 @@ import {
 import { publicationUploadArchive, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
 
 const nodeId = randomUUID();
+test("browser startup waits for Firefox prewarm and rechecks cancellation", async () => {
+  const ready = { ok: true, engine: "camoufox", browserConnected: true, browserRunning: true };
+  const states = [
+    { ...ready, browserConnected: false },
+    { ...ready, browserRunning: false },
+    ready,
+  ];
+  let calls = 0,
+    waits = 0;
+  await waitForBrowserReady(
+    async (path, body, timeout) => {
+      assert.equal(path, "/health");
+      assert.equal(body, undefined);
+      assert.equal(timeout, 2000);
+      return Response.json(states[calls++]);
+    },
+    {
+      assertActive() {},
+      sleep: async () => {
+        waits++;
+      },
+    },
+  );
+  assert.equal(calls, 3);
+  assert.equal(waits, 2);
+  let active = true;
+  await assert.rejects(
+    () =>
+      waitForBrowserReady(
+        async () => {
+          active = false;
+          return Response.json(ready);
+        },
+        {
+          assertActive() {
+            if (!active) throw Error("lease_expired");
+          },
+          sleep: async () => {},
+        },
+      ),
+    /lease_expired/,
+  );
+  calls = 0;
+  await assert.rejects(
+    () =>
+      waitForBrowserReady(
+        async () => {
+          calls++;
+          return Response.json({ ...ready, browserConnected: false });
+        },
+        { assertActive() {}, sleep: async () => {} },
+      ),
+    /browser_start_timeout/,
+  );
+  assert.equal(calls, 60);
+});
 test("browser compatibility hook preserves proxy and unrelated preferences across launches", () => {
   const events = new EventEmitter();
   registerCompatibility({}, { events }, { enabled: true });

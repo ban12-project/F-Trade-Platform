@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
-import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
+import { openEgressCheckedSession, verifyBrowserEgress, waitForBrowserReady } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
 import { createIdleExitPolicy } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
@@ -226,17 +226,13 @@ async function launch(slot) {
   const details = await docker("GET", `/containers/${created.Id}/json`);
   slot.apiPort = Number(details.NetworkSettings.Ports["9377/tcp"][0].HostPort);
   slot.vncPort = Number(details.NetworkSettings.Ports["6080/tcp"][0].HostPort);
-  for (let i = 0; i < 60; i++) {
-    if (slot.stopping || slot.expiresAt <= Date.now()) throw new Error("start_cancelled");
-    try {
-      const response = await browserRequest(slot, "/health", undefined, 2000);
-      await response.body?.cancel();
-      break;
-    } catch {
-      if (i === 59) throw new Error("browser_start_timeout");
-      await sleep(1000, undefined, { signal: slot.abort.signal });
-    }
-  }
+  await waitForBrowserReady((path, body, timeout) => browserRequest(slot, path, body, timeout), {
+    assertActive() {
+      if (slot.stopping || slot.abort.signal.aborted || slot.expiresAt <= Date.now())
+        throw new Error("start_cancelled");
+    },
+    sleep: (ms) => sleep(ms, undefined, { signal: slot.abort.signal }),
+  });
   slot.egressTabId = await openEgressCheckedSession(
     (path, body) => browserRequest(slot, path, body),
     slot.run,

@@ -320,7 +320,10 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 创建事件不等于握手成功，收发帧也不等于聊天恢复成功；零计数不能证明连接正常。计数只为排查提供证据，不改变账号、渠道、收件箱同步或安全存储状态。合成 Chromium 测试通过本地拒绝连接的代理验证实际 socket 错误，未连接 Facebook；真实 Messenger 诊断和修复仍需单独验收。
 
 
-## 自动登录配置 version 2（#423，真实账号待验收）
+## 自动登录配置 version 2（#423，生产待验收）
+
+节点在首次导航前必须等待 `/health` 同时返回 Camoufox 引擎、浏览器运行和连接就绪；HTTP 监听成功不代表 Firefox 预启动完成。检查受当前租约和取消信号约束，最多进行 60 次，不重发创建标签页请求。固定版本上游创建标签页请求超时后仍可能在后台完成，因此不得仅凭超时断言没有创建页面。
+
 
 按 ADR 0002 的 2026-09-23 修订，保存账号时可以同时保存 Base32 TOTP 密钥及六位 Messenger PIN。二者复用账号登录凭据的加密封装与账号/渠道绑定，不另存明文；表单留空保留原值，清除登录会同时移除所有因素。这里的 Base32 是长期密钥，不是短信码或当前六位 OTP。节点本地生成 TOTP，不调用第三方 OTP API。
 
@@ -340,4 +343,4 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 
 节点通过专用鉴权插件观察页面并单次提交密码、当前 TOTP 和 PIN。PIN 输入前要求账号身份匹配；就绪要求身份与 Messenger 页面同时匹配。提交后的页面上下文销毁只允许有限重试读取，不重发密码或验证码。缺少因素、挑战、页面不匹配、撤销及未知结果停止本轮；自动拒绝以 `needs_login` 退出并回收容器。已领取凭据的自动运行可随拒绝回执报告受限枚举 `checkpoint`、`rejected` 或 `unsupported_factor`；平台保存并显示对应处理提示，拒绝任意自由文本及冲突重放。人工验证后的原运行交接/续跑尚未接通，不能承诺当前页面保持可操作。只有有效的 `ready` 回执可更新账号登录状态，不能自动解除渠道暂停或授权内容发布。
 
-验证证据：加密因素保留/轮换/清除测试、RFC TOTP 向量、PostgreSQL 无 VNC 授权/并发单次领取/旧版隔离/撤销检查，以及 Chromium 完整执行器密码→TOTP→PIN→Chats 链路。合成浏览器网络全部拦截；另有真实本地密码、TOTP、PIN 和 CAPTCHA 人工处理后恢复证据，见 `docs/testing/reports/facebook-automatic-pin-local-20260923.md`。真实平台完整自动登录回执及生产部署仍未通过。
+验证证据：加密因素保留/轮换/清除测试、RFC TOTP 向量、PostgreSQL 无 VNC 授权/并发单次领取/旧版隔离/撤销检查，以及 Chromium 完整执行器密码→TOTP→PIN→Chats 链路。合成浏览器网络全部拦截；另有真实本地密码、TOTP、PIN 和 CAPTCHA 人工处理后恢复证据，见 `docs/testing/reports/facebook-automatic-pin-local-20260923.md`。本地正式 broker 的已登录会话→PIN→持久化 ready 续跑已通过；全新会话的一次授权全流程、原运行人工交接及生产部署仍未通过。
