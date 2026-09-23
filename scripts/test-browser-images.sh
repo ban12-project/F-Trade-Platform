@@ -120,6 +120,20 @@ assert "BROWSER_NODE_ACCESS_KEY" not in agent["environment"]
 key = next(v for v in agent["volumes"] if v["target"] == "/run/secrets/node-key")
 assert key["read_only"] and not key.get("bind", {}).get("create_host_path", False)
 PY
+mode_dir=$(mktemp -d)
+marker="$mode_dir/native-profile.enabled"
+test "$(bash ops/browser-node/native-profile-mode.sh "$mode_dir")" = 0
+printf '1\n' > "$marker"
+chmod 600 "$marker"
+test "$(bash ops/browser-node/native-profile-mode.sh "$mode_dir")" = 1
+chmod 644 "$marker"
+if bash ops/browser-node/native-profile-mode.sh "$mode_dir" >/dev/null; then exit 1; fi
+chmod 600 "$marker"
+rm "$marker"
+ln -s /dev/null "$marker"
+if bash ops/browser-node/native-profile-mode.sh "$mode_dir" >/dev/null; then exit 1; fi
+rm "$marker"
+rmdir "$mode_dir"
 printf 'PASS: %s image pair, runtime startup, watchdog expiry and pull-only Compose\n' "$ARCH"
 
 NATIVE_PROFILE_IMAGE="$browser" bash scripts/test-native-profile-runtime.sh
