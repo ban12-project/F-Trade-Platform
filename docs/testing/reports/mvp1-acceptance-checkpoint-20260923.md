@@ -1,21 +1,28 @@
 # MVP1 验收检查点 — 2026-09-23
 
-关联 #32。核对源版本 `d9af21c164ca3de7edfddb7bf85dc1cec7c5ce72`，结论为 **pending**。本记录区分当前执行、既有证据和仍需验收的项目，不作人工 Go/No-Go 决定。
+关联 #32。初次核对源版本 `d9af21c164ca3de7edfddb7bf85dc1cec7c5ce72`；同日增补核对已合并 #422 及 #424 的 `6dfb0dc`，结论为 **pending**。本记录区分当前执行、既有证据和仍需验收的项目，不作人工 Go/No-Go 决定。
 
 ## 当前执行与交付
 
 - `pnpm demo:synthetic`、`pnpm test:demo`、`pnpm test:mvp-acceptance` 均通过。合成链路到达 PRODUCT_READY、CONTENT_PUBLISHED、VIDEO_APPROVED、RFQ_READY、QUOTE_SENT、OPPORTUNITY 和 DELIVERY_CONFIRMATION_CONFIRMED；包含三个模拟人工 Gate、入站去重及签名发布结果。它不证明真实资料、实际投递或真实人工审批。
 - PIN 修复 #420 已 squash 合并，全部 PR 检查通过。Camoufox 152.0.4-beta.30 配合固定 camofox-browser 在本地 Podman 经代理运行：默认配置卡在 PIN 验证；设置 `network.http.http2.websockets=false` 后成功进入 Messenger Chats，再用实际项目插件重启复测也成功。后续只读快照仍显示 Chats、没有 PIN 验证窗口。
-- AMD64 与 ARM64 镜像 smoke test 均实际启动 Firefox 并检查 prefs.js 中该设置为 false。主分支镜像发布与生产运行时切换是后续独立步骤，不能以 PR 镜像测试替代部署验收。
+- AMD64 与 ARM64 镜像 smoke test 均实际启动 Firefox 并检查 prefs.js 中该设置为 false。主分支镜像发布工作流 `35816270756` 已完成并成功；生产运行时切换仍待确认，不能以镜像发布替代部署验收。
 - #420 最初继承了无关分支提交，已在合并前整理为仅五个修复文件。最终提交的首轮 Playwright 在工作台键盘打开弹窗断言失败，196 项通过；未改代码，重跑失败任务后全部通过。保留首次失败，不声称已修复其偶发原因。
 
 PIN 兼容配置有 Mozilla [Bug 2055521](https://bugzilla.mozilla.org/show_bug.cgi?id=2055521) 的绕过记录和 [Bug 2037813](https://bugzilla.mozilla.org/show_bug.cgi?id=2037813) 的代理 HTTP/2 WebSocket 请求头修复依据。后者在 Firefox 154 修复。当前证据支持采用兼容配置，无需为本次 PIN 问题 fork 内核；跨重启 WebCrypto 密钥持久化仍由 #414 跟踪。
+
+## 自动登录及存储补充证据
+
+- #424 已完成密码、Base32 TOTP 和 PIN 的加密保存及本地自动执行。真实已登录会话经正式本地 broker、单次凭据领取和 PIN 恢复取得持久 ready；独立数据库查询确认运行 completed，旧失败回执仍保留。完整边界见 [本地自动登录报告](facebook-automatic-pin-local-20260923.md)。
+- 原运行 CAPTCHA 人工交接已实现，并通过合成执行器、数据库及实际 UI 回归。全新真实会话在一次授权内完成所有验证仍待验收，PR 保持 draft；生产工作台当前仍停在登录页。
+- #414 的合成实验已验证 Camoufox 152.0.4-beta.30 在写入容器退出并删除后，通过同一持久化卷在新容器恢复不可导出的 CryptoKey，并成功加解密。该实验使用禁网容器和虚构站点，不含真实账号。它不证明 Messenger 使用同类密钥，也不证明历史消息或被动 DM 恢复。
+- 当前固定上游 `79d425be26743883a06613eaa3be5e38e7ab5409` 的 `server.js` 仍在 `session:creating` 钩子后固定调用 `newContext(contextOptions)`；持久化插件只注入 storageState。启用 IndexedDB 或修改目录配置无法实现原生 profile 生命周期，需要独立修改会话创建及关闭契约，并验证账号隔离、租约回收和回滚。生产配置未改变。
 
 ## 尚未达到整体验收的项目
 
 | 范围 | 已有证据及边界 | 后续验收 |
 | --- | --- | --- |
-| 产品识别与事实来源 | [最新 300 次模型比较](product-agent-model-selection-20260922.md)中所有候选均未达到 60/60；组件 OE 提升为整件 OE 的错误尝试被生产来源校验拒绝 | #392/#268：保持冻结失败结果，修复后独立新批次；真实工厂资料留出集及 #6 授权不能由模型代替 |
+| 产品识别与事实来源 | 旧 [300 次模型比较](product-agent-model-selection-20260922.md)失败记录保留；#422 已合并，修复后的 [Kimi K3 独立合成回归](product-component-oe-regression-20260923.md)为 20 场景 × 3 次，60/60 首次通过 | 真实工厂资料留出集及 #6 授权仍待完成；合成回归不能替代真实资料验收 |
 | 内容与视频制作 | [9 月 18 日生产受控补测](mvp1-production-content-video-20260918.md)通过，但临时云素材和成片已删除 | 发布前必须有当前可访问、有权利证据且已审核的素材和成片 |
 | 应用文字发布回执 | #383 最后记录为一条 unknown，#409 已提供带人工来源的核对入口 | 核对生产当前状态及原帖；保留原始回执、不重复发布，不把人工核对冒充平台观察 |
 | 发布自动唤醒 | #386/#408 已实现并通过合成并发与权限测试 | 真实合格任务唤醒停止节点、执行同一 job 并产生持久结果 |
