@@ -88,7 +88,9 @@ function automaticLoginPage({ profile, operation, phase, values, expiresAt, sess
     let restored = false;
     if (readyRoots.length === 1 && !matches('[role="dialog"]').length) {
       const root = readyRoots[0];
-      const empties = [...root.querySelectorAll(auto.ready.empty)].filter(visible);
+      const empties = [...root.querySelectorAll(auto.ready.empty)].filter(
+        (element) => visible(element) && element.textContent.trim() === auto.ready.emptyText,
+      );
       const threads = [...root.querySelectorAll(auto.ready.thread)].filter(visible);
       restored =
         (empties.length === 1 &&

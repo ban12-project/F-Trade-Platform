@@ -46,7 +46,7 @@ for (const mode of [
         ready: {
           url: `${base}/messages/`,
           marker: "#chats",
-          empty: "#empty",
+          empty: "span",
           emptyText: "No chats",
           thread: "a[data-thread-id]",
         },
@@ -85,7 +85,7 @@ for (const mode of [
       await page.evaluate(() => {
         const root = document.createElement("nav");
         root.id = "chats";
-        root.innerHTML = "<h1>Chats</h1>";
+        root.innerHTML = "<h1>Chats</h1><span>Other interface label</span>";
         document.body.append(root);
       });
       expect(await runtime("observe", { ...packet })).toMatchObject({
