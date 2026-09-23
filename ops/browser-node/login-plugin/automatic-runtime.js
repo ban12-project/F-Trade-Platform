@@ -31,8 +31,27 @@ export function createAutomaticLoginRuntime({
       const page = sessions.get(accountId)?.tabGroups.get(runId)?.get(packet.tabId)?.page;
       if (!page || page.isClosed()) return { outcome: "refused" };
       requestId = packet.requestId;
-      if (operation === "observe")
-        return await page.evaluate(program, { profile, operation, expiresAt });
+      if (operation === "observe") {
+        // A submitted form can destroy the previous document before observation starts.
+        // Retry reads only; never replay a credential submission after navigation.
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            return await page.evaluate(program, { profile, operation, expiresAt });
+          } catch (error) {
+            if (
+              attempt === 2 ||
+              Date.now() >= expiresAt ||
+              !/Execution context was destroyed|Cannot find context with specified id/i.test(
+                String(error?.message ?? ""),
+              )
+            )
+              throw error;
+            await page.waitForLoadState("domcontentloaded", {
+              timeout: Math.min(5000, Math.max(1, expiresAt - Date.now())),
+            });
+          }
+        }
+      }
       const phase = packet.phase;
       if (!["password", "totp", "messenger", "pin"].includes(phase) || submitted.has(phase))
         return { outcome: "refused" };
