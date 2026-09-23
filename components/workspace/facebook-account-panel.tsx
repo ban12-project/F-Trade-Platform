@@ -24,6 +24,10 @@ type Values = z.infer<typeof facebookCredentialFormSchema>;
 const empty: Values = {
   loginUsername: "",
   loginPassword: "",
+  totpSecret: "",
+  messengerPin: "",
+  clearTotp: false,
+  clearPin: false,
   proxyHost: "",
   proxyPort: "",
   proxyUsername: "",
@@ -234,6 +238,8 @@ export function FacebookAccountPanel() {
                 [
                   ["loginUsername", "Facebook 账号", "text"],
                   ["loginPassword", "Facebook 密码", "password"],
+                  ["totpSecret", "2FA Base32 密钥", "password"],
+                  ["messengerPin", "Messenger PIN", "password"],
                   ["proxyHost", "固定代理主机", "text"],
                   ["proxyPort", "固定代理端口", "text"],
                   ["proxyUsername", "代理用户名", "text"],
@@ -255,7 +261,9 @@ export function FacebookAccountPanel() {
             </div>
             {(
               [
-                ["clearLogin", "清除已保存的登录凭据"],
+                ["clearLogin", "清除已保存的登录凭据及验证密钥"],
+                ["clearTotp", "清除已保存的 2FA 密钥"],
+                ["clearPin", "清除已保存的 Messenger PIN"],
                 ["clearProxy", "清除已保存的代理凭据"],
               ] as const
             ).map(([name, label]) => (
@@ -266,7 +274,7 @@ export function FacebookAccountPanel() {
                   render={({ field }) => (
                     <Checkbox
                       id={`fb-${name}`}
-                      checked={field.value}
+                      checked={field.value ?? false}
                       onCheckedChange={field.onChange}
                       disabled={busy || !!connection}
                     />

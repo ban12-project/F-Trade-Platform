@@ -32,6 +32,10 @@ type Connection = {
 const emptyCredentials = {
   loginUsername: "",
   loginPassword: "",
+  totpSecret: "",
+  messengerPin: "",
+  clearTotp: false,
+  clearPin: false,
   proxyHost: "",
   proxyPort: "",
   proxyUsername: "",
@@ -331,6 +335,8 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
               [
                 ["loginUsername", "Facebook 登录名（可选）"],
                 ["loginPassword", "Facebook 密码（可选，加密保存）"],
+                ["totpSecret", "2FA Base32 密钥（可选，加密保存）"],
+                ["messengerPin", "Messenger PIN（可选，加密保存）"],
                 ["proxyHost", "固定 HTTP 代理主机"],
                 ["proxyPort", "代理端口"],
                 ["proxyUsername", "代理用户名"],
@@ -341,7 +347,11 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                 <FieldLabel htmlFor={`credential-${name}`}>{label}</FieldLabel>
                 <Input
                   id={`credential-${name}`}
-                  type={name.endsWith("Password") ? "password" : "text"}
+                  type={
+                    name.endsWith("Password") || name === "totpSecret" || name === "messengerPin"
+                      ? "password"
+                      : "text"
+                  }
                   autoComplete="off"
                   {...accountForm.register(`credentials.${name}`)}
                   disabled={busy}

@@ -9,6 +9,7 @@ import {
   facebookLoginSecretSchema,
   facebookProxySecretSchema,
 } from "@/lib/social/facebook-account-forms";
+import { updateFacebookLoginCiphertext } from "@/lib/social/facebook-login-credentials";
 import {
   type FacebookMediaSource,
   openFacebookMediaSource,
@@ -379,14 +380,12 @@ async function grant(
     row.document.accounts.push(account);
   }
   const ring = configuredFacebookKeyring();
-  if (c.clearLogin) account.loginCiphertext = null;
-  else if (c.loginPassword)
-    account.loginCiphertext = encryptFacebookCredential(
-      facebookLoginSecretSchema.parse({ username: c.loginUsername, password: c.loginPassword }),
-      account,
-      "login",
-      ring,
-    );
+  account.loginCiphertext = updateFacebookLoginCiphertext(
+    c,
+    account.loginCiphertext,
+    account,
+    ring,
+  );
   if (c.clearProxy) account.proxyCiphertext = null;
   else if (c.proxyHost)
     account.proxyCiphertext = encryptFacebookCredential(
