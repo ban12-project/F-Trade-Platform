@@ -85,7 +85,7 @@ async function automaticLoginPage({
             : "refused";
       }
     }
-    const authenticatorPage = () => {
+    const authenticatorUrl = (path, flow) => {
       const current = new URL(location.href);
       const keys = [];
       current.searchParams.forEach((_value, key) => {
@@ -93,19 +93,22 @@ async function automaticLoginPage({
       });
       return (
         auto.totp.mode === "facebook-authenticator" &&
-        current.origin + current.pathname === auto.totp.url &&
+        auto.totp.url === "https://www.facebook.com/two_step_verification/two_factor/" &&
+        current.pathname === path &&
         !current.hash &&
         keys.every((key) => ["encrypted_context", "flow", "next"].includes(key)) &&
         new Set(keys).size === keys.length &&
         (current.searchParams.get("encrypted_context")?.length ?? 0) > 0 &&
         current.searchParams.get("encrypted_context").length <= 4096 &&
-        current.searchParams.get("flow") === "two_factor_login" &&
-        [null, "", "/", "/messages/"].includes(current.searchParams.get("next")) &&
-        matches(auto.totp.marker).filter(
-          (element) => element.textContent.trim() === "Go to your authentication app",
-        ).length === 1
+        current.searchParams.get("flow") === flow &&
+        [null, "", "/", "/messages/"].includes(current.searchParams.get("next"))
       );
     };
+    const authenticatorPage = () =>
+      authenticatorUrl("/two_step_verification/two_factor/", "two_factor_login") &&
+      matches(auto.totp.marker).filter(
+        (element) => element.textContent.trim() === "Go to your authentication app",
+      ).length === 1;
     const states = [];
     for (const attention of ["checkpoint", "rejected"])
       if (matches(auto[attention]).length) states.push(attention);
@@ -137,7 +140,9 @@ async function automaticLoginPage({
         ? states[0]
         : states.length
           ? "invalid"
-          : readyRoots.length > 0 || matches(auto.loading).length
+          : readyRoots.length > 0 ||
+              matches(auto.loading).length ||
+              authenticatorUrl("/two_step_verification/authentication/", "pre_authentication")
             ? "loading"
             : identityVerified
               ? "messenger"

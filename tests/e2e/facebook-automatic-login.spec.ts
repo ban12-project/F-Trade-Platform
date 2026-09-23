@@ -21,6 +21,7 @@ for (const mode of [
   "authenticator",
   "authenticator-stuck",
   "authenticator-wrong-flow",
+  "authenticator-transition",
 ] as const) {
   test(`automatic login contract: ${mode}`, async ({ page }) => {
     const base = "https://www.facebook.com";
@@ -104,6 +105,30 @@ for (const mode of [
       expiresAt: Date.now() + 30000,
     };
     if (mode.startsWith("authenticator")) {
+      if (mode === "authenticator-transition") {
+        await page.goto(
+          `${base}/two_step_verification/authentication/?encrypted_context=synthetic&flow=pre_authentication&next`,
+        );
+        await page.setContent('<img alt="Meta"><iframe></iframe>');
+        expect(await runtime("observe", { ...packet })).toMatchObject({
+          state: "loading",
+          identityVerified: false,
+          messengerRestored: false,
+        });
+        expect(
+          await runtime("submit", {
+            ...packet,
+            phase: "totp",
+            values: { code: "123456", expiresAt: packet.expiresAt },
+          }),
+        ).toMatchObject({ outcome: "refused" });
+        await page.goto(
+          `${base}/two_step_verification/authentication/?encrypted_context=synthetic&flow=wrong&next`,
+        );
+        await page.setContent('<img alt="Meta"><iframe></iframe>');
+        expect(await runtime("observe", { ...packet })).toMatchObject({ state: "invalid" });
+        return;
+      }
       await page.goto(
         `${base}/two_step_verification/two_factor/?encrypted_context=synthetic&flow=${mode === "authenticator-wrong-flow" ? "wrong" : "two_factor_login"}&next`,
       );
