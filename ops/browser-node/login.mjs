@@ -128,7 +128,7 @@ export function createSavedLoginExecutor({
       await checkEgress();
       assertActive();
       const acquireCredentials = async () => {
-        await checkEgress();
+        if (profile.version === 2) await checkEgress();
         assertActive();
         claimAttempted = true;
         release = await request("claim-login", {
