@@ -309,7 +309,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
         throw new Error("run_forbidden");
       if (command.operation === "stop") requestStop(state, run);
       else if (command.operation === "use-saved-login") {
-        await savedLoginAccount(tx, row, run, now);
+        const { account } = await savedLoginAccount(tx, row, run, now);
         if (run.authSessionId !== actor.sessionId || run.savedLogin)
           throw new Error("saved_login_already_requested_or_wrong_session");
         run.savedLogin = {
@@ -317,8 +317,8 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
           automatic: (state.loginFillScopes ?? []).some(
             (scope) =>
               scope.automatic === true &&
-              scope.accountRef === run.accountRef &&
-              scope.channelRef === run.channelRef &&
+              scope.accountRef === account.accountRef &&
+              scope.channelRef === account.channelRef &&
               scope.expiresAt > now + 10000,
           ),
           requestedAt: now,
@@ -684,6 +684,7 @@ async function nodeOperation(
   )
     requestStop(state, run);
   const renewed = renewRun(state, run.id, request.leaseId, request.ready, now);
+  const loginAccount = state.accounts.find((account) => account.id === run.accountId);
   if (
     renewed &&
     run.kind === "interactive" &&
@@ -691,8 +692,8 @@ async function nodeOperation(
     (state.loginFillScopes ?? []).some(
       (scope) =>
         scope.automatic === true &&
-        scope.channelRef === run.channelRef &&
-        scope.accountRef === run.accountRef &&
+        scope.channelRef === loginAccount?.channelRef &&
+        scope.accountRef === loginAccount?.accountRef &&
         scope.expiresAt > now + 10000,
     )
   ) {
