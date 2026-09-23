@@ -146,13 +146,21 @@ export function register(app, ctx, config = {}) {
     });
     app.get("/ftrade/login-status", ctx.auth(), (_req, res) => {
       res.set("Cache-Control", "no-store");
-      res.json({
-        version: 2,
-        runId,
-        accountId,
-        reviewRef: profile.reviewRef,
-        expiresAt: Date.parse(profile.expiresAt),
-      });
+      try {
+        validateLoginProfile(profile);
+        const deadline = Number(readFileSync("/tmp/ftrade-lease", "utf8"));
+        if (!Number.isFinite(deadline) || deadline <= Date.now())
+          throw new Error("login_lease_expired");
+        res.json({
+          version: 2,
+          runId,
+          accountId,
+          reviewRef: profile.reviewRef,
+          expiresAt: Date.parse(profile.expiresAt),
+        });
+      } catch {
+        res.status(403).json({ error: "login_unavailable" });
+      }
     });
     for (const operation of ["observe", "submit"])
       app.post(`/ftrade/login-${operation}`, ctx.auth(), async (req, res) => {
