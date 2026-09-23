@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { sql } from "drizzle-orm";
+import type { FleetState } from "../lib/browser-fleet/policy";
 import {
   authorizeBrowserSandboxStart,
   authorizeManualSandboxStart,
 } from "../lib/browser-fleet/sandbox-authorization";
 import { sealBrowserSandboxKey } from "../lib/browser-fleet/sandbox-credentials";
 import { claimManualSandboxDispatch } from "../lib/browser-fleet/sandbox-dispatch";
-import { registerBrowserSandbox } from "../lib/browser-fleet/sandbox-lifecycle";
 import { enqueueDueInboxSandboxes } from "../lib/browser-fleet/sandbox-inbox-wakeup";
-import type { FleetState } from "../lib/browser-fleet/policy";
+import { registerBrowserSandbox } from "../lib/browser-fleet/sandbox-lifecycle";
 import type { Database } from "../lib/db/client";
 import { configuredFacebookKeyring } from "../lib/social/facebook-vault-crypto";
 
@@ -18,7 +18,9 @@ export async function testInboxWakeup(
 ) {
   const { nodeId, accessKey, channelRef, accountRef } = input;
   const previous = process.env.BROWSER_SANDBOX_ENABLED;
-  const before = await db.execute(sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`);
+  const before = await db.execute(
+    sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`,
+  );
   const original = before.rows[0].document as FleetState;
   process.env.BROWSER_SANDBOX_ENABLED = "1";
   try {
@@ -52,8 +54,8 @@ export async function testInboxWakeup(
     assert.ok(operation, "due inbox starts a stopped Sandbox");
     assert.equal((await read()).phase, "starting");
     assert.equal(
-      (await db.execute(sql`SELECT * FROM browser_sandbox_outbox WHERE node_id = ${nodeId}`))
-        .rows.length,
+      (await db.execute(sql`SELECT * FROM browser_sandbox_outbox WHERE node_id = ${nodeId}`)).rows
+        .length,
       1,
       "concurrent schedulers create one start intent",
     );
