@@ -7,6 +7,8 @@ for (const mode of [
   "page-contract",
   "executor",
   "executor-ready",
+  "executor-observe-only-ready",
+  "executor-observe-only-recovery",
   "executor-checkpoint-ready",
   "executor-checkpoint",
   "lease-bound",
@@ -39,7 +41,11 @@ for (const mode of [
           : path === "/two_factor/"
             ? `<div id="totp"><input id="code"><button id="verify">Verify</button></div><script>document.querySelector('button').onclick=()=>location.href='/messages/';</script>`
             : `<a id="identity" data-account-id="123456789">Account</a><div id="pin"><input id="pin-code" type="password"><button id="restore">Restore</button></div><script>document.querySelector('button').onclick=()=>{document.querySelector('#pin').remove();const el=document.createElement('div');el.id='chats';el.innerHTML='<span id="empty">No chats</span>';document.body.append(el);};</script>`;
-      if (mode === "executor-ready" || mode === "executor-checkpoint-ready")
+      if (
+        mode === "executor-ready" ||
+        mode === "executor-observe-only-ready" ||
+        mode === "executor-checkpoint-ready"
+      )
         content =
           '<a id="identity" data-account-id="123456789">Account</a><div id="chats"><span id="empty">No chats</span></div>';
       if (path === "/login/" && mode.startsWith("aria-")) {
@@ -85,6 +91,8 @@ for (const mode of [
         loading: "#loading",
       },
     };
+    if (mode.startsWith("executor-observe-only"))
+      Object.assign(profile.automation, { mode: "observe-only" });
     if (mode.startsWith("bootstrap"))
       profile.automation.identity = {
         selector: 'script[type="application/json"]',
@@ -401,7 +409,11 @@ for (const mode of [
             });
           if (path === "/tabs") {
             await page.goto(
-              ["executor-ready", "executor-checkpoint-ready"].includes(mode)
+              [
+                "executor-ready",
+                "executor-observe-only-ready",
+                "executor-checkpoint-ready",
+              ].includes(mode)
                 ? `${base}/messages/`
                 : profile.url,
             );
@@ -421,32 +433,46 @@ for (const mode of [
         },
       });
       const outcome = await execute({ id: packet.requestId, expiresAt: packet.expiresAt });
-      expect(outcome, JSON.stringify(calls)).toBe("ready");
-      expect(calls).toEqual(
-        mode === "executor-checkpoint-ready"
-          ? ["login-challenge", "login-result", "result:ready"]
-          : mode === "executor-ready"
-            ? ["login-result", "result:ready"]
-            : mode === "executor-checkpoint"
-              ? [
-                  "claim-login",
-                  "submit:password",
-                  "login-challenge",
-                  "submit:totp",
-                  "submit:pin",
-                  "login-result",
-                  "result:ready",
-                ]
-              : [
-                  "claim-login",
-                  "submit:password",
-                  "submit:totp",
-                  "submit:pin",
-                  "login-result",
-                  "result:ready",
-                ],
+      expect(outcome, JSON.stringify(calls)).toBe(
+        mode === "executor-observe-only-recovery" ? "refused" : "ready",
       );
+      expect(calls).toEqual(
+        mode === "executor-observe-only-recovery"
+          ? ["login-result", "result:refused"]
+          : mode === "executor-checkpoint-ready"
+            ? ["login-challenge", "login-result", "result:ready"]
+            : mode === "executor-ready" || mode === "executor-observe-only-ready"
+              ? ["login-result", "result:ready"]
+              : mode === "executor-checkpoint"
+                ? [
+                    "claim-login",
+                    "submit:password",
+                    "login-challenge",
+                    "submit:totp",
+                    "submit:pin",
+                    "login-result",
+                    "result:ready",
+                  ]
+                : [
+                    "claim-login",
+                    "submit:password",
+                    "submit:totp",
+                    "submit:pin",
+                    "login-result",
+                    "result:ready",
+                  ],
+      );
+      if (mode === "executor-observe-only-recovery") {
+        for (const [phase, values] of [
+          ["password", { username: "synthetic", password: "synthetic-password" }],
+          ["totp", { code: "123456", expiresAt: packet.expiresAt }],
+          ["pin", { code: "654321", expiresAt: packet.expiresAt }],
+        ] as const)
+          expect((await runtime("submit", { ...packet, phase, values })).outcome).toBe("refused");
+        await expect(page.locator("#password")).toHaveValue("");
+      }
       expect(await execute({ id: packet.requestId, expiresAt: packet.expiresAt })).toBe("refused");
+      if (mode === "executor-observe-only-recovery") return;
     } else {
       await page.goto(`${base}/login/`);
       if (["aria-disabled", "aria-outside"].includes(mode)) {

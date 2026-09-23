@@ -11,6 +11,7 @@ async function automaticLoginPage({
   let attempted = false;
   try {
     const auto = profile.automation;
+    if (operation === "submit" && auto.mode === "observe-only") return "refused";
     const visible = (element) =>
       element.getClientRects().length && getComputedStyle(element).visibility !== "hidden";
     const matches = (selector) => [...document.querySelectorAll(selector)].filter(visible);

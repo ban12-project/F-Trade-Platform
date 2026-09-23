@@ -128,6 +128,7 @@ export function createSavedLoginExecutor({
       await checkEgress();
       assertActive();
       const acquireCredentials = async () => {
+        if (profile.automation?.mode === "observe-only") return null;
         if (profile.version === 2) await checkEgress();
         assertActive();
         claimAttempted = true;
@@ -168,6 +169,7 @@ export function createSavedLoginExecutor({
         const result = await runFacebookLoginFlow({
           acquireCredentials: async () => {
             const credential = await acquireCredentials();
+            if (!credential) return null;
             packet.expiresAt = Math.min(
               expiresAt,
               localLoginAuthorizationDeadline(release, release.expiresAt),
