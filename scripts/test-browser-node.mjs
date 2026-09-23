@@ -125,6 +125,7 @@ test("browser compatibility hook preserves proxy and unrelated preferences acros
     events.emit("browser:launching", { options });
     assert.equal(options.proxy, proxy);
     assert.equal(options.firefoxUserPrefs["network.http.http2.websockets"], false);
+    assert.equal(options.firefoxUserPrefs["media.peerconnection.enabled"], false);
     if (firefoxUserPrefs) {
       assert.equal(options.firefoxUserPrefs["network.http.http2.enabled"], true);
       assert.deepEqual(firefoxUserPrefs, { "network.http.http2.enabled": true });

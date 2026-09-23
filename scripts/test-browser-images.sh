@@ -71,6 +71,7 @@ docker exec "$name" node --input-type=module -e '
   assert.ok(profile, "pinned Playwright Firefox profile must exist");
   const prefs = readFileSync(`/tmp/${profile}/prefs.js`, "utf8");
   assert.match(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
+  assert.match(prefs, /user_pref\("media\.peerconnection\.enabled", false\);/);
 '
 docker exec "$name" node -e 'require("node:fs").writeFileSync("/tmp/ftrade-lease",String(Date.now()+2000),{mode:0o600})'
 timeout 35 docker wait "$name" >/dev/null
@@ -109,6 +110,7 @@ assert agent["pull_policy"] == "never"
 assert agent["container_name"] == "ftrade-browser-agent"
 assert agent["labels"]["io.ftrade.role"] == "agent"
 assert agent["environment"]["BROWSER_NODE_ON_DEMAND"] == "1"
+assert agent["environment"]["BROWSER_NATIVE_PROFILES"] == "0"
 assert agent["environment"]["BROWSER_NODE_IDLE_MS"] == "30000"
 assert agent["environment"]["BROWSER_MANAGED_FACEBOOK_CONFIG_DIR"] == "/run/facebook-config"
 facebook = next(v for v in agent["volumes"] if v["target"] == "/run/facebook-config")
