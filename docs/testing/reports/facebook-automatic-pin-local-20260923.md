@@ -144,3 +144,11 @@
 进程结束后，独立 PostgreSQL 连接再次确认运行 completed、账号 ready、授权结果 ready、待处理挑战为空，之前 refused 回执仍存在；数据库文档没有密码或 TOTP 密钥明文。该实验不发送消息、不发布内容，生产工作台会话保持原状。代码提交 `f54bdf8` 的全部 CI 已通过。
 
 本证据完成真实本地单轮密码/TOTP/PIN 自动登录闭环；真实 CAPTCHA 在同一授权内人工完成后的续跑尚未发生（合成回归已覆盖），生产部署、非空收件箱和跨重启历史恢复仍待验收。
+
+## Session-first recovery integration
+
+The automatic executor now observes the existing browser session before claiming credentials. A verified ready state reports completion without a password/TOTP/PIN release. An authenticated page may navigate to Messenger without releasing factors. Only an observed recovery phase triggers one credential claim; an ambiguous claim response is not retried. Loading, invalid scope and CAPTCHA do not themselves release factors. CAPTCHA may report human attention before a claim, and any subsequent recovery remains within the existing authorization and lease.
+
+The broker accepts a ready receipt without a prior claim only for an automatic authorization, and still validates expiry, current account grant, credential version and reviewed scope before marking the account ready. A completed ready receipt prevents later credential claims. Revocation tests exercise both the new ready and checkpoint paths. Manual version-1 filling retains its existing claim requirement.
+
+Browser executor coverage includes a ready session with only a login-result call, the password/TOTP/PIN recovery sequence and CAPTCHA handoff. This change is recovery-path integration; native profile implementation and real-account continuity evidence are tracked separately in #425. Neither establishes historical chat restoration or real inbound-message ingestion.

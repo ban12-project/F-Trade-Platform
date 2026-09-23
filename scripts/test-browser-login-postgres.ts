@@ -441,11 +441,31 @@ export async function testBrowserLogin(
     mutate(changed);
     await write(changed);
     await assert.rejects(() => call({ operation: "claim-login", ...autoRequest }), /saved_login_/);
+    await assert.rejects(
+      () => call({ operation: "login-result", ...autoRequest, outcome: "ready" }),
+      /saved_login_/,
+    );
+    await assert.rejects(
+      () => call({ operation: "login-challenge", ...autoRequest, challenge: "checkpoint" }),
+      /saved_login_/,
+    );
   }
   await write(autoBaseline);
-  await assert.rejects(() =>
-    call({ operation: "login-challenge", ...autoRequest, challenge: "checkpoint" }),
+  assert.equal(
+    (await call({ operation: "login-challenge", ...autoRequest, challenge: "checkpoint" }))
+      .recorded,
+    true,
   );
+  assert.equal((await state()).runs.at(-1)?.savedLogin?.claimedAt, null);
+  await write(autoBaseline);
+  assert.equal(
+    (await call({ operation: "login-result", ...autoRequest, outcome: "ready" })).recorded,
+    true,
+  );
+  assert.equal((await state()).runs.at(-1)?.savedLogin?.claimedAt, null);
+  assert.equal((await state()).accounts[0].authState, "ready");
+  await assert.rejects(() => call({ operation: "claim-login", ...autoRequest }));
+  await write(autoBaseline);
   const autoResponses = await Promise.all(
     Array.from({ length: 8 }, () => http({ operation: "claim-login", ...autoRequest })),
   );

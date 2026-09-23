@@ -6,6 +6,7 @@ import { validateLoginProfile } from "../../ops/browser-node/login-plugin/index.
 for (const mode of [
   "page-contract",
   "executor",
+  "executor-ready",
   "executor-checkpoint",
   "lease-bound",
   "formaction",
@@ -37,6 +38,9 @@ for (const mode of [
           : path === "/two_factor/"
             ? `<div id="totp"><input id="code"><button id="verify">Verify</button></div><script>document.querySelector('button').onclick=()=>location.href='/messages/';</script>`
             : `<a id="identity" data-account-id="123456789">Account</a><div id="pin"><input id="pin-code" type="password"><button id="restore">Restore</button></div><script>document.querySelector('button').onclick=()=>{document.querySelector('#pin').remove();const el=document.createElement('div');el.id='chats';el.innerHTML='<span id="empty">No chats</span>';document.body.append(el);};</script>`;
+      if (mode === "executor-ready")
+        content =
+          '<a id="identity" data-account-id="123456789">Account</a><div id="chats"><span id="empty">No chats</span></div>';
       if (path === "/login/" && mode.startsWith("aria-")) {
         const button = `<div id="submit" role="button" tabindex="0" ${mode === "aria-disabled" ? 'aria-disabled="true"' : ""} onclick="location.href='/two_factor/'">Log in</div>`;
         content = content.replace(
@@ -339,7 +343,7 @@ for (const mode of [
       else await expect(page.locator("#pin-code")).toHaveValue("");
       return;
     }
-    if (mode === "executor" || mode === "executor-checkpoint") {
+    if (mode === "executor" || mode === "executor-checkpoint" || mode === "executor-ready") {
       profile.expiresAt = new Date(Date.now() + 180000).toISOString();
       packet.expiresAt = Date.now() + 170000;
       const calls: string[] = [];
@@ -391,7 +395,7 @@ for (const mode of [
               expiresAt: Date.parse(profile.expiresAt),
             });
           if (path === "/tabs") {
-            await page.goto(profile.url);
+            await page.goto(mode === "executor-ready" ? `${base}/messages/` : profile.url);
             return Response.json({ tabId: "tab", url: page.url() });
           }
           if (!body) throw new Error("missing_browser_packet");
@@ -410,24 +414,26 @@ for (const mode of [
       const outcome = await execute({ id: packet.requestId, expiresAt: packet.expiresAt });
       expect(outcome, JSON.stringify(calls)).toBe("ready");
       expect(calls).toEqual(
-        mode === "executor-checkpoint"
-          ? [
-              "claim-login",
-              "submit:password",
-              "login-challenge",
-              "submit:totp",
-              "submit:pin",
-              "login-result",
-              "result:ready",
-            ]
-          : [
-              "claim-login",
-              "submit:password",
-              "submit:totp",
-              "submit:pin",
-              "login-result",
-              "result:ready",
-            ],
+        mode === "executor-ready"
+          ? ["login-result", "result:ready"]
+          : mode === "executor-checkpoint"
+            ? [
+                "claim-login",
+                "submit:password",
+                "login-challenge",
+                "submit:totp",
+                "submit:pin",
+                "login-result",
+                "result:ready",
+              ]
+            : [
+                "claim-login",
+                "submit:password",
+                "submit:totp",
+                "submit:pin",
+                "login-result",
+                "result:ready",
+              ],
       );
       expect(await execute({ id: packet.requestId, expiresAt: packet.expiresAt })).toBe("refused");
     } else {

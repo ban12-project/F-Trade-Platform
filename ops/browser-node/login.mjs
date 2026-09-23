@@ -127,27 +127,34 @@ export function createSavedLoginExecutor({
       // Navigation can take time; recheck egress and connection before releasing a credential.
       await checkEgress();
       assertActive();
-      claimAttempted = true;
-      release = await request("claim-login", {
-        runId: run.id,
-        leaseId: run.leaseId,
-        authorizationId: notice.id,
-      });
-      const credential = release.credential;
-      if (
-        release.authorizationId !== notice.id ||
-        typeof credential?.username !== "string" ||
-        !credential.username ||
-        credential.username.length > 320 ||
-        typeof credential.password !== "string" ||
-        !credential.password ||
-        credential.password.length > 4096
-      )
-        throw new Error("login_release_invalid");
-      const expiresAt =
-        profile.version === 2
-          ? localLoginAuthorizationDeadline(release, release.expiresAt)
-          : localDeadline(release, release.expiresAt);
+      const acquireCredentials = async () => {
+        await checkEgress();
+        assertActive();
+        claimAttempted = true;
+        release = await request("claim-login", {
+          runId: run.id,
+          leaseId: run.leaseId,
+          authorizationId: notice.id,
+        });
+        const credential = release.credential;
+        if (
+          release.authorizationId !== notice.id ||
+          typeof credential?.username !== "string" ||
+          !credential.username ||
+          credential.username.length > 320 ||
+          typeof credential.password !== "string" ||
+          !credential.password ||
+          credential.password.length > 4096
+        )
+          throw new Error("login_release_invalid");
+        return credential;
+      };
+      let expiresAt = Math.min(
+        Date.now() + 175000,
+        profile.version === 2 ? notice.expiresAt - 5000 : Date.now() + 30000,
+        Date.parse(profile.expiresAt),
+      );
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error("login_expired");
       assertActive();
       validateLoginProfile(profile);
       if (profile.version === 2) {
@@ -159,7 +166,14 @@ export function createSavedLoginExecutor({
           expiresAt,
         };
         const result = await runFacebookLoginFlow({
-          credentials: credential,
+          acquireCredentials: async () => {
+            const credential = await acquireCredentials();
+            packet.expiresAt = Math.min(
+              expiresAt,
+              localLoginAuthorizationDeadline(release, release.expiresAt),
+            );
+            return credential;
+          },
           deadline: expiresAt,
           assertActive,
           onAttention: async (reason) => {
@@ -193,6 +207,8 @@ export function createSavedLoginExecutor({
         )
           challenge = result.reason;
       } else {
+        const credential = await acquireCredentials();
+        expiresAt = localDeadline(release, release.expiresAt);
         const result = await json(
           await browserRequest("/ftrade/login-fill", {
             userId: run.accountId,
@@ -212,6 +228,8 @@ export function createSavedLoginExecutor({
       if (release?.credential) {
         delete release.credential.username;
         delete release.credential.password;
+        delete release.credential.totpSecret;
+        delete release.credential.messengerPin;
         delete release.credential;
       }
     }

@@ -586,11 +586,11 @@ async function nodeOperation(
     if (
       !authorization?.automatic ||
       authorization.id !== request.authorizationId ||
-      authorization.claimedAt === null ||
       authorization.outcome ||
       authorization.expiresAt <= now
     )
       throw new Error("saved_login_challenge_not_authorized");
+    await savedLoginAccount(tx, row, run, now);
     const replayed = authorization.challenge === "checkpoint";
     authorization.challenge = "checkpoint";
     if (!replayed) await audit(tx, row.owner_id, "browser_credentials.login_checkpoint", run.id);
@@ -602,15 +602,12 @@ async function nodeOperation(
       run.kind !== "interactive" ||
       !authorization ||
       authorization.id !== request.authorizationId ||
-      (authorization.claimedAt === null && request.outcome !== "refused")
+      (authorization.claimedAt === null &&
+        request.outcome !== "refused" &&
+        !(authorization.automatic && ["ready", "unknown"].includes(request.outcome)))
     )
       throw new Error("saved_login_result_not_authorized");
-    if (
-      request.challenge &&
-      (request.outcome !== "refused" ||
-        !authorization.automatic ||
-        authorization.claimedAt === null)
-    )
+    if (request.challenge && (request.outcome !== "refused" || !authorization.automatic))
       throw new Error("saved_login_challenge_not_authorized");
     if (
       authorization.outcome &&
