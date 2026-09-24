@@ -104,6 +104,8 @@ export function createAutomaticLoginRuntime({
         }
       }
       const phase = packet.phase;
+      if (profile.automation.mode === "observe-only" && phase !== "messenger")
+        return { outcome: "refused" };
       if (!["password", "totp", "messenger", "pin"].includes(phase) || submitted.has(phase))
         return { outcome: "refused" };
       if (

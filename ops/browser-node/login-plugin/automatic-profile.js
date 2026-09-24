@@ -28,7 +28,9 @@ export function validateAutomaticProfile(value) {
       "checkpoint",
       "rejected",
       "loading",
+      ...(value?.mode === "observe-only" ? ["mode"] : []),
     ]) ||
+    (value.mode !== undefined && value.mode !== "observe-only") ||
     !/^[0-9]{5,30}$/.test(value.accountRef ?? "") ||
     !exact(value.identity, ["selector", "attribute"]) ||
     !selector(value.identity.selector) ||
