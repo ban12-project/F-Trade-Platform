@@ -160,6 +160,7 @@ async function automaticLoginPage({
         state,
         originVerified: true,
         identityVerified,
+        atReadyUrl: location.href === auto.ready.url,
         messengerRestored: state === "ready" && restored,
       };
     if (state !== phase || !["password", "totp", "pin"].includes(phase)) return "refused";

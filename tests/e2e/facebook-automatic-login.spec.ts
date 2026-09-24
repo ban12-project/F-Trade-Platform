@@ -21,6 +21,7 @@ for (const mode of [
   "bootstrap-switched",
   "bootstrap-no-cookie",
   "ready-shell",
+  "ready-hydration",
   "aria-submit",
   "aria-disabled",
   "aria-outside",
@@ -48,6 +49,8 @@ for (const mode of [
       )
         content =
           '<a id="identity" data-account-id="123456789">Account</a><div id="chats"><span id="empty">No chats</span></div>';
+      if (mode === "ready-hydration" && path !== "/login/" && path !== "/two_factor/")
+        content = '<a id="identity" data-account-id="123456789">Account</a>';
       if (path === "/login/" && mode.startsWith("aria-")) {
         const button = `<div id="submit" role="button" tabindex="0" ${mode === "aria-disabled" ? 'aria-disabled="true"' : ""} onclick="location.href='/two_factor/'">Log in</div>`;
         content = content.replace(
@@ -300,6 +303,21 @@ for (const mode of [
       expect(await runtime("observe", { ...packet })).toMatchObject({
         state: "ready",
         messengerRestored: true,
+      });
+      return;
+    }
+    if (mode === "ready-hydration") {
+      await page.goto(`${base}/messages/`);
+      expect(await runtime("observe", { ...packet })).toMatchObject({
+        state: "messenger",
+        identityVerified: true,
+        atReadyUrl: true,
+      });
+      await page.goto(`${base}/home/`);
+      expect(await runtime("observe", { ...packet })).toMatchObject({
+        state: "messenger",
+        identityVerified: true,
+        atReadyUrl: false,
       });
       return;
     }

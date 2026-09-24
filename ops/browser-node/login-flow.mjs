@@ -61,9 +61,17 @@ export async function runFacebookLoginFlow({
         await sleep(Math.min(500, Math.max(0, deadline - now())));
         continue;
       }
+      if (phase === "messenger" && observed.identityVerified !== true)
+        return { outcome: "refused", reason: "identity" };
       if (observeOnly && phase === "messenger") {
         // The thread list can hydrate after account identity appears. Observe
         // until ready without issuing a page submission or claiming factors.
+        await sleep(Math.min(500, Math.max(0, deadline - now())));
+        continue;
+      }
+      if (phase === "messenger" && observed.atReadyUrl === true) {
+        // An existing Messenger tab may expose identity before its list root
+        // hydrates. Navigating to the same URL would discard that progress.
         await sleep(Math.min(500, Math.max(0, deadline - now())));
         continue;
       }
@@ -98,7 +106,6 @@ export async function runFacebookLoginFlow({
         }
         values = { code: otp.code, expiresAt: Math.min(deadline, otp.expiresAt) };
       } else if (phase === "messenger") {
-        if (observed.identityVerified !== true) return { outcome: "refused", reason: "identity" };
         values = {};
       } else {
         if (!credentials?.messengerPin) return { outcome: "needs_credential", reason: "pin" };
