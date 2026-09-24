@@ -13,6 +13,7 @@ import {
 } from "../ops/browser-node/diagnostics-plugin/index.js";
 import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/docker.mjs";
 import { waitForBrowserReady } from "../ops/browser-node/egress.mjs";
+import { awaitVideoPreview } from "../ops/browser-node/facebook-driver.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
 import { viewerGraceExpired } from "../ops/browser-node/idle.mjs";
 import { localDeadline, localLoginAuthorizationDeadline } from "../ops/browser-node/lease.mjs";
@@ -563,6 +564,40 @@ test("upload staging verifies container ownership and never accepts task paths",
     /publication_container_mismatch/,
   );
   assert.equal(calls.length, 1);
+});
+
+test("video preview waits for a verified attachment and fails closed on a wrong digest", async () => {
+  const expected = {
+    accountRef: "account",
+    channelRef: "facebook-personal",
+    text: "approved text",
+    attachmentSha256: "a".repeat(64),
+  };
+  const signal = new AbortController().signal;
+  let scans = 0;
+  const preview = await awaitVideoPreview(
+    async () => {
+      scans++;
+      return {
+        ...expected,
+        attachmentCount: scans === 1 ? 0 : 1,
+        attachmentSha256: scans === 1 ? undefined : expected.attachmentSha256,
+        readyToPublish: scans !== 1,
+      };
+    },
+    expected,
+    signal,
+  );
+  assert.equal(scans, 2);
+  assert.equal(preview.attachmentSha256, expected.attachmentSha256);
+  await assert.rejects(
+    awaitVideoPreview(
+      async () => ({ ...expected, attachmentCount: 1, attachmentSha256: "b".repeat(64) }),
+      expected,
+      signal,
+    ),
+    /facebook_video_preview_mismatch/,
+  );
 });
 
 test("Docker exec transport streams confirmed binary bytes into a read-only container", async () => {

@@ -155,6 +155,40 @@ async function json(response) {
   }
 }
 
+/** A video thumbnail may appear before Facebook enables the composer. */
+export async function awaitVideoPreview(inspect, expected, signal) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (signal.aborted) throw new Error("facebook_cancelled");
+    let preview;
+    try {
+      preview = await inspect();
+    } catch (error) {
+      if (error?.message !== "facebook_evaluation_failed") throw error;
+    }
+    if (preview) {
+      if (
+        preview.accountRef !== expected.accountRef ||
+        preview.channelRef !== expected.channelRef ||
+        preview.text !== expected.text
+      )
+        return preview;
+      if (
+        preview.attachmentCount > 1 ||
+        (preview.attachmentSha256 && preview.attachmentSha256 !== expected.attachmentSha256)
+      )
+        throw new Error("facebook_video_preview_mismatch");
+      if (
+        preview.readyToPublish === true &&
+        preview.attachmentCount === 1 &&
+        preview.attachmentSha256 === expected.attachmentSha256
+      )
+        return preview;
+    }
+    if (attempt < 59) await delay(500, undefined, { signal });
+  }
+  throw new Error("facebook_video_preview_unready");
+}
+
 export function createFacebookDriver(input, browserRequest) {
   const profile = validateFacebookProfile(input);
   const evaluate = async (session, action) => {
@@ -359,6 +393,8 @@ export function createFacebookDriver(input, browserRequest) {
       }
       session.expected = {
         kind: "publish",
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
         text: payload.text,
         attachmentCount: upload ? 1 : 0,
         attachmentName: upload?.path.split("/").at(-1),
@@ -366,11 +402,16 @@ export function createFacebookDriver(input, browserRequest) {
         attachmentSha256: upload?.media?.sha256,
       };
     },
-    inspect: (session) =>
-      evaluate(session, {
-        kind: "inspect",
-        attachmentFormat: session.expected?.attachmentFormat,
-      }),
+    inspect: (session) => {
+      const inspect = () =>
+        evaluate(session, {
+          kind: "inspect",
+          attachmentFormat: session.expected?.attachmentFormat,
+        });
+      return session.expected?.attachmentFormat === "video"
+        ? awaitVideoPreview(inspect, session.expected, session.signal)
+        : inspect();
+    },
     async publish(session, authorization) {
       if (!session.expected || session.clicked)
         throw new Error("facebook_publish_already_attempted");

@@ -1,13 +1,9 @@
 function checkedPreview(preview, run, upload) {
   const payload = run.publication;
-  if (
-    !preview ||
-    preview.accountRef !== run.accountRef ||
-    preview.channelRef !== run.channelRef ||
-    preview.text !== payload.text ||
-    preview.readyToPublish !== true
-  )
-    throw new Error("publication_preview_mismatch");
+  if (!preview || preview.accountRef !== run.accountRef || preview.channelRef !== run.channelRef)
+    throw new Error("publication_preview_identity_mismatch");
+  if (preview.text !== payload.text) throw new Error("publication_preview_text_mismatch");
+  if (preview.readyToPublish !== true) throw new Error("publication_preview_not_ready");
   if (payload.format === "text") {
     if (preview.attachmentCount !== 0) throw new Error("publication_attachment_mismatch");
   } else if (
@@ -55,6 +51,12 @@ const diagnosticErrors = new Set([
   "publication_container_invalid",
   "publication_container_mismatch",
   "publication_upload_transport_failed",
+  "publication_preview_identity_mismatch",
+  "publication_preview_text_mismatch",
+  "publication_preview_not_ready",
+  "publication_attachment_mismatch",
+  "facebook_video_preview_unready",
+  "facebook_video_preview_mismatch",
 ]);
 function diagnosticError(error) {
   return diagnosticErrors.has(error?.message) ? error.message : "unclassified";
