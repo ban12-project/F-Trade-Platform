@@ -22,7 +22,7 @@ export async function reconcilePublicationAction(input: unknown) {
     return { ok: false as const, message: "请核对帖子链接、依据编号和确认选项。" };
   try {
     await reconcileUnknownTextPublication(parsed.data, current.user.id);
-    revalidatePath(`/workspace/projects/${parsed.data.projectId}`);
+    revalidatePath(`/workspace/${parsed.data.projectId}`);
     revalidatePath("/workspace");
     return {
       ok: true as const,
@@ -45,7 +45,7 @@ export async function reconcileVideoPublicationAction(input: unknown) {
     return { ok: false as const, message: "请核对 Reel 链接、依据编号和确认选项。" };
   try {
     await reconcileUnknownVideoPublication(parsed.data, current.user.id);
-    revalidatePath(`/workspace/projects/${parsed.data.projectId}`);
+    revalidatePath(`/workspace/${parsed.data.projectId}`);
     revalidatePath("/workspace");
     return {
       ok: true as const,
