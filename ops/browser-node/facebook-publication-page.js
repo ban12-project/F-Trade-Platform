@@ -1,6 +1,6 @@
 // Trusted page program, read as source so host transpilers cannot inject helper dependencies.
 // biome-ignore lint/correctness/noUnusedVariables: The driver reads and invokes this fixed page source.
-function inspectPage(profile, action) {
+async function inspectPage(profile, action) {
   if (Date.now() >= Date.parse(profile.expiresAt)) throw new Error("facebook_profile_expired");
   if (location.origin !== "https://www.facebook.com") throw new Error("facebook_origin_changed");
   const visible = (element) =>
@@ -168,23 +168,36 @@ function inspectPage(profile, action) {
   const submit = one(composer, profile.selectors.submit);
   const attachments = all(composer, profile.selectors.attachmentName);
   const text = "value" in textbox ? textbox.value : textbox.innerText;
+  let videoDigest;
+  if (action.attachmentFormat === "video") {
+    const videos = all(composer, "video");
+    if (attachments.length || videos.length !== 1 || !videos[0].currentSrc.startsWith("blob:"))
+      throw new Error("facebook_video_preview_ambiguous");
+    const source = await fetch(videos[0].currentSrc);
+    if (!source.ok) throw new Error("facebook_video_preview_unreadable");
+    const blob = await source.blob();
+    if (!blob.size || blob.size > 200 * 1024 * 1024)
+      throw new Error("facebook_video_preview_invalid");
+    const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+    const bytes = new DataView(digest);
+    videoDigest = "";
+    for (let index = 0; index < bytes.byteLength; index++)
+      videoDigest += bytes.getUint8(index).toString(16).padStart(2, "0");
+  }
   const preview = {
     accountRef: profile.accountRef,
     channelRef: profile.channelRef,
     text,
-    attachmentCount: attachments.length,
+    attachmentCount: videoDigest ? 1 : attachments.length,
     attachmentName: attachments[0]?.innerText,
+    attachmentSha256: videoDigest,
     readyToPublish: enabled(submit),
   };
   if (action.kind === "upload-check") {
-    // Pinned Camofox uploads to the first file input globally. Require that this
-    // is the one and only input and belongs to the verified composer.
+    // The patched Camofox upload route targets this exact composer input.
+    // Other page-level inputs may exist, but ambiguous composer inputs fail closed.
     const input = one(composer, profile.selectors.fileInput, false);
-    if (
-      input.tagName !== "INPUT" ||
-      input.type !== "file" ||
-      document.querySelectorAll('input[type="file"]').length !== 1
-    )
+    if (input.tagName !== "INPUT" || input.type !== "file")
       throw new Error("facebook_file_input_ambiguous");
   }
   if (action.kind === "publish") {
@@ -194,7 +207,10 @@ function inspectPage(profile, action) {
       text !== action.text ||
       !preview.readyToPublish ||
       preview.attachmentCount !== action.attachmentCount ||
-      (action.attachmentCount === 1 && preview.attachmentName !== action.attachmentName)
+      (action.attachmentCount === 1 &&
+        (action.attachmentFormat === "video"
+          ? preview.attachmentSha256 !== action.attachmentSha256
+          : preview.attachmentName !== action.attachmentName))
     )
       throw new Error("facebook_preview_changed");
     // One DOM click, no generic click endpoint with retry/fallback behavior.

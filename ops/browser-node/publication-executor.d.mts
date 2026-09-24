@@ -58,6 +58,7 @@ export type PublicationDriver<Session> = {
     readyToPublish: boolean;
     attachmentCount: number;
     attachmentName?: string;
+    attachmentSha256?: string;
   }>;
   publish(
     session: Session,
