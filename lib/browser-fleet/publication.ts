@@ -173,7 +173,7 @@ export async function reconcilePublications(
     )
       continue;
     const reservation = await tx.execute(
-      sql`SELECT job_id FROM browser_fleet_publication WHERE node_id = ${nodeId} AND run_id = ${run.id} AND job_id = ${run.jobRef}`,
+      sql`SELECT job_id, authorization_id FROM browser_fleet_publication WHERE node_id = ${nodeId} AND run_id = ${run.id} AND job_id = ${run.jobRef}`,
     );
     if (!reservation.rows.length) continue;
     const [job] = await tx
@@ -182,21 +182,40 @@ export async function reconcilePublications(
       .where(eq(socialBrowserJob.id, run.jobRef))
       .for("update");
     if (!job || !["queued", "claimed"].includes(job.status)) continue;
-    const unknown = job.status === "claimed";
+    // A stopped, reviewed executor cannot click Publish without a persisted
+    // authorization. A quarantined run may still have a live browser.
+    const preClickFailure =
+      job.status === "claimed" &&
+      run.status !== "quarantined" &&
+      !reservation.rows[0].authorization_id;
+    const unknown = job.status === "claimed" && !preClickFailure;
     await tx
       .update(socialBrowserJob)
       .set({
         status: "paused",
-        failureCode: unknown ? "fleet_publication_result_unknown" : "fleet_publication_cancelled",
+        failureCode: preClickFailure
+          ? "fleet_publication_not_authorized"
+          : unknown
+            ? "fleet_publication_result_unknown"
+            : "fleet_publication_cancelled",
         updatedAt: new Date(now),
       })
       .where(eq(socialBrowserJob.id, job.id));
     await tx
       .update(socialPublication)
-      .set({ status: unknown ? "unknown" : "paused", updatedAt: new Date(now) })
+      .set({
+        status: preClickFailure ? "failed" : unknown ? "unknown" : "paused",
+        updatedAt: new Date(now),
+      })
       .where(
         and(eq(socialPublication.id, job.payloadRef), eq(socialPublication.browserJobId, job.id)),
       );
+    if (preClickFailure) {
+      run.status = "failed";
+      run.failure = "publication_not_authorized";
+      const account = state.accounts.find((item) => item.id === run.accountId);
+      if (account?.authState === "result_unknown") account.authState = "ready";
+    }
     if (unknown)
       await tx
         .update(socialChannelControl)
