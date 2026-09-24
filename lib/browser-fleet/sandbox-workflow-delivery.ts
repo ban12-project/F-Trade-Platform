@@ -5,8 +5,10 @@ import { start } from "workflow/api";
 import { runManualBrowserSandbox } from "@/workflows/browser-sandbox";
 import { getDatabase } from "../db/client";
 import { deliverBrowserSandboxOutbox } from "./sandbox-outbox";
+import { reconcileStoppedBrowserSandboxes } from "./sandbox-reconcile";
 
 export async function deliverQueuedBrowserSandboxes(nodeId?: string) {
+  await reconcileStoppedBrowserSandboxes(nodeId);
   const { enqueueDueInboxSandboxes } = await import("./sandbox-inbox-wakeup");
   const { enqueueQueuedPublicationSandboxes } = await import("./sandbox-publication-wakeup");
   await enqueueDueInboxSandboxes(getDatabase(), nodeId);

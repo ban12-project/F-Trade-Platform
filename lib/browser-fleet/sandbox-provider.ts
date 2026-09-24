@@ -19,7 +19,15 @@ export type BrowserSandboxProviderRequest = z.infer<typeof requestSchema>;
 
 export type BrowserSandboxProviderHandle = Pick<
   Sandbox,
-  "name" | "status" | "persistent" | "timeout" | "vcpus" | "tags" | "currentSession" | "domain"
+  | "name"
+  | "status"
+  | "persistent"
+  | "timeout"
+  | "vcpus"
+  | "tags"
+  | "currentSession"
+  | "domain"
+  | "listSessions"
 >;
 export type BrowserSandboxProvider = {
   create(input: Parameters<typeof Sandbox.create>[0]): Promise<BrowserSandboxProviderHandle>;
