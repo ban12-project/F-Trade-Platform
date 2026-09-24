@@ -30,6 +30,16 @@ docker run --rm --network none --add-host target.browser.test:127.0.0.1 \
   -v "$PWD/scripts/fixtures/native-profile/proxy-fail-closed.mjs:/app/proxy-fail-closed.mjs:ro" \
   --entrypoint node "$browser" /app/proxy-fail-closed.mjs
 
+# Decode a generated H.264 frame, not merely a canPlayType/metadata claim.
+docker run --rm --network none --read-only --init \
+  --cap-drop ALL --security-opt no-new-privileges:true \
+  --memory 2g --memory-swap 2g --cpus 2 --pids-limit 512 --shm-size 256m \
+  --tmpfs /tmp:rw,nosuid,nodev,size=512m,mode=1777 \
+  --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
+  --tmpfs /root/camoufox:rw,nosuid,nodev,size=16m,mode=700 \
+  -v "$PWD/scripts/fixtures/browser-media:/fixture:ro" \
+  --entrypoint node "$browser" /fixture/verify-h264.mjs
+
 # No Facebook/proxy/account is used. Test server startup and independent lease expiry.
 name="ftrade-image-smoke-${ARCH}-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT

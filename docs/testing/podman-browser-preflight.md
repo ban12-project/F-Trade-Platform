@@ -29,6 +29,8 @@ The existing synthetic continuity fixture accepts `NATIVE_PROFILE_SECCOMP=/absol
 
 ## Live observation and final gate
 
+The reviewed Debian 13 browser base also lacked H.264 decoding: a self-generated MP4 returned an empty `canPlayType` result and media error 4. Installing Debian's `libavcodec61` made the same sample decode with the correct dimensions; a pixel assertion independently verified its blue frame. The browser Dockerfile now includes that runtime library, and both architecture image checks run the generated fixture with network disabled and production resource/isolation settings. See [Mozilla's system codec explanation](https://support.mozilla.org/en-US/kb/open-h264-plugin-firefox) and the [Debian runtime package](https://packages.debian.org/trixie/libavcodec61). This does not prove Facebook playback or automatic publication receipt recognition.
+
 Wait within a bounded deadline for matching account identity, the reviewed Messenger ready root and empty/thread marker, and absence of visible checkpoint, factor, dialog and loading states. A fixed sleep followed by an HTTP success or a Chats heading alone is insufficient. Record timeouts as unproven; do not convert them into recovery attempts. Preserve the same profile across sequential task/container checks and confirm the browser's egress each time.
 
 Local real-account observations on 2026-09-25 reached the empty Messenger inbox without submitting password/TOTP/PIN after container replacement using the production browser image and restrictive filter. These were DOM observations, not a new broker-issued ready receipt. The local container HTTP-to-authorized-SOCKS adapter also remains a transport difference from the production HTTP proxy configuration.
