@@ -8,6 +8,8 @@ const postRef = "https://www.facebook.com/synthetic/posts/12345";
 type Mode =
   | "success"
   | "identity"
+  | "baseline"
+  | "prepare"
   | "changed"
   | "expired"
   | "click_lost"
@@ -38,10 +40,12 @@ async function scenario(page: Page, mode: Mode, format: "text" | "image" | "vide
       return { accountRef: mode === "identity" ? "different" : accountRef, channelRef };
     },
     async existingPublicationRefs() {
+      if (mode === "baseline") throw new Error("private timeline text must not escape");
       return mode === "old_post" ? [postRef] : [];
     },
     async prepare(_session: Page, content: typeof payload, upload: { path: string } | null) {
       events.push("prepare");
+      if (mode === "prepare") throw new Error("private editor text must not escape");
       await page.getByLabel("Copy").fill(content.text);
       if (upload)
         await page.getByLabel("Attachment").setInputFiles({
@@ -107,6 +111,9 @@ async function scenario(page: Page, mode: Mode, format: "text" | "image" | "vide
       if (mode === "receipt_once_lost" && receipts.length === 1) throw new Error("response_lost");
       if (mode === "receipt_lost") throw new Error("response_lost");
     },
+    onPreclickFailure(stage: string) {
+      events.push(`preclick:${stage}`);
+    },
   });
   return { result, events, receipts, clicks: Number(await page.locator("#count").textContent()) };
 }
@@ -125,12 +132,28 @@ for (const format of ["text", "image", "video"] as const) {
     expect(run.events.at(-1)).toBe("close");
   });
 }
-for (const mode of ["identity", "changed", "expired", "aborted"] as const) {
+for (const mode of ["identity", "baseline", "prepare", "changed", "expired", "aborted"] as const) {
   test(`publication executor refuses ${mode} before clicking`, async ({ page }) => {
     const run = await scenario(page, mode);
     expect(run.result).toBe("failed");
     expect(run.clicks).toBe(0);
     expect(run.receipts).toHaveLength(0);
+  });
+}
+for (const [mode, stage] of [
+  ["identity", "identity"],
+  ["baseline", "baseline"],
+  ["prepare", "prepare"],
+  ["changed", "recheck"],
+  ["expired", "authorization_deadline"],
+  ["aborted", "authorize"],
+] as const) {
+  test(`pre-click failure exposes only the fixed ${stage} stage`, async ({ page }) => {
+    const run = await scenario(page, mode);
+    expect(run.events.filter((event) => event.startsWith("preclick:"))).toEqual([
+      `preclick:${stage}`,
+    ]);
+    expect(run.events.join(" ")).not.toContain("private ");
   });
 }
 for (const mode of ["click_lost", "receipt_lost", "old_post"] as const) {
@@ -165,5 +188,6 @@ for (const [mode, phase] of [
     expect(run.result).toBe("unknown");
     expect(run.clicks).toBe(1);
     expect(run.receipts[0].failureCode).toBe(`publication_${phase}_unknown`);
+    expect(run.events.some((event) => event.startsWith("preclick:"))).toBe(false);
   });
 }

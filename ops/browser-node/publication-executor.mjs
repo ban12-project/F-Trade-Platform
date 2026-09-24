@@ -45,6 +45,7 @@ export function createPublicationExecutor(driver) {
     preparePublicationMedia,
     authorizePublication,
     reportPublication,
+    onPreclickFailure,
   }) {
     const active = () => {
       if (signal.aborted) throw new Error("publication_cancelled");
@@ -64,25 +65,34 @@ export function createPublicationExecutor(driver) {
     let clickStarted = false;
     let session;
     let phase = "publish";
+    let preClickStage = "open";
     try {
       active();
       session = await driver.open(run, signal);
       active();
+      preClickStage = "identity";
       const identity = await driver.identity(session);
       if (identity.accountRef !== run.accountRef || identity.channelRef !== run.channelRef)
         throw new Error("publication_identity_mismatch");
+      preClickStage = "baseline";
       const existingRefs = new Set(await driver.existingPublicationRefs(session));
+      preClickStage = "media";
       const upload = payload.format === "text" ? null : await preparePublicationMedia();
       active();
+      preClickStage = "prepare";
       await driver.prepare(session, payload, upload);
       active();
+      preClickStage = "preview";
       checkedPreview(await driver.inspect(session), run, upload);
+      preClickStage = "authorize";
       authorization = await authorizePublication();
       active();
       // Authorization can involve network/egress checks; inspect again in case
       // the composer, attachment or acting account changed while it was pending.
+      preClickStage = "recheck";
       checkedPreview(await driver.inspect(session), run, upload);
       active();
+      preClickStage = "authorization_deadline";
       if (
         !Number.isFinite(authorization.localExpiresAt) ||
         authorization.localExpiresAt <= Date.now()
@@ -121,6 +131,13 @@ export function createPublicationExecutor(driver) {
       }
       return "unknown";
     } catch {
+      if (!clickStarted) {
+        try {
+          onPreclickFailure?.(preClickStage);
+        } catch {
+          /* Diagnostics must never change the no-click outcome. */
+        }
+      }
       if (authorization && clickStarted) {
         try {
           await reportPublication({
