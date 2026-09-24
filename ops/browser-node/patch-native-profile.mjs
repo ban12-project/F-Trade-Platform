@@ -31,6 +31,18 @@ export function patchNativeProfileSource(file, source) {
             "const launchTimeoutMs = proxyPool?.launchTimeoutMs ?? 60000;\n  if (nativeProfile) return nativeProfile.ensureBrowser(launchBrowserInstance, launchTimeoutMs);",
           ],
           [
+            ' *               selector:\n *                 type: string\n *                 description: "Trigger element CSS/Playwright selector. Optional when an input[type=file] already exists."',
+            ' *               selector:\n *                 type: string\n *                 description: "Trigger element CSS/Playwright selector. Optional when an input[type=file] already exists."\n *               inputSelector:\n *                 type: string\n *                 description: "Exact CSS selector for an existing file input; fails closed if not unique."',
+          ],
+          [
+            "const { userId, ref, selector } = req.body;\n    const { path: filePath } = req.body;",
+            "const { userId, ref, selector, inputSelector } = req.body;\n    const { path: filePath } = req.body;\n    if (inputSelector !== undefined && (typeof inputSelector !== 'string' || !inputSelector.trim() || inputSelector.length > 500 || inputSelector.includes(','))) {\n      const err = new Error('Invalid exact file input selector.');\n      err.statusCode = 400;\n      throw err;\n    }",
+          ],
+          [
+            "const directInput = tabState.page.locator('input[type=\"file\"]').first();\n      let attachedVia = null;\n\n      const trySetExistingInput = async () => {",
+            "const directInput = inputSelector ? tabState.page.locator(inputSelector) : tabState.page.locator('input[type=\"file\"]').first();\n      let attachedVia = null;\n\n      const trySetExistingInput = async () => {\n        if (inputSelector) {\n          const count = await directInput.count();\n          if (count !== 1 || !(await directInput.evaluate(el => el.tagName === 'INPUT' && el.type === 'file'))) {\n            const err = new Error('Exact file input is not unique.');\n            err.statusCode = 422;\n            throw err;\n          }\n          await directInput.setInputFiles(paths, { timeout: UPLOAD_INPUT_TIMEOUT_MS });\n          return true;\n        }",
+          ],
+          [
             "const context = await b.newContext(contextOptions);",
             "const context = nativeProfile ? await nativeProfile.contextFor(key) : await b.newContext(contextOptions);",
           ],

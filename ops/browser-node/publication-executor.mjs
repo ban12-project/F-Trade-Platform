@@ -14,7 +14,9 @@ function checkedPreview(preview, run, upload) {
     !upload ||
     upload.media?.sha256 !== payload.media?.sha256 ||
     preview.attachmentCount !== 1 ||
-    preview.attachmentName !== upload.path.split("/").at(-1)
+    (payload.format === "video"
+      ? preview.attachmentSha256 !== upload.media.sha256
+      : preview.attachmentName !== upload.path.split("/").at(-1))
   ) {
     throw new Error("publication_attachment_mismatch");
   }

@@ -27,6 +27,8 @@ const payload = execFileSync(
     "ops/browser-node",
     "lib/browser-fleet",
     "scripts/test-browser-images.sh",
+    "scripts/test-native-profile-runtime.sh",
+    "scripts/fixtures/native-profile",
   ],
   { maxBuffer: 20_000_000 },
 );

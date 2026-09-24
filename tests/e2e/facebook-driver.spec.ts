@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { checkedBrowserResponse } from "../../ops/browser-node/browser-response.mjs";
 import {
@@ -49,6 +49,8 @@ for (const mode of [
   "post_author_changed",
   "image",
   "video",
+  "video_wrong_blob",
+  "video_blob_changed",
   "identity_changed",
   "audience_changed",
   "audience_missing",
@@ -62,7 +64,9 @@ for (const mode of [
   "wrong_attachment",
   "transit_expiry",
   "extra_file_input",
+  "duplicate_scoped_file_input",
   "upload_replaces_composer",
+  "upload_resets_audience",
   "hidden_duplicate_composer",
 ] as const) {
   test(`Camofox DOM driver ${mode} using intercepted synthetic HTML`, async ({ page, context }) => {
@@ -72,15 +76,21 @@ for (const mode of [
         ? route.fulfill({ contentType: "text/html", body: fixture })
         : route.abort(),
     );
-    const format =
-      mode === "video"
-        ? "video"
-        : ["image", "wrong_attachment", "extra_file_input", "upload_replaces_composer"].includes(
-              mode,
-            )
-          ? "image"
-          : "text";
-    const sha256 = "a".repeat(64);
+    const format = mode.startsWith("video")
+      ? "video"
+      : [
+            "image",
+            "wrong_attachment",
+            "extra_file_input",
+            "duplicate_scoped_file_input",
+            "upload_replaces_composer",
+            "upload_resets_audience",
+          ].includes(mode)
+        ? "image"
+        : "text";
+    const mediaBytes = Buffer.from("SYNTHETIC media");
+    const sha256 =
+      format === "video" ? createHash("sha256").update(mediaBytes).digest("hex") : "a".repeat(64);
     const path = `/tmp/ftrade-uploads/${sha256}.${format === "video" ? "mp4" : "png"}`;
     const requests: string[] = [];
     let postReadFailures = 0;
@@ -89,12 +99,16 @@ for (const mode of [
       if (endpoint === "/tabs") {
         expect(body.trace).toBe(false);
         await page.goto(String(body.url));
-        if (mode.startsWith("audience_selection") || mode === "audience_default_changed")
+        if (
+          mode.startsWith("audience_selection") ||
+          mode === "audience_default_changed" ||
+          mode === "upload_resets_audience"
+        )
           await page.evaluate((scenario) => {
             const composer = document.querySelector<HTMLElement>("#composer");
             const audience = document.querySelector<HTMLElement>(".audience");
             if (!composer || !audience) throw new Error("fixture missing");
-            audience.textContent = "Friends";
+            if (scenario !== "upload_resets_audience") audience.textContent = "Friends";
             audience.onclick = () => {
               composer.hidden = true;
               const dialog = document.createElement("section");
@@ -133,6 +147,12 @@ for (const mode of [
             const input = document.createElement("input");
             input.type = "file";
             document.body.prepend(input);
+          });
+        if (mode === "duplicate_scoped_file_input")
+          await page.evaluate(() => {
+            const input = document.createElement("input");
+            input.type = "file";
+            document.querySelector("#composer")?.append(input);
           });
         if (mode === "baseline_duplicate")
           await page.evaluate((owner) => {
@@ -215,11 +235,33 @@ for (const mode of [
       }
       if (endpoint.endsWith("/upload")) {
         expect(body.path).toBe(path);
-        await page.locator('input[type="file"]').setInputFiles({
+        expect(body.inputSelector).toBe("#composer input");
+        const input = page.locator(String(body.inputSelector));
+        expect(await input.count()).toBe(1);
+        await input.setInputFiles({
           name: path.split("/").at(-1)!,
           mimeType: format === "video" ? "video/mp4" : "image/png",
-          buffer: Buffer.from("SYNTHETIC media"),
+          buffer: mediaBytes,
         });
+        if (format === "video")
+          await input.evaluate((element, scenario) => {
+            const file = (element as HTMLInputElement).files?.[0];
+            if (!file) throw new Error("synthetic_file_missing");
+            const name = document.querySelector<HTMLElement>(".filename");
+            if (!name) throw new Error("synthetic_filename_missing");
+            name.hidden = true;
+            const video = document.createElement("video");
+            video.src = URL.createObjectURL(
+              scenario === "video_wrong_blob" ? new Blob(["WRONG synthetic media"]) : file,
+            );
+            document.querySelector("#composer")?.append(video);
+          }, mode);
+        if (mode === "extra_file_input")
+          expect(
+            await page
+              .locator("body > input[type=file]")
+              .evaluate((element) => (element as HTMLInputElement).files?.length),
+          ).toBe(0);
         if (mode === "upload_replaces_composer")
           await page.locator("#composer").evaluate((element) => {
             const stale = element.cloneNode(true) as HTMLElement;
@@ -240,6 +282,10 @@ for (const mode of [
           await page.locator(".filename").evaluate((element) => {
             element.textContent = "wrong.png";
           });
+        if (mode === "upload_resets_audience")
+          await page.locator(".audience").evaluate((element) => {
+            element.textContent = "Friends";
+          });
         return Response.json({ ok: true, attached: [path] });
       }
       throw new Error("Unapproved browser endpoint");
@@ -255,7 +301,9 @@ for (const mode of [
         ...(mode === "post_link_hover_receipt" ? { receiptIdentity: "#identity" } : {}),
         ...(mode.startsWith("composer_identity") ? { composerIdentity: "#composer-identity" } : {}),
       },
-      ...(mode.startsWith("audience_selection") || mode === "audience_default_changed"
+      ...(mode.startsWith("audience_selection") ||
+      mode === "audience_default_changed" ||
+      mode === "upload_resets_audience"
         ? {
             audienceSelection: {
               dialog: "#privacy",
@@ -311,6 +359,10 @@ for (const mode of [
           await page.locator("#composer").evaluate((element) => {
             element.after(element.cloneNode(true));
           });
+        if (mode === "video_blob_changed")
+          await page.locator("#composer video").evaluate((element) => {
+            (element as HTMLVideoElement).src = URL.createObjectURL(new Blob(["CHANGED media"]));
+          });
         return { authorizationId: randomUUID(), localExpiresAt: Date.now() + 30000 };
       },
       async reportPublication(receipt) {
@@ -324,6 +376,8 @@ for (const mode of [
       "post_link_hover_detached",
       "image",
       "video",
+      "extra_file_input",
+      "upload_resets_audience",
       "upload_replaces_composer",
       "hidden_duplicate_composer",
       "audience_selection",
@@ -344,7 +398,8 @@ for (const mode of [
     if (mode === "post_link_hover")
       expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/synthetic/posts/1");
     expect(requests.some((url) => url.endsWith("/click"))).toBe(false);
-    if (["wrong_attachment", "extra_file_input"].includes(mode)) expect(authorized).toBe(0);
+    if (["wrong_attachment", "duplicate_scoped_file_input"].includes(mode))
+      expect(authorized).toBe(0);
   });
 }
 test("DOM profiles require a current review and fixed Facebook origin", () => {

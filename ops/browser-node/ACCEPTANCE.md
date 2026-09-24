@@ -8,14 +8,14 @@
 2. 从已停止的 Sandbox 开始，让本项任务先完成只读预检：出口必须与审核 IP 一致，Facebook 当前身份与账号绑定一致；DM 检查还必须看到 Messenger `ready` 且恢复完成。若出现明确的密码／TOTP／PIN 恢复页，再走经复核的 version 2 交互恢复契约；当前生产 `observe-only` 配置会拒绝因素领取，不能假装已验收自动恢复。CAPTCHA 或设备批准交给人完成原运行，失败或不确定时停止，不重新提交已执行因素。
 3. 每种外部效果使用独立审核范围、独立授权和独立结果。签名、租约、身份、受众、素材、版本或出口有一项不符即停止。已发生但无法确认的效果保持 `unknown`，不再次点击或自动重排。
 
-## 文字发布：先完成当前门槛
+## 文字发布：保留已完成验收的证据
 
-准备一条没有工程事实、客户资料或报价的私有测试正文。工作台内容 Gate 01 由真人核对并批准；批准不等于发布。先启用正确渠道，取得该帖**正文、账号和 `Only me` 受众**的逐帖确认。确认前核对 `publication.json` 为当前审核的 `textOnly: true`，并确保正文与已批准内容版本一致。提交一次后，从停止状态记录唯一 Sandbox 唤醒、唯一浏览器任务、唯一外部提交和新生成的规范 permalink；检查签名节点回执及应用持久 `published`。旧帖的人工核对和原始 `unknown` 分开保存。如果没有明确新 permalink 或回执，保持暂停并人工核对，不重复发布。
+2026-09-24 一条独立的私有测试正文已通过工作台内容 Gate 01、逐帖授权、停止状态自动唤醒、唯一提交、规范 permalink、签名回执及应用持久 `published` 的核对；详见[生产会话检查点](../../docs/testing/reports/mvp1-production-session-checkpoint-20260924.md)。旧帖的人工核对和原始 `unknown` 仍分开保存，不重试。再次验收时仍须使用没有工程事实、客户资料或报价的新正文，核对账号和 `Only me` 受众，并独立保留完整回执链。
 
 ## 视频：单独审核媒体页面和素材
 
 1. 使用有明确对外发布权的素材重新制作视频，核对产品事实、素材授权期限、当前 Gate 01、最终 MP4 私有预览和下载。代码要求视频记录为 `VIDEO_APPROVED`、产品仍为 `PRODUCT_READY`、`mediaId` 等于已批准的 `renderedAssetRef`、私有视频可读取且为合规 `video/mp4`；内容里写着“仅内部审核，不发布”的旧版本不能作为授权。
-2. 在同一 Sandbox 的隔离诊断副本中，先只读复核真实 Facebook 视频编辑器的身份、受众、文件输入和回执页。验证上传后实际附件预览需要把媒体传给 Facebook，须就具体测试 MP4 取得授权后再执行；复核唯一可用文件输入、编辑器替换及正文／媒体组合，不点击发布。把私有 `publication.json` 的审核范围扩展到视频后，才移除 `textOnly: true`；先用合成页面测试 `pnpm exec playwright test tests/e2e/facebook-driver.spec.ts` 与 `pnpm test:video-social-publication` 核对拒绝和回执路径。这些测试不算真实投递。
+2. 在同一 Sandbox 的隔离诊断副本中复核真实 Facebook 视频编辑器的身份、受众、编辑器内唯一文件输入和回执页。上传后 Facebook 可能替换编辑器并重置受众，须重新核对身份、恢复 `Only me`，再验证正文。视频编辑器不一定显示文件名；以唯一可见 blob 视频的 SHA-256 与已审核 MP4 的摘要一致作为附件证据，授权后和点击前各核对一次。把私有 `publication.json` 的审核范围扩展到视频后，才移除 `textOnly: true`；先用合成页面测试 `pnpm exec playwright test tests/e2e/facebook-driver.spec.ts` 与 `pnpm test:video-social-publication` 核对拒绝和回执路径。隔离副本的无点击预检不算真实投递。
 3. 人工预览并逐帖确认**具体 MP4、账号、受众和文案**。从停止状态提交一次真实私有视频，核对媒体摘要、唯一唤醒、唯一点击、规范 permalink、签名回执及应用状态。附件不符或结果不明时保持 `unknown` 和渠道暂停；不得用文字发布结果替代视频验收。
 
 ## DM：先取得可核对的真实入站样本

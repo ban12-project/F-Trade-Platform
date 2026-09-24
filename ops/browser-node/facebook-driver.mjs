@@ -307,28 +307,36 @@ export function createFacebookDriver(input, browserRequest) {
       }
       await evaluate(session, { kind: "open" });
       await waitFor(session, "composer-ready");
-      if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
-        await waitFor(session, "audience-picker-ready");
-        await evaluate(session, { kind: "audience-select" });
-        await waitFor(session, "audience-selection-ready");
-        await evaluate(session, { kind: "audience-confirm" });
-        await waitFor(session, "audience-applied");
-      }
-      await evaluate(session, { kind: "inspect" });
+      const ensureAudience = async () => {
+        if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
+          await waitFor(session, "audience-picker-ready");
+          await evaluate(session, { kind: "audience-select" });
+          await waitFor(session, "audience-selection-ready");
+          await evaluate(session, { kind: "audience-confirm" });
+          await waitFor(session, "audience-applied");
+        }
+        await evaluate(session, { kind: "inspect" });
+      };
+      await ensureAudience();
       if (upload) {
         await evaluate(session, { kind: "upload-check" });
         const attached = await json(
           await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/upload`, {
             userId: session.accountId,
             path: upload.path,
+            inputSelector: `${profile.selectors.composer} ${profile.selectors.fileInput}`,
           }),
         );
         if (!attached.ok || attached.attached?.length !== 1 || attached.attached[0] !== upload.path)
           throw new Error("facebook_upload_failed");
       }
-      // Upload may replace the composer and discard its earlier text. Recheck
-      // the active composer after attaching, then type into that composer only.
-      await evaluate(session, { kind: "inspect" });
+      // Upload may replace the composer, text and audience. Recheck the active
+      // account and restore the reviewed audience before typing into it.
+      if (upload) {
+        await waitFor(session, "composer-ready");
+        await evaluate(session, { kind: "identity" });
+        await ensureAudience();
+      }
       const active =
         ':not([aria-hidden="true"]):not([aria-hidden="true"] *):not([inert]):not([inert] *)';
       const selector = `${profile.selectors.composer}${active} ${profile.selectors.textbox}${active}`;
@@ -354,9 +362,15 @@ export function createFacebookDriver(input, browserRequest) {
         text: payload.text,
         attachmentCount: upload ? 1 : 0,
         attachmentName: upload?.path.split("/").at(-1),
+        attachmentFormat: upload ? payload.format : undefined,
+        attachmentSha256: upload?.media?.sha256,
       };
     },
-    inspect: (session) => evaluate(session, { kind: "inspect" }),
+    inspect: (session) =>
+      evaluate(session, {
+        kind: "inspect",
+        attachmentFormat: session.expected?.attachmentFormat,
+      }),
     async publish(session, authorization) {
       if (!session.expected || session.clicked)
         throw new Error("facebook_publish_already_attempted");
