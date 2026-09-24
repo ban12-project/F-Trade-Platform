@@ -152,7 +152,7 @@ for (const [mode, stage] of [
   test(`pre-click failure exposes only the fixed ${stage} stage`, async ({ page }) => {
     const run = await scenario(page, mode);
     expect(run.events.filter((event) => event.startsWith("preclick:"))).toEqual([
-      `preclick:${stage}:${mode === "expired" ? "publication_authorization_expired" : "unclassified"}`,
+      `preclick:${stage}:${mode === "expired" ? "publication_authorization_expired" : mode === "changed" ? "publication_preview_text_mismatch" : "unclassified"}`,
     ]);
     expect(run.events.join(" ")).not.toContain("private ");
   });
