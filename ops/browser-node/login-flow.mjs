@@ -4,6 +4,7 @@ import { generateTotp } from "./totp.mjs";
 export async function runFacebookLoginFlow({
   credentials,
   acquireCredentials,
+  observeOnly = false,
   observe,
   submit,
   assertActive,
@@ -60,6 +61,14 @@ export async function runFacebookLoginFlow({
         await sleep(Math.min(500, Math.max(0, deadline - now())));
         continue;
       }
+      if (observeOnly && phase === "messenger") {
+        // The thread list can hydrate after account identity appears. Observe
+        // until ready without issuing a page submission or claiming factors.
+        await sleep(Math.min(500, Math.max(0, deadline - now())));
+        continue;
+      }
+      if (observeOnly && ["password", "totp", "pin"].includes(phase))
+        return { outcome: "refused", reason: "recovery_required" };
       if (!Object.hasOwn(rank, phase) || rank[phase] < highest)
         return { outcome: "refused", reason: "unexpected_phase" };
       if (phase !== "messenger" && !credentials && acquireCredentials) {
