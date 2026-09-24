@@ -32,6 +32,7 @@ import { testPublicationWakeup } from "./test-browser-publication-wakeup";
 import { testBrowserSandboxOwner } from "./test-browser-sandbox-owner";
 import { testFacebookInbound } from "./test-facebook-inbound-postgres";
 import { testPublicationReconciliation } from "./test-publication-reconciliation-postgres";
+import { testVideoPublicationReconciliation } from "./test-video-publication-reconciliation-postgres";
 
 async function main() {
   const connectionString = process.env.FACEBOOK_PUBLICATION_TEST_DATABASE_URL;
@@ -225,6 +226,99 @@ async function main() {
       media: { assetRef: evidenceId, contentType: "image/png", sizeBytes: 100, sha256 },
     });
     return { ...f, mediaId };
+  }
+  async function videoFixture() {
+    const f = await fixture("video");
+    const productId = randomUUID();
+    const assetRef = `asset-synthetic-video-${randomUUID()}`;
+    const sha256 = createHash("sha256").update(assetRef).digest("hex");
+    await db.insert(schema.aggregateRecord).values({
+      id: productId,
+      type: "product",
+      state: "PRODUCT_READY",
+      payload: {
+        record_id: productId,
+        source_ref: "source-synthetic-383",
+        evidence_refs: [
+          "evidence-product-name-383",
+          "evidence-product-type-383",
+          "evidence-product-sku-383",
+          "evidence-product-oe-383",
+        ],
+        field_evidence: {
+          "product.product_name": "evidence-product-name-383",
+          "product.product_type": "evidence-product-type-383",
+          "product.internal_sku": "evidence-product-sku-383",
+          "product.oe_numbers": "evidence-product-oe-383",
+        },
+        verification_status: "verified",
+        blocking_missing_fields: [],
+        optional_missing_fields: [],
+        product: {
+          product_name: "Synthetic test kit",
+          product_type: "clutch_kit",
+          internal_sku: "TEST-383",
+          oe_numbers: ["TEST-OE-383"],
+        },
+        specifications: {},
+        commercial: {},
+        approval_ref: "approval-product-383",
+      },
+      createdByType: "human",
+      createdById: actor,
+    });
+    await db
+      .update(schema.aggregateRecord)
+      .set({
+        type: "video",
+        state: "VIDEO_APPROVED",
+        payload: {
+          id: f.contentRef,
+          productId,
+          status: "export_ready",
+          objective: "Private TEST ONLY video",
+          targetAudience: "Synthetic test account",
+          platforms: ["facebook"],
+          factualClaims: [
+            {
+              field: "product.product_name",
+              value: "Synthetic test kit",
+              evidenceRef: "evidence-product-name-383",
+            },
+          ],
+          sourceAssets: [],
+          scenes: [
+            {
+              sceneId: "scene-synthetic-383",
+              prompt: "Private test frame",
+              durationSeconds: 5,
+              claimRefs: ["product.product_name"],
+              assetRefs: [],
+            },
+          ],
+          approvalRefs: ["evidence-video-review-383"],
+          renderedAssetRef: assetRef,
+        },
+      })
+      .where(eq(schema.aggregateRecord.id, f.contentRef));
+    await db.insert(schema.videoGeneratedAsset).values({
+      assetRef,
+      blobPath: `synthetic/${assetRef}`,
+      contentType: "video/mp4",
+      sizeBytes: 100,
+      provider: "synthetic",
+      modelId: "synthetic-test",
+    });
+    await db.insert(facebookPublicationManifest).values({
+      publicationId: f.id,
+      contentVersion: 1,
+      format: "video",
+      caption: "",
+      mediaId: assetRef,
+      confirmedBy: actor,
+      media: { assetRef, contentType: "video/mp4", sizeBytes: 100, sha256 },
+    });
+    return f;
   }
   async function claim() {
     return claimNextSocialWorkerJob(workerId, new Date(), database);
@@ -750,7 +844,14 @@ async function main() {
       "PASS actual broker reserves one publication, excludes legacy claims, replays the lease and keeps unreceipted completion unknown",
     );
 
-    for (const outcome of ["published", "unknown", "expired", "media", "preclick"] as const) {
+    for (const outcome of [
+      "published",
+      "unknown",
+      "unknown_video",
+      "expired",
+      "media",
+      "preclick",
+    ] as const) {
       accountRef = randomUUID();
       await db.insert(schema.socialChannelControl).values({
         id: randomUUID(),
@@ -796,7 +897,12 @@ async function main() {
         owner,
       );
       const expectedOutcome = outcome === "published" ? "published" : "unknown";
-      const target = outcome === "media" ? await imageFixture() : await fixture();
+      const target =
+        outcome === "media"
+          ? await imageFixture()
+          : outcome === "unknown_video"
+            ? await videoFixture()
+            : await fixture();
       const claimResponse = await handleBrowserNodeRequest(node.accessKey, {
         ...request,
         requestId: randomUUID(),
@@ -1023,6 +1129,14 @@ async function main() {
       assert.equal(saved.status, outcome === "published" ? "published" : "unknown");
       if (outcome === "unknown")
         await testPublicationReconciliation(database, {
+          actor,
+          projectId,
+          publicationId: target.id,
+          jobId: target.jobId,
+          contentRef: target.contentRef,
+        });
+      if (outcome === "unknown_video")
+        await testVideoPublicationReconciliation(database, {
           actor,
           projectId,
           publicationId: target.id,

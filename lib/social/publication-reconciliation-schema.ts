@@ -33,3 +33,22 @@ export const publicationReconciliationSchema = z
     confirmed: z.boolean().refine((value) => value, "请先核对账号、完整文案、受众和帖子链接。"),
   })
   .strict();
+
+export const videoPublicationReconciliationSchema = z
+  .object({
+    projectId: z.uuid(),
+    publicationId: z.uuid(),
+    externalPublicationRef: z
+      .url("请填写有效的 Reel 链接。")
+      .max(160)
+      .refine(
+        (value) => /^https:\/\/www\.facebook\.com\/reel\/[0-9]+\/$/.test(value),
+        "请填写不含跟踪参数的 Facebook Reel 正式链接。",
+      ),
+    evidenceRef: z
+      .string()
+      .trim()
+      .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写 evidence- 开头的私有核对依据编号。"),
+    confirmed: z.boolean().refine((value) => value, "请核对原账号、视频画面、受众和 Reel 链接。"),
+  })
+  .strict();
