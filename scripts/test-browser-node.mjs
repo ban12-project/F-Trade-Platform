@@ -443,6 +443,14 @@ test("media reader releases only manifest-matching bytes and fixes request scope
     },
   });
   assert.deepEqual(result.bytes, bytes);
+  const streamed = await readPublicationMedia({
+    run: assigned,
+    assertActive() {},
+    async request() {
+      return new Response(bytes, { headers: { "Content-Type": media.contentType } });
+    },
+  });
+  assert.deepEqual(streamed.bytes, bytes);
 });
 
 test("media reader rejects truncated, oversized, altered and wrong-type bytes", async () => {
@@ -471,6 +479,18 @@ test("media reader rejects truncated, oversized, altered and wrong-type bytes", 
       /publication_media_/,
     );
   }
+  await assert.rejects(
+    readPublicationMedia({
+      run: { kind: "publish", publicationDigest: "a".repeat(64), publication: { media } },
+      assertActive() {},
+      async request() {
+        return new Response(bytes, {
+          headers: { "Content-Type": media.contentType, "Content-Length": "1" },
+        });
+      },
+    }),
+    /publication_media_response_invalid/,
+  );
 });
 
 test("generated upload archive is readable by system tar and contains only the confirmed file", async () => {

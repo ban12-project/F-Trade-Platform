@@ -96,7 +96,7 @@ export function FacebookMediaPanel() {
               });
               setMessage(
                 result.ok
-                  ? `已提交发布任务 ${result.publicationId}，等待 Worker 返回真实发布结果。`
+                  ? `已提交发布任务 ${result.publicationId}，等待浏览器节点返回真实发布结果。`
                   : result.message,
               );
               form.setValue("confirm", false);

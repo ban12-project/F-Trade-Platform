@@ -13,6 +13,7 @@ import { productMediaAsset } from "../lib/db/product-media-schema";
 import * as schema from "../lib/db/schema";
 import {
   authorizeFacebookPublication,
+  requeueUnsentFacebookMediaPublication,
   resolveFacebookMediaSubmissionScope,
 } from "../lib/social/facebook-media-store";
 import { claimNextSocialWorkerJob } from "../lib/social/job-store";
@@ -839,8 +840,24 @@ async function main() {
           nodeState.rows[0].document as { accounts: Array<{ id: string; authState: string }> }
         ).accounts.find((item) => item.id === bound.id);
         assert.equal(account?.authState, "ready");
+        await assert.rejects(
+          database.transaction(async (tx) => {
+            await requeueUnsentFacebookMediaPublication(tx, target.jobId, target.id, actor);
+            const [requeued] = await tx
+              .select()
+              .from(schema.socialBrowserJob)
+              .where(eq(schema.socialBrowserJob.id, target.jobId));
+            const reservation = await tx.execute(
+              sql`SELECT 1 FROM browser_fleet_publication WHERE job_id = ${target.jobId}`,
+            );
+            assert.equal(requeued.status, "queued");
+            assert.equal(reservation.rows.length, 0);
+            throw new Error("rollback_synthetic_requeue");
+          }),
+          /rollback_synthetic_requeue/,
+        );
         console.log(
-          "PASS stopped publication without authorization is failed without pausing the channel",
+          "PASS stopped publication without authorization is failed and only its original job can be requeued after renewed confirmation",
         );
         continue;
       }

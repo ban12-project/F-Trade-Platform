@@ -203,6 +203,61 @@ export async function resolveFacebookMediaSubmissionScope(
   return { channelRef: account.channelRef, accountRef: account.accountRef };
 }
 
+/** Reuse the original publication only when the broker can prove that no
+ * publish authorization was ever issued. A new user confirmation is still
+ * required through submitFacebookMediaPublication before this is called. */
+export async function requeueUnsentFacebookMediaPublication(
+  tx: Tx,
+  jobId: string,
+  publicationId: string,
+  actorId: string,
+) {
+  const result = await tx.execute(sql`SELECT p.run_id, p.authorization_id, p.receipt,
+    j.status AS job_status, j.failure_code, s.status AS publication_status,
+    s.external_publication_ref, n.document
+    FROM browser_fleet_publication p
+    JOIN social_browser_job j ON j.id = p.job_id
+    JOIN social_publication s ON s.id = j.payload_ref AND s.browser_job_id = j.id
+    JOIN browser_fleet_node n ON n.id = p.node_id
+    WHERE p.job_id = ${jobId} AND s.id = ${publicationId} AND n.owner_id = ${actorId}
+    FOR UPDATE OF p, j, s`);
+  const row = result.rows[0];
+  const state = row?.document as FleetState | undefined;
+  const run = state?.runs.find((item) => item.id === row.run_id);
+  if (
+    result.rows.length !== 1 ||
+    row.job_status !== "paused" ||
+    row.failure_code !== "fleet_publication_not_authorized" ||
+    row.publication_status !== "failed" ||
+    row.external_publication_ref !== null ||
+    row.authorization_id !== null ||
+    row.receipt !== null ||
+    run?.status !== "failed" ||
+    run.failure !== "publication_not_authorized" ||
+    run.jobRef !== jobId
+  )
+    throw new Error("facebook_media_retry_not_proven_unsent");
+  await tx.execute(sql`DELETE FROM browser_fleet_publication WHERE job_id = ${jobId}`);
+  await tx
+    .update(socialBrowserJob)
+    .set({ status: "queued", failureCode: null, updatedAt: new Date() })
+    .where(eq(socialBrowserJob.id, jobId));
+  await tx
+    .update(socialPublication)
+    .set({ status: "submitted", updatedAt: new Date() })
+    .where(eq(socialPublication.id, publicationId));
+  await tx.insert(auditEvent).values({
+    id: randomUUID(),
+    actorType: "human",
+    actorId,
+    action: "facebook_media.preclick_requeued",
+    subjectType: "social_publication",
+    subjectId: publicationId,
+    metadata: { reason: "no_publish_authorization" },
+    occurredAt: new Date(),
+  });
+}
+
 export async function submitFacebookMediaPublication(
   input: unknown,
   actorId: string,
@@ -246,10 +301,29 @@ export async function submitFacebookMediaPublication(
     }
     const idempotencyKey = `facebook-media:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}`;
     const [existing] = await tx
-      .select({ id: socialBrowserJob.payloadRef })
+      .select({
+        id: socialBrowserJob.payloadRef,
+        jobId: socialBrowserJob.id,
+        status: socialBrowserJob.status,
+        failureCode: socialBrowserJob.failureCode,
+      })
       .from(socialBrowserJob)
-      .where(eq(socialBrowserJob.idempotencyKey, idempotencyKey));
-    if (existing) return { publicationId: existing.id };
+      .where(eq(socialBrowserJob.idempotencyKey, idempotencyKey))
+      .for("update");
+    if (existing) {
+      if (
+        existing.status === "paused" &&
+        existing.failureCode !== "fleet_publication_not_authorized"
+      )
+        throw new Error("facebook_media_existing_attempt_requires_review");
+      if (
+        existing.status === "paused" &&
+        existing.failureCode === "fleet_publication_not_authorized"
+      ) {
+        await requeueUnsentFacebookMediaPublication(tx, existing.jobId, existing.id, actorId);
+      }
+      return { publicationId: existing.id };
+    }
     const publicationId = randomUUID();
     const jobId = randomUUID();
     await tx.insert(socialBrowserJob).values({
