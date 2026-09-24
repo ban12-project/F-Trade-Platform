@@ -4,6 +4,10 @@ set -euo pipefail
 name="ftrade-native-profile-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 volume="${name}-data"
 fixture="$(cd "$(dirname "$0")/fixtures/native-profile" && pwd)"
+security_options=()
+if [[ -n "${NATIVE_PROFILE_SECCOMP:-}" ]]; then
+  security_options+=(--security-opt "seccomp=$NATIVE_PROFILE_SECCOMP")
+fi
 cleanup() {
   docker rm -f "$name" >/dev/null 2>&1 || true
   docker volume rm "$volume" >/dev/null 2>&1 || true
@@ -18,6 +22,7 @@ start() {
   local deadline=$(( $(date +%s) * 1000 + 90000 ))
   docker run -d --name "$name" --network none --read-only --init \
     --cap-drop ALL --security-opt no-new-privileges:true \
+    "${security_options[@]}" \
     --memory 2g --memory-swap 2g --cpus 2 --pids-limit 256 \
     --tmpfs /tmp:rw,nosuid,nodev,size=512m,mode=1777 \
     --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
@@ -39,7 +44,14 @@ docker exec "$name" node /app/plugins/synthetic-profile/client.mjs write
 docker exec "$name" node /app/plugins/synthetic-profile/client.mjs read keep-session
 # Expiring the lease must terminate the runtime even though its volume survives.
 docker exec "$name" node -e 'require("fs").writeFileSync("/tmp/ftrade-lease",String(Date.now()+1000))'
-timeout 35 docker wait "$name" >/dev/null
+node --input-type=module - "$name" <<'JS'
+import { spawnSync } from "node:child_process";
+const result = spawnSync("docker", ["wait", process.argv[2]], {
+  timeout: 35_000,
+  stdio: ["ignore", "ignore", "inherit"],
+});
+if (result.error || result.status !== 0) throw new Error("lease_shutdown_wait_failed");
+JS
 test "$(docker inspect --format '{{.State.Running}}' "$name")" = false
 test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
 docker rm "$name" >/dev/null

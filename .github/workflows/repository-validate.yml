@@ -37,6 +37,8 @@ jobs:
 
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify local Podman namespace restriction does not broaden policy
+        run: node scripts/test-podman-browser-seccomp.mjs
       - name: Verify Remotion smoke failure cleanup with synthetic resources
         run: node --experimental-test-module-mocks --import tsx scripts/test-remotion-smoke-cleanup.mts
       - name: Verify video failure summaries omit private provider details
