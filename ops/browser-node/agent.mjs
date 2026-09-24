@@ -5,6 +5,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
+import { checkedBrowserResponse } from "./browser-response.mjs";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import { openEgressCheckedSession, verifyBrowserEgress, waitForBrowserReady } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
@@ -130,11 +131,7 @@ async function browserRequest(slot, path, body, timeout = 30_000) {
     ...(body ? { body: JSON.stringify(body) } : {}),
     signal: AbortSignal.any([slot.abort.signal, AbortSignal.timeout(timeout)]),
   });
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error("browser_request_failed");
-  }
-  return response;
+  return checkedBrowserResponse(response, path, body);
 }
 const sync = await nodeCall("sync");
 if (sync.nodeId !== nodeId) throw new Error("node_identity_mismatch");

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { checkedBrowserResponse } from "../../ops/browser-node/browser-response.mjs";
 import {
   createFacebookDriver,
   validateFacebookProfile,
@@ -174,7 +175,11 @@ for (const mode of [
         expect(body.kind).toBe("hover");
         await page.locator(String(body.selector)).hover();
         if (mode === "post_link_hover_detached")
-          return Response.json({ code: "element_not_actionable" }, { status: 422 });
+          return checkedBrowserResponse(
+            Response.json({ code: "element_not_actionable" }, { status: 422 }),
+            endpoint,
+            body,
+          );
         return Response.json({ ok: true });
       }
       if (endpoint.endsWith("/evaluate")) {
@@ -425,7 +430,11 @@ test("baseline resolves existing post permalinks before publication", async ({ p
         throw new Error("browser_request_failed");
       }
       await page.locator(String(body.selector)).hover();
-      return Response.json({ code: "element_not_actionable" }, { status: 422 });
+      return checkedBrowserResponse(
+        Response.json({ code: "element_not_actionable" }, { status: 422 }),
+        endpoint,
+        body,
+      );
     }
     throw new Error("Unapproved browser endpoint");
   };
