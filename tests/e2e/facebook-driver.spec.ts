@@ -36,7 +36,7 @@ const fixture = `<!doctype html><a id="identity" href="${profile.identityHref}">
 const composer=document.querySelector('#composer');
 document.querySelector('#open').onclick=()=>composer.hidden=false;
 composer.querySelector('input').onchange=(e)=>{const name=composer.querySelector('.filename');name.textContent=e.target.files[0].name;name.hidden=false;};
-composer.querySelector('button').onclick=()=>{const count=document.querySelector('#clicks');count.textContent=String(Number(count.textContent)+1);const post=document.createElement('article');const author=document.createElement('a');author.className='author';author.href='${profile.identityHref}';author.textContent='Synthetic author';const copy=document.createElement('p');copy.className='copy';copy.textContent=composer.querySelector('textarea').value;const link=document.createElement('a');link.className='permalink';link.href='https://www.facebook.com/synthetic/posts/'+count.textContent;link.textContent='Synthetic post';post.append(author,copy,link);document.body.append(post);};
+composer.querySelector('button').onclick=()=>{const count=document.querySelector('#clicks');count.textContent=String(Number(count.textContent)+1);const post=document.createElement('article');const author=document.createElement('a');author.className='author';author.href='${profile.identityHref}';author.textContent='Synthetic author';const copy=document.createElement('p');copy.className='copy';copy.textContent=composer.querySelector('textarea').value;const link=document.createElement('a');link.className='permalink';link.href='https://www.facebook.com/synthetic/posts/'+count.textContent;link.textContent='Synthetic post';post.append(author,copy,link);document.body.append(post);if(composer.querySelector('video')){const receipt=document.createElement('section');receipt.id='video-receipt';receipt.innerHTML='<a href="https://www.facebook.com/reel/'+count.textContent+'/">Published Reel</a>';document.body.append(receipt);}};
 </script>`;
 
 for (const mode of [
@@ -49,6 +49,10 @@ for (const mode of [
   "post_author_changed",
   "image",
   "video",
+  "video_empty_caption",
+  "video_existing_blank",
+  "video_receipt_stale",
+  "video_receipt_wrong_link",
   "video_wrong_blob",
   "video_blob_changed",
   "identity_changed",
@@ -148,20 +152,29 @@ for (const mode of [
             input.type = "file";
             document.body.prepend(input);
           });
+        if (mode === "video_receipt_stale")
+          await page.evaluate(() => {
+            const receipt = document.createElement("section");
+            receipt.id = "video-receipt";
+            receipt.innerHTML = '<a href="https://www.facebook.com/reel/12345">Published Reel</a>';
+            document.body.append(receipt);
+          });
         if (mode === "duplicate_scoped_file_input")
           await page.evaluate(() => {
             const input = document.createElement("input");
             input.type = "file";
             document.querySelector("#composer")?.append(input);
           });
-        if (mode === "baseline_duplicate")
-          await page.evaluate((owner) => {
-            const post = document.createElement("article");
-            post.innerHTML =
-              '<a class="author">Author</a><p class="copy">SYNTHETIC approved copy</p><a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Old link</a>';
-            post.querySelector("a")?.setAttribute("href", owner);
-            document.body.append(post);
-          }, profile.identityHref);
+        if (mode === "baseline_duplicate" || mode === "video_existing_blank")
+          await page.evaluate(
+            ({ owner, blank }) => {
+              const post = document.createElement("article");
+              post.innerHTML = `<a class="author">Author</a><p class="copy">${blank ? "" : "SYNTHETIC approved copy"}</p><a class="permalink" href="https://www.facebook.com/synthetic/posts/old">Old link</a>`;
+              post.querySelector("a")?.setAttribute("href", owner);
+              document.body.append(post);
+            },
+            { owner: profile.identityHref, blank: mode === "video_existing_blank" },
+          );
         if (mode.startsWith("post_"))
           await page.evaluate((scenario) => {
             const composer = document.querySelector<HTMLElement>("#composer");
@@ -204,6 +217,14 @@ for (const mode of [
       }
       if (endpoint.endsWith("/evaluate")) {
         const expression = String(body.expression);
+        if (
+          mode === "video_receipt_wrong_link" &&
+          expression.includes('"kind":"video-receipt"') &&
+          (await page.locator("#video-receipt").count())
+        )
+          await page.locator("#video-receipt a").evaluate((element) => {
+            element.setAttribute("href", "https://www.facebook.com/synthetic/posts/wrong");
+          });
         if (
           mode === "post_link_hover_detached" &&
           expression.includes('"kind":"posts"') &&
@@ -295,6 +316,15 @@ for (const mode of [
     const scopedProfile = {
       ...profile,
       resolvePostLinks: mode.startsWith("post_"),
+      ...(format === "video"
+        ? {
+            videoReceipt: {
+              container: "#video-receipt",
+              link: "a",
+              successText: "Published Reel",
+            },
+          }
+        : {}),
       ...(mode === "post_link_hover_receipt" ? { receiptUrl: profile.identityHref } : {}),
       selectors: {
         ...profile.selectors,
@@ -327,7 +357,9 @@ for (const mode of [
         publication: {
           accountRef: profile.accountRef,
           channelRef: profile.channelRef,
-          text: "SYNTHETIC approved copy",
+          text: ["video_empty_caption", "video_existing_blank"].includes(mode)
+            ? ""
+            : "SYNTHETIC approved copy",
           format,
           ...(format === "text" ? {} : { media: { sha256 } }),
         },
@@ -376,6 +408,8 @@ for (const mode of [
       "post_link_hover_detached",
       "image",
       "video",
+      "video_empty_caption",
+      "video_existing_blank",
       "extra_file_input",
       "upload_resets_audience",
       "upload_replaces_composer",
@@ -388,15 +422,18 @@ for (const mode of [
       "audience_transit_change",
       "post_link_unresolved",
       "post_author_changed",
+      "video_receipt_wrong_link",
     ].includes(mode);
     expect(result).toBe(success ? "completed" : uncertain ? "unknown" : "failed");
     expect(await page.locator("#clicks").textContent()).toBe(
-      success || mode.startsWith("post_") ? "1" : "0",
+      success || mode.startsWith("post_") || mode === "video_receipt_wrong_link" ? "1" : "0",
     );
     expect(receipts).toHaveLength(success || uncertain ? 1 : 0);
     if (uncertain) expect(receipts[0].outcome).toBe("unknown");
     if (mode === "post_link_hover")
       expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/synthetic/posts/1");
+    if (["video", "video_empty_caption", "video_existing_blank"].includes(mode))
+      expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/reel/1");
     expect(requests.some((url) => url.endsWith("/click"))).toBe(false);
     if (["wrong_attachment", "duplicate_scoped_file_input"].includes(mode))
       expect(authorized).toBe(0);
@@ -437,6 +474,33 @@ test("text-only reviewed profiles reject media before browser navigation", async
       new AbortController().signal,
     ),
   ).rejects.toThrow("facebook_profile_format_unreviewed");
+  expect(requests).toBe(0);
+});
+
+test("video without a reviewed receipt contract stops before browser navigation", async () => {
+  let requests = 0;
+  const driver = createFacebookDriver(profile, async () => {
+    requests++;
+    throw new Error("must not navigate");
+  });
+  await expect(
+    driver.open(
+      {
+        id: randomUUID(),
+        accountId: randomUUID(),
+        kind: "publish",
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
+        publication: {
+          accountRef: profile.accountRef,
+          channelRef: profile.channelRef,
+          text: "",
+          format: "video",
+        },
+      },
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow("facebook_video_receipt_unreviewed");
   expect(requests).toBe(0);
 });
 

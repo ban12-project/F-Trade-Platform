@@ -98,6 +98,29 @@ async function inspectPage(profile, action) {
     throw new Error("facebook_identity_changed");
   if (action.kind === "identity")
     return { accountRef: profile.accountRef, channelRef: profile.channelRef };
+  if (action.kind === "video-receipt") {
+    if (!profile.videoReceipt) throw new Error("facebook_video_receipt_unreviewed");
+    const containers = all(document, profile.videoReceipt.container);
+    if (!containers.length) return null;
+    if (containers.length !== 1) throw new Error("facebook_video_receipt_ambiguous");
+    const container = containers[0];
+    if (container.innerText.trim() !== profile.videoReceipt.successText)
+      throw new Error("facebook_video_receipt_changed");
+    const links = all(container, profile.videoReceipt.link);
+    if (links.length !== 1) throw new Error("facebook_video_receipt_ambiguous");
+    const url = new URL(links[0].href);
+    if (
+      url.origin !== "https://www.facebook.com" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      !/^\/reel\/\d+\/?$/.test(url.pathname)
+    )
+      throw new Error("facebook_video_receipt_invalid");
+    url.pathname = url.pathname.replace(/\/$/, "");
+    return url.href;
+  }
   if (action.kind === "posts-ready") return all(document, profile.selectors.postsReady).length > 0;
   if (["posts", "post-count"].includes(action.kind)) {
     const posts = all(document, profile.selectors.post);
