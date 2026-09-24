@@ -19,7 +19,7 @@ export async function testVideoPublicationReconciliation(
   const value = {
     projectId,
     publicationId,
-    externalPublicationRef: "https://www.facebook.com/reel/1073951705440240/",
+    externalPublicationRef: "https://www.facebook.com/reel/1234567890123456/",
     evidenceRef: "evidence-synthetic-video-observation",
     confirmed: true,
   };
