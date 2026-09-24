@@ -66,6 +66,7 @@ async function scenario(page: Page, mode: Mode, format: "text" | "image" | "vide
         readyToPublish: true,
         attachmentCount: files.length,
         attachmentName: files[0],
+        attachmentSha256: format === "video" ? "a".repeat(64) : undefined,
       };
     },
     async publish() {
