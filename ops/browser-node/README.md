@@ -1,5 +1,7 @@
 # 按需 Browser 节点（PR #323 / Part of #322）
 
+当前生产验收边界与视频／DM 的逐项执行步骤见 [MVP1 真实账号验收手册](ACCEPTANCE.md)。下文保留各阶段的设计与测试记录；遇到旧阶段描述时，以当前代码、最新生产验收报告及该手册为准。
+
 这是多账号隔离浏览器的控制面和按需运行节点。一个 VPS 配置一个平台 Access Key，自动同步该节点的全部账号授权及资源策略；不是给每个浏览器配置一套平台密钥。不同 VPS 必须分别创建节点/Key，防止共享 Key 后无法单独撤销。Key 只允许访问绑定的账号，不能读取平台主加密密钥、其他节点账号或所有人的密码。
 
 ## 已实现与明确边界
@@ -8,8 +10,8 @@
 - PostgreSQL 节点行锁串行预留容量；队列和租约持久化，不依赖 Vercel 进程内存。不同节点各自调度。
 - 常驻的是轻量 Agent 与 HTTPS 网关，不是所有 Firefox。每个获租约账号启动独立容器/网络，使用账号独立 volume；结束后删除容器和网络，保留 volume。
 - 一次性平台票据换取短期 viewer / WebSocket 能力；不依赖第三方 Cookie，不把节点 Key 或 Camofox API Key 发给前端。VNC 密码是每次运行生成的临时值，只在已授权 iframe 中使用。
-- 内置执行能力仅 `interactive`。`inbox` 周期排队和 `publish` 优先级/未知结果策略已在调度核心实现，但不包含经过真实 Facebook 验证的入站采集、图片/视频发布或自动填入密码执行器。不能把开浏览器等同于完成原 Issue 的业务闭环。
-- 账号密码、Base32 TOTP 长期密钥和 Messenger PIN 可按账号加密保存。version 2 登录配置支持按租约自动登录；version 1 保留人工提交的填充流程。详见下文，本地单轮密码/TOTP/PIN 已验证，生产仍待验收。
+- Agent 可按私有审核配置声明 `interactive`、`publish`、`inbox`；当前生产节点只声明 `interactive, publish`，收件箱尚未启用。真实图片／视频发布和入站 DM 仍需独立验收，不能把开浏览器等同于完成业务闭环。
+- 账号密码、Base32 TOTP 长期密钥和 Messenger PIN 可按账号加密保存。version 2 的 interactive 运行先观察现有会话，仅在确认需要恢复且完整页面契约已复核时才领取并提交因素；version 1 保留人工填充。当前生产使用 version 2 `observe-only`，跨任务与 Sandbox 停启保持就绪已通过；生产因素恢复尚未验收。
 - 新节点授权使用独立、带拥有者的记录。旧单账号环境变量和旧 Vault 不会自动变成全量节点授权；在新界面明确授权并保存配置后才能同步。旧 Worker 不得同时操作同一个账号。
 
 ## 资源和队列策略
@@ -289,7 +291,7 @@ Provision only while the node has no running or unknown leases. Use the existing
 
 The example node ID is synthetic and all capabilities are disabled. The real `nodeId` must equal the node encoded in the Agent access key. Enabled switches select fixed filenames only: `publication.json` uses the existing publication-profile array schema, `inbox.json` the inbox-profile array schema, and `login.json` the saved-login profile array schema documented above. Disabled files are not loaded. Each selected file is limited to 64 KB and 1–16 entries; existing loaders still enforce reviewed selectors, account/channel scope, duplicate rejection and expiry. The loader cannot select arbitrary adapter code. Private files remain in this dedicated VM across ordinary stops/starts; provision them again if the VM is replaced. Never include them in a reusable template.
 
-Start a fresh operation after provisioning and verify the node's reported capabilities and expiring scopes before queuing a test. Updating files does not change a running Agent; stop through the platform and start a new operation. To disable automation, set all manifest switches to false before that new start. Login configuration only enables the existing explicitly requested, once-per-interactive-run saved-credential fill flow; it does not bypass 2FA or checkpoints. This provisioning support does not implement DM reply execution and is not evidence of real Facebook automation acceptance.
+Start a fresh operation after provisioning and verify the node's reported capabilities and expiring scopes before queuing a test. Updating files does not change a running Agent; stop through the platform and start a new operation. To disable automation, set all manifest switches to false before that new start. Version 1 login profiles retain the explicitly requested, once-per-interactive-run saved-credential fill flow. Version 2 profiles support session-first observation and, only with separately reviewed recovery pages, bounded password/TOTP/PIN submission. The production `observe-only` profile never releases or submits those factors. Checkpoints still require human action; this provisioning support does not implement DM replies or establish real inbound acceptance.
 
 发布受众必须在编辑器预检与最终点击的同一次页面执行中匹配 `audienceText`；控件缺失、歧义或文字改变均拒绝点击。缺少受众声明的旧发布配置必须重新审核后补齐，不能默认沿用 Facebook 当前受众。合成测试覆盖授权期间与最终点击前受众变化，但不能替代真实账号受众与回执验收。
 
