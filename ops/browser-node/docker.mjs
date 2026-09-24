@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import http from "node:http";
 
 export function dockerClient(socketPath = "/var/run/docker.sock") {
-  return async function docker(method, path, body, timeout = 45_000) {
+  async function docker(method, path, body, timeout = 45_000) {
     return new Promise((resolve, reject) => {
       const binary = Buffer.isBuffer(body);
       const data = body === undefined ? undefined : binary ? body : JSON.stringify(body);
@@ -49,7 +49,90 @@ export function dockerClient(socketPath = "/var/run/docker.sock") {
       request.on("error", reject);
       request.end(data);
     });
+  }
+  // Docker's archive endpoint rejects a read-only rootfs even when /tmp is a
+  // writable tmpfs. Stream verified bytes into a short-lived exec instead.
+  docker.execInput = async (containerId, path, bytes, sha256, timeout = 120_000) => {
+    if (
+      !/^[a-f0-9]{64}$/.test(containerId) ||
+      !/^\/tmp\/ftrade-uploads\/[a-f0-9]{64}\.(png|jpg|mp4)$/.test(path) ||
+      !Buffer.isBuffer(bytes) ||
+      !/^[a-f0-9]{64}$/.test(sha256)
+    )
+      throw new Error("publication_upload_invalid");
+    if (!path.startsWith(`/tmp/ftrade-uploads/${sha256}.`))
+      throw new Error("publication_upload_invalid");
+    const receive = `const fs=require('node:fs'),crypto=require('node:crypto');
+const target=process.argv[1],length=Number(process.argv[2]),expected=process.argv[3];
+fs.mkdirSync('/tmp/ftrade-uploads',{recursive:true,mode:0o700});
+const temporary=target+'.partial-'+process.pid;
+let fd=fs.openSync(temporary,'wx',0o600),received=0;
+const hash=crypto.createHash('sha256');
+function fail(){try{fs.closeSync(fd)}catch{};try{fs.unlinkSync(temporary)}catch{};process.exit(1)}
+process.stdin.on('data',chunk=>{try{
+  if(received+chunk.length>length) return fail();
+  for(let offset=0;offset<chunk.length;){
+    const written=fs.writeSync(fd,chunk,offset,chunk.length-offset);
+    if(written<=0)return fail();
+    offset+=written;
+  }
+  hash.update(chunk);received+=chunk.length;
+  if(received===length){
+    if(hash.digest('hex')!==expected)return fail();
+    fs.closeSync(fd);fs.renameSync(temporary,target);process.exit(0);
+  }
+}catch{fail()}});
+process.stdin.on('end',()=>{if(received!==length)fail()});
+process.stdin.on('error',fail);`;
+    const exec = await docker("POST", `/containers/${containerId}/exec`, {
+      AttachStdin: true,
+      AttachStdout: false,
+      AttachStderr: false,
+      Tty: false,
+      Cmd: ["node", "-e", receive, path, String(bytes.length), sha256],
+    });
+    if (!/^[a-f0-9]{64}$/.test(exec?.Id ?? "")) throw new Error("docker_exec_invalid");
+    await new Promise((resolve, reject) => {
+      const body = JSON.stringify({ Detach: false, Tty: false });
+      const request = http.request({
+        socketPath,
+        method: "POST",
+        path: `/exec/${exec.Id}/start`,
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+          Connection: "Upgrade",
+          Upgrade: "tcp",
+        },
+      });
+      const timer = setTimeout(() => request.destroy(new Error("docker_exec_timeout")), timeout);
+      const finish = (error) => {
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve();
+      };
+      request.on("upgrade", (response, socket) => {
+        if (response.statusCode !== 101) return finish(new Error("docker_exec_upgrade_failed"));
+        socket.on("error", finish);
+        socket.on("close", () => finish());
+        socket.end(bytes);
+      });
+      request.on("response", () => finish(new Error("docker_exec_upgrade_failed")));
+      request.on("error", finish);
+      request.end(body);
+    });
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      const state = await docker("GET", `/exec/${exec.Id}/json`);
+      if (!state?.Running) {
+        if (state?.ExitCode !== 0) throw new Error("docker_exec_upload_failed");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("docker_exec_upload_unconfirmed");
   };
+  return docker;
 }
 function identifier(value) {
   if (!/^[a-f0-9-]{36}$/.test(value)) throw new Error("invalid_runtime_identifier");

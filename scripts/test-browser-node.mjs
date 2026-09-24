@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter, once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -28,7 +27,7 @@ import {
   createPublicationAuthorizer,
   createPublicationReporter,
 } from "../ops/browser-node/publication.mjs";
-import { publicationUploadArchive, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
+import { publicationUploadFile, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
 
 const nodeId = randomUUID();
 test("automatic authorization preserves 180 seconds without extending container leases", (t) => {
@@ -493,31 +492,20 @@ test("media reader rejects truncated, oversized, altered and wrong-type bytes", 
   );
 });
 
-test("generated upload archive is readable by system tar and contains only the confirmed file", async () => {
+test("publication upload path derives only from confirmed bytes and media", () => {
   const bytes = Buffer.from("synthetic confirmed image");
   const media = {
     contentType: "image/png",
     sizeBytes: bytes.length,
     sha256: createHash("sha256").update(bytes).digest("hex"),
   };
-  const upload = publicationUploadArchive({ bytes, media });
-  const temporary = await mkdtemp(join(tmpdir(), "ftrade-upload-test-"));
-  try {
-    const archive = join(temporary, "upload.tar");
-    await writeFile(archive, upload.archive);
-    const file = upload.path.slice("/tmp/".length);
-    assert.equal(
-      execFileSync("tar", ["-tf", archive], { encoding: "utf8" }),
-      `ftrade-uploads/\n${file}\n`,
-    );
-    assert.deepEqual(execFileSync("tar", ["-xOf", archive, file]), bytes);
-    assert.throws(
-      () => publicationUploadArchive({ bytes: Buffer.from("changed"), media }),
-      /publication_upload_invalid/,
-    );
-  } finally {
-    await rm(temporary, { recursive: true, force: true });
-  }
+  const upload = publicationUploadFile({ bytes, media });
+  assert.equal(upload.path, `/tmp/ftrade-uploads/${media.sha256}.png`);
+  assert.deepEqual(upload.bytes, bytes);
+  assert.throws(
+    () => publicationUploadFile({ bytes: Buffer.from("changed"), media }),
+    /publication_upload_invalid/,
+  );
 });
 
 test("upload staging verifies container ownership and never accepts task paths", async () => {
@@ -544,7 +532,10 @@ test("upload staging verifies container ownership and never accepts task paths",
           },
         },
       };
-    assert.ok(Buffer.isBuffer(body));
+    throw new Error("unexpected_docker_request");
+  };
+  docker.execInput = async (id, path, payload, digest) => {
+    calls.push({ method: "EXEC_INPUT", path, body: payload, id, digest });
   };
   const result = await stagePublicationUpload({
     docker,
@@ -555,10 +546,10 @@ test("upload staging verifies container ownership and never accepts task paths",
     assertActive() {},
   });
   assert.equal(result.path, `/tmp/ftrade-uploads/${media.sha256}.png`);
-  assert.equal(
-    calls[1].path,
-    `/containers/${containerId}/archive?path=%2Ftmp&noOverwriteDirNonDir=1`,
-  );
+  assert.equal(calls[1].method, "EXEC_INPUT");
+  assert.equal(calls[1].path, result.path);
+  assert.equal(calls[1].digest, media.sha256);
+  assert.deepEqual(calls[1].body, bytes);
   calls.length = 0;
   await assert.rejects(
     stagePublicationUpload({
@@ -574,25 +565,52 @@ test("upload staging verifies container ownership and never accepts task paths",
   assert.equal(calls.length, 1);
 });
 
-test("Docker archive transport sends binary bytes rather than JSON encoding", async () => {
+test("Docker exec transport streams confirmed binary bytes into a read-only container", async () => {
   const directory = await mkdtemp("/tmp/ft-docker-");
   const socket = join(directory, "engine.sock");
-  let observed;
+  const containerId = "a".repeat(64);
+  const execId = "b".repeat(64);
+  const bytes = Buffer.from([0, 255, 1, 128]);
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const target = `/tmp/ftrade-uploads/${digest}.mp4`;
+  let observed = Buffer.alloc(0);
+  let finished = false;
   const server = createServer((request, response) => {
+    if (request.url === `/containers/${containerId}/exec`) {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const config = JSON.parse(Buffer.concat(chunks).toString());
+        assert.equal(config.AttachStdin, true);
+        assert.equal(config.Cmd.at(-3), target);
+        assert.equal(config.Cmd.at(-2), String(bytes.length));
+        assert.equal(config.Cmd.at(-1), digest);
+        response.end(JSON.stringify({ Id: execId }));
+      });
+    } else if (request.url === `/exec/${execId}/json`) {
+      response.end(JSON.stringify({ Running: !finished, ExitCode: finished ? 0 : null }));
+    } else {
+      response.statusCode = 404;
+      response.end();
+    }
+  });
+  server.on("upgrade", (request, peer) => {
+    assert.equal(request.url, `/exec/${execId}/start`);
+    peer.write("HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n");
     const chunks = [];
-    request.on("data", (chunk) => chunks.push(chunk));
-    request.on("end", () => {
-      observed = { bytes: Buffer.concat(chunks), type: request.headers["content-type"] };
-      response.end("{}");
+    peer.on("data", (chunk) => chunks.push(chunk));
+    peer.on("end", () => {
+      observed = Buffer.concat(chunks);
+      finished = true;
+      peer.end();
     });
   });
   try {
     server.listen(socket);
     await once(server, "listening");
-    const bytes = Buffer.from([0, 255, 1, 128]);
-    await dockerClient(socket)("PUT", "/containers/synthetic/archive?path=%2Ftmp", bytes);
-    assert.deepEqual(observed.bytes, bytes);
-    assert.equal(observed.type, "application/x-tar");
+    await dockerClient(socket).execInput(containerId, target, bytes, digest);
+    assert.deepEqual(observed, bytes);
+    assert.equal(finished, true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(directory, { recursive: true, force: true });
