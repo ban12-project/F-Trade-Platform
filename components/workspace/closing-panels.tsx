@@ -54,6 +54,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { PublicationReconciliationForm } from "@/components/workspace/publication-reconciliation-form";
+import { VideoPublicationReconciliationForm } from "@/components/workspace/video-publication-reconciliation-form";
 import { initialClosingActionState } from "@/lib/action-states";
 import {
   confirmOpportunityAction,
@@ -1468,6 +1469,9 @@ export function PublicationPanel({
               <p className="text-sm">{progress.detail}</p>
               {item.status === "unknown" && item.format === "text" ? (
                 <PublicationReconciliationForm projectId={projectId} publicationId={item.id} />
+              ) : null}
+              {item.status === "unknown" && item.format === "video" ? (
+                <VideoPublicationReconciliationForm projectId={projectId} publicationId={item.id} />
               ) : null}
               {item.externalPublicationRef ? (
                 <p className="break-all text-sm">发布凭证：{item.externalPublicationRef}</p>
