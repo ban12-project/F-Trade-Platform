@@ -104,6 +104,20 @@ export function validateFacebookProfile(value, now = Date.now()) {
     throw new Error("facebook_profile_selector_invalid");
   if (value.textOnly !== undefined && typeof value.textOnly !== "boolean")
     throw new Error("facebook_profile_format_invalid");
+  if (value.videoReceipt !== undefined) {
+    if (
+      !value.videoReceipt ||
+      ["container", "link", "successText"].some(
+        (key) =>
+          typeof value.videoReceipt[key] !== "string" ||
+          !value.videoReceipt[key].trim() ||
+          value.videoReceipt[key].length > 500,
+      ) ||
+      value.videoReceipt.container.includes(",") ||
+      value.videoReceipt.link.includes(",")
+    )
+      throw new Error("facebook_video_receipt_unreviewed");
+  }
   if (value.receiptUrl !== undefined) {
     const receipt = new URL(value.receiptUrl);
     if (
@@ -282,6 +296,8 @@ export function createFacebookDriver(input, browserRequest) {
     async open(run, signal) {
       if (profile.textOnly && run.publication?.format !== "text")
         throw new Error("facebook_profile_format_unreviewed");
+      if (run.publication?.format === "video" && !profile.videoReceipt)
+        throw new Error("facebook_video_receipt_unreviewed");
       if (
         run.accountRef !== profile.accountRef ||
         run.channelRef !== profile.channelRef ||
@@ -333,7 +349,7 @@ export function createFacebookDriver(input, browserRequest) {
       return [...session.baseline];
     },
     async prepare(session, payload, upload) {
-      if (session.existingTexts?.has(payload.text))
+      if (payload.text && session.existingTexts?.has(payload.text))
         throw new Error("facebook_matching_post_already_exists");
       if (session.readingReceipts) {
         await navigate(session, profile.url);
@@ -403,11 +419,17 @@ export function createFacebookDriver(input, browserRequest) {
       };
     },
     inspect: (session) => {
-      const inspect = () =>
-        evaluate(session, {
+      const inspect = async () => {
+        if (
+          session.expected?.attachmentFormat === "video" &&
+          (await evaluate(session, { kind: "video-receipt" }))
+        )
+          throw new Error("facebook_video_receipt_stale");
+        return evaluate(session, {
           kind: "inspect",
           attachmentFormat: session.expected?.attachmentFormat,
         });
+      };
       return session.expected?.attachmentFormat === "video"
         ? awaitVideoPreview(inspect, session.expected, session.signal)
         : inspect();
@@ -422,6 +444,20 @@ export function createFacebookDriver(input, browserRequest) {
       });
     },
     async observe(session, payload, signal) {
+      if (payload.format === "video") {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const ref = await evaluate(session, { kind: "video-receipt" });
+          if (ref)
+            return {
+              accountRef: profile.accountRef,
+              channelRef: profile.channelRef,
+              text: payload.text,
+              externalPublicationRef: ref,
+            };
+          await delay(500, undefined, { signal });
+        }
+        throw new Error("facebook_video_receipt_not_observed");
+      }
       if (profile.receiptUrl) await waitFor(session, "composer-closed");
       for (let attempt = 0; attempt < 20; attempt++) {
         const posts = await readPosts(session, payload.text);
