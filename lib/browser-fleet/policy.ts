@@ -133,6 +133,7 @@ export function enqueueRun(
   state: FleetState,
   input: Pick<Run, "id" | "accountId" | "kind" | "jobRef" | "requestedBy" | "authSessionId">,
   now: number,
+  allowProvenUnsentRetry = false,
 ) {
   const account = state.accounts.find((a) => a.id === input.accountId);
   if (!account?.enabled) throw new Error("account_not_authorized");
@@ -150,6 +151,11 @@ export function enqueueRun(
           (r.status === "queued"
             ? now - r.createdAt < 900_000
             : r.leaseUntil > now && r.deadline > now))) &&
+      !(
+        allowProvenUnsentRetry &&
+        r.status === "failed" &&
+        r.failure === "publication_not_authorized"
+      ) &&
       (input.jobRef ? r.jobRef === input.jobRef : r.status === "queued" || isLive(r)),
   );
   if (duplicate) return duplicate;

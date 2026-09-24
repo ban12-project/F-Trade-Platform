@@ -6,6 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
+import { schedulePublications } from "../lib/browser-fleet/publication";
 import { handleBrowserNodeRequest, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import { closeDatabase, type Database } from "../lib/db/client";
 import { facebookPublicationManifest } from "../lib/db/facebook-runtime-schema";
@@ -852,6 +853,22 @@ async function main() {
             );
             assert.equal(requeued.status, "queued");
             assert.equal(reservation.rows.length, 0);
+            const nodeId = node.nodeId;
+            assert.ok(nodeId);
+            const nodeRow = await tx.execute(
+              sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId} FOR UPDATE`,
+            );
+            const state = nodeRow.rows[0].document as Parameters<typeof schedulePublications>[2];
+            await schedulePublications(tx, nodeId, state, Date.now());
+            const renewed = await tx.execute(
+              sql`SELECT run_id FROM browser_fleet_publication WHERE job_id = ${target.jobId}`,
+            );
+            assert.equal(renewed.rows.length, 1);
+            assert.notEqual(renewed.rows[0].run_id, lease.id);
+            assert.equal(
+              state.runs.find((item) => item.id === renewed.rows[0].run_id)?.status,
+              "queued",
+            );
             throw new Error("rollback_synthetic_requeue");
           }),
           /rollback_synthetic_requeue/,

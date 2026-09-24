@@ -77,6 +77,7 @@ export async function schedulePublications(
         authSessionId: null,
       },
       now,
+      true, // The queued job had no reservation; only a proven pre-authorization failure may be bypassed.
     );
     await tx.execute(
       sql`INSERT INTO browser_fleet_publication (job_id, node_id, run_id) VALUES (${job.id}, ${nodeId}, ${run.id})`,
