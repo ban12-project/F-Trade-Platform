@@ -29,7 +29,8 @@ export async function readPublicationMedia({ run, request, assertActive }) {
     !response.ok ||
     !response.body ||
     response.headers.get("content-type") !== media.contentType ||
-    response.headers.get("content-length") !== String(media.sizeBytes)
+    (response.headers.has("content-length") &&
+      response.headers.get("content-length") !== String(media.sizeBytes))
   ) {
     await response.body?.cancel();
     throw new Error("publication_media_response_invalid");

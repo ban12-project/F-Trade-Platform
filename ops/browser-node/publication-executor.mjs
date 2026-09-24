@@ -46,6 +46,15 @@ const diagnosticErrors = new Set([
   "facebook_profile_expired",
   "publication_authorization_expired",
   "publication_lease_inactive",
+  "publication_media_invalid",
+  "publication_media_response_invalid",
+  "publication_media_size_invalid",
+  "publication_media_integrity_invalid",
+  "publication_media_transport_failed",
+  "publication_upload_invalid",
+  "publication_container_invalid",
+  "publication_container_mismatch",
+  "publication_upload_transport_failed",
 ]);
 function diagnosticError(error) {
   return diagnosticErrors.has(error?.message) ? error.message : "unclassified";

@@ -491,6 +491,9 @@ async function tick() {
                   },
                   body: JSON.stringify({ operation, installationId, bootId, ...fields }),
                 }),
+            }).catch((error) => {
+              if (/^publication_(media_|lease_)/.test(error?.message ?? "")) throw error;
+              throw new Error("publication_media_transport_failed");
             });
             return mediaRead.then((asset) => {
               assertPublicationActive();
@@ -507,6 +510,10 @@ async function tick() {
                 containerId: slot.containerId,
                 asset,
                 assertActive: assertPublicationActive,
+              }).catch((error) => {
+                if (/^publication_(upload_|container_|lease_)/.test(error?.message ?? ""))
+                  throw error;
+                throw new Error("publication_upload_transport_failed");
               }),
             );
             return mediaPreparation.then((upload) => {
