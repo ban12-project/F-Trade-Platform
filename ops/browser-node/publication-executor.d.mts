@@ -20,6 +20,16 @@ export type PublicationReceipt = {
   externalPublicationRef?: string;
   failureCode?: string;
 };
+export type PublicationPreclickStage =
+  | "open"
+  | "identity"
+  | "baseline"
+  | "media"
+  | "prepare"
+  | "preview"
+  | "authorize"
+  | "recheck"
+  | "authorization_deadline";
 export type PublicationDriver<Session> = {
   open(run: PublicationRun, signal: AbortSignal): Promise<Session>;
   identity(session: Session): Promise<{ accountRef: string; channelRef: string }>;
@@ -61,4 +71,5 @@ export function createPublicationExecutor<Session>(
   preparePublicationMedia(): Promise<PreparedUpload>;
   authorizePublication(): Promise<{ authorizationId: string; localExpiresAt: number }>;
   reportPublication(receipt: PublicationReceipt): Promise<unknown>;
+  onPreclickFailure?(stage: PublicationPreclickStage): void;
 }) => Promise<"completed" | "failed" | "unknown">;
