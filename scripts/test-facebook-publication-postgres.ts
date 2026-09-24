@@ -719,7 +719,7 @@ async function main() {
       "PASS actual broker reserves one publication, excludes legacy claims, replays the lease and keeps unreceipted completion unknown",
     );
 
-    for (const outcome of ["published", "unknown", "expired", "media"] as const) {
+    for (const outcome of ["published", "unknown", "expired", "media", "preclick"] as const) {
       accountRef = randomUUID();
       await db.insert(schema.socialChannelControl).values({
         id: randomUUID(),
@@ -779,6 +779,42 @@ async function main() {
         leaseId: lease.leaseId,
         ready: true,
       });
+      if (outcome === "preclick") {
+        await handleBrowserNodeRequest(node.accessKey, {
+          ...identity,
+          operation: "finish",
+          runId: lease.id,
+          leaseId: lease.leaseId,
+          outcome: "failed",
+          stopped: true,
+        });
+        const [publication] = await db
+          .select()
+          .from(schema.socialPublication)
+          .where(eq(schema.socialPublication.id, target.id));
+        const [job] = await db
+          .select()
+          .from(schema.socialBrowserJob)
+          .where(eq(schema.socialBrowserJob.id, target.jobId));
+        const [channel] = await db
+          .select()
+          .from(schema.socialChannelControl)
+          .where(eq(schema.socialChannelControl.accountRef, accountRef));
+        assert.equal(publication.status, "failed");
+        assert.equal(job.failureCode, "fleet_publication_not_authorized");
+        assert.equal(channel.circuitStatus, "active");
+        const nodeState: { rows: Array<Record<string, unknown>> } = await db.execute(
+          sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+        );
+        const account: { id: string; authState: string } | undefined = (
+          nodeState.rows[0].document as { accounts: Array<{ id: string; authState: string }> }
+        ).accounts.find((item) => item.id === bound.id);
+        assert.equal(account?.authState, "ready");
+        console.log(
+          "PASS stopped publication without authorization is failed without pausing the channel",
+        );
+        continue;
+      }
       if (outcome === "media") {
         let opened = 0;
         const mediaRequest = {
