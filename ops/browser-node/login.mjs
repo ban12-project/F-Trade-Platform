@@ -170,6 +170,7 @@ export function createSavedLoginExecutor({
           expiresAt,
         };
         const result = await runFacebookLoginFlow({
+          observeOnly: profile.automation.mode === "observe-only",
           acquireCredentials: async () => {
             const credential = await acquireCredentials();
             if (!credential) return null;
