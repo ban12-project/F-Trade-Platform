@@ -230,7 +230,9 @@ export function containerSpec(nodeId, run, imageId, deadline, nativeProfile = fa
         ReadonlyRootfs: true,
         CapDrop: ["ALL"],
         SecurityOpt: ["no-new-privileges:true"],
-        PidsLimit: 256,
+        // The cgroup counts Firefox threads too. A three-tab Reel observation
+        // reached 270 tasks; 256 hit the limit during closed-target failures.
+        PidsLimit: 512,
         Memory: run.memoryMb * 1024 * 1024,
         MemorySwap: run.memoryMb * 1024 * 1024,
         NanoCpus: 2_000_000_000,

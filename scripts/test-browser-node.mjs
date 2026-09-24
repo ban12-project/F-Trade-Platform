@@ -178,6 +178,9 @@ test("browser runtime cannot access the host Docker socket or choose a mount", (
   assert.equal(body.HostConfig.Mounts[0].Type, "volume");
   assert.equal(body.HostConfig.RestartPolicy.Name, "no");
   assert.equal(body.HostConfig.Memory, 2048 * 1024 * 1024);
+  assert.equal(body.HostConfig.MemorySwap, body.HostConfig.Memory);
+  assert.equal(body.HostConfig.NanoCpus, 2_000_000_000);
+  assert.equal(body.HostConfig.PidsLimit, 512);
   assert.equal(JSON.stringify(body).includes("docker.sock"), false);
 });
 test("all browser ports are loopback only", () => {

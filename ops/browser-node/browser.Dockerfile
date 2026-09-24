@@ -1,5 +1,9 @@
 ARG BROWSER_BASE_IMAGE=ftrade-camofox-base:e5a36f5
 FROM ${BROWSER_BASE_IMAGE}
+# Firefox on the reviewed Debian 13 base uses system FFmpeg for H.264/AAC.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libavcodec61 \
+    && rm -rf /var/lib/apt/lists/*
 # Proxy-enabled launches require GeoIP before the read-only runtime starts.
 # The pinned downloader does not await file-stream writes. Let its process drain
 # pending filesystem work before a separate process validates the finished file.

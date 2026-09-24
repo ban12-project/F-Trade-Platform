@@ -8,6 +8,8 @@ Use the exported production image and verify the OCI manifest-to-config digest m
 
 Compare host and VM UTC time before issuing the 90-second lease. Reject a skew exceeding ten seconds and correct VM time synchronization before proceeding. A rejected lease is not evidence that the Facebook session expired. Keep production memory, CPU, PID, shared-memory, read-only-root, dropped-capability, and no-new-privileges settings.
 
+The browser task budget is 512 PIDs/threads. The previous 256 limit was exhausted while reading an existing Reel alongside the egress and Messenger tabs: `pids.events max=82`, `pids.peak=256`, and a closed-target response. A local comparison changing only that limit to 512 recorded `pids.events max=0`, `pids.peak=270`, and no closed-target response. Both runs had zero memory-limit/OOM events and memory peaks below 1.5 GiB. CPU, memory, shared memory, capabilities, and the four-tab ceiling remain unchanged. The synthetic continuity fixture uses the same revised task budget. This fixes an observed resource constraint; it does not establish successful video playback or a publication receipt.
+
 ## Namespace diagnostic
 
 The tested Podman default profile allowed `clone`, `clone3`, and `unshare` without argument restrictions. With all capabilities dropped, Firefox repeatedly logged `uid_map: EPERM` and child SIGSEGV. A restrictive local filter prevented this startup failure in both rootful and rootless trials. This supports a namespace-creation-path incompatibility; it is not proof of the complete crash mechanism or complete equivalence to Docker's policy.
@@ -26,6 +28,8 @@ Use the generated absolute path as `--security-opt seccomp=PATH` for the local d
 The existing synthetic continuity fixture accepts `NATIVE_PROFILE_SECCOMP=/absolute/path/restricted.json`. Its `docker` command must address the intended local engine. By default it retains the Docker engine policy used by CI. Run with `NATIVE_PROFILE_IMAGE` set to the reviewed image; the fixture creates and deletes its own synthetic volume and must never target an account volume. It verifies task reuse, container replacement, and lease shutdown independently from real Messenger.
 
 ## Live observation and final gate
+
+The reviewed Debian 13 browser base also lacked H.264 decoding: a self-generated MP4 returned an empty `canPlayType` result and media error 4. Installing Debian's `libavcodec61` made the same sample decode with the correct dimensions; a pixel assertion independently verified its blue frame. The browser Dockerfile now includes that runtime library, and both architecture image checks run the generated fixture with network disabled and production resource/isolation settings. See [Mozilla's system codec explanation](https://support.mozilla.org/en-US/kb/open-h264-plugin-firefox) and the [Debian runtime package](https://packages.debian.org/trixie/libavcodec61). This does not prove Facebook playback or automatic publication receipt recognition.
 
 Wait within a bounded deadline for matching account identity, the reviewed Messenger ready root and empty/thread marker, and absence of visible checkpoint, factor, dialog and loading states. A fixed sleep followed by an HTTP success or a Chats heading alone is insufficient. Record timeouts as unproven; do not convert them into recovery attempts. Preserve the same profile across sequential task/container checks and confirm the browser's egress each time.
 
