@@ -1,9 +1,45 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { BrowserSandboxProviderHandle } from "../lib/browser-fleet/sandbox-provider";
+import { recordedSessionIsStopped } from "../lib/browser-fleet/sandbox-reconcile";
 import {
   type BrowserSandboxRecoveryDependencies,
   recoverBrowserSandboxDispatch,
 } from "../lib/browser-fleet/sandbox-recovery";
+
+function stoppedHistory(status: string, sessions: { id: string; status: string }[]) {
+  return {
+    status,
+    currentSession: () => ({ status: status === "stopped" ? "stopped" : "running" }),
+    async listSessions() {
+      return {
+        async *[Symbol.asyncIterator]() {
+          for (const session of sessions) yield session;
+        },
+      };
+    },
+  } as unknown as BrowserSandboxProviderHandle;
+}
+
+test("external stop reconciliation checks the exact recorded session", async () => {
+  assert.equal(
+    await recordedSessionIsStopped(
+      stoppedHistory("stopped", [
+        { id: "later", status: "stopped" },
+        { id: "recorded", status: "stopped" },
+      ]),
+      "recorded",
+    ),
+    true,
+  );
+  for (const sandbox of [
+    stoppedHistory("running", [{ id: "recorded", status: "stopped" }]),
+    stoppedHistory("stopped", [{ id: "recorded", status: "running" }]),
+    stoppedHistory("stopped", [{ id: "different", status: "stopped" }]),
+  ]) {
+    assert.equal(await recordedSessionIsStopped(sandbox, "recorded"), false);
+  }
+});
 
 function fixture(initial = "running") {
   const calls: string[] = [];
