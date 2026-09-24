@@ -541,9 +541,9 @@ async function tick() {
             authorizePublication,
             preparePublicationMedia,
             reportPublication: createPublicationReporter({ run: slot.run, request: nodeCall }),
-            onPreclickFailure(stage) {
-              // Stage is a fixed executor enum; never log exception text or page content.
-              console.error(`browser_publication_preclick_failed:${stage}`);
+            onPreclickFailure(stage, code) {
+              // Both fields come from fixed executor enums; never log raw page text.
+              console.error(`browser_publication_preclick_failed:${stage}:${code}`);
             },
             readPublicationMedia: readAssignedMedia,
             signal: slot.abort.signal,

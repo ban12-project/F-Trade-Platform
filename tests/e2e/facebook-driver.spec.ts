@@ -406,6 +406,7 @@ test("baseline resolves existing post permalinks before publication", async ({ p
       : route.abort(),
   );
   const calls: string[] = [];
+  let firstHover = true;
   const browserRequest = async (endpoint: string, body: Record<string, unknown> = {}) => {
     calls.push(endpoint);
     if (endpoint === "/tabs") {
@@ -419,6 +420,10 @@ test("baseline resolves existing post permalinks before publication", async ({ p
     if (endpoint.endsWith("/evaluate"))
       return Response.json({ ok: true, result: await page.evaluate(String(body.expression)) });
     if (endpoint === "/act") {
+      if (firstHover) {
+        firstHover = false;
+        throw new Error("browser_request_failed");
+      }
       await page.locator(String(body.selector)).hover();
       return Response.json({ code: "element_not_actionable" }, { status: 422 });
     }
@@ -446,5 +451,5 @@ test("baseline resolves existing post permalinks before publication", async ({ p
     channelRef: profile.channelRef,
   });
   expect(await driver.existingPublicationRefs(session)).toEqual([oldRef]);
-  expect(calls).toContain("/act");
+  expect(calls.filter((item) => item === "/act").length).toBeGreaterThanOrEqual(3);
 });

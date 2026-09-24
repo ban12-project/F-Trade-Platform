@@ -111,8 +111,8 @@ async function scenario(page: Page, mode: Mode, format: "text" | "image" | "vide
       if (mode === "receipt_once_lost" && receipts.length === 1) throw new Error("response_lost");
       if (mode === "receipt_lost") throw new Error("response_lost");
     },
-    onPreclickFailure(stage: string) {
-      events.push(`preclick:${stage}`);
+    onPreclickFailure(stage: string, code: string) {
+      events.push(`preclick:${stage}:${code}`);
     },
   });
   return { result, events, receipts, clicks: Number(await page.locator("#count").textContent()) };
@@ -151,7 +151,7 @@ for (const [mode, stage] of [
   test(`pre-click failure exposes only the fixed ${stage} stage`, async ({ page }) => {
     const run = await scenario(page, mode);
     expect(run.events.filter((event) => event.startsWith("preclick:"))).toEqual([
-      `preclick:${stage}`,
+      `preclick:${stage}:${mode === "expired" ? "publication_authorization_expired" : "unclassified"}`,
     ]);
     expect(run.events.join(" ")).not.toContain("private ");
   });

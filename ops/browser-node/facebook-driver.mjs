@@ -235,6 +235,15 @@ export function createFacebookDriver(input, browserRequest) {
     }
     throw new Error("facebook_permalink_unresolved");
   };
+  const retryableBaselineErrors = new Set([
+    "browser_request_failed",
+    "facebook_browser_response_invalid",
+    "facebook_composer_transition_timeout",
+    "facebook_evaluation_failed",
+    "facebook_navigation_invalid",
+    "facebook_permalink_hover_failed",
+    "facebook_permalink_unresolved",
+  ]);
   return {
     async open(run, signal) {
       if (profile.textOnly && run.publication?.format !== "text")
@@ -269,7 +278,20 @@ export function createFacebookDriver(input, browserRequest) {
       return evaluate(session, { kind: "identity" });
     },
     async existingPublicationRefs(session) {
-      const posts = await readPosts(session, undefined, profile.resolvePostLinks === true);
+      let posts;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          posts = await readPosts(session, undefined, profile.resolvePostLinks === true);
+          break;
+        } catch (error) {
+          if (
+            attempt === 1 ||
+            session.signal.aborted ||
+            !retryableBaselineErrors.has(error?.message)
+          )
+            throw error;
+        }
+      }
       session.baseline = new Set(posts.map((post) => post.externalPublicationRef).filter(Boolean));
       session.existingTexts = new Set(
         posts.filter((post) => post.accountRef === profile.accountRef).map((post) => post.text),

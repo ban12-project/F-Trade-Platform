@@ -33,6 +33,21 @@ function publicationReference(value) {
     throw new Error("publication_observation_invalid");
   return url.href;
 }
+const diagnosticErrors = new Set([
+  "browser_request_failed",
+  "facebook_browser_response_invalid",
+  "facebook_composer_transition_timeout",
+  "facebook_evaluation_failed",
+  "facebook_navigation_invalid",
+  "facebook_permalink_hover_failed",
+  "facebook_permalink_unresolved",
+  "facebook_profile_expired",
+  "publication_authorization_expired",
+  "publication_lease_inactive",
+]);
+function diagnosticError(error) {
+  return diagnosticErrors.has(error?.message) ? error.message : "unclassified";
+}
 
 /** Execution order shared by reviewed DOM drivers. This module supplies no
  * Facebook selectors and advertises no runtime capability on its own. Drivers
@@ -130,10 +145,10 @@ export function createPublicationExecutor(driver) {
         }
       }
       return "unknown";
-    } catch {
+    } catch (error) {
       if (!clickStarted) {
         try {
-          onPreclickFailure?.(preClickStage);
+          onPreclickFailure?.(preClickStage, diagnosticError(error));
         } catch {
           /* Diagnostics must never change the no-click outcome. */
         }

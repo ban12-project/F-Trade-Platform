@@ -309,7 +309,7 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 
 执行器在成功观察后最多传输同一份回执三次，不重新授权或重复点击。无法确认回执仍为 unknown；已保存的 unknown 不被此次改动覆盖。失败代码仅包含固定阶段 `publication_publish_unknown`、`publication_observe_unknown` 或 `publication_validate_unknown`，不保存异常正文、账号或页面内容。这些阶段诊断与合成回归不能证明既有生产 unknown 已确认，也不等同于真实视频和 DM 验收。
 
-发布点击前失败时，Agent 只记录 `browser_publication_preclick_failed:<stage>`，其中 stage 为执行器固定枚举（打开、身份、基线、媒体、准备、预览、授权、复核或授权期限）。不记录异常正文、页面内容或凭据；诊断回调失败也不能改变“未点击”的执行结果。这条日志只用于定位后续运行，不会把既有 `unknown` 改写为失败或许可自动重试。2026-09-24 的一次生产尝试及其证据边界见 [验收记录](../../docs/testing/reports/mvp1-production-publication-attempt-20260924.md)。
+发布点击前失败时，Agent 只记录 `browser_publication_preclick_failed:<stage>:<code>`，其中 stage 与 code 都来自执行器固定枚举；无法识别的异常统一记为 `unclassified`。不记录异常正文、页面内容或凭据；诊断回调失败也不能改变“未点击”的执行结果。读取旧帖子基线时，仅对已知的临时页面／传输错误重试一次完整只读读取，失败后停止，不点击或重排原发布任务。2026-09-24 的生产尝试及其证据边界见 [验收记录](../../docs/testing/reports/mvp1-production-publication-attempt-20260924.md)。
 
 ### 未知文字发布的人工核对
 
