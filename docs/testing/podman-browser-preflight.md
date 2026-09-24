@@ -8,6 +8,8 @@ Use the exported production image and verify the OCI manifest-to-config digest m
 
 Compare host and VM UTC time before issuing the 90-second lease. Reject a skew exceeding ten seconds and correct VM time synchronization before proceeding. A rejected lease is not evidence that the Facebook session expired. Keep production memory, CPU, PID, shared-memory, read-only-root, dropped-capability, and no-new-privileges settings.
 
+The browser task budget is 512 PIDs/threads. The previous 256 limit was exhausted while reading an existing Reel alongside the egress and Messenger tabs: `pids.events max=82`, `pids.peak=256`, and a closed-target response. A local comparison changing only that limit to 512 recorded `pids.events max=0`, `pids.peak=270`, and no closed-target response. Both runs had zero memory-limit/OOM events and memory peaks below 1.5 GiB. CPU, memory, shared memory, capabilities, and the four-tab ceiling remain unchanged. The synthetic continuity fixture uses the same revised task budget. This fixes an observed resource constraint; it does not establish successful video playback or a publication receipt.
+
 ## Namespace diagnostic
 
 The tested Podman default profile allowed `clone`, `clone3`, and `unshare` without argument restrictions. With all capabilities dropped, Firefox repeatedly logged `uid_map: EPERM` and child SIGSEGV. A restrictive local filter prevented this startup failure in both rootful and rootless trials. This supports a namespace-creation-path incompatibility; it is not proof of the complete crash mechanism or complete equivalence to Docker's policy.

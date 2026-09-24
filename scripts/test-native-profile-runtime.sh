@@ -23,7 +23,7 @@ start() {
   docker run -d --name "$name" --network none --read-only --init \
     --cap-drop ALL --security-opt no-new-privileges:true \
     "${security_options[@]}" \
-    --memory 2g --memory-swap 2g --cpus 2 --pids-limit 256 \
+    --memory 2g --memory-swap 2g --cpus 2 --pids-limit 512 \
     --tmpfs /tmp:rw,nosuid,nodev,size=512m,mode=1777 \
     --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
     --tmpfs /root/camoufox:rw,nosuid,nodev,size=16m,mode=700 \
