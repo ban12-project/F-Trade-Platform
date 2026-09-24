@@ -167,7 +167,9 @@ async function inspectPage(profile, action) {
   const textbox = one(composer, profile.selectors.textbox);
   const submit = one(composer, profile.selectors.submit);
   const attachments = all(composer, profile.selectors.attachmentName);
-  const text = "value" in textbox ? textbox.value : textbox.innerText;
+  const rawText = "value" in textbox ? textbox.value : textbox.innerText;
+  // An empty contenteditable with its editor <br> reports one LF as innerText.
+  const text = rawText === "\n" && textbox.textContent?.trim() === "" ? "" : rawText;
   let videoDigest;
   if (action.attachmentFormat === "video") {
     const videos = all(composer, "video");
