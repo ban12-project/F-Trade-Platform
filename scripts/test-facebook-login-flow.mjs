@@ -100,6 +100,28 @@ assert.deepEqual(
   hydration.submissions.map((s) => s.phase),
   ["totp", "messenger"],
 );
+const messengerHydration = await run([
+  { state: "messenger", identityVerified: true, atReadyUrl: true },
+  { state: "messenger", identityVerified: true, atReadyUrl: true },
+  ready,
+]);
+assert.equal(messengerHydration.result.outcome, "ready");
+assert.equal(messengerHydration.submissions.length, 0);
+const messengerNavigation = await run([
+  { state: "messenger", identityVerified: true, atReadyUrl: false },
+  ready,
+]);
+assert.equal(messengerNavigation.result.outcome, "ready");
+assert.deepEqual(
+  messengerNavigation.submissions.map((s) => s.phase),
+  ["messenger"],
+);
+const unverifiedMessenger = await run([
+  { state: "messenger", identityVerified: false, atReadyUrl: true },
+  ready,
+]);
+assert.equal(unverifiedMessenger.result.reason, "identity");
+assert.equal(unverifiedMessenger.submissions.length, 0);
 const unrecognized = await run([
   { state: "password" },
   ...Array.from({ length: 21 }, () => ({ state: "invalid" })),
@@ -153,6 +175,7 @@ for (const states of [
   [{ state: "invalid" }, ready],
   [{ state: "loading" }, ready],
   [{ state: "messenger", identityVerified: true }, ready],
+  [{ state: "messenger", identityVerified: true, atReadyUrl: true }, ready],
 ]) {
   await run(states, { credentials: undefined, acquireCredentials });
   assert.equal(claims, 0, "session checks and navigation must not acquire factors");
