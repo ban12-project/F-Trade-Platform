@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { get } from "@vercel/blob";
 import { and, eq, sql } from "drizzle-orm";
+import { type FleetState, publicationScopeActive } from "@/lib/browser-fleet/policy";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { facebookPublicationManifest } from "@/lib/db/facebook-runtime-schema";
 import { productMediaAsset } from "@/lib/db/product-media-schema";
@@ -39,6 +40,7 @@ import {
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type ReadDb = Pick<Database, "select">;
+type ScopeDb = Pick<Database, "execute">;
 type Selection = {
   projectId: string;
   contentRef: string;
@@ -161,6 +163,46 @@ async function digestVideo(blobKey: string, sizeBytes: number) {
   }
 }
 
+/** Resolve the current, unique account binding. Legacy Worker scope is used
+ * only while that Worker is explicitly enabled; fleet media jobs never borrow
+ * its environment identifiers. */
+export async function resolveFacebookMediaSubmissionScope(
+  actorId: string,
+  database: ScopeDb = getDatabase(),
+  now = Date.now(),
+) {
+  if (process.env.SOCIAL_FACEBOOK_WORKER_ENABLED === "1") {
+    const scope = configuredFacebookWorkerScope();
+    return { channelRef: scope.channelRef, accountRef: scope.accountRef };
+  }
+  const result = await database.execute(sql`SELECT b.channel_ref, b.account_ref, n.document
+    FROM browser_fleet_binding b
+    JOIN browser_fleet_node n ON n.id = b.node_id
+    JOIN social_channel_control c ON c.channel_ref = b.channel_ref AND c.account_ref = b.account_ref
+    WHERE n.owner_id = ${actorId} AND n.status = 'active'
+      AND c.enabled = true AND c.circuit_status = 'active'`);
+  if (result.rows.length !== 1) throw new Error("facebook_media_scope_ambiguous");
+  const row = result.rows[0];
+  const state = row.document as FleetState;
+  const accounts = Array.isArray(state?.accounts)
+    ? state.accounts.filter(
+        (account) =>
+          account.channelRef === row.channel_ref && account.accountRef === row.account_ref,
+      )
+    : [];
+  const account = accounts[0];
+  if (
+    accounts.length !== 1 ||
+    !account.enabled ||
+    account.authState !== "ready" ||
+    !account.expectedEgressIp ||
+    !state.capabilities?.includes("publish") ||
+    !publicationScopeActive(state, account, now)
+  )
+    throw new Error("facebook_media_scope_inactive");
+  return { channelRef: account.channelRef, accountRef: account.accountRef };
+}
+
 export async function submitFacebookMediaPublication(
   input: unknown,
   actorId: string,
@@ -169,7 +211,6 @@ export async function submitFacebookMediaPublication(
   if (actorId !== process.env.SOCIAL_FACEBOOK_OWNER_USER_ID)
     throw new Error("facebook_account_owner_required");
   const value = facebookMediaSubmitFormSchema.parse(input);
-  const scope = configuredFacebookWorkerScope();
   await assertWorkspaceProjectAccess(value.projectId, actorId, "write", database);
   const selected = await sourceFor(value, database, new Date());
   if (value.format === "video") {
@@ -185,6 +226,7 @@ export async function submitFacebookMediaPublication(
     sha256: selected.sha256 ?? (await digestVideo(selected.blobKey, selected.sizeBytes)),
   });
   return database.transaction(async (tx) => {
+    const scope = await resolveFacebookMediaSubmissionScope(actorId, tx);
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
     await assertPublicationEligible(
       { ...value, channelRef: scope.channelRef, accountRef: scope.accountRef },

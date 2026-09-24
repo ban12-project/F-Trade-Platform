@@ -11,7 +11,10 @@ import { closeDatabase, type Database } from "../lib/db/client";
 import { facebookPublicationManifest } from "../lib/db/facebook-runtime-schema";
 import { productMediaAsset } from "../lib/db/product-media-schema";
 import * as schema from "../lib/db/schema";
-import { authorizeFacebookPublication } from "../lib/social/facebook-media-store";
+import {
+  authorizeFacebookPublication,
+  resolveFacebookMediaSubmissionScope,
+} from "../lib/social/facebook-media-store";
 import { claimNextSocialWorkerJob } from "../lib/social/job-store";
 import {
   listProjectPublicationData,
@@ -514,6 +517,32 @@ async function main() {
       stoppedRunIds: [],
       capabilities: ["interactive", "publish"],
     });
+    const previousLegacyFlag = process.env.SOCIAL_FACEBOOK_WORKER_ENABLED;
+    delete process.env.SOCIAL_FACEBOOK_WORKER_ENABLED;
+    try {
+      assert.deepEqual(await resolveFacebookMediaSubmissionScope(actor, database), {
+        channelRef,
+        accountRef,
+      });
+      await assert.rejects(
+        resolveFacebookMediaSubmissionScope(randomUUID(), database),
+        /facebook_media_scope_ambiguous/,
+      );
+      await db.execute(
+        sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{publicationScopes}', ${JSON.stringify([{ channelRef, accountRef, expiresAt: 1 }])}::jsonb) WHERE id = ${node.nodeId}`,
+      );
+      await assert.rejects(
+        resolveFacebookMediaSubmissionScope(actor, database),
+        /facebook_media_scope_inactive/,
+      );
+      await db.execute(
+        sql`UPDATE browser_fleet_node SET document = document - 'publicationScopes' WHERE id = ${node.nodeId}`,
+      );
+    } finally {
+      if (previousLegacyFlag === undefined) delete process.env.SOCIAL_FACEBOOK_WORKER_ENABLED;
+      else process.env.SOCIAL_FACEBOOK_WORKER_ENABLED = previousLegacyFlag;
+    }
+    console.log("PASS media submission resolves only the active owner-bound fleet account");
     await testBrowserInbox(
       database,
       { nodeId: node.nodeId, accessKey: node.accessKey },
