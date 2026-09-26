@@ -70,13 +70,16 @@ export async function assertPublicationEligible(
   },
   tx: DatabaseTransaction,
   now: Date,
+  purpose: "dispatch" | "receipt" = "dispatch",
 ) {
   const [project] = await tx
-    .select({ kind: workspaceProject.kind })
+    .select({ kind: workspaceProject.kind, status: workspaceProject.status })
     .from(workspaceProject)
     .where(eq(workspaceProject.id, value.projectId))
     .for("update");
-  if (!project || project.kind !== "marketing") throw new Error("发布只能从产品营销项目发起。");
+  if (project?.kind !== "marketing") throw new Error("发布只能从产品营销项目发起。");
+  if (purpose === "dispatch" && project.status !== "active")
+    throw new Error("项目已归档，请重开后再发起发布。");
   const [control] = await tx
     .select()
     .from(socialChannelControl)
@@ -126,7 +129,7 @@ export async function assertPublicationEligible(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, video.productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
+    if (product?.state !== "PRODUCT_READY")
       throw new Error("视频引用的产品已不再处于 ProductReady，不能发布。");
     const mediaRows = mediaIds.length
       ? await tx
@@ -375,7 +378,7 @@ export async function recordControlledPublicationResult(
       .from(socialBrowserJob)
       .where(eq(socialBrowserJob.id, value.jobId))
       .for("update");
-    if (!job || job.kind !== "publish") throw new Error("发布任务不存在。");
+    if (job?.kind !== "publish") throw new Error("发布任务不存在。");
     const fleet = await tx.execute(
       sql`SELECT job_id FROM browser_fleet_publication WHERE job_id = ${job.id}`,
     );
@@ -402,6 +405,7 @@ export async function recordControlledPublicationResult(
         return publication;
       throw new Error("发布任务已经终结，不能用不同结果覆盖。");
     }
+    if (job.status !== "claimed") throw new Error("发布任务尚未领取，不能记录执行回执。");
     if (value.outcome === "published") {
       const { record } = await assertPublicationEligible(
         {
@@ -413,6 +417,7 @@ export async function recordControlledPublicationResult(
         },
         tx,
         now,
+        "receipt",
       );
       const [duplicate] = await tx
         .select({ id: socialPublication.id })

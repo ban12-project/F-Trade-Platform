@@ -51,6 +51,7 @@ export async function authorizeProductStreamWrite(
       and(
         eq(workspaceProject.id, identity.projectId),
         eq(workspaceProject.kind, "marketing"),
+        eq(workspaceProject.status, "active"),
         eq(workspaceProjectMember.userId, identity.actorId),
         inArray(workspaceProjectMember.role, ["owner", "editor"]),
       ),
@@ -124,8 +125,7 @@ export async function persistProductStreamDraft(
       .where(eq(aggregateRecord.id, run.productId))
       .for("update");
     if (
-      !aggregate ||
-      aggregate.state !== "PRODUCT_REVIEW_REQUIRED" ||
+      aggregate?.state !== "PRODUCT_REVIEW_REQUIRED" ||
       draft.verification_status !== "review_required"
     )
       throw new Error("仅待审草稿允许追加生成字段。");

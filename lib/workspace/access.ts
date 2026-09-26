@@ -10,11 +10,12 @@ import {
   user,
   workspaceProject,
   workspaceProjectEvidence,
+  workspaceProjectItem,
   workspaceProjectMember,
 } from "@/lib/db/schema";
 
 export type WorkspaceMemberRole = "owner" | "editor" | "viewer";
-export type WorkspaceAccess = "view" | "write" | "manage";
+export type WorkspaceAccess = "view" | "write" | "manage" | "receipt";
 export type WorkspaceMemberSummary = {
   userId: string;
   name: string;
@@ -45,10 +46,22 @@ export async function assertWorkspaceProjectAccess(
   access: WorkspaceAccess,
   database: DatabaseExecutor = getDatabase(),
 ) {
+  // Serialize business authorization with archival and membership management.
+  // A preflight on a connection is useful, but writes must repeat this inside their transaction.
+  if (access === "write" || access === "manage") {
+    const [project] = await database
+      .select({ status: workspaceProject.status })
+      .from(workspaceProject)
+      .where(eq(workspaceProject.id, projectId))
+      .for("update");
+    if (!project) throw new Error("项目不存在。");
+    if (access === "write" && project.status !== "active")
+      throw new Error("项目已归档，请重开后再写入业务资料。");
+  }
   const allowedRoles: WorkspaceMemberRole[] =
     access === "manage"
       ? ["owner"]
-      : access === "write"
+      : access === "write" || access === "receipt"
         ? ["owner", "editor"]
         : ["owner", "editor", "viewer"];
   const [membership] = await database
@@ -65,7 +78,7 @@ export async function assertWorkspaceProjectAccess(
     throw new Error(
       access === "view"
         ? "你不是该项目成员。"
-        : access === "write"
+        : access === "write" || access === "receipt"
           ? "你没有该项目的编辑权限。"
           : "只有项目所有者可以管理成员。",
     );
@@ -248,47 +261,49 @@ export async function assertAndLinkProjectEvidence(
   actorId: string,
   database: DatabaseExecutor = getDatabase(),
 ) {
-  const uniqueIds = [...new Set(evidenceIds.filter(Boolean))];
-  if (!uniqueIds.length) throw new Error("至少需要一项已持久化证据。");
-  await assertWorkspaceProjectAccess(projectId, actorId, "write", database);
-  const rows = await database
-    .select({
-      id: evidence.id,
-      linkedProjectId: workspaceProjectEvidence.projectId,
-      uploadedByType: evidence.uploadedByType,
-      uploadedById: evidence.uploadedById,
-    })
-    .from(evidence)
-    .leftJoin(
-      workspaceProjectEvidence,
-      and(
-        eq(workspaceProjectEvidence.evidenceId, evidence.id),
-        eq(workspaceProjectEvidence.projectId, projectId),
-      ),
-    )
-    .where(inArray(evidence.id, uniqueIds));
-  const allowed = new Set(
-    rows
-      .filter(
-        (row) =>
-          row.linkedProjectId === projectId ||
-          (row.uploadedByType === "human" && row.uploadedById === actorId),
+  return database.transaction(async (tx) => {
+    const uniqueIds = [...new Set(evidenceIds.filter(Boolean))];
+    if (!uniqueIds.length) throw new Error("至少需要一项已持久化证据。");
+    await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
+    const rows = await tx
+      .select({
+        id: evidence.id,
+        linkedProjectId: workspaceProjectEvidence.projectId,
+        uploadedByType: evidence.uploadedByType,
+        uploadedById: evidence.uploadedById,
+      })
+      .from(evidence)
+      .leftJoin(
+        workspaceProjectEvidence,
+        and(
+          eq(workspaceProjectEvidence.evidenceId, evidence.id),
+          eq(workspaceProjectEvidence.projectId, projectId),
+        ),
       )
-      .map((row) => row.id),
-  );
-  const missing = uniqueIds.filter((id) => !allowed.has(id));
-  if (missing.length) throw new Error("部分证据不存在或无权用于当前项目。");
-  await database
-    .insert(workspaceProjectEvidence)
-    .values(
-      uniqueIds.map((evidenceId) => ({
-        id: randomUUID(),
-        projectId,
-        evidenceId,
-        linkedById: actorId,
-      })),
-    )
-    .onConflictDoNothing();
+      .where(inArray(evidence.id, uniqueIds));
+    const allowed = new Set(
+      rows
+        .filter(
+          (row) =>
+            row.linkedProjectId === projectId ||
+            (row.uploadedByType === "human" && row.uploadedById === actorId),
+        )
+        .map((row) => row.id),
+    );
+    const missing = uniqueIds.filter((id) => !allowed.has(id));
+    if (missing.length) throw new Error("部分证据不存在或无权用于当前项目。");
+    await tx
+      .insert(workspaceProjectEvidence)
+      .values(
+        uniqueIds.map((evidenceId) => ({
+          id: randomUUID(),
+          projectId,
+          evidenceId,
+          linkedById: actorId,
+        })),
+      )
+      .onConflictDoNothing();
+  });
 }
 
 export async function projectExistsForMember(
@@ -302,4 +317,39 @@ export async function projectExistsForMember(
     .innerJoin(workspaceProjectMember, eq(workspaceProjectMember.projectId, workspaceProject.id))
     .where(and(eq(workspaceProject.id, projectId), eq(workspaceProjectMember.userId, actorId)));
   return Boolean(row);
+}
+
+/** Internal worker barrier. Does not grant membership or permission to invoke a worker. */
+export async function assertActiveWorkspaceProject(projectId: string, database: DatabaseExecutor) {
+  const [project] = await database
+    .select({ status: workspaceProject.status })
+    .from(workspaceProject)
+    .where(eq(workspaceProject.id, projectId))
+    .for("update");
+  if (project?.status !== "active") throw new Error("项目已归档，请重开后再写入业务资料。");
+}
+
+/** Freeze mutations of owned aggregates; reference projects do not own their source facts.
+ * Legacy unlinked aggregates keep their existing authorization policy.
+ * Must precede aggregate locks in the caller's transaction.
+ */
+export async function assertAggregateWorkspaceWrite(
+  aggregateId: string,
+  database: DatabaseExecutor,
+  actorId?: string,
+) {
+  const owners = await database
+    .select({ projectId: workspaceProjectItem.projectId })
+    .from(workspaceProjectItem)
+    .where(
+      and(
+        eq(workspaceProjectItem.aggregateId, aggregateId),
+        eq(workspaceProjectItem.relation, "owned"),
+      ),
+    )
+    .orderBy(asc(workspaceProjectItem.projectId));
+  for (const { projectId } of owners) {
+    if (actorId) await assertWorkspaceProjectAccess(projectId, actorId, "write", database);
+    else await assertActiveWorkspaceProject(projectId, database);
+  }
 }

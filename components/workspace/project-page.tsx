@@ -4,6 +4,7 @@ import { cache, Suspense } from "react";
 import { z } from "zod";
 import { ProjectMembersPanel } from "@/components/workspace/project-members-panel";
 import { ProjectStagePanel } from "@/components/workspace/project-stage-panel";
+import { ProjectStatusControl } from "@/components/workspace/project-status-control";
 import {
   ProjectStageDetails,
   ProjectStageNavigation,
@@ -185,8 +186,15 @@ async function Badges({ params }: Pick<ProjectPageProps, "params">) {
   return <ProjectWorkspaceBadges project={project} />;
 }
 async function ProjectMembers({ params }: Pick<ProjectPageProps, "params">) {
-  const { projectId, session } = await readProject(params);
-  return <Members projectId={projectId} actorId={session.user.id} />;
+  const { projectId, project, session } = await readProject(params);
+  return (
+    <>
+      {project.memberRole === "owner" ? (
+        <ProjectStatusControl projectId={projectId} status={project.status} />
+      ) : null}
+      <Members projectId={projectId} actorId={session.user.id} />
+    </>
+  );
 }
 async function Navigation({ params, searchParams, mode }: ProjectPageProps) {
   const { projectId, stages, activeStage } = await readStage(params, searchParams, mode);

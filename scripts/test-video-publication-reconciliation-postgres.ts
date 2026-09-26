@@ -41,6 +41,7 @@ export async function testVideoPublicationReconciliation(
   await db.execute(sql`UPDATE aggregate_record SET version = version + 1 WHERE id = ${contentRef}`);
   await assert.rejects(reconcileUnknownVideoPublication(value, actor, db));
   await db.execute(sql`UPDATE aggregate_record SET version = version - 1 WHERE id = ${contentRef}`);
+  await db.execute(sql`UPDATE workspace_project SET status = 'archived' WHERE id = ${projectId}`);
   const results = await Promise.all(
     Array.from({ length: 3 }, () => reconcileUnknownVideoPublication(value, actor, db)),
   );
@@ -79,6 +80,7 @@ export async function testVideoPublicationReconciliation(
     ).rows.length,
     1,
   );
+  await db.execute(sql`UPDATE workspace_project SET status = 'active' WHERE id = ${projectId}`);
   console.log(
     "PASS video human reconciliation: scoped Reel, current manifest, concurrent replay, immutable unknown receipt, unchanged approval and channel pause",
   );

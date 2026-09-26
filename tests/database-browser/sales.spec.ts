@@ -533,3 +533,49 @@ for (const inbound of [false, true]) {
     // No worker is connected: queued is not delivered, and all confirmations are simulated.
   });
 }
+
+test("stale RFQ form rejects after archival and owner can reopen", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+  await context.addCookies([
+    {
+      name: "better-auth.session_token",
+      value: encodeURIComponent(`${token}.${signature}`),
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  await page.goto(`/workspace/${projectId}/new/rfq`);
+  const form = page.locator("form#create-rfq").filter({ visible: true });
+  await form.getByLabel("客户名称", { exact: true }).fill("SYNTHETIC stale form");
+  await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+  // Archive in another request after the browser has already obtained a writable form.
+  await db
+    .update(schema.workspaceProject)
+    .set({ status: "archived" })
+    .where(eq(schema.workspaceProject.id, projectId));
+  await page.getByRole("button", { name: "保存询盘", exact: true }).click();
+  await expect(
+    page.getByText("项目已归档，请重开后再写入业务资料。", { exact: true }),
+  ).toBeVisible();
+  expect(
+    await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(
+        and(
+          eq(schema.aggregateRecord.createdById, actorId),
+          eq(schema.aggregateRecord.type, "rfq"),
+        ),
+      ),
+  ).toHaveLength(0);
+  await page.goto(`/workspace/${projectId}`);
+  await page.getByRole("button", { name: "重开项目", exact: true }).click();
+  await expect(page.getByRole("button", { name: "归档项目", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "归档项目", exact: true }).click();
+  await expect(page.getByRole("button", { name: "重开项目", exact: true })).toBeVisible();
+});

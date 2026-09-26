@@ -9,3 +9,10 @@ export const createWorkspaceProjectSchema = z
     title: z.string().trim().min(1, "请输入项目名称。").max(120, "项目名称不能超过 120 个字符。"),
   })
   .strict();
+
+export const workspaceProjectStatusChangeSchema = z
+  .object({
+    projectId: z.uuid("项目标识无效。"),
+    status: workspaceProjectStatusSchema,
+  })
+  .strict();

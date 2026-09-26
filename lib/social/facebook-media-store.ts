@@ -374,6 +374,7 @@ export async function buildFacebookPublicationPayload(
   tx: Tx,
   publication: typeof socialPublication.$inferSelect,
   now: Date,
+  purpose: "dispatch" | "receipt" = "dispatch",
 ): Promise<Record<string, unknown>> {
   if (!["text", "image", "video"].includes(publication.format)) {
     throw new Error("publication_format_invalid");
@@ -382,6 +383,7 @@ export async function buildFacebookPublicationPayload(
     { ...publication, format: publication.format as "text" | "image" | "video" },
     tx,
     now,
+    purpose,
   );
   if (publication.format !== "text") {
     return buildFacebookMediaPayload(tx, publication, now);

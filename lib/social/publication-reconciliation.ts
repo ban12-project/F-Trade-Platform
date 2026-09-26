@@ -44,7 +44,7 @@ export async function reconcileUnknownTextPublication(
       !hasPermission(actor.role, "content:review")
     )
       throw new Error("需要节点所有者的管理与审核权限。");
-    await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
+    await assertWorkspaceProjectAccess(value.projectId, actorId, "receipt", tx);
     const locations =
       await tx.execute(sql`SELECT p.node_id, p.job_id FROM browser_fleet_publication p
       JOIN social_publication s ON s.browser_job_id = p.job_id WHERE s.id = ${value.publicationId} AND s.project_id = ${value.projectId}`);
@@ -213,7 +213,7 @@ export async function reconcileUnknownVideoPublication(
       !hasPermission(actor.role, "content:review")
     )
       throw new Error("需要节点所有者的管理与审核权限。");
-    await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
+    await assertWorkspaceProjectAccess(value.projectId, actorId, "receipt", tx);
     const locations =
       await tx.execute(sql`SELECT p.node_id, p.job_id FROM browser_fleet_publication p
       JOIN social_publication s ON s.browser_job_id = p.job_id WHERE s.id = ${value.publicationId} AND s.project_id = ${value.projectId}`);

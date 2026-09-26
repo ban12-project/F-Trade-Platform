@@ -52,6 +52,7 @@ export async function testPublicationReconciliation(
   await db.execute(sql`UPDATE aggregate_record SET version = version + 1 WHERE id = ${contentRef}`);
   await assert.rejects(reconcileUnknownTextPublication(value, actor, db), /内容或原确认已变化/);
   await db.execute(sql`UPDATE aggregate_record SET version = version - 1 WHERE id = ${contentRef}`);
+  await db.execute(sql`UPDATE workspace_project SET status = 'archived' WHERE id = ${projectId}`);
   const results = await Promise.all(
     Array.from({ length: 3 }, () => reconcileUnknownTextPublication(value, actor, db)),
   );
@@ -96,6 +97,7 @@ export async function testPublicationReconciliation(
     )?.humanConfirmed,
     true,
   );
+  await db.execute(sql`UPDATE workspace_project SET status = 'active' WHERE id = ${projectId}`);
   console.log(
     "PASS manual receipt reconciliation: current owner/project/content, concurrent replay, immutable original receipt, one version increment and preserved channel pause",
   );
