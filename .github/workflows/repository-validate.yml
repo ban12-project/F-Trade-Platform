@@ -87,7 +87,7 @@ jobs:
         run: pnpm test:rendered-video-inspection && pnpm test:ffmpeg-renderer
 
       - name: Test governed marketing-video captions
-        run: pnpm test:marketing-video-edit && pnpm test:video-product-fact-runtime && pnpm test:video-visual-sampling && pnpm test:video-download-delivery
+        run: pnpm test:video-creative && pnpm test:marketing-video-edit && pnpm test:video-product-fact-runtime && pnpm test:video-visual-sampling && pnpm test:video-download-delivery
 
       - name: Set up Python
         uses: actions/setup-python@v7

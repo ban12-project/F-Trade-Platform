@@ -1,0 +1,48 @@
+{
+  "classification": "sanitized_aggregate",
+  "run_id": "sanitized-mvp1-acceptance-20260926",
+  "executed_at": "2026-09-26T14:08:58+00:00",
+  "criteria": [
+    {
+      "criterion_id": "product_import",
+      "status": "not_run",
+      "evidence_refs": ["sanitized-mvp1-acceptance-20260926"]
+    },
+    {
+      "criterion_id": "content_gate",
+      "status": "not_run",
+      "evidence_refs": ["sanitized-mvp1-acceptance-20260926"]
+    },
+    {
+      "criterion_id": "rfq_completion",
+      "status": "not_run",
+      "evidence_refs": ["sanitized-mvp1-acceptance-20260926"]
+    },
+    {
+      "criterion_id": "quotation_handoff",
+      "status": "not_run",
+      "evidence_refs": ["sanitized-mvp1-acceptance-20260926"]
+    },
+    {
+      "criterion_id": "follow_up_opportunity",
+      "status": "not_run",
+      "evidence_refs": ["sanitized-mvp1-acceptance-20260926"]
+    },
+    {
+      "criterion_id": "gate_bypass",
+      "status": "not_run",
+      "evidence_refs": ["sanitized-mvp1-acceptance-20260926"]
+    }
+  ],
+  "metrics": {
+    "manual_revision_count": 0,
+    "factual_error_count": 0,
+    "rfq_total": 0,
+    "rfq_ready": 0,
+    "gate_bypass_count": 0,
+    "blocked_external_dependency_count": 6
+  },
+  "decision": {
+    "status": "pending"
+  }
+}
