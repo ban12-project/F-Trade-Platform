@@ -12,8 +12,15 @@ import {
   workspaceMemberFormSchema,
   workspaceMemberRemovalSchema,
 } from "@/lib/workspace/access";
-import { createWorkspaceProjectSchema } from "@/lib/workspace/contracts";
-import { createWorkspaceProject, linkReadyProductToSalesProject } from "@/lib/workspace/store";
+import {
+  createWorkspaceProjectSchema,
+  workspaceProjectStatusChangeSchema,
+} from "@/lib/workspace/contracts";
+import {
+  changeWorkspaceProjectStatus,
+  createWorkspaceProject,
+  linkReadyProductToSalesProject,
+} from "@/lib/workspace/store";
 
 export type WorkspaceActionState = {
   status: "idle" | "success" | "error";
@@ -106,6 +113,27 @@ export async function removeWorkspaceProjectMemberAction(
     return {
       status: "error",
       message: error instanceof Error ? error.message : "无法移除项目成员。",
+    };
+  }
+}
+
+export async function changeWorkspaceProjectStatusAction(
+  input: unknown,
+): Promise<WorkspaceActionState> {
+  try {
+    const session = await requireWorkspaceUser();
+    const value = workspaceProjectStatusChangeSchema.parse(input);
+    const project = await changeWorkspaceProjectStatus(value, session.user.id);
+    revalidatePath("/workspace", "layout");
+    return {
+      status: "success",
+      projectId: project.id,
+      message: project.status === "archived" ? "项目已归档，新业务写入已冻结。" : "项目已重开。",
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "无法更新项目状态。",
     };
   }
 }

@@ -17,6 +17,8 @@ export async function enqueueQueuedPublicationSandboxes(db: Database, nodeId?: s
     JOIN browser_sandbox s ON s.node_id = n.id
     JOIN browser_fleet_binding b ON b.node_id = n.id
     JOIN social_browser_job j ON j.channel_ref = b.channel_ref AND j.account_ref = b.account_ref
+    JOIN social_publication p ON p.browser_job_id = j.id
+    JOIN workspace_project w ON w.id = p.project_id AND w.status = 'active'
     WHERE n.status = 'active' AND s.phase = 'stopped' AND j.kind = 'publish'
     AND j.status = 'queued' ${scope} ORDER BY n.id LIMIT 100`);
   for (const node of nodes.rows) {

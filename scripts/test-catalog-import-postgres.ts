@@ -233,6 +233,7 @@ void (async () => {
       .set({ status: "archived" })
       .where(eq(workspaceProject.id, identity.projectId));
     await assert.rejects(selectCatalogRecords(selection, identity, db), /进行中/);
+    assert.equal((await catalogImportView(lookup, identity, db)).candidates.length, 20);
     await db
       .update(workspaceProject)
       .set({ status: "active" })

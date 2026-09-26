@@ -17,7 +17,10 @@ import type { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form
 import { productFactLabels } from "@/lib/product/fact-labels";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
-import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import {
+  assertAggregateWorkspaceWrite,
+  assertWorkspaceProjectAccess,
+} from "@/lib/workspace/access";
 
 export type ContentDraftInput = z.infer<typeof contentDraftFormSchema>;
 export type ContentReviewInput = z.infer<typeof contentReviewFormSchema>;
@@ -270,14 +273,15 @@ export async function createContentDraft(
   const approvalId = randomUUID();
   const eventId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    if (projectId) await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
+    else await assertAggregateWorkspaceWrite(input.productId, tx, actorId);
     if (projectId) {
       const [workspace] = await tx
         .select({ kind: workspaceProject.kind })
         .from(workspaceProject)
         .where(eq(workspaceProject.id, projectId))
         .for("update");
-      if (!workspace || workspace.kind !== "marketing")
-        throw new Error("内容草稿只能关联到产品营销项目。");
+      if (workspace?.kind !== "marketing") throw new Error("内容草稿只能关联到产品营销项目。");
       const [productLink] = await tx
         .select({ id: workspaceProjectItem.id })
         .from(workspaceProjectItem)
@@ -298,8 +302,7 @@ export async function createContentDraft(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, input.productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
-      throw new Error("只能引用已通过 Gate 01 的产品。");
+    if (product?.state !== "PRODUCT_READY") throw new Error("只能引用已通过 Gate 01 的产品。");
     const readyProduct = product.payload as unknown as ProductReady;
     const content = buildContentDraft(input, readyProduct, id);
     assertTransition({
@@ -424,13 +427,13 @@ export async function copyContentDraftToProject(
   const eventId = randomUUID();
   const now = new Date();
   return getDatabase().transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
     const [workspace] = await tx
       .select({ kind: workspaceProject.kind })
       .from(workspaceProject)
       .where(eq(workspaceProject.id, projectId))
       .for("update");
-    if (!workspace || workspace.kind !== "marketing")
-      throw new Error("内容只能复制到产品营销项目。");
+    if (workspace?.kind !== "marketing") throw new Error("内容只能复制到产品营销项目。");
     const [source] = await tx
       .select({ payload: aggregateRecord.payload, ownerProjectId: workspaceProjectItem.projectId })
       .from(aggregateRecord)
@@ -453,8 +456,7 @@ export async function copyContentDraftToProject(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, current.product_id), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
-      throw new Error("源内容引用的产品已不再可用于新草稿。");
+    if (product?.state !== "PRODUCT_READY") throw new Error("源内容引用的产品已不再可用于新草稿。");
     await tx
       .insert(workspaceProjectItem)
       .values({
@@ -687,6 +689,7 @@ export async function decideContentReview(
   const now = new Date();
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(input.contentId, tx, actorId);
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,
@@ -699,7 +702,7 @@ export async function decideContentReview(
       .for("update");
     if (aggregate && String(aggregate.version) !== input.reviewedVersion)
       throw new Error("内容已更新，请刷新后重新审核当前版本。");
-    if (!aggregate || aggregate.state !== "CONTENT_REVIEW_REQUIRED")
+    if (aggregate?.state !== "CONTENT_REVIEW_REQUIRED")
       throw new Error("该内容当前不处于待审核状态。");
     const [pendingApproval] = await tx
       .select()
@@ -801,6 +804,7 @@ export async function reviseContentDraft(
   const eventId = randomUUID();
   const approvalId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(contentId, tx, actorId);
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,
@@ -811,7 +815,7 @@ export async function reviseContentDraft(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, contentId), eq(aggregateRecord.type, "content")))
       .for("update");
-    if (!aggregate || aggregate.state !== "CONTENT_REVISION_REQUIRED")
+    if (aggregate?.state !== "CONTENT_REVISION_REQUIRED")
       throw new Error("该内容当前不处于待修订状态。");
     const currentContent = aggregate.payload as ContentRecord;
     if (input.productId !== currentContent.product_id)
@@ -821,7 +825,7 @@ export async function reviseContentDraft(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, input.productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
+    if (product?.state !== "PRODUCT_READY")
       throw new Error("引用产品不再处于 Product Ready，不能重新送审。");
     const content = buildContentDraft(input, product.payload as unknown as ProductReady, contentId);
     assertTransition({

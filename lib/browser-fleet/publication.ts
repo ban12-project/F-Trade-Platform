@@ -56,6 +56,7 @@ export async function schedulePublications(
         and(
           eq(socialBrowserJob.kind, "publish"),
           eq(socialBrowserJob.status, "queued"),
+          sql`EXISTS (SELECT 1 FROM social_publication p JOIN workspace_project w ON w.id = p.project_id WHERE p.browser_job_id = ${socialBrowserJob.id} AND w.status = 'active')`,
           eq(socialBrowserJob.channelRef, account.channelRef),
           eq(socialBrowserJob.accountRef, account.accountRef),
           sql`EXISTS (SELECT 1 FROM browser_fleet_binding b WHERE b.node_id = ${nodeId} AND b.channel_ref = ${socialBrowserJob.channelRef} AND b.account_ref = ${socialBrowserJob.accountRef})`,
@@ -399,7 +400,12 @@ export async function recordPublicationReceipt(
   )
     throw new Error("publication_scope_invalid");
   if (receipt.outcome === "published") {
-    const payload = await buildFacebookPublicationPayload(tx, publication, new Date(now));
+    const payload = await buildFacebookPublicationPayload(
+      tx,
+      publication,
+      new Date(now),
+      "receipt",
+    );
     if (
       digestSocialWorkerPayload(payload) !== receipt.payloadDigest ||
       !receipt.externalPublicationRef

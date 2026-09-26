@@ -1,3 +1,4 @@
+import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -87,6 +88,7 @@ export async function createMarketingVideoEditProjectFromProductMedia(
   const id = randomUUID();
   const now = new Date();
   return database.transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
     const [workspace] = await tx
       .select({
         id: workspaceProject.id,

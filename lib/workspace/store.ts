@@ -18,7 +18,7 @@ import {
 import type { ProductReady } from "@/lib/product/verification";
 import { assertWorkspaceProjectAccess } from "./access";
 
-import { createWorkspaceProjectSchema } from "./contracts";
+import { createWorkspaceProjectSchema, workspaceProjectStatusChangeSchema } from "./contracts";
 import {
   deriveWorkspacePipeline,
   deriveWorkspaceTasks,
@@ -370,14 +370,13 @@ export async function linkReadyProductToSalesProject(
       .from(workspaceProject)
       .where(eq(workspaceProject.id, projectId))
       .for("update");
-    if (!project || project.kind !== "sales") throw new Error("产品引用只能添加到销售机会项目。");
+    if (project?.kind !== "sales") throw new Error("产品引用只能添加到销售机会项目。");
     const [product] = await tx
       .select({ state: aggregateRecord.state })
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
-      throw new Error("只能引用已通过 Gate 01 的产品。");
+    if (product?.state !== "PRODUCT_READY") throw new Error("只能引用已通过 Gate 01 的产品。");
     await tx
       .insert(workspaceProjectItem)
       .values({
@@ -429,5 +428,39 @@ export async function listProjectReadyProductReferences(
     return typeof productName === "string" && typeof internalSku === "string"
       ? [{ id: row.id, productName, internalSku }]
       : [];
+  });
+}
+
+/** Owner-only lifecycle change; the project row is the business write serialization point. */
+export async function changeWorkspaceProjectStatus(
+  input: unknown,
+  actorId: string,
+  database: Database = getDatabase(),
+) {
+  const value = workspaceProjectStatusChangeSchema.parse(input);
+  return database.transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(value.projectId, actorId, "manage", tx);
+    const [project] = await tx
+      .select()
+      .from(workspaceProject)
+      .where(eq(workspaceProject.id, value.projectId))
+      .for("update");
+    if (project.status === value.status) return { id: project.id, status: project.status };
+    await tx
+      .update(workspaceProject)
+      .set({ status: value.status, updatedAt: new Date() })
+      .where(eq(workspaceProject.id, project.id));
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action:
+        value.status === "archived" ? "workspace_project.archived" : "workspace_project.reopened",
+      actorType: "human",
+      actorId,
+      subjectType: "workspace_project",
+      subjectId: project.id,
+      metadata: { previous_status: project.status, status: value.status },
+      occurredAt: new Date(),
+    });
+    return { id: project.id, status: value.status };
   });
 }

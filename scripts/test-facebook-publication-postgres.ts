@@ -1100,6 +1100,21 @@ async function main() {
         );
         await handleBrowserNodeRequest(node.accessKey, { ...identity, operation: "sync" });
       } else {
+        // Archival after an external attempt must not discard its authenticated result.
+        await db
+          .update(schema.workspaceProject)
+          .set({ status: "archived" })
+          .where(eq(schema.workspaceProject.id, projectId));
+        await assert.rejects(
+          handleBrowserNodeRequest(node.accessKey, {
+            ...identity,
+            operation: "authorize-publication",
+            runId: lease.id,
+            leaseId: lease.leaseId,
+            payloadDigest: lease.publicationDigest,
+          }),
+          /已归档/,
+        );
         const accepted = await handleBrowserNodeRequest(node.accessKey, resultRequest);
         assert.deepEqual(accepted.receipt, { outcome: expectedOutcome, replayed: false });
         const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);
@@ -1114,6 +1129,10 @@ async function main() {
           /publication_receipt_conflict/,
         );
       }
+      await db
+        .update(schema.workspaceProject)
+        .set({ status: "active" })
+        .where(eq(schema.workspaceProject.id, projectId));
       await handleBrowserNodeRequest(node.accessKey, {
         ...identity,
         operation: "finish",

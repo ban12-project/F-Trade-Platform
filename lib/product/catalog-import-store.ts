@@ -44,7 +44,11 @@ type AttemptRow = typeof attempts.$inferSelect;
 
 export class CatalogAccessError extends Error {}
 
-async function authorize(tx: DatabaseTransaction, identity: CatalogIdentity) {
+async function authorize(
+  tx: DatabaseTransaction,
+  identity: CatalogIdentity,
+  access: "view" | "write" = "write",
+) {
   const [actor] = await tx
     .select({ role: user.role })
     .from(user)
@@ -66,17 +70,22 @@ async function authorize(tx: DatabaseTransaction, identity: CatalogIdentity) {
     .from(workspaceProject)
     .where(eq(workspaceProject.id, identity.projectId))
     .for("update");
-  if (project?.kind !== "marketing" || project.status !== "active")
+  if (project?.kind !== "marketing" || (access === "write" && project.status !== "active"))
     throw new CatalogAccessError("目录导入需要进行中的营销项目。");
   try {
-    await assertWorkspaceProjectAccess(identity.projectId, identity.actorId, "write", tx);
+    await assertWorkspaceProjectAccess(identity.projectId, identity.actorId, access, tx);
   } catch {
     throw new CatalogAccessError("目录项目编辑权限已失效。");
   }
 }
 
-async function ownImport(tx: DatabaseTransaction, importId: string, identity: CatalogIdentity) {
-  await authorize(tx, identity);
+async function ownImport(
+  tx: DatabaseTransaction,
+  importId: string,
+  identity: CatalogIdentity,
+  access: "view" | "write" = "write",
+) {
+  await authorize(tx, identity, access);
   const [row] = await tx
     .select()
     .from(imports)
@@ -257,7 +266,7 @@ export async function catalogImportView(
   const parsed = catalogLookupSchema.parse(input);
   if (parsed.projectId !== identity.projectId) throw new Error("目录项目不匹配。");
   return database.transaction(async (tx) => {
-    const row = await ownImport(tx, parsed.importId, identity);
+    const row = await ownImport(tx, parsed.importId, identity, "view");
     const records = await tx
       .select()
       .from(candidates)
@@ -293,7 +302,7 @@ export async function latestCatalogImport(
 ): Promise<CatalogImportView | null> {
   if (projectId !== identity.projectId) throw new Error("目录项目不匹配。");
   const id = await database.transaction(async (tx) => {
-    await authorize(tx, identity);
+    await authorize(tx, identity, "view");
     const rows = await tx
       .select({ id: imports.id })
       .from(imports)

@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
-
 import { type Database, getDatabase } from "../db/client";
 import { aggregateRecord, approval, auditEvent, workflowEvent } from "../db/schema";
+import { assertAggregateWorkspaceWrite } from "../workspace/access";
 import { type ApprovalDecision, assertTransition, type WorkflowEventInput } from "./transitions";
 
 export interface PersistedTransition {
@@ -53,6 +53,7 @@ export async function persistTransition(
   database: Database = getDatabase(),
 ): Promise<PersistedTransition> {
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(event.entityId, tx);
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,

@@ -131,6 +131,7 @@ void (async () => {
       id: projectId,
       kind: "marketing",
       title: "SYNTHETIC isolated media",
+      status: "archived",
       createdById: owner,
     });
     await db
