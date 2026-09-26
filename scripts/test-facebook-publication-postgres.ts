@@ -357,6 +357,31 @@ async function main() {
     });
 
     const text = await fixture("text", accountRef, true);
+    await db
+      .update(schema.workspaceProject)
+      .set({ status: "archived" })
+      .where(eq(schema.workspaceProject.id, projectId));
+    assert.equal(await claim(), null, "frozen queued work stays unclaimed");
+    await assert.rejects(
+      recordControlledPublicationResult(
+        { jobId: text.jobId, outcome: "published", externalPublicationRef: "synthetic-unexecuted" },
+        database,
+      ),
+      /尚未领取/,
+    );
+    assert.equal(
+      (
+        await db
+          .select()
+          .from(schema.socialBrowserJob)
+          .where(eq(schema.socialBrowserJob.id, text.jobId))
+      )[0].status,
+      "queued",
+    );
+    await db
+      .update(schema.workspaceProject)
+      .set({ status: "active" })
+      .where(eq(schema.workspaceProject.id, projectId));
     const claimed = await claim();
     assert.ok(claimed);
     assert.equal(claimed.command.command.jobId, text.jobId);

@@ -405,6 +405,7 @@ export async function recordControlledPublicationResult(
         return publication;
       throw new Error("发布任务已经终结，不能用不同结果覆盖。");
     }
+    if (job.status !== "claimed") throw new Error("发布任务尚未领取，不能记录执行回执。");
     if (value.outcome === "published") {
       const { record } = await assertPublicationEligible(
         {

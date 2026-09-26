@@ -126,6 +126,18 @@
       "status": "passed",
       "sha256": "56282b4c0767787db27aff9b5ffe394708522ed9eb9847232ec46c9ddaead8d8",
       "bytes": 455
+    },
+    {
+      "local_log": "unclaimed-receipt-failure.log",
+      "status": "failed",
+      "sha256": "f57fd1db42caf9ddf5adeb504568108424a186f1ae7c5ae1fa0791562f66acb0",
+      "bytes": 399
+    },
+    {
+      "local_log": "publication-unclaimed-fixed.log",
+      "status": "passed",
+      "sha256": "e352749a8d8beda5f3ba361b363802be5e9bec882179770b0d3bd106bc8c953e",
+      "bytes": 2645
     }
   ],
   "initial_package_commands": [
