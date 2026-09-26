@@ -146,6 +146,41 @@
       "note": "Explicit Node 24 / exact pnpm and Python dependency paths",
       "sha256": "5a535de2b4b717be116bacf7a8db9225796ba62cb5476cafc25040098286c5c5",
       "bytes": 1025
+    },
+    {
+      "local_log": "ci-database-browser-failure.log",
+      "status": "failed",
+      "note": "CI run 36250081042 at ba45e6d: legacy product browser fixture skipped worker claim; receipt guard correctly rejected it. Prior local 44/44 preceded this guard.",
+      "sha256": "6b8a7f597e49c128eff90f2df6ed65668a74c3cda466b7df86261f348719f439",
+      "bytes": 76253
+    },
+    {
+      "local_log": "product-browser-claim-recheck.log",
+      "status": "failed",
+      "note": "Fixture adaptation first failed type check: signed command nesting",
+      "sha256": "c796d6aa596d34792e3e6442e71b8514ac6782c5a8f65b5814ad1fcd478d9496",
+      "bytes": 685
+    },
+    {
+      "local_log": "product-browser-claim-final.log",
+      "status": "failed",
+      "note": "Direct worker import is server-only and unavailable in Playwright process",
+      "sha256": "80d8a0df1d2cad5411b33df6d2cd844e52000df54abc616766d2a90386783b4b",
+      "bytes": 3704
+    },
+    {
+      "local_log": "product-browser-fixture-final.log",
+      "status": "failed",
+      "note": "Explicit synthetic claimed-state fixture required non-null job ID narrowing",
+      "sha256": "0df3c115856c0406841c6e20ecc73f1b66a5dc58444c3bed665b884cdbe11afd",
+      "bytes": 873
+    },
+    {
+      "local_log": "product-browser-fixture-recheck.log",
+      "status": "passed",
+      "note": "Production-build product browser journey 2/2 after explicit synthetic claimed-state fixture correction",
+      "sha256": "526ae8d1e60c68c389b7c109e80c1596cb46b6ebb3bada209424340ca9337966",
+      "bytes": 3414
     }
   ],
   "initial_package_commands": [

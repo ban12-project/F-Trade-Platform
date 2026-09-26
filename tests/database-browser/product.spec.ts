@@ -637,6 +637,21 @@ test("authenticated browser reviews a mock product and its content through real 
   expect(submitted.status).toBe("submitted");
   expect(submitted.textConfirmation?.contentVersion).toBe(4);
   expect((await contentQuery())[0].state).toBe("CONTENT_APPROVED");
+  // Simulate the external worker having claimed this exact synthetic job.
+  // Actual claim/preflight and unclaimed-result rejection are covered by the
+  // isolated PostgreSQL publication suite; this browser test covers the UI journey.
+  if (!submitted.browserJobId) throw new Error("Missing synthetic publication job");
+  const claimed = await db
+    .update(schema.socialBrowserJob)
+    .set({ status: "claimed", updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.socialBrowserJob.id, submitted.browserJobId),
+        eq(schema.socialBrowserJob.status, "queued"),
+      ),
+    )
+    .returning({ id: schema.socialBrowserJob.id });
+  expect(claimed).toEqual([{ id: submitted.browserJobId }]);
   await recordControlledPublicationResult(
     {
       jobId: submitted.browserJobId,
