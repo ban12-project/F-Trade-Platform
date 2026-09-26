@@ -1,0 +1,796 @@
+{
+  "classification": "synthetic",
+  "run_id": "synthetic-mvp1-technical-20260926",
+  "base_commit": "b29c3e64bf7f851313279179c4905d114fbfcc4d",
+  "executed_at": "2026-09-26T14:10:15+00:00",
+  "environment": {
+    "node": "24.21.0",
+    "pnpm": "12.3.4",
+    "postgresql": "17.10",
+    "playwright": "1.62.1",
+    "chromium": "151.0.7922.34",
+    "ffmpeg": "7.0.2-static",
+    "ffprobe": "4.0.2-static"
+  },
+  "package_commands": [
+    {
+      "name": "test:product-stream",
+      "command": "tsx scripts/test-product-stream.ts && tsx scripts/test-product-stream-store.ts && tsx scripts/test-product-stream-transport.ts && tsx scripts/test-product-stream-model.ts && tsx scripts/test-product-source-images.ts && tsx scripts/test-product-image-upload.ts",
+      "exit_code": 0,
+      "seconds": 5.59,
+      "status": "passed",
+      "log_sha256": "8d12b18ed19d7378a092eead3d7430b9f08d2a2e35b90a6c297e8d706a24d220"
+    },
+    {
+      "name": "test:product-agent-evidence",
+      "command": "tsx scripts/test-product-agent-evidence-locations.ts",
+      "exit_code": 0,
+      "seconds": 0.82,
+      "status": "passed",
+      "log_sha256": "24d397b5b4aa63e820d1e6eb089af8338ec8fc1fffb21628e11b19f1a89b42db"
+    },
+    {
+      "name": "test:catalog-preflight",
+      "command": "tsx scripts/test-product-catalog-preflight.ts",
+      "exit_code": 0,
+      "seconds": 1.57,
+      "status": "passed",
+      "log_sha256": "5f4f0a8b335c7670cb74203a182cabf6d75b15ed380a895845b932c2982dec5c"
+    },
+    {
+      "name": "test:product-catalog-entry",
+      "command": "tsx scripts/test-product-catalog-entry.ts && tsx scripts/test-product-cohorts.ts",
+      "exit_code": 0,
+      "seconds": 1.62,
+      "status": "passed",
+      "log_sha256": "38fc332e7b41acc1426b9012427035b66bfcd08ef63951d134840403b8cf03e9"
+    },
+    {
+      "name": "test:content-catalog-entry",
+      "command": "tsx scripts/test-content-catalog-entry.ts",
+      "exit_code": 0,
+      "seconds": 0.77,
+      "status": "passed",
+      "log_sha256": "f27636ea75256e6673340eaee8aefc9529159255cebcb699094b4f91b0591b89"
+    },
+    {
+      "name": "test:mvp-acceptance",
+      "command": "tsx scripts/test-mvp-acceptance-summary.ts",
+      "exit_code": 0,
+      "seconds": 0.47,
+      "status": "passed",
+      "log_sha256": "469aa1c9990963409f89fdf9116cc1c495d0b716e615d3934e1dcf7d5a6bc5b8"
+    },
+    {
+      "name": "test:local-ocr",
+      "command": "python3 scripts/test-local-ocr-preprocess.py",
+      "exit_code": 0,
+      "seconds": 0.16,
+      "status": "passed",
+      "log_sha256": "0e1cdbfba986b4d851c57c45bb594f5660ddfd9a05a61acd44c25e4318299939"
+    },
+    {
+      "name": "test:social-inbound",
+      "command": "tsx scripts/test-social-inbound-policy.ts",
+      "exit_code": 0,
+      "seconds": 0.31,
+      "status": "passed",
+      "log_sha256": "9290c8988f0ce9f9c769bb8af6868bcd76e38e5673781d8a2a675bc369775e05"
+    },
+    {
+      "name": "test:social-message-record",
+      "command": "tsx scripts/test-social-message-record.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "16d499e2d0a6865dcc46df3eb6b32a794b857c312f660b49b0089d9a424bd9e7"
+    },
+    {
+      "name": "test:social-worker-protocol",
+      "command": "tsx scripts/test-social-worker-protocol.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "f994c9c476e433b40f24d7de2db9bbc00666eed9ca7f6284d8227676408c622c"
+    },
+    {
+      "name": "test:social-worker-deployment",
+      "command": "tsx scripts/test-social-worker-deployment.ts",
+      "exit_code": 0,
+      "seconds": 0.26,
+      "status": "passed",
+      "log_sha256": "c2a16f90ab55c09ec4a5dc4e64f4144747a44d4b4d2352e57fd709af95e71dc6"
+    },
+    {
+      "name": "test:social-circuit-breaker",
+      "command": "tsx scripts/test-social-circuit-breaker.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "43d9022f1220f31785f52d5cd3306d378da8852ed92c2bf7178434bd92bc1241"
+    },
+    {
+      "name": "test:controlled-publication",
+      "command": "tsx scripts/test-controlled-publication-command.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "4767e333d2cf84232b2abe1374d597e2f155468f4e2eff3f0ef6e2c71986b42b"
+    },
+    {
+      "name": "test:publication-result",
+      "command": "tsx scripts/test-publication-result-protocol.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "16b81822b9b8e00f52730f3518a7874bc4c1332faf53176dc06c1703496a1fb9"
+    },
+    {
+      "name": "test:reply-result",
+      "command": "tsx scripts/test-reply-result-protocol.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "0c86e29178539f173ca8f5b07a8a024208068869b65c49afe60cba5d1c193112"
+    },
+    {
+      "name": "test:controlled-reply",
+      "command": "tsx scripts/test-controlled-reply.ts",
+      "exit_code": 0,
+      "seconds": 0.47,
+      "status": "passed",
+      "log_sha256": "a5144fb0d86e01447d7a10cfb91172427cc6ca8c1a897cf9295147ad7ea6a579"
+    },
+    {
+      "name": "test:inbound-lead-intake",
+      "command": "tsx scripts/test-inbound-lead-intake.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "6c1f38fb98597d0788fcff0c9619782ae8df3893392c4898d20ae39ba46e454b"
+    },
+    {
+      "name": "test:rfq-reply-policy",
+      "command": "tsx scripts/test-rfq-reply-policy.ts",
+      "exit_code": 0,
+      "seconds": 0.31,
+      "status": "passed",
+      "log_sha256": "e8beb1b0085767db4ad43fbed10f5282fe65a449c2652509c4759e5bda127192"
+    },
+    {
+      "name": "test:social-control-record",
+      "command": "tsx scripts/test-social-control-record.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "adb122f6497094b9f531262678df5f327141ab31c6cd9e351c24227bb2f8f28b"
+    },
+    {
+      "name": "test:social-controlled-pilot",
+      "command": "tsx scripts/test-social-controlled-pilot-template.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "status": "passed",
+      "log_sha256": "2d6657aa07ea6bb5e8f77bf6decb44fb5fdd16dc8f6d52da478eb3774fdd7824"
+    },
+    {
+      "name": "test:camofox-worker-client",
+      "command": "tsx scripts/test-camofox-worker-client.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "9c7fff870af62edbbbe07ccad7782b3accae63b2a7cc6c9c1c2f4cef642c21ff"
+    },
+    {
+      "name": "test:social-worker-executor",
+      "command": "tsx scripts/test-social-worker-executor.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "a182b1d27d2ce8aafedeac7f05c593cb82932fff2d93cb83234976fcba8dcc3b"
+    },
+    {
+      "name": "test:inbound-delivery",
+      "command": "tsx scripts/test-inbound-delivery-store.ts",
+      "exit_code": 0,
+      "seconds": 0.52,
+      "status": "passed",
+      "log_sha256": "a7a9189ba912ed3ceca11f9d4ebbe009cbc7ecfd54ea44894d955b6ce3beb4f6"
+    },
+    {
+      "name": "test:database-driver",
+      "command": "tsx scripts/test-database-transaction-driver.ts",
+      "exit_code": 0,
+      "seconds": 0.57,
+      "status": "passed",
+      "log_sha256": "d9470912e8cc5bfcc471510eab7d5f449d0a861d5ce7c0f61630e3f99f6d7e29"
+    },
+    {
+      "name": "test:github-governance",
+      "command": "python3 scripts/test-github-governance.py",
+      "exit_code": 0,
+      "seconds": 0.11,
+      "status": "passed",
+      "log_sha256": "9efed7a66c056c2cea6839030eabc291efa8ec52a3bfdeb07ac5f4f647690594"
+    },
+    {
+      "name": "test:main-push-guard",
+      "command": "sh scripts/test-main-push-guard.sh",
+      "exit_code": 0,
+      "seconds": 0.02,
+      "status": "passed",
+      "log_sha256": "7cd11560962437374c592f18b3cf07f88fccc7fcf51e244a001c8d8953b7c2e9"
+    },
+    {
+      "name": "test:content-publication",
+      "command": "tsx scripts/test-content-publication-policy.ts",
+      "exit_code": 0,
+      "seconds": 0.31,
+      "status": "passed",
+      "log_sha256": "987f8ed945a9912df6081b65decab7e726d143837c48fd8bf4b4a6f35ae07d54"
+    },
+    {
+      "name": "test:harbor",
+      "command": "tsx scripts/test-harbor-product-agent.ts",
+      "exit_code": 0,
+      "seconds": 2.22,
+      "status": "passed",
+      "log_sha256": "5ca8f43050a453c80a4264cf823d72e159fdd5b1402b3621d253f4824e6277da"
+    },
+    {
+      "name": "test:workflow",
+      "command": "tsx scripts/test-workflow-transitions.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "status": "passed",
+      "log_sha256": "a745ee5175b94195b79f519c8feeec0e79a8ed34149562d3aa872a20992c918b"
+    },
+    {
+      "name": "test:workspace",
+      "command": "tsx scripts/test-workspace-contracts.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "7e16990afba8a07704f8c1e0f6036782b23456fd0ad5f8dac632695b687c95c4"
+    },
+    {
+      "name": "test:demo",
+      "command": "tsx scripts/test-synthetic-demo.ts",
+      "exit_code": 0,
+      "seconds": 1.02,
+      "status": "passed",
+      "log_sha256": "08bc7af65a4be93a4164beb50874ee4455690933cbb12d46f6c2c81f031ee0e6"
+    },
+    {
+      "name": "test:quotation",
+      "command": "tsx scripts/test-quotation-handoff.ts",
+      "exit_code": 0,
+      "seconds": 0.57,
+      "status": "passed",
+      "log_sha256": "52cb99f0e3360f2657d5733c67b0e19b0a6244dccebac25de4446fa495b23779"
+    },
+    {
+      "name": "test:delivery",
+      "command": "tsx scripts/test-delivery-confirmation.ts",
+      "exit_code": 0,
+      "seconds": 0.47,
+      "status": "passed",
+      "log_sha256": "8fc9f85c793e9cabd7fece7e9af59ce06c40d3c3f96da96d0fd70e21ed2322a0"
+    },
+    {
+      "name": "test:rfq",
+      "command": "tsx scripts/test-rfq-completeness.ts",
+      "exit_code": 0,
+      "seconds": 0.47,
+      "status": "passed",
+      "log_sha256": "c275c2da14c120bffbc4e0072747dc72c3ecf478b02b9496c8964fa3d25b1747"
+    },
+    {
+      "name": "test:sales",
+      "command": "tsx scripts/test-sales-clarification.ts && tsx scripts/test-sales-journey.ts",
+      "exit_code": 0,
+      "seconds": 0.77,
+      "status": "passed",
+      "log_sha256": "bd2216123a3cdfcbf005ece7a6f6682cf222408c701eae1645315e12af600163"
+    },
+    {
+      "name": "test:scoring",
+      "command": "tsx scripts/test-lead-scoring.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "status": "passed",
+      "log_sha256": "c102a9449f425cfdde30cbc6db9a8b38e150005a95272b9c229346bee8704127"
+    },
+    {
+      "name": "test:cadence",
+      "command": "tsx scripts/test-follow-up-cadence.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "status": "passed",
+      "log_sha256": "5d685986a0b1063f9f7799535c953c96590843fba2f035ab762a6813a8eb18fd"
+    },
+    {
+      "name": "test:content-gate",
+      "command": "tsx scripts/test-content-gate.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "status": "passed",
+      "log_sha256": "7283b3c52a53a79a092f61651f090490d2338f9574994c547b3be6ba480ba298"
+    },
+    {
+      "name": "test:video-contracts",
+      "command": "tsx scripts/test-video-contracts.ts",
+      "exit_code": 0,
+      "seconds": 0.47,
+      "status": "passed",
+      "log_sha256": "57fdc8871b77aec5f9c6969cb4d92b938abbd6d20bfbddb9648f1877d2f130bc"
+    },
+    {
+      "name": "test:video-provider-capabilities",
+      "command": "tsx scripts/test-video-provider-capabilities.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "158696a52879cead9821412852b1c22b82f938f4e96d93221c8a2b84f0eec80c"
+    },
+    {
+      "name": "test:video-provider-config",
+      "command": "tsx scripts/test-video-provider-config.ts",
+      "exit_code": 0,
+      "seconds": 0.57,
+      "status": "passed",
+      "log_sha256": "f1e57f0d186dc62e86c69b641ccae142241022296d3f9b81e1d70d399583eec7"
+    },
+    {
+      "name": "test:video-creative",
+      "command": "tsx scripts/test-video-creative.ts",
+      "exit_code": 1,
+      "seconds": 0.57,
+      "status": "failed",
+      "log_sha256": "f66bd8135629392d4ad3d5667840873d0b1e376a5c1566c5696794ae25f38167",
+      "recheck": {
+        "status": "passed",
+        "exit_code": 0,
+        "log_sha256": "4dd364fc7aecc62172d232f37f1b609492b5a0e63654513f7d5672311e185dbf"
+      }
+    },
+    {
+      "name": "test:video-jobs",
+      "command": "tsx scripts/test-video-jobs.ts",
+      "exit_code": 0,
+      "seconds": 0.31,
+      "status": "passed",
+      "log_sha256": "7694152f11b62ccbeb4bc4f37faa5a7983719a1d67b7f66d9e021b67e9cebfcb"
+    },
+    {
+      "name": "test:video-job-runner",
+      "command": "tsx scripts/test-video-job-runner.ts",
+      "exit_code": 0,
+      "seconds": 0.62,
+      "status": "passed",
+      "log_sha256": "45eae42577f476cac89739170554dacf22382604247834f6a7dbc131263b2daa"
+    },
+    {
+      "name": "test:video-job-submission",
+      "command": "tsx scripts/test-video-job-submission.ts",
+      "exit_code": 0,
+      "seconds": 0.67,
+      "status": "passed",
+      "log_sha256": "5a01d164f7ccdcc2ce541d9c1ffa1c148e1dbfb66f721f8eb97f12528feb31c3"
+    },
+    {
+      "name": "test:video-private-assets",
+      "command": "tsx scripts/test-video-private-asset-store.ts",
+      "exit_code": 0,
+      "seconds": 0.82,
+      "status": "passed",
+      "log_sha256": "f0a65c5644248d8e30890717c2c9f15de834c5464629ea7b604a0bff3205a8e5"
+    },
+    {
+      "name": "test:video-preview-delivery",
+      "command": "node --conditions=react-server --import tsx scripts/test-video-preview-delivery.ts",
+      "exit_code": 0,
+      "seconds": 0.72,
+      "status": "passed",
+      "log_sha256": "300a35a89693c4dbe9d72aa4c5a87e38b0c0186682bc44576a193b86833561d1"
+    },
+    {
+      "name": "test:video-export-presets",
+      "command": "tsx scripts/test-video-export-presets.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "1cc0e1fa6ae8327370afb26dd5128a815d3802e9b4cd5b2f68b281b5834032a8"
+    },
+    {
+      "name": "test:video-acceptance",
+      "command": "tsx scripts/test-video-acceptance.ts",
+      "exit_code": 0,
+      "seconds": 0.47,
+      "status": "passed",
+      "log_sha256": "8a37b132f73d429b9468c901be41376e16d99131671b7df1eac4b50a0e57b99b"
+    },
+    {
+      "name": "test:video-execution",
+      "command": "tsx scripts/test-video-execution.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "c397b0cd0074ab5bceaa15e52c14f5a82b5fc377928d24c21e5e4417b300d7d3"
+    },
+    {
+      "name": "test:video-workspace",
+      "command": "tsx scripts/test-video-workspace.ts && tsx scripts/test-video-workspace-selection.ts",
+      "exit_code": 0,
+      "seconds": 0.77,
+      "status": "passed",
+      "log_sha256": "74e38f5b3e253788585fb0cf0999fb914392545d87720f95587b2fe5b94b1835"
+    },
+    {
+      "name": "test:video-material-intake",
+      "command": "tsx scripts/test-video-material-intake.ts",
+      "exit_code": 0,
+      "seconds": 0.72,
+      "status": "passed",
+      "log_sha256": "952695c560d0d0ed22ee8f711269e9173ff7503195cd12f7b25051e605b568c0"
+    },
+    {
+      "name": "test:product-media",
+      "command": "tsx scripts/test-video-ready.ts && tsx scripts/test-product-media-persistence.ts && tsx scripts/test-video-media-selection.ts && tsx scripts/test-product-media-runtime-policy.ts",
+      "exit_code": 0,
+      "seconds": 1.77,
+      "status": "passed",
+      "log_sha256": "b00a86b3bce239c33c1f928217b2d33210403e61119296924c4841cc060d3b5b"
+    },
+    {
+      "name": "test:product-media-workflow",
+      "command": "tsx scripts/test-product-media-workflow.ts && tsx scripts/test-product-media-probe-parser.ts",
+      "exit_code": 0,
+      "seconds": 0.77,
+      "status": "passed",
+      "log_sha256": "4ea7f23b96fd3b7efd82740c99aa809bad48b8961367eb0d9199108e9ccbc648"
+    },
+    {
+      "name": "test:video-presigned-upload",
+      "command": "tsx scripts/test-video-presigned-upload.ts",
+      "exit_code": 0,
+      "seconds": 0.72,
+      "status": "passed",
+      "log_sha256": "f0e68b7f595b3400a13a1d27113f2871e28c282d509a74b356d64a8b3a9cf1e1"
+    },
+    {
+      "name": "test:internet-video-media",
+      "command": "tsx scripts/test-internet-video-media.ts",
+      "exit_code": 0,
+      "seconds": 0.77,
+      "status": "passed",
+      "log_sha256": "36dd410590a6ec04799ed97f7049568884f57166548afea030fc99eed84208a2"
+    },
+    {
+      "name": "test:ai-sdk-video-adapters",
+      "command": "tsx scripts/test-ai-sdk-video-adapters.ts",
+      "exit_code": 0,
+      "seconds": 0.87,
+      "status": "passed",
+      "log_sha256": "dd1c9fad767758f080b29e3812765227cee8c449bc7c9b8b295781241ef7b598"
+    },
+    {
+      "name": "test:video-media-probe",
+      "command": "tsx scripts/test-video-media-probe.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "bcda2e71b38761c2bba5587d26e4366ca00b8e5f21373c4410453df2a5dfa6bd"
+    },
+    {
+      "name": "test:rendered-video-inspection",
+      "command": "tsx scripts/test-rendered-video-inspection.ts",
+      "exit_code": 0,
+      "seconds": 0.67,
+      "status": "passed",
+      "log_sha256": "b903a64fbcc894705ab32ffc021a3f5ef7a0113480b33f40c0cd5e0f99a54565"
+    },
+    {
+      "name": "test:video-timeline",
+      "command": "tsx scripts/test-video-timeline.ts",
+      "exit_code": 0,
+      "seconds": 0.36,
+      "status": "passed",
+      "log_sha256": "6f4b743571085c851869db7879a840837d95939419c6d78515cc5e0a547c9b27"
+    },
+    {
+      "name": "test:marketing-video-edit",
+      "command": "tsx scripts/test-marketing-video-edit.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "status": "passed",
+      "log_sha256": "680987954c492d5fc8d16b9a754ffa7945f1b933693276c89f486739d2bbe289"
+    },
+    {
+      "name": "test:video-product-fact-runtime",
+      "command": "tsx scripts/test-video-product-fact-runtime-policy.ts",
+      "exit_code": 0,
+      "seconds": 0.47,
+      "status": "passed",
+      "log_sha256": "56a85ca15085eec5e3d22fd202636817fe6c46275f46fa37fd45ea46d6a86827"
+    },
+    {
+      "name": "test:video-download-delivery",
+      "command": "tsx scripts/test-video-download-delivery.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "410c26a0d51d26f5bd24b34da14301a52a971b833b8f3ca8b6a420423165efd6"
+    },
+    {
+      "name": "test:video-mvp-policy",
+      "command": "tsx scripts/test-video-mvp-policy.ts",
+      "exit_code": 0,
+      "seconds": 0.26,
+      "status": "passed",
+      "log_sha256": "d508ae753198c5f7cb4498c295466f9318240922ff4ccf87ecf6e552a2fc5dca"
+    },
+    {
+      "name": "test:video-visual-sampling",
+      "command": "tsx scripts/test-video-visual-sampling.ts",
+      "exit_code": 0,
+      "seconds": 0.67,
+      "status": "passed",
+      "log_sha256": "3b275fdddbc63bd20a40f55d062f78218a7955101ea1989d1fba1db4b55e0d2f"
+    },
+    {
+      "name": "test:video-shot-analysis",
+      "command": "tsx scripts/test-video-shot-analysis.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "status": "passed",
+      "log_sha256": "e46863390b21e5cc3c4e59d44ca6c8b1b7b908b5acf4a8e5dad9cea02f571a99"
+    },
+    {
+      "name": "test:video-rendering",
+      "command": "tsx scripts/test-video-rendering.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "status": "passed",
+      "log_sha256": "2c8a52c417675ef5973cbad4349eab64f14c9f01878909535a655bf3ff5880dd"
+    },
+    {
+      "name": "test:ffmpeg-renderer",
+      "command": "tsx scripts/test-ffmpeg-renderer.ts",
+      "exit_code": 0,
+      "seconds": 9.26,
+      "status": "passed",
+      "log_sha256": "5132f997c7761002fcf69d3662c1488063ed3334c0c5410d53521a9222acc33a"
+    },
+    {
+      "name": "test:remotion-abcd",
+      "command": "tsx scripts/test-remotion-abcd.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "c8c74ac46e5002c7c0d038b49705330d932b1caae537382e1c28f3160f8de79a"
+    },
+    {
+      "name": "test:video-social-publication",
+      "command": "tsx scripts/test-video-social-publication.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "status": "passed",
+      "log_sha256": "9edf7076ec06f9d3388715b0fb80bc3f641a7c4f75796aa160c98163d95d15fb"
+    },
+    {
+      "name": "test:workspace-navigation",
+      "command": "tsx scripts/test-workspace-navigation.ts && tsx scripts/test-workspace-task-model.ts && node --conditions=react-server --import tsx scripts/test-workspace-queries.ts",
+      "exit_code": 0,
+      "seconds": 0.92,
+      "status": "passed",
+      "log_sha256": "ea48cef0aa61b2f6d2af0fc7feaa6b750eb04d2128e96f2a42bf7a6655a51129"
+    },
+    {
+      "name": "test:product-output",
+      "command": "tsx scripts/test-product-output-policy.ts && tsx scripts/test-product-evaluation-run.ts && tsx scripts/test-catalog-agent.ts && tsx scripts/test-product-selection-summary.ts && tsx scripts/test-product-selection-health.ts",
+      "exit_code": 0,
+      "seconds": 2.72,
+      "status": "passed",
+      "log_sha256": "d4534cd7a4188b4de28f601c8491b7b99025252c4219c1e1d8c431e6ce55ac5a"
+    },
+    {
+      "name": "typecheck",
+      "command": "tsc --noEmit",
+      "exit_code": 0,
+      "seconds": 6.13,
+      "status": "passed",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "db:check",
+      "command": "drizzle-kit check",
+      "exit_code": 0,
+      "seconds": 0.67,
+      "status": "passed",
+      "log_sha256": "cc4d7d123bef2a8eb5e9aec706a3ece219bb88ff2a01f4475bf42130a41a28ff"
+    },
+    {
+      "name": "check:ci",
+      "command": "biome ci .",
+      "exit_code": 0,
+      "seconds": 1.22,
+      "status": "passed",
+      "log_sha256": "77916d1c25eb58470f01add701b6121fce3b04ad74be4d8bdd686c209e2bf922"
+    }
+  ],
+  "database_commands": [
+    {
+      "script": "scripts/test-product-stream-postgres.ts",
+      "exit_code": 0,
+      "seconds": 1.82
+    },
+    {
+      "script": "scripts/test-video-workspace-access-postgres.ts",
+      "exit_code": 0,
+      "seconds": 1.17
+    },
+    {
+      "script": "scripts/test-evidence-upload-postgres.ts",
+      "exit_code": 0,
+      "seconds": 1.02
+    },
+    {
+      "script": "scripts/test-document-upload-postgres.ts",
+      "exit_code": 0,
+      "seconds": 1.17
+    },
+    {
+      "script": "scripts/test-catalog-import-postgres.ts",
+      "exit_code": 0,
+      "seconds": 1.82
+    },
+    {
+      "script": "scripts/test-video-upload-reconciliation-postgres.ts",
+      "exit_code": 0,
+      "seconds": 0.97
+    },
+    {
+      "script": "scripts/test-product-source-images-postgres.ts",
+      "exit_code": 0,
+      "seconds": 1.07
+    },
+    {
+      "script": "scripts/test-product-evidence-preview-postgres.ts",
+      "exit_code": 0,
+      "seconds": 0.87
+    },
+    {
+      "script": "scripts/test-sales-context-postgres.ts",
+      "exit_code": 0,
+      "seconds": 0.77
+    },
+    {
+      "script": "scripts/test-product-revision-evidence-postgres.ts",
+      "exit_code": 0,
+      "seconds": 0.72
+    }
+  ],
+  "additional_commands": [
+    {
+      "name": "repository",
+      "command": "python3 scripts/validate_repository.py",
+      "exit_code": 1,
+      "seconds": 1.67,
+      "recheck": {
+        "status": "passed",
+        "exit_code": 0,
+        "log_sha256": "5a535de2b4b717be116bacf7a8db9225796ba62cb5476cafc25040098286c5c5"
+      }
+    },
+    {
+      "name": "document-image",
+      "command": "python3 scripts/test-document-image-context.py",
+      "exit_code": 0,
+      "seconds": 0.06
+    },
+    {
+      "name": "native-ocr",
+      "command": "python3 scripts/test-local-ocr-preprocess.py --native-pdf --local-ocr",
+      "exit_code": 0,
+      "seconds": 0.97
+    },
+    {
+      "name": "pdf-layout",
+      "command": "python3 scripts/test-pdf-catalog-layout.py --native-pdf",
+      "exit_code": 0,
+      "seconds": 0.21
+    },
+    {
+      "name": "pdf-kit",
+      "command": "python3 scripts/test-pdf-kit-ocr.py --native-pdf",
+      "exit_code": 0,
+      "seconds": 0.16
+    },
+    {
+      "name": "catalog-contracts",
+      "command": "node --import tsx scripts/test-catalog-import-contracts.ts",
+      "exit_code": 0,
+      "seconds": 0.32
+    },
+    {
+      "name": "catalog-agent",
+      "command": "node --import tsx scripts/test-catalog-agent.ts",
+      "exit_code": 0,
+      "seconds": 0.52
+    },
+    {
+      "name": "catalog-identity",
+      "command": "node --import tsx scripts/test-catalog-draft-identity.ts",
+      "exit_code": 0,
+      "seconds": 0.62
+    },
+    {
+      "name": "pdf-preflight",
+      "command": "node --import tsx scripts/test-pdf-catalog-preflight.ts",
+      "exit_code": 0,
+      "seconds": 1.37
+    },
+    {
+      "name": "safety-ablation",
+      "command": "node --import tsx scripts/run-product-safety-ablation.ts",
+      "exit_code": 0,
+      "seconds": 2.97
+    }
+  ],
+  "suites": [
+    {
+      "name": "browser-runtime",
+      "passed": 120,
+      "failed": 0,
+      "log_sha256": "caf8891eb5136c416790ab29df7c1ccdc0cff50f0d718c053495ef228618ca0a"
+    },
+    {
+      "name": "browser-dispatch",
+      "passed": 27,
+      "failed": 0,
+      "log_sha256": "d92094a96165fef877b88f2f34649fa33e2b889b63dc81588b5b654eadcaaf14"
+    },
+    {
+      "name": "playwright",
+      "passed": 243,
+      "failed": 0,
+      "log_sha256": "68348567bbc66e47896d62f026a38175af65624293e0cd058d599d5121a2868f"
+    },
+    {
+      "name": "playwright-database",
+      "passed": 43,
+      "failed": 0,
+      "log_sha256": "70a8c2e4cae30e76626f2a67b20230e29459bed25ca5bb342a56b3ae04094074"
+    }
+  ],
+  "integration_entries": [
+    {
+      "name": "browser-fleet-postgres",
+      "status": "passed",
+      "log_sha256": "22ca7232e4b9a58e1bc95589c36409c18a5e86cebd176704616c12694ed1c4c2"
+    },
+    {
+      "name": "facebook-publication-postgres",
+      "status": "passed",
+      "log_sha256": "e352749a8d8beda5f3ba361b363802be5e9bec882179770b0d3bd106bc8c953e"
+    },
+    {
+      "name": "broker-ablation",
+      "status": "passed",
+      "log_sha256": "c86a70273ff5eac8524eb8b65e93b6d2c5078d8f19b9909808f4f655d6be64a9"
+    },
+    {
+      "name": "production-build",
+      "status": "passed",
+      "log_sha256": "6975ade651fbdc7d27b948175f5997d95129c59b71d0537cd7365edbb34fc0e9",
+      "initial_attempt": "blocked by new summary JSON formatting; formatted the artifact and reran"
+    }
+  ],
+  "live_business_acceptance": "not_run",
+  "decision": "pending",
+  "summary_validation": {
+    "command": "pnpm validate:mvp-acceptance -- docs/testing/reports/mvp1-acceptance-20260926.summary.json",
+    "status": "passed"
+  }
+}
