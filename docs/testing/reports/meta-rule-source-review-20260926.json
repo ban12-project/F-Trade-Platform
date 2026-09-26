@@ -1,0 +1,120 @@
+[
+  {
+    "contractVersion": "1.0.0",
+    "classification": "sanitized_aggregate",
+    "reviewedAt": "2026-09-26T14:51:53.372984Z",
+    "projectPreset": {
+      "version": "2026-08",
+      "minDurationSeconds": 3,
+      "maxDurationSeconds": 90
+    },
+    "measurements": {
+      "fileSizeBytes": "available_when_reported",
+      "averageBitrateBps": "available_when_reported",
+      "peakBitrateBps": "not_measured",
+      "missingValue": null
+    },
+    "sourceApplicability": "unverified",
+    "platformAcceptance": "not_evaluated",
+    "reviewId": "meta-facebook-source-review-20260926",
+    "platform": "facebook",
+    "projectPublishingScope": {
+      "path": "facebook_profile_browser",
+      "accountCategory": "personal_profile",
+      "apiVersion": null,
+      "decisionRef": "docs/decisions/0002-camofox-facebook-personal-profile-mvp1.md"
+    },
+    "sources": [
+      {
+        "url": "https://developers.facebook.com/documentation/video-api/guides/reels-publishing",
+        "kind": "vendor_documentation",
+        "readStatus": "unavailable",
+        "documentRevision": null,
+        "ruleVersion": null,
+        "scope": "not_established",
+        "observedSummary": "The current developer page could not be read during this review; no current rules inferred."
+      },
+      {
+        "url": "https://www.postman.com/meta/facebook/folder/simabyk/reels-publishing",
+        "kind": "vendor_collection",
+        "readStatus": "incomplete",
+        "documentRevision": null,
+        "ruleVersion": null,
+        "scope": "publishing_api",
+        "observedSummary": "Only collection navigation was readable in this run; the earlier duration observation was not re-established from this page."
+      },
+      {
+        "url": "https://github.com/fbsamples/reels_publishing_apis/blob/7bf98f94e75d841ecc9612c0061881d1d713c6bd/fb_reels_publishing_api_sample/README.md",
+        "kind": "vendor_sample",
+        "readStatus": "readable",
+        "documentRevision": "7bf98f94e75d841ecc9612c0061881d1d713c6bd",
+        "ruleVersion": null,
+        "scope": "publishing_api",
+        "observedSummary": "The pinned sample lists duration 4–60 seconds. Its publishing API instructions do not establish acceptance by the current Profile browser path."
+      }
+    ],
+    "differences": [
+      "Project export duration remains 3–90 seconds; the sample documents 4–60 seconds. Neither range is promoted to a verified current Profile restriction."
+    ],
+    "unresolved": [
+      "Current authoritative rules applicable to the Profile browser publishing path.",
+      "A vendor rule version; the sample commit is only a document revision.",
+      "The supported account/path scope and explanation of the duration discrepancy.",
+      "Peak bitrate and any other properties not covered by current measurements."
+    ]
+  },
+  {
+    "contractVersion": "1.0.0",
+    "classification": "sanitized_aggregate",
+    "reviewedAt": "2026-09-26T14:51:53.372997Z",
+    "projectPreset": {
+      "version": "2026-08",
+      "minDurationSeconds": 3,
+      "maxDurationSeconds": 900
+    },
+    "measurements": {
+      "fileSizeBytes": "available_when_reported",
+      "averageBitrateBps": "available_when_reported",
+      "peakBitrateBps": "not_measured",
+      "missingValue": null
+    },
+    "sourceApplicability": "unverified",
+    "platformAcceptance": "not_evaluated",
+    "reviewId": "meta-instagram-source-review-20260926",
+    "platform": "instagram",
+    "projectPublishingScope": {
+      "path": "not_selected",
+      "accountCategory": "not_selected",
+      "apiVersion": null,
+      "decisionRef": null
+    },
+    "sources": [
+      {
+        "url": "https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media",
+        "kind": "vendor_documentation",
+        "readStatus": "unavailable",
+        "documentRevision": null,
+        "ruleVersion": null,
+        "scope": "not_established",
+        "observedSummary": "The developer reference could not be read in this run."
+      },
+      {
+        "url": "https://www.postman.com/meta/instagram/folder/830j7my/reels-publishing",
+        "kind": "vendor_collection",
+        "readStatus": "readable",
+        "documentRevision": null,
+        "ruleVersion": null,
+        "scope": "publishing_api",
+        "observedSummary": "The Facebook Login collection lists 3–900 seconds, 23–60 FPS, horizontal size up to 1920 pixels, AAC 48 kHz, video bitrate up to 25 Mbps and file size up to 1 GB. This is a readable reference, not an account/version-specific acceptance result."
+      }
+    ],
+    "differences": [
+      "Exact 1080×1920 and 30 FPS are project output choices, not the only documented accepted dimensions or frame rate."
+    ],
+    "unresolved": [
+      "An explicitly selected Instagram account and publishing API path.",
+      "The current vendor rules version applicable to that path.",
+      "Peak bitrate measurement and interpretation of all platform bitrate/size constraints."
+    ]
+  }
+]
