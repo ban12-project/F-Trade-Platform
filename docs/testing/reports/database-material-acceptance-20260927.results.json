@@ -1,0 +1,111 @@
+{
+  "classification": "sanitized_aggregate",
+  "readOnly": true,
+  "network": "none",
+  "checks": {
+    "product_contract": {
+      "passed": 3,
+      "failed": 0
+    },
+    "field_refs_in_evidence_refs": {
+      "passed": 3,
+      "failed": 0
+    },
+    "product_single_owner": {
+      "passed": 3,
+      "failed": 0
+    },
+    "ready_current_human_approval_reference": {
+      "passed": 1,
+      "failed": 0
+    },
+    "catalog_receipt_and_project_evidence": {
+      "passed": 2,
+      "failed": 0
+    },
+    "catalog_ordinal_contiguous": {
+      "passed": 2,
+      "failed": 0
+    },
+    "candidate_source_contract": {
+      "passed": 72,
+      "failed": 0
+    },
+    "candidate_base_evidence": {
+      "passed": 72,
+      "failed": 0
+    },
+    "candidate_source_digest_reference": {
+      "passed": 72,
+      "failed": 0
+    },
+    "candidate_duplicate_review_status": {
+      "passed": 72,
+      "failed": 0
+    },
+    "candidate_location_positive": {
+      "passed": 72,
+      "failed": 0
+    },
+    "candidate_bounded_locations": {
+      "passed": 72,
+      "failed": 0
+    },
+    "completed_candidate_product_exists": {
+      "passed": 1,
+      "failed": 0
+    },
+    "completed_candidate_field_fact_support": {
+      "passed": 1,
+      "failed": 0
+    },
+    "receipt_evidence_metadata": {
+      "passed": 5,
+      "failed": 0
+    }
+  },
+  "limitations": [
+    "original_blob_bytes_not_read",
+    "factory_facts_not_independently_confirmed",
+    "synthetic_or_real_classification_not_inferred_from_state",
+    "model_not_invoked"
+  ],
+  "catalogCounts": [
+    {
+      "candidates": 0
+    },
+    {
+      "candidates": 72
+    }
+  ],
+  "source_revision": "6286070cf6f8fe52835ab77d86e763a2a1cd3e3b",
+  "observed_at": "2026-09-27T02:37:22.813Z",
+  "runtime": {
+    "image_id": "sha256:4e78c6fe6e8df18a1de947814e442ac3ac4943d65c09d4320152973cde1cd0b3",
+    "node": "24.21.0",
+    "pnpm": "12.3.4"
+  },
+  "attempts": [
+    {
+      "result": "harness_setup_failed",
+      "cause": "shared Ajv duplicate schema registration across module loaders; two attempts"
+    },
+    {
+      "result": "harness_assertions_failed",
+      "cause": "incorrect bare evidence reference and nonempty catalog assumptions",
+      "sha256": "8ef6c1b1711fc4ec25a6020f7b32afa6c83913de4407daaeef298851cf77d6eb"
+    },
+    {
+      "result": "passed",
+      "cause": "isolated Ajv with unchanged strict options and canonical schemas; exact page/line references; empty catalog explicitly unverified",
+      "sha256": "3b751781af6c69e0b69649829b3619dfd87755b20914f8bcc90b6752e3effb5c"
+    }
+  ],
+  "provider_inventory": {
+    "configured_default_provider_count": 1,
+    "encrypted_key_present": true,
+    "decryption_key_available_locally": false,
+    "private_blob_token_available_locally": false,
+    "model_invocations": 0
+  }
+}
