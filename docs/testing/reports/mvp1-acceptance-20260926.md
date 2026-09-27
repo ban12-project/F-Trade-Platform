@@ -92,7 +92,7 @@ GitHub 的 Vercel commit status 为 success。它不证明既有 Sandbox 的应�
 
 ## 剩余来源与候选运行时复核
 
-2026-09-27 后续进展见 [WSL Podman 本地验收](wsl-podman-acceptance-20260927.md)：系统 Podman 已可用，Harbor 实际合成容器及资源限额检查通过；Vercel/Sandbox 只读访问已取得。此前的对应环境阻塞已解除，GHCR 镜像授权及真实业务条件仍未齐备。
+2026-09-27 后续进展见 [WSL Podman 本地验收](wsl-podman-acceptance-20260927.md)：系统 Podman 已可用，Harbor 实际合成容器及资源限额检查通过；Vercel/Sandbox 只读访问已取得。用户完成 GHCR 登录后，精确 browser 镜像的本地解码、资源限额和合成 profile 连续性也已通过。此前的对应环境阻塞已解除，实际 Sandbox 同镜像及真实业务条件仍待完成。
 
 - [Meta 来源规则审计](meta-rule-source-review-20260926.md)及独立契约保留当前规则版本和路径适用性未知；不修改项目预设，也不关闭 #318。
 - [#415 候选审计](browser-candidate-415-audit-20260926.md)核对固定 head、CI 与代码边界；保持草稿和独立验收范围。

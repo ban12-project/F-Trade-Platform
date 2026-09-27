@@ -49,6 +49,49 @@
       "status": "passed",
       "sha256": "76ec4b2f56bcaee3ad0ca43ae3fe819eacdf203b31a03259050ad32e64b9ea92",
       "bytes": 3871
+    },
+    {
+      "log": "browser-image-pull.log",
+      "status": "passed",
+      "sha256": "e49e088969888ca10ce7b3a23c5f473cbba58037d81938bbf77fb891a9a04063",
+      "bytes": 2739
+    },
+    {
+      "log": "browser-image-identity.log",
+      "status": "passed",
+      "sha256": "d78860a20a9f76c74fd313b437f3e587894f16481b5d7fcef9e4ddb7d2867cc6",
+      "bytes": 186
+    },
+    {
+      "log": "browser-h264.log",
+      "status": "passed",
+      "sha256": "fa92a359a41ae0cf42aa87a3be0c5557b645aa9999500c899d090c92f04879fd",
+      "bytes": 204
+    },
+    {
+      "log": "browser-native-profile.log",
+      "status": "passed",
+      "sha256": "d6c8eae20f158f4683a700a209e33ac5c23c1198620c73d56d6f6bc049772dd0",
+      "bytes": 344
     }
-  ]
+  ],
+  "browser": {
+    "requested_digest": "sha256:60dee95faafbcd77c1b25dfe412e7b5810699f29ee4a62214ed2f48d38d69aff",
+    "image_id": "sha256:0cc22e02fe7a1542036a47b6fc64d84027747cd6eebdabe0192f773cbda42e1f",
+    "revision": "b29c3e64bf7f851313279179c4905d114fbfcc4d",
+    "architecture": "amd64",
+    "native_profile_label": "1",
+    "h264_pixel_decode": "passed",
+    "pids_max": 512,
+    "pids_peak": 165,
+    "pids_events_max": 0,
+    "memory_max_bytes": 2147483648,
+    "memory_peak_bytes": 425230336,
+    "oom_events": 0,
+    "oom_kill_events": 0,
+    "synthetic_profile_continuity": "passed",
+    "local_seccomp": "repository restriction generated from installed Podman default",
+    "production_profile_used": false,
+    "credential_claims": 0
+  }
 }
