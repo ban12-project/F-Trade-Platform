@@ -53,6 +53,11 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Offline browser login control ablations
+        run: node scripts/browser-login-ablation.mjs
+        env:
+          REVIEW_REVISION: ${{ github.sha }}
+
       - name: Run type checks
         run: pnpm typecheck
 
@@ -73,4 +78,5 @@ jobs:
           path: |
             blob-report/
             blob-report-database/
+            artifacts/browser-login-ablation/
           retention-days: 7
