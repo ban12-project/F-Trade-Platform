@@ -5,12 +5,17 @@ import { getDatabase } from "../db/client";
 import { authorizeBrowserSandboxStart } from "./sandbox-authorization";
 import { claimManualSandboxDispatch, recordedBrowserSandboxDispatch } from "./sandbox-dispatch";
 import { bindBrowserSandboxGateway, settleBrowserSandboxOperation } from "./sandbox-lifecycle";
+import {
+  browserSandboxNetworkPolicySchema,
+  configuredBrowserSandboxNetworkPolicy,
+} from "./sandbox-network-policy";
 import { provisionBrowserSandbox } from "./sandbox-provider";
 import { startBrowserSandboxRuntime } from "./sandbox-runtime";
 import { secureOrigin } from "./security";
 
 const configSchema = z
   .object({
+    networkPolicy: browserSandboxNetworkPolicySchema,
     templateSnapshotId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/),
     appOrigin: z.string().transform(secureOrigin),
     agentImage: z.string().regex(/^sha256:[a-f0-9]{64}$/),
@@ -66,8 +71,13 @@ export async function dispatchManualBrowserSandbox(
     if (!(await deps.authorize(nodeId, operationId))) throw new Error("authorization_changed");
     captured = await deps.provision(
       claim.mode === "create"
-        ? { ...claim, mode: "create", templateSnapshotId: settings.templateSnapshotId }
-        : { ...claim, mode: "resume" },
+        ? {
+            ...claim,
+            mode: "create",
+            templateSnapshotId: settings.templateSnapshotId,
+            networkPolicy: settings.networkPolicy,
+          }
+        : { ...claim, mode: "resume", networkPolicy: settings.networkPolicy },
     );
     const sessionId = captured.session.sessionId;
     if (!(await deps.bind(nodeId, operationId, sessionId, captured.gatewayOrigin)))
@@ -111,6 +121,7 @@ export async function dispatchManualBrowserSandbox(
 
 export function configuredBrowserSandboxRuntime() {
   return configSchema.parse({
+    networkPolicy: configuredBrowserSandboxNetworkPolicy(),
     templateSnapshotId: process.env.BROWSER_SANDBOX_TEMPLATE_SNAPSHOT_ID,
     appOrigin: process.env.BROWSER_SANDBOX_PLATFORM_ORIGIN,
     agentImage: process.env.BROWSER_SANDBOX_AGENT_IMAGE_ID,
