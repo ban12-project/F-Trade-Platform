@@ -69,7 +69,7 @@ export function FacebookAccountPanel() {
         const result = await facebookAccountStatusAction();
         if (!disposed) {
           setStatus(result);
-          setMessage(result ? "" : "未配置独立 Facebook Worker；托管账号请前往浏览器页面。");
+          if (!result) setMessage("未配置独立 Facebook Worker；托管账号请前往浏览器页面。");
         }
       } catch {
         if (!disposed) setMessage("无法读取账号状态。请检查账号拥有者权限、环境配置和数据库迁移。");
