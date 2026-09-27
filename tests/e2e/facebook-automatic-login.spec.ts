@@ -20,6 +20,9 @@ for (const mode of [
   "bootstrap-data-mismatch",
   "bootstrap-switched",
   "bootstrap-no-cookie",
+  "bootstrap-limit-hydration",
+  "bootstrap-limit-persistent",
+  "bootstrap-limit-conflict",
   "ready-shell",
   "ready-hydration",
   "aria-submit",
@@ -334,24 +337,81 @@ for (const mode of [
             : []),
         ]);
       await page.goto(`${base}/messages/`);
-      await page.evaluate((wrong) => {
-        const script = document.createElement("script");
-        script.type = "application/json";
-        script.textContent = JSON.stringify({
-          require: [
-            [
-              "CurrentUserInitialData",
-              [],
-              {
-                USER_ID: wrong ? "999999999" : "123456789",
-                ACCOUNT_ID: "123456789",
-              },
-              1,
+      await page.evaluate(
+        (wrong) => {
+          const script = document.createElement("script");
+          script.type = "application/json";
+          script.textContent = JSON.stringify({
+            require: [
+              [
+                "CurrentUserInitialData",
+                [],
+                {
+                  USER_ID: wrong ? "999999999" : "123456789",
+                  ACCOUNT_ID: "123456789",
+                },
+                1,
+              ],
             ],
-          ],
+          });
+          document.head.append(script);
+        },
+        mode === "bootstrap-data-mismatch" || mode === "bootstrap-limit-conflict",
+      );
+      if (mode.startsWith("bootstrap-limit-")) {
+        Object.assign(profile.automation, { mode: "observe-only" });
+        await page.evaluate(() => {
+          document.querySelector("#pin")?.remove();
+          const chats = document.createElement("div");
+          chats.id = "chats";
+          chats.innerHTML = '<span id="empty">No chats</span>';
+          document.body.append(chats);
+          const payload = document.createElement("script");
+          payload.id = "hydrating-payload";
+          payload.type = "application/json";
+          payload.textContent = JSON.stringify({ unrelated: "x".repeat(4_000_000) });
+          document.head.append(payload);
         });
-        document.head.append(script);
-      }, mode === "bootstrap-data-mismatch");
+        let reads = 0;
+        const calls: string[] = [];
+        const execute = createSavedLoginExecutor({
+          run: { id: runId, leaseId: packet.requestId, accountId, kind: "interactive" },
+          profile,
+          assertActive() {},
+          async checkEgress() {},
+          async request(operation) {
+            calls.push(operation);
+            if (operation !== "login-result") throw new Error("unexpected credential request");
+            return { recorded: true };
+          },
+          async browserRequest(path, body) {
+            let value: unknown;
+            if (path === "/ftrade/login-status")
+              value = {
+                version: 2,
+                runId,
+                accountId,
+                reviewRef: profile.reviewRef,
+                expiresAt: Date.parse(profile.expiresAt),
+              };
+            else if (path === "/tabs") value = { tabId: "tab", url: profile.automation.ready.url };
+            else if (path === "/ftrade/login-observe") {
+              if (!body) throw new Error("missing observation packet");
+              value = await runtime("observe", body);
+              reads++;
+              if (reads === 1 && mode !== "bootstrap-limit-persistent")
+                await page.locator("#hydrating-payload").evaluate((element) => element.remove());
+            } else throw new Error("unexpected browser submission");
+            return new Response(JSON.stringify(value));
+          },
+        });
+        expect(await execute({ id: packet.requestId, expiresAt: Date.now() + 30000 })).toBe(
+          mode === "bootstrap-limit-hydration" ? "ready" : "refused",
+        );
+        expect(reads).toBe(mode === "bootstrap-limit-persistent" ? 21 : 2);
+        expect(calls).toEqual(["login-result"]);
+        return;
+      }
       const observed = await runtime("observe", { ...packet });
       expect(observed.identityVerified === true).toBe(mode === "bootstrap");
       expect(

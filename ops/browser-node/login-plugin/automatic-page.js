@@ -302,6 +302,14 @@ async function automaticLoginPage({
     submit?.click();
     return "submitted";
   } catch {
+    // Bootstrap data can exceed observation bounds while the page hydrates.
+    // Return an unverified observation so the existing bounded read retries apply.
+    if (operation === "observe")
+      return {
+        state: "invalid",
+        originVerified: location.origin === "https://www.facebook.com",
+        identityVerified: false,
+      };
     return attempted ? "unknown" : "refused";
   }
 }
