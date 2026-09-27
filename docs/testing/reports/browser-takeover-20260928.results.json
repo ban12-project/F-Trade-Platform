@@ -55,6 +55,8 @@
     "rollback_stopped_deny_all": true,
     "verification_stopped_deny_all": true,
     "review_expires_at": "2026-09-27T18:47:50.162Z",
-    "application_revision": "efe07e0bd1d6728cbb41d017e85e1140665df138"
+    "application_revision": "efe07e0bd1d6728cbb41d017e85e1140665df138",
+    "deployment_ready": true,
+    "production_alias_assigned": true
   }
 }

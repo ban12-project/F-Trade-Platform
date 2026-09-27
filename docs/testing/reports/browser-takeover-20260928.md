@@ -53,3 +53,5 @@ The original Sandbox name and account binding were preserved; its selected snaps
 Postflight at `2026-09-27T16:52:55.404Z` confirmed production stopped on the selected snapshot, policy unchanged, and both verification and independent rollback copies stopped/deny-all. Rollback requires restoring the preserved original snapshot plus both previous image IDs and redeploying; exact private identifiers are held outside GitHub. Snapshot retention is seven days.
 
 A redeploy CLI invocation using unsupported `--prod` was rejected before deployment; it was corrected to `--target production`. No local working-tree application build was uploaded. The prior ready application deployment at `efe07e0` returned no matching 500 entries in a one-hour filtered log query. Empty logs are not evidence of a fresh authenticated request succeeding.
+
+The corrected redeploy completed: `dpl_3dAxYJuFyT4t4Z3VTc5hwY25pe4g` is READY, targets production at `efe07e0bd1d6728cbb41d017e85e1140665df138`, and has `ftp.ban12.com` assigned. An unauthenticated browser-page request returned HTTP 307 (authentication redirect); it is not counted as an authenticated queue success.
