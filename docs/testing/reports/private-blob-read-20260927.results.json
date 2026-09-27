@@ -1,0 +1,70 @@
+{
+  "classification": "sanitized_aggregate",
+  "method": "official_blob_oidc_private_get",
+  "useCache": false,
+  "databaseReadOnly": true,
+  "results": [
+    {
+      "ordinal": 1,
+      "contentType": "application/pdf",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 2,
+      "contentType": "application/pdf",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 3,
+      "contentType": "text/csv",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 4,
+      "contentType": "text/csv",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 5,
+      "contentType": "text/csv",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 6,
+      "contentType": "video/mp4",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 7,
+      "contentType": "video/mp4",
+      "providerResult": 200,
+      "read": true,
+      "digestMatches": true,
+      "sizeMatches": true,
+      "typeMatches": true
+    }
+  ],
+  "source_revision": "37c068363aea3e746119b56a01f7757dfca63fbd",
+  "attempts": [
+    {
+      "file": "blob-read-results.json",
+      "sha256": "27ab6c06544b87e1448faf6fc13506faa84c162625ee8e95bc6724b22e4d7284"
+    },
+    {
+      "file": "blob-read-recheck-results.json",
+      "sha256": "44f6d0c4049cfda6925f99228c21655636e3c0ba87cec4a966189f31a4580c24"
+    }
+  ]
+}
