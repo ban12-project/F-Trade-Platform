@@ -32,7 +32,10 @@ import {
   decryptFacebookCredential,
   encryptFacebookCredential,
 } from "./facebook-vault-crypto";
-import { configuredFacebookWorkerScope } from "./facebook-worker-protocol";
+import {
+  configuredFacebookStatusScope,
+  configuredFacebookWorkerScope,
+} from "./facebook-worker-protocol";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const key = () => process.env.FACEBOOK_INTERACTIVE_SIGNING_KEY ?? "";
@@ -61,7 +64,8 @@ async function lockControl(tx: Tx) {
   return { scope, control, where };
 }
 export async function readFacebookAccountStatus(database: Database = getDatabase()) {
-  const scope = configuredScope();
+  const scope = configuredFacebookStatusScope();
+  if (!scope) return null;
   const [record] = await database
     .select()
     .from(facebookAccountRuntime)

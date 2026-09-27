@@ -13,6 +13,7 @@ on:
       - "scripts/test-browser-inbox-roundtrip.ts"
       - "scripts/test-browser-login-postgres.ts"
       - "scripts/test-facebook-login-credentials.ts"
+      - "scripts/test-facebook-account-status.ts"
       - "scripts/test-facebook-totp.mjs"
       - "scripts/test-facebook-login-flow.mjs"
       - "drizzle/**"
@@ -56,6 +57,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Encrypted login factors and local TOTP
         run: |
+          node --conditions=react-server --import tsx scripts/test-facebook-account-status.ts
           node --import tsx scripts/test-facebook-login-credentials.ts
           node scripts/test-facebook-totp.mjs
           node scripts/test-facebook-login-flow.mjs

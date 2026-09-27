@@ -287,6 +287,7 @@ type NodeRow = {`,
     }
     // Legacy migration and disable switch are exercised through actual stores.
     process.env.SOCIAL_FACEBOOK_OWNER_USER_ID = actor.id;
+    process.env.SOCIAL_FACEBOOK_WORKER_ENABLED = "1";
     process.env.SOCIAL_WORKER_ID = "synthetic-worker";
     process.env.SOCIAL_WORKER_ACCOUNT_REF = "synthetic-legacy-account";
     process.env.SOCIAL_WORKER_CHANNEL_REF = "synthetic-legacy-channel";
@@ -311,6 +312,7 @@ type NodeRow = {`,
       actor.id,
     );
     const status = await readFacebookAccountStatus();
+    assert.ok(status);
     assert.equal(status.loginSaved, true);
     process.env.SOCIAL_FACEBOOK_WORKER_ENABLED = "0";
     const disabled = await interactiveEndpoint(
