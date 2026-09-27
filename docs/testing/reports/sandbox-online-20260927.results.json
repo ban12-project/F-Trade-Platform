@@ -1,0 +1,50 @@
+{
+  "classification": "sanitized_aggregate",
+  "run_id": "sanitized-sandbox-online-20260927",
+  "observed_at": "2026-09-27T13:53:56.583675+00:00",
+  "app_baseline": "85b7bf253e90e4a274155abb4092baf3ed6af1f2",
+  "browser_original_config": "sha256:0cc22e02fe7a1542036a47b6fc64d84027747cd6eebdabe0192f773cbda42e1f",
+  "browser_docker_manifest": "sha256:d11c92125b355a5003d401f02f8f9cb2b467451954e1a8d97438db8bf742b75a",
+  "rootfs_layers": 28,
+  "proxy_network_probe": {
+    "policyMatches": true,
+    "proxy": {
+      "status": 200,
+      "expectedEgressMatches": true
+    },
+    "directBlocked": true
+  },
+  "ready_rounds": 3,
+  "container_replacements": 1,
+  "sandbox_stop_resume_cycles": 1,
+  "browser_egress_matched_rounds": 3,
+  "identity_verified_rounds": 3,
+  "credential_claims": 0,
+  "login_factor_submissions": 0,
+  "publications": 0,
+  "dm_sends": 0,
+  "production_mutations": 0,
+  "original_unknown_results_retried": 0,
+  "runtime_mode": "observe-only",
+  "production_profile_modified": false,
+  "no_oom_killed": true,
+  "first_failures": [
+    "WSL browser proxy tunnel rejected; raw proxy response HTTP 403 without CRLF. Cause not established.",
+    "Local OIDC context failure; refreshed through authenticated Vercel CLI.",
+    "Explicit empty allow array omitted by provider; strict comparison refused. Omitted optional empty field and verified exact stored policy before resume."
+  ],
+  "source_logs": {
+    "local-proxy-result.log": "c260cd2384a5965d57f82013c0fbf44d59311110a89c9c0cca12bbf9af7bbc87",
+    "connect-result.log": "6bf252b97badf383adf80bdf38babc71ce2433b920e02731c959c2607de0fbeb",
+    "cloud-proxy-result.json": "168e6300b83c98dd413a7aa36d88be6c9633221676d1e189008c9ed86dc0de3f",
+    "online-first-result.json": "0a044f1bd02f958c4418a17611a88858b2820bfce36871587e5cc498a0279a01",
+    "online-result.json": "a57d47722a95465b654490670a837edf619f062666f6ca78bd5d5f2f002bb29f",
+    "image-transfer.json": "503ffe9c06feb5ee21bfd775a5ba7d04d03b2aed61c84d3e8016b4b8f72f1ec6"
+  },
+  "remaining": [
+    "coordinated production network policy and runtime rollout",
+    "application-authorized automatic video receipt",
+    "independently authorized real inbound DM",
+    "factory originals and formal business/device acceptance"
+  ]
+}
