@@ -7,7 +7,14 @@ test("shared navigation stays mounted and interactive while a child route stream
   page,
 }) => {
   await page.goto(root);
+  // Capture the persistent layout after hydration, before the client-side transition.
+  await page.getByRole("button", { name: "开始新工作", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "开始新工作", exact: true });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
   const dock = page.getByTestId("workspace-navigation");
+  await expect(dock).toHaveCount(1);
   await expect(dock).toBeVisible();
   const original = await dock.elementHandle();
   const click = page.getByRole("link", { name: "切换测试页面" }).click({ noWaitAfter: true });
