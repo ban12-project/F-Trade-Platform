@@ -369,7 +369,10 @@ async function heartbeat(slot) {
         const reason = loginStopOutcome(profile.version, outcome);
         if (reason) await stop(slot, reason);
       })
-      .catch(() => stop(slot, loginStopOutcome(profile.version, "unknown")));
+      .catch(() => stop(slot, loginStopOutcome(profile.version, "unknown")))
+      .finally(() => {
+        slot.loginTask = null;
+      });
   }
 }
 let ticking = false;

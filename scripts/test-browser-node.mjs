@@ -22,6 +22,7 @@ import {
   loadLoginProfiles,
   loginProfileForRun,
   loginScopes,
+  loginStopOutcome,
 } from "../ops/browser-node/login.mjs";
 import { readPublicationMedia } from "../ops/browser-node/media.mjs";
 import {
@@ -59,6 +60,32 @@ test("closing a challenge viewer preserves the bounded automatic task only", () 
     ),
     false,
   );
+});
+test("automatic ready preserves admission and connected viewer until normal retirement", () => {
+  assert.equal(
+    loginStopOutcome(2, "ready"),
+    null,
+    "login observation must not terminate human takeover",
+  );
+  const state = {
+    automatic: true,
+    connected: false,
+    pendingConnection: true,
+    readyAt: 1,
+    loginTask: false,
+  };
+  assert.equal(viewerGraceExpired(state, 100000), false);
+  assert.equal(
+    viewerGraceExpired({ ...state, connected: true, pendingConnection: false }, 100000),
+    false,
+  );
+  assert.equal(viewerGraceExpired({ ...state, pendingConnection: false }, 100000), true);
+  assert.equal(
+    viewerGraceExpired({ ...state, connected: true, disconnectedAt: 80000 }, 100000),
+    true,
+  );
+  assert.equal(loginStopOutcome(2, "unknown"), "page_contract_failed");
+  assert.equal(loginStopOutcome(2, "refused"), "page_contract_failed");
 });
 test("browser startup waits for Firefox prewarm and rechecks cancellation", async () => {
   const ready = { ok: true, engine: "camoufox", browserConnected: true, browserRunning: true };
