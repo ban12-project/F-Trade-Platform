@@ -258,7 +258,9 @@ export function createSavedLoginExecutor({
 
 /** Uncertain automatic observations pause work; they do not establish logout. */
 export function loginStopOutcome(version, outcome) {
-  if (version === 2) return outcome === "ready" ? "completed" : "page_contract_failed";
+  // Readiness is an observation, not a request to end the owner's viewer.
+  // Idle grace, explicit stop and the lease still bound this interactive run.
+  if (version === 2) return outcome === "ready" ? null : "page_contract_failed";
   if (outcome === "ready") return "completed";
   if (outcome === "unknown") return "unknown";
   return null;
