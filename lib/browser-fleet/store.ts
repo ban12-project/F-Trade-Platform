@@ -46,6 +46,7 @@ import {
 import {
   authorizePublication,
   claimPublication,
+  hasHumanReconciledPublication,
   reconcilePublications,
   recordPublicationReceipt,
   resolvePublicationMedia,
@@ -279,12 +280,14 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
           if (run.accountId === account.id && (isLive(run) || run.status === "queued"))
             requestStop(state, run);
       } else if (command.operation === "confirm-login") {
-        if (
-          state.runs.some(
-            (r) => r.accountId === account.id && (isLive(r) || r.status === "unknown"),
+        for (const run of state.runs.filter((r) => r.accountId === account.id)) {
+          if (
+            isLive(run) ||
+            (run.status === "unknown" &&
+              !(await hasHumanReconciledPublication(tx, row.id, row.owner_id, account, run)))
           )
-        )
-          throw new Error("resolve_running_or_unknown_result_first");
+            throw new Error("resolve_running_or_unknown_result_first");
+        }
         if (!account.proxyCiphertext) throw new Error("proxy_required");
         if (!account.expectedEgressIp) throw new Error("expected_egress_required");
         account.authState = "ready";

@@ -28,6 +28,7 @@ import { testBrowserInbox } from "./test-browser-inbox-postgres";
 import { testInboxRoundTrip } from "./test-browser-inbox-roundtrip";
 import { testInboxWakeup } from "./test-browser-inbox-wakeup";
 import { testBrowserLogin } from "./test-browser-login-postgres";
+import { testReconciledLogin } from "./test-browser-login-reconciliation-postgres";
 import { testPublicationWakeup } from "./test-browser-publication-wakeup";
 import { testBrowserSandboxOwner } from "./test-browser-sandbox-owner";
 import { testFacebookInbound } from "./test-facebook-inbound-postgres";
@@ -1171,6 +1172,19 @@ async function main() {
         .from(schema.socialPublication)
         .where(eq(schema.socialPublication.id, target.id));
       assert.equal(saved.status, outcome === "published" ? "published" : "unknown");
+      if (outcome === "unknown" || outcome === "unknown_video")
+        await assert.rejects(
+          ownerBrowserCommand(
+            {
+              operation: "confirm-login",
+              nodeId: node.nodeId,
+              accountId: bound.id,
+              confirmed: true,
+            },
+            owner,
+          ),
+          /resolve_running_or_unknown_result_first/,
+        );
       if (outcome === "unknown")
         await testPublicationReconciliation(database, {
           actor,
@@ -1187,6 +1201,15 @@ async function main() {
           jobId: target.jobId,
           contentRef: target.contentRef,
         });
+      if (outcome === "unknown" || outcome === "unknown_video") {
+        await testReconciledLogin(database, {
+          owner,
+          nodeId: node.nodeId,
+          accountId: bound.id,
+          jobId: target.jobId,
+          publicationId: target.id,
+        });
+      }
       if (outcome === "published") {
         const [record] = await db
           .select()

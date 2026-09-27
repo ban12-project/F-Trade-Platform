@@ -25,6 +25,49 @@ import {
   requestStop,
 } from "./policy";
 
+/** Called under the node lock shared with human reconciliation. This only
+ * resolves the login-confirmation blocker; original receipts and channel pause
+ * remain unchanged, and this is never a new publication authorization. */
+export async function hasHumanReconciledPublication(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  ownerId: string,
+  account: Account,
+  run: Run,
+) {
+  if (run.kind !== "publish" || run.status !== "unknown" || !run.jobRef) return false;
+  const result = await tx.execute(sql`
+    SELECT r.payload, r.receipt
+    FROM browser_fleet_publication r
+    JOIN social_browser_job j ON j.id = r.job_id
+    JOIN social_publication p ON p.browser_job_id = j.id AND p.id = j.payload_ref
+    WHERE r.node_id = ${nodeId} AND r.run_id = ${run.id} AND r.job_id = ${run.jobRef}
+      AND j.kind = 'publish' AND j.status = 'succeeded' AND p.status = 'published'
+      AND j.account_ref = ${account.accountRef} AND p.account_ref = j.account_ref
+      AND j.channel_ref = ${account.channelRef} AND p.channel_ref = j.channel_ref
+      AND p.external_publication_ref IS NOT NULL AND j.result_ref = p.external_publication_ref
+      AND r.authorization_id IS NOT NULL AND r.received_at IS NOT NULL
+      AND r.receipt->>'outcome' = 'unknown'
+      AND r.receipt->>'authorizationId' = r.authorization_id
+      AND EXISTS (
+        SELECT 1 FROM audit_event e
+        WHERE e.subject_id = p.id AND e.subject_type = 'social_publication'
+          AND e.action = 'social_publication.reconciled' AND e.actor_type = 'human'
+          AND e.actor_id = ${ownerId} AND e.aggregate_id = p.content_ref
+          AND e.metadata->>'job_id' = j.id
+          AND e.metadata->>'payload_digest' = r.receipt->>'payloadDigest'
+          AND e.metadata->>'evidence_ref' <> ''
+          AND e.metadata->'original_receipt_preserved' = 'true'::jsonb
+          AND e.metadata->'retry_allowed' = 'false'::jsonb
+      )`);
+  const row = result.rows[0];
+  if (!row?.payload || !row.receipt) return false;
+  return (
+    digestSocialWorkerPayload(row.payload as Record<string, unknown>) ===
+    (row.receipt as Record<string, unknown>).payloadDigest
+  );
+}
+
 /** Called under the node row lock. The job lock and unique reservation exclude
  * legacy workers and duplicate polls, including after terminal run pruning. */
 export async function schedulePublications(
