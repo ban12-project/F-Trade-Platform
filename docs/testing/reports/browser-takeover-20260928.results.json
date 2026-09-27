@@ -1,0 +1,60 @@
+{
+  "classification": "sanitized_engineering_evidence",
+  "run_id": "sanitized-browser-takeover-20260928",
+  "revision": "efe07e0bd1d6728cbb41d017e85e1140665df138",
+  "broker_boundary": "synthetic",
+  "production_authenticated_ui": "not_run",
+  "rounds": [
+    {
+      "run": 1,
+      "after_sandbox_restart": false,
+      "observed_at": "2026-09-27T16:38:18.957Z",
+      "identity_verified": true,
+      "messenger_ready": true,
+      "credential_claimed": false,
+      "viewer_connected_ms": 75000,
+      "viewer_errors": 0,
+      "finish_outcome": "completed",
+      "finish_after_runtime_ready_ms": 140665,
+      "finish_after_observation_ms": 127790
+    },
+    {
+      "run": 2,
+      "after_sandbox_restart": true,
+      "observed_at": "2026-09-27T16:47:50.162Z",
+      "identity_verified": true,
+      "messenger_ready": true,
+      "credential_claimed": false,
+      "viewer_connected_ms": 75000,
+      "viewer_errors": 0,
+      "finish_outcome": "completed",
+      "finish_after_runtime_ready_ms": 128004,
+      "finish_after_observation_ms": 118272
+    }
+  ],
+  "media": {
+    "h264_local": "pass",
+    "h264_sandbox": "pass",
+    "pids_peak": 148,
+    "pids_limit": 512,
+    "pids_exhaustion_events": 0,
+    "memory_peak_bytes": 859516928,
+    "memory_limit_bytes": 2147483648,
+    "oom_events": 0
+  },
+  "publish_enabled": false,
+  "inbox_enabled": false,
+  "factor_submissions": 0,
+  "business_acceptance": "pending",
+  "production_configuration": {
+    "selected_snapshot_matches": true,
+    "actual_sandbox_policy_matches": true,
+    "agent_image_env_matches": true,
+    "browser_image_env_matches": true,
+    "policy_env_readback": "unavailable_sensitive_variable",
+    "rollback_stopped_deny_all": true,
+    "verification_stopped_deny_all": true,
+    "review_expires_at": "2026-09-27T18:47:50.162Z",
+    "application_revision": "efe07e0bd1d6728cbb41d017e85e1140665df138"
+  }
+}
