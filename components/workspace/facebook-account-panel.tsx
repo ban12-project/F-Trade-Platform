@@ -67,7 +67,10 @@ export function FacebookAccountPanel() {
       loading = true;
       try {
         const result = await facebookAccountStatusAction();
-        if (!disposed) setStatus(result);
+        if (!disposed) {
+          setStatus(result);
+          setMessage(result ? "" : "未配置独立 Facebook Worker；托管账号请前往浏览器页面。");
+        }
       } catch {
         if (!disposed) setMessage("无法读取账号状态。请检查账号拥有者权限、环境配置和数据库迁移。");
       } finally {

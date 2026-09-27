@@ -14,7 +14,7 @@ export function FacebookAttentionNotice() {
       busy = true;
       try {
         const value = await facebookAccountStatusAction();
-        if (!gone) setState(value.authState);
+        if (!gone) setState(value?.authState ?? "");
       } catch {
         /* Configuration absent or access revoked: never reveal account data. */
       } finally {
