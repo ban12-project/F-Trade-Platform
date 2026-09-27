@@ -13,6 +13,7 @@ import {
   useId,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
@@ -69,6 +70,9 @@ function NewWorkRouteReset() {
   }, [pathname, start]);
   return null;
 }
+const subscribeToHydration = () => () => {};
+const clientHydrationSnapshot = () => true;
+const serverHydrationSnapshot = () => false;
 const initialState: WorkspaceActionState = { status: "idle", message: "" };
 function NewProjectForm({
   kind,
@@ -274,6 +278,12 @@ export function NewWorkProvider({
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
   const dialogId = useId();
+  // Preloaded projects do not make the server-rendered trigger interactive.
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    clientHydrationSnapshot,
+    serverHydrationSnapshot,
+  );
   const [loadedProjects, setProjects] = useState(projects);
   const [intent, setIntent] = useState<NewWorkIntent | null>(null);
   const [destination, setDestination] = useState<string | null>(null);
@@ -285,7 +295,12 @@ export function NewWorkProvider({
   return (
     <ProjectDataContext value={setProjects}>
       <NewWorkContext
-        value={{ start: setIntent, ready: loadedProjects !== undefined, dialogId, open: !!intent }}
+        value={{
+          start: setIntent,
+          ready: hydrated && loadedProjects !== undefined,
+          dialogId,
+          open: !!intent,
+        }}
       >
         <Suspense fallback={null}>
           <NewWorkRouteReset />

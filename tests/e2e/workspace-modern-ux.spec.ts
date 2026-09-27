@@ -44,15 +44,45 @@ test("streaming keeps a main target and a text-bearing status outside its busy s
   await expect(page.getByRole("heading", { name: "Synthetic persistent workspace" })).toBeVisible();
 });
 
+test("new work waits for hydration before accepting its first keyboard activation", async ({
+  page,
+}) => {
+  let releaseScripts = () => {};
+  const scriptsReady = new Promise<void>((resolve) => {
+    releaseScripts = resolve;
+  });
+  await page.route(/\/_next\/static\/.*\.js(?:\?|$)/, async (route) => {
+    await scriptsReady;
+    await route.continue();
+  });
+  try {
+    await page.goto(navigationFixture, { waitUntil: "commit" });
+    const trigger = page.getByRole("button", { name: "开始新工作", exact: true });
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toBeDisabled();
+    releaseScripts();
+    await expect(trigger).toBeEnabled();
+    await trigger.focus();
+    await trigger.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "开始新工作", exact: true });
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  } finally {
+    releaseScripts();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+});
+
 test("new work exposes its controlled dialog and restores keyboard focus on Escape", async ({
   page,
 }) => {
   await page.goto(navigationFixture);
-  const trigger = page.getByRole("button", {
-    name: "开始新工作",
-    exact: true,
-    includeHidden: true,
-  });
+  // Keep the modal's inert background trigger addressable, excluding hidden SSR copies.
+  const trigger = page
+    .getByRole("button", { name: "开始新工作", exact: true, includeHidden: true })
+    .filter({ visible: true });
   await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   // Keyboard press does not wait for an initially disabled trigger to become enabled.
@@ -225,7 +255,9 @@ test("forced-colors keyboard focus uses an outline rather than only a shadow", a
   await page.goto(navigationFixture);
   await page.keyboard.press("Tab");
   const button = page.getByRole("button", { name: "开始新工作", exact: true });
+  await expect(button).toBeEnabled();
   await button.focus();
+  await expect(button).toBeFocused();
   await expect(button).toHaveCSS("outline-style", "solid");
   await expect(button).toHaveCSS("outline-width", "2px");
 });
