@@ -1,5 +1,9 @@
 import { Sandbox } from "@vercel/sandbox";
 import { z } from "zod";
+import {
+  browserSandboxNetworkPolicyMatches,
+  browserSandboxNetworkPolicySchema,
+} from "./sandbox-network-policy";
 
 const uuid = z
   .string()
@@ -9,11 +13,19 @@ const requestSchema = z.discriminatedUnion("mode", [
     .object({
       mode: z.literal("create"),
       nodeId: uuid,
+      networkPolicy: browserSandboxNetworkPolicySchema,
       operationId: uuid,
       templateSnapshotId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/),
     })
     .strict(),
-  z.object({ mode: z.literal("resume"), nodeId: uuid, operationId: uuid }).strict(),
+  z
+    .object({
+      mode: z.literal("resume"),
+      nodeId: uuid,
+      operationId: uuid,
+      networkPolicy: browserSandboxNetworkPolicySchema,
+    })
+    .strict(),
 ]);
 export type BrowserSandboxProviderRequest = z.infer<typeof requestSchema>;
 
@@ -25,6 +37,7 @@ export type BrowserSandboxProviderHandle = Pick<
   | "timeout"
   | "vcpus"
   | "tags"
+  | "networkPolicy"
   | "currentSession"
   | "domain"
   | "listSessions"
@@ -50,6 +63,7 @@ export async function provisionBrowserSandbox(
     if (request.mode === "create") {
       sandbox = await provider.create({
         name,
+        networkPolicy: request.networkPolicy,
         source: { type: "snapshot", snapshotId: request.templateSnapshotId },
         ports: [9400],
         persistent: true,
@@ -84,10 +98,14 @@ export async function provisionBrowserSandbox(
         existing.timeout > 20 * 60 * 1000
       )
         throw new Error("sandbox_timeout_requires_reconciliation");
+      if (!browserSandboxNetworkPolicyMatches(existing.networkPolicy, request.networkPolicy))
+        throw new Error("sandbox_network_policy_requires_reconciliation");
       sandbox = await provider.get({ name, resume: true });
     }
     if (sandbox.name !== name || !sandbox.persistent || sandbox.status !== "running")
       throw new Error("sandbox_requires_reconciliation");
+    if (!browserSandboxNetworkPolicyMatches(sandbox.networkPolicy, request.networkPolicy))
+      throw new Error("sandbox_network_policy_requires_reconciliation");
     const session = sandbox.currentSession();
     if (session.status !== "running") throw new Error("sandbox_requires_reconciliation");
     return { sandboxName: name, session, gatewayOrigin: sandbox.domain(9400) };

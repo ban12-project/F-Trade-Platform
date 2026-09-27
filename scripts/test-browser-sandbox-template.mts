@@ -92,6 +92,7 @@ try {
   provisionAttempted = true;
   const created = await provisionBrowserSandbox({
     mode: "create",
+    networkPolicy: "deny-all",
     nodeId,
     operationId: randomUUID(),
     templateSnapshotId: template.snapshotId,
@@ -122,6 +123,7 @@ try {
   assert.equal(stopped.currentSession().sessionId, firstSession);
   const resumed = await provisionBrowserSandbox({
     mode: "resume",
+    networkPolicy: "deny-all",
     nodeId,
     operationId: randomUUID(),
   });

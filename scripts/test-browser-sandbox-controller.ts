@@ -9,6 +9,7 @@ import {
 const nodeId = randomUUID(),
   operationId = randomUUID();
 const config = {
+  networkPolicy: "deny-all" as const,
   templateSnapshotId: "snap_reviewed",
   appOrigin: "https://platform.example.invalid",
   agentImage: `sha256:${"a".repeat(64)}`,
@@ -148,4 +149,34 @@ test("recorded session recovery survives unavailable deployment configuration", 
     /deployment configuration unavailable/,
   );
   assert.deepEqual(fresh.calls, []);
+});
+
+test("missing network policy rejects before claim or credential authorization", async () => {
+  const f = fixture();
+  await assert.rejects(
+    dispatchManualBrowserSandbox(
+      nodeId,
+      operationId,
+      { ...config, networkPolicy: undefined } as never,
+      f.deps,
+    ),
+  );
+  assert.deepEqual(f.calls, []);
+});
+
+test("reviewed policy is passed to provisioning for creates and resumes", async () => {
+  for (const mode of ["create", "resume"] as const) {
+    const f = fixture();
+    const provision = f.deps.provision;
+    f.deps.claim = async () => ({ mode, nodeId, operationId }) as never;
+    f.deps.provision = async (input) => {
+      assert.equal(input.mode, mode);
+      assert.equal(input.networkPolicy, "deny-all");
+      return provision(input);
+    };
+    assert.equal(
+      (await dispatchManualBrowserSandbox(nodeId, operationId, config, f.deps)).status,
+      "running",
+    );
+  }
 });

@@ -5,9 +5,17 @@ This runbook applies to the existing, persistent single-account Vercel Sandbox. 
 ## Release preflight
 
 1. Confirm #424, #426 and #427 are reviewed and their required checks pass at their final commits. Merge in that order and wait for the final `main` application deployment and both GHCR images to finish. A green pull-request build does not publish images.
-2. Confirm the named production Sandbox is **stopped**, its node tags and restricted network policy match the broker record, and no running, stopping or unknown account lease remains. Record its current snapshot ID and the deployment/image IDs without recording credentials or Facebook content.
+2. Confirm the named production Sandbox is **stopped**, its node tags match the broker record and its observed restricted network policy matches the reviewed server configuration `BROWSER_SANDBOX_NETWORK_POLICY_JSON`, and no running/stopping account lease or unreconciled unknown result remains (preserve original unknown receipts that already have a complete scoped human reconciliation chain). Record its current snapshot ID and the deployment/image IDs without recording credentials or Facebook content.
 3. Make a separate, access-restricted backup fork of that stopped Sandbox and verify it is stopped. Its snapshot must retain the original account volume for rollback. Do not make a reusable template from the account's profile, and do not rely on the source Sandbox retaining an older snapshot: its `keepLastSnapshots` policy evicts prior snapshots.
 4. Recheck the private publication and login page-review expiry. A successful read-only Messenger ready-path review does not extend an expired password/TOTP/PIN review. Use the explicit `observe-only` login mode for a current ready-path profile; it may return `ready` without releasing credentials but refuses all factor submissions. Leave recovery disabled until every recovery selector is freshly reviewed. The production inbox manifest remains disabled until a separate reviewed inbox profile and controlled inbound-message test exist.
+
+## Network policy deployment gate (#459)
+
+Before deploying the policy-enforcement change, establish the reviewed proxy/application/media destinations in private server configuration as `BROWSER_SANDBOX_NETWORK_POLICY_JSON`. There is no fallback policy. Missing or malformed configuration rejects before taking a new dispatch claim; `"allow-all"` is rejected. The broker currently does not store the expected policy: do not claim a comparison against an absent database field.
+
+Creation passes that explicit policy. Resume first uses `resume:false` and compares returned policy metadata against configuration, normalizing object key order only. Arrays and rule/transform order remain significant; semantically equivalent but differently represented policies require reconciliation. Missing SDK metadata is unknown and refuses resume, even if a historical snapshot was restricted. Returned create/resume metadata must also match before runtime credentials are dispatched. A response mismatch leaves the operation uncertain for existing reconciliation; do not repeat provisioning or automatically rewrite the policy.
+
+Recorded-session monitoring and stop/reconciliation remain available without this new setting. Before merging/deploying, verify the actual SDK returns the reviewed policy in the isolated environment and prepare a coordinated production configuration migration; otherwise existing automatic wakes will fail closed. Do not use `"deny-all"` as a production substitute for unknown policy. It is appropriate only for explicitly offline tests. Do not call a policy update endpoint merely to obtain evidence of the previous policy.
 
 ## Stage the original Sandbox
 
