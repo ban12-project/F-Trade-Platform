@@ -1,0 +1,54 @@
+{
+  "classification": "synthetic",
+  "source_commit": "241bec2cb29f396e6bee07994cdcaafd0dc50100",
+  "environment": {
+    "wsl_kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "podman": "4.9.3",
+    "rootless": true,
+    "cgroup": "v2",
+    "compose": "2.40.3",
+    "harbor": "0.23.0",
+    "node": "24.21.0",
+    "pnpm": "12.3.4"
+  },
+  "image_id": "sha256:4e78c6fe6e8df18a1de947814e442ac3ac4943d65c09d4320152973cde1cd0b3",
+  "resource_probe": {
+    "network": "none",
+    "pids_max": 64,
+    "memory_max_bytes": 268435456
+  },
+  "model_calls": 0,
+  "production_account_actions": 0,
+  "entries": [
+    {
+      "log": "harbor-framework.log",
+      "status": "failed",
+      "sha256": "26157796e6fc8d9cd7ccaa522c860bf628b2db8fcd15e54a6a7a7684ffedb849",
+      "bytes": 199
+    },
+    {
+      "log": "harbor-framework-recheck.log",
+      "status": "passed",
+      "sha256": "a7e048ce9159e03a2fe6a7716abb9cc37f145b50e6b86de46680d1b26dbeb4ca",
+      "bytes": 107
+    },
+    {
+      "log": "harbor-dry-run.log",
+      "status": "passed",
+      "sha256": "8cf176403ae29eb497067d2e07f8d737add2e5d4f97973b4b1e6d6a58834b86e",
+      "bytes": 113
+    },
+    {
+      "log": "harbor-image-build.log",
+      "status": "passed",
+      "sha256": "e64797c448537fe55bd57c62e02035e9c23d124b07fd58d3f7dd88aea7d10a0a",
+      "bytes": 15839
+    },
+    {
+      "log": "harbor-container-smoke.log",
+      "status": "passed",
+      "sha256": "76ec4b2f56bcaee3ad0ca43ae3fe819eacdf203b31a03259050ad32e64b9ea92",
+      "bytes": 3871
+    }
+  ]
+}
