@@ -99,3 +99,5 @@ GitHub 的 Vercel commit status 为 success。它不证明既有 Sandbox 的应�
 - [本机最终镜像探测](mvp1-local-runtime-probe-20260926.md)补齐可观察阻塞：Podman 已在仓库外准备，但 rootless UID 映射被拒绝、匿名 GHCR 返回 401；没有同镜像浏览器运行，也没有领取生产凭据。
 
 归档最终提交 `85f3800` 的 CI：生产构建、仓库校验（含 PostgreSQL／Harbor）、browser node、fleet 和 worker 均通过；Playwright run `36250921771` 为 Chromium 243/243、数据库浏览器 44/44，无重试失败。旧夹具绕过 worker 领取的 CI 失败及修正已保留在归档专项索引。
+
+2026-09-27 同镜像隔离 Sandbox 进展另见 [专项报告](sandbox-same-image-20260927.md)：在用户明确授权后建立停止回滚备份和账号副本，完成 Docker 下同构建产物的内容摘要核对、解码/额度与合成连续性验证，并检查现有账号副本的离线恢复。在线身份、指定出口、自动视频回执和真实 DM 仍单列待验；#459 保留原实例网络策略与生产镜像接入差异。离线结果不改变六项正式业务验收的 `pending` 结论。
