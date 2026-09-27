@@ -1,0 +1,162 @@
+{
+  "classification": "sanitized_aggregate",
+  "source_commit": "0a9fc494a3025e50acc917399c40c528d46c67d4",
+  "environment": {
+    "docker": "29.1.3",
+    "image_store": "containerd",
+    "network_policy": "deny-all",
+    "container_network": "none",
+    "seccomp": "Docker default"
+  },
+  "artifact": {
+    "registry_index": "sha256:60dee95faafbcd77c1b25dfe412e7b5810699f29ee4a62214ed2f48d38d69aff",
+    "config_digest": "sha256:0cc22e02fe7a1542036a47b6fc64d84027747cd6eebdabe0192f773cbda42e1f",
+    "docker_oci_manifest": "sha256:d11c92125b355a5003d401f02f8f9cb2b467451954e1a8d97438db8bf742b75a",
+    "revision": "b29c3e64bf7f851313279179c4905d114fbfcc4d",
+    "architecture": "amd64",
+    "verified_rootfs_diff_ids": 28,
+    "archive_transfer": {
+      "size": 1383023083,
+      "sha256": "7e41409cda2e0ca29fd7fcc1ce6e1f003162c0daaa340a7d91acdc3c347ce5cd",
+      "chunks": 83
+    }
+  },
+  "h264": {
+    "status": "passed",
+    "pids_peak": 150,
+    "pids_limit": 512,
+    "pids_max_events": 0,
+    "memory_peak_bytes": 836116480,
+    "memory_limit_bytes": 2147483648,
+    "memory_max_events": 0,
+    "oom_events": 0,
+    "oom_kill_events": 0
+  },
+  "synthetic_continuity": "passed",
+  "account_copy": {
+    "owner_matches_broker": true,
+    "offline_container_replacement": "passed",
+    "offline_sandbox_stop_resume": "passed",
+    "successful_rounds": 3,
+    "persistent_cookie_set_unchanged": true,
+    "external_identity_verified": false,
+    "credential_claims": 0,
+    "factor_submissions": 0,
+    "posts": 0,
+    "dm_sends": 0
+  },
+  "external": {
+    "login_review": "expired",
+    "publication_profile": "unexpired_at_check",
+    "inbox_profile": "absent",
+    "fixed_egress": "not_run",
+    "original_network_policy": "unknown",
+    "production_target_config_match": false,
+    "production_revision": "5769f1f0f8c9bd5fb1182787e50f12108bdd6a02"
+  },
+  "entries": [
+    {
+      "log": "sandbox-offline-preflight.log",
+      "status": "inconclusive",
+      "sha256": "2b368c19d83aea5f09d96986c809ce050e6f8fde5cb340c62cee6b25da0f682a",
+      "bytes": 472
+    },
+    {
+      "log": "sandbox-profile-review.log",
+      "status": "passed",
+      "sha256": "707da896cc13468d8b3df500c035447377c56176d141bf8696f12f087ef7fed3",
+      "bytes": 490
+    },
+    {
+      "log": "sandbox-image-load.log",
+      "status": "failed",
+      "sha256": "c5363a0dbfa08ce3f89b46abc9c496e8c412213cad1e2dd656220abec1798772",
+      "bytes": 237
+    },
+    {
+      "log": "sandbox-oci-load-first.log",
+      "status": "failed",
+      "sha256": "4ae4b72ff7611f132c08b53796ad44ae951316d020d0951dfc35dd0e47bb6836",
+      "bytes": 307
+    },
+    {
+      "log": "sandbox-oci-load.log",
+      "status": "passed",
+      "sha256": "7f2ce643361c3765f8a94dd1d9f17fc4d4a0af36124222025377294b749e1963",
+      "bytes": 344
+    },
+    {
+      "log": "sandbox-image-identity-chain-first.log",
+      "status": "failed",
+      "sha256": "a91078262dfd62bc0a7830e322acdbe9b77c494ab1bb02d1d590dd75a9c447a5",
+      "bytes": 178
+    },
+    {
+      "log": "sandbox-image-identity-chain.log",
+      "status": "passed",
+      "sha256": "c38bacb04af3d79257beb55015eeeedc6c7c52202437704ea0f2ba1d7f93be2e",
+      "bytes": 761
+    },
+    {
+      "log": "sandbox-production-image.log",
+      "status": "passed",
+      "sha256": "700eaabb2b190f44a23324885b71c25e883ad1dce27685431c1a0753d1e49724",
+      "bytes": 289
+    },
+    {
+      "log": "sandbox-owner-check.log",
+      "status": "passed",
+      "sha256": "1f1b6f1de3a3da75019d9dc5086392b18ce4724afe89b6299b10d57df70ba376",
+      "bytes": 56
+    },
+    {
+      "log": "sandbox-same-image-tests.log",
+      "status": "passed",
+      "sha256": "679ac8f99fea471981ec07d653ddb32b1d0fc3b4d668a8a41115019f10c7eade",
+      "bytes": 606
+    },
+    {
+      "log": "sandbox-account-copy-tests.log",
+      "status": "failed",
+      "sha256": "e4d830beec05a7aff683dc34a1ed9f116dd90fd69c51ba19ec9b78896e67b5eb",
+      "bytes": 790
+    },
+    {
+      "log": "sandbox-account-copy-recheck.log",
+      "status": "passed",
+      "sha256": "301ba6f6a285bad8dbd402a4fe841d48040351157acd198dfde32296699b0771",
+      "bytes": 396
+    },
+    {
+      "log": "sandbox-account-copy-resume.log",
+      "status": "passed",
+      "sha256": "c16168b4cf97c87da883dfbd5c5e3c9950592219b330e8deb9163d36b85955b5",
+      "bytes": 218
+    },
+    {
+      "log": "sandbox-docker-resume.log",
+      "status": "passed",
+      "sha256": "fc6a940bcea178d51da60fef632fcd8e24bfb9f3549cb785f30224fd99dff36e",
+      "bytes": 996
+    }
+  ],
+  "cleanup": {
+    "action": "delete",
+    "verificationStatus": "deleted",
+    "verificationDenyAll": true,
+    "originalStopped": true,
+    "originalSnapshotUnchanged": true,
+    "backupStopped": true,
+    "backupSnapshotPresent": true,
+    "backupDenyAll": true,
+    "checkedAt": "2026-09-27T01:59:57.631Z",
+    "backup_retention_days": 7,
+    "initial_delete_guard": "rejected_while_stopping"
+  },
+  "broker_postflight": {
+    "checkedAt": "2026-09-27T01:58:15.967Z",
+    "phase": "stopped",
+    "pending_or_live_runs": 0,
+    "unresolved_operation": false
+  }
+}
