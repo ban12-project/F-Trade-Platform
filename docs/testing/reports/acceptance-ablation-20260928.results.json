@@ -1,0 +1,1521 @@
+{
+  "classification": "synthetic_engineering_evidence",
+  "executed_at": "2026-09-27T23:17:01.962206+00:00",
+  "baseline_revision": "a3d09b2130d5aaba9d5549c0b487802a846084e9",
+  "login": {
+    "classification": "synthetic_engineering_evidence",
+    "experiment": "browser-login-ablation-v1",
+    "testedRevision": "a3d09b2130d5aaba9d5549c0b487802a846084e9",
+    "nodeVersion": "v24.21.0",
+    "sourceHashes": {
+      "login.mjs": "31e1e98693eedf7551d8a1f1141ef70de95451eaa4d35d25d79bf187b037c9c2",
+      "login-flow.mjs": "82c0392107b42edede25899317d879dd185f5dce000330b2c823121c6c5ab127",
+      "idle.mjs": "e7211fc78d1a082bcdbf1e741b3f0421e82bf6519ed51e82622a9b4e01cf07e0",
+      "agent.mjs": "94ecd1d2c62de800e1c3fe626e8c1ff4f21675d0e6542cd8abfd225b9dc91f8e",
+      "login-plugin/automatic-page.js": "7d240fa0961c1d6a5e6ed0762a9180fc581b7468492d09bb0487484cd586c089",
+      "login-plugin/automatic-runtime.js": "6132f90c5336c1ad02992c3a8e187ae944a0f8ce77e0b7dd86901c6f5b5c738b"
+    },
+    "variants": [
+      {
+        "name": "full",
+        "settlementBlockHash": "beb5feb559593b708ee19e668a9570540bb822f933225b9b681f44c5d6383f87",
+        "loginModuleHash": "31e1e98693eedf7551d8a1f1141ef70de95451eaa4d35d25d79bf187b037c9c2",
+        "observationProgramHash": "7d240fa0961c1d6a5e6ed0762a9180fc581b7468492d09bb0487484cd586c089"
+      },
+      {
+        "name": "without_ready_preservation",
+        "settlementBlockHash": "beb5feb559593b708ee19e668a9570540bb822f933225b9b681f44c5d6383f87",
+        "loginModuleHash": "1221d4e967b115670518e96c0c9ac392185b8a5102c24ad83d8267bac4084b00",
+        "observationProgramHash": "7d240fa0961c1d6a5e6ed0762a9180fc581b7468492d09bb0487484cd586c089"
+      },
+      {
+        "name": "without_observation_retry",
+        "settlementBlockHash": "beb5feb559593b708ee19e668a9570540bb822f933225b9b681f44c5d6383f87",
+        "loginModuleHash": "31e1e98693eedf7551d8a1f1141ef70de95451eaa4d35d25d79bf187b037c9c2",
+        "observationProgramHash": "1801b304405bd3fcdb3214ceb56758906c83cfc908b9bc16a51c24e53a120ae9"
+      },
+      {
+        "name": "without_both",
+        "settlementBlockHash": "beb5feb559593b708ee19e668a9570540bb822f933225b9b681f44c5d6383f87",
+        "loginModuleHash": "1221d4e967b115670518e96c0c9ac392185b8a5102c24ad83d8267bac4084b00",
+        "observationProgramHash": "1801b304405bd3fcdb3214ceb56758906c83cfc908b9bc16a51c24e53a120ae9"
+      },
+      {
+        "name": "without_task_cleanup",
+        "settlementBlockHash": "e7783ba38a516e5eac9535cec958d8681b6442e8bfe9664df00d7d9ac8652b50",
+        "loginModuleHash": "31e1e98693eedf7551d8a1f1141ef70de95451eaa4d35d25d79bf187b037c9c2",
+        "observationProgramHash": "7d240fa0961c1d6a5e6ed0762a9180fc581b7468492d09bb0487484cd586c089"
+      }
+    ],
+    "design": "2x2 ready-preservation/observation-shape plus independent task-cleanup ablation; 3 deterministic repeats",
+    "clock": "injected virtual observation sleep; real Chromium DOM; no real elapsed-time or production transport claim",
+    "rows": [
+      {
+        "variant": "full",
+        "scenario": "ready",
+        "repetition": 1,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "transient_overflow",
+        "repetition": 1,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "persistent_overflow",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "late_identity_conflict",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "ready",
+        "repetition": 2,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "transient_overflow",
+        "repetition": 2,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "persistent_overflow",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "late_identity_conflict",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "ready",
+        "repetition": 3,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "transient_overflow",
+        "repetition": 3,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "persistent_overflow",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "full",
+        "scenario": "late_identity_conflict",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "ready",
+        "repetition": 1,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "transient_overflow",
+        "repetition": 1,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "persistent_overflow",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "late_identity_conflict",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "ready",
+        "repetition": 2,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "transient_overflow",
+        "repetition": 2,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "persistent_overflow",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "late_identity_conflict",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "ready",
+        "repetition": 3,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "transient_overflow",
+        "repetition": 3,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "persistent_overflow",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_ready_preservation",
+        "scenario": "late_identity_conflict",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "ready",
+        "repetition": 1,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "transient_overflow",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "persistent_overflow",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "late_identity_conflict",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "ready",
+        "repetition": 2,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "transient_overflow",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "persistent_overflow",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "late_identity_conflict",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "ready",
+        "repetition": 3,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": true,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "transient_overflow",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "persistent_overflow",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_observation_retry",
+        "scenario": "late_identity_conflict",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "ready",
+        "repetition": 1,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "transient_overflow",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "persistent_overflow",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "late_identity_conflict",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "ready",
+        "repetition": 2,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "transient_overflow",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "persistent_overflow",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "late_identity_conflict",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "ready",
+        "repetition": 3,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "completed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "transient_overflow",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "persistent_overflow",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_both",
+        "scenario": "late_identity_conflict",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": true,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": true,
+        "disconnectRetires": true
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "ready",
+        "repetition": 1,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": false,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "transient_overflow",
+        "repetition": 1,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": false,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "persistent_overflow",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": false,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "late_identity_conflict",
+        "repetition": 1,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": false,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "ready",
+        "repetition": 2,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": false,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "transient_overflow",
+        "repetition": 2,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": false,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "persistent_overflow",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": false,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "late_identity_conflict",
+        "repetition": 2,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": false,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "ready",
+        "repetition": 3,
+        "outcome": "ready",
+        "reads": 1,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": false,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "transient_overflow",
+        "repetition": 3,
+        "outcome": "ready",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": null,
+        "taskCleared": false,
+        "connectedPreserved": true,
+        "pendingPreserved": true,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "persistent_overflow",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 21,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": false,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": false,
+        "disconnectRetires": false
+      },
+      {
+        "variant": "without_task_cleanup",
+        "scenario": "late_identity_conflict",
+        "repetition": 3,
+        "outcome": "refused",
+        "reads": 2,
+        "claims": 0,
+        "submissions": 0,
+        "immediateStop": "page_contract_failed",
+        "taskCleared": false,
+        "connectedPreserved": false,
+        "pendingPreserved": false,
+        "idleRetires": false,
+        "disconnectRetires": false
+      }
+    ],
+    "status": "pass",
+    "browserVersion": "151.0.7922.34",
+    "productionSourcesUnchanged": true
+  },
+  "product": {
+    "experiment": "product-safety-control-ablation-v1",
+    "syntheticOnly": true,
+    "modelCalls": 0,
+    "sourceHashes": {
+      "lib/product/evidence-located-agent.ts": "62b004a3afaf710f5934b27c20c300b90da1d38616d50d4343f4d49fae2eeddd",
+      "lib/product/verification.ts": "2abce576bc53164a52e4910bee8b8af20ca97edba55f80a131a151109bdf2287",
+      "lib/product/agent.ts": "df3e061bfe157be79bf18da15a26fb019eacb055dd314fc40b7fb6e03010e761",
+      "lib/product/evidence-locations.ts": "3b52fb0ee242803649ec9e674f3ed0ca95c42eabe05c870182df11ec7eff482e"
+    },
+    "results": [
+      {
+        "variant": "full",
+        "validAccepted": 2,
+        "validTotal": 2,
+        "unsafeAccepted": 0,
+        "unsafeTotal": 8,
+        "cases": [
+          {
+            "id": "synthetic-ablation-valid-1",
+            "kind": "valid",
+            "safe": true,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-valid-2",
+            "kind": "valid",
+            "safe": true,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-wrong_location-1",
+            "kind": "wrong_location",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.product_name must match an explicitly labelled source value"
+          },
+          {
+            "id": "synthetic-ablation-wrong_location-2",
+            "kind": "wrong_location",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.product_name must match an explicitly labelled source value"
+          },
+          {
+            "id": "synthetic-ablation-agent_approval-1",
+            "kind": "agent_approval",
+            "safe": false,
+            "accepted": false,
+            "stage": "approval",
+            "error": "Product approval requires a human actor"
+          },
+          {
+            "id": "synthetic-ablation-agent_approval-2",
+            "kind": "agent_approval",
+            "safe": false,
+            "accepted": false,
+            "stage": "approval",
+            "error": "Product approval requires a human actor"
+          },
+          {
+            "id": "synthetic-ablation-both-1",
+            "kind": "both",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.product_name must match an explicitly labelled source value"
+          },
+          {
+            "id": "synthetic-ablation-both-2",
+            "kind": "both",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.product_name must match an explicitly labelled source value"
+          },
+          {
+            "id": "synthetic-ablation-unknown_evidence-1",
+            "kind": "unknown_evidence",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.oe_numbers is not backed by supplied evidence"
+          },
+          {
+            "id": "synthetic-ablation-invented_oe-1",
+            "kind": "invented_oe",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent may populate only OE numbers explicitly listed under an OE or OEM No. source label"
+          }
+        ]
+      },
+      {
+        "variant": "without_location",
+        "validAccepted": 2,
+        "validTotal": 2,
+        "unsafeAccepted": 2,
+        "unsafeTotal": 8,
+        "cases": [
+          {
+            "id": "synthetic-ablation-valid-1",
+            "kind": "valid",
+            "safe": true,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-valid-2",
+            "kind": "valid",
+            "safe": true,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-wrong_location-1",
+            "kind": "wrong_location",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-wrong_location-2",
+            "kind": "wrong_location",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-agent_approval-1",
+            "kind": "agent_approval",
+            "safe": false,
+            "accepted": false,
+            "stage": "approval",
+            "error": "Product approval requires a human actor"
+          },
+          {
+            "id": "synthetic-ablation-agent_approval-2",
+            "kind": "agent_approval",
+            "safe": false,
+            "accepted": false,
+            "stage": "approval",
+            "error": "Product approval requires a human actor"
+          },
+          {
+            "id": "synthetic-ablation-both-1",
+            "kind": "both",
+            "safe": false,
+            "accepted": false,
+            "stage": "approval",
+            "error": "Product approval requires a human actor"
+          },
+          {
+            "id": "synthetic-ablation-both-2",
+            "kind": "both",
+            "safe": false,
+            "accepted": false,
+            "stage": "approval",
+            "error": "Product approval requires a human actor"
+          },
+          {
+            "id": "synthetic-ablation-unknown_evidence-1",
+            "kind": "unknown_evidence",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.oe_numbers is not backed by supplied evidence"
+          },
+          {
+            "id": "synthetic-ablation-invented_oe-1",
+            "kind": "invented_oe",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent may populate only OE numbers explicitly listed under an OE or OEM No. source label"
+          }
+        ]
+      },
+      {
+        "variant": "without_human_actor",
+        "validAccepted": 2,
+        "validTotal": 2,
+        "unsafeAccepted": 2,
+        "unsafeTotal": 8,
+        "cases": [
+          {
+            "id": "synthetic-ablation-valid-1",
+            "kind": "valid",
+            "safe": true,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-valid-2",
+            "kind": "valid",
+            "safe": true,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-wrong_location-1",
+            "kind": "wrong_location",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.product_name must match an explicitly labelled source value"
+          },
+          {
+            "id": "synthetic-ablation-wrong_location-2",
+            "kind": "wrong_location",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.product_name must match an explicitly labelled source value"
+          },
+          {
+            "id": "synthetic-ablation-agent_approval-1",
+            "kind": "agent_approval",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-agent_approval-2",
+            "kind": "agent_approval",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-both-1",
+            "kind": "both",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.product_name must match an explicitly labelled source value"
+          },
+          {
+            "id": "synthetic-ablation-both-2",
+            "kind": "both",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.product_name must match an explicitly labelled source value"
+          },
+          {
+            "id": "synthetic-ablation-unknown_evidence-1",
+            "kind": "unknown_evidence",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.oe_numbers is not backed by supplied evidence"
+          },
+          {
+            "id": "synthetic-ablation-invented_oe-1",
+            "kind": "invented_oe",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent may populate only OE numbers explicitly listed under an OE or OEM No. source label"
+          }
+        ]
+      },
+      {
+        "variant": "without_both",
+        "validAccepted": 2,
+        "validTotal": 2,
+        "unsafeAccepted": 6,
+        "unsafeTotal": 8,
+        "cases": [
+          {
+            "id": "synthetic-ablation-valid-1",
+            "kind": "valid",
+            "safe": true,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-valid-2",
+            "kind": "valid",
+            "safe": true,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-wrong_location-1",
+            "kind": "wrong_location",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-wrong_location-2",
+            "kind": "wrong_location",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-agent_approval-1",
+            "kind": "agent_approval",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-agent_approval-2",
+            "kind": "agent_approval",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-both-1",
+            "kind": "both",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-both-2",
+            "kind": "both",
+            "safe": false,
+            "accepted": true,
+            "stage": "approval"
+          },
+          {
+            "id": "synthetic-ablation-unknown_evidence-1",
+            "kind": "unknown_evidence",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent field product.oe_numbers is not backed by supplied evidence"
+          },
+          {
+            "id": "synthetic-ablation-invented_oe-1",
+            "kind": "invented_oe",
+            "safe": false,
+            "accepted": false,
+            "stage": "draft",
+            "error": "Product Agent may populate only OE numbers explicitly listed under an OE or OEM No. source label"
+          }
+        ]
+      }
+    ]
+  },
+  "fleet": {
+    "design": "paired deterministic source ablation",
+    "seeds": [
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+      27, 28, 29, 30
+    ],
+    "referenceRevision": "2aa242f5d2d512ae4c8d51eccfd4f9aa14ad4c8b",
+    "testedRevision": "a3d09b2130d5aaba9d5549c0b487802a846084e9",
+    "nodeVersion": "v24.21.0",
+    "sourceHashes": {
+      "policy": "c3e16a94313cb3c25bf03c5aaabfa29eb2bf36bfd0114695c1b4b73ac6fdc7ae",
+      "vault": "d67f3759fbf84cc5cef0b3e7a53282457245ccbae37f168e669e8f1f9383cd63",
+      "gateway": "a8ffe32f5cf366e91598ce8d811251ed7195f3277b6e2e1947cee6216cc60b21"
+    },
+    "scope": "Production policy functions with synthetic faults; not Facebook/VPS throughput or RAM measurements. Seeds permute fixed inputs; no population significance claim.",
+    "experiments": [
+      {
+        "control": "capacity_limit",
+        "equivalent": false,
+        "mutatedHash": "aa7a7808a65024fccc82f2e2df2ba6fb3ee821e08642a2c5d2ef4633bd3e8bd9",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "memory_budget",
+        "equivalent": false,
+        "mutatedHash": "02d0758a4fe3f81631a2304d3d26bc7a6243934c24bc3a326c8af566f4944d47",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "current_free_memory",
+        "equivalent": false,
+        "mutatedHash": "4265e7a6a602b4a910eb30d960e4b0fc31af3d4e000968d88726c95536abd353",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "same_account_exclusion",
+        "equivalent": false,
+        "mutatedHash": "6707ae88116de5211b1d6ed173a82c20d340ae5b1ae5bdf7cf8e5918651540da",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "claim_idempotency",
+        "equivalent": false,
+        "mutatedHash": "d6ebd1823f6f4527a68ec6854bcba0b95074bef954412aa121182109ae577437",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "unconfirmed_stop_quarantine",
+        "equivalent": false,
+        "mutatedHash": "81a3e9133e2e8e5b35a1efbbb38bed48a54c187aa81675e9d149219f083ea4bb",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "credential_version_fence",
+        "equivalent": false,
+        "mutatedHash": "5474be1b2d14a37bc18d6d987a7e64f100d04f48073679a1ea70b9295a12f810",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "revoked_account_fence",
+        "equivalent": false,
+        "mutatedHash": "0fcf0df3f095a5b09e65f680dea37d710eef0d7e4dffef9fe32459480f77c59a",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "priority_aging",
+        "equivalent": false,
+        "mutatedHash": "4f84ab973c4c7defb27e36b0424f720e7a4c9a2dbe8b0d30367c1fbaf7d2459e",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "installation_binding",
+        "equivalent": false,
+        "mutatedHash": "827918a4f119fadcf6f6a7b7499f0a76efbc7810da6aee291ccb1ea07de28bc2",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      },
+      {
+        "control": "poll_fast_path_only",
+        "equivalent": true,
+        "mutatedHash": "df1f6d98c066163f47a43b5847f6e7b508cdd76eda8e395b2a4094d57b35c577",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 0
+      },
+      {
+        "control": "vault_account_purpose_aad",
+        "equivalent": false,
+        "mutatedHash": "8f96cede99d36722e1c32edab9b5aa7cb54f3ebb04a218e86cbc2eb5462b2eaa",
+        "baselineViolatedTrials": 0,
+        "ablatedViolatedTrials": 30
+      }
+    ],
+    "gateway": [
+      {
+        "variant": "full",
+        "passed": 5,
+        "failed": 0,
+        "mutatedHash": "a8ffe32f5cf366e91598ce8d811251ed7195f3277b6e2e1947cee6216cc60b21"
+      },
+      {
+        "variant": "without_ws_origin",
+        "passed": 4,
+        "failed": 1,
+        "mutatedHash": "c3aa4c94e72062d76e8b6aa17bee4038da1809411ba51aec1358125a1524f58e"
+      },
+      {
+        "variant": "without_active_tunnel_expiry",
+        "passed": 3,
+        "failed": 2,
+        "mutatedHash": "64ab5ecca1205580986d3a6d6e7b69c73dde05929f730a67ab460b36be1324f8"
+      }
+    ]
+  },
+  "postgres": {
+    "testedRevision": "a3d09b2130d5aaba9d5549c0b487802a846084e9",
+    "nodeVersion": "v24.21.0",
+    "postgresVersion": "17.11 (Debian 17.11-1.pgdg12+2)",
+    "method": "Actual production broker; the no-lock copy changes FOR UPDATE only plus a forced-read-overlap barrier. Not a production failure rate.",
+    "checks": [
+      "all four legacy Facebook tables match ORM columns after full migrations",
+      "another admin and another installation cannot acquire the node",
+      "real broker retries reuse one lease and interactive tickets consume once",
+      "account revocation fences real broker heartbeats",
+      "legacy encrypted credential store works after migration; disable switch and owner check deny access"
+    ],
+    "cases": [
+      {
+        "repetition": 1,
+        "variant": "full",
+        "simultaneousRequests": 8,
+        "configuredSlots": 2,
+        "issuedLeases": 2,
+        "uniqueJobs": 2,
+        "duplicateJobDeliveries": 0,
+        "persistedStartingRuns": 2
+      },
+      {
+        "repetition": 1,
+        "variant": "without_row_lock",
+        "simultaneousRequests": 8,
+        "configuredSlots": 2,
+        "issuedLeases": 8,
+        "uniqueJobs": 1,
+        "duplicateJobDeliveries": 7,
+        "persistedStartingRuns": 1
+      },
+      {
+        "repetition": 2,
+        "variant": "full",
+        "simultaneousRequests": 8,
+        "configuredSlots": 2,
+        "issuedLeases": 2,
+        "uniqueJobs": 2,
+        "duplicateJobDeliveries": 0,
+        "persistedStartingRuns": 2
+      },
+      {
+        "repetition": 2,
+        "variant": "without_row_lock",
+        "simultaneousRequests": 8,
+        "configuredSlots": 2,
+        "issuedLeases": 8,
+        "uniqueJobs": 1,
+        "duplicateJobDeliveries": 7,
+        "persistedStartingRuns": 1
+      },
+      {
+        "repetition": 3,
+        "variant": "full",
+        "simultaneousRequests": 8,
+        "configuredSlots": 2,
+        "issuedLeases": 2,
+        "uniqueJobs": 2,
+        "duplicateJobDeliveries": 0,
+        "persistedStartingRuns": 2
+      },
+      {
+        "repetition": 3,
+        "variant": "without_row_lock",
+        "simultaneousRequests": 8,
+        "configuredSlots": 2,
+        "issuedLeases": 8,
+        "uniqueJobs": 1,
+        "duplicateJobDeliveries": 7,
+        "persistedStartingRuns": 1
+      }
+    ]
+  },
+  "artifact_hashes": {
+    "login-pending/login-ablation.json": "95fd6cc7e5f760930cc141b6eae02b354b2cb71f3c23308bb9d5164f0de274bb",
+    "login-pending/result.log": "b745e6759f050d6ae63086e251d9ed88be715bc678bf3cf9a5d6d15dd8838ca1",
+    "fleet-recheck/control-ablation.json": "39c86cee4efaccba08bdd6f1ce538336dd31f2cbb7efddc6a02e11a098025e60",
+    "fleet-recheck/control-ablation.csv": "2740005cca3ec40a79ee153da005db1af8b6906e6eed0f5fbcdbc8034cdff41a",
+    "fleet-recheck/result.log": "015fdce7e89c5a64b64b837e9b19c9154e6b408aa7a5e4ef32dcd87fb66e32a6",
+    "login-first/login-ablation.json": "b6fccd05cb85dc2ebaa64b934116d9d808c39d81e3ee31da802059984a45e14f",
+    "login-final/login-ablation.json": "925ceaa5c8c252a861b36ce8770e6ef3bb48368589fcaefd35947bf146be73ef",
+    "login-final/result.log": "b745e6759f050d6ae63086e251d9ed88be715bc678bf3cf9a5d6d15dd8838ca1",
+    "postgres/postgres-ablation.json": "c72da049c79294e2bdcb79e3c9aeed5bedaeba2ac464b6ae42177ae5f6bcd9f3",
+    "postgres/result.log": "0729b0364fd411e780a21e4419cab287252ece37d2838316cf3ef52d1b7747ea",
+    "fleet/result.log": "9c0149dc9541511f1dba6e6e51816331015161b3f0758d7eb85c70108a01f2df",
+    "product/result.log": "a1487de8c678b71fb3357662b66f05ea3002b16259305f1dbede3362f39dfd7e"
+  },
+  "runner_sha256": "321cce5f8177e07d8a633685a5645feb21250e698874a0ec96af0ab7261e8b66"
+}
