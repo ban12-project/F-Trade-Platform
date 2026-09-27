@@ -1,0 +1,625 @@
+{
+  "classification": "sanitized_aggregate",
+  "scope": "existing_database_candidates",
+  "sourceCommit": "abaf85affc74078b8c4700d89649e7def223ce21",
+  "startedAt": "2026-09-27T06:03:14.526Z",
+  "finishedAt": "2026-09-27T06:07:04.071Z",
+  "planned": 60,
+  "completed": 60,
+  "firstAttemptAccepted": 60,
+  "finalAccepted": 60,
+  "failures": {},
+  "executionHealth": {
+    "valid": true,
+    "max_event_loop_gap_ms": 1001,
+    "clock_reversed": false,
+    "invalid_duration_trials": 0
+  },
+  "model": "gpt-6-luna",
+  "usage": {
+    "input": 187149,
+    "output": 37616,
+    "missing": 0
+  },
+  "billedCost": null,
+  "databaseWrites": 0,
+  "limitations": [
+    "stored_candidate_fragments_only",
+    "original_pdf_unavailable",
+    "not_fixed_synthetic_benchmark",
+    "not_factory_20_sku_approval",
+    "no_independent_truth_for_unreviewed_candidates"
+  ],
+  "runtime": {
+    "imageId": "sha256:4e78c6fe6e8df18a1de947814e442ac3ac4943d65c09d4320152973cde1cd0b3",
+    "node": "24.21.0",
+    "pnpm": "12.3.4",
+    "concurrency": 4,
+    "memoryBytes": 2147483648,
+    "cpus": 2,
+    "pidsLimit": 256
+  },
+  "provenance": {
+    "inputSha256": "2b49a674229d5d65d17718fa45387b07d0fd7583ea1a3550a97be63380420fb5",
+    "runnerSha256": "c87ac982eca9115c595a9064ed8aee1c4d1392afabbe328e77568dea6af4189b"
+  },
+  "sample": {
+    "availableCandidates": 72,
+    "frozenCandidates": 20,
+    "physicalPages": 14,
+    "includedCompletedCandidate": 1,
+    "selection": "evenly spaced ordered candidates, including completed candidate",
+    "independentGroundTruth": false
+  },
+  "latencyMs": {
+    "min": 9445,
+    "p50": 13171,
+    "p95": 18829,
+    "max": 37570
+  },
+  "attemptCount": 60,
+  "correctionTrials": 0,
+  "supersededBatch": {
+    "model": "gpt-5.6-luna",
+    "reason": "user_requested_gpt-6-luna",
+    "recordedCompleted": 13,
+    "exitCode": 137,
+    "inflightOutcomes": "unknown",
+    "complete": false,
+    "recordedFirstAccepted": 13
+  },
+  "productionDefaultChanged": false,
+  "modelIdentity": "requested gateway model ID; backend routing not independently attested",
+  "firstSetupFailure": {
+    "exitCode": 127,
+    "cause": "git unavailable inside image; source identity verified on host before invocation"
+  },
+  "anonymousTrials": [
+    {
+      "candidate": 1,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 14184
+    },
+    {
+      "candidate": 1,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 14243
+    },
+    {
+      "candidate": 1,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 15504
+    },
+    {
+      "candidate": 2,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 16497
+    },
+    {
+      "candidate": 2,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 15820
+    },
+    {
+      "candidate": 2,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 18773
+    },
+    {
+      "candidate": 3,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 10724
+    },
+    {
+      "candidate": 3,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 11475
+    },
+    {
+      "candidate": 3,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 10876
+    },
+    {
+      "candidate": 4,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13194
+    },
+    {
+      "candidate": 4,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13777
+    },
+    {
+      "candidate": 4,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 15403
+    },
+    {
+      "candidate": 5,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12715
+    },
+    {
+      "candidate": 5,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13226
+    },
+    {
+      "candidate": 5,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13174
+    },
+    {
+      "candidate": 6,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12081
+    },
+    {
+      "candidate": 6,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13171
+    },
+    {
+      "candidate": 6,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13643
+    },
+    {
+      "candidate": 7,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12724
+    },
+    {
+      "candidate": 7,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 37570
+    },
+    {
+      "candidate": 7,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 11817
+    },
+    {
+      "candidate": 8,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12594
+    },
+    {
+      "candidate": 8,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13533
+    },
+    {
+      "candidate": 8,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13566
+    },
+    {
+      "candidate": 9,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 23336
+    },
+    {
+      "candidate": 9,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13429
+    },
+    {
+      "candidate": 9,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13093
+    },
+    {
+      "candidate": 10,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12811
+    },
+    {
+      "candidate": 10,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 10362
+    },
+    {
+      "candidate": 10,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 10684
+    },
+    {
+      "candidate": 11,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13079
+    },
+    {
+      "candidate": 11,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 14010
+    },
+    {
+      "candidate": 11,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12876
+    },
+    {
+      "candidate": 12,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12594
+    },
+    {
+      "candidate": 12,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 15228
+    },
+    {
+      "candidate": 12,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12325
+    },
+    {
+      "candidate": 13,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13147
+    },
+    {
+      "candidate": 13,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13172
+    },
+    {
+      "candidate": 13,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12501
+    },
+    {
+      "candidate": 14,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12548
+    },
+    {
+      "candidate": 14,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 17761
+    },
+    {
+      "candidate": 14,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 16309
+    },
+    {
+      "candidate": 15,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 16275
+    },
+    {
+      "candidate": 15,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12811
+    },
+    {
+      "candidate": 15,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 21134
+    },
+    {
+      "candidate": 16,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12536
+    },
+    {
+      "candidate": 16,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13264
+    },
+    {
+      "candidate": 16,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12403
+    },
+    {
+      "candidate": 17,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12373
+    },
+    {
+      "candidate": 17,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 14401
+    },
+    {
+      "candidate": 17,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12960
+    },
+    {
+      "candidate": 18,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 11047
+    },
+    {
+      "candidate": 18,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13177
+    },
+    {
+      "candidate": 18,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 9445
+    },
+    {
+      "candidate": 19,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 9846
+    },
+    {
+      "candidate": 19,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 18829
+    },
+    {
+      "candidate": 19,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 14702
+    },
+    {
+      "candidate": 20,
+      "repetition": 1,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 13098
+    },
+    {
+      "candidate": 20,
+      "repetition": 2,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 14651
+    },
+    {
+      "candidate": 20,
+      "repetition": 3,
+      "attempt_count": 1,
+      "first_attempt_accepted": true,
+      "final_accepted": true,
+      "failure": null,
+      "duration_ms": 12975
+    }
+  ],
+  "reportValidation": {
+    "podmanSummary": "passed",
+    "podmanJsonFormatting": "passed",
+    "podmanRepositoryValidation": "setup_failed_missing_PyYAML",
+    "fullRepositoryValidation": "pending_CI"
+  }
+}
