@@ -84,7 +84,7 @@ const readRecordContext = cache(
             : undefined;
     let unavailable =
       query.panel !== undefined ||
-      (kind !== "video" && query.item !== undefined) ||
+      query.item !== undefined ||
       (mode === "record" && (givenSources.length > 0 || !z.uuid().safeParse(recordId).success)) ||
       (mode === "create" &&
         (givenSources.length > 1 ||

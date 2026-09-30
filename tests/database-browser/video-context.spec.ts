@@ -260,6 +260,23 @@ test("invalid, conflicting and cross-project video links never select another re
   }
 });
 
+test("canonical video addresses reject legacy selection parameters before redirecting", async ({
+  page,
+}) => {
+  for (const href of [
+    `/workspace/${projectId}/records/video/${videoIds[0]}?item=${videoIds[1]}`,
+    `/workspace/${projectId}/new/video?item=${videoIds[0]}`,
+  ]) {
+    await page.goto(href);
+    await expect(page.getByRole("heading", { name: "记录已不可用", exact: true })).toBeVisible();
+    await expect(page.getByLabel("视频目标")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: names[0], exact: true })).toHaveCount(0);
+  }
+  await page.goto(`/workspace/${projectId}/records/video/${videoIds[0]}`);
+  await expect(page).toHaveURL(new RegExp(`/video\\?item=${videoIds[0]}(?:&|$)`));
+  await expect(page.getByRole("heading", { name: names[0], exact: true })).toBeVisible();
+});
+
 test("copy opens its returned draft, protects other input, and repeated saves clear dirty state", async ({
   page,
 }) => {
