@@ -33,7 +33,7 @@
 
 2026-09-30 本地验证通过：
 
-- 完整界面回归：244 / 244；真实路由数据库浏览器：48 / 48。
+- 完整界面回归：247 / 247（包含同步主分支新增的 3 项登录检查）；真实路由数据库浏览器：48 / 48。
 - 最后有界 RFQ 资格读取与旧样式清理：25 / 25 任务目标、设置与即时导航；中文截图运行 10 / 10。
 - 工作区契约、导航、任务规则、查询并发、受控发布预览版本检查均通过。
 - 隔离 PostgreSQL 销售客户上下文／对象权限／关联冲突、归档与并发写入检查均通过。
@@ -42,7 +42,7 @@
 
 截图已人工检查，全部为 MOCK 合成数据：[桌面详情](assets/workspace-cutover-482/1280px-loaded.png)、[390px 详情](assets/workspace-cutover-482/390px-loaded.png)、[桌面静态壳](assets/workspace-cutover-482/1280px-shell.png)、[390px 静态壳](assets/workspace-cutover-482/390px-shell.png)。静态壳有独立标题和业务内容加载区域，详情使用文档滚动；不出现阶段导航。截图使用补齐中文字体的隔离浏览器，不包含真实业务资料或会话文件。
 
-PR、全部 CI 与 squash merge 结果在交付后补齐。
+交付 PR：[#483](https://github.com/ban12-project/F-Trade-Platform/pull/483)。本分支已同步 main 2b0addf 的浏览器登录修复和控制消融检查。PR 的 [Checks](https://github.com/ban12-project/F-Trade-Platform/pull/483/checks) 是最终版本 CI 结果入口；只有全部通过后才执行 squash merge。关联 [Decision #482](https://github.com/ban12-project/F-Trade-Platform/issues/482) 的验收清单与 PR 合并状态记录最终交付，不以排队或部分通过视为完成。
 
 ## 一次性切换与回滚
 
