@@ -13,13 +13,13 @@ AI 外贸工作流平台第一阶段 MVP，试点品类为汽车离合器。
 
 第一阶段范围固定为：1 家工厂、约 20 个真实离合器 SKU、1 个海外渠道、4 个业务 Agent、1 个 Workflow Orchestrator 和 3 类 Human Gate。
 
-应用以线性工作流为默认入口：全局工作台先汇总入站消息、跨项目待办、审批、到期跟进和项目 Pipeline；进入项目后，营销项目按“产品资料 → 营销内容 → 营销视频 → 发布”推进，销售项目按“客户线索 → 需求确认 → 报价 → 跟进 → 交期 → 商机”推进。工程事实、报价、审核和发布仍由既有受控工作流与人工 Gate 决定。
+工作区以“任务 → 具体记录 → 当前动作”组织。主导航为今日任务、产品资料、内容与发布、客户与询盘，项目作为筛选与归属；独立项目管理页处理名称、成员和归档。详情直接读取指定对象及显式关系，单条创建后打开结果，返回清单保留项目、类型和状态筛选。工程事实、报价、审核和发布仍由既有领域状态机与人工 Gate 决定。
 
-项目画布、布局存储和 React Flow 依赖已经从生产代码删除。项目只保留受控业务记录、成员关系和阶段导航；产品事实、报价、交期、审批与发布结果继续由领域状态机保存。迁移记录见 ADR 0005。
+项目画布、布局存储和 React Flow 依赖已经从生产代码删除。项目阶段导航及默认阶段推断也已删除；历史项目阶段参数明确停用，不能自动选择替代对象。产品事实、报价、交期、审批与发布结果继续由领域状态机保存。一次性切换见 ADR 0008。
 
 全局工作台承接尚未分流的入站会话，业务用户必须显式新建销售项目或关联已有项目。项目成员关系独立保存 owner/editor/viewer 角色，所有 Server Action 都会重新校验成员权限。产品表单只从当前用户可访问的持久化证据中选择来源，并逐字段保存绑定，不接受任意证据文本。
 
-MVP1 的主要视频能力是在营销项目的“营销视频”步骤中，把用户已有且登记权利证据的素材剪成最长 15 秒的营销视频。真正的素材、片段、预览、渲染和审核工作进入独立视频编辑器；AI 只提出可编辑剪辑初稿。文本／图片生成视频及其模型、供应商和任务管理不在 MVP1 投入使用。
+MVP1 视频从内容列表或已核验产品按需进入独立编辑器，把用户已有且登记权利证据的素材剪成最长 15 秒的营销视频。真正的素材、片段、预览、渲染和审核工作进入独立视频编辑器；AI 只提出可编辑剪辑初稿。文本／图片生成视频及其模型、供应商和任务管理不在 MVP1 投入使用。
 
 ## 重要边界
 
@@ -38,7 +38,9 @@ MVP1 的主要视频能力是在营销项目的“营销视频”步骤中，把
 - [ADR 0001：MVP 应用技术栈](docs/decisions/0001-mvp-application-stack.md)
 - [ADR 0003：项目画布与角色边界](docs/decisions/0003-console-task-flow.md)（导航部分已由 ADR 0005 取代）
 - [ADR 0004：MVP1 营销视频采用已有素材剪辑](docs/decisions/0004-mvp1-marketing-video-editing.md)
-- [ADR 0005：工作台与项目采用线性引导流程](docs/decisions/0005-guided-workspace-navigation.md)
+- [ADR 0005：工作台与项目采用线性引导流程](docs/decisions/0005-guided-workspace-navigation.md)（导航已由 ADR 0008 取代）
+- [ADR 0008：工作区按对象一次性切换](docs/decisions/0008-object-workspace-cutover.md)
+- [工作区迁移验收](docs/testing/workspace-cutover-482.md)
 - [研发工作约定](CONTRIBUTING.md)
 - [安全与数据分级](SECURITY.md)
 - [项目状态](docs/PROJECT_STATUS.md)
@@ -52,7 +54,7 @@ MVP1 的主要视频能力是在营销项目的“营销视频”步骤中，把
 ## 研发流
 
 ```text
-Issue → type/issue-short-name 分支 → Pull Request → repository-validate
+Issue → codex/issue-short-name 分支 → Pull Request → repository-validate
 → squash merge → 自动关闭 Issue
 ```
 
@@ -100,13 +102,21 @@ pnpm db:migrate
 `db:migrate` 会连接并修改目标数据库，执行前必须核对环境和连接 URL；前两个
 命令只生成或检查迁移结构。
 
+### 工作区地址
+
+- 任务与资料清单：`/workspace`、`/workspace/products`、`/workspace/content`、`/workspace/customers`。资料清单支持 `project/type/state`。
+- 对象详情：`/workspace/[projectId]/records/[kind]/[recordId]`；创建：`/workspace/[projectId]/new/[kind]`。合法创建来源继续保留；`returnTo` 只允许任务页和三类资料清单。
+- 可选视频：`/workspace/[projectId]/video?item=…`；没有选择时返回本项目内容清单，不默认打开第一条。
+- 项目管理：`/workspace/projects` 与 `/workspace/[projectId]`。旧项目首页 `panel/item/lead/product/rfq` 链接显示停用提示。
+- 设置：`/workspace/settings?section=account|team|agent|channels`。渠道包含账户、连接和暂停／恢复；节点、代理和队列进入高级区域。旧 Facebook 和浏览器页面只显示迁移入口。发布操作在具体内容或视频中逐帖确认。
+
 ### 产品目录录入
 
-业务员和管理员可在营销项目的“产品资料”步骤中，将工厂资料按“产品编号、OE、适配与规格”的目录结构创建为
+业务员和管理员可从产品资料清单选择营销项目，将工厂资料按“产品编号、OE、适配与规格”的目录结构创建为
 `PRODUCT_REVIEW_REQUIRED` 草稿。每条已填写的字段必须从已上传、已持久化且当前项目可访问的私有证据中选择；录入不会使
 产品成为 `ProductReady`，也不会生成正式报价或交期。真实目录、产品图片与本机路径都不能提交到 Git。
 
-已配置模型后，业务员和管理员可在产品资料步骤上传已获授权的 PDF、CSV、XLS 或 XLSX（最大 25MB），
+已配置模型后，业务员和管理员可在产品录入页上传已获授权的 PDF、CSV、XLS 或 XLSX（最大 25MB），
 或粘贴已脱敏的预处理文本。上传文件会以 `restricted` 分类写入 Vercel Private Blob 与 evidence 表，再在
 短生命周期的本地副本上预处理；Product Agent 只生成 `PRODUCT_REVIEW_REQUIRED` 草稿。该入口不支持把本机路径
 或公开 URL 作为来源，且每次运行均需 Gate 01 人工审核。
@@ -121,7 +131,7 @@ pnpm db:migrate
 
 ### Product Agent 模型配置
 
-Product Agent 只从工作台“Agent 配置”页面中保存的 provider 读取模型、端点和认证信息，不再读取模型环境变量或命令行 `--model` 覆盖。API key 和 Auth token 会使用 `MODEL_CONFIG_ENCRYPTION_KEY` 以 AES-256-GCM 加密后写入数据库；设置该变量为 `openssl rand -base64 32` 的结果。密钥永不回显。未保存可用 provider 时，Agent 会明确拒绝运行。
+Product Agent 只从工作区设置的“Agent”栏目中保存的 provider 读取模型、端点和认证信息，不再读取模型环境变量或命令行 `--model` 覆盖。API key 和 Auth token 会使用 `MODEL_CONFIG_ENCRYPTION_KEY` 以 AES-256-GCM 加密后写入数据库；设置该变量为 `openssl rand -base64 32` 的结果。密钥永不回显。未保存可用 provider 时，Agent 会明确拒绝运行。
 
 ### 初始化管理员
 

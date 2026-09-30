@@ -151,6 +151,7 @@ export async function assertPublicationEligible(
 export async function listProjectPublicationData(
   projectId: string,
   database: Database = getDatabase(),
+  contentId?: string,
 ) {
   const [projectRecords, channels] = await Promise.all([
     database
@@ -161,6 +162,7 @@ export async function listProjectPublicationData(
         and(
           eq(workspaceProjectItem.projectId, projectId),
           inArray(workspaceProjectItem.role, ["marketing_content", "marketing_video"]),
+          contentId ? eq(aggregateRecord.id, contentId) : undefined,
         ),
       ),
     database

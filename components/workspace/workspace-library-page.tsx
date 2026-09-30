@@ -12,7 +12,9 @@ const labels = {
   content: ["内容与发布", "查看内容版本、审核状态和发布回执。"],
   customers: ["客户与询盘", "从客户线索、需求确认到人工报价与跟进。"],
 };
-export type LibraryPageProps = { searchParams: Promise<{ project?: string }> };
+export type LibraryPageProps = {
+  searchParams: Promise<{ project?: string; type?: string; state?: string }>;
+};
 async function Records({
   collection,
   searchParams,
@@ -30,6 +32,8 @@ async function Records({
       projects={projects}
       records={records}
       projectId={query.project}
+      recordType={query.type}
+      state={query.state}
     />
   );
 }

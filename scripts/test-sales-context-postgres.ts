@@ -7,8 +7,11 @@ import rfqFixture from "../data/fixtures/rfq-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
 import { listProjectLeads } from "../lib/sales/closing-store";
+import { salesRelations } from "../lib/sales/journey";
+import { readSalesJourney } from "../lib/sales/journey-store";
 import { listProjectRfqEntries } from "../lib/sales/store";
 import { createStoredSocialMessageRecord } from "../lib/social/message-record";
+import { readWorkspaceRecord } from "../lib/workspace/record-read-model";
 
 const connection = process.env.SALES_CONTEXT_TEST_DATABASE_URL;
 if (
@@ -263,6 +266,39 @@ void (async () => {
       "Wrong RFQ/type or expired delivery must not authorize a promise",
     );
   }
+  // Record detail follows stored IDs only, even when customer names are identical.
+  await db
+    .update(schema.aggregateRecord)
+    .set({ payload: confirmation })
+    .where(eq(schema.aggregateRecord.id, deliveryId));
+  const scoped = await readSalesJourney(project, owner, leadB, { kind: "lead", id: leadB });
+  assert.deepEqual(
+    scoped.rfqs.map((row) => row.id),
+    [rfqIds[0]],
+  );
+  assert(scoped.leads.some((row) => row.id === leadB));
+  assert(!scoped.leads.some((row) => row.id === leadA || row.id === leadC));
+  assert.equal((await readWorkspaceRecord(project, "rfq", rfqIds[0], viewer))?.id, rfqIds[0]);
+  assert.equal(await readWorkspaceRecord(project, "quotation", rfqIds[0], viewer), null);
+  assert.equal(await readWorkspaceRecord(project, "lead", foreignLead, viewer), null);
+  await assert.rejects(readWorkspaceRecord(project, "rfq", rfqIds[0], outsider), /不是该项目成员/);
+  await db
+    .update(schema.aggregateRecord)
+    .set({ payload: { ...confirmation, related_entity_id: rfqIds[1] } })
+    .where(eq(schema.aggregateRecord.id, deliveryId));
+  const conflictedJourney = await readSalesJourney(project, owner, leadB, {
+    kind: "lead",
+    id: leadB,
+  });
+  const conflictedContext = salesRelations(conflictedJourney.records, "lead", leadB)!;
+  assert(
+    conflictedContext.missingContext,
+    "Conflicting delivery relationship remains visible as an issue",
+  );
+  assert(
+    !conflictedContext.related.some((row) => row.id === rfqIds[1]),
+    "Never substitute the conflicting customer's RFQ",
+  );
   const unownedRfq = randomUUID();
   await db
     .update(schema.aggregateRecord)

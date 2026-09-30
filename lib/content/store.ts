@@ -238,6 +238,7 @@ function readyProductSources(
 
 export async function listReadyProductContentSources(
   projectId?: string,
+  productId?: string,
 ): Promise<ReadyProductContentSource[]> {
   if (projectId) {
     const rows = await getDatabase()
@@ -249,6 +250,7 @@ export async function listReadyProductContentSources(
           eq(workspaceProjectItem.projectId, projectId),
           eq(aggregateRecord.type, "product"),
           eq(aggregateRecord.state, "PRODUCT_READY"),
+          productId ? eq(aggregateRecord.id, productId) : undefined,
         ),
       )
       .orderBy(desc(workspaceProjectItem.createdAt));
@@ -883,4 +885,27 @@ export async function reviseContentDraft(
     });
     return { approvalId, content };
   });
+}
+
+/** Candidates for cross-project references are limited to the actor's readable projects. */
+export async function listActorReadyProductContentSources(
+  actorId: string,
+  database: Database = getDatabase(),
+) {
+  const rows = await database
+    .select({ record: aggregateRecord })
+    .from(workspaceProjectItem)
+    .innerJoin(
+      workspaceProjectMember,
+      eq(workspaceProjectMember.projectId, workspaceProjectItem.projectId),
+    )
+    .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
+    .where(
+      and(
+        eq(workspaceProjectMember.userId, actorId),
+        eq(aggregateRecord.type, "product"),
+        eq(aggregateRecord.state, "PRODUCT_READY"),
+      ),
+    );
+  return readyProductSources([...new Map(rows.map((row) => [row.record.id, row.record])).values()]);
 }

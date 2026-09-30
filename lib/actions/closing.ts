@@ -1,12 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { after } from "next/server";
-import { ZodError } from "zod";
+import { actionError, refreshWorkspace, requireActionActor } from "@/lib/action-boundary";
 import type { ClosingActionState } from "@/lib/action-states";
-import { auth } from "@/lib/auth";
-import { hasPermission, type Permission } from "@/lib/authz";
 import {
   deliveryDecisionFormSchema,
   deliveryRequestFormSchema,
@@ -30,26 +26,11 @@ import {
 import { routeInboundConversation } from "@/lib/social/inbound-routing-store";
 import { submitControlledPublication } from "@/lib/social/publication-store";
 
-async function actor(permission: Permission) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, permission))
-    throw new Error("无权执行该操作。");
-  return session.user.id;
-}
+const actor = requireActionActor;
+const resultError = actionError;
+const refresh = refreshWorkspace;
 function values(formData: FormData) {
   return Object.fromEntries(formData);
-}
-function resultError(error: unknown): ClosingActionState {
-  if (error instanceof ZodError)
-    return { status: "error", message: error.issues[0]?.message ?? "请检查表单内容。" };
-  return {
-    status: "error",
-    message: error instanceof Error ? error.message : "操作未完成，请重试。",
-  };
-}
-function refresh(projectId: string) {
-  revalidatePath("/workspace", "layout");
-  revalidatePath(`/workspace/${projectId}`);
 }
 
 export async function saveQuotationAction(

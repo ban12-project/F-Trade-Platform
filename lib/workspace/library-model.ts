@@ -17,7 +17,7 @@ export const recordKindLabels: Record<WorkspaceRecordKind, string> = {
   quotation: "人工报价",
   delivery: "交期确认",
 };
-const stateLabels: Record<string, string> = {
+export const recordStateLabels: Record<string, string> = {
   PRODUCT_DRAFT: "资料待补全",
   PRODUCT_REVIEW_REQUIRED: "待核验",
   PRODUCT_REVISION_REQUIRED: "待修订",
@@ -65,6 +65,7 @@ export type WorkspaceLibraryRecord = {
   collection: WorkspaceCollection;
   title: string;
   statusLabel: string;
+  state: string;
   relation: string;
   updatedAt: Date;
   href: string;
@@ -101,7 +102,8 @@ export function deriveWorkspaceLibrary(snapshot: WorkspaceTaskSnapshot): Workspa
       kind,
       collection: workspaceCollection(kind),
       title: name || `${recordKindLabels[kind]} · ${record.id.slice(0, 8)}`,
-      statusLabel: stateLabels[record.state] ?? "状态待核对",
+      state: record.state,
+      statusLabel: recordStateLabels[record.state] ?? "状态待核对",
       relation: record.relation,
       updatedAt: record.updatedAt,
       href: workspaceRecordHref(project.id, kind, record.id),
@@ -120,7 +122,8 @@ export function deriveWorkspaceLibrary(snapshot: WorkspaceTaskSnapshot): Workspa
       kind: "publication",
       collection: "content",
       title: content ? `${content.title} · 发布` : `发布记录 · ${publication.id.slice(0, 8)}`,
-      statusLabel: stateLabels[publication.status] ?? "回执待核对",
+      state: publication.status,
+      statusLabel: recordStateLabels[publication.status] ?? "回执待核对",
       relation: "owned",
       updatedAt: publication.createdAt,
       href: workspaceRecordHref(project.id, "publication", publication.id),

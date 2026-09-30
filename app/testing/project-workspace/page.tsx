@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { ProjectMembersPanel } from "@/components/workspace/project-members-panel";
-import { type ProjectStage, ProjectWorkspace } from "@/components/workspace/project-workspace";
-import type { WorkspaceProjectSummary, WorkspaceTaskSummary } from "@/lib/workspace/store";
+import { WorkspaceLink } from "@/components/workspace/workspace-link";
+import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 
 const project: WorkspaceProjectSummary = {
   id: "00000000-0000-4000-8000-000000000721",
@@ -13,54 +13,7 @@ const project: WorkspaceProjectSummary = {
   status: "active",
   updatedAt: new Date("2026-09-01T00:00:00Z"),
 };
-const stages: ProjectStage[] = [
-  {
-    id: "product",
-    panelKind: "product",
-    label: "产品事实",
-    description: "导入、核验证据并完成 Gate 01。",
-  },
-  { id: "content", panelKind: "content", label: "内容", description: "从已核验事实创建营销内容。" },
-  { id: "video", panelKind: "video", label: "视频", description: "在独立编辑器完成视频制作。" },
-  {
-    id: "publication",
-    panelKind: "publication",
-    label: "发布",
-    description: "逐帖确认渠道与载荷，等待平台回执。",
-  },
-];
-const tasks: WorkspaceTaskSummary[] = [
-  {
-    id: "00000000-0000-4000-8000-000000000722",
-    projectId: project.id,
-    projectTitle: project.title,
-    nodeKind: "product",
-    title: "核对产品事实",
-    detail: "等待 Gate 01",
-    priority: "review",
-    taskType: "approval",
-    actionLabel: "完成审核",
-    createdAt: new Date("2026-09-03T00:00:00Z"),
-  },
-];
-
-async function ProjectWorkspaceFixture({
-  searchParams,
-}: {
-  searchParams: Promise<{ panel?: string }>;
-}) {
-  const query = await searchParams;
-  const active = stages.some((stage) => stage.id === query.panel) ? query.panel! : "product";
-  const stage = stages.find((item) => item.id === active)!;
-  const panel = (
-    <Card>
-      <CardHeader>
-        <CardTitle>{stage.label}记录</CardTitle>
-        <CardDescription>合成测试详情面板</CardDescription>
-      </CardHeader>
-      <CardContent>人工操作保持可追溯。</CardContent>
-    </Card>
-  );
+async function ProjectWorkspaceFixture() {
   const membersPanel = (
     <ProjectMembersPanel
       projectId={project.id}
@@ -82,27 +35,27 @@ async function ProjectWorkspaceFixture({
     />
   );
   return (
-    <ProjectWorkspace
-      project={project}
-      tasks={tasks}
-      membersPanel={membersPanel}
-      stages={stages}
-      activeStage={active}
-      panel={panel}
-      basePath="/testing/project-workspace"
-    />
+    <WorkspaceDirtyProvider>
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-4xl space-y-6 p-6">
+        <WorkspaceLink
+          href="/workspace/projects"
+          className={buttonVariants({ variant: "ghost", className: "min-h-11" })}
+        >
+          返回项目管理
+        </WorkspaceLink>
+        <h1 className="text-2xl font-semibold">{project.title}</h1>
+        <p>名称、成员与归档状态</p>
+        {membersPanel}
+      </main>
+    </WorkspaceDirtyProvider>
   );
 }
 
-export default function ProjectWorkspaceTestingPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ panel?: string }>;
-}) {
+export default function ProjectWorkspaceTestingPage() {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (
     <Suspense fallback={null}>
-      <ProjectWorkspaceFixture searchParams={searchParams} />
+      <ProjectWorkspaceFixture />
     </Suspense>
   );
 }

@@ -204,21 +204,17 @@ test("video collection, exact draft and sourced creation remain distinct with mu
   page,
 }) => {
   await page.goto(path);
-  await expect(page.getByRole("heading", { name: "营销视频", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "内容与发布", exact: true })).toBeVisible();
   await expect(page.getByLabel("成片时长（秒）")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "制作新视频" })).toHaveAttribute(
-    "href",
-    `${path}?new=1`,
-  );
-  await page
-    .getByRole("link", { name: /SYNTHETIC secondary disc · SYNTHETIC video objective 1/ })
-    .click();
-  await expect(page).toHaveURL(`${path}?item=${videoIds[1]}`);
+  await expect(page).toHaveURL(`/workspace/content?project=${projectId}&type=video`);
+  await expect(page.getByRole("button", { name: "按需制作视频", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: /SYNTHETIC video objective 1/ }).click();
+  await expect(page).toHaveURL(new RegExp(`${path}[?]item=${videoIds[1]}&returnTo=`));
   await expect(page.getByRole("heading", { name: names[1], exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: names[0], exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "返回内容与发布" })).toHaveAttribute(
     "href",
-    `/workspace/content?project=${projectId}`,
+    `/workspace/content?project=${projectId}&type=video`,
   );
   await page.goto(`${path}?new=1`);
   await expect(page.getByLabel("视频目标")).toBeVisible();
@@ -271,6 +267,9 @@ test("copy opens its returned draft, protects other input, and repeated saves cl
   await expect(page.getByLabel("视频目标")).toHaveValue("展示已核实产品，引导客户咨询");
   await page.getByLabel("视频目标").fill("SYNTHETIC unsaved separate creation");
   await page.getByRole("button", { name: "复制为新剪辑稿" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "继续编辑" }).click();
   const open = page.getByRole("link", { name: "打开复制的剪辑稿" });
   await expect(open).toBeVisible();
   const href = await open.getAttribute("href");
@@ -284,7 +283,6 @@ test("copy opens its returned draft, protects other input, and repeated saves cl
   expect(copy.state).toBe("VIDEO_DRAFT");
   expect(copy.payload).toMatchObject({ id: copiedId, productId: productIds[2] });
   await open.click();
-  const dialog = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "继续编辑" }).click();
   await expect(page.getByLabel("视频目标")).toHaveValue("SYNTHETIC unsaved separate creation");

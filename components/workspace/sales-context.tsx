@@ -18,6 +18,7 @@ export function SalesContext({
   id,
   canWrite,
   hideContinuation = false,
+  returnTo,
 }: {
   projectId: string;
   records: SalesRelationRecord[];
@@ -25,6 +26,7 @@ export function SalesContext({
   id: string;
   canWrite: boolean;
   hideContinuation?: boolean;
+  returnTo?: string;
 }) {
   const context = salesRelations(records, kind, id);
   if (!context) return null;
@@ -36,34 +38,37 @@ export function SalesContext({
   if (current.kind === "rfq" && current.state === "RFQ_READY") {
     if (quotes.length === 1)
       next = {
-        href: workspaceRecordHref(projectId, "quotation", quotes[0].id),
+        href: workspaceRecordHref(projectId, "quotation", quotes[0].id, returnTo),
         label: "打开人工报价",
       };
     else if (!quotes.length && canWrite && !context.missingContext)
       next = {
-        href: workspaceCreateHref(projectId, "quotation", { kind: "rfq", id }),
+        href: workspaceCreateHref(projectId, "quotation", { kind: "rfq", id }, returnTo),
         label: "创建人工报价",
       };
   } else if (current.kind === "lead" && current.state === "LEAD_RECEIVED") {
     if (rfqs.length === 1)
-      next = { href: workspaceRecordHref(projectId, "rfq", rfqs[0].id), label: "继续整理客户需求" };
+      next = {
+        href: workspaceRecordHref(projectId, "rfq", rfqs[0].id, returnTo),
+        label: "继续整理客户需求",
+      };
     else if (!rfqs.length && canWrite && !context.missingContext)
       next = {
-        href: workspaceCreateHref(projectId, "rfq", { kind: "lead", id }),
+        href: workspaceCreateHref(projectId, "rfq", { kind: "lead", id }, returnTo),
         label: "整理客户需求",
       };
   } else if (current.kind === "quotation" && current.state === "QUOTE_SENT") {
     const sentLeads = leads.filter((lead) => lead.quotationId === id);
     if (sentLeads.length === 1)
       next = {
-        href: workspaceRecordHref(projectId, "lead", sentLeads[0].id),
+        href: workspaceRecordHref(projectId, "lead", sentLeads[0].id, returnTo),
         label: "继续客户跟进",
       };
   } else if (current.kind === "delivery") {
     const requestLeads = leads.filter((lead) => lead.deliveryId === id);
     if (requestLeads.length === 1)
       next = {
-        href: workspaceRecordHref(projectId, "lead", requestLeads[0].id),
+        href: workspaceRecordHref(projectId, "lead", requestLeads[0].id, returnTo),
         label: "返回客户跟进",
       };
   }
@@ -86,7 +91,7 @@ export function SalesContext({
             {related.map((record) => (
               <WorkspaceLink
                 key={`${record.kind}:${record.id}`}
-                href={workspaceRecordHref(projectId, record.kind, record.id)}
+                href={workspaceRecordHref(projectId, record.kind, record.id, returnTo)}
                 className="rounded-md border p-3 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="block break-words font-medium">{record.title}</span>

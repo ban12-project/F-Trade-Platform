@@ -161,7 +161,7 @@ test("touch controls have two-dimensional targets and the drawer has an explicit
     await close.tap();
     await expect(drawer).toBeHidden();
     await page.goto("/testing/project-workspace");
-    const back = await page.getByRole("link", { name: "返回工作台" }).boundingBox();
+    const back = await page.getByRole("link", { name: "返回项目管理" }).boundingBox();
     expect(back?.width).toBeGreaterThanOrEqual(44);
     expect(back?.height).toBeGreaterThanOrEqual(44);
   } finally {
@@ -210,8 +210,8 @@ test("small mobile dialogs stay within the viewport and keep submission reachabl
 test("details use document scrolling at mobile and desktop sizes", async ({ page }) => {
   for (const width of [390, 1024]) {
     await page.setViewportSize({ width, height: 844 });
-    await page.goto("/testing/project-workflow?panel=product");
-    const details = page.getByRole("region", { name: /详情与审批/ });
+    await page.goto("/testing/project-workflow?record=product");
+    const details = page.getByRole("region", { name: "业务记录" });
     await expect(details).toBeVisible();
     await expect(details.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(

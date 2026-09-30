@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeftIcon, FilmIcon } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -26,6 +26,8 @@ function VideoWorkspaceInner({
   canReview,
   canWrite,
   selection,
+  returnTo,
+  publication,
 }: {
   projectId: string;
   projectTitle: string;
@@ -35,6 +37,8 @@ function VideoWorkspaceInner({
   canReview: boolean;
   canWrite: boolean;
   selection: VideoWorkspaceSelection;
+  returnTo?: string;
+  publication?: ReactNode;
 }) {
   const [editorDirty, setDirty] = useState(false);
   useWorkspaceDirty("video-editor", editorDirty);
@@ -44,7 +48,7 @@ function VideoWorkspaceInner({
   const productId =
     active?.productId ?? (selection.mode === "create" ? selection.productId : undefined);
   const product = products.find((item) => item.id === productId);
-  const back = `/workspace/content?project=${projectId}`;
+  const back = returnTo ?? `/workspace/content?project=${projectId}`;
   return (
     <main id="main-content" className="min-h-screen bg-muted/30 pb-24">
       <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-xl">
@@ -157,6 +161,7 @@ function VideoWorkspaceInner({
                 selectedId={active?.id}
                 onDirtyChange={setDirty}
               />
+              {publication}
             </fieldset>
           </>
         )}

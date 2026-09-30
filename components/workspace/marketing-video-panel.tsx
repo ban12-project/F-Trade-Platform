@@ -10,7 +10,7 @@ import {
   SaveIcon,
   ScissorsIcon,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -63,7 +63,8 @@ import type {
   MarketingVideoEditorEntry,
   ReadyVideoProductSource,
 } from "@/lib/video/store";
-import { workspaceRecordHref } from "@/lib/workspace/navigation";
+import { workspaceRecordHref, workspaceReturnTo } from "@/lib/workspace/navigation";
+import { useWorkspaceDirtyState } from "./dirty-state";
 import { MarketingVideoCreateForm } from "./marketing-video-create-form";
 import { WorkspaceLink } from "./workspace-link";
 
@@ -666,6 +667,8 @@ export function MarketingVideoPanel({
   const router = useRouter();
   const active = mode === "record" ? entries.find((entry) => entry.id === selectedId) : undefined;
   const [copiedId, setCopiedId] = useState("");
+  const { requestNavigation } = useWorkspaceDirtyState();
+  const returnTo = workspaceReturnTo(useSearchParams().get("returnTo"));
   return (
     <div className="flex flex-col gap-4">
       {active ? (
@@ -727,7 +730,12 @@ export function MarketingVideoPanel({
                   setCopyMessage(result.message);
                   if (result.status === "success") {
                     setCopiedId(result.videoId ?? "");
-                    router.refresh();
+                    if (result.videoId)
+                      requestNavigation(() =>
+                        router.push(
+                          workspaceRecordHref(projectId, "video", result.videoId!, returnTo),
+                        ),
+                      );
                   }
                 })
               }
@@ -737,7 +745,7 @@ export function MarketingVideoPanel({
             </Button>
             {copiedId ? (
               <WorkspaceLink
-                href={workspaceRecordHref(projectId, "video", copiedId)}
+                href={workspaceRecordHref(projectId, "video", copiedId, returnTo)}
                 className={buttonVariants({ variant: "outline" })}
               >
                 打开复制的剪辑稿

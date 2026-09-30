@@ -1,13 +1,10 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { start } from "workflow/api";
 import { z } from "zod";
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
+import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 import {
   createMarketingVideoDraftFormSchema,
   createMarketingVideoFromInternetSchema,
@@ -52,9 +49,8 @@ export type InternetMediaSearchActionState = {
   results: InternetMediaSearchResult[];
 };
 async function requireVideoWriter() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "video:write"))
-    throw new Error("无权编辑营销视频。");
+  const session = await authorizedActionSession("video:write");
+  if (!session) throw new Error("无权编辑营销视频。");
   return session;
 }
 
@@ -86,7 +82,7 @@ async function finishVideoCreation(
 ): Promise<MarketingVideoActionState> {
   await startVideoJob("ai_draft", result.id, actorId);
   revalidatePath(`/workspace/${projectId}`);
-  revalidatePath("/workspace", "layout");
+  refreshWorkspace();
   return { status: "success", message, videoId: result.id };
 }
 
@@ -105,17 +101,14 @@ export async function copyMarketingVideoDraftAction(
       session.user.id,
     );
     revalidatePath(`/workspace/${projectId}`);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return {
       status: "success",
       message: "已复制为当前项目的独立剪辑稿；预览和审核状态不会共享。",
       videoId: result.id,
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法复制营销视频。",
-    };
+    return actionError(error, "无法复制营销视频。");
   }
 }
 
@@ -243,10 +236,7 @@ export async function createMarketingVideoDraftAction(
       "素材已保存，AI 剪辑初稿已进入后台队列。",
     );
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法创建营销视频剪辑稿。",
-    };
+    return actionError(error, "无法创建营销视频剪辑稿。");
   }
 }
 
@@ -289,13 +279,10 @@ export async function generateMarketingVideoAiDraftAction(
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await startVideoJob("ai_draft", videoId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return { status: "success", message: "AI 初稿已进入后台队列，完成后会自动刷新。", videoId };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法生成 AI 剪辑初稿。",
-    };
+    return actionError(error, "无法生成 AI 剪辑初稿。");
   }
 }
 
@@ -309,13 +296,10 @@ export async function saveMarketingVideoDraftAction(
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await updateMarketingVideoEditDraft(videoId, draft, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return { status: "success", message: "剪辑稿已保存。", videoId };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法保存剪辑稿。",
-    };
+    return actionError(error, "无法保存剪辑稿。");
   }
 }
 
@@ -330,13 +314,10 @@ export async function renderMarketingVideoDraftAction(
     await updateMarketingVideoEditDraft(videoId, draft, session.user.id);
     await startVideoJob("render", videoId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return { status: "success", message: "私有预览已进入后台合成队列。", videoId };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法合成营销视频。",
-    };
+    return actionError(error, "无法合成营销视频。");
   }
 }
 
@@ -348,22 +329,18 @@ export async function reviewMarketingVideoAction(
   notes = "",
 ): Promise<MarketingVideoActionState> {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session || !hasPermission(session.user.role, "content:review"))
-      throw new Error("只有管理员可以审核营销视频成片。");
+    const session = await authorizedActionSession("content:review");
+    if (!session) throw new Error("只有管理员可以审核营销视频成片。");
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
     await decideGuardedVideoReview({ videoId, decision, evidenceRef, notes }, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return {
       status: "success",
       message: decision === "approved" ? "成片已通过人工审核；不会自动发布。" : "成片已退回修改。",
       videoId,
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法审核营销视频。",
-    };
+    return actionError(error, "无法审核营销视频。");
   }
 }

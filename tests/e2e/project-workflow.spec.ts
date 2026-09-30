@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 test("Product Agent keeps saved models selectable in the product step", async ({ page }) => {
-  await page.goto("/testing/project-workflow?panel=product");
+  await page.goto("/testing/project-workflow?record=product");
   await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "高级设置：模型", exact: true }).click();
   const model = page
-    .getByRole("region", { name: /详情与审批/ })
+    .getByRole("region", { name: "业务记录" })
     .getByRole("combobox", { name: "模型", exact: true });
   await expect(model).toContainText("日常产品导入 · gpt-5-mini");
   await model.click();
@@ -14,9 +15,9 @@ test("Product Agent keeps saved models selectable in the product step", async ({
 });
 
 test("product Gate 01 submits the displayed revision and approval request", async ({ page }) => {
-  await page.goto("/testing/project-workflow?panel=product&state=product-review");
+  await page.goto("/testing/project-workflow?record=product&state=product-review");
   await page.waitForLoadState("networkidle");
-  const detail = page.getByRole("region", { name: "当前阶段", exact: true });
+  const detail = page.getByRole("region", { name: "业务记录", exact: true });
   await expect(detail.getByText("产品事实与证据")).toBeVisible();
   await expect(detail.getByText("产品核实决定", { exact: true })).toBeVisible();
   await expect(detail.getByText(/审核版本 1/)).toBeVisible();
@@ -40,15 +41,15 @@ test("product Gate 01 submits the displayed revision and approval request", asyn
 });
 
 test("rejected content exposes revision in the content step", async ({ page }) => {
-  await page.goto("/testing/project-workflow?panel=content&state=content-revision");
-  const detail = page.getByRole("region", { name: /详情与审批/ });
+  await page.goto("/testing/project-workflow?record=content&state=content-revision");
+  const detail = page.getByRole("region", { name: "业务记录" });
   await expect(detail.getByText("修订内容草稿")).toBeVisible();
   await expect(detail.getByRole("button", { name: "提交修订并送审" })).toBeVisible();
 });
 
 test("sales demand detail links its actual customer and quotation", async ({ page }) => {
-  await page.goto("/testing/project-workflow?kind=sales&panel=rfq");
-  const detail = page.getByRole("region", { name: /详情与审批/ });
+  await page.goto("/testing/project-workflow?kind=sales&record=rfq");
+  const detail = page.getByRole("region", { name: "业务记录" });
   await expect(detail.getByText("客户需求", { exact: true })).toBeVisible();
   await expect(detail.getByRole("link", { name: "打开人工报价", exact: true })).toHaveAttribute(
     "href",
@@ -60,15 +61,15 @@ test("sales demand detail links its actual customer and quotation", async ({ pag
 });
 
 test("sales quotation stays explicitly human controlled", async ({ page }) => {
-  await page.goto("/testing/project-workflow?kind=sales&panel=quotation");
-  const detail = page.getByRole("region", { name: /详情与审批/ });
+  await page.goto("/testing/project-workflow?kind=sales&record=quotation");
+  const detail = page.getByRole("region", { name: "业务记录" });
   await expect(detail.getByText("创建人工报价", { exact: true })).toBeVisible();
   await expect(detail.getByRole("button", { name: /自动报价/ })).toHaveCount(0);
 });
 
 test("follow-up shows the authorized timeline and explicit human send", async ({ page }) => {
-  await page.goto("/testing/project-workflow?kind=sales&panel=follow-up");
-  const detail = page.getByRole("region", { name: /详情与审批/ });
+  await page.goto("/testing/project-workflow?kind=sales&record=lead");
+  const detail = page.getByRole("region", { name: "业务记录" });
   await expect(detail.getByText("客户会话", { exact: true })).toBeVisible();
   await expect(detail.getByText("Synthetic buyer asks for the verified lead time.")).toBeVisible();
   await expect(detail.getByRole("button", { name: "人工确认并发送此回复" })).toBeEnabled();
@@ -78,8 +79,8 @@ test("follow-up shows the authorized timeline and explicit human send", async ({
 });
 
 test("publication waits for explicit confirmation and platform receipt", async ({ page }) => {
-  await page.goto("/testing/project-workflow?panel=publication");
-  const detail = page.getByRole("region", { name: /详情与审批/ });
+  await page.goto("/testing/project-workflow?record=publication");
+  const detail = page.getByRole("region", { name: "业务记录" });
   await expect(detail.getByText("尚无可发布内容", { exact: true })).toBeVisible();
   await expect(detail.getByText("平台回执前不会显示为已发布", { exact: false })).toBeVisible();
   await expect(detail.locator("#publication-confirmation")).toHaveCount(0);
@@ -87,12 +88,12 @@ test("publication waits for explicit confirmation and platform receipt", async (
 
 test("editor uses the main document width and appears before related tasks", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 600 });
-  await page.goto("/testing/project-workflow?panel=product");
-  const detail = page.getByRole("region", { name: /详情与审批/ });
+  await page.goto("/testing/project-workflow?record=product");
+  const detail = page.getByRole("region", { name: "业务记录" });
   expect((await detail.boundingBox())?.width).toBeGreaterThan(800);
   await expect(detail.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0);
-  const tasks = page.getByRole("complementary", { name: "相关任务" });
-  expect((await detail.boundingBox())!.y).toBeLessThan((await tasks.boundingBox())!.y);
+  await expect(page.getByRole("complementary", { name: "相关任务" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "项目栏目" })).toHaveCount(0);
 });
 
 for (const zeroAccepted of [false, true]) {
@@ -200,7 +201,7 @@ for (const zeroAccepted of [false, true]) {
             .join("\n") + "\n",
       });
     });
-    await page.goto("/testing/project-workflow?panel=product");
+    await page.goto("/testing/project-workflow?record=product");
     await page.waitForLoadState("networkidle");
     await page.getByLabel("产品资料", { exact: true }).setInputFiles({
       name: "synthetic.csv",
@@ -252,8 +253,8 @@ test("customer quotation revision preserves its reason, validation and unsaved m
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/testing/project-workflow?kind=sales&panel=quotation&state=quote-revision");
-  const panel = page.getByRole("region", { name: "报价详情与审批" });
+  await page.goto("/testing/project-workflow?kind=sales&record=quotation&state=quote-revision");
+  const panel = page.getByRole("region", { name: "业务记录" });
   const form = panel.locator("#quotation-00000000-0000-4000-8000-000000000603");
   await expect(panel.getByText("MOCK: 请核对付款条件后再次送审。", { exact: true })).toBeVisible();
   await form.getByLabel("单价", { exact: true }).fill("-1");
@@ -275,8 +276,8 @@ test("customer quotation revision preserves its reason, validation and unsaved m
 test("customer delivery is optional and an ineligible opportunity is explained", async ({
   page,
 }) => {
-  await page.goto("/testing/project-workflow?kind=sales&panel=follow-up");
-  const panel = page.getByRole("region", { name: /详情与审批/ });
+  await page.goto("/testing/project-workflow?kind=sales&record=lead");
+  const panel = page.getByRole("region", { name: "业务记录" });
   const delivery = panel.getByRole("link", { name: "查看交期确认", exact: true });
   await expect(delivery).toHaveCount(0);
   await panel.getByRole("button", { name: "客户询问交期或样品", exact: true }).click();

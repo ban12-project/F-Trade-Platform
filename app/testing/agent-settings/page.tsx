@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-settings-panel";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 
@@ -45,11 +46,13 @@ async function AgentSettingsFixture({ searchParams }: FixtureProps) {
   const { empty } = await searchParams;
   return (
     <main className="mx-auto max-w-md p-4">
-      <WorkspaceSettingsPanel
-        settings={empty === "1" ? [] : syntheticSettings}
-        canManage
-        currentUser={{ name: "Synthetic admin", email: "admin@synthetic.invalid", role: "admin" }}
-      />
+      <WorkspaceDirtyProvider>
+        <WorkspaceSettingsPanel
+          settings={empty === "1" ? [] : syntheticSettings}
+          canManage
+          currentUser={{ name: "Synthetic admin", email: "admin@synthetic.invalid", role: "admin" }}
+        />
+      </WorkspaceDirtyProvider>
     </main>
   );
 }

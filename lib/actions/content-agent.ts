@@ -1,12 +1,10 @@
 "use server";
 
-import { headers } from "next/headers";
 import { z } from "zod";
+import { actionError, authorizedActionSession } from "@/lib/action-boundary";
 
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
 import {
   type contentGenerationOutputSchema,
   generateMarketingContent,
@@ -24,9 +22,8 @@ export async function generateContentDraftAction(
   _previous: ContentAgentActionState,
   formData: FormData,
 ): Promise<ContentAgentActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "content:write"))
-    return { status: "error", message: "无权生成内容初稿。" };
+  const session = await authorizedActionSession("content:write");
+  if (!session) return { status: "error", message: "无权生成内容初稿。" };
   const parsed = contentAgentRequestSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success)
     return { status: "error", message: parsed.error.issues[0]?.message ?? "内容请求格式不正确。" };
@@ -58,9 +55,6 @@ export async function generateContentDraftAction(
     });
     return { status: "success", message: "AI 初稿已生成；请人工核对后再创建待审内容。", draft };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法生成内容初稿。",
-    };
+    return actionError(error, "无法生成内容初稿。");
   }
 }

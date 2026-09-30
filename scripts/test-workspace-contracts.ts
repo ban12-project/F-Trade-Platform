@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { createWorkspaceProjectSchema } from "../lib/workspace/contracts";
 import { workspaceTaskHref } from "../lib/workspace/navigation";
-import type { WorkspaceTaskSummary } from "../lib/workspace/store";
+import type { WorkspaceTaskSummary } from "../lib/workspace/types";
 
 assert.equal(
   createWorkspaceProjectSchema.parse({
@@ -18,7 +18,8 @@ const task: WorkspaceTaskSummary = {
   id: "00000000-0000-4000-8000-000000000101",
   projectId: "00000000-0000-4000-8000-000000000102",
   projectTitle: "Synthetic project",
-  nodeKind: "content",
+  recordKind: "content",
+  destination: { type: "record", kind: "content", id: "00000000-0000-4000-8000-000000000101" },
   title: "Review content",
   detail: "Waiting for a human",
   priority: "review",
@@ -26,12 +27,12 @@ const task: WorkspaceTaskSummary = {
 };
 assert.equal(workspaceTaskHref(task), `/workspace/${task.projectId}/records/content/${task.id}`);
 assert.equal(
-  workspaceTaskHref({ ...task, nodeKind: "video" }),
+  workspaceTaskHref({ ...task, destination: { type: "record", kind: "video", id: task.id } }),
   `/workspace/${task.projectId}/video?item=${task.id}`,
 );
 assert.equal(
   workspaceTaskHref(task, "/testing/project-workspace"),
-  `/testing/project-workspace?panel=content&item=${task.id}`,
+  `/workspace/${task.projectId}/records/content/${task.id}`,
 );
 
 console.log("PASS workspace project navigation contracts");

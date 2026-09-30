@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -69,6 +71,20 @@ jobs:
 
       - name: Verify authenticated browser writes against isolated PostgreSQL
         run: pnpm exec playwright test --config playwright.database.config.ts
+
+      - name: Verify previous application readers accept newly created records
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          ROLLBACK_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          WORKSPACE_ROLLBACK_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_browser_test
+        run: |
+          rollback_dir="$(mktemp -d)"
+          git archive "$ROLLBACK_BASE_SHA" | tar -x -C "$rollback_dir"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$rollback_dir/node_modules"
+          cp scripts/test-workspace-rollback-readers.ts "$rollback_dir/scripts/"
+          cd "$rollback_dir"
+          node --conditions=react-server --import tsx scripts/test-workspace-rollback-readers.ts
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

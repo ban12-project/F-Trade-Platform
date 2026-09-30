@@ -14,7 +14,9 @@ const actorId = `synthetic-instant-${randomUUID()}`;
 const projectId = randomUUID();
 const token = randomUUID();
 const title = "MOCK instant navigation project";
-const path = `/workspace/${projectId}?panel=product`;
+const recordId = randomUUID();
+const recordTitle = "MOCK instant product";
+const path = `/workspace/${projectId}/records/product/${recordId}`;
 
 test.beforeAll(async () => {
   await migrate(db, { migrationsFolder: "./drizzle" });
@@ -37,8 +39,50 @@ test.beforeAll(async () => {
   await db
     .insert(schema.workspaceProjectMember)
     .values({ id: randomUUID(), projectId, userId: actorId, role: "owner", createdById: actorId });
+  await db.insert(schema.aggregateRecord).values({
+    id: recordId,
+    type: "product",
+    state: "PRODUCT_REVIEW_REQUIRED",
+    createdByType: "human",
+    createdById: actorId,
+    payload: {
+      record_id: recordId,
+      source_ref: "synthetic-instant-source",
+      evidence_refs: [],
+      verification_status: "review_required",
+      blocking_missing_fields: [],
+      optional_missing_fields: [],
+      field_evidence: {},
+      product: {
+        product_name: recordTitle,
+        internal_sku: "MOCK-INSTANT",
+        product_type: "clutch_kit",
+      },
+    },
+  });
+  await db.insert(schema.workspaceProjectItem).values({
+    id: randomUUID(),
+    projectId,
+    aggregateId: recordId,
+    role: "product_source",
+    relation: "owned",
+  });
+  await db.insert(schema.approval).values({
+    id: randomUUID(),
+    aggregateId: recordId,
+    gate: "gate_01_truth",
+    status: "pending",
+    requestedByType: "human",
+    requestedById: actorId,
+    requestedAt: new Date(),
+  });
 });
 test.afterAll(async () => {
+  await db
+    .delete(schema.workspaceProjectItem)
+    .where(eq(schema.workspaceProjectItem.projectId, projectId));
+  await db.delete(schema.approval).where(eq(schema.approval.aggregateId, recordId));
+  await db.delete(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, recordId));
   await db
     .delete(schema.workspaceProjectMember)
     .where(eq(schema.workspaceProjectMember.projectId, projectId));
@@ -64,9 +108,9 @@ for (const viewport of [
   { width: 1280, height: 800 },
   { width: 390, height: 844 },
 ]) {
-  test.describe(`${viewport.width}px project shell`, () => {
+  test.describe(`${viewport.width}px record shell`, () => {
     test.use({ viewport });
-    test("direct load exposes the real header while data is gated", async ({
+    test("direct record load paints the frame and independent loading regions", async ({
       page,
       baseURL,
     }, testInfo) => {
@@ -74,47 +118,53 @@ for (const viewport of [
         page,
         async () => {
           await page.goto(path);
+          await expect(page.getByTestId("record-frame")).toBeVisible();
+          await expect(
+            page.getByRole("status", { name: "正在加载记录信息", exact: true }),
+          ).toBeVisible();
+          await expect(
+            page.getByRole("status", { name: "正在加载业务记录", exact: true }),
+          ).toBeVisible();
+          await expect(page.getByRole("heading", { name: recordTitle, exact: true })).toHaveCount(
+            0,
+          );
           await page.screenshot({ path: testInfo.outputPath("shell.png") });
-          await expect(page.getByTestId("project-back-link")).toBeVisible();
-          await expect(page.getByText("关键动作需人工确认", { exact: true })).toBeVisible();
-          await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
         },
         { baseURL },
       );
       await page.reload();
-      await expect(page.getByRole("heading", { name: title })).toBeVisible();
+      await expect(page.getByRole("heading", { name: recordTitle, exact: true })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "项目栏目" })).toHaveCount(0);
+      await page.screenshot({ path: testInfo.outputPath("loaded.png"), fullPage: true });
     });
-    test("Link navigation keeps the real header mounted through streaming", async ({
+    test("record Link keeps its main landmark mounted and focused through streaming", async ({
       page,
     }, testInfo) => {
-      await page.goto("/workspace");
-      let header: import("@playwright/test").ElementHandle<HTMLElement | SVGElement> | null = null;
+      await page.goto(`/workspace/products?project=${projectId}`);
+      let frame: import("@playwright/test").ElementHandle<HTMLElement | SVGElement> | null = null;
       await instant(page, async () => {
-        await page
-          .getByRole("link", { name: new RegExp(title) })
-          .first()
-          .click();
-        await expect(page).toHaveURL(new RegExp(`/workspace/${projectId}$`));
+        await page.getByRole("link", { name: new RegExp(recordTitle) }).click();
+        await expect(page.getByTestId("record-frame")).toBeVisible();
+        await expect(page.getByRole("heading", { name: recordTitle, exact: true })).toHaveCount(0);
+        frame = await page.getByTestId("record-frame").elementHandle();
+        await page.getByTestId("record-frame").focus();
         await page.screenshot({ path: testInfo.outputPath("shell.png") });
-        await expect(page.getByTestId("project-back-link")).toBeVisible();
-        await expect(page.getByText("关键动作需人工确认", { exact: true })).toBeVisible();
-        await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
-        header = await page.getByTestId("project-back-link").elementHandle();
-        await page.getByTestId("project-back-link").focus();
       });
-      await expect(page.getByRole("heading", { name: title })).toBeVisible();
-      await expect(page.getByTestId("project-back-link")).toBeFocused();
-      if (!header) throw new Error("Missing mounted header control");
+      await expect(page.getByRole("heading", { name: recordTitle, exact: true })).toBeVisible();
+      await expect(page.getByTestId("record-frame")).toBeFocused();
+      if (!frame) throw new Error("Missing real static record frame");
       expect(
         await page.evaluate(
-          (element) => element === document.querySelector('[data-testid="project-back-link"]'),
-          header,
+          (element) => element === document.querySelector('[data-testid="record-frame"]'),
+          frame,
         ),
       ).toBe(true);
-      await expect(page.getByRole("tab", { name: "手动录入" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "成员 1" })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
+      );
+      await expect(page.getByRole("link", { name: "返回清单", exact: true })).toHaveAttribute(
+        "href",
+        `/workspace/products?project=${projectId}`,
       );
       await page.screenshot({ path: testInfo.outputPath("loaded.png"), fullPage: true });
     });
@@ -129,13 +179,13 @@ test("unauthenticated and invalid sessions cannot read project data", async ({
   await context.clearCookies();
   await page.goto(path);
   await expect(page).toHaveURL(/\/auth$/);
-  await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: recordTitle })).toHaveCount(0);
   await context.addCookies([
     { name: "better-auth.session_token", value: "synthetic-invalid-session", url: baseURL },
   ]);
   await page.goto(path);
   await expect(page).toHaveURL(/\/auth$/);
-  await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: recordTitle })).toHaveCount(0);
 });
 
 for (const target of ["products", "content", "customers"]) {
@@ -165,7 +215,7 @@ for (const target of ["products", "content", "customers"]) {
   });
 }
 for (const route of ["new/product", `records/product/${randomUUID()}`]) {
-  test(`${route.split("/")[0]} keeps the project shell on direct navigation`, async ({
+  test(`${route.split("/")[0]} keeps an independent record frame on direct navigation`, async ({
     page,
     baseURL,
   }) => {
@@ -173,7 +223,7 @@ for (const route of ["new/product", `records/product/${randomUUID()}`]) {
       page,
       async () => {
         await page.goto(`/workspace/${projectId}/${route}`);
-        await expect(page.getByTestId("project-back-link")).toBeVisible();
+        await expect(page.getByTestId("record-frame")).toBeVisible();
       },
       { baseURL },
     );

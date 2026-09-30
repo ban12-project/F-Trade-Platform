@@ -189,9 +189,7 @@ html {
   [data-slot]::after,
   [class~="group/button"],
   .motion-landing-enter,
-  .workspace-stage-link,
   .workspace-task-arrow,
-  .workspace-pipeline-card,
   .workspace-link-progress {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
@@ -207,9 +205,8 @@ html {
 
   /* Do not unset layout transforms on centered dialogs or positioned popups. */
   [class~="group/button"],
-  .workspace-stage-link,
   .workspace-task-arrow,
-  .workspace-pipeline-card {
+  .workspace-link-progress {
     scale: none !important;
     translate: none !important;
   }

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Field,
   FieldDescription,
@@ -28,6 +29,7 @@ import { SandboxRegistrationCard } from "@/components/workspace/sandbox-registra
 import { SandboxStatus } from "@/components/workspace/sandbox-status";
 import { browserNodeCommandAction, browserNodesAction } from "@/lib/actions/browser-nodes";
 import { accountFormSchema, nodeFormSchema } from "@/lib/browser-fleet/contracts";
+import { useWorkspaceDirty } from "./dirty-state";
 
 type Nodes = Awaited<ReturnType<typeof browserNodesAction>>;
 type Connection = {
@@ -96,6 +98,8 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
       credentials: emptyCredentials,
     },
   });
+  useWorkspaceDirty("channel-node", nodeForm.formState.isDirty);
+  useWorkspaceDirty("channel-account", accountForm.formState.isDirty);
   useEffect(() => {
     let disposed = false;
     let loading = false;
@@ -223,60 +227,67 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
           </CardContent>
         </Card>
       )}
-      <SandboxRegistrationCard
-        enabled={sandboxEnabled}
-        onCreated={async () => setNodes(await browserNodesAction())}
-      />
-      <Card>
-        <CardHeader>
-          <CardTitle>连接自管服务器</CardTitle>
-          <CardDescription>
-            设置这台 VPS 的容量。平台不按账号数量启动浏览器，只有排队任务获得租约后才启动。
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="grid gap-4 sm:grid-cols-2"
-            onSubmit={nodeForm.handleSubmit(async (value) => {
-              await send({ operation: "create", value });
-            })}
-          >
-            {(
-              [
-                ["name", "节点名称"],
-                ["gatewayOrigin", "接管域名，例如 https://browser-a.example.com"],
-              ] as const
-            ).map(([name, label]) => (
-              <Field key={name}>
-                <FieldLabel htmlFor={`node-${name}`}>{label}</FieldLabel>
-                <Input id={`node-${name}`} {...nodeForm.register(name)} disabled={busy} />
-                <FieldError errors={[nodeForm.formState.errors[name]]} />
-              </Field>
-            ))}
-            {(
-              [
-                ["maxBrowsers", "最大同时运行数"],
-                ["memoryBudgetMb", "浏览器总内存预算（MiB）"],
-                ["browserMemoryMb", "单浏览器内存上限（MiB）"],
-              ] as const
-            ).map(([name, label]) => (
-              <Field key={name}>
-                <FieldLabel htmlFor={`node-${name}`}>{label}</FieldLabel>
-                <Input
-                  id={`node-${name}`}
-                  type="number"
-                  {...nodeForm.register(name, { valueAsNumber: true })}
-                  disabled={busy}
-                />
-                <FieldError errors={[nodeForm.formState.errors[name]]} />
-              </Field>
-            ))}
-            <Button type="submit" disabled={busy}>
-              创建节点并生成 Key
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <Collapsible>
+        <CollapsibleTrigger render={<Button variant="outline" />}>
+          高级：连接节点与容量
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-4">
+          <SandboxRegistrationCard
+            enabled={sandboxEnabled}
+            onCreated={async () => setNodes(await browserNodesAction())}
+          />
+          <Card>
+            <CardHeader>
+              <CardTitle>连接自管服务器</CardTitle>
+              <CardDescription>
+                设置这台 VPS 的容量。平台不按账号数量启动浏览器，只有排队任务获得租约后才启动。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form
+                className="grid gap-4 sm:grid-cols-2"
+                onSubmit={nodeForm.handleSubmit(async (value) => {
+                  if (await send({ operation: "create", value })) nodeForm.reset();
+                })}
+              >
+                {(
+                  [
+                    ["name", "节点名称"],
+                    ["gatewayOrigin", "接管域名，例如 https://browser-a.example.com"],
+                  ] as const
+                ).map(([name, label]) => (
+                  <Field key={name}>
+                    <FieldLabel htmlFor={`node-${name}`}>{label}</FieldLabel>
+                    <Input id={`node-${name}`} {...nodeForm.register(name)} disabled={busy} />
+                    <FieldError errors={[nodeForm.formState.errors[name]]} />
+                  </Field>
+                ))}
+                {(
+                  [
+                    ["maxBrowsers", "最大同时运行数"],
+                    ["memoryBudgetMb", "浏览器总内存预算（MiB）"],
+                    ["browserMemoryMb", "单浏览器内存上限（MiB）"],
+                  ] as const
+                ).map(([name, label]) => (
+                  <Field key={name}>
+                    <FieldLabel htmlFor={`node-${name}`}>{label}</FieldLabel>
+                    <Input
+                      id={`node-${name}`}
+                      type="number"
+                      {...nodeForm.register(name, { valueAsNumber: true })}
+                      disabled={busy}
+                    />
+                    <FieldError errors={[nodeForm.formState.errors[name]]} />
+                  </Field>
+                ))}
+                <Button type="submit" disabled={busy}>
+                  创建节点并生成 Key
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
       <Card>
         <CardHeader>
           <CardTitle>授权账号与同步配置</CardTitle>
@@ -306,7 +317,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                     onValueChange={(v) => field.onChange(v ?? "")}
                     disabled={busy}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="目标节点">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -357,10 +368,6 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                 ["loginPassword", "Facebook 密码（可选，加密保存）"],
                 ["totpSecret", "2FA Base32 密钥（可选，加密保存）"],
                 ["messengerPin", "Messenger PIN（可选，加密保存）"],
-                ["proxyHost", "固定 HTTP 代理主机"],
-                ["proxyPort", "代理端口"],
-                ["proxyUsername", "代理用户名"],
-                ["proxyPassword", "代理密码"],
               ] as const
             ).map(([name, label]) => (
               <Field key={name}>
@@ -379,6 +386,37 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                 <FieldError errors={[accountForm.formState.errors.credentials?.[name]]} />
               </Field>
             ))}
+            <Collapsible className="sm:col-span-2">
+              <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
+                高级：固定代理
+              </CollapsibleTrigger>
+              <CollapsibleContent className="grid gap-4 pt-4 sm:grid-cols-2">
+                {(
+                  [
+                    ["proxyHost", "固定 HTTP 代理主机"],
+                    ["proxyPort", "代理端口"],
+                    ["proxyUsername", "代理用户名"],
+                    ["proxyPassword", "代理密码"],
+                  ] as const
+                ).map(([name, label]) => (
+                  <Field key={name}>
+                    <FieldLabel htmlFor={`credential-${name}`}>{label}</FieldLabel>
+                    <Input
+                      id={`credential-${name}`}
+                      type={
+                        name.endsWith("Password") || ["totpSecret", "messengerPin"].includes(name)
+                          ? "password"
+                          : "text"
+                      }
+                      autoComplete="off"
+                      {...accountForm.register(`credentials.${name}`)}
+                      disabled={busy}
+                    />
+                    <FieldError errors={[accountForm.formState.errors.credentials?.[name]]} />
+                  </Field>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
             <FieldSet>
               <FieldLegend>清除已保存的凭据</FieldLegend>
               <FieldDescription>
@@ -430,35 +468,44 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
               {node.name} <Badge variant="outline">{node.status}</Badge>
             </CardTitle>
             <CardDescription>
-              {node.id} · 并发上限 {node.limits.maxBrowsers} · 最近心跳{" "}
-              {node.lastSeenAt ? new Date(node.lastSeenAt).toLocaleString() : "尚未连接"} · 执行能力{" "}
-              {node.capabilities.join(", ") || "待节点报告"}
+              最近连接 {node.lastSeenAt ? new Date(node.lastSeenAt).toLocaleString() : "尚未连接"} ·
+              执行能力 {node.capabilities.join(", ") || "待节点报告"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <SandboxStatus sandbox={node.sandbox} />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => {
-                  void send({ operation: "rotate", nodeId: node.id });
-                }}
-              >
-                轮换 Key，停止旧租约
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy || node.status !== "active"}
-                onClick={() => {
-                  void send({ operation: "revoke", nodeId: node.id });
-                }}
-              >
-                撤销节点授权
-              </Button>
-            </div>
+            <Collapsible>
+              <CollapsibleTrigger render={<Button variant="outline" />}>
+                高级：节点授权
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 pt-4">
+                <p className="text-sm">
+                  节点：{node.id} · 并发上限 {node.limits.maxBrowsers}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      void send({ operation: "rotate", nodeId: node.id });
+                    }}
+                  >
+                    轮换 Key，停止旧租约
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy || node.status !== "active"}
+                    onClick={() => {
+                      void send({ operation: "revoke", nodeId: node.id });
+                    }}
+                  >
+                    撤销节点授权
+                  </Button>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
             {node.accounts.map((account) => (
               <div key={account.id} className="space-y-2 rounded-lg border p-3">
                 <p className="font-medium">
@@ -517,12 +564,33 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                 </div>
               </div>
             ))}
+            <Collapsible>
+              <CollapsibleTrigger render={<Button variant="ghost" />}>
+                高级：执行队列
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 pt-3">
+                {node.runs
+                  .filter((run) => run.kind !== "interactive")
+                  .map((run) => (
+                    <p key={run.id} className="text-sm">
+                      {run.kind} · {stateLabels[run.status] ?? run.status}
+                    </p>
+                  ))}
+              </CollapsibleContent>
+            </Collapsible>
             <div className="space-y-2">
               {node.runs
-                .filter((r) =>
-                  ["queued", "starting", "running", "stopping", "quarantined", "unknown"].includes(
-                    r.status,
-                  ),
+                .filter(
+                  (r) =>
+                    r.kind === "interactive" &&
+                    [
+                      "queued",
+                      "starting",
+                      "running",
+                      "stopping",
+                      "quarantined",
+                      "unknown",
+                    ].includes(r.status),
                 )
                 .map((run) => (
                   <div

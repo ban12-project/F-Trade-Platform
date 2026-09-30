@@ -2,9 +2,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { ProjectWorkspace } from "@/components/workspace/project-workspace";
+import { RecordFrame } from "@/components/workspace/record-frame";
 import { WorkspaceLoadingSkeleton } from "@/components/workspace/workspace-loading-skeleton";
-import { marketingStages } from "@/lib/workspace/stages";
 import { navigationProject } from "../data";
 import { NavigationEditor } from "../editor";
 
@@ -16,14 +15,9 @@ async function Content({ params, searchParams }: Props) {
   // Deliberately slow, synthetic-only route: this is a persistence regression, not a production benchmark.
   if (query.slow === "1") await delay(1500);
   return (
-    <ProjectWorkspace
-      project={navigationProject}
-      tasks={[]}
-      stages={marketingStages}
-      activeStage="product"
-      basePath={`/testing/workspace-navigation/${navigationProject.id}`}
-      panel={<NavigationEditor href="/testing/workspace-navigation" />}
-    />
+    <RecordFrame header={<h1 className="text-2xl font-semibold">{navigationProject.title}</h1>}>
+      <NavigationEditor href="/testing/workspace-navigation" />
+    </RecordFrame>
   );
 }
 export default function Page(props: Props) {

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { getDatabase } from "@/lib/db/client";
 import {
@@ -180,7 +180,10 @@ export async function listRfqEntries(limit = 50): Promise<RfqEntry[]> {
   return rows.flatMap((row) => entryFromRecord(row) ?? []);
 }
 
-export async function listProjectRfqEntries(projectId: string): Promise<RfqEntry[]> {
+export async function listProjectRfqEntries(
+  projectId: string,
+  ids?: readonly string[],
+): Promise<RfqEntry[]> {
   const rows = await getDatabase()
     .select({ record: aggregateRecord })
     .from(workspaceProjectItem)
@@ -191,6 +194,7 @@ export async function listProjectRfqEntries(projectId: string): Promise<RfqEntry
         eq(workspaceProjectItem.role, "sales_rfq"),
         eq(workspaceProjectItem.relation, "owned"),
         eq(aggregateRecord.type, "rfq"),
+        ids ? inArray(aggregateRecord.id, [...ids]) : undefined,
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));

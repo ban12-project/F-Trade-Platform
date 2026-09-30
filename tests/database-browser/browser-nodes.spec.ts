@@ -56,7 +56,8 @@ test("expected egress is required by the actual account form and persisted with 
       sameSite: "Lax",
     },
   ]);
-  await page.goto("/workspace/browsers");
+  await page.goto("/workspace/settings?section=channels");
+  await page.getByRole("button", { name: "高级：连接节点与容量", exact: true }).click();
   await page.getByLabel("节点名称", { exact: true }).fill(nodeName);
   await page
     .getByLabel("接管域名，例如 https://browser-a.example.com")
@@ -64,9 +65,10 @@ test("expected egress is required by the actual account form and persisted with 
   await page.getByRole("button", { name: "创建节点并生成 Key", exact: true }).click();
   await expect(page.getByRole("button", { name: "我已保存，隐藏 Key" })).toBeVisible();
   await page.getByRole("button", { name: "我已保存，隐藏 Key" }).click();
-  await page.getByRole("combobox").click();
+  await page.getByRole("combobox", { name: "目标节点" }).click();
   await page.getByRole("option", { name: nodeName, exact: true }).click();
   await page.getByLabel("账号标识（固定不变）", { exact: true }).fill(accountRef);
+  await page.getByRole("button", { name: "高级：固定代理", exact: true }).click();
   await page
     .getByLabel("固定 HTTP 代理主机", { exact: true })
     .fill("synthetic-proxy.example.invalid");

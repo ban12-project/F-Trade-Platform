@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { workspaceTaskHref } from "../lib/workspace/navigation";
 import {
-  deriveWorkspacePipeline,
+  deriveWorkspaceProjectOverview,
   deriveWorkspaceTasks,
   isActionableTask,
   type TaskRecord,
@@ -95,7 +95,7 @@ for (const [state, type, kind] of [
 ]) {
   const [task] = tasks(snapshot([record(state, type)]));
   assert.equal(task.taskType, "revision");
-  assert.equal(task.nodeKind, kind);
+  assert.equal(task.recordKind, kind);
   assert.equal(task.state, "actionable");
 }
 const ready = snapshot([record("PRODUCT_READY")]);
@@ -166,7 +166,7 @@ for (const data of [
   blockedPublication,
 ]) {
   const output = tasks(data);
-  const summary = deriveWorkspacePipeline(data, output)[0];
+  const summary = deriveWorkspaceProjectOverview(data, output)[0];
   if (output.length) {
     assert.equal(summary.nextActionHref, workspaceTaskHref(output[0]));
     assert.equal(
@@ -175,9 +175,10 @@ for (const data of [
     );
   }
 }
-assert.equal(deriveWorkspacePipeline(snapshot(), [])[0].currentStage, "尚未开始");
+assert.equal(deriveWorkspaceProjectOverview(snapshot(), [])[0].statusLabel, "尚未开始");
 assert.equal(
-  deriveWorkspacePipeline(snapshot([record("CONTENT_PUBLISHED", "content")]), [])[0].currentStage,
+  deriveWorkspaceProjectOverview(snapshot([record("CONTENT_PUBLISHED", "content")]), [])[0]
+    .statusLabel,
   "当前工作已处理",
 );
 console.log(

@@ -1,11 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { z } from "zod";
+import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
 import { productReviewFormSchema } from "@/lib/form-schemas";
 import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
 import {
@@ -30,16 +27,15 @@ function projectIdFrom(formData: FormData) {
 
 function revalidateProductPaths(projectId: string | undefined, productId?: string) {
   void productId;
-  revalidatePath("/workspace", "layout");
-  if (projectId) revalidatePath(`/workspace/${projectId}`);
+  refreshWorkspace(projectId);
 }
 
 export async function createProductCatalogDraftAction(
   _previousState: ProductActionState,
   formData: FormData,
 ): Promise<ProductActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "product:write")) {
+  const session = await authorizedActionSession("product:write");
+  if (!session) {
     return { status: "error", message: "无权录入产品资料。" };
   }
 
@@ -59,10 +55,7 @@ export async function createProductCatalogDraftAction(
       productId: result.id,
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法保存产品草稿。",
-    };
+    return actionError(error, "无法保存产品草稿。");
   }
 }
 
@@ -70,8 +63,8 @@ export async function decideProductCatalogReviewAction(
   _previousState: ProductActionState,
   formData: FormData,
 ): Promise<ProductActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "product:review")) {
+  const session = await authorizedActionSession("product:review");
+  if (!session) {
     return { status: "error", message: "无权执行 Gate 01 审核。" };
   }
   const parsed = productReviewFormSchema.safeParse(Object.fromEntries(formData));
@@ -100,10 +93,7 @@ export async function decideProductCatalogReviewAction(
           : "Gate 01 已退回，产品需要修订。",
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法完成 Gate 01 审核。",
-    };
+    return actionError(error, "无法完成 Gate 01 审核。");
   }
 }
 
@@ -111,8 +101,8 @@ export async function reviseProductCatalogDraftAction(
   _previousState: ProductActionState,
   formData: FormData,
 ): Promise<ProductActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "product:write")) {
+  const session = await authorizedActionSession("product:write");
+  if (!session) {
     return { status: "error", message: "无权修订产品草稿。" };
   }
   const productId = formData.get("productId");
@@ -145,9 +135,6 @@ export async function reviseProductCatalogDraftAction(
       productId: parsedProductId.data,
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法保存产品修订。",
-    };
+    return actionError(error, "无法保存产品修订。");
   }
 }

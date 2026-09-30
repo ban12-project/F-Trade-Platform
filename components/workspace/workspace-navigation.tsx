@@ -22,16 +22,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { workspaceCollection } from "@/lib/workspace/navigation";
-import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
 import { NewWorkButton } from "./new-work";
 import { WorkspaceLink } from "./workspace-link";
 
 export function WorkspaceNavigation({
-  projects,
   basePath = "/workspace",
   canManage = false,
 }: {
-  projects: WorkspaceProjectSummary[];
   basePath?: string;
   canManage?: boolean;
 }) {
@@ -90,30 +87,20 @@ export function WorkspaceNavigation({
             <SidebarGroupLabel>项目与成员</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {projects.map((project) => (
-                  <SidebarMenuItem key={project.id}>
-                    <SidebarMenuButton
-                      isActive={pathname.startsWith(`${basePath}/${project.id}`)}
-                      render={
-                        <WorkspaceLink
-                          href={`${basePath}/${project.id}`}
-                          aria-current={
-                            pathname.startsWith(`${basePath}/${project.id}`) ? "page" : undefined
-                          }
-                          onFollow={() => setOpenMobile(false)}
-                        />
-                      }
-                    >
-                      <FolderOpenIcon />
-                      <span>{project.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-                {!projects.length ? (
-                  <p className="px-2 py-3 text-xs text-muted-foreground">
-                    开始第一项工作时创建项目。
-                  </p>
-                ) : null}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={pathname === `${basePath}/projects`}
+                    render={
+                      <WorkspaceLink
+                        href={`${basePath}/projects`}
+                        onFollow={() => setOpenMobile(false)}
+                      />
+                    }
+                  >
+                    <FolderOpenIcon />
+                    <span>项目管理</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

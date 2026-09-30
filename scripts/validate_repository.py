@@ -354,8 +354,12 @@ def check_database_baseline() -> None:
     for required in ('source: "/admin/:path*"', 'destination: "/workspace"', "permanent: true"):
         if required not in next_config:
             raise AssertionError(f"Workspace route migration is missing: {required}")
+    action_boundary = (ROOT / "lib/action-boundary.ts").read_text(encoding="utf-8")
+    for required in ("auth.api.getSession", "headers: await headers()", "hasPermission(session.user.role, permission)", 'revalidatePath("/workspace", "layout")'):
+        if required not in action_boundary:
+            raise AssertionError(f"Independent shared Action authentication boundary is missing: {required}")
     invitation_actions = (ROOT / "lib/actions/invitations.ts").read_text(encoding="utf-8")
-    for required in ('"use server"', "auth.api.getSession", "issueInvitation", "provisionInvitedUser", "invitationFormSchema.safeParse"):
+    for required in ('"use server"', 'await authorizedActionSession("team:manage")', "issueInvitation", "provisionInvitedUser", "invitationFormSchema.safeParse"):
         if required not in invitation_actions:
             raise AssertionError(f"Invitation Server Action contract is missing: {required}")
 
@@ -415,9 +419,9 @@ def check_database_baseline() -> None:
 
     product_actions = (ROOT / "lib/actions/products.ts").read_text(encoding="utf-8")
     for required in (
-        '"use server"', "auth.api.getSession", "productCatalogFormSchema.safeParse",
+        '"use server"', 'await authorizedActionSession("product:write")', 'await authorizedActionSession("product:review")', "productCatalogFormSchema.safeParse",
         "productReviewFormSchema.safeParse", "createProductCatalogDraft",
-        "decideProductCatalogReview", "reviseProductCatalogDraft", 'revalidatePath("/workspace", "layout")',
+        "decideProductCatalogReview", "reviseProductCatalogDraft", "refreshWorkspace(projectId)",
     ):
         if required not in product_actions:
             raise AssertionError(f"Product catalog Server Action contract is missing: {required}")

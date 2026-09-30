@@ -128,7 +128,7 @@ async function assertSalesProject(
     .from(workspaceProject)
     .where(eq(workspaceProject.id, projectId))
     .for("update");
-  if (!project || project.kind !== "sales") throw new Error("该操作只能在销售机会项目中执行。");
+  if (project?.kind !== "sales") throw new Error("该操作只能在销售机会项目中执行。");
 }
 
 const DELIVERY_CONFIRMATION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -192,8 +192,7 @@ export async function createOrReviseQuotation(
         ),
       )
       .for("update");
-    if (!rfq || rfq.state !== "RFQ_READY")
-      throw new Error("正式报价必须引用当前项目的 RFQ Ready。");
+    if (rfq?.state !== "RFQ_READY") throw new Error("正式报价必须引用当前项目的 RFQ Ready。");
     const [product] = await tx
       .select({ state: aggregateRecord.state })
       .from(workspaceProjectItem)
@@ -207,7 +206,7 @@ export async function createOrReviseQuotation(
         ),
       )
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
+    if (product?.state !== "PRODUCT_READY")
       throw new Error("正式报价必须引用当前项目的 Product Ready。");
     const id = value.quotationId || randomUUID();
     const approvalId = randomUUID();
@@ -221,7 +220,7 @@ export async function createOrReviseQuotation(
         .from(aggregateRecord)
         .where(and(eq(aggregateRecord.id, id), eq(aggregateRecord.type, "quotation")))
         .for("update");
-      if (!current || current.state !== "QUOTE_REVISION_REQUIRED")
+      if (current?.state !== "QUOTE_REVISION_REQUIRED")
         throw new Error("只有被退回的报价可以修订。");
       const existing = current.payload as unknown as QuotationHandoff;
       const next: QuotationHandoff = {
@@ -371,7 +370,7 @@ export async function decideQuotation(
       .for("update");
     if (record && String(record.version) !== value.reviewedVersion)
       throw new Error("报价已更新，请刷新后重新审核当前条款。");
-    if (!record || record.state !== "QUOTE_REVIEW_REQUIRED")
+    if (record?.state !== "QUOTE_REVIEW_REQUIRED")
       throw new Error("该报价当前不处于 Gate 02 待审核状态。");
     const [pending] = await tx
       .select()
@@ -522,7 +521,7 @@ export async function sendQuotation(
       .for("update");
     const leadRef =
       typeof (rfqRecord?.payload as Record<string, unknown> | undefined)?.lead_ref === "string"
-        ? ((rfqRecord!.payload as Record<string, unknown>).lead_ref as string)
+        ? ((rfqRecord.payload as Record<string, unknown>).lead_ref as string)
         : undefined;
     const [receivedLead] = leadRef
       ? await tx
@@ -631,7 +630,7 @@ export async function recordFollowUp(
         ),
       )
       .for("update");
-    if (!record || record.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以发送回复。");
+    if (record?.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以发送回复。");
     const lead = validateLead(record.payload);
     if (!lead.conversation_ref) throw new Error("该线索没有可发送的渠道会话，请先关联入站消息。");
     const [conversation] = await tx
@@ -783,13 +782,13 @@ export async function recordControlledReplyResult(
       .from(socialBrowserJob)
       .where(eq(socialBrowserJob.id, value.jobId))
       .for("update");
-    if (!job || job.kind !== "reply") throw new Error("回复任务不存在。");
+    if (job?.kind !== "reply") throw new Error("回复任务不存在。");
     const [message] = await tx
       .select()
       .from(socialMessage)
       .where(eq(socialMessage.id, job.payloadRef))
       .for("update");
-    if (!message || message.direction !== "outbound") throw new Error("回复任务缺少待发送消息。");
+    if (message?.direction !== "outbound") throw new Error("回复任务缺少待发送消息。");
     const [conversation] = await tx
       .select()
       .from(socialConversation)
@@ -921,7 +920,7 @@ export async function confirmOpportunity(
       )
       .for("update");
     const lead = record?.payload as LeadRecord | undefined;
-    if (!record || record.state !== "FOLLOW_UP" || lead?.score_band !== "HOT")
+    if (record?.state !== "FOLLOW_UP" || lead?.score_band !== "HOT")
       throw new Error("只有达到 HOT 的跟进线索才能由人工确认有效商机。");
     const next = validateLead({
       ...lead,
@@ -979,7 +978,7 @@ export async function createDeliveryRequest(
         ),
       )
       .for("update");
-    if (!lead || lead.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以申请交期确认。");
+    if (lead?.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以申请交期确认。");
     const leadPayload = validateLead(lead.payload);
     if (!leadPayload.rfq_ref) throw new Error("交期确认必须引用当前线索的 RFQ。");
     if (leadPayload.delivery_confirmation_ref) {
@@ -1079,7 +1078,7 @@ export async function decideDelivery(
         ),
       )
       .for("update");
-    if (!record || record.state !== "DELIVERY_CONFIRMATION_PENDING")
+    if (record?.state !== "DELIVERY_CONFIRMATION_PENDING")
       throw new Error("该交期确认当前不可审核。");
     const [pending] = await tx
       .select()
@@ -1186,6 +1185,7 @@ async function latestApprovals(
 export async function listProjectQuotations(
   projectId: string,
   database: Database = getDatabase(),
+  ids?: readonly string[],
 ): Promise<QuotationEntry[]> {
   const rows = await database
     .select({ record: aggregateRecord })
@@ -1196,6 +1196,7 @@ export async function listProjectQuotations(
         eq(workspaceProjectItem.projectId, projectId),
         eq(workspaceProjectItem.role, "sales_quotation"),
         eq(aggregateRecord.type, "quotation"),
+        ids ? inArray(aggregateRecord.id, [...ids]) : undefined,
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));
@@ -1225,7 +1226,7 @@ export async function listProjectLeads(
   projectId: string,
   actorId: string,
   database: Database = getDatabase(),
-  options: { timelineLeadId?: string } = {},
+  options: { timelineLeadId?: string; ids?: readonly string[] } = {},
 ): Promise<LeadEntry[]> {
   await assertWorkspaceProjectAccess(projectId, actorId, "view", database);
   const rows = await database
@@ -1237,6 +1238,7 @@ export async function listProjectLeads(
         eq(workspaceProjectItem.projectId, projectId),
         eq(workspaceProjectItem.role, "sales_lead"),
         eq(aggregateRecord.type, "lead"),
+        options.ids ? inArray(aggregateRecord.id, [...options.ids]) : undefined,
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));
@@ -1429,6 +1431,7 @@ export async function listProjectLeads(
 export async function listProjectDeliveryConfirmations(
   projectId: string,
   database: Database = getDatabase(),
+  ids?: readonly string[],
 ): Promise<DeliveryConfirmationEntry[]> {
   const rows = await database
     .select({ record: aggregateRecord })
@@ -1439,6 +1442,7 @@ export async function listProjectDeliveryConfirmations(
         eq(workspaceProjectItem.projectId, projectId),
         eq(workspaceProjectItem.role, "delivery_confirmation"),
         eq(aggregateRecord.type, "delivery_confirmation"),
+        ids ? inArray(aggregateRecord.id, [...ids]) : undefined,
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));
