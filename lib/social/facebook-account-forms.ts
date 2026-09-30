@@ -104,6 +104,15 @@ export const facebookMediaSubmitFormSchema = z
     contentRef: z.uuid(),
     format: z.enum(["image", "video"]),
     mediaId: z.string().max(200),
+    contentVersion: z.number().int().positive(),
+    previewDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    channelRef: z.string().min(1).max(200),
+    accountRef: z.string().min(1).max(200),
     confirm: z.literal(true),
   })
   .strict();
+
+export const facebookMediaFormSchema = facebookMediaSubmitFormSchema.extend({
+  mediaId: facebookMediaSubmitFormSchema.shape.mediaId.min(1, "请选择当前内容的素材。"),
+  confirm: z.boolean().refine((value) => value, "请确认本次发布。"),
+});

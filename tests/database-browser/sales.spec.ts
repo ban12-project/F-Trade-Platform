@@ -173,8 +173,7 @@ for (const inbound of [false, true]) {
     const [rfq] = await records("rfq");
     expect(rfq.state).toBe("RFQ_COLLECTING");
     if (inbound) expect(rfq.payload.lead_ref).toBe(receivedLeadId);
-    if (!inbound) await page.getByRole("link", { name: "打开客户需求", exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/records/rfq/${rfq.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/records/rfq/${rfq.id}(?:[?].*)?$`));
     await expect(page.getByRole("button", { name: "确认需求完整", exact: true })).toBeDisabled();
     expect(await records("quotation")).toHaveLength(0);
     const revise = page.locator(`form#revise-rfq-${rfq.id}`).filter({ visible: true });
@@ -212,8 +211,7 @@ for (const inbound of [false, true]) {
       product_id: productId,
       quote: { unit_price: 12.5, currency: "USD", moq: 10, lead_time_days: 30 },
     });
-    await page.getByRole("link", { name: "打开人工报价", exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/records/quotation/${draft.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/records/quotation/${draft.id}(?:[?].*)?$`));
     const staleContext = await browser.newContext({ baseURL });
     await staleContext.addCookies(await context.cookies());
     const stalePage = await staleContext.newPage();
@@ -316,7 +314,7 @@ for (const inbound of [false, true]) {
     await page.reload();
     // Streaming SSR may temporarily stage another copy under a hidden S:* container.
     // Scope to the accessible panel, never select an arbitrary first duplicate.
-    const quotationDetails = page.getByRole("region", { name: "报价详情与审批" });
+    const quotationDetails = page.getByRole("region", { name: "业务记录" });
     const send = quotationDetails.locator(`form#quote-send-${draft.id}`);
     await expect(send).toHaveCount(1);
     await expect(send).toBeVisible();

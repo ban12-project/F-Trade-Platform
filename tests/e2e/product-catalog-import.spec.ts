@@ -111,7 +111,7 @@ test("catalog browser selects 20 independent records, restores progress and retr
       body: `0:{"a":"$@1","f":"","b":"synthetic"}\n1:${JSON.stringify({ status: "success", view })}\n`,
     });
   });
-  await page.goto("/testing/project-workflow?panel=product");
+  await page.goto("/testing/project-workflow?record=product");
   await page.waitForLoadState("networkidle");
   await page.getByRole("tab", { name: "产品目录" }).click();
   await page
@@ -152,7 +152,7 @@ test("shared intake keeps the chosen file across methods and protects abandoning
       body: '0:{"a":"$@1","f":"","b":"synthetic"}\n1:{"status":"success","view":null}\n',
     });
   });
-  await page.goto("/testing/project-workflow?panel=product");
+  await page.goto("/testing/project-workflow?record=product");
   const file = page.getByLabel("产品资料", { exact: true });
   await expect(file).toBeEnabled();
   await file.setInputFiles({

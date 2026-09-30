@@ -16,3 +16,10 @@ export const workspaceProjectStatusChangeSchema = z
     status: workspaceProjectStatusSchema,
   })
   .strict();
+
+export const workspaceProjectNameChangeSchema = z
+  .object({
+    projectId: z.uuid("项目标识无效。"),
+    title: createWorkspaceProjectSchema.shape.title,
+  })
+  .strict();

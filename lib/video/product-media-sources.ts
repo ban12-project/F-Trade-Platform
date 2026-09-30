@@ -34,8 +34,9 @@ export type ReadyVideoProductSourceWithMedia = ReadyVideoProductSource & {
 export async function listReadyVideoProductSourcesWithMedia(
   projectId: string,
   evaluatedAt = new Date(),
+  productId?: string,
 ): Promise<ReadyVideoProductSourceWithMedia[]> {
-  const products = await listReadyVideoProductSources(projectId);
+  const products = await listReadyVideoProductSources(projectId, productId);
   const media = await Promise.all(
     products.map((product) => listEditingEligibleProductMedia(product.id, evaluatedAt)),
   );

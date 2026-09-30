@@ -234,7 +234,7 @@ export function AuthPanel() {
               使用 Passkey 登录
             </Button>
             <p className="text-xs leading-5 text-muted-foreground">
-              新的 Passkey 需要登录后在“账号与工具”中添加。
+              新的 Passkey 需要登录后在“工作区设置”中添加。
             </p>
           </div>
           <p className="min-h-5 text-sm text-muted-foreground" aria-live="polite">

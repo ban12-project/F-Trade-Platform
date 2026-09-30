@@ -2,13 +2,11 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { z } from "zod";
+import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
@@ -26,9 +24,8 @@ export async function runProductAgentAction(
   _previous: ProductAgentActionState,
   formData: FormData,
 ): Promise<ProductAgentActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "product:write"))
-    return { status: "error", message: "无权运行 Product Agent。" };
+  const session = await authorizedActionSession("product:write");
+  if (!session) return { status: "error", message: "无权运行 Product Agent。" };
   try {
     const modelConfigId = z
       .string()
@@ -96,7 +93,7 @@ export async function runProductAgentAction(
       projectId,
       source.image_refs,
     );
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return {
       status: "success",
@@ -104,9 +101,6 @@ export async function runProductAgentAction(
       productId: saved.id,
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "Product Agent 运行失败。",
-    };
+    return actionError(error, "Product Agent 运行失败。");
   }
 }

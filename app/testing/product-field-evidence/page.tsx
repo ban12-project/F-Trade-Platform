@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
-import { ProductPanel } from "@/components/workspace/product-panel";
+import { ProductIntakePanel } from "@/components/workspace/product-intake-panel";
 
 /** Test-only fixture; production product intake remains authenticated and project-scoped. */
 export default function ProductFieldEvidenceTestingPage() {
@@ -10,10 +10,8 @@ export default function ProductFieldEvidenceTestingPage() {
     <main className="mx-auto min-h-screen max-w-4xl p-6">
       <Suspense fallback={<p>Loading product form…</p>}>
         <WorkspaceDirtyProvider>
-          <ProductPanel
+          <ProductIntakePanel
             projectId="00000000-0000-4000-8000-000000000701"
-            entries={[]}
-            detail={null}
             canReview={false}
             agentModelConfigs={[]}
             evidenceOptions={[

@@ -14,12 +14,18 @@ import {
   socialBrowserJob,
   socialPublication,
   videoGeneratedAsset,
+  workspaceProject,
   workspaceProjectItem,
+  workspaceProjectMember,
 } from "@/lib/db/schema";
 import { videoProjectSchema } from "@/lib/video/contracts";
 import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { facebookMediaSubmitFormSchema } from "./facebook-account-forms";
+import {
+  assertFacebookMediaPreview,
+  facebookMediaPreviewDigest,
+} from "./facebook-media-confirmation";
 import {
   FACEBOOK_MEDIA_LIMITS,
   type FacebookMediaPayload,
@@ -268,6 +274,13 @@ export async function submitFacebookMediaPublication(
   const value = facebookMediaSubmitFormSchema.parse(input);
   await assertWorkspaceProjectAccess(value.projectId, actorId, "write", database);
   const selected = await sourceFor(value, database, new Date());
+  assertFacebookMediaPreview(value, {
+    contentRef: value.contentRef,
+    format: value.format,
+    mediaId: value.mediaId,
+    contentVersion: selected.content.version,
+    caption: selected.text,
+  });
   if (value.format === "video") {
     await assertCurrentProductFactsForVideo(
       videoProjectSchema.parse(selected.content.payload),
@@ -282,6 +295,8 @@ export async function submitFacebookMediaPublication(
   });
   return database.transaction(async (tx) => {
     const scope = await resolveFacebookMediaSubmissionScope(actorId, tx);
+    if (scope.channelRef !== value.channelRef || scope.accountRef !== value.accountRef)
+      throw new Error("media_account_changed_since_preview");
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
     await assertPublicationEligible(
       { ...value, channelRef: scope.channelRef, accountRef: scope.accountRef },
@@ -548,18 +563,27 @@ export async function listFacebookMediaOptions(
   projectId: string,
   actorId: string,
   database: Database = getDatabase(),
+  contentRef?: string,
 ) {
   await assertWorkspaceProjectAccess(projectId, actorId, "write", database);
   const records = await database
     .select({ record: aggregateRecord })
     .from(workspaceProjectItem)
     .innerJoin(aggregateRecord, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
-    .where(eq(workspaceProjectItem.projectId, projectId));
+    .where(
+      and(
+        eq(workspaceProjectItem.projectId, projectId),
+        contentRef ? eq(aggregateRecord.id, contentRef) : undefined,
+      ),
+    );
   const result: Array<{
     contentRef: string;
     mediaId: string;
     format: "image" | "video";
     label: string;
+    preview: string;
+    contentVersion: number;
+    previewDigest: string;
   }> = [];
   for (const { record } of records) {
     if (record.type === "video" && record.state === "VIDEO_APPROVED") {
@@ -570,6 +594,15 @@ export async function listFacebookMediaOptions(
           mediaId: video.renderedAssetRef,
           format: "video",
           label: `视频 · ${video.objective}`,
+          preview: "已批准 MP4 成片；无附加文案。",
+          contentVersion: record.version,
+          previewDigest: facebookMediaPreviewDigest({
+            contentRef: record.id,
+            format: "video",
+            mediaId: record.payload.renderedAssetRef as string,
+            contentVersion: record.version,
+            caption: "",
+          }),
         });
       }
     } else if (
@@ -594,6 +627,15 @@ export async function listFacebookMediaOptions(
           mediaId: asset.id,
           format: "image",
           label: `图片 · ${String(record.payload.hook ?? "已审核文案")} · ${asset.description || asset.id.slice(0, 8)}`,
+          preview: String(record.payload.body ?? ""),
+          contentVersion: record.version,
+          previewDigest: facebookMediaPreviewDigest({
+            contentRef: record.id,
+            format: "image",
+            mediaId: asset.id,
+            contentVersion: record.version,
+            caption: String(record.payload.body ?? ""),
+          }),
         });
       }
     }
@@ -693,4 +735,21 @@ export async function openFacebookMediaSource(source: FacebookMediaSource) {
     throw new Error("media_unavailable");
   }
   return { stream: blob.stream, media: source.media };
+}
+
+export async function listFacebookMarketingProjects(
+  actorId: string,
+  database: Database = getDatabase(),
+) {
+  return database
+    .select({ id: workspaceProject.id, title: workspaceProject.title })
+    .from(workspaceProject)
+    .innerJoin(workspaceProjectMember, eq(workspaceProjectMember.projectId, workspaceProject.id))
+    .where(
+      and(
+        eq(workspaceProjectMember.userId, actorId),
+        eq(workspaceProject.kind, "marketing"),
+        eq(workspaceProject.status, "active"),
+      ),
+    );
 }

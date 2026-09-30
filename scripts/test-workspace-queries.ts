@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { getTableName, type SQL, type Table } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { Database } from "../lib/db/client";
-import { listWorkspacePipeline, listWorkspaceTasks } from "../lib/workspace/store";
+import { listWorkspaceProjectOverview, listWorkspaceTasks } from "../lib/workspace/store";
 
 type Row = Record<string, unknown>;
 const projectId = "00000000-0000-4000-8000-000000000263";
@@ -117,9 +117,13 @@ async function main() {
   await listWorkspaceTasks(actorId, all.asDatabase());
   assert.ok(all.queries[0]?.params.includes(actorId));
   assert.ok(!all.queries[0]?.params.includes(projectId));
-  const pipeline = new FakeDatabase();
-  await listWorkspacePipeline(actorId, pipeline.asDatabase());
-  assert.equal(pipeline.maximum, 4, "Pipeline must derive from the same parallel snapshot reads");
+  const overview = new FakeDatabase();
+  await listWorkspaceProjectOverview(actorId, overview.asDatabase());
+  assert.equal(
+    overview.maximum,
+    4,
+    "Project overview must derive from the same parallel snapshot reads",
+  );
   console.log(
     "PASS deterministic query concurrency: shared snapshot 4-way; project and actor authorization filters retained",
   );

@@ -18,66 +18,23 @@ import {
 import type { ProductReady } from "@/lib/product/verification";
 import { assertWorkspaceProjectAccess } from "./access";
 
-import { createWorkspaceProjectSchema, workspaceProjectStatusChangeSchema } from "./contracts";
 import {
-  deriveWorkspacePipeline,
+  createWorkspaceProjectSchema,
+  workspaceProjectNameChangeSchema,
+  workspaceProjectStatusChangeSchema,
+} from "./contracts";
+import {
+  deriveWorkspaceProjectOverview,
   deriveWorkspaceTasks,
   type WorkspaceTaskSnapshot,
 } from "./task-model";
 
-export type WorkspaceProjectSummary = {
-  memberRole?: "owner" | "editor" | "viewer";
-  id: string;
-  title: string;
-  kind: "marketing" | "sales";
-  status: "active" | "archived";
-  updatedAt: Date;
-};
-export type WorkspaceProductReference = { id: string; productName: string; internalSku: string };
-export type WorkspaceTaskSummary = {
-  id: string;
-  projectId: string;
-  projectTitle: string;
-  nodeKind:
-    | "product"
-    | "content"
-    | "video"
-    | "publication"
-    | "rfq"
-    | "quotation"
-    | "lead"
-    | "delivery";
-  title: string;
-  detail: string;
-  priority: "attention" | "overdue" | "review" | "complete";
-  state?: "actionable" | "waiting" | "processing" | "attention" | "scheduled";
-  responsibleLabel?: string;
-  source?: { kind: "product" | "rfq"; id: string };
-  createdAt: Date;
-  dueAt?: Date;
-  actionLabel?: string;
-  taskType?:
-    | "approval"
-    | "follow_up"
-    | "publication"
-    | "rfq"
-    | "opportunity"
-    | "revision"
-    | "create"
-    | "send"
-    | "processing";
-};
-export type WorkspacePipelineSummary = WorkspaceProjectSummary & {
-  currentStage: string;
-  nextAction: string;
-  currentStageId?: string;
-  nextActionHref?: string;
-  recordCount: number;
-  publishedCount: number;
-  leadCount: number;
-  opportunityCount: number;
-  relatedMarketingProjectTitle?: string;
-};
+import type {
+  WorkspaceProductReference,
+  WorkspaceProjectOverview,
+  WorkspaceProjectSummary,
+  WorkspaceTaskSummary,
+} from "./types";
 
 export async function listWorkspaceProjects(
   actorId: string,
@@ -198,12 +155,12 @@ export async function listWorkspaceTasks(
     new Date(),
   );
 }
-export async function listWorkspacePipeline(
+export async function listWorkspaceProjectOverview(
   actorId: string,
   database: Database = getDatabase(),
-): Promise<WorkspacePipelineSummary[]> {
+): Promise<WorkspaceProjectOverview[]> {
   const snapshot = await readWorkspaceTaskSnapshot(actorId, database);
-  return deriveWorkspacePipeline(snapshot, deriveWorkspaceTasks(snapshot, new Date()));
+  return deriveWorkspaceProjectOverview(snapshot, deriveWorkspaceTasks(snapshot, new Date()));
 }
 
 export async function createWorkspaceProject(
@@ -371,6 +328,21 @@ export async function linkReadyProductToSalesProject(
       .where(eq(workspaceProject.id, projectId))
       .for("update");
     if (project?.kind !== "sales") throw new Error("产品引用只能添加到销售机会项目。");
+    const [readable] = await tx
+      .select({ id: workspaceProjectItem.id })
+      .from(workspaceProjectItem)
+      .innerJoin(
+        workspaceProjectMember,
+        eq(workspaceProjectMember.projectId, workspaceProjectItem.projectId),
+      )
+      .where(
+        and(
+          eq(workspaceProjectItem.aggregateId, productId),
+          eq(workspaceProjectMember.userId, actorId),
+        ),
+      )
+      .limit(1);
+    if (!readable) throw new Error("该产品不在可访问项目范围内。");
     const [product] = await tx
       .select({ state: aggregateRecord.state })
       .from(aggregateRecord)
@@ -462,5 +434,33 @@ export async function changeWorkspaceProjectStatus(
       occurredAt: new Date(),
     });
     return { id: project.id, status: value.status };
+  });
+}
+
+/** Project metadata is managed by its owner, including after archival. */
+export async function changeWorkspaceProjectName(
+  input: unknown,
+  actorId: string,
+  database: Database = getDatabase(),
+) {
+  const value = workspaceProjectNameChangeSchema.parse(input);
+  return database.transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(value.projectId, actorId, "manage", tx);
+    const [project] = await tx
+      .update(workspaceProject)
+      .set({ title: value.title, updatedAt: new Date() })
+      .where(eq(workspaceProject.id, value.projectId))
+      .returning({ id: workspaceProject.id });
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "workspace_project.renamed",
+      actorType: "human",
+      actorId,
+      subjectType: "workspace_project",
+      subjectId: value.projectId,
+      metadata: {},
+      occurredAt: new Date(),
+    });
+    return project;
   });
 }

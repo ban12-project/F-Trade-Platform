@@ -1,9 +1,6 @@
 "use server";
+import { actionError, authorizedActionSession } from "@/lib/action-boundary";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
 import { invitationFormSchema } from "@/lib/form-schemas";
 import { issueInvitation, provisionInvitedUser } from "@/lib/invitations";
 
@@ -12,19 +9,12 @@ export type InvitationActionState = {
   message: string;
 };
 
-function actionError(error: unknown, fallback: string): InvitationActionState {
-  return {
-    status: "error",
-    message: error instanceof Error ? error.message : fallback,
-  };
-}
-
 export async function createInvitationAction(
   _previousState: InvitationActionState,
   formData: FormData,
 ): Promise<InvitationActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "team:manage")) {
+  const session = await authorizedActionSession("team:manage");
+  if (!session) {
     return { status: "error", message: "无权发送邀请。" };
   }
 

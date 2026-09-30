@@ -1,23 +1,19 @@
-import { Suspense } from "react";
-import { BrowserNodesPanel } from "@/components/workspace/browser-nodes-panel";
-import { requirePermission } from "@/lib/auth-guard";
-
-async function Content() {
-  await requirePermission("settings:manage");
-  return <BrowserNodesPanel sandboxEnabled={process.env.BROWSER_SANDBOX_ENABLED === "1"} />;
-}
-export default function BrowserNodesPage() {
+import { buttonVariants } from "@/components/ui/button";
+import { WorkspaceLink } from "@/components/workspace/workspace-link";
+export default function Page() {
   return (
-    <main id="main-content" tabIndex={-1} className="workspace-page">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
-        <h1 className="text-2xl font-semibold">浏览器与按需队列</h1>
-        <p className="text-muted-foreground">
-          托管浏览器只在需要时启动，空闲后停止。每个账号独立保存会话；创建节点不会立即启动浏览器。
-        </p>
-        <Suspense fallback={<p>正在读取节点权限…</p>}>
-          <Content />
-        </Suspense>
-      </div>
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">浏览器管理入口已迁移</h1>
+      <p>账户、渠道和浏览器管理已统一到设置。发布请打开具体图文或视频，核对最终载荷并逐帖确认。</p>
+      <WorkspaceLink
+        href="/workspace/settings?section=channels"
+        className={buttonVariants({ variant: "outline" })}
+      >
+        打开渠道设置
+      </WorkspaceLink>
+      <WorkspaceLink href="/workspace/content" className={buttonVariants({ variant: "outline" })}>
+        打开内容与发布
+      </WorkspaceLink>
     </main>
   );
 }

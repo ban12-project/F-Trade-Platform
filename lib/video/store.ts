@@ -83,6 +83,7 @@ function factOptions(product: ProductReady) {
 
 export async function listReadyVideoProductSources(
   projectId?: string,
+  productId?: string,
 ): Promise<ReadyVideoProductSource[]> {
   const rows = projectId
     ? (
@@ -95,6 +96,7 @@ export async function listReadyVideoProductSources(
               eq(workspaceProjectItem.projectId, projectId),
               eq(aggregateRecord.type, "product"),
               eq(aggregateRecord.state, "PRODUCT_READY"),
+              productId ? eq(aggregateRecord.id, productId) : undefined,
             ),
           )
           .orderBy(desc(workspaceProjectItem.createdAt))
@@ -236,6 +238,7 @@ export async function createMarketingVideoEditProject(
 export async function listProjectMarketingVideoEntries(
   projectId: string,
   database: Database = getDatabase(),
+  id?: string,
 ): Promise<MarketingVideoEditorEntry[]> {
   const rows = await database
     .select({ record: aggregateRecord, createdAt: workspaceProjectItem.createdAt })
@@ -247,6 +250,7 @@ export async function listProjectMarketingVideoEntries(
         eq(workspaceProjectItem.role, "marketing_video"),
         eq(workspaceProjectItem.relation, "owned"),
         eq(aggregateRecord.type, "video"),
+        id ? eq(aggregateRecord.id, id) : undefined,
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));

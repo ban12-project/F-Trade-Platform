@@ -25,6 +25,23 @@ const contentRef = randomUUID();
 const channelRef = `synthetic-${randomUUID()}`;
 const accountRef = randomUUID();
 const now = new Date();
+function contentPayload(body: string) {
+  return {
+    content_id: contentRef,
+    product_id: randomUUID(),
+    content_type: "product",
+    objective: "SYNTHETIC",
+    target_customer: "SYNTHETIC",
+    platform: "pending-channel-decision",
+    product_facts: [],
+    call_to_action: "",
+    hashtags: [],
+    visual_instruction: "",
+    status: "approved",
+    body,
+    hook: "SYNTHETIC",
+  };
+}
 
 test.beforeAll(async () => {
   await migrate(db, { migrationsFolder: "drizzle" });
@@ -51,7 +68,7 @@ test.beforeAll(async () => {
     id: contentRef,
     type: "content",
     state: "CONTENT_APPROVED",
-    payload: { status: "approved", body: "SYNTHETIC preview one", hook: "SYNTHETIC" },
+    payload: contentPayload("SYNTHETIC preview one"),
     createdByType: "human",
     createdById: actor,
   });
@@ -101,7 +118,7 @@ test("stale displayed preview cannot create a publication; refreshed preview con
       sameSite: "Lax",
     },
   ]);
-  await page.goto(`/workspace/${projectId}?panel=publication`);
+  await page.goto(`/workspace/${projectId}/records/content/${contentRef}`);
   const confirmation = page.locator("#publication-confirmation:visible");
   const submit = page.locator('button[form="publication-confirmation"]:visible');
   await expect(confirmation).toHaveCount(1);
@@ -122,7 +139,7 @@ test("stale displayed preview cannot create a publication; refreshed preview con
     .update(schema.aggregateRecord)
     .set({
       version: 2,
-      payload: { status: "approved", body: "SYNTHETIC preview two", hook: "SYNTHETIC" },
+      payload: contentPayload("SYNTHETIC preview two"),
     })
     .where(eq(schema.aggregateRecord.id, contentRef));
   await submit.click();
@@ -187,7 +204,7 @@ test("older unknown results stay addressable and cannot reappear as publish cand
     data.publications.every((item) => !("textConfirmation" in item) && !("browserJobId" in item)),
   ).toBe(true);
   await page.goto(`/workspace/${projectId}/records/publication/${older}`);
-  const detail = page.getByRole("region", { name: "发布详情与审批" });
+  const detail = page.getByRole("region", { name: "业务记录" });
   await expect(detail.getByText("结果待人工核对", { exact: true })).toBeVisible();
   await expect(detail.locator("#publication-confirmation")).toHaveCount(0);
 });

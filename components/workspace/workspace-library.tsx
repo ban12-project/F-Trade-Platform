@@ -5,9 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { recordKindLabels, type WorkspaceLibraryRecord } from "@/lib/workspace/library-model";
-import type { WorkspaceCollection } from "@/lib/workspace/navigation";
-import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
+import {
+  recordKindLabels,
+  recordStateLabels,
+  type WorkspaceLibraryRecord,
+} from "@/lib/workspace/library-model";
+import { type WorkspaceCollection, withWorkspaceReturnTo } from "@/lib/workspace/navigation";
+import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 import { useWorkspaceDirtyState } from "./dirty-state";
 import { NewWorkButton } from "./new-work";
 import { WorkspaceLink } from "./workspace-link";
@@ -22,21 +26,56 @@ export function WorkspaceLibrary({
   records,
   projects,
   projectId,
+  recordType,
+  state,
 }: {
   collection: WorkspaceCollection;
   records: WorkspaceLibraryRecord[];
   projects: WorkspaceProjectSummary[];
   projectId?: string;
+  recordType?: string;
+  state?: string;
 }) {
   const id = useId();
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
   const unavailable = !!projectId && !projects.some((project) => project.id === projectId);
+  const collectionRecords = records.filter(
+    (record) => record.collection === collection && (!projectId || record.projectId === projectId),
+  );
+  const types = [
+    ...new Set(
+      records.filter((record) => record.collection === collection).map((record) => record.kind),
+    ),
+  ];
+  const states = [
+    ...new Set(
+      collectionRecords
+        .filter((record) => !recordType || record.kind === recordType)
+        .map((record) => record.state),
+    ),
+  ];
+  const query = new URLSearchParams();
+  if (projectId) query.set("project", projectId);
+  if (recordType) query.set("type", recordType);
+  if (state) query.set("state", state);
+  const returnTo = `/workspace/${collection}${query.size ? `?${query.toString()}` : ""}`;
+  function filter(key: "project" | "type" | "state", value: string) {
+    const next = new URLSearchParams(query);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    requestNavigation(() =>
+      router.push(`/workspace/${collection}${next.size ? `?${next.toString()}` : ""}`),
+    );
+  }
   const rows = unavailable
     ? []
     : records.filter(
         (record) =>
-          record.collection === collection && (!projectId || record.projectId === projectId),
+          record.collection === collection &&
+          (!projectId || record.projectId === projectId) &&
+          (!recordType || record.kind === recordType) &&
+          (!state || record.state === state),
       );
   return (
     <div className="flex flex-col gap-5">
@@ -48,10 +87,7 @@ export function WorkspaceLibrary({
             id={id}
             value={projectId ?? ""}
             onChange={(event) => {
-              const value = event.target.value;
-              requestNavigation(() =>
-                router.push(`/workspace/${collection}${value ? `?project=${value}` : ""}`),
-              );
+              filter("project", event.target.value);
             }}
           >
             <NativeSelectOption value="">全部可访问项目</NativeSelectOption>
@@ -70,7 +106,45 @@ export function WorkspaceLibrary({
             ))}
           </NativeSelect>
         </Field>
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor={`${id}-type`}>记录类型</FieldLabel>
+          <NativeSelect
+            id={`${id}-type`}
+            value={recordType ?? ""}
+            onChange={(event) => filter("type", event.target.value)}
+          >
+            <NativeSelectOption value="">全部类型</NativeSelectOption>
+            {recordType && !types.includes(recordType as (typeof types)[number]) ? (
+              <NativeSelectOption value={recordType}>类型不可用</NativeSelectOption>
+            ) : null}
+            {types.map((kind) => (
+              <NativeSelectOption key={kind} value={kind}>
+                {recordKindLabels[kind]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor={`${id}-state`}>状态</FieldLabel>
+          <NativeSelect
+            id={`${id}-state`}
+            value={state ?? ""}
+            onChange={(event) => filter("state", event.target.value)}
+          >
+            <NativeSelectOption value="">全部状态</NativeSelectOption>
+            {state && !states.includes(state) ? (
+              <NativeSelectOption value={state}>状态不可用</NativeSelectOption>
+            ) : null}
+            {states.map((value) => (
+              <NativeSelectOption key={value} value={value}>
+                {recordStateLabels[value] ?? "状态待核对"}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
         <NewWorkButton
+          projectId={projectId}
+          returnTo={returnTo}
           intent={
             collection === "products" ? "product" : collection === "content" ? "content" : "rfq"
           }
@@ -81,13 +155,18 @@ export function WorkspaceLibrary({
               ? "制作内容"
               : "记录询盘"}
         </NewWorkButton>
+        {collection === "content" ? (
+          <NewWorkButton intent="video" projectId={projectId} returnTo={returnTo} variant="outline">
+            按需制作视频
+          </NewWorkButton>
+        ) : null}
       </div>
       {rows.length ? (
         <ul className="divide-y rounded-xl border bg-background">
           {rows.map((record) => (
             <li key={`${record.projectId}:${record.kind}:${record.id}`}>
               <WorkspaceLink
-                href={record.href}
+                href={withWorkspaceReturnTo(record.href, returnTo)}
                 className="flex min-h-20 flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <div className="min-w-0 flex-1">
@@ -106,7 +185,9 @@ export function WorkspaceLibrary({
         <Empty className="border bg-background">
           <EmptyHeader>
             <EmptyTitle>
-              {unavailable ? "这个项目不可访问" : `还没有${collectionLabels[collection]}记录`}
+              {unavailable
+                ? "这个项目不可访问"
+                : `没有符合筛选的${collectionLabels[collection]}记录`}
             </EmptyTitle>
             <EmptyDescription>
               {unavailable

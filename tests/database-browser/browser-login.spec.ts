@@ -153,7 +153,7 @@ test("saved password fill uses the actual owner action and never returns credent
       body: `<body>Simulated viewer<script>window.addEventListener('message', e => { if(e.data.type === 'ftrade-browser-ticket') document.body.dataset.ticket=e.data.token; }); window.parent.postMessage({type:'ftrade-browser-ready'}, '${baseURL}');</script>`,
     }),
   );
-  await page.goto("/workspace/browsers");
+  await page.goto("/workspace/settings?section=channels");
   const connect = page.getByRole("button", { name: "接入登录 / 2FA", exact: true });
   await expect(connect).toBeVisible();
   await expect(page.getByRole("main")).toHaveAttribute("id", "main-content");
@@ -288,7 +288,7 @@ test("owner page reads managed lifecycle changes while cloud provisioning stays 
     "SELECT count(*)::int AS count FROM browser_sandbox_outbox WHERE node_id=$1",
     [nodeId],
   );
-  await page.goto("/workspace/browsers");
+  await page.goto("/workspace/settings?section=channels");
   await expect(page.getByText("自管服务器", { exact: true })).toBeVisible();
   const updatedAt = "2026-09-01T00:00:00Z";
   try {
@@ -299,6 +299,7 @@ test("owner page reads managed lifecycle changes while cloud provisioning stays 
     await expect(page.getByText("按需浏览器", { exact: true })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText("已停止", { exact: true })).toBeVisible();
     await expect(page.getByText("不是云端实时状态。", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "高级：连接节点与容量", exact: true }).click();
     await expect(page.getByRole("button", { name: "创建托管节点", exact: true })).toBeDisabled();
     const operationId = randomUUID();
     await pool.query(

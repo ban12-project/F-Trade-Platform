@@ -12,18 +12,26 @@ import {
 } from "@/components/ui/empty";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
+import { isActionableTask, taskStateLabel } from "@/lib/workspace/task-model";
 import type {
-  WorkspacePipelineSummary,
+  WorkspaceProjectOverview,
   WorkspaceProjectSummary,
   WorkspaceTaskSummary,
-} from "@/lib/workspace/store";
-import { isActionableTask, taskStateLabel } from "@/lib/workspace/task-model";
+} from "@/lib/workspace/types";
 import { WorkspaceDirtyProvider } from "./dirty-state";
 import { InboundRoutingList } from "./inbound-routing-list";
 import { NewWorkButton } from "./new-work";
 import { WorkspaceLink as Link } from "./workspace-link";
 
-function TaskRows({ tasks, empty }: { tasks: WorkspaceTaskSummary[]; empty: string }) {
+function TaskRows({
+  tasks,
+  empty,
+  selectedReturnTo,
+}: {
+  tasks: WorkspaceTaskSummary[];
+  empty: string;
+  selectedReturnTo: string;
+}) {
   if (!tasks.length)
     return (
       <Empty className="border-0 py-8">
@@ -41,7 +49,7 @@ function TaskRows({ tasks, empty }: { tasks: WorkspaceTaskSummary[]; empty: stri
       {tasks.map((task) => (
         <Link
           key={`${task.taskType}-${task.id}`}
-          href={workspaceTaskHref(task)}
+          href={workspaceTaskHref(task, selectedReturnTo)}
           className="group flex min-h-16 items-center gap-3 px-1 py-3 outline-none transition-colors duration-[120ms] hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <div className="min-w-0 flex-1">
@@ -66,14 +74,14 @@ function TaskRows({ tasks, empty }: { tasks: WorkspaceTaskSummary[]; empty: stri
 export function WorkspaceDashboard({
   projects,
   tasks,
-  pipeline,
+  overview,
   inbound = [],
   view = "actionable",
   basePath = "/workspace",
 }: {
   projects: WorkspaceProjectSummary[];
   tasks: WorkspaceTaskSummary[];
-  pipeline: WorkspacePipelineSummary[];
+  overview: WorkspaceProjectOverview[];
   inbound?: InboundRoutingSummary[];
   currentTime: number;
   view?: string;
@@ -90,7 +98,7 @@ export function WorkspaceDashboard({
     { id: "scheduled", label: "已安排", rows: tasks.filter((task) => task.state === "scheduled") },
   ];
   const selected = groups.find((group) => group.id === view) ?? groups[0]!;
-  const pendingCount = groups[0]!.rows.length + inbound.length;
+  const pendingCount = groups[0]?.rows.length + inbound.length;
   return (
     <WorkspaceDirtyProvider>
       <main id="main-content" tabIndex={-1} className="workspace-page bg-muted/30">
@@ -142,6 +150,9 @@ export function WorkspaceDashboard({
                 ) : null}
                 <TaskRows
                   tasks={selected.rows}
+                  selectedReturnTo={
+                    selected.id === "actionable" ? "/workspace" : `/workspace?view=${selected.id}`
+                  }
                   empty={
                     selected.id === "actionable" ? "当前没有需要你处理的任务" : "当前没有这类事项"
                   }
@@ -157,16 +168,16 @@ export function WorkspaceDashboard({
               </CardContent>
             </Card>
           </section>
-          <section id="pipeline" className="flex flex-col gap-3" aria-label="项目概况">
+          <section id="overview" className="flex flex-col gap-3" aria-label="项目概况">
             <div>
               <h2 className="text-base font-semibold">项目概况</h2>
               <p className="text-sm text-muted-foreground">
                 项目用于组织资料和成员权限，具体工作从上方任务或固定栏目进入。
               </p>
             </div>
-            {pipeline.length ? (
+            {overview.length ? (
               <div className="grid gap-3 xl:grid-cols-2">
-                {pipeline.map((item) => (
+                {overview.map((item) => (
                   <Card key={item.id} size="sm">
                     <CardHeader>
                       <CardTitle>
@@ -178,8 +189,8 @@ export function WorkspaceDashboard({
                         </Link>
                       </CardTitle>
                       <CardDescription>
-                        {item.kind === "marketing" ? "营销项目" : "销售项目"} · {item.currentStage}{" "}
-                        · {item.recordCount} 条记录
+                        {item.kind === "marketing" ? "营销项目" : "销售项目"} · {item.statusLabel} ·{" "}
+                        {item.recordCount} 条记录 · {item.taskCount} 项待办
                       </CardDescription>
                     </CardHeader>
                   </Card>

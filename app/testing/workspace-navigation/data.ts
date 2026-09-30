@@ -1,4 +1,4 @@
-import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
+import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 export const navigationProject: WorkspaceProjectSummary = {
   id: "00000000-0000-4000-8000-000000000263",
   title: "Synthetic persistent workspace",

@@ -1,11 +1,10 @@
 import { hasPermission, type Permission } from "@/lib/authz";
-import { workspaceTaskHref } from "./navigation";
-import { defaultProjectStage, projectStages, taskProjectStage } from "./stages";
+import { workspaceCollection, workspaceTaskHref } from "./navigation";
 import type {
-  WorkspacePipelineSummary,
+  WorkspaceProjectOverview,
   WorkspaceProjectSummary,
   WorkspaceTaskSummary,
-} from "./store";
+} from "./types";
 
 export type TaskProject = WorkspaceProjectSummary & {
   memberRole: "owner" | "editor" | "viewer";
@@ -91,7 +90,7 @@ function titleFor(record: TaskRecord) {
 }
 const reviewRules: Record<
   string,
-  { kind: WorkspaceTaskSummary["nodeKind"]; permission: Permission; gate: string; action: string }
+  { kind: WorkspaceTaskSummary["recordKind"]; permission: Permission; gate: string; action: string }
 > = {
   PRODUCT_REVIEW_REQUIRED: {
     kind: "product",
@@ -126,7 +125,7 @@ const reviewRules: Record<
 };
 const revisionRules: Record<
   string,
-  { kind: WorkspaceTaskSummary["nodeKind"]; permission: Permission; action: string }
+  { kind: WorkspaceTaskSummary["recordKind"]; permission: Permission; action: string }
 > = {
   PRODUCT_REVISION_REQUIRED: {
     kind: "product",
@@ -166,7 +165,7 @@ export function deriveWorkspaceTasks(
     const publications = snapshot.publications.filter((row) => row.projectId === project.id);
     function add(
       record: TaskRecord,
-      values: Pick<WorkspaceTaskSummary, "nodeKind" | "detail" | "actionLabel" | "taskType"> &
+      values: Pick<WorkspaceTaskSummary, "recordKind" | "detail" | "actionLabel" | "taskType"> &
         Partial<WorkspaceTaskSummary>,
       permission: Permission,
     ) {
@@ -186,6 +185,11 @@ export function deriveWorkspaceTasks(
         priority: "complete",
         createdAt: record.createdAt,
         ...values,
+        destination:
+          values.destination ??
+          (values.source
+            ? { type: "create", kind: values.recordKind, source: values.source }
+            : { type: "record", kind: values.recordKind, id: values.id ?? record.id }),
         state,
         responsibleLabel: state === "processing" ? "系统" : responsibleLabel,
         actionLabel: needsPerson && !permitted ? "查看状态" : values.actionLabel,
@@ -201,7 +205,7 @@ export function deriveWorkspaceTasks(
         add(
           record,
           {
-            nodeKind: review.kind,
+            recordKind: review.kind,
             taskType: "approval",
             priority: pending ? "review" : "attention",
             state: pending ? "actionable" : "attention",
@@ -220,7 +224,7 @@ export function deriveWorkspaceTasks(
         add(
           record,
           {
-            nodeKind: revision.kind,
+            recordKind: revision.kind,
             taskType: "revision",
             priority: "review",
             actionLabel: revision.action,
@@ -240,7 +244,7 @@ export function deriveWorkspaceTasks(
         add(
           record,
           {
-            nodeKind: record.type === "video" ? "video" : "content",
+            recordKind: record.type === "video" ? "video" : "content",
             taskType: "processing",
             state: "processing",
             detail: "处理完成后会更新状态；可打开查看进度。",
@@ -259,7 +263,7 @@ export function deriveWorkspaceTasks(
           add(
             record,
             {
-              nodeKind: "content",
+              recordKind: "content",
               taskType: "create",
               actionLabel: "制作图文内容",
               detail: "产品已核实，可以开始第一条图文内容；视频可按需制作。",
@@ -275,7 +279,7 @@ export function deriveWorkspaceTasks(
         add(
           record,
           {
-            nodeKind: "rfq",
+            recordKind: "rfq",
             taskType: "rfq",
             actionLabel: "补齐询盘",
             detail: missing ? `还缺 ${missing} 项资料。` : "核对需求后提交完整询盘。",
@@ -293,14 +297,14 @@ export function deriveWorkspaceTasks(
           record,
           hasProduct
             ? {
-                nodeKind: "quotation",
+                recordKind: "quotation",
                 taskType: "create",
                 actionLabel: "录入人工报价",
                 detail: "需求已完整，价格和商业条款由人工填写。",
                 source: { kind: "rfq", id: record.id },
               }
             : {
-                nodeKind: "rfq",
+                recordKind: "rfq",
                 taskType: "rfq",
                 actionLabel: "关联已核实产品",
                 detail: "需求已完整；报价前需先关联已核实产品。",
@@ -311,7 +315,7 @@ export function deriveWorkspaceTasks(
         add(
           record,
           {
-            nodeKind: "quotation",
+            recordKind: "quotation",
             taskType: "send",
             actionLabel: "核对报价发送凭证",
             detail: "人工报价已批准；实际发送并核对凭证后才能标记已发送。",
@@ -323,8 +327,9 @@ export function deriveWorkspaceTasks(
           add(
             record,
             {
-              nodeKind: "lead",
+              recordKind: "rfq",
               taskType: "rfq",
+              source: { kind: "lead", id: record.id },
               actionLabel: "录入询盘",
               detail: "新线索已归属项目，开始整理客户需求。",
             },
@@ -340,7 +345,7 @@ export function deriveWorkspaceTasks(
         add(
           record,
           {
-            nodeKind: "lead",
+            recordKind: "lead",
             taskType: hot ? "opportunity" : "follow_up",
             title: hot ? "确认有效商机" : scheduled ? "客户跟进已安排" : "客户需要跟进",
             actionLabel: hot ? "确认有效商机" : scheduled ? "查看跟进计划" : "继续跟进",
@@ -368,7 +373,7 @@ export function deriveWorkspaceTasks(
         record,
         {
           id: publication.id,
-          nodeKind: "publication",
+          recordKind: "publication",
           taskType: "publication",
           title: processing ? "发布等待平台回执" : "发布结果需要核对",
           state: processing ? "processing" : "attention",
@@ -391,7 +396,7 @@ export function deriveWorkspaceTasks(
       add(
         record,
         {
-          nodeKind: "publication",
+          recordKind: record.type === "video" ? "video" : "content",
           taskType: "publication",
           priority: "review",
           actionLabel: snapshot.hasActiveChannel ? "核对并确认发布" : "查看发布条件",
@@ -416,10 +421,10 @@ export function deriveWorkspaceTasks(
   );
 }
 
-export function deriveWorkspacePipeline(
+export function deriveWorkspaceProjectOverview(
   snapshot: WorkspaceTaskSnapshot,
   tasks: WorkspaceTaskSummary[],
-): WorkspacePipelineSummary[] {
+): WorkspaceProjectOverview[] {
   const projectNames = new Map(snapshot.projects.map((project) => [project.id, project.title]));
   return snapshot.projects.map((project) => {
     const records = snapshot.records.filter(
@@ -430,11 +435,6 @@ export function deriveWorkspacePipeline(
     );
     const leadRecords = records.filter((row) => row.type === "lead");
     const next = tasks.find((task) => task.projectId === project.id);
-    const currentStageId = next
-      ? taskProjectStage(next)
-      : defaultProjectStage(project.kind, [], records, published.length > 0);
-    const stageLabel =
-      projectStages(project.kind).find((stage) => stage.id === currentStageId)?.label ?? "项目记录";
     const sourceRef = leadRecords
       .map((row) => text(row.payload.source_publication_ref))
       .find(Boolean);
@@ -448,12 +448,12 @@ export function deriveWorkspacePipeline(
       kind: project.kind,
       status: project.status,
       updatedAt: project.updatedAt,
-      currentStageId,
-      currentStage:
+      taskCount: tasks.filter((task) => task.projectId === project.id).length,
+      statusLabel:
         project.status === "archived"
           ? "已归档"
           : next
-            ? `${stageLabel} · ${taskStateLabel(next)}`
+            ? taskStateLabel(next)
             : records.length
               ? "当前工作已处理"
               : "尚未开始",
@@ -468,7 +468,7 @@ export function deriveWorkspacePipeline(
             : "录入第一条客户询盘",
       nextActionHref: next
         ? workspaceTaskHref(next)
-        : `/workspace/${project.id}?panel=${project.kind === "sales" && !records.length ? "rfq" : currentStageId}`,
+        : `/workspace/${workspaceCollection(project.kind === "marketing" ? "product" : "lead")}?project=${project.id}`,
       recordCount: records.length,
       publishedCount: published.length,
       leadCount: leadRecords.length,

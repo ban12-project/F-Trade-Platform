@@ -26,7 +26,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { initialClosingActionState } from "@/lib/action-states";
 import { routeInboundConversationAction } from "@/lib/actions/closing";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
-import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
+import { workspaceRecordHref } from "@/lib/workspace/navigation";
+import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 
 function RoutingDialog({
   inbound,
@@ -45,9 +46,9 @@ function RoutingDialog({
     initialClosingActionState,
   );
   useEffect(() => {
-    if (state.status === "success" && state.projectId) {
+    if (state.status === "success" && state.projectId && state.id) {
       setOpen(false);
-      router.push(`/workspace/${state.projectId}?panel=lead&item=${state.id}`);
+      router.push(workspaceRecordHref(state.projectId, "lead", state.id, "/workspace"));
       router.refresh();
     }
   }, [router, state]);

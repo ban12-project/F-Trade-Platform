@@ -249,7 +249,6 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.approval.aggregateId, created.id));
   expect(pending.status).toBe("pending");
   // Navigate using the actual record link after the action refreshes the page.
-  await page.getByRole("button", { name: "打开产品草稿", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/records/product/${created.id}$`));
   await expect(page.getByRole("tab")).toHaveCount(0);
   await expect(page.locator("#create-product").filter({ visible: true })).toHaveCount(0);
@@ -281,7 +280,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.reload();
   await expect(
     page
-      .getByText("当前为只读视图。请由项目编辑者处理写入或审核。", { exact: true })
+      .getByText("当前为只读视图。写入和审核由有权限的项目编辑者处理。", { exact: true })
       .filter({ visible: true }),
   ).toBeVisible();
   await expect(original).toBeEnabled();
@@ -349,7 +348,9 @@ test("authenticated browser reviews a mock product and its content through real 
     )
     .toBe("PRODUCT_READY");
   await page.reload();
-  await expect(page.getByText("已核验", { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "业务记录" }).getByText("已核验", { exact: true }),
+  ).toBeVisible();
   await expect(page.locator("form#product-review").filter({ visible: true })).toHaveCount(0);
 
   const [ready] = await db
@@ -416,7 +417,9 @@ test("authenticated browser reviews a mock product and its content through real 
   expect(evidenceLink.projectId).toBe(projectId);
 
   await page.getByRole("button", { name: "制作图文内容", exact: true }).click();
-  await expect(page).toHaveURL(`/workspace/${projectId}/new/content?product=${created.id}`);
+  await expect(page).toHaveURL(
+    new RegExp("/workspace/" + projectId + "/new/content[?]product=" + created.id + "&returnTo="),
+  );
   const contentForm = page.locator("form#create-content").filter({ visible: true });
   await contentForm.getByRole("combobox").nth(2).click();
   await page.getByRole("option", { name: "OE 编号", exact: true }).click();
@@ -437,7 +440,6 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.getByRole("button", { name: "创建待审内容", exact: true }).click();
   const savedContentResponse = await contentResponse;
   expect(savedContentResponse.ok()).toBe(true);
-  await expect(page.getByText(/内容草稿已创建/).filter({ visible: true })).toBeVisible();
   // A successful save must settle, rather than continually refreshing on new product props.
   await page.waitForLoadState("networkidle", { timeout: 5_000 });
   const contentQuery = () =>
@@ -468,12 +470,12 @@ test("authenticated browser reviews a mock product and its content through real 
     .from(schema.approval)
     .where(eq(schema.approval.aggregateId, contentDraft.id));
   expect(contentApproval.status).toBe("pending");
-  await page.getByRole("button", { name: "打开内容草稿", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/records/content/${contentDraft.id}(?:[?].*)?$`));
   const contentReview = page.locator("form#content-review").filter({ visible: true });
   const staleContext = await browser.newContext({ baseURL });
   await staleContext.addCookies(await context.cookies());
   const stalePage = await staleContext.newPage();
-  await stalePage.goto(`/workspace/${projectId}?panel=content&item=${contentDraft.id}`);
+  await stalePage.goto(`/workspace/${projectId}/records/content/${contentDraft.id}`);
   const staleReview = stalePage.locator("form#content-review").filter({ visible: true });
   await staleReview.getByRole("combobox").click();
   await stalePage.getByRole("option", { name: "批准营销内容", exact: true }).click();
@@ -566,7 +568,9 @@ test("authenticated browser reviews a mock product and its content through real 
   expect((await contentReviewResponse).ok()).toBe(true);
   await expect.poll(async () => (await contentQuery())[0].state).toBe("CONTENT_APPROVED");
   await page.reload();
-  await expect(page.getByText("已批准", { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "业务记录" }).getByText("可安排发布", { exact: true }),
+  ).toBeVisible();
   await expect(page.locator("form#content-review").filter({ visible: true })).toHaveCount(0);
   const [approvedContent] = await contentQuery();
   expect(approvedContent.version).toBe(4);
@@ -668,7 +672,7 @@ test("authenticated browser reviews a mock product and its content through real 
   ).toBeVisible();
   await expect(
     page
-      .getByRole("region", { name: "营销内容详情与审批" })
+      .getByRole("region", { name: "业务记录" })
       .getByText("已收到平台成功回执，可以查看发布凭证。", { exact: true }),
   ).toBeVisible();
   await expect(publicationForm).toHaveCount(0);
@@ -723,15 +727,15 @@ test("authenticated browser reviews a mock product and its content through real 
     .select()
     .from(schema.aggregateRecord)
     .where(eq(schema.aggregateRecord.id, targetA.id));
-  await page.goto(`/workspace/${projectId}?panel=content&item=${targetA.id}`);
+  await page.goto(`/workspace/${projectId}/records/content/${targetA.id}`);
   await expect(page.locator("form#content-review").filter({ visible: true })).toBeVisible();
-  await page.getByRole("link", { name: "返回记录列表", exact: true }).click();
+  await page.getByRole("link", { name: "返回清单", exact: true }).click();
   await expect(page).toHaveURL(`/workspace/content?project=${projectId}`);
   await page
     .getByRole("main")
     .getByRole("link", { name: /MOCK switching B/ })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/records/content/${targetB.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/records/content/${targetB.id}(?:[?].*)?$`));
   const switchingReview = page.locator("form#content-review").filter({ visible: true });
   await switchingReview.getByRole("combobox").click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();

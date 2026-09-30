@@ -6,15 +6,15 @@ import {
   PublicationPanel,
   QuotationPanel,
 } from "@/components/workspace/closing-panels";
-import { ContentPanel } from "@/components/workspace/content-panel";
-import { ProductPanel } from "@/components/workspace/product-panel";
-import {
-  type ProjectStage,
-  ProjectWorkspace,
-  VideoStageEntry,
-} from "@/components/workspace/project-workspace";
+import { ContentCreatePanel } from "@/components/workspace/content-create-panel";
+import { ContentReview } from "@/components/workspace/content-review";
+import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
+import { ProductIntakePanel } from "@/components/workspace/product-intake-panel";
+import { ProductReview } from "@/components/workspace/product-review";
+import { RecordFrame } from "@/components/workspace/record-frame";
+import { RfqDetail } from "@/components/workspace/rfq-detail";
 import { SalesContext } from "@/components/workspace/sales-context";
-import { RfqPanel } from "@/components/workspace/sales-panels";
+import { WorkspaceLink } from "@/components/workspace/workspace-link";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import type { ContentCatalogDetail } from "@/lib/content/store";
 import type { ProductCatalogDetail } from "@/lib/products";
@@ -25,7 +25,7 @@ import type {
 } from "@/lib/sales/closing-store";
 import type { SalesRelationRecord } from "@/lib/sales/journey";
 import type { RfqEntry } from "@/lib/sales/store";
-import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
+import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 
 const syntheticMarketingProject: WorkspaceProjectSummary = {
   id: "00000000-0000-4000-8000-000000000202",
@@ -41,7 +41,7 @@ const syntheticSalesProject: WorkspaceProjectSummary = {
   title: "Synthetic sales canvas",
   kind: "sales",
 };
-const syntheticProjects: WorkspaceProjectSummary[] = [
+const _syntheticProjects: WorkspaceProjectSummary[] = [
   syntheticMarketingProject,
   syntheticSalesProject,
 ];
@@ -152,7 +152,7 @@ const syntheticQuote: QuotationEntry = {
   },
 };
 const syntheticDelivery: DeliveryConfirmationEntry = {
-  id: syntheticLead.confirmedDelivery!.id,
+  id: "30000000-0000-4000-8000-000000000010",
   state: "DELIVERY_CONFIRMATION_CONFIRMED",
   createdAt: syntheticRfq.createdAt,
   approvalId: null,
@@ -162,7 +162,7 @@ const syntheticDelivery: DeliveryConfirmationEntry = {
     related_entity_id: syntheticRfq.id,
     result: {
       confirmed_lead_time_days: 21,
-      valid_until: syntheticLead.confirmedDelivery!.validUntil,
+      valid_until: syntheticLead.confirmedDelivery?.validUntil,
     },
   },
 };
@@ -300,77 +300,12 @@ const syntheticContentDetail: ContentCatalogDetail = {
   },
 };
 
-const marketingStages: ProjectStage[] = [
-  {
-    id: "product",
-    panelKind: "product",
-    label: "产品资料",
-    description: "导入资料，补全字段并完成产品事实核验。",
-  },
-  {
-    id: "content",
-    panelKind: "content",
-    label: "营销内容",
-    description: "基于已核验产品事实生成、修改并审核营销内容。",
-  },
-  {
-    id: "video",
-    panelKind: "video",
-    label: "营销视频",
-    description: "选择授权素材，在独立编辑器生成剪辑初稿、预览并提审。",
-  },
-  {
-    id: "publication",
-    panelKind: "publication",
-    label: "发布",
-    description: "人工确认渠道、账户与载荷，提交后等待平台回执。",
-  },
-];
-const salesStages: ProjectStage[] = [
-  {
-    id: "inbound",
-    panelKind: "lead",
-    label: "客户线索",
-    description: "查看已关联到当前项目的询盘、消息和跟进上下文。",
-  },
-  {
-    id: "rfq",
-    panelKind: "rfq",
-    label: "需求确认",
-    description: "补齐产品身份、数量、目的地、证据与产品引用。",
-  },
-  {
-    id: "quotation",
-    panelKind: "quotation",
-    label: "报价",
-    description: "人工录入价格与商业条款，并完成报价确认。",
-  },
-  {
-    id: "follow-up",
-    panelKind: "lead",
-    label: "跟进",
-    description: "人工编辑并发送回复，安排下一次跟进。",
-  },
-  {
-    id: "delivery",
-    panelKind: "delivery",
-    label: "交期",
-    description: "客户询问交期时发起并完成人工确认。",
-  },
-  {
-    id: "opportunity",
-    panelKind: "lead",
-    label: "商机",
-    description: "达到条件后，仍由业务人员显式确认有效商机。",
-  },
-];
-
 async function ProjectWorkflowFixture({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string; kind?: string; panel?: string }>;
+  searchParams: Promise<{ state?: string; kind?: string; record?: string }>;
 }) {
-  const { state, kind, panel } = await searchParams;
+  const { state, kind, record } = await searchParams;
   if (kind === "sales") {
     const context = (recordKind: SalesRelationRecord["kind"], id: string) => (
       <SalesContext
@@ -383,14 +318,13 @@ async function ProjectWorkflowFixture({
     );
     const panels = {
       rfq: (
-        <RfqPanel
+        <RfqDetail
           projectId={syntheticSalesProject.id}
-          entries={[syntheticRfq]}
-          selectedId={syntheticRfq.id}
+          entry={syntheticRfq}
           leads={[syntheticLead]}
         >
           {context("rfq", syntheticRfq.id)}
-        </RfqPanel>
+        </RfqDetail>
       ),
       quotation: (
         <div className="space-y-6">
@@ -427,66 +361,58 @@ async function ProjectWorkflowFixture({
       ),
       opportunity: <LeadPanel projectId={syntheticSalesProject.id} entries={[]} />,
     };
-    const active = salesStages.some((stage) => stage.id === panel)
-      ? panel!
-      : panel === "lead"
-        ? "follow-up"
-        : "inbound";
-    const panelKind = salesStages.find((stage) => stage.id === active)!.panelKind;
-    const activePanel =
-      active === "opportunity" ? panels.opportunity : panels[panelKind as keyof typeof panels];
+    const active = record === "lead" ? "lead" : (record ?? "lead");
     return (
-      <ProjectWorkspace
-        project={syntheticSalesProject}
-        tasks={[]}
-        stages={salesStages}
-        activeStage={active}
-        panel={activePanel}
-        basePath="/testing/project-workflow"
-      />
+      <WorkspaceDirtyProvider>
+        <RecordFrame
+          header={<h1 className="text-2xl font-semibold">{syntheticSalesProject.title}</h1>}
+        >
+          {panels[active as keyof typeof panels]}
+        </RecordFrame>
+      </WorkspaceDirtyProvider>
     );
   }
   const productDetail = state === "product-review" ? syntheticProductDetail : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
   const panels = {
-    product: (
-      <ProductPanel
+    product: productDetail ? (
+      <ProductReview
         projectId={syntheticMarketingProject.id}
-        entries={productDetail ? [productDetail] : []}
         detail={productDetail}
         canReview
+        evidenceOptions={[
+          {
+            id: "evidence-product-001",
+            sourceLabel: "Synthetic review evidence",
+            contentType: "text/plain",
+            classification: "internal",
+            createdAt: new Date("2026-09-01T00:00:00Z"),
+          },
+        ]}
+        sourceDocuments={[]}
+      />
+    ) : (
+      <ProductIntakePanel
+        projectId={syntheticMarketingProject.id}
+        canReview
         agentModelConfigs={syntheticAgentModels}
-        evidenceOptions={
-          productDetail
-            ? [
-                {
-                  id: "evidence-product-001",
-                  sourceLabel: "Synthetic review evidence",
-                  contentType: "text/plain",
-                  classification: "internal",
-                  createdAt: new Date("2026-09-01T00:00:00Z"),
-                },
-              ]
-            : []
-        }
+        evidenceOptions={[]}
       />
     ),
-    content: (
-      <ContentPanel
+    content: contentDetail ? (
+      <ContentReview
         projectId={syntheticMarketingProject.id}
-        products={[syntheticProduct]}
-        entries={contentDetail ? [contentDetail] : []}
-        copyCandidates={[]}
         detail={contentDetail}
+        product={syntheticProduct}
         canReview
       />
+    ) : (
+      <ContentCreatePanel projectId={syntheticMarketingProject.id} products={[syntheticProduct]} />
     ),
     video: (
-      <VideoStageEntry
-        projectId={syntheticMarketingProject.id}
-        count={1}
-        pendingReview={state === "review" ? 1 : 0}
-      />
+      <WorkspaceLink href={`/workspace/${syntheticMarketingProject.id}/video?new=1`}>
+        按需制作视频
+      </WorkspaceLink>
     ),
     publication: (
       <PublicationPanel
@@ -513,16 +439,15 @@ async function ProjectWorkflowFixture({
       />
     ),
   };
-  const active = marketingStages.some((stage) => stage.id === panel) ? panel! : "product";
+  const active = record ?? "product";
   return (
-    <ProjectWorkspace
-      project={syntheticMarketingProject}
-      tasks={[]}
-      stages={marketingStages}
-      activeStage={active}
-      panel={panels[active as keyof typeof panels]}
-      basePath="/testing/project-workflow"
-    />
+    <WorkspaceDirtyProvider>
+      <RecordFrame
+        header={<h1 className="text-2xl font-semibold">{syntheticMarketingProject.title}</h1>}
+      >
+        {panels[active as keyof typeof panels]}
+      </RecordFrame>
+    </WorkspaceDirtyProvider>
   );
 }
 
@@ -530,7 +455,7 @@ async function ProjectWorkflowFixture({
 export default function ProjectWorkflowTestingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string; kind?: string; panel?: string }>;
+  searchParams: Promise<{ state?: string; kind?: string; record?: string }>;
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (

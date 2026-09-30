@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("unknown publication requires reviewed evidence and rejects an unauthenticated confirmation", async ({
   page,
 }) => {
-  await page.goto("/testing/project-workflow?kind=marketing&panel=publication&state=unknown");
+  await page.goto("/testing/project-workflow?kind=marketing&record=publication&state=unknown");
   await page.getByRole("button", { name: "确认已发布结果" }).click();
   await expect(
     page.getByText("请先核对账号、完整文案、受众和帖子链接。", { exact: true }),

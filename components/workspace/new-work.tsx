@@ -1,7 +1,7 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   type ReactNode,
@@ -32,17 +32,19 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createWorkspaceProjectAction, type WorkspaceActionState } from "@/lib/actions/workspace";
 import { createWorkspaceProjectSchema } from "@/lib/workspace/contracts";
 import { workspaceCreateHref } from "@/lib/workspace/navigation";
-import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
+import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
 
-export type NewWorkIntent = "product" | "content" | "rfq";
+export type NewWorkIntent = "product" | "content" | "rfq" | "video";
 const intents = [
   { id: "product", label: "录入产品" },
   { id: "content", label: "制作内容" },
   { id: "rfq", label: "记录询盘" },
+  { id: "video", label: "制作视频" },
 ] as const;
 const NewWorkContext = createContext<{
-  start: (intent: NewWorkIntent | null) => void;
+  start: (intent: NewWorkIntent | null, projectId?: string, returnTo?: string) => void;
+  projects: WorkspaceProjectSummary[];
   ready: boolean;
   dialogId: string;
   open: boolean;
@@ -154,7 +156,6 @@ function NewWorkDialog({
 }) {
   const id = useId();
   const { requestNavigation } = useWorkspaceDirtyState();
-  const params = useParams();
   const [creating, setCreating] = useState(false);
   const [ownDirty, setOwnDirty] = useState(false);
   function changeSelection(action: () => void) {
@@ -167,13 +168,9 @@ function NewWorkDialog({
     (project) =>
       project.kind === kind && project.status === "active" && project.memberRole !== "viewer",
   );
-  const [projectId, setProjectId] = useState(
-    available.find((project) => project.id === params.projectId)?.id ?? available[0]?.id ?? "new",
-  );
+  const [projectId, setProjectId] = useState("");
   const selected =
-    projectId === "new" || available.some((project) => project.id === projectId)
-      ? projectId
-      : (available[0]?.id ?? "new");
+    projectId === "new" || available.some((project) => project.id === projectId) ? projectId : "";
   return (
     <Dialog
       open
@@ -228,6 +225,7 @@ function NewWorkDialog({
                 changeSelection(() => setProjectId(nextProject));
               }}
             >
+              <NativeSelectOption value="">请选择归属项目</NativeSelectOption>
               {available.map((project) => (
                 <NativeSelectOption key={project.id} value={project.id}>
                   {project.title}
@@ -252,13 +250,9 @@ function NewWorkDialog({
               onCreated={(id) => onStart(id, selectedIntent)}
             />
           ) : (
-            <Button onClick={() => onStart(selected, selectedIntent)}>
+            <Button disabled={!selected} onClick={() => onStart(selected, selectedIntent)}>
               在此项目开始
-              {selectedIntent === "rfq"
-                ? "记录询盘"
-                : selectedIntent === "content"
-                  ? "制作内容"
-                  : "录入产品"}
+              {intents.find((item) => item.id === selectedIntent)?.label}
             </Button>
           )}
         </FieldGroup>
@@ -269,7 +263,6 @@ function NewWorkDialog({
 export function NewWorkProvider({
   children,
   projects,
-  basePath = "/workspace",
 }: {
   children: ReactNode;
   projects?: WorkspaceProjectSummary[];
@@ -287,6 +280,7 @@ export function NewWorkProvider({
   const [loadedProjects, setProjects] = useState(projects);
   const [intent, setIntent] = useState<NewWorkIntent | null>(null);
   const [destination, setDestination] = useState<string | null>(null);
+  const [returnTo, setReturnTo] = useState<string | undefined>();
   useEffect(() => {
     if (!destination || intent) return;
     setDestination(null);
@@ -296,7 +290,26 @@ export function NewWorkProvider({
     <ProjectDataContext value={setProjects}>
       <NewWorkContext
         value={{
-          start: setIntent,
+          projects: loadedProjects ?? [],
+          start: (nextIntent, projectId, origin) => {
+            if (!nextIntent) {
+              setIntent(null);
+              return;
+            }
+            if (projectId) {
+              const project = loadedProjects?.find((project) => project.id === projectId);
+              if (
+                project?.status !== "active" ||
+                project.memberRole === "viewer" ||
+                project.kind !== (nextIntent === "rfq" ? "sales" : "marketing")
+              )
+                return;
+              setDestination(workspaceCreateHref(projectId, nextIntent, undefined, origin));
+              return;
+            }
+            setReturnTo(origin);
+            setIntent(nextIntent);
+          },
           ready: hydrated && loadedProjects !== undefined,
           dialogId,
           open: !!intent,
@@ -314,11 +327,7 @@ export function NewWorkProvider({
             onClose={() => setIntent(null)}
             onStart={(projectId, intent) => {
               setIntent(null);
-              setDestination(
-                basePath === "/workspace"
-                  ? workspaceCreateHref(projectId, intent)
-                  : `${basePath}/${projectId}?panel=${intent}`,
-              );
+              setDestination(workspaceCreateHref(projectId, intent, undefined, returnTo));
             }}
           />
         ) : null}
@@ -331,25 +340,36 @@ export function NewWorkButton({
   children = "开始新工作",
   variant = "default",
   onOpen,
+  projectId,
+  returnTo,
 }: {
   intent?: NewWorkIntent;
   children?: ReactNode;
   variant?: "default" | "outline" | "secondary";
   onOpen?: () => void;
+  projectId?: string;
+  returnTo?: string;
 }) {
   const context = useContext(NewWorkContext);
+  const selectedProject = context?.projects.find((project) => project.id === projectId);
+  const knownProjectReady =
+    !projectId ||
+    (!!selectedProject &&
+      selectedProject.status === "active" &&
+      selectedProject.memberRole !== "viewer" &&
+      selectedProject.kind === (intent === "rfq" ? "sales" : "marketing"));
   return (
     <Button
       className="min-h-11"
-      aria-haspopup="dialog"
+      aria-haspopup={projectId ? undefined : "dialog"}
       aria-expanded={context?.open ?? false}
       aria-controls={context?.open ? context.dialogId : undefined}
       variant={variant}
       onClick={() => {
         onOpen?.();
-        context?.start(intent);
+        context?.start(intent, projectId, returnTo);
       }}
-      disabled={!context?.ready}
+      disabled={!context?.ready || !knownProjectReady}
     >
       <PlusIcon data-icon="inline-start" />
       {children}
