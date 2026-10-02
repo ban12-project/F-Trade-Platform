@@ -12,7 +12,17 @@ import {
   documentUploadPath,
   documentUploadPayloadSchema,
 } from "./document-upload-contracts";
-import { logProductIntakeFailure } from "./intake-diagnostics";
+import { logProductIntakeFailure, productIntakeFailureDiagnostic } from "./intake-diagnostics";
+
+const retryableReadCodes = new Set([
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "EAI_AGAIN",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_SOCKET",
+]);
 
 async function lockAuthorizedProject(tx: DatabaseTransaction, projectId: string, actorId: string) {
   // Membership changes lock this same project row. Recheck after taking that lock.
@@ -71,22 +81,45 @@ export async function claimDocumentUpload(
       ),
     );
   if (!row || row.expiresAt.getTime() <= Date.now()) throw new Error("上传回执无效或已过期。");
-  const blob = await readBlob(row.blobPath, { access: "private", useCache: false }).catch(
-    (error: unknown) => {
-      logProductIntakeFailure("private_blob_read", error);
-      throw error;
-    },
-  );
-  if (!blob || blob.statusCode !== 200 || !blob.stream || blob.blob.contentType !== row.contentType)
+  const verified = await (async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        // Permission/expiry failures are outside the retry boundary.
+        await assertWorkspaceProjectAccess(value.projectId, actorId, "write", database);
+        const [current] = await database
+          .select({ expiresAt: productDocumentUploadReceipt.expiresAt })
+          .from(productDocumentUploadReceipt)
+          .where(eq(productDocumentUploadReceipt.id, row.id));
+        if (!current || current.expiresAt.getTime() <= Date.now())
+          throw new Error("上传回执无效或已过期。");
+      }
+      try {
+        const blob = await readBlob(row.blobPath, { access: "private", useCache: false });
+        if (
+          !blob ||
+          blob.statusCode !== 200 ||
+          !blob.stream ||
+          blob.blob.contentType !== row.contentType
+        ) {
+          await blob?.stream?.cancel().catch(() => {});
+          throw new Error("无法核验私有文件，请重新上传。");
+        }
+        // Each attempt owns a fresh stream and byte buffer; partial reads are discarded.
+        return await verifyDocumentUploadBytes(blob.stream, row.originalFilename, row.sizeBytes);
+      } catch (error) {
+        logProductIntakeFailure("private_blob_read", error);
+        const diagnostic = productIntakeFailureDiagnostic("private_blob_read", error);
+        if (
+          attempt === 1 ||
+          diagnostic.category !== "transport" ||
+          !retryableReadCodes.has(diagnostic.code)
+        )
+          throw error;
+      }
+    }
     throw new Error("无法核验私有文件，请重新上传。");
-  const verified = await verifyDocumentUploadBytes(
-    blob.stream,
-    row.originalFilename,
-    row.sizeBytes,
-  ).catch((error: unknown) => {
-    logProductIntakeFailure("private_blob_read", error);
-    throw error;
-  });
+  })();
   const evidenceId = await database.transaction(async (tx) => {
     await lockAuthorizedProject(tx, row.projectId, actorId);
     const [current] = await tx

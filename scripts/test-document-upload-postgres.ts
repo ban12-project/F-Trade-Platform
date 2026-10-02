@@ -119,6 +119,76 @@ void (async () => {
     blobBytes = Buffer.alloc(bytes.length, 65);
     await assert.rejects(claim(second.id), /变化/);
     blobBytes = bytes;
+    const transportError = () =>
+      Object.assign(new Error("SYNTHETIC transport failure"), { code: "ECONNRESET" });
+    const runWithReader = (id: string, reader: typeof get) =>
+      claimDocumentUpload(
+        { receiptId: id, projectId: projects[0], purpose: "evidence" },
+        actors[0],
+        db,
+        reader,
+      );
+    for (const mode of ["initial", "partial"] as const) {
+      const retryReceipt = await issueDocumentUploadReceipt(payload(), actors[0], db);
+      let attempts = 0;
+      const flaky = (async () => {
+        attempts++;
+        if (attempts === 1) {
+          if (mode === "initial") throw new Error("SYNTHETIC wrapper", { cause: transportError() });
+          let pulled = false;
+          return {
+            statusCode: 200,
+            blob: { contentType: "text/csv" },
+            stream: new ReadableStream<Uint8Array>({
+              pull(controller) {
+                if (pulled) controller.error(transportError());
+                else {
+                  pulled = true;
+                  controller.enqueue(bytes.subarray(0, 5));
+                }
+              },
+            }),
+          };
+        }
+        return readBlob(retryReceipt.blobPath, { access: "private" });
+      }) as typeof get;
+      const result = await runWithReader(retryReceipt.id, flaky);
+      assert.equal(attempts, 2);
+      assert.equal(
+        result.sha256,
+        createHash("sha256").update(bytes).digest("hex"),
+        "retry discards partial bytes",
+      );
+      const [saved] = await db.select().from(receipt).where(eq(receipt.id, retryReceipt.id));
+      assert.equal(saved.evidenceId, result.evidenceId);
+    }
+    for (const mode of ["persistent", "missing", "mime", "bytes", "dns", "expired"] as const) {
+      const failed = await issueDocumentUploadReceipt(payload(), actors[0], db);
+      let attempts = 0;
+      const reader = (async () => {
+        attempts++;
+        if (mode === "persistent") throw transportError();
+        if (mode === "dns")
+          throw Object.assign(new Error("SYNTHETIC invalid host"), { code: "ENOTFOUND" });
+        if (mode === "expired") {
+          await db
+            .update(receipt)
+            .set({ expiresAt: new Date(0) })
+            .where(eq(receipt.id, failed.id));
+          throw transportError();
+        }
+        if (mode === "missing") return null;
+        return {
+          statusCode: 200,
+          blob: { contentType: mode === "mime" ? "application/pdf" : "text/csv" },
+          stream: new Blob([Buffer.alloc(bytes.length, 0)]).stream(),
+        };
+      }) as typeof get;
+      await assert.rejects(runWithReader(failed.id, reader));
+      assert.equal(attempts, mode === "persistent" ? 2 : 1, `${mode}: bounded retry policy`);
+      const [saved] = await db.select().from(receipt).where(eq(receipt.id, failed.id));
+      assert.equal(saved.evidenceId, null, "failed reads must not attach evidence");
+    }
     const revoked = await issueDocumentUploadReceipt(payload(), actors[0], db);
     await db.insert(workspaceProjectMember).values({
       id: randomUUID(),
@@ -150,6 +220,28 @@ void (async () => {
     before = reads;
     await assert.rejects(claim(revoked.id), /权限/);
     assert.equal(reads, before);
+    await db.insert(workspaceProjectMember).values({
+      id: randomUUID(),
+      projectId: projects[0],
+      userId: actors[0],
+      role: "owner",
+      createdById: actors[1],
+    });
+    const retryRevoked = await issueDocumentUploadReceipt(payload(), actors[0], db);
+    let revokedAttempts = 0;
+    await assert.rejects(
+      runWithReader(retryRevoked.id, (async () => {
+        revokedAttempts++;
+        await removeWorkspaceProjectMember(
+          { projectId: projects[0], userId: actors[0] },
+          actors[1],
+          db,
+        );
+        throw transportError();
+      }) as typeof get),
+      /权限/,
+    );
+    assert.equal(revokedAttempts, 1, "revocation prevents a second private read");
     for (const size of [1024 * 1024 + 1, maximumProductDocumentBytes]) {
       const large = Buffer.alloc(size, 65);
       const verified = await verifyDocumentUploadBytes(
