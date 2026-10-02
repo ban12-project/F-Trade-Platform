@@ -281,6 +281,27 @@ export const evidence = pgTable(
   ],
 );
 
+export const evidenceUploadIntent = pgTable(
+  "evidence_upload_intent",
+  {
+    id: text("id").primaryKey(),
+    blobKey: text("blob_key").notNull(),
+    status: text("status")
+      .$type<"upload_pending" | "uncertain" | "cleanup_pending" | "attached" | "cleaned">()
+      .notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("evidence_upload_intent_blob_uidx").on(table.blobKey),
+    index("evidence_upload_intent_pending_idx").on(table.status, table.updatedAt),
+    check(
+      "evidence_upload_intent_status",
+      sql`${table.status} IN ('upload_pending', 'uncertain', 'cleanup_pending', 'attached', 'cleaned')`,
+    ),
+  ],
+);
+
 export const workflowEvent = pgTable(
   "workflow_event",
   {

@@ -8,6 +8,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { closeDatabase, type Database, getDatabase } from "../lib/db/client";
 import {
   evidence,
+  evidenceUploadIntent,
   user,
   videoUploadReceipt,
   workspaceProject,
@@ -21,6 +22,7 @@ import { prepareUploadedProductAgentDocument } from "../lib/product/uploaded-doc
 import { claimCompletedVideoUploads } from "../lib/video/upload-receipts";
 import { prepareUploadedVideoAssets } from "../lib/video/uploaded-assets";
 import { assertAndLinkProjectEvidence, listProjectEvidenceOptions } from "../lib/workspace/access";
+import { testUploadReconciliation } from "./test-evidence-upload-reconciliation";
 
 const connectionString = process.env.EVIDENCE_UPLOAD_TEST_DATABASE_URL;
 if (!connectionString) throw new Error("EVIDENCE_UPLOAD_TEST_DATABASE_URL required");
@@ -209,16 +211,14 @@ void (async () => {
     };
     const count = memory.values.size;
     await assert.rejects(persistUploadedEvidence(failureInput, db, store));
-    assert.equal(memory.values.size, count, "Rejected insert must delete its unreferenced blob");
+    assert.equal(memory.values.size, count, "Invalid metadata must not create a blob");
     const lostAck = new Proxy(db, {
       get(target, key, receiver) {
-        if (key === "insert")
-          return (table: typeof evidence) => ({
-            values: async (value: typeof evidence.$inferInsert) => {
-              await target.insert(table).values(value);
-              throw new Error("synthetic lost acknowledgement");
-            },
-          });
+        if (key === "transaction")
+          return async (...args: Parameters<Database["transaction"]>) => {
+            await target.transaction(...args);
+            throw new Error("synthetic lost acknowledgement");
+          };
         return Reflect.get(target, key, receiver);
       },
     }) as Database;
@@ -231,6 +231,21 @@ void (async () => {
       count + 1,
       "A lost acknowledgement must preserve a possibly committed blob",
     );
+    const [committed] = await db
+      .select()
+      .from(evidence)
+      .where(eq(evidence.sha256, failureInput.sha256));
+    assert.ok(committed);
+    const [committedIntent] = await db
+      .select()
+      .from(evidenceUploadIntent)
+      .where(eq(evidenceUploadIntent.id, committed.id));
+    assert.equal(
+      committedIntent.status,
+      "attached",
+      "lost commit response retains atomic attached state",
+    );
+    await testUploadReconciliation(db, actors[0]);
     console.log(
       "Evidence uploads: independent provenance, cross-project denial, concurrent uploads, receipt idempotency, stored-byte readback and failure cleanup passed (synthetic adapters, real PostgreSQL).",
     );
