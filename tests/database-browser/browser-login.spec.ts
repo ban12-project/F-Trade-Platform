@@ -190,7 +190,12 @@ test("saved password fill uses the actual owner action and never returns credent
   const reconnect = page.getByRole("button", { name: "重新授权连接", exact: true });
   await expect(reconnect).toBeVisible({ timeout: 15000 });
   await reconnect.click();
-  await expect(viewer.locator("body")).toHaveAttribute("data-ticket", /.+/);
+  await expect
+    .poll(async () => {
+      const value = await viewer.locator("body").getAttribute("data-ticket");
+      return Boolean(value && value !== ticket);
+    })
+    .toBe(true);
   const freshTicket = await viewer.locator("body").getAttribute("data-ticket");
   expect(freshTicket).not.toBe(ticket);
   const replay = await page.request.post(`${baseURL}/api/browser-nodes`, {
