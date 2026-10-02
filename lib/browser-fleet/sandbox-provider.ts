@@ -39,6 +39,7 @@ export type BrowserSandboxProviderHandle = Pick<
   | "vcpus"
   | "tags"
   | "networkPolicy"
+  | "currentSnapshotId"
   | "currentSession"
   | "domain"
   | "listSessions"

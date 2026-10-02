@@ -19,6 +19,16 @@ categories. No policy contents, node keys, private URLs, session IDs, account
 identifiers, raw exceptions or provider responses leave the server. Inspection
 does not start/stop compute, reset the lifecycle or claim login credentials.
 
+Further read-only evidence identified the selected current snapshot as deleted,
+with expiration at 2026-09-28 16:51 UTC. This is a definite resume blocker; the
+original caught exception is still unavailable. The selected snapshot originated
+from a verification instance with one-day retention, even though the destination
+instance's future snapshots were configured for 30 days. Referencing a snapshot
+does not establish a new retention window. Inspection therefore also checks the
+selected snapshot's availability and expiry without returning its identifier.
+An existing stopped rollback copy has an available snapshot; recovery must retain
+account ownership, verify its contents and preserve the original rollback record.
+
 Local validation: TypeScript, 13 provider tests and real PostgreSQL lifecycle tests
 pass. Added checks reject foreign/missing/extra-field requests before provider
 access; verify no lifecycle writes, policy mismatch and secret-safe failures.

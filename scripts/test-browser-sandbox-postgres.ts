@@ -120,6 +120,36 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
     });
   }
   assert.ok(!JSON.stringify(inspection).includes(privateMarker));
+  assert.ok(inspection.kind === "observed" && inspection.snapshot === "missing");
+  for (const variant of ["available", "expired", "deleted", "unavailable"] as const) {
+    const checked = await inspectOwnedBrowserSandbox(
+      { nodeId },
+      "synthetic-owner",
+      database,
+      {
+        async get(input) {
+          return {
+            ...(await provider.get(input as { name: string; resume?: boolean })),
+            currentSnapshotId: "synthetic-snapshot",
+          };
+        },
+      },
+      () => "deny-all",
+      {
+        async get(input) {
+          assert.deepEqual(input, { snapshotId: "synthetic-snapshot" });
+          if (variant === "unavailable") throw new Error(privateMarker);
+          return {
+            status: variant === "deleted" ? "deleted" : "created",
+            expiresAt: variant === "expired" ? new Date(0) : new Date(Date.now() + 60_000),
+          };
+        },
+      },
+    );
+    assert.ok(checked.kind === "observed");
+    assert.equal(checked.snapshot, variant === "deleted" ? "missing" : variant);
+    assert.ok(!JSON.stringify(checked).includes(privateMarker));
+  }
   const mismatch = await inspectOwnedBrowserSandbox(
     { nodeId },
     "synthetic-owner",
@@ -158,7 +188,7 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
     },
   );
   assert.deepEqual(configured, { kind: "unavailable", reason: "configuration" });
-  assert.equal(inspected, 2);
+  assert.equal(inspected, 6);
   assert.deepEqual(
     (await pool.query("SELECT * FROM browser_sandbox WHERE node_id=$1", [nodeId])).rows,
     beforeInspection,

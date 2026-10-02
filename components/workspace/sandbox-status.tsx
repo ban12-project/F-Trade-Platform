@@ -29,6 +29,12 @@ const failureLabels = {
   provider_authorization: "云端拒绝访问，请核对项目授权。",
   provider_unavailable: "暂时无法读取云端状态，请稍后检查。",
 };
+const snapshotLabels = {
+  available: "可用",
+  missing: "缺失，需要从备份恢复",
+  expired: "已过期，需要从备份恢复",
+  unavailable: "暂时无法核验",
+};
 
 export function SandboxStatus({ sandbox, nodeId }: { sandbox: Summary; nodeId: string }) {
   const [pending, startTransition] = useTransition();
@@ -103,6 +109,7 @@ export function SandboxStatus({ sandbox, nodeId }: { sandbox: Summary; nodeId: s
                 </li>
               ))}
             </ul>
+            <p>恢复快照：{snapshotLabels[inspection.snapshot]}</p>
             <p className="text-muted-foreground">此次检查不会启动浏览器或清除待核对记录。</p>
           </div>
         ) : null}

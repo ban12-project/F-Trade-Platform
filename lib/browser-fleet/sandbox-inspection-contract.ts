@@ -10,5 +10,6 @@ export type SandboxInspection =
       kind: "observed";
       observedAt: string;
       state: "stopped" | "running" | "transitioning";
+      snapshot: "available" | "missing" | "expired" | "unavailable";
       checks: { ownership: boolean; resources: boolean; timeout: boolean; networkPolicy: boolean };
     };

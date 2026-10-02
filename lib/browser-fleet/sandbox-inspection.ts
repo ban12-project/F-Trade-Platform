@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Sandbox } from "@vercel/sandbox";
+import { Sandbox, Snapshot } from "@vercel/sandbox";
 import { sql } from "drizzle-orm";
 import { type DatabaseExecutor, getDatabase } from "../db/client";
 import { type SandboxInspection, sandboxInspectionSchema } from "./sandbox-inspection-contract";
@@ -14,6 +14,9 @@ export async function inspectOwnedBrowserSandbox(
   database: DatabaseExecutor = getDatabase(),
   provider: Pick<BrowserSandboxProvider, "get"> = Sandbox,
   configuredPolicy = configuredBrowserSandboxNetworkPolicy,
+  snapshots: {
+    get: (input: { snapshotId: string }) => Promise<Pick<Snapshot, "status" | "expiresAt">>;
+  } = Snapshot,
 ): Promise<SandboxInspection> {
   const { nodeId } = sandboxInspectionSchema.parse(input);
   const owned = await database.execute(sql`SELECT n.id FROM browser_fleet_node n
@@ -28,6 +31,20 @@ export async function inspectOwnedBrowserSandbox(
   }
   try {
     const sandbox = await provider.get({ name: `ftrade-browser-${nodeId}`, resume: false });
+    let snapshot: Extract<SandboxInspection, { kind: "observed" }>["snapshot"] = "missing";
+    if (sandbox.currentSnapshotId) {
+      try {
+        const saved = await snapshots.get({ snapshotId: sandbox.currentSnapshotId });
+        snapshot =
+          saved.expiresAt && saved.expiresAt.getTime() <= Date.now()
+            ? "expired"
+            : saved.status === "created"
+              ? "available"
+              : "missing";
+      } catch {
+        snapshot = "unavailable";
+      }
+    }
     return {
       kind: "observed",
       observedAt: new Date().toISOString(),
@@ -36,6 +53,7 @@ export async function inspectOwnedBrowserSandbox(
           ? sandbox.status
           : "transitioning",
       checks: browserSandboxPreflightChecks(sandbox, nodeId, policy),
+      snapshot,
     };
   } catch (error) {
     const status =
