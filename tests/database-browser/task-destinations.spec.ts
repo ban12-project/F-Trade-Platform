@@ -754,7 +754,9 @@ test("legacy stage parameters stop without selecting records or new forms", asyn
     "rfq=" + randomUUID(),
   ]) {
     await page.goto("/workspace/" + id + "?" + param);
-    await expect(page.getByText("旧阶段链接已停用", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("旧阶段链接已停用", { exact: true }).filter({ visible: true }),
+    ).toHaveCount(1);
     await expect(page.locator("#create-rfq")).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "项目栏目" })).toHaveCount(0);
   }

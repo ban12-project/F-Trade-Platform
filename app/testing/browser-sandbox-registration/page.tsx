@@ -12,10 +12,11 @@ async function Content({ searchParams }: { searchParams: Promise<{ enabled?: str
         {(["stopped", "starting", "running", "stopping", "unknown"] as const).map((phase) => (
           <SandboxStatus
             key={phase}
+            nodeId="00000000-0000-4000-8000-000000000001"
             sandbox={{ phase, updatedAt: Date.parse("2026-09-01T00:00:00Z") }}
           />
         ))}
-        <SandboxStatus sandbox={null} />
+        <SandboxStatus sandbox={null} nodeId="00000000-0000-4000-8000-000000000001" />
       </section>
     </div>
   );

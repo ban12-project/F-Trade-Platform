@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
 import { recordedBrowserSandboxDispatch } from "../lib/browser-fleet/sandbox-dispatch";
+import { inspectOwnedBrowserSandbox } from "../lib/browser-fleet/sandbox-inspection";
 import {
   beginBrowserSandboxStart,
   beginBrowserSandboxStop,
@@ -12,6 +13,7 @@ import {
   registerBrowserSandbox,
   settleBrowserSandboxOperation,
 } from "../lib/browser-fleet/sandbox-lifecycle";
+import type { BrowserSandboxProviderHandle } from "../lib/browser-fleet/sandbox-provider";
 import {
   bindInitialBrowserSandboxRecovery,
   claimBrowserSandboxRecovery,
@@ -58,6 +60,140 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
   const registered = await database.transaction((tx) => registerBrowserSandbox(tx, nodeId));
   assert.equal(registered.phase, "stopped");
   assert.equal(registered.operation_id, null);
+  const beforeInspection = (
+    await pool.query("SELECT * FROM browser_sandbox WHERE node_id=$1", [nodeId])
+  ).rows;
+  let inspected = 0;
+  const privateMarker = "synthetic-private-provider-value";
+  const provider = {
+    async get(input: { name: string; resume?: boolean }) {
+      inspected++;
+      assert.deepEqual(input, { name: `ftrade-browser-${nodeId}`, resume: false });
+      return {
+        name: input.name,
+        persistent: true,
+        status: "stopped",
+        vcpus: 2,
+        timeout: 1200000,
+        tags: { "ftrade-node": nodeId, private: privateMarker },
+        networkPolicy: "deny-all",
+      } as unknown as BrowserSandboxProviderHandle;
+    },
+  };
+  await assert.rejects(
+    inspectOwnedBrowserSandbox({ nodeId }, "foreign-owner", database, provider, () => "deny-all"),
+  );
+  await assert.rejects(
+    inspectOwnedBrowserSandbox(
+      { nodeId: randomUUID() },
+      "synthetic-owner",
+      database,
+      provider,
+      () => "deny-all",
+    ),
+  );
+  await assert.rejects(
+    inspectOwnedBrowserSandbox(
+      { nodeId, unexpected: privateMarker },
+      "synthetic-owner",
+      database,
+      provider,
+      () => "deny-all",
+    ),
+  );
+  assert.equal(inspected, 0, "invalid or foreign requests never inspect the provider");
+  const inspection = await inspectOwnedBrowserSandbox(
+    { nodeId },
+    "synthetic-owner",
+    database,
+    provider,
+    () => "deny-all",
+  );
+  assert.equal(inspection.kind, "observed");
+  if (inspection.kind === "observed") {
+    assert.equal(inspection.state, "stopped");
+    assert.deepEqual(inspection.checks, {
+      ownership: true,
+      resources: true,
+      timeout: true,
+      networkPolicy: true,
+    });
+  }
+  assert.ok(!JSON.stringify(inspection).includes(privateMarker));
+  assert.ok(inspection.kind === "observed" && inspection.snapshot === "missing");
+  for (const variant of ["available", "expired", "deleted", "unavailable"] as const) {
+    const checked = await inspectOwnedBrowserSandbox(
+      { nodeId },
+      "synthetic-owner",
+      database,
+      {
+        async get(input) {
+          return {
+            ...(await provider.get(input as { name: string; resume?: boolean })),
+            currentSnapshotId: "synthetic-snapshot",
+          };
+        },
+      },
+      () => "deny-all",
+      {
+        async get(input) {
+          assert.deepEqual(input, { snapshotId: "synthetic-snapshot" });
+          if (variant === "unavailable") throw new Error(privateMarker);
+          return {
+            status: variant === "deleted" ? "deleted" : "created",
+            expiresAt: variant === "expired" ? new Date(0) : new Date(Date.now() + 60_000),
+          };
+        },
+      },
+    );
+    assert.ok(checked.kind === "observed");
+    assert.equal(checked.snapshot, variant === "deleted" ? "missing" : variant);
+    assert.ok(!JSON.stringify(checked).includes(privateMarker));
+  }
+  const mismatch = await inspectOwnedBrowserSandbox(
+    { nodeId },
+    "synthetic-owner",
+    database,
+    provider,
+    () => ({ allow: ["example.invalid"] }),
+  );
+  assert.ok(mismatch.kind === "observed" && !mismatch.checks.networkPolicy);
+  for (const status of [401, 403, 500]) {
+    const failed = await inspectOwnedBrowserSandbox(
+      { nodeId },
+      "synthetic-owner",
+      database,
+      {
+        async get() {
+          throw Object.assign(new Error(privateMarker), {
+            response: new Response(privateMarker, { status }),
+          });
+        },
+      },
+      () => "deny-all",
+    );
+    assert.deepEqual(failed, {
+      kind: "unavailable",
+      reason: status === 500 ? "provider_unavailable" : "provider_authorization",
+    });
+    assert.ok(!JSON.stringify(failed).includes(privateMarker));
+  }
+  const configured = await inspectOwnedBrowserSandbox(
+    { nodeId },
+    "synthetic-owner",
+    database,
+    provider,
+    () => {
+      throw new Error(privateMarker);
+    },
+  );
+  assert.deepEqual(configured, { kind: "unavailable", reason: "configuration" });
+  assert.equal(inspected, 6);
+  assert.deepEqual(
+    (await pool.query("SELECT * FROM browser_sandbox WHERE node_id=$1", [nodeId])).rows,
+    beforeInspection,
+    "inspection never changes lifecycle records",
+  );
   const start = () => database.transaction((tx) => beginBrowserSandboxStart(tx, nodeId));
   assert.equal(await start(), null, "an empty queue never starts compute");
   const run = enqueueRun(
