@@ -14,7 +14,7 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
-import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
+import { assertAndLinkProjectEvidence, assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 
 import {
   kitContentValues,
@@ -347,6 +347,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
   const eventId = randomUUID();
   const approvalId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
     const draft = buildEvidenceBoundProductCatalogDraft(input, productId);
     const [aggregate] = await tx
       .select({

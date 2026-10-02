@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import { and, desc, eq, type InferInsertModel, inArray, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
@@ -24,6 +23,10 @@ import {
   reviewProductDraft,
 } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
+import {
+  assertAggregateWorkspaceWrite,
+  assertWorkspaceProjectAccess,
+} from "@/lib/workspace/access";
 
 export type ProductCatalogInput = z.infer<typeof productCatalogFormSchema>;
 export type ProductReviewInput = z.infer<typeof productReviewFormSchema>;
@@ -198,13 +201,13 @@ export async function createProductCatalogDraft(
   };
   await database.transaction(async (tx) => {
     if (projectId) {
+      await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
       const [project] = await tx
         .select({ kind: workspaceProject.kind })
         .from(workspaceProject)
         .where(eq(workspaceProject.id, projectId))
         .for("update");
-      if (!project || project.kind !== "marketing")
-        throw new Error("产品草稿只能关联到产品营销项目。");
+      if (project?.kind !== "marketing") throw new Error("产品草稿只能关联到产品营销项目。");
     }
     await tx.insert(aggregateRecord).values(aggregateValues);
     if (projectId)
@@ -263,12 +266,13 @@ export async function insertProductAgentDraft(
     evidenceRefs: draft.evidence_refs,
   });
   if (projectId) {
+    await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
     const [project] = await tx
       .select({ kind: workspaceProject.kind })
       .from(workspaceProject)
       .where(eq(workspaceProject.id, projectId))
       .for("update");
-    if (!project || project.kind !== "marketing")
+    if (project?.kind !== "marketing")
       throw new Error("Product Agent 草稿只能关联到产品营销项目。");
   }
   await tx.insert(aggregateRecord).values({
@@ -500,6 +504,7 @@ export async function decideProductCatalogReview(
   const now = new Date();
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(input.productId, tx, actorId);
     // Lock the run before the aggregate, matching incremental persistence lock order.
     const [activeRun] = await tx
       .select()
@@ -660,6 +665,7 @@ export async function reviseProductCatalogDraft(
   const eventId = randomUUID();
   const approvalId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(productId, tx, actorId);
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,

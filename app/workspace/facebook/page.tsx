@@ -1,31 +1,19 @@
-import Link from "next/link";
-import { Suspense } from "react";
-import { FacebookAccountPanel } from "@/components/workspace/facebook-account-panel";
-import { FacebookMediaPanel } from "@/components/workspace/facebook-media-panel";
-import { requirePermission } from "@/lib/auth-guard";
-
-async function AccountContent() {
-  await requirePermission("settings:manage");
+import { buttonVariants } from "@/components/ui/button";
+import { WorkspaceLink } from "@/components/workspace/workspace-link";
+export default function Page() {
   return (
-    <div className="space-y-6">
-      <FacebookAccountPanel />
-      <FacebookMediaPanel />
-    </div>
-  );
-}
-export default function FacebookAccountPage() {
-  return (
-    <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Facebook 发布与账号连接</h1>
-        <p className="text-muted-foreground">加密凭据、人工验证、图片和视频发布。</p>
-        <Link href="/workspace/browsers" className="text-sm underline underline-offset-4">
-          多浏览器节点与按需队列
-        </Link>
-      </div>
-      <Suspense fallback={<p>正在读取账号权限…</p>}>
-        <AccountContent />
-      </Suspense>
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">Facebook 素材发布入口已迁移</h1>
+      <p>账户、渠道和浏览器管理已统一到设置。发布请打开具体图文或视频，核对最终载荷并逐帖确认。</p>
+      <WorkspaceLink
+        href="/workspace/settings?section=channels"
+        className={buttonVariants({ variant: "outline" })}
+      >
+        打开渠道设置
+      </WorkspaceLink>
+      <WorkspaceLink href="/workspace/content" className={buttonVariants({ variant: "outline" })}>
+        打开内容与发布
+      </WorkspaceLink>
     </main>
   );
 }

@@ -14,7 +14,6 @@ const slot = {
 };
 const tickets = new Set([config.ticket, `${config.ticket}-viewer`]);
 const gateway = createGateway({
-  acquireControl: async (slot) => ({ expiresAt: slot.expiresAt, release: async () => {} }),
   appOrigin: config.origin,
   slots: new Map([[config.runId, slot]]),
   nodeCall: async (operation, input) => {

@@ -1,0 +1,139 @@
+{
+  "classification": "sanitized_aggregate",
+  "method": "official_blob_oidc_private_get",
+  "useCache": false,
+  "databaseReadOnly": true,
+  "results": [
+    {
+      "ordinal": 1,
+      "contentType": "application/pdf",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 2,
+      "contentType": "application/pdf",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 3,
+      "contentType": "text/csv",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 4,
+      "contentType": "text/csv",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 5,
+      "contentType": "text/csv",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 6,
+      "contentType": "video/mp4",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 7,
+      "contentType": "video/mp4",
+      "providerResult": 200,
+      "read": true,
+      "digestMatches": true,
+      "sizeMatches": true,
+      "typeMatches": true
+    }
+  ],
+  "source_revision": "37c068363aea3e746119b56a01f7757dfca63fbd",
+  "attempts": [
+    {
+      "file": "blob-read-results.json",
+      "sha256": "27ab6c06544b87e1448faf6fc13506faa84c162625ee8e95bc6724b22e4d7284"
+    },
+    {
+      "file": "blob-read-recheck-results.json",
+      "sha256": "44f6d0c4049cfda6925f99228c21655636e3c0ba87cec4a966189f31a4580c24"
+    }
+  ],
+  "rendered_assets": [
+    {
+      "ordinal": 1,
+      "contentType": "video/mp4",
+      "providerResult": "not_found",
+      "read": false,
+      "error": "private_read_unavailable"
+    },
+    {
+      "ordinal": 2,
+      "contentType": "video/mp4",
+      "providerResult": 200,
+      "read": true,
+      "sizeMatches": true,
+      "typeMatches": true
+    }
+  ],
+  "offline_render_measurement": {
+    "method": "offline_podman_ffprobe",
+    "results": [
+      {
+        "classification": "sanitized_aggregate",
+        "projectFound": true,
+        "contractPassed": true,
+        "measuredPresetPassed": true,
+        "currentTimelineMatches": true,
+        "receiptTimelineMatches": true,
+        "receiptAssetMatches": true,
+        "receiptMeasurementsMatch": true,
+        "privateArtifactApproved": true,
+        "measurements": {
+          "resources": {
+            "fileSizeBytes": 883562,
+            "containerBitrateBps": 739588,
+            "videoBitrateBps": 414415,
+            "audioBitrateBps": 317374
+          },
+          "encoding": {
+            "pixelFormat": "yuv420p",
+            "sampleAspectRatio": "1:1",
+            "audioSampleRate": 48000,
+            "audioChannels": 2
+          },
+          "container": "mp4",
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "width": 1080,
+          "height": 1920,
+          "fps": 30,
+          "durationSeconds": 9.557333,
+          "subtitleStreamCount": 0
+        }
+      }
+    ]
+  },
+  "decode_attempts": [
+    {
+      "attempt": "first",
+      "exit_code": 8,
+      "cause": "bundled FFmpeg null muxer default wrapped_avframe encoder unavailable",
+      "log_sha256": "9b129d446ac78560f54de8794780f22dff75ba452801791fe467aea8cc04eb3f"
+    },
+    {
+      "attempt": "recheck",
+      "exit_code": 0,
+      "method": "explicit rawvideo and pcm_s16le encoders, null output, complete audio/video decode",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

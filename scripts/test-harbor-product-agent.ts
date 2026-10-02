@@ -32,6 +32,9 @@ async function main() {
               verification_status: "review_required",
               optional_missing_fields: [],
               ...item.expected,
+              ...(item.expected.commercial?.packaging
+                ? { commercial: { packaging: "  Neutral   carton. " } }
+                : {}),
             },
             source,
           ),
@@ -40,6 +43,12 @@ async function main() {
       },
     }).run({ source: item.source, model: {} as never });
     assert.deepEqual(result.draft.blocking_missing_fields, item.expected.blocking_missing_fields);
+    if (item.expected.commercial?.packaging)
+      assert.equal(
+        result.draft.commercial?.packaging,
+        "neutral carton",
+        "production and verifier share packaging semantics",
+      );
     fixtures.push({ expected, result: { draft: result.draft, _evaluation: metadata } });
   }
   const directory = mkdtempSync(join(tmpdir(), "f-trade-harbor-tests-"));

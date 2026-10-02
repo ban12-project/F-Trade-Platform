@@ -55,7 +55,9 @@ export type Run = {
     requestedAt: number;
     expiresAt: number;
     claimedAt: number | null;
-    outcome?: "filled" | "refused" | "unknown";
+    automatic?: boolean;
+    outcome?: "filled" | "ready" | "refused" | "unknown";
+    challenge?: "checkpoint" | "rejected" | "unsupported_factor";
   };
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
@@ -79,7 +81,12 @@ export type FleetState = {
   installationId: string | null;
   bootId: string | null;
   capabilities: RunKind[];
-  loginFillScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
+  loginFillScopes?: Array<{
+    channelRef: string;
+    accountRef: string;
+    expiresAt: number;
+    automatic?: boolean;
+  }>;
   inboxScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   publicationScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
   lastSeenAt: number;
@@ -87,6 +94,9 @@ export type FleetState = {
   runs: Run[];
 };
 export const LEASE_MS = 90_000;
+// Automatic login spans several navigations. Runtime operations still require
+// the independently renewed 90-second lease at every observation/submission.
+export const AUTOMATIC_LOGIN_MS = 180_000;
 export const LIVE_STATUSES: RunStatus[] = ["starting", "running", "stopping", "quarantined"];
 export const isLive = (run: Run) => LIVE_STATUSES.includes(run.status);
 export function initialState(limits: Limits): FleetState {
@@ -123,6 +133,7 @@ export function enqueueRun(
   state: FleetState,
   input: Pick<Run, "id" | "accountId" | "kind" | "jobRef" | "requestedBy" | "authSessionId">,
   now: number,
+  allowProvenUnsentRetry = false,
 ) {
   const account = state.accounts.find((a) => a.id === input.accountId);
   if (!account?.enabled) throw new Error("account_not_authorized");
@@ -140,6 +151,11 @@ export function enqueueRun(
           (r.status === "queued"
             ? now - r.createdAt < 900_000
             : r.leaseUntil > now && r.deadline > now))) &&
+      !(
+        allowProvenUnsentRetry &&
+        r.status === "failed" &&
+        r.failure === "publication_not_authorized"
+      ) &&
       (input.jobRef ? r.jobRef === input.jobRef : r.status === "queued" || isLive(r)),
   );
   if (duplicate) return duplicate;
@@ -185,11 +201,17 @@ export function sweep(state: FleetState, now: number) {
   const prune = new Set(terminal.slice(0, Math.max(0, terminal.length - 50)).map((r) => r.id));
   state.runs = state.runs.filter((r) => !prune.has(r.id));
 }
-export function scheduleInbox(state: FleetState, now: number, newId: () => string) {
+export function scheduleInbox(
+  state: FleetState,
+  now: number,
+  newId: () => string,
+  allowedAccounts?: ReadonlySet<string>,
+) {
   if (!state.capabilities.includes("inbox")) return;
   for (const a of state.accounts) {
     if (
       !a.enabled ||
+      (allowedAccounts !== undefined && !allowedAccounts.has(a.id)) ||
       !inboxScopeActive(state, a, now) ||
       a.authState !== "ready" ||
       a.pollSeconds === 0 ||
@@ -374,7 +396,10 @@ export function finishRun(
     }
   }
 }
-function savedLoginOutcome(run: Run, now: number): "filled" | "refused" | "unknown" | null {
+function savedLoginOutcome(
+  run: Run,
+  now: number,
+): "filled" | "ready" | "refused" | "unknown" | null {
   const authorization = run.savedLogin;
   if (!authorization) return null;
   if (authorization.outcome) return authorization.outcome;
@@ -382,9 +407,13 @@ function savedLoginOutcome(run: Run, now: number): "filled" | "refused" | "unkno
     run.status !== "running" || run.stopRequested || run.leaseUntil <= now || run.deadline <= now;
   if (authorization.claimedAt === null)
     return inactive || authorization.expiresAt <= now ? "refused" : null;
-  // Credential validity is at most 30 seconds. Allow the node's 10-second
+  // Allow the node's 10-second
   // result transport timeout, then show uncertainty instead of waiting forever.
-  const receiptDueAt = Math.min(authorization.expiresAt, authorization.claimedAt + 30000) + 10000;
+  const receiptDueAt =
+    Math.min(
+      authorization.expiresAt,
+      authorization.claimedAt + (authorization.automatic ? AUTOMATIC_LOGIN_MS : 30000),
+    ) + 10000;
   return inactive || receiptDueAt <= now ? "unknown" : null;
 }
 export function publicState(state: FleetState, now = Date.now()) {
@@ -403,6 +432,7 @@ export function publicState(state: FleetState, now = Date.now()) {
       return {
         ...r,
         savedLoginOutcome: savedLoginOutcome(run, now),
+        savedLoginChallenge: savedLogin?.challenge ?? null,
         savedLoginState: savedLogin
           ? savedLogin.claimedAt === null
             ? "requested"

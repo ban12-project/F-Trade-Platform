@@ -37,6 +37,8 @@ jobs:
 
       - name: Install application dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify local Podman namespace restriction does not broaden policy
+        run: node scripts/test-podman-browser-seccomp.mjs
       - name: Verify Remotion smoke failure cleanup with synthetic resources
         run: node --experimental-test-module-mocks --import tsx scripts/test-remotion-smoke-cleanup.mts
       - name: Verify video failure summaries omit private provider details
@@ -63,6 +65,9 @@ jobs:
       - name: Test Harbor acceptance gate and synthetic expectations
         run: pnpm test:harbor
 
+      - name: Test Product Agent structured output and production evaluation policy
+        run: pnpm test:product-output
+
       - name: Test Product Agent evidence locations
         run: pnpm test:product-agent-evidence
 
@@ -81,8 +86,11 @@ jobs:
       - name: Inspect real media and render all platform export variants
         run: pnpm test:rendered-video-inspection && pnpm test:ffmpeg-renderer
 
+      - name: Verify independent platform rule source review contract
+        run: pnpm exec tsx scripts/test-video-rule-source-review.ts
+
       - name: Test governed marketing-video captions
-        run: pnpm test:marketing-video-edit && pnpm test:video-product-fact-runtime && pnpm test:video-visual-sampling && pnpm test:video-download-delivery
+        run: pnpm test:video-creative && pnpm test:marketing-video-edit && pnpm test:video-product-fact-runtime && pnpm test:video-visual-sampling && pnpm test:video-download-delivery
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -169,6 +177,10 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/test-sales-context-postgres.ts
         env:
           SALES_CONTEXT_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+      - name: Verify archived project transaction barriers and reopening
+        run: node --conditions=react-server --import tsx scripts/test-workspace-archive-postgres.ts
+        env:
+          WORKSPACE_ARCHIVE_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
       - name: Verify revision preserves authorized field evidence locations
         run: node --conditions=react-server --import tsx scripts/test-product-revision-evidence-postgres.ts
         env:

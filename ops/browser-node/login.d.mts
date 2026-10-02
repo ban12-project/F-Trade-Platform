@@ -21,3 +21,8 @@ export function createSavedLoginExecutor(input: {
   request(operation: string, fields: Record<string, unknown>): Promise<Record<string, unknown>>;
   browserRequest(path: string, body?: Record<string, unknown>): Promise<Response>;
 }): (notice: { id: string; expiresAt: number }) => Promise<string>;
+
+export function loginStopOutcome(
+  version: number,
+  outcome: string,
+): "completed" | "page_contract_failed" | "unknown" | null;

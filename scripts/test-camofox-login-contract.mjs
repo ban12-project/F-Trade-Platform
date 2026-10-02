@@ -19,12 +19,20 @@ const stage = mkdtempSync(join(tmpdir(), "ftrade-pinned-plugin-"));
 const names = [
   "FTRADE_LOGIN_PROFILE_JSON",
   "FTRADE_ACCOUNT_ID",
+  "FTRADE_ACCOUNT_REF",
   "FTRADE_RUN_ID",
   "FTRADE_RUN_KIND",
 ];
 const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
 try {
   cpSync("ops/browser-node/login-plugin", join(stage, "plugins/ftrade-login"), { recursive: true });
+  // Keep the actual plugin/loader paths but isolate the runtime lease file.
+  const leaseFile = join(stage, "lease");
+  const stagedPlugin = join(stage, "plugins/ftrade-login/index.js");
+  writeFileSync(
+    stagedPlugin,
+    readFileSync(stagedPlugin, "utf8").replaceAll("/tmp/ftrade-lease", leaseFile),
+  );
   writeFileSync(join(stage, "package.json"), '{"type":"module"}');
   cpSync("ops/browser-node/camofox.config.json", join(stage, "config.json"));
   const routes = new Map();
@@ -61,7 +69,7 @@ try {
   });
   assert.deepEqual(await loadPlugins(app, ctx, options), ["ftrade-login"]);
   assert.equal(routes.size, 2);
-  const invoke = async (authorization) => {
+  const invoke = async (authorization, path = "/ftrade/login-fill", method = "POST") => {
     let status = 200,
       body;
     const res = {
@@ -78,12 +86,15 @@ try {
       },
     };
     const req = {
-      path: "/ftrade/login-fill",
-      method: "POST",
+      path,
+      method,
       headers: { authorization },
       body: {},
     };
-    const handlers = [accessKeyMiddleware(config), ...routes.get("post /ftrade/login-fill")];
+    const handlers = [
+      accessKeyMiddleware(config),
+      ...routes.get(`${method.toLowerCase()} ${path}`),
+    ];
     const next = async () => {
       const handler = handlers.shift();
       if (handler) await handler(req, res, next);
@@ -97,13 +108,69 @@ try {
     status: 200,
     body: { outcome: "refused" },
   });
+  const legacy = JSON.parse(process.env.FTRADE_LOGIN_PROFILE_JSON);
+  process.env.FTRADE_ACCOUNT_REF = "123456789";
+  process.env.FTRADE_LOGIN_PROFILE_JSON = JSON.stringify({
+    ...legacy,
+    version: 2,
+    automation: {
+      accountRef: "123456789",
+      identity: { selector: "#identity", attribute: "data-account-id" },
+      passwordSubmit: "#submit",
+      totp: {
+        url: "https://www.facebook.com/two_factor/",
+        marker: "#totp",
+        input: "#code",
+        submit: "#verify",
+      },
+      pin: {
+        url: "https://www.facebook.com/messages/",
+        marker: "#pin",
+        input: "#pin-code",
+        submit: null,
+      },
+      ready: {
+        url: "https://www.facebook.com/messages/",
+        marker: "#chats",
+        empty: "#empty",
+        emptyText: "No chats",
+        thread: "#thread",
+      },
+      checkpoint: "#checkpoint",
+      rejected: "#rejected",
+      loading: "#loading",
+    },
+  });
+  routes.clear();
+  assert.deepEqual(await loadPlugins(app, ctx, options), ["ftrade-login"]);
+  assert.equal(routes.size, 3);
+  assert.equal(routes.has("post /ftrade/login-fill"), false);
+  for (const [method, path] of [
+    ["GET", "/ftrade/login-status"],
+    ["POST", "/ftrade/login-observe"],
+    ["POST", "/ftrade/login-submit"],
+  ]) {
+    assert.equal((await invoke(undefined, path, method)).status, 401);
+    assert.equal((await invoke("Bearer SYNTHETIC-wrong-key", path, method)).status, 401);
+  }
+  const status = () => invoke(`Bearer ${config.accessKey}`, "/ftrade/login-status", "GET");
+  assert.deepEqual(await status(), { status: 403, body: { error: "login_unavailable" } });
+  writeFileSync(leaseFile, String(Date.now() + 30000));
+  const available = await status();
+  assert.equal(available.status, 200);
+  assert.equal(available.body.version, 2);
+  assert.equal(available.body.accountId, process.env.FTRADE_ACCOUNT_ID);
+  writeFileSync(leaseFile, "0");
+  assert.deepEqual(await status(), { status: 403, body: { error: "login_unavailable" } });
+  writeFileSync(leaseFile, "invalid");
+  assert.deepEqual(await status(), { status: 403, body: { error: "login_unavailable" } });
   assert.equal(
     logs.some(([level]) => level === "error"),
     false,
     "Actual upstream loader must not swallow a registration error",
   );
   console.log(
-    "PASS pinned Camofox loader + global/per-route auth: default off, registered routes, missing/wrong key denied, valid key reaches fail-closed fill",
+    "PASS pinned Camofox loader + global/per-route auth: default off, registered routes, missing/wrong key denied, valid key reaches fail-closed fill; v2 routes authenticated and expired/missing leases denied",
   );
 } finally {
   for (const name of names) {

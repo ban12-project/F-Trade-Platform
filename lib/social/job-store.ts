@@ -1,3 +1,4 @@
+import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
 import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
@@ -127,6 +128,8 @@ export async function claimNextSocialWorkerJob(
       .where(
         and(
           eq(socialBrowserJob.status, "queued"),
+          sql`NOT EXISTS (SELECT 1 FROM social_publication p JOIN workspace_project w ON w.id = p.project_id WHERE p.browser_job_id = ${socialBrowserJob.id} AND w.status = 'archived')`,
+          sql`NOT EXISTS (SELECT 1 FROM social_message m JOIN social_conversation c ON c.id = m.conversation_id JOIN workspace_project_item i ON i.aggregate_id = c.lead_id AND i.relation = 'owned' JOIN workspace_project w ON w.id = i.project_id WHERE m.id = ${socialBrowserJob.payloadRef} AND ${socialBrowserJob.kind} = 'reply' AND w.status = 'archived')`,
           eq(socialBrowserJob.channelRef, scope.channelRef),
           eq(socialBrowserJob.accountRef, scope.accountRef),
           sql`NOT EXISTS (SELECT 1 FROM browser_fleet_binding b WHERE b.channel_ref = ${socialBrowserJob.channelRef} AND b.account_ref = ${socialBrowserJob.accountRef})`,
@@ -212,12 +215,13 @@ export async function claimNextSocialWorkerJob(
           conversation.accountRef !== job.accountRef
         )
           throw new Error("回复任务与授权会话不一致。");
+        await assertAggregateWorkspaceWrite(conversation.leadId, tx);
         const [leadRow] = await tx
           .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
           .from(aggregateRecord)
           .where(and(eq(aggregateRecord.id, conversation.leadId), eq(aggregateRecord.type, "lead")))
           .for("update");
-        if (!leadRow || leadRow.state !== "FOLLOW_UP")
+        if (leadRow?.state !== "FOLLOW_UP")
           throw new PreflightRejection(
             "lead_not_in_follow_up",
             "线索已不处于跟进状态，不能发送回复。",
@@ -239,7 +243,7 @@ export async function claimNextSocialWorkerJob(
               ),
             )
             .for("update");
-          if (!deliveryRow || deliveryRow.state !== "DELIVERY_CONFIRMATION_CONFIRMED")
+          if (deliveryRow?.state !== "DELIVERY_CONFIRMATION_CONFIRMED")
             throw new PreflightRejection("gate_03_not_confirmed", "Gate 03 未确认，不能发送回复。");
           const delivery = validateDeliveryConfirmation(deliveryRow.payload);
           const validUntil = delivery.result?.valid_until;

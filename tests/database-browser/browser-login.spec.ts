@@ -153,7 +153,7 @@ test("saved password fill uses the actual owner action and never returns credent
       body: `<body>Simulated viewer<script>window.addEventListener('message', e => { if(e.data.type === 'ftrade-browser-ticket') document.body.dataset.ticket=e.data.token; }); window.parent.postMessage({type:'ftrade-browser-ready'}, '${baseURL}');</script>`,
     }),
   );
-  await page.goto("/workspace/browsers");
+  await page.goto("/workspace/settings?section=channels");
   const connect = page.getByRole("button", { name: "接入登录 / 2FA", exact: true });
   await expect(connect).toBeVisible();
   await expect(page.getByRole("main")).toHaveAttribute("id", "main-content");
@@ -187,6 +187,18 @@ test("saved password fill uses the actual owner action and never returns credent
     return result.json();
   };
   await nodeCall({ operation: "admit", ticket });
+  const reconnect = page.getByRole("button", { name: "重新授权连接", exact: true });
+  await expect(reconnect).toBeVisible({ timeout: 15000 });
+  await reconnect.click();
+  await expect(viewer.locator("body")).toHaveAttribute("data-ticket", /.+/);
+  const freshTicket = await viewer.locator("body").getAttribute("data-ticket");
+  expect(freshTicket).not.toBe(ticket);
+  const replay = await page.request.post(`${baseURL}/api/browser-nodes`, {
+    headers: { authorization: `Bearer ${accessKey}` },
+    data: { installationId, bootId, operation: "admit", ticket },
+  });
+  expect(replay.ok()).toBe(false);
+  await nodeCall({ operation: "admit", ticket: freshTicket });
   const button = page.getByRole("button", { name: "填入已保存账号和密码", exact: true });
   await expect(button).toBeEnabled();
   await button.click();
@@ -205,7 +217,7 @@ test("saved password fill uses the actual owner action and never returns credent
   // Node receipts reach this page through its five-second status refresh.
   // Allow the next refresh plus request latency instead of racing its interval.
   await expect(
-    page.getByText("填充结果未知，本次不再重试。请重新接入后核对。", { exact: true }),
+    page.getByText("登录结果未知，本次不再重试。请重新接入后核对。", { exact: true }),
   ).toBeVisible({ timeout: 15_000 });
   const interrupted = await pool.query("SELECT document FROM browser_fleet_node WHERE id=$1", [
     nodeId,
@@ -226,6 +238,47 @@ test("saved password fill uses the actual owner action and never returns credent
   expect(rows.rows[0].document.accounts[0].authState).toBe("needs_login");
   expect(await page.content()).not.toContain(credential.password);
   expect(await page.content()).not.toContain(credential.username);
+  // Replace this synthetic fixture with an automatic challenge result to verify
+  // the polling UI. Broker authorization/replay rules have separate DB coverage.
+  const challengeState = rows.rows[0].document;
+  Object.assign(challengeState.runs[0], {
+    status: "running",
+    leaseUntil: Date.now() + 90000,
+    deadline: Date.now() + 600000,
+  });
+  Object.assign(challengeState.runs[0].savedLogin, {
+    automatic: true,
+    outcome: undefined,
+    claimedAt: Date.now(),
+    expiresAt: Date.now() + 180000,
+    challenge: "checkpoint",
+  });
+  await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+    nodeId,
+    JSON.stringify(challengeState),
+  ]);
+  await expect(
+    page.getByText("等待人工验证，请接入远程页面；完成后自动继续。", { exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  await expect(
+    page.getByText("请在远程页面完成人机或设备验证，程序将在本次授权有效期内自动继续。", {
+      exact: true,
+    }),
+  ).toBeVisible({ timeout: 15000 });
+  challengeState.runs[0].savedLogin.outcome = "refused";
+  await pool.query("UPDATE browser_fleet_node SET document=$2::jsonb WHERE id=$1", [
+    nodeId,
+    JSON.stringify(challengeState),
+  ]);
+  await expect(
+    page.getByText(
+      "Facebook 要求额外的人机或设备验证。请人工完成验证后重新接入；本次未自动重试。",
+      {
+        exact: true,
+      },
+    ),
+  ).toBeVisible({ timeout: 15_000 });
+  expect(await page.content()).not.toContain(credential.password);
 });
 
 test("owner page reads managed lifecycle changes while cloud provisioning stays disabled", async ({
@@ -247,7 +300,7 @@ test("owner page reads managed lifecycle changes while cloud provisioning stays 
     "SELECT count(*)::int AS count FROM browser_sandbox_outbox WHERE node_id=$1",
     [nodeId],
   );
-  await page.goto("/workspace/browsers");
+  await page.goto("/workspace/settings?section=channels");
   await expect(page.getByText("自管服务器", { exact: true })).toBeVisible();
   const updatedAt = "2026-09-01T00:00:00Z";
   try {
@@ -258,6 +311,7 @@ test("owner page reads managed lifecycle changes while cloud provisioning stays 
     await expect(page.getByText("按需浏览器", { exact: true })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText("已停止", { exact: true })).toBeVisible();
     await expect(page.getByText("不是云端实时状态。", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "高级：连接节点与容量", exact: true }).click();
     await expect(page.getByRole("button", { name: "创建托管节点", exact: true })).toBeDisabled();
     const operationId = randomUUID();
     await pool.query(

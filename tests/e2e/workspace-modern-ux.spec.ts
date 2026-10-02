@@ -44,15 +44,45 @@ test("streaming keeps a main target and a text-bearing status outside its busy s
   await expect(page.getByRole("heading", { name: "Synthetic persistent workspace" })).toBeVisible();
 });
 
+test("new work waits for hydration before accepting its first keyboard activation", async ({
+  page,
+}) => {
+  let releaseScripts = () => {};
+  const scriptsReady = new Promise<void>((resolve) => {
+    releaseScripts = resolve;
+  });
+  await page.route(/\/_next\/static\/.*\.js(?:\?|$)/, async (route) => {
+    await scriptsReady;
+    await route.continue();
+  });
+  try {
+    await page.goto(navigationFixture, { waitUntil: "commit" });
+    const trigger = page.getByRole("button", { name: "开始新工作", exact: true });
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toBeDisabled();
+    releaseScripts();
+    await expect(trigger).toBeEnabled();
+    await trigger.focus();
+    await trigger.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "开始新工作", exact: true });
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  } finally {
+    releaseScripts();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+});
+
 test("new work exposes its controlled dialog and restores keyboard focus on Escape", async ({
   page,
 }) => {
   await page.goto(navigationFixture);
-  const trigger = page.getByRole("button", {
-    name: "开始新工作",
-    exact: true,
-    includeHidden: true,
-  });
+  // Keep the modal's inert background trigger addressable, excluding hidden SSR copies.
+  const trigger = page
+    .getByRole("button", { name: "开始新工作", exact: true, includeHidden: true })
+    .filter({ visible: true });
   await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   // Keyboard press does not wait for an initially disabled trigger to become enabled.
@@ -131,7 +161,7 @@ test("touch controls have two-dimensional targets and the drawer has an explicit
     await close.tap();
     await expect(drawer).toBeHidden();
     await page.goto("/testing/project-workspace");
-    const back = await page.getByRole("link", { name: "返回工作台" }).boundingBox();
+    const back = await page.getByRole("link", { name: "返回项目管理" }).boundingBox();
     expect(back?.width).toBeGreaterThanOrEqual(44);
     expect(back?.height).toBeGreaterThanOrEqual(44);
   } finally {
@@ -180,8 +210,8 @@ test("small mobile dialogs stay within the viewport and keep submission reachabl
 test("details use document scrolling at mobile and desktop sizes", async ({ page }) => {
   for (const width of [390, 1024]) {
     await page.setViewportSize({ width, height: 844 });
-    await page.goto("/testing/project-workflow?panel=product");
-    const details = page.getByRole("region", { name: /详情与审批/ });
+    await page.goto("/testing/project-workflow?record=product");
+    const details = page.getByRole("region", { name: "业务记录" });
     await expect(details).toBeVisible();
     await expect(details.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
@@ -225,7 +255,9 @@ test("forced-colors keyboard focus uses an outline rather than only a shadow", a
   await page.goto(navigationFixture);
   await page.keyboard.press("Tab");
   const button = page.getByRole("button", { name: "开始新工作", exact: true });
+  await expect(button).toBeEnabled();
   await button.focus();
+  await expect(button).toBeFocused();
   await expect(button).toHaveCSS("outline-style", "solid");
   await expect(button).toHaveCSS("outline-width", "2px");
 });

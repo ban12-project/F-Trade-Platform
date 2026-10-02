@@ -1,5 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { checkedBrowserResponse } from "../../ops/browser-node/browser-response.mjs";
 import {
   createFacebookDriver,
   validateFacebookProfile,
@@ -35,7 +36,7 @@ const fixture = `<!doctype html><a id="identity" href="${profile.identityHref}">
 const composer=document.querySelector('#composer');
 document.querySelector('#open').onclick=()=>composer.hidden=false;
 composer.querySelector('input').onchange=(e)=>{const name=composer.querySelector('.filename');name.textContent=e.target.files[0].name;name.hidden=false;};
-composer.querySelector('button').onclick=()=>{const count=document.querySelector('#clicks');count.textContent=String(Number(count.textContent)+1);const post=document.createElement('article');const author=document.createElement('a');author.className='author';author.href='${profile.identityHref}';author.textContent='Synthetic author';const copy=document.createElement('p');copy.className='copy';copy.textContent=composer.querySelector('textarea').value;const link=document.createElement('a');link.className='permalink';link.href='https://www.facebook.com/synthetic/posts/'+count.textContent;link.textContent='Synthetic post';post.append(author,copy,link);document.body.append(post);};
+composer.querySelector('button').onclick=()=>{const count=document.querySelector('#clicks');count.textContent=String(Number(count.textContent)+1);const post=document.createElement('article');const author=document.createElement('a');author.className='author';author.href='${profile.identityHref}';author.textContent='Synthetic author';const copy=document.createElement('p');copy.className='copy';copy.textContent=composer.querySelector('textarea').value;const link=document.createElement('a');link.className='permalink';link.href='https://www.facebook.com/synthetic/posts/'+count.textContent;link.textContent='Synthetic post';post.append(author,copy,link);document.body.append(post);if(composer.querySelector('video')){const receipt=document.createElement('section');receipt.id='video-receipt';receipt.innerHTML='<a href="https://www.facebook.com/reel/'+count.textContent+'/">Published Reel</a>';document.body.append(receipt);}};
 </script>`;
 
 for (const mode of [
@@ -48,6 +49,12 @@ for (const mode of [
   "post_author_changed",
   "image",
   "video",
+  "video_empty_caption",
+  "video_existing_blank",
+  "video_receipt_stale",
+  "video_receipt_wrong_link",
+  "video_wrong_blob",
+  "video_blob_changed",
   "identity_changed",
   "audience_changed",
   "audience_missing",
@@ -61,7 +68,9 @@ for (const mode of [
   "wrong_attachment",
   "transit_expiry",
   "extra_file_input",
+  "duplicate_scoped_file_input",
   "upload_replaces_composer",
+  "upload_resets_audience",
   "hidden_duplicate_composer",
 ] as const) {
   test(`Camofox DOM driver ${mode} using intercepted synthetic HTML`, async ({ page, context }) => {
@@ -71,15 +80,21 @@ for (const mode of [
         ? route.fulfill({ contentType: "text/html", body: fixture })
         : route.abort(),
     );
-    const format =
-      mode === "video"
-        ? "video"
-        : ["image", "wrong_attachment", "extra_file_input", "upload_replaces_composer"].includes(
-              mode,
-            )
-          ? "image"
-          : "text";
-    const sha256 = "a".repeat(64);
+    const format = mode.startsWith("video")
+      ? "video"
+      : [
+            "image",
+            "wrong_attachment",
+            "extra_file_input",
+            "duplicate_scoped_file_input",
+            "upload_replaces_composer",
+            "upload_resets_audience",
+          ].includes(mode)
+        ? "image"
+        : "text";
+    const mediaBytes = Buffer.from("SYNTHETIC media");
+    const sha256 =
+      format === "video" ? createHash("sha256").update(mediaBytes).digest("hex") : "a".repeat(64);
     const path = `/tmp/ftrade-uploads/${sha256}.${format === "video" ? "mp4" : "png"}`;
     const requests: string[] = [];
     let postReadFailures = 0;
@@ -88,12 +103,16 @@ for (const mode of [
       if (endpoint === "/tabs") {
         expect(body.trace).toBe(false);
         await page.goto(String(body.url));
-        if (mode.startsWith("audience_selection") || mode === "audience_default_changed")
+        if (
+          mode.startsWith("audience_selection") ||
+          mode === "audience_default_changed" ||
+          mode === "upload_resets_audience"
+        )
           await page.evaluate((scenario) => {
             const composer = document.querySelector<HTMLElement>("#composer");
             const audience = document.querySelector<HTMLElement>(".audience");
             if (!composer || !audience) throw new Error("fixture missing");
-            audience.textContent = "Friends";
+            if (scenario !== "upload_resets_audience") audience.textContent = "Friends";
             audience.onclick = () => {
               composer.hidden = true;
               const dialog = document.createElement("section");
@@ -133,14 +152,29 @@ for (const mode of [
             input.type = "file";
             document.body.prepend(input);
           });
-        if (mode === "baseline_duplicate")
-          await page.evaluate((owner) => {
-            const post = document.createElement("article");
-            post.innerHTML =
-              '<a class="author">Author</a><p class="copy">SYNTHETIC approved copy</p><a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Old link</a>';
-            post.querySelector("a")?.setAttribute("href", owner);
-            document.body.append(post);
-          }, profile.identityHref);
+        if (mode === "video_receipt_stale")
+          await page.evaluate(() => {
+            const receipt = document.createElement("section");
+            receipt.id = "video-receipt";
+            receipt.innerHTML = '<a href="https://www.facebook.com/reel/12345">Published Reel</a>';
+            document.body.append(receipt);
+          });
+        if (mode === "duplicate_scoped_file_input")
+          await page.evaluate(() => {
+            const input = document.createElement("input");
+            input.type = "file";
+            document.querySelector("#composer")?.append(input);
+          });
+        if (mode === "baseline_duplicate" || mode === "video_existing_blank")
+          await page.evaluate(
+            ({ owner, blank }) => {
+              const post = document.createElement("article");
+              post.innerHTML = `<a class="author">Author</a><p class="copy">${blank ? "" : "SYNTHETIC approved copy"}</p><a class="permalink" href="https://www.facebook.com/synthetic/posts/old">Old link</a>`;
+              post.querySelector("a")?.setAttribute("href", owner);
+              document.body.append(post);
+            },
+            { owner: profile.identityHref, blank: mode === "video_existing_blank" },
+          );
         if (mode.startsWith("post_"))
           await page.evaluate((scenario) => {
             const composer = document.querySelector<HTMLElement>("#composer");
@@ -174,11 +208,23 @@ for (const mode of [
         expect(body.kind).toBe("hover");
         await page.locator(String(body.selector)).hover();
         if (mode === "post_link_hover_detached")
-          return Response.json({ code: "element_not_actionable" }, { status: 422 });
+          return checkedBrowserResponse(
+            Response.json({ code: "element_not_actionable" }, { status: 422 }),
+            endpoint,
+            body,
+          );
         return Response.json({ ok: true });
       }
       if (endpoint.endsWith("/evaluate")) {
         const expression = String(body.expression);
+        if (
+          mode === "video_receipt_wrong_link" &&
+          expression.includes('"kind":"video-receipt"') &&
+          (await page.locator("#video-receipt").count())
+        )
+          await page.locator("#video-receipt a").evaluate((element) => {
+            element.setAttribute("href", "https://www.facebook.com/synthetic/posts/wrong");
+          });
         if (
           mode === "post_link_hover_detached" &&
           expression.includes('"kind":"posts"') &&
@@ -210,11 +256,33 @@ for (const mode of [
       }
       if (endpoint.endsWith("/upload")) {
         expect(body.path).toBe(path);
-        await page.locator('input[type="file"]').setInputFiles({
+        expect(body.inputSelector).toBe("#composer input");
+        const input = page.locator(String(body.inputSelector));
+        expect(await input.count()).toBe(1);
+        await input.setInputFiles({
           name: path.split("/").at(-1)!,
           mimeType: format === "video" ? "video/mp4" : "image/png",
-          buffer: Buffer.from("SYNTHETIC media"),
+          buffer: mediaBytes,
         });
+        if (format === "video")
+          await input.evaluate((element, scenario) => {
+            const file = (element as HTMLInputElement).files?.[0];
+            if (!file) throw new Error("synthetic_file_missing");
+            const name = document.querySelector<HTMLElement>(".filename");
+            if (!name) throw new Error("synthetic_filename_missing");
+            name.hidden = true;
+            const video = document.createElement("video");
+            video.src = URL.createObjectURL(
+              scenario === "video_wrong_blob" ? new Blob(["WRONG synthetic media"]) : file,
+            );
+            document.querySelector("#composer")?.append(video);
+          }, mode);
+        if (mode === "extra_file_input")
+          expect(
+            await page
+              .locator("body > input[type=file]")
+              .evaluate((element) => (element as HTMLInputElement).files?.length),
+          ).toBe(0);
         if (mode === "upload_replaces_composer")
           await page.locator("#composer").evaluate((element) => {
             const stale = element.cloneNode(true) as HTMLElement;
@@ -235,6 +303,10 @@ for (const mode of [
           await page.locator(".filename").evaluate((element) => {
             element.textContent = "wrong.png";
           });
+        if (mode === "upload_resets_audience")
+          await page.locator(".audience").evaluate((element) => {
+            element.textContent = "Friends";
+          });
         return Response.json({ ok: true, attached: [path] });
       }
       throw new Error("Unapproved browser endpoint");
@@ -244,13 +316,24 @@ for (const mode of [
     const scopedProfile = {
       ...profile,
       resolvePostLinks: mode.startsWith("post_"),
+      ...(format === "video"
+        ? {
+            videoReceipt: {
+              container: "#video-receipt",
+              link: "a",
+              successText: "Published Reel",
+            },
+          }
+        : {}),
       ...(mode === "post_link_hover_receipt" ? { receiptUrl: profile.identityHref } : {}),
       selectors: {
         ...profile.selectors,
         ...(mode === "post_link_hover_receipt" ? { receiptIdentity: "#identity" } : {}),
         ...(mode.startsWith("composer_identity") ? { composerIdentity: "#composer-identity" } : {}),
       },
-      ...(mode.startsWith("audience_selection") || mode === "audience_default_changed"
+      ...(mode.startsWith("audience_selection") ||
+      mode === "audience_default_changed" ||
+      mode === "upload_resets_audience"
         ? {
             audienceSelection: {
               dialog: "#privacy",
@@ -274,7 +357,9 @@ for (const mode of [
         publication: {
           accountRef: profile.accountRef,
           channelRef: profile.channelRef,
-          text: "SYNTHETIC approved copy",
+          text: ["video_empty_caption", "video_existing_blank"].includes(mode)
+            ? ""
+            : "SYNTHETIC approved copy",
           format,
           ...(format === "text" ? {} : { media: { sha256 } }),
         },
@@ -306,6 +391,10 @@ for (const mode of [
           await page.locator("#composer").evaluate((element) => {
             element.after(element.cloneNode(true));
           });
+        if (mode === "video_blob_changed")
+          await page.locator("#composer video").evaluate((element) => {
+            (element as HTMLVideoElement).src = URL.createObjectURL(new Blob(["CHANGED media"]));
+          });
         return { authorizationId: randomUUID(), localExpiresAt: Date.now() + 30000 };
       },
       async reportPublication(receipt) {
@@ -319,6 +408,10 @@ for (const mode of [
       "post_link_hover_detached",
       "image",
       "video",
+      "video_empty_caption",
+      "video_existing_blank",
+      "extra_file_input",
+      "upload_resets_audience",
       "upload_replaces_composer",
       "hidden_duplicate_composer",
       "audience_selection",
@@ -329,17 +422,21 @@ for (const mode of [
       "audience_transit_change",
       "post_link_unresolved",
       "post_author_changed",
+      "video_receipt_wrong_link",
     ].includes(mode);
     expect(result).toBe(success ? "completed" : uncertain ? "unknown" : "failed");
     expect(await page.locator("#clicks").textContent()).toBe(
-      success || mode.startsWith("post_") ? "1" : "0",
+      success || mode.startsWith("post_") || mode === "video_receipt_wrong_link" ? "1" : "0",
     );
     expect(receipts).toHaveLength(success || uncertain ? 1 : 0);
     if (uncertain) expect(receipts[0].outcome).toBe("unknown");
     if (mode === "post_link_hover")
       expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/synthetic/posts/1");
+    if (["video", "video_empty_caption", "video_existing_blank"].includes(mode))
+      expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/reel/1");
     expect(requests.some((url) => url.endsWith("/click"))).toBe(false);
-    if (["wrong_attachment", "extra_file_input"].includes(mode)) expect(authorized).toBe(0);
+    if (["wrong_attachment", "duplicate_scoped_file_input"].includes(mode))
+      expect(authorized).toBe(0);
   });
 }
 test("DOM profiles require a current review and fixed Facebook origin", () => {
@@ -378,4 +475,109 @@ test("text-only reviewed profiles reject media before browser navigation", async
     ),
   ).rejects.toThrow("facebook_profile_format_unreviewed");
   expect(requests).toBe(0);
+});
+
+test("video without a reviewed receipt contract stops before browser navigation", async () => {
+  let requests = 0;
+  const driver = createFacebookDriver(profile, async () => {
+    requests++;
+    throw new Error("must not navigate");
+  });
+  await expect(
+    driver.open(
+      {
+        id: randomUUID(),
+        accountId: randomUUID(),
+        kind: "publish",
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
+        publication: {
+          accountRef: profile.accountRef,
+          channelRef: profile.channelRef,
+          text: "",
+          format: "video",
+        },
+      },
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow("facebook_video_receipt_unreviewed");
+  expect(requests).toBe(0);
+});
+
+test("baseline resolves existing post permalinks before publication", async ({ page, context }) => {
+  const receiptProfile = {
+    ...profile,
+    receiptUrl: profile.identityHref,
+    resolvePostLinks: true,
+    selectors: { ...profile.selectors, receiptIdentity: "#identity", postHover: ".permalink" },
+  };
+  const oldRef = "https://www.facebook.com/synthetic/posts/old";
+  await context.route("**/*", (route) =>
+    [profile.url, profile.identityHref].includes(route.request().url())
+      ? route.fulfill({
+          contentType: "text/html",
+          body: `<!doctype html><a id="identity" href="${profile.identityHref}">Identity</a>
+            <article><a class="author" href="${profile.identityHref}">Author</a>
+            <p class="copy">An older synthetic post</p>
+            <a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Time</a></article>
+            <article><a class="author" href="${profile.identityHref}">Author</a>
+            <p class="copy">An unrelated older video</p>
+            <a class="permalink" href="https://www.facebook.com/profile.php#placeholder">Time</a></article>
+            <script>document.querySelector('.permalink').onmouseenter = (event) => {
+              event.currentTarget.href = '${oldRef}';
+            }</script>`,
+        })
+      : route.abort(),
+  );
+  const calls: string[] = [];
+  let firstHover = true;
+  const browserRequest = async (endpoint: string, body: Record<string, unknown> = {}) => {
+    calls.push(endpoint);
+    if (endpoint === "/tabs") {
+      await page.goto(String(body.url));
+      return Response.json({ tabId: "synthetic-tab", url: body.url });
+    }
+    if (endpoint.endsWith("/navigate")) {
+      await page.goto(String(body.url));
+      return Response.json({ ok: true });
+    }
+    if (endpoint.endsWith("/evaluate"))
+      return Response.json({ ok: true, result: await page.evaluate(String(body.expression)) });
+    if (endpoint === "/act") {
+      if (firstHover) {
+        firstHover = false;
+        throw new Error("browser_request_failed");
+      }
+      await page.locator(String(body.selector)).hover();
+      return checkedBrowserResponse(
+        Response.json({ code: "element_not_actionable" }, { status: 422 }),
+        endpoint,
+        body,
+      );
+    }
+    throw new Error("Unapproved browser endpoint");
+  };
+  const driver = createFacebookDriver(receiptProfile, browserRequest);
+  const session = await driver.open(
+    {
+      id: randomUUID(),
+      accountId: randomUUID(),
+      kind: "publish",
+      accountRef: profile.accountRef,
+      channelRef: profile.channelRef,
+      publication: {
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
+        text: "A new synthetic post",
+        format: "text",
+      },
+    },
+    new AbortController().signal,
+  );
+  expect(await driver.identity(session)).toEqual({
+    accountRef: profile.accountRef,
+    channelRef: profile.channelRef,
+  });
+  expect(await driver.existingPublicationRefs(session)).toEqual([oldRef]);
+  expect(calls.filter((item) => item === "/act").length).toBeGreaterThanOrEqual(3);
 });

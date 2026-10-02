@@ -7,11 +7,25 @@ const product: ProductReady = {
   record_id: id,
   source_ref: "source-product-101",
   evidence_refs: ["evidence-product-101"],
-  field_evidence: { "product.product_name": "evidence-product-101" },
+  field_evidence: {
+    "product.product_name": "evidence-product-101",
+    "product.product_type": "evidence-product-101",
+    "product.internal_sku": "evidence-product-101",
+    "product.application": "evidence-product-101",
+    "product.vehicle_brand": "evidence-product-101",
+    "product.vehicle_model": "evidence-product-101",
+  },
   verification_status: "verified",
   blocking_missing_fields: [],
   optional_missing_fields: [],
-  product: { product_name: "Synthetic clutch" },
+  product: {
+    product_name: "Synthetic clutch",
+    product_type: "clutch_kit",
+    internal_sku: "SYN-VIDEO-101",
+    application: "Synthetic application",
+    vehicle_brand: "Synthetic brand",
+    vehicle_model: "Synthetic model",
+  },
   approval_ref: "approval-product-101",
 };
 const creative = buildVideoCreative(
@@ -58,6 +72,28 @@ assert.throws(
       },
       product,
     ),
-  /没有有效/,
+  /缺少有效证据/,
+);
+assert.throws(
+  () =>
+    buildVideoCreative(
+      {
+        productId: id,
+        objective: "Reject unbound facts",
+        targetAudience: "Synthetic distributor",
+        factPaths: ["product.product_name"],
+        sourceAssets: [],
+        platforms: ["youtube"],
+        scenes: [],
+      },
+      {
+        ...product,
+        field_evidence: {
+          ...product.field_evidence,
+          "product.product_name": "evidence-unbound-synthetic",
+        },
+      },
+    ),
+  /缺少有效证据/,
 );
 console.log("PASS evidence-bound video creative ready for generation");

@@ -6,20 +6,21 @@ import type { DatabaseTransaction } from "../db/client";
 import { configuredFacebookKeyring } from "../social/facebook-vault-crypto";
 import type { FleetState } from "./policy";
 import { openBrowserSandboxKey } from "./sandbox-credentials";
+import { hasAuthorizedInboxDemand } from "./sandbox-inbox-demand";
 import { hasAuthorizedPublicationDemand } from "./sandbox-publication-demand";
 import { matches } from "./security";
 
 /** Internal dispatch check for manual browser demand. Re-run before provider
  * creation/resume and again before credential release. Never return this value
  * through an Action or serialize it into Workflow history.
- * Publication demand uses separate current grant checks; inbox cannot wake.
+ * Publication and inbox demand use separate current grant checks.
  */
 async function authorizeSandboxStart(
   tx: DatabaseTransaction,
   nodeId: string,
   operationId: string,
   now = Date.now(),
-  allowPublication = false,
+  allowScheduled = false,
 ) {
   if (process.env.BROWSER_SANDBOX_ENABLED !== "1") return null;
   const node = await tx.execute(sql`SELECT owner_id, status, document, key_hash
@@ -77,7 +78,8 @@ async function authorizeSandboxStart(
   });
   if (
     !demand &&
-    !(allowPublication && (await hasAuthorizedPublicationDemand(tx, nodeId, row.document, now)))
+    !(allowScheduled && (await hasAuthorizedPublicationDemand(tx, nodeId, row.document, now))) &&
+    !(allowScheduled && (await hasAuthorizedInboxDemand(tx, nodeId, row.document, now)))
   )
     return null;
   const accessKey = openBrowserSandboxKey(

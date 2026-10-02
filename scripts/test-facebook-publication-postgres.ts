@@ -6,12 +6,17 @@ import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
+import { schedulePublications } from "../lib/browser-fleet/publication";
 import { handleBrowserNodeRequest, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import { closeDatabase, type Database } from "../lib/db/client";
 import { facebookPublicationManifest } from "../lib/db/facebook-runtime-schema";
 import { productMediaAsset } from "../lib/db/product-media-schema";
 import * as schema from "../lib/db/schema";
-import { authorizeFacebookPublication } from "../lib/social/facebook-media-store";
+import {
+  authorizeFacebookPublication,
+  requeueUnsentFacebookMediaPublication,
+  resolveFacebookMediaSubmissionScope,
+} from "../lib/social/facebook-media-store";
 import { claimNextSocialWorkerJob } from "../lib/social/job-store";
 import {
   listProjectPublicationData,
@@ -21,11 +26,14 @@ import {
 import { digestSocialWorkerPayload } from "../lib/social/worker-protocol";
 import { testBrowserInbox } from "./test-browser-inbox-postgres";
 import { testInboxRoundTrip } from "./test-browser-inbox-roundtrip";
+import { testInboxWakeup } from "./test-browser-inbox-wakeup";
 import { testBrowserLogin } from "./test-browser-login-postgres";
+import { testReconciledLogin } from "./test-browser-login-reconciliation-postgres";
 import { testPublicationWakeup } from "./test-browser-publication-wakeup";
 import { testBrowserSandboxOwner } from "./test-browser-sandbox-owner";
 import { testFacebookInbound } from "./test-facebook-inbound-postgres";
 import { testPublicationReconciliation } from "./test-publication-reconciliation-postgres";
+import { testVideoPublicationReconciliation } from "./test-video-publication-reconciliation-postgres";
 
 async function main() {
   const connectionString = process.env.FACEBOOK_PUBLICATION_TEST_DATABASE_URL;
@@ -220,6 +228,99 @@ async function main() {
     });
     return { ...f, mediaId };
   }
+  async function videoFixture() {
+    const f = await fixture("video");
+    const productId = randomUUID();
+    const assetRef = `asset-synthetic-video-${randomUUID()}`;
+    const sha256 = createHash("sha256").update(assetRef).digest("hex");
+    await db.insert(schema.aggregateRecord).values({
+      id: productId,
+      type: "product",
+      state: "PRODUCT_READY",
+      payload: {
+        record_id: productId,
+        source_ref: "source-synthetic-383",
+        evidence_refs: [
+          "evidence-product-name-383",
+          "evidence-product-type-383",
+          "evidence-product-sku-383",
+          "evidence-product-oe-383",
+        ],
+        field_evidence: {
+          "product.product_name": "evidence-product-name-383",
+          "product.product_type": "evidence-product-type-383",
+          "product.internal_sku": "evidence-product-sku-383",
+          "product.oe_numbers": "evidence-product-oe-383",
+        },
+        verification_status: "verified",
+        blocking_missing_fields: [],
+        optional_missing_fields: [],
+        product: {
+          product_name: "Synthetic test kit",
+          product_type: "clutch_kit",
+          internal_sku: "TEST-383",
+          oe_numbers: ["TEST-OE-383"],
+        },
+        specifications: {},
+        commercial: {},
+        approval_ref: "approval-product-383",
+      },
+      createdByType: "human",
+      createdById: actor,
+    });
+    await db
+      .update(schema.aggregateRecord)
+      .set({
+        type: "video",
+        state: "VIDEO_APPROVED",
+        payload: {
+          id: f.contentRef,
+          productId,
+          status: "export_ready",
+          objective: "Private TEST ONLY video",
+          targetAudience: "Synthetic test account",
+          platforms: ["facebook"],
+          factualClaims: [
+            {
+              field: "product.product_name",
+              value: "Synthetic test kit",
+              evidenceRef: "evidence-product-name-383",
+            },
+          ],
+          sourceAssets: [],
+          scenes: [
+            {
+              sceneId: "scene-synthetic-383",
+              prompt: "Private test frame",
+              durationSeconds: 5,
+              claimRefs: ["product.product_name"],
+              assetRefs: [],
+            },
+          ],
+          approvalRefs: ["evidence-video-review-383"],
+          renderedAssetRef: assetRef,
+        },
+      })
+      .where(eq(schema.aggregateRecord.id, f.contentRef));
+    await db.insert(schema.videoGeneratedAsset).values({
+      assetRef,
+      blobPath: `synthetic/${assetRef}`,
+      contentType: "video/mp4",
+      sizeBytes: 100,
+      provider: "synthetic",
+      modelId: "synthetic-test",
+    });
+    await db.insert(facebookPublicationManifest).values({
+      publicationId: f.id,
+      contentVersion: 1,
+      format: "video",
+      caption: "",
+      mediaId: assetRef,
+      confirmedBy: actor,
+      media: { assetRef, contentType: "video/mp4", sizeBytes: 100, sha256 },
+    });
+    return f;
+  }
   async function claim() {
     return claimNextSocialWorkerJob(workerId, new Date(), database);
   }
@@ -257,6 +358,31 @@ async function main() {
     });
 
     const text = await fixture("text", accountRef, true);
+    await db
+      .update(schema.workspaceProject)
+      .set({ status: "archived" })
+      .where(eq(schema.workspaceProject.id, projectId));
+    assert.equal(await claim(), null, "frozen queued work stays unclaimed");
+    await assert.rejects(
+      recordControlledPublicationResult(
+        { jobId: text.jobId, outcome: "published", externalPublicationRef: "synthetic-unexecuted" },
+        database,
+      ),
+      /尚未领取/,
+    );
+    assert.equal(
+      (
+        await db
+          .select()
+          .from(schema.socialBrowserJob)
+          .where(eq(schema.socialBrowserJob.id, text.jobId))
+      )[0].status,
+      "queued",
+    );
+    await db
+      .update(schema.workspaceProject)
+      .set({ status: "active" })
+      .where(eq(schema.workspaceProject.id, projectId));
     const claimed = await claim();
     assert.ok(claimed);
     assert.equal(claimed.command.command.jobId, text.jobId);
@@ -513,6 +639,32 @@ async function main() {
       stoppedRunIds: [],
       capabilities: ["interactive", "publish"],
     });
+    const previousLegacyFlag = process.env.SOCIAL_FACEBOOK_WORKER_ENABLED;
+    delete process.env.SOCIAL_FACEBOOK_WORKER_ENABLED;
+    try {
+      assert.deepEqual(await resolveFacebookMediaSubmissionScope(actor, database), {
+        channelRef,
+        accountRef,
+      });
+      await assert.rejects(
+        resolveFacebookMediaSubmissionScope(randomUUID(), database),
+        /facebook_media_scope_ambiguous/,
+      );
+      await db.execute(
+        sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{publicationScopes}', ${JSON.stringify([{ channelRef, accountRef, expiresAt: 1 }])}::jsonb) WHERE id = ${node.nodeId}`,
+      );
+      await assert.rejects(
+        resolveFacebookMediaSubmissionScope(actor, database),
+        /facebook_media_scope_inactive/,
+      );
+      await db.execute(
+        sql`UPDATE browser_fleet_node SET document = document - 'publicationScopes' WHERE id = ${node.nodeId}`,
+      );
+    } finally {
+      if (previousLegacyFlag === undefined) delete process.env.SOCIAL_FACEBOOK_WORKER_ENABLED;
+      else process.env.SOCIAL_FACEBOOK_WORKER_ENABLED = previousLegacyFlag;
+    }
+    console.log("PASS media submission resolves only the active owner-bound fleet account");
     await testBrowserInbox(
       database,
       { nodeId: node.nodeId, accessKey: node.accessKey },
@@ -525,6 +677,12 @@ async function main() {
       identity,
       actor,
     );
+    await testInboxWakeup(database, {
+      nodeId: node.nodeId,
+      accessKey: node.accessKey,
+      channelRef,
+      accountRef,
+    });
     await testBrowserLogin(database, owner);
     await testBrowserSandboxOwner(database, owner);
     const fleetJob = await fixture();
@@ -712,7 +870,14 @@ async function main() {
       "PASS actual broker reserves one publication, excludes legacy claims, replays the lease and keeps unreceipted completion unknown",
     );
 
-    for (const outcome of ["published", "unknown", "expired", "media"] as const) {
+    for (const outcome of [
+      "published",
+      "unknown",
+      "unknown_video",
+      "expired",
+      "media",
+      "preclick",
+    ] as const) {
       accountRef = randomUUID();
       await db.insert(schema.socialChannelControl).values({
         id: randomUUID(),
@@ -758,7 +923,12 @@ async function main() {
         owner,
       );
       const expectedOutcome = outcome === "published" ? "published" : "unknown";
-      const target = outcome === "media" ? await imageFixture() : await fixture();
+      const target =
+        outcome === "media"
+          ? await imageFixture()
+          : outcome === "unknown_video"
+            ? await videoFixture()
+            : await fixture();
       const claimResponse = await handleBrowserNodeRequest(node.accessKey, {
         ...request,
         requestId: randomUUID(),
@@ -772,6 +942,74 @@ async function main() {
         leaseId: lease.leaseId,
         ready: true,
       });
+      if (outcome === "preclick") {
+        await handleBrowserNodeRequest(node.accessKey, {
+          ...identity,
+          operation: "finish",
+          runId: lease.id,
+          leaseId: lease.leaseId,
+          outcome: "failed",
+          stopped: true,
+        });
+        const [publication] = await db
+          .select()
+          .from(schema.socialPublication)
+          .where(eq(schema.socialPublication.id, target.id));
+        const [job] = await db
+          .select()
+          .from(schema.socialBrowserJob)
+          .where(eq(schema.socialBrowserJob.id, target.jobId));
+        const [channel] = await db
+          .select()
+          .from(schema.socialChannelControl)
+          .where(eq(schema.socialChannelControl.accountRef, accountRef));
+        assert.equal(publication.status, "failed");
+        assert.equal(job.failureCode, "fleet_publication_not_authorized");
+        assert.equal(channel.circuitStatus, "active");
+        const nodeState: { rows: Array<Record<string, unknown>> } = await db.execute(
+          sql`SELECT document FROM browser_fleet_node WHERE id = ${node.nodeId}`,
+        );
+        const account: { id: string; authState: string } | undefined = (
+          nodeState.rows[0].document as { accounts: Array<{ id: string; authState: string }> }
+        ).accounts.find((item) => item.id === bound.id);
+        assert.equal(account?.authState, "ready");
+        await assert.rejects(
+          database.transaction(async (tx) => {
+            await requeueUnsentFacebookMediaPublication(tx, target.jobId, target.id, actor);
+            const [requeued] = await tx
+              .select()
+              .from(schema.socialBrowserJob)
+              .where(eq(schema.socialBrowserJob.id, target.jobId));
+            const reservation = await tx.execute(
+              sql`SELECT 1 FROM browser_fleet_publication WHERE job_id = ${target.jobId}`,
+            );
+            assert.equal(requeued.status, "queued");
+            assert.equal(reservation.rows.length, 0);
+            const nodeId = node.nodeId;
+            assert.ok(nodeId);
+            const nodeRow = await tx.execute(
+              sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId} FOR UPDATE`,
+            );
+            const state = nodeRow.rows[0].document as Parameters<typeof schedulePublications>[2];
+            await schedulePublications(tx, nodeId, state, Date.now());
+            const renewed = await tx.execute(
+              sql`SELECT run_id FROM browser_fleet_publication WHERE job_id = ${target.jobId}`,
+            );
+            assert.equal(renewed.rows.length, 1);
+            assert.notEqual(renewed.rows[0].run_id, lease.id);
+            assert.equal(
+              state.runs.find((item) => item.id === renewed.rows[0].run_id)?.status,
+              "queued",
+            );
+            throw new Error("rollback_synthetic_requeue");
+          }),
+          /rollback_synthetic_requeue/,
+        );
+        console.log(
+          "PASS stopped publication without authorization is failed and only its original job can be requeued after renewed confirmation",
+        );
+        continue;
+      }
       if (outcome === "media") {
         let opened = 0;
         const mediaRequest = {
@@ -888,6 +1126,21 @@ async function main() {
         );
         await handleBrowserNodeRequest(node.accessKey, { ...identity, operation: "sync" });
       } else {
+        // Archival after an external attempt must not discard its authenticated result.
+        await db
+          .update(schema.workspaceProject)
+          .set({ status: "archived" })
+          .where(eq(schema.workspaceProject.id, projectId));
+        await assert.rejects(
+          handleBrowserNodeRequest(node.accessKey, {
+            ...identity,
+            operation: "authorize-publication",
+            runId: lease.id,
+            leaseId: lease.leaseId,
+            payloadDigest: lease.publicationDigest,
+          }),
+          /已归档/,
+        );
         const accepted = await handleBrowserNodeRequest(node.accessKey, resultRequest);
         assert.deepEqual(accepted.receipt, { outcome: expectedOutcome, replayed: false });
         const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);
@@ -902,6 +1155,10 @@ async function main() {
           /publication_receipt_conflict/,
         );
       }
+      await db
+        .update(schema.workspaceProject)
+        .set({ status: "active" })
+        .where(eq(schema.workspaceProject.id, projectId));
       await handleBrowserNodeRequest(node.accessKey, {
         ...identity,
         operation: "finish",
@@ -915,6 +1172,19 @@ async function main() {
         .from(schema.socialPublication)
         .where(eq(schema.socialPublication.id, target.id));
       assert.equal(saved.status, outcome === "published" ? "published" : "unknown");
+      if (outcome === "unknown" || outcome === "unknown_video")
+        await assert.rejects(
+          ownerBrowserCommand(
+            {
+              operation: "confirm-login",
+              nodeId: node.nodeId,
+              accountId: bound.id,
+              confirmed: true,
+            },
+            owner,
+          ),
+          /resolve_running_or_unknown_result_first/,
+        );
       if (outcome === "unknown")
         await testPublicationReconciliation(database, {
           actor,
@@ -923,6 +1193,23 @@ async function main() {
           jobId: target.jobId,
           contentRef: target.contentRef,
         });
+      if (outcome === "unknown_video")
+        await testVideoPublicationReconciliation(database, {
+          actor,
+          projectId,
+          publicationId: target.id,
+          jobId: target.jobId,
+          contentRef: target.contentRef,
+        });
+      if (outcome === "unknown" || outcome === "unknown_video") {
+        await testReconciledLogin(database, {
+          owner,
+          nodeId: node.nodeId,
+          accountId: bound.id,
+          jobId: target.jobId,
+          publicationId: target.id,
+        });
+      }
       if (outcome === "published") {
         const [record] = await db
           .select()

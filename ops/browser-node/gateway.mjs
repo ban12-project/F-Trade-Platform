@@ -1,7 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import http from "node:http";
-import { acquireBrowserControl } from "./control.mjs";
 
 export function safeAssetPath(value) {
   let path;
@@ -27,52 +26,24 @@ async function readBody(request) {
   }
   return JSON.parse(Buffer.concat(parts).toString("utf8"));
 }
-export function createGateway({
-  appOrigin,
-  nodeCall,
-  slots,
-  port = 9400,
-  acquireControl = acquireBrowserControl,
-}) {
+export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
   const views = new Map();
-  const queues = new WeakMap();
-  const generations = new WeakMap();
-  const releases = new WeakMap();
-  let closing = false;
-  function serial(slot, operation) {
-    const pending = (queues.get(slot) || Promise.resolve()).catch(() => {}).then(operation);
-    queues.set(slot, pending);
-    return pending;
-  }
   function allowed(entry) {
     return (
       !!entry &&
-      !closing &&
       !entry.closed &&
-      entry.control.expiresAt > Date.now() &&
       !entry.slot.stopping &&
       slots.get(entry.slot.run.id) === entry.slot &&
       entry.slot.expiresAt > Date.now()
     );
   }
   function dispose(key, entry) {
-    if (entry.closed) return entry.cleanup;
+    if (entry.closed) return;
     entry.closed = true;
     entry.slot.disconnectedAt = Date.now();
     for (const request of entry.requests) request.destroy();
     for (const socket of entry.sockets) socket.destroy();
     views.delete(key);
-    entry.cleanup = Promise.resolve().then(() => entry.control.release());
-    if (!releases.has(entry.slot)) releases.set(entry.slot, new Set());
-    const pending = releases.get(entry.slot);
-    pending.add(entry.cleanup);
-    entry.cleanup.then(
-      () => pending.delete(entry.cleanup),
-      () => {
-        entry.slot.controlFailure = true;
-      },
-    );
-    return entry.cleanup;
   }
   // Established tunnels need their own expiry check, even while a Docker call
   // blocks the Agent's next poll. Handshake-only checks do not revoke a tunnel.
@@ -124,57 +95,30 @@ export function createGateway({
           origin !== slot.gatewayOrigin
         )
           return fail();
-        const generation = generations.get(slot) || 0;
-        await serial(slot, async () => {
-          const active = () =>
-            !closing &&
-            !response.destroyed &&
-            !slot.stopping &&
-            !slot.automationHandoff &&
-            slots.get(slot.run.id) === slot &&
-            slot.expiresAt > Date.now() &&
-            (generations.get(slot) || 0) === generation;
-          if (!active()) throw new Error("admission_cancelled");
-          // Finish revoking old input before asking the backend for a new grant.
-          for (const [key, entry] of views) {
-            if (entry.slot === slot) await dispose(key, entry);
-          }
-          if (!active()) throw new Error("admission_cancelled");
-          const control = await acquireControl(slot);
-          if (!active() || control.expiresAt <= Date.now()) {
-            await control.release();
-            throw new Error("admission_cancelled");
-          }
-          const view = randomBytes(32).toString("base64url");
-          const ws = randomBytes(32).toString("base64url");
-          const entry = {
-            slot,
-            control,
-            ws,
-            used: false,
-            closed: false,
-            createdAt: Date.now(),
-            sockets: new Set(),
-            requests: new Set(),
-          };
-          views.set(view, entry);
-          // A response lost before delivery must not strand a backend grant.
-          let delivered = false;
-          response.once("finish", () => {
-            delivered = true;
-          });
-          response.once("close", () => {
-            if (!delivered) dispose(view, entry);
-          });
-          response.setHeader("Content-Type", "application/json");
-          response.end(
-            JSON.stringify({
-              module: `/assets/${view}/core/rfb.js`,
-              websocket: `/ws/${view}/${ws}`,
-              password: slot.vncPassword,
-            }),
-          );
+        // Fresh broker authorization replaces older capabilities, including
+        // pending handshakes. Late close events must not affect the replacement.
+        for (const [key, entry] of views) {
+          if (entry.slot.run.id === slot.run.id) dispose(key, entry);
+        }
+        const view = randomBytes(32).toString("base64url");
+        const ws = randomBytes(32).toString("base64url");
+        views.set(view, {
+          slot,
+          ws,
+          used: false,
+          closed: false,
+          createdAt: Date.now(),
+          sockets: new Set(),
+          requests: new Set(),
         });
+        response.setHeader("Content-Type", "application/json");
+        response.end(
+          JSON.stringify({
+            module: `/assets/${view}/core/rfb.js`,
+            websocket: `/ws/${view}/${ws}`,
+            password: slot.vncPassword,
+          }),
+        );
         return;
       }
       const match = /^\/assets\/([A-Za-z0-9_-]{43})(\/.*)$/.exec(request.url ?? "");
@@ -279,15 +223,9 @@ export function createGateway({
   return {
     server,
     closeRun(runId) {
-      const slot = slots.get(runId);
-      if (!slot) return Promise.resolve();
-      generations.set(slot, (generations.get(slot) || 0) + 1);
-      const cleanups = [];
-      for (const [key, entry] of views) if (entry.slot === slot) cleanups.push(dispose(key, entry));
-      return serial(slot, () => Promise.all([...cleanups, ...(releases.get(slot) || [])]));
+      for (const [key, entry] of views) if (entry.slot.run.id === runId) dispose(key, entry);
     },
     close() {
-      closing = true;
       clearInterval(expiryTimer);
       for (const [key, entry] of views) dispose(key, entry);
       server.close();

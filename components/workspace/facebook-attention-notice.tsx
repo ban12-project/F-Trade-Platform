@@ -1,8 +1,8 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { facebookAccountStatusAction } from "@/lib/actions/facebook-account";
+import { WorkspaceLink } from "./workspace-link";
 /** In-app notification only; does not request OS notification permissions. */
 export function FacebookAttentionNotice() {
   const [state, setState] = useState("");
@@ -14,7 +14,7 @@ export function FacebookAttentionNotice() {
       busy = true;
       try {
         const value = await facebookAccountStatusAction();
-        if (!gone) setState(value.authState);
+        if (!gone) setState(value?.authState ?? "");
       } catch {
         /* Configuration absent or access revoked: never reveal account data. */
       } finally {
@@ -43,9 +43,12 @@ export function FacebookAttentionNotice() {
         </AlertTitle>
         <AlertDescription>
           自动任务已暂停。
-          <Link href="/workspace/facebook" className="font-medium underline">
+          <WorkspaceLink
+            href="/workspace/settings?section=channels"
+            className="font-medium underline"
+          >
             接入账号验证
-          </Link>
+          </WorkspaceLink>
         </AlertDescription>
       </Alert>
     </div>

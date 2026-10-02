@@ -26,12 +26,16 @@ import {
   type InteractiveEvent,
   signInteractiveTicket,
 } from "./facebook-interactive-protocol";
+import { updateFacebookLoginCiphertext } from "./facebook-login-credentials";
 import {
   configuredFacebookKeyring,
   decryptFacebookCredential,
   encryptFacebookCredential,
 } from "./facebook-vault-crypto";
-import { configuredFacebookWorkerScope } from "./facebook-worker-protocol";
+import {
+  configuredFacebookStatusScope,
+  configuredFacebookWorkerScope,
+} from "./facebook-worker-protocol";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const key = () => process.env.FACEBOOK_INTERACTIVE_SIGNING_KEY ?? "";
@@ -60,7 +64,8 @@ async function lockControl(tx: Tx) {
   return { scope, control, where };
 }
 export async function readFacebookAccountStatus(database: Database = getDatabase()) {
-  const scope = configuredScope();
+  const scope = configuredFacebookStatusScope();
+  if (!scope) return null;
   const [record] = await database
     .select()
     .from(facebookAccountRuntime)
@@ -103,19 +108,12 @@ export async function saveFacebookCredentials(
       .for("update");
     if (record && record.channelRef !== scope.channelRef) throw new Error("账号范围不匹配。");
     const ring = configuredFacebookKeyring();
-    const loginCiphertext = value.clearLogin
-      ? null
-      : value.loginPassword
-        ? encryptFacebookCredential(
-            facebookLoginSecretSchema.parse({
-              username: value.loginUsername,
-              password: value.loginPassword,
-            }),
-            scope,
-            "login",
-            ring,
-          )
-        : (record?.loginCiphertext ?? null);
+    const loginCiphertext = updateFacebookLoginCiphertext(
+      value,
+      record?.loginCiphertext ?? null,
+      scope,
+      ring,
+    );
     const proxyCiphertext = value.clearProxy
       ? null
       : value.proxyHost

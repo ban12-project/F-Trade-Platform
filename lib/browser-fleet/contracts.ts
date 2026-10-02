@@ -86,11 +86,22 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
   z
     .object({
       ...common,
+      operation: z.literal("login-challenge"),
+      runId: id,
+      leaseId: id,
+      authorizationId: id,
+      challenge: z.literal("checkpoint"),
+    })
+    .strict(),
+  z
+    .object({
+      ...common,
       operation: z.literal("login-result"),
       runId: id,
       leaseId: id,
       authorizationId: id,
-      outcome: z.enum(["filled", "refused", "unknown"]),
+      outcome: z.enum(["filled", "ready", "refused", "unknown"]),
+      challenge: z.enum(["checkpoint", "rejected", "unsupported_factor"]).optional(),
     })
     .strict(),
   z
@@ -178,6 +189,7 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
               channelRef: reference,
               accountRef: reference,
               expiresAt: z.number().int().positive(),
+              automatic: z.boolean().optional(),
             })
             .strict(),
         )

@@ -1,0 +1,536 @@
+{
+  "classification": "synthetic",
+  "executed_at": "2026-09-26T14:43:38.481551+00:00",
+  "base_commit": "64b4163e77ebf1e9c7a073d9868f350996257ade",
+  "issue": 407,
+  "environment": {
+    "node": "24.21.0",
+    "pnpm": "12.3.4",
+    "postgresql": "17.10",
+    "production_access": false
+  },
+  "entries": [
+    {
+      "local_log": "baseline-failure.log",
+      "status": "failed",
+      "note": "Confirmed baseline archive bypass",
+      "sha256": "9f60b1490c8bc20a39e253df6491515ff35077558a15410ad1e12fd00e5f7cad",
+      "bytes": 399
+    },
+    {
+      "local_log": "regression.log",
+      "status": "passed",
+      "note": "Initial transaction regression",
+      "sha256": "96155a1184eb71ae4be31e4ef727bf356da9bd49d8fb1bf573e91fcc3a867375",
+      "bytes": 352
+    },
+    {
+      "local_log": "product-catalog-recheck.log",
+      "status": "passed",
+      "note": "Review snapshot and synthetic cohorts",
+      "sha256": "a783c810e82b87f33e5c86c61190d871fbb8c9c28e38a59c40a703078fb1b49a",
+      "bytes": 1435
+    },
+    {
+      "local_log": "product-stream-fixture-conflict.log",
+      "status": "failed",
+      "note": "Synthetic database fixture collision; no product change",
+      "sha256": "d90d29d7347ca1b4d11e37c2b55ddfc299748c4b18c6e2034f0ed54dc166c608",
+      "bytes": 2714
+    },
+    {
+      "local_log": "product-stream-recheck.log",
+      "status": "passed",
+      "note": "Fresh synthetic database",
+      "sha256": "17154b94aaba2d1f53bd09cd787209d01f40cfd1e2f2175a68998430e401035e",
+      "bytes": 304
+    },
+    {
+      "local_log": "publication.log",
+      "status": "failed",
+      "note": "Missing local Chromium shared-library search path",
+      "sha256": "75a823d130ec17189ce48ea2f5a09a27463322be7a28ab1519fb8f289050d053",
+      "bytes": 8110
+    },
+    {
+      "local_log": "publication-final.log",
+      "status": "passed",
+      "note": "Broker, receipt and archived authorization regressions",
+      "sha256": "e352749a8d8beda5f3ba361b363802be5e9bec882179770b0d3bd106bc8c953e",
+      "bytes": 2645
+    },
+    {
+      "local_log": "archive-final.log",
+      "status": "passed",
+      "note": "Transactional freeze/reopen",
+      "sha256": "96155a1184eb71ae4be31e4ef727bf356da9bd49d8fb1bf573e91fcc3a867375",
+      "bytes": 352
+    },
+    {
+      "local_log": "catalog-final.log",
+      "status": "passed",
+      "note": "Archived catalog read and active writes",
+      "sha256": "97ac856ea8cb56c3c3858709c9684786693f98bd4d25f795c67bdb47e2807d7a",
+      "bytes": 176
+    },
+    {
+      "local_log": "private-video-final.log",
+      "status": "passed",
+      "note": "Archived private reads/downloads",
+      "sha256": "2d522cb257d8f16bcaa4950688a78db979cc9df2128c9e0948301de5ad47105e",
+      "bytes": 211
+    },
+    {
+      "local_log": "revision-final.log",
+      "status": "passed",
+      "note": "Retained evidence and revision",
+      "sha256": "53108d88af8378021461c05920ee40e341097455c56ed3e937603436ddd6059d",
+      "bytes": 141
+    },
+    {
+      "local_log": "database-browser.log",
+      "status": "passed",
+      "note": "44 browser tests; production build included",
+      "sha256": "c5575b28d141ac6f2730a5a6bbe9a246bbef2efcbca34f6bf7660e3a55d592cc",
+      "bytes": 12211
+    },
+    {
+      "local_log": "rendered-video-recheck.log",
+      "status": "passed",
+      "note": "Actual ffmpeg media validation",
+      "sha256": "fb9ee6e78975339d8051b4de242f4c8ad11474f00e8ee3b7d5fff757a5c3005b",
+      "bytes": 129
+    },
+    {
+      "local_log": "visual-sampling-recheck.log",
+      "status": "passed",
+      "note": "Actual ffmpeg visual sampling",
+      "sha256": "396e971a175001c15f0d0e0a937a02831d445e711c1f2f3dc14970b8ece9977b",
+      "bytes": 127
+    },
+    {
+      "local_log": "check-ci-final.log",
+      "status": "passed",
+      "note": "Repository lint/format; existing warnings retained",
+      "sha256": "fbf1149e3575e3b6966163840ab10692fffd377077d509f572467131f338e167",
+      "bytes": 1382153
+    },
+    {
+      "local_log": "typecheck-final.log",
+      "status": "passed",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "local_log": "repository-validation.log",
+      "status": "failed",
+      "sha256": "56282b4c0767787db27aff9b5ffe394708522ed9eb9847232ec46c9ddaead8d8",
+      "bytes": 455,
+      "note": "First invocation omitted the declared Node/pnpm PATH; legacy pnpm bootstrap failed. Preserved; see explicit-environment recheck."
+    },
+    {
+      "local_log": "unclaimed-receipt-failure.log",
+      "status": "failed",
+      "sha256": "f57fd1db42caf9ddf5adeb504568108424a186f1ae7c5ae1fa0791562f66acb0",
+      "bytes": 399
+    },
+    {
+      "local_log": "publication-unclaimed-fixed.log",
+      "status": "passed",
+      "sha256": "e352749a8d8beda5f3ba361b363802be5e9bec882179770b0d3bd106bc8c953e",
+      "bytes": 2645
+    },
+    {
+      "local_log": "repository-validation-recheck.log",
+      "status": "passed",
+      "note": "Explicit Node 24 / exact pnpm and Python dependency paths",
+      "sha256": "5a535de2b4b717be116bacf7a8db9225796ba62cb5476cafc25040098286c5c5",
+      "bytes": 1025
+    },
+    {
+      "local_log": "ci-database-browser-failure.log",
+      "status": "failed",
+      "note": "CI run 36250081042 at ba45e6d: legacy product browser fixture skipped worker claim; receipt guard correctly rejected it. Prior local 44/44 preceded this guard.",
+      "sha256": "6b8a7f597e49c128eff90f2df6ed65668a74c3cda466b7df86261f348719f439",
+      "bytes": 76253
+    },
+    {
+      "local_log": "product-browser-claim-recheck.log",
+      "status": "failed",
+      "note": "Fixture adaptation first failed type check: signed command nesting",
+      "sha256": "c796d6aa596d34792e3e6442e71b8514ac6782c5a8f65b5814ad1fcd478d9496",
+      "bytes": 685
+    },
+    {
+      "local_log": "product-browser-claim-final.log",
+      "status": "failed",
+      "note": "Direct worker import is server-only and unavailable in Playwright process",
+      "sha256": "80d8a0df1d2cad5411b33df6d2cd844e52000df54abc616766d2a90386783b4b",
+      "bytes": 3704
+    },
+    {
+      "local_log": "product-browser-fixture-final.log",
+      "status": "failed",
+      "note": "Explicit synthetic claimed-state fixture required non-null job ID narrowing",
+      "sha256": "0df3c115856c0406841c6e20ecc73f1b66a5dc58444c3bed665b884cdbe11afd",
+      "bytes": 873
+    },
+    {
+      "local_log": "product-browser-fixture-recheck.log",
+      "status": "passed",
+      "note": "Production-build product browser journey 2/2 after explicit synthetic claimed-state fixture correction",
+      "sha256": "526ae8d1e60c68c389b7c109e80c1596cb46b6ebb3bada209424340ca9337966",
+      "bytes": 3414
+    }
+  ],
+  "initial_package_commands": [
+    {
+      "name": "test:product-stream",
+      "command": "tsx scripts/test-product-stream.ts && tsx scripts/test-product-stream-store.ts && tsx scripts/test-product-stream-transport.ts && tsx scripts/test-product-stream-model.ts && tsx scripts/test-product-source-images.ts && tsx scripts/test-product-image-upload.ts",
+      "exit_code": 0,
+      "seconds": 3.12,
+      "log": "test-product-stream.log"
+    },
+    {
+      "name": "test:product-agent-evidence",
+      "command": "tsx scripts/test-product-agent-evidence-locations.ts",
+      "exit_code": 0,
+      "seconds": 0.57,
+      "log": "test-product-agent-evidence.log"
+    },
+    {
+      "name": "test:product-catalog-entry",
+      "command": "tsx scripts/test-product-catalog-entry.ts && tsx scripts/test-product-cohorts.ts",
+      "exit_code": 1,
+      "seconds": 1.02,
+      "log": "test-product-catalog-entry.log"
+    },
+    {
+      "name": "test:content-catalog-entry",
+      "command": "tsx scripts/test-content-catalog-entry.ts",
+      "exit_code": 0,
+      "seconds": 0.57,
+      "log": "test-content-catalog-entry.log"
+    },
+    {
+      "name": "test:controlled-publication",
+      "command": "tsx scripts/test-controlled-publication-command.ts",
+      "exit_code": 0,
+      "seconds": 0.26,
+      "log": "test-controlled-publication.log"
+    },
+    {
+      "name": "test:publication-result",
+      "command": "tsx scripts/test-publication-result-protocol.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "log": "test-publication-result.log"
+    },
+    {
+      "name": "test:content-publication",
+      "command": "tsx scripts/test-content-publication-policy.ts",
+      "exit_code": 0,
+      "seconds": 0.27,
+      "log": "test-content-publication.log"
+    },
+    {
+      "name": "test:workflow",
+      "command": "tsx scripts/test-workflow-transitions.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "log": "test-workflow.log"
+    },
+    {
+      "name": "test:workspace",
+      "command": "tsx scripts/test-workspace-contracts.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "log": "test-workspace.log"
+    },
+    {
+      "name": "test:sales",
+      "command": "tsx scripts/test-sales-clarification.ts && tsx scripts/test-sales-journey.ts",
+      "exit_code": 0,
+      "seconds": 0.57,
+      "log": "test-sales.log"
+    },
+    {
+      "name": "test:content-gate",
+      "command": "tsx scripts/test-content-gate.ts",
+      "exit_code": 0,
+      "seconds": 0.22,
+      "log": "test-content-gate.log"
+    },
+    {
+      "name": "test:video-contracts",
+      "command": "tsx scripts/test-video-contracts.ts",
+      "exit_code": 0,
+      "seconds": 0.52,
+      "log": "test-video-contracts.log"
+    },
+    {
+      "name": "test:video-provider-capabilities",
+      "command": "tsx scripts/test-video-provider-capabilities.ts",
+      "exit_code": 0,
+      "seconds": 0.52,
+      "log": "test-video-provider-capabilities.log"
+    },
+    {
+      "name": "test:video-provider-config",
+      "command": "tsx scripts/test-video-provider-config.ts",
+      "exit_code": 0,
+      "seconds": 0.47,
+      "log": "test-video-provider-config.log"
+    },
+    {
+      "name": "test:video-creative",
+      "command": "tsx scripts/test-video-creative.ts",
+      "exit_code": 0,
+      "seconds": 0.46,
+      "log": "test-video-creative.log"
+    },
+    {
+      "name": "test:video-jobs",
+      "command": "tsx scripts/test-video-jobs.ts",
+      "exit_code": 0,
+      "seconds": 0.16,
+      "log": "test-video-jobs.log"
+    },
+    {
+      "name": "test:video-job-runner",
+      "command": "tsx scripts/test-video-job-runner.ts",
+      "exit_code": 0,
+      "seconds": 0.52,
+      "log": "test-video-job-runner.log"
+    },
+    {
+      "name": "test:video-job-submission",
+      "command": "tsx scripts/test-video-job-submission.ts",
+      "exit_code": 0,
+      "seconds": 0.46,
+      "log": "test-video-job-submission.log"
+    },
+    {
+      "name": "test:video-private-assets",
+      "command": "tsx scripts/test-video-private-asset-store.ts",
+      "exit_code": 0,
+      "seconds": 0.62,
+      "log": "test-video-private-assets.log"
+    },
+    {
+      "name": "test:video-preview-delivery",
+      "command": "node --conditions=react-server --import tsx scripts/test-video-preview-delivery.ts",
+      "exit_code": 0,
+      "seconds": 0.67,
+      "log": "test-video-preview-delivery.log"
+    },
+    {
+      "name": "test:video-export-presets",
+      "command": "tsx scripts/test-video-export-presets.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "log": "test-video-export-presets.log"
+    },
+    {
+      "name": "test:video-acceptance",
+      "command": "tsx scripts/test-video-acceptance.ts",
+      "exit_code": 0,
+      "seconds": 0.31,
+      "log": "test-video-acceptance.log"
+    },
+    {
+      "name": "test:video-execution",
+      "command": "tsx scripts/test-video-execution.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "log": "test-video-execution.log"
+    },
+    {
+      "name": "test:video-workspace",
+      "command": "tsx scripts/test-video-workspace.ts && tsx scripts/test-video-workspace-selection.ts",
+      "exit_code": 0,
+      "seconds": 0.62,
+      "log": "test-video-workspace.log"
+    },
+    {
+      "name": "test:video-material-intake",
+      "command": "tsx scripts/test-video-material-intake.ts",
+      "exit_code": 0,
+      "seconds": 0.83,
+      "log": "test-video-material-intake.log"
+    },
+    {
+      "name": "test:product-media",
+      "command": "tsx scripts/test-video-ready.ts && tsx scripts/test-product-media-persistence.ts && tsx scripts/test-video-media-selection.ts && tsx scripts/test-product-media-runtime-policy.ts",
+      "exit_code": 0,
+      "seconds": 1.88,
+      "log": "test-product-media.log"
+    },
+    {
+      "name": "test:product-media-workflow",
+      "command": "tsx scripts/test-product-media-workflow.ts && tsx scripts/test-product-media-probe-parser.ts",
+      "exit_code": 0,
+      "seconds": 1.28,
+      "log": "test-product-media-workflow.log"
+    },
+    {
+      "name": "test:video-presigned-upload",
+      "command": "tsx scripts/test-video-presigned-upload.ts",
+      "exit_code": 0,
+      "seconds": 0.62,
+      "log": "test-video-presigned-upload.log"
+    },
+    {
+      "name": "test:internet-video-media",
+      "command": "tsx scripts/test-internet-video-media.ts",
+      "exit_code": 0,
+      "seconds": 0.67,
+      "log": "test-internet-video-media.log"
+    },
+    {
+      "name": "test:ai-sdk-video-adapters",
+      "command": "tsx scripts/test-ai-sdk-video-adapters.ts",
+      "exit_code": 0,
+      "seconds": 0.67,
+      "log": "test-ai-sdk-video-adapters.log"
+    },
+    {
+      "name": "test:video-media-probe",
+      "command": "tsx scripts/test-video-media-probe.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "log": "test-video-media-probe.log"
+    },
+    {
+      "name": "test:rendered-video-inspection",
+      "command": "tsx scripts/test-rendered-video-inspection.ts",
+      "exit_code": 1,
+      "seconds": 0.37,
+      "log": "test-rendered-video-inspection.log"
+    },
+    {
+      "name": "test:video-timeline",
+      "command": "tsx scripts/test-video-timeline.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "log": "test-video-timeline.log"
+    },
+    {
+      "name": "test:marketing-video-edit",
+      "command": "tsx scripts/test-marketing-video-edit.ts",
+      "exit_code": 0,
+      "seconds": 0.37,
+      "log": "test-marketing-video-edit.log"
+    },
+    {
+      "name": "test:video-product-fact-runtime",
+      "command": "tsx scripts/test-video-product-fact-runtime-policy.ts",
+      "exit_code": 0,
+      "seconds": 0.42,
+      "log": "test-video-product-fact-runtime.log"
+    },
+    {
+      "name": "test:video-download-delivery",
+      "command": "tsx scripts/test-video-download-delivery.ts",
+      "exit_code": 0,
+      "seconds": 0.31,
+      "log": "test-video-download-delivery.log"
+    },
+    {
+      "name": "test:video-mvp-policy",
+      "command": "tsx scripts/test-video-mvp-policy.ts",
+      "exit_code": 0,
+      "seconds": 0.21,
+      "log": "test-video-mvp-policy.log"
+    },
+    {
+      "name": "test:video-visual-sampling",
+      "command": "tsx scripts/test-video-visual-sampling.ts",
+      "exit_code": 1,
+      "seconds": 0.32,
+      "log": "test-video-visual-sampling.log"
+    },
+    {
+      "name": "test:video-shot-analysis",
+      "command": "tsx scripts/test-video-shot-analysis.ts",
+      "exit_code": 0,
+      "seconds": 0.26,
+      "log": "test-video-shot-analysis.log"
+    },
+    {
+      "name": "test:video-rendering",
+      "command": "tsx scripts/test-video-rendering.ts",
+      "exit_code": 0,
+      "seconds": 0.26,
+      "log": "test-video-rendering.log"
+    },
+    {
+      "name": "test:video-social-publication",
+      "command": "tsx scripts/test-video-social-publication.ts",
+      "exit_code": 0,
+      "seconds": 0.32,
+      "log": "test-video-social-publication.log"
+    },
+    {
+      "name": "test:workspace-navigation",
+      "command": "tsx scripts/test-workspace-navigation.ts && tsx scripts/test-workspace-task-model.ts && node --conditions=react-server --import tsx scripts/test-workspace-queries.ts",
+      "exit_code": 0,
+      "seconds": 0.77,
+      "log": "test-workspace-navigation.log"
+    },
+    {
+      "name": "test:product-output",
+      "command": "tsx scripts/test-product-output-policy.ts && tsx scripts/test-product-evaluation-run.ts && tsx scripts/test-catalog-agent.ts && tsx scripts/test-product-selection-summary.ts && tsx scripts/test-product-selection-health.ts",
+      "exit_code": 0,
+      "seconds": 2.27,
+      "log": "test-product-output.log"
+    },
+    {
+      "name": "typecheck",
+      "command": "tsc --noEmit",
+      "exit_code": 0,
+      "seconds": 0.77,
+      "log": "typecheck.log"
+    },
+    {
+      "name": "db:check",
+      "command": "drizzle-kit check",
+      "exit_code": 0,
+      "seconds": 0.57,
+      "log": "db-check.log"
+    },
+    {
+      "name": "check:ci",
+      "command": "biome ci .",
+      "exit_code": 1,
+      "seconds": 1.0,
+      "log": "check-ci.log"
+    }
+  ],
+  "final_database_commands": [
+    {
+      "name": "archive",
+      "script": "scripts/test-workspace-archive-postgres.ts",
+      "exit_code": 0,
+      "seconds": 0.77
+    },
+    {
+      "name": "catalog",
+      "script": "scripts/test-catalog-import-postgres.ts",
+      "exit_code": 0,
+      "seconds": 1.77
+    },
+    {
+      "name": "private-video",
+      "script": "scripts/test-video-workspace-access-postgres.ts",
+      "exit_code": 0,
+      "seconds": 0.97
+    },
+    {
+      "name": "revision",
+      "script": "scripts/test-product-revision-evidence-postgres.ts",
+      "exit_code": 0,
+      "seconds": 0.72
+    }
+  ]
+}

@@ -7,13 +7,15 @@ export function isRejectedCatalogOutput(error: unknown) {
   );
 }
 
+export const PRODUCT_AGENT_TOTAL_TIMEOUT_MS = 75_000;
+
 /** One corrective generation within the original total deadline; validators remain unchanged. */
 export async function runCatalogProductAgent(
   request: ProductAgentRequest,
   agent: ProductAgent = new EvidenceLocatedProductAgent(),
   now: () => number = Date.now,
 ) {
-  const deadline = now() + (request.timeout_ms ?? 75_000);
+  const deadline = now() + (request.timeout_ms ?? PRODUCT_AGENT_TOTAL_TIMEOUT_MS);
   try {
     return await agent.run({ ...request, timeout_ms: Math.max(1, deadline - now()) });
   } catch (error) {

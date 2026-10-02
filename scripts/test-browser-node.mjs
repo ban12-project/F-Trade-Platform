@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter, once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -7,26 +6,167 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { register as registerCompatibility } from "../ops/browser-node/compatibility-plugin/index.js";
 import {
   createConnectionDiagnostics,
   register as registerDiagnostics,
 } from "../ops/browser-node/diagnostics-plugin/index.js";
 import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/docker.mjs";
+import { waitForBrowserReady } from "../ops/browser-node/egress.mjs";
+import { awaitVideoPreview } from "../ops/browser-node/facebook-driver.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
+import { viewerGraceExpired } from "../ops/browser-node/idle.mjs";
+import { localDeadline, localLoginAuthorizationDeadline } from "../ops/browser-node/lease.mjs";
 import {
   configureLoginRuntime,
   loadLoginProfiles,
   loginProfileForRun,
   loginScopes,
+  loginStopOutcome,
 } from "../ops/browser-node/login.mjs";
 import { readPublicationMedia } from "../ops/browser-node/media.mjs";
 import {
   createPublicationAuthorizer,
   createPublicationReporter,
 } from "../ops/browser-node/publication.mjs";
-import { publicationUploadArchive, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
+import { publicationUploadFile, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
 
 const nodeId = randomUUID();
+test("automatic authorization preserves 180 seconds without extending container leases", (t) => {
+  t.mock.method(Date, "now", () => 1000000);
+  const response = { serverNow: 2000000, roundTripMs: 100 };
+  assert.equal(localDeadline(response, 2180000), 1084900);
+  assert.equal(localLoginAuthorizationDeadline(response, 2180000), 1174900);
+  assert.equal(localLoginAuthorizationDeadline(response, 2600000), 1174900);
+  assert.equal(localLoginAuthorizationDeadline(response, 2030000), 1024900);
+  assert.throws(() => localLoginAuthorizationDeadline(response, 2005000));
+});
+test("closing a challenge viewer preserves the bounded automatic task only", () => {
+  const state = {
+    automatic: true,
+    connected: false,
+    pendingConnection: false,
+    readyAt: 1,
+    disconnectedAt: 1,
+    loginTask: true,
+  };
+  assert.equal(viewerGraceExpired(state, 100000), false);
+  assert.equal(viewerGraceExpired({ ...state, automatic: false }, 100000), true);
+  assert.equal(viewerGraceExpired({ ...state, loginTask: false }, 100000), true);
+  assert.equal(
+    viewerGraceExpired(
+      { ...state, loginTask: false, disconnectedAt: null, pendingConnection: true },
+      100000,
+    ),
+    false,
+  );
+});
+test("automatic ready preserves admission and connected viewer until normal retirement", () => {
+  assert.equal(
+    loginStopOutcome(2, "ready"),
+    null,
+    "login observation must not terminate human takeover",
+  );
+  const state = {
+    automatic: true,
+    connected: false,
+    pendingConnection: true,
+    readyAt: 1,
+    loginTask: false,
+  };
+  assert.equal(viewerGraceExpired(state, 100000), false);
+  assert.equal(
+    viewerGraceExpired({ ...state, connected: true, pendingConnection: false }, 100000),
+    false,
+  );
+  assert.equal(viewerGraceExpired({ ...state, pendingConnection: false }, 100000), true);
+  assert.equal(
+    viewerGraceExpired({ ...state, connected: true, disconnectedAt: 80000 }, 100000),
+    true,
+  );
+  assert.equal(loginStopOutcome(2, "unknown"), "page_contract_failed");
+  assert.equal(loginStopOutcome(2, "refused"), "page_contract_failed");
+});
+test("browser startup waits for Firefox prewarm and rechecks cancellation", async () => {
+  const ready = { ok: true, engine: "camoufox", browserConnected: true, browserRunning: true };
+  const states = [
+    { ...ready, browserConnected: false },
+    { ...ready, browserRunning: false },
+    ready,
+  ];
+  let calls = 0,
+    waits = 0;
+  await waitForBrowserReady(
+    async (path, body, timeout) => {
+      assert.equal(path, "/health");
+      assert.equal(body, undefined);
+      assert.equal(timeout, 2000);
+      return Response.json(states[calls++]);
+    },
+    {
+      assertActive() {},
+      sleep: async () => {
+        waits++;
+      },
+    },
+  );
+  assert.equal(calls, 3);
+  assert.equal(waits, 2);
+  let active = true;
+  await assert.rejects(
+    () =>
+      waitForBrowserReady(
+        async () => {
+          active = false;
+          return Response.json(ready);
+        },
+        {
+          assertActive() {
+            if (!active) throw Error("lease_expired");
+          },
+          sleep: async () => {},
+        },
+      ),
+    /lease_expired/,
+  );
+  calls = 0;
+  await assert.rejects(
+    () =>
+      waitForBrowserReady(
+        async () => {
+          calls++;
+          return Response.json({ ...ready, browserConnected: false });
+        },
+        { assertActive() {}, sleep: async () => {} },
+      ),
+    /browser_start_timeout/,
+  );
+  assert.equal(calls, 60);
+});
+test("browser compatibility hook preserves proxy and unrelated preferences across launches", () => {
+  const events = new EventEmitter();
+  registerCompatibility({}, { events }, { enabled: true });
+  for (const firefoxUserPrefs of [undefined, { "network.http.http2.enabled": true }]) {
+    const proxy = { server: "http://proxy.example:3128" };
+    const options = { proxy, firefoxUserPrefs };
+    events.emit("browser:launching", { options });
+    assert.equal(options.proxy, proxy);
+    assert.equal(options.firefoxUserPrefs["network.http.http2.websockets"], false);
+    assert.equal(options.firefoxUserPrefs["media.peerconnection.enabled"], false);
+    if (firefoxUserPrefs) {
+      assert.equal(options.firefoxUserPrefs["network.http.http2.enabled"], true);
+      assert.deepEqual(firefoxUserPrefs, { "network.http.http2.enabled": true });
+    }
+  }
+});
+
+test("browser compatibility plugin is inactive unless enabled", () => {
+  const events = new EventEmitter();
+  registerCompatibility({}, { events });
+  registerCompatibility({}, { events }, { enabled: false });
+  assert.equal(events.listenerCount("browser:launching"), 0);
+});
+
 const accountId = randomUUID();
 const run = {
   id: randomUUID(),
@@ -59,11 +199,15 @@ test("browser runtime cannot access the host Docker socket or choose a mount", (
   assert.equal(body.HostConfig.Privileged, undefined);
   assert.equal(body.HostConfig.ReadonlyRootfs, true);
   assert.ok(body.Env.includes("BROWSER_IDLE_TIMEOUT_MS=900000"));
+  assert.ok(body.Env.includes("PROXY_PROTOCOL=http"));
   assert.deepEqual(body.HostConfig.CapDrop, ["ALL"]);
   assert.equal(body.HostConfig.Mounts.length, 1);
   assert.equal(body.HostConfig.Mounts[0].Type, "volume");
   assert.equal(body.HostConfig.RestartPolicy.Name, "no");
   assert.equal(body.HostConfig.Memory, 2048 * 1024 * 1024);
+  assert.equal(body.HostConfig.MemorySwap, body.HostConfig.Memory);
+  assert.equal(body.HostConfig.NanoCpus, 2_000_000_000);
+  assert.equal(body.HostConfig.PidsLimit, 512);
   assert.equal(JSON.stringify(body).includes("docker.sock"), false);
 });
 test("all browser ports are loopback only", () => {
@@ -329,6 +473,14 @@ test("media reader releases only manifest-matching bytes and fixes request scope
     },
   });
   assert.deepEqual(result.bytes, bytes);
+  const streamed = await readPublicationMedia({
+    run: assigned,
+    assertActive() {},
+    async request() {
+      return new Response(bytes, { headers: { "Content-Type": media.contentType } });
+    },
+  });
+  assert.deepEqual(streamed.bytes, bytes);
 });
 
 test("media reader rejects truncated, oversized, altered and wrong-type bytes", async () => {
@@ -357,33 +509,34 @@ test("media reader rejects truncated, oversized, altered and wrong-type bytes", 
       /publication_media_/,
     );
   }
+  await assert.rejects(
+    readPublicationMedia({
+      run: { kind: "publish", publicationDigest: "a".repeat(64), publication: { media } },
+      assertActive() {},
+      async request() {
+        return new Response(bytes, {
+          headers: { "Content-Type": media.contentType, "Content-Length": "1" },
+        });
+      },
+    }),
+    /publication_media_response_invalid/,
+  );
 });
 
-test("generated upload archive is readable by system tar and contains only the confirmed file", async () => {
+test("publication upload path derives only from confirmed bytes and media", () => {
   const bytes = Buffer.from("synthetic confirmed image");
   const media = {
     contentType: "image/png",
     sizeBytes: bytes.length,
     sha256: createHash("sha256").update(bytes).digest("hex"),
   };
-  const upload = publicationUploadArchive({ bytes, media });
-  const temporary = await mkdtemp(join(tmpdir(), "ftrade-upload-test-"));
-  try {
-    const archive = join(temporary, "upload.tar");
-    await writeFile(archive, upload.archive);
-    const file = upload.path.slice("/tmp/".length);
-    assert.equal(
-      execFileSync("tar", ["-tf", archive], { encoding: "utf8" }),
-      `ftrade-uploads/\n${file}\n`,
-    );
-    assert.deepEqual(execFileSync("tar", ["-xOf", archive, file]), bytes);
-    assert.throws(
-      () => publicationUploadArchive({ bytes: Buffer.from("changed"), media }),
-      /publication_upload_invalid/,
-    );
-  } finally {
-    await rm(temporary, { recursive: true, force: true });
-  }
+  const upload = publicationUploadFile({ bytes, media });
+  assert.equal(upload.path, `/tmp/ftrade-uploads/${media.sha256}.png`);
+  assert.deepEqual(upload.bytes, bytes);
+  assert.throws(
+    () => publicationUploadFile({ bytes: Buffer.from("changed"), media }),
+    /publication_upload_invalid/,
+  );
 });
 
 test("upload staging verifies container ownership and never accepts task paths", async () => {
@@ -410,7 +563,10 @@ test("upload staging verifies container ownership and never accepts task paths",
           },
         },
       };
-    assert.ok(Buffer.isBuffer(body));
+    throw new Error("unexpected_docker_request");
+  };
+  docker.execInput = async (id, path, payload, digest) => {
+    calls.push({ method: "EXEC_INPUT", path, body: payload, id, digest });
   };
   const result = await stagePublicationUpload({
     docker,
@@ -421,10 +577,10 @@ test("upload staging verifies container ownership and never accepts task paths",
     assertActive() {},
   });
   assert.equal(result.path, `/tmp/ftrade-uploads/${media.sha256}.png`);
-  assert.equal(
-    calls[1].path,
-    `/containers/${containerId}/archive?path=%2Ftmp&noOverwriteDirNonDir=1`,
-  );
+  assert.equal(calls[1].method, "EXEC_INPUT");
+  assert.equal(calls[1].path, result.path);
+  assert.equal(calls[1].digest, media.sha256);
+  assert.deepEqual(calls[1].body, bytes);
   calls.length = 0;
   await assert.rejects(
     stagePublicationUpload({
@@ -440,25 +596,86 @@ test("upload staging verifies container ownership and never accepts task paths",
   assert.equal(calls.length, 1);
 });
 
-test("Docker archive transport sends binary bytes rather than JSON encoding", async () => {
+test("video preview waits for a verified attachment and fails closed on a wrong digest", async () => {
+  const expected = {
+    accountRef: "account",
+    channelRef: "facebook-personal",
+    text: "approved text",
+    attachmentSha256: "a".repeat(64),
+  };
+  const signal = new AbortController().signal;
+  let scans = 0;
+  const preview = await awaitVideoPreview(
+    async () => {
+      scans++;
+      return {
+        ...expected,
+        attachmentCount: scans === 1 ? 0 : 1,
+        attachmentSha256: scans === 1 ? undefined : expected.attachmentSha256,
+        readyToPublish: scans !== 1,
+      };
+    },
+    expected,
+    signal,
+  );
+  assert.equal(scans, 2);
+  assert.equal(preview.attachmentSha256, expected.attachmentSha256);
+  await assert.rejects(
+    awaitVideoPreview(
+      async () => ({ ...expected, attachmentCount: 1, attachmentSha256: "b".repeat(64) }),
+      expected,
+      signal,
+    ),
+    /facebook_video_preview_mismatch/,
+  );
+});
+
+test("Docker exec transport streams confirmed binary bytes into a read-only container", async () => {
   const directory = await mkdtemp("/tmp/ft-docker-");
   const socket = join(directory, "engine.sock");
-  let observed;
+  const containerId = "a".repeat(64);
+  const execId = "b".repeat(64);
+  const bytes = Buffer.from([0, 255, 1, 128]);
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const target = `/tmp/ftrade-uploads/${digest}.mp4`;
+  let observed = Buffer.alloc(0);
+  let finished = false;
   const server = createServer((request, response) => {
+    if (request.url === `/containers/${containerId}/exec`) {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const config = JSON.parse(Buffer.concat(chunks).toString());
+        assert.equal(config.AttachStdin, true);
+        assert.equal(config.Cmd.at(-3), target);
+        assert.equal(config.Cmd.at(-2), String(bytes.length));
+        assert.equal(config.Cmd.at(-1), digest);
+        response.end(JSON.stringify({ Id: execId }));
+      });
+    } else if (request.url === `/exec/${execId}/json`) {
+      response.end(JSON.stringify({ Running: !finished, ExitCode: finished ? 0 : null }));
+    } else {
+      response.statusCode = 404;
+      response.end();
+    }
+  });
+  server.on("upgrade", (request, peer) => {
+    assert.equal(request.url, `/exec/${execId}/start`);
+    peer.write("HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n");
     const chunks = [];
-    request.on("data", (chunk) => chunks.push(chunk));
-    request.on("end", () => {
-      observed = { bytes: Buffer.concat(chunks), type: request.headers["content-type"] };
-      response.end("{}");
+    peer.on("data", (chunk) => chunks.push(chunk));
+    peer.on("end", () => {
+      observed = Buffer.concat(chunks);
+      finished = true;
+      peer.end();
     });
   });
   try {
     server.listen(socket);
     await once(server, "listening");
-    const bytes = Buffer.from([0, 255, 1, 128]);
-    await dockerClient(socket)("PUT", "/containers/synthetic/archive?path=%2Ftmp", bytes);
-    assert.deepEqual(observed.bytes, bytes);
-    assert.equal(observed.type, "application/x-tar");
+    await dockerClient(socket).execInput(containerId, target, bytes, digest);
+    assert.deepEqual(observed, bytes);
+    assert.equal(finished, true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(directory, { recursive: true, force: true });

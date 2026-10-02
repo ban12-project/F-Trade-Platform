@@ -58,7 +58,21 @@ async function record(
         ? { ...payload, lead_id: id }
         : type === "product"
           ? { ...payload, record_id: id }
-          : payload,
+          : type === "content"
+            ? {
+                content_id: id,
+                product_id: randomUUID(),
+                content_type: "product",
+                objective: "SYNTHETIC",
+                target_customer: "SYNTHETIC",
+                platform: "pending-channel-decision",
+                product_facts: [],
+                call_to_action: "",
+                hashtags: [],
+                visual_instruction: "",
+                ...payload,
+              }
+            : payload,
     createdByType: "human",
     createdById: actorId,
   });
@@ -171,19 +185,21 @@ test("HOT task opens its candidate, including legacy links, without unrelated le
   const other = await lead(id);
   await page.goto("/workspace");
   const href = `/workspace/${id}/records/lead/${hot}`;
-  await page.locator("#my-tasks").filter({ visible: true }).locator(`a[href="${href}"]`).click();
-  await expect(page).toHaveURL(new RegExp(`/records/lead/${hot}$`));
-  const panel = page.getByRole("region", { name: "商机详情与审批" });
+  await page.locator("#my-tasks").filter({ visible: true }).locator(`a[href^="${href}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`/records/lead/${hot}(?:[?].*)?$`));
+  const panel = page.getByRole("region", { name: "业务记录" });
   await expect(panel.locator(`#follow-up-${hot}`)).toBeVisible();
   await expect(panel.locator(`#follow-up-${other}`)).toHaveCount(0);
   await panel.getByLabel("商机确认凭据").fill("evidence-synthetic-task-navigation");
   await expect(panel.getByRole("button", { name: "确认有效商机", exact: true })).toBeEnabled();
-  // Navigate after discarding this test-only input through a new document.
   await page.goto(`/workspace/${id}?panel=lead&item=${hot}`);
-  await expect(panel.locator(`#follow-up-${hot}`)).toBeVisible();
-  await page.goto(`/workspace/${id}?panel=opportunity`);
-  await expect(panel.locator("form")).toHaveCount(0);
-  await panel.getByRole("link", { name: `客户会话 ${hot.slice(0, 8)}`, exact: true }).click();
+  await expect(page.getByText("旧阶段链接已停用", { exact: true })).toBeVisible();
+  await expect(page.locator(`#follow-up-${hot}`)).toHaveCount(0);
+  await page.goto(`/workspace/customers?project=${id}&type=lead`);
+  await page
+    .locator(`a[href^="/workspace/${id}/records/lead/${hot}"]`)
+    .filter({ visible: true })
+    .click();
   await expect(panel.locator(`#follow-up-${hot}`)).toBeVisible();
   await expect(panel.locator(`#follow-up-${other}`)).toHaveCount(0);
 });
@@ -208,25 +224,22 @@ test("quotation tasks and default entry survive existing leads and target the se
     "sales_quotation",
   );
   await approval(chosen, "gate_02_quote");
-  await page.goto(`/workspace/${id}`);
-  await expect(page.getByRole("link", { name: "报价", exact: true })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await page.goto(`/workspace/customers?project=${id}&type=quotation`);
   await page
-    .getByRole("region", { name: "报价详情与审批" })
-    .locator(`a[href="/workspace/${id}/records/quotation/${chosen}"]`)
+    .locator(`a[href^="/workspace/${id}/records/quotation/${chosen}"]`)
     .filter({ visible: true })
     .click();
-  const panel = page.getByRole("region", { name: "报价详情与审批" });
+  const panel = page.getByRole("region", { name: "业务记录" });
   await expect(panel.locator(`#quote-decision-${chosen}`)).toBeVisible();
   await expect(panel.locator(`#quote-decision-${other}`)).toHaveCount(0);
   await expect(panel.locator("#quotation-new")).toHaveCount(0);
-  await panel.getByRole("link", { name: "返回记录列表" }).click();
-  await expect(page).toHaveURL(new RegExp(`/workspace/customers[?]project=${id}$`));
+  await page.getByRole("main").getByRole("link", { name: "返回清单" }).click();
+  await expect(page).toHaveURL(
+    new RegExp("/workspace/customers[?]project=" + id + "&type=quotation$"),
+  );
   await expect(page.getByRole("heading", { name: "客户与询盘", exact: true })).toBeVisible();
   await expect(
-    page.getByRole("main").locator(`a[href="/workspace/${id}/records/quotation/${other}"]`),
+    page.getByRole("main").locator(`a[href^="/workspace/${id}/records/quotation/${other}"]`),
   ).toBeVisible();
 });
 
@@ -236,19 +249,19 @@ test("new lead task opens RFQ creation with that lead selected and reopens its e
   const id = await project();
   const received = await lead(id, true);
   await record(id, "rfq", "RFQ_COLLECTING", rfq, "sales_rfq");
-  await page.goto(`/workspace/${id}?panel=rfq`);
+  await page.goto("/workspace");
   await page
-    .locator(`a[href="/workspace/${id}/new/rfq?lead=${received}"]`)
+    .locator(`a[href^="/workspace/${id}/new/rfq?lead=${received}"]`)
     .filter({ visible: true })
     .click();
-  const panel = page.getByRole("region", { name: "需求确认详情与审批" });
+  const panel = page.getByRole("region", { name: "业务记录" });
   const form = panel.locator("#create-rfq");
   await expect(form).toBeVisible();
   await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toContainText(
     `客户会话 ${received.slice(0, 8)}`,
   );
   await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toBeDisabled();
-  await page.goto(`/workspace/${id}?panel=lead&item=${received}`);
+  await page.goto(`/workspace/${id}/new/rfq?lead=${received}`);
   await expect(form).toBeVisible();
   await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toContainText(
     `客户会话 ${received.slice(0, 8)}`,
@@ -283,14 +296,14 @@ test("delivery task isolates its confirmation and unknown IDs never fall back to
     delivery,
     "delivery_confirmation",
   );
-  await page.goto(`/workspace/${id}?panel=delivery&item=${chosen}`);
-  const panel = page.getByRole("region", { name: "交期详情与审批" });
+  await page.goto(`/workspace/${id}/records/delivery/${chosen}`);
+  const panel = page.getByRole("region", { name: "业务记录" });
   await expect(panel.locator(`#delivery-${chosen}`)).toBeVisible();
   await expect(panel.locator(`#delivery-${other}`)).toHaveCount(0);
-  for (const stage of ["quotation", "delivery", "follow-up", "rfq"]) {
-    await page.goto(`/workspace/${id}?panel=${stage}&item=${randomUUID()}`);
+  for (const stage of ["quotation", "delivery", "lead", "rfq"]) {
+    await page.goto(`/workspace/${id}/records/${stage}/${randomUUID()}`);
     // Streaming may retain hidden previous regions; assert the accessible details only.
-    const currentDetails = page.getByRole("region", { name: /详情与审批/ });
+    const currentDetails = page.getByRole("region", { name: "业务记录" });
     await expect(currentDetails.getByText("这条记录已不可用", { exact: true })).toBeVisible();
     await expect(currentDetails.locator("form")).toHaveCount(0);
   }
@@ -316,9 +329,13 @@ test("publication link selects its approved payload and unavailable targets cann
   );
   await approval(other, "gate_01_truth", true);
   await approval(chosen, "gate_01_truth", true);
-  await page.goto(`/workspace/${id}?panel=publication&item=${chosen}`);
-  const panel = page.getByRole("region", { name: "发布详情与审批" });
-  await expect(panel.getByText("Chosen synthetic payload", { exact: true })).toBeVisible();
+  await page.goto(`/workspace/${id}/records/content/${chosen}`);
+  const panel = page.getByRole("region", { name: "业务记录" });
+  await expect(
+    panel
+      .locator("#publication-confirmation")
+      .getByText("Chosen synthetic payload", { exact: true }),
+  ).toBeVisible();
   await expect(panel.getByText("Other synthetic payload", { exact: true })).toHaveCount(0);
   const publicationId = randomUUID();
   await db.insert(schema.socialPublication).values([
@@ -344,7 +361,7 @@ test("publication link selects its approved payload and unavailable targets cann
       externalPublicationRef: "synthetic-other-post",
     },
   ]);
-  await page.goto(`/workspace/${id}?panel=publication&item=${publicationId}`);
+  await page.goto(`/workspace/${id}/records/publication/${publicationId}`);
   await expect(panel.getByText("synthetic-chosen-channel", { exact: false })).toBeVisible();
   await expect(panel.getByText("结果待人工核对", { exact: true })).toBeVisible();
   await expect(panel.getByText(/系统不会自动重试/)).toBeVisible();
@@ -363,7 +380,7 @@ test("publication link selects its approved payload and unavailable targets cann
   }
   await expect(panel.getByText("synthetic-other-post", { exact: false })).toHaveCount(0);
   await expect(panel.getByText("Other synthetic payload", { exact: true })).toHaveCount(0);
-  await page.goto(`/workspace/${id}?panel=publication&item=${randomUUID()}`);
+  await page.goto(`/workspace/${id}/records/publication/${randomUUID()}`);
   await expect(panel.getByText("这条记录已不可用", { exact: true })).toBeVisible();
   await expect(panel.locator("#publication-confirmation")).toHaveCount(0);
 });
@@ -384,8 +401,8 @@ test("review tasks respect application role, project role and archival without c
   const actionable = page
     .locator("#my-tasks")
     .filter({ visible: true })
-    .locator(`a[href="${href}"]`);
-  const waiting = page.locator("#my-tasks").filter({ visible: true }).locator(`a[href="${href}"]`);
+    .locator(`a[href^="${href}"]`);
+  const waiting = page.locator("#my-tasks").filter({ visible: true }).locator(`a[href^="${href}"]`);
   await page.goto("/workspace");
   await expect(actionable).toBeVisible();
   await db.update(schema.user).set({ role: "user" }).where(eq(schema.user.id, actorId));
@@ -394,7 +411,7 @@ test("review tasks respect application role, project role and archival without c
   await page.getByRole("link", { name: /等待他人/ }).click();
   await expect(waiting).toBeVisible();
   await waiting.click();
-  const panel = page.getByRole("region", { name: "报价详情与审批" });
+  const panel = page.getByRole("region", { name: "业务记录" });
   await expect(panel.locator(`#quote-decision-${quote}`)).toHaveCount(0);
   await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, actorId));
   await db
@@ -406,10 +423,13 @@ test("review tasks respect application role, project role and archival without c
   await page.getByRole("link", { name: /等待他人/ }).click();
   await expect(waiting).toBeVisible();
   await waiting.click();
-  await expect(panel.getByText("当前为只读视图。请由项目编辑者处理写入或审核。")).toBeVisible();
-  await page.goto(`/workspace/${id}?panel=quotation`);
-  await panel.getByRole("link", { name: `人工报价 ${quote.slice(0, 8)}` }).click();
-  await expect(panel.getByText("当前为只读视图。请由项目编辑者处理写入或审核。")).toBeVisible();
+  await expect(
+    panel.getByText("当前为只读视图。写入和审核由有权限的项目编辑者处理。"),
+  ).toBeVisible();
+  await page.goto(`/workspace/${id}/records/quotation/${quote}`);
+  await expect(
+    panel.getByText("当前为只读视图。写入和审核由有权限的项目编辑者处理。"),
+  ).toBeVisible();
   await expect(panel.locator(`#quote-decision-${quote}`)).toHaveCount(0);
   await db
     .update(schema.workspaceProjectMember)
@@ -451,9 +471,10 @@ test("unused ready product and RFQ tasks open the intended creation context", as
   await page.goto("/workspace");
   await page
     .locator("#my-tasks")
-    .locator(`a[href="/workspace/${marketing}/new/content?product=${product}"]`)
+    .filter({ visible: true })
+    .locator(`a[href^="/workspace/${marketing}/new/content?product=${product}"]`)
     .click();
-  const contentPanel = page.getByRole("region", { name: "营销内容详情与审批" });
+  const contentPanel = page.getByRole("region", { name: "业务记录" });
   await contentPanel.getByRole("combobox").first().click();
   await expect(page.getByRole("option", { name: /SYNTHETIC chosen source/ })).toHaveAttribute(
     "aria-selected",
@@ -473,9 +494,10 @@ test("unused ready product and RFQ tasks open the intended creation context", as
   await page.goto("/workspace");
   await page
     .locator("#my-tasks")
-    .locator(`a[href="/workspace/${sales}/new/quotation?rfq=${request}"]`)
+    .filter({ visible: true })
+    .locator(`a[href^="/workspace/${sales}/new/quotation?rfq=${request}"]`)
     .click();
-  const quotePanel = page.getByRole("region", { name: "报价详情与审批" });
+  const quotePanel = page.getByRole("region", { name: "业务记录" });
   await expect(quotePanel.locator("#quotation-new")).toBeVisible();
   await expect(quotePanel.getByRole("combobox", { name: "客户需求", exact: true })).toBeDisabled();
   await expect(quotePanel.getByRole("combobox", { name: "客户需求", exact: true })).toContainText(
@@ -531,39 +553,37 @@ test("revisions, scheduled follow-ups and pending publication receipts have dist
   const receiptHref = `/workspace/${marketing}/records/publication/${publication}`;
   await page.goto("/workspace");
   await expect(
-    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href="${revisionHref}"]`),
+    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href^="${revisionHref}"]`),
   ).toContainText("修订人工报价");
   await page.getByRole("link", { name: /已安排/ }).click();
   await expect(
     page
       .locator("#my-tasks")
       .filter({ visible: true })
-      .locator(`a[href="/workspace/${sales}/records/lead/${planned}"]`),
+      .locator(`a[href^="/workspace/${sales}/records/lead/${planned}"]`),
   ).toBeVisible();
   await page.getByRole("link", { name: /系统处理中/ }).click();
   await expect(
-    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href="${receiptHref}"]`),
+    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href^="${receiptHref}"]`),
   ).toBeVisible();
   await page.getByRole("link", { name: /我可处理/ }).click();
   await expect(
-    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href="${receiptHref}"]`),
+    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href^="${receiptHref}"]`),
   ).toHaveCount(0);
   await page.goto(`/workspace/${sales}`);
-  await expect(page.getByRole("link", { name: /报价/ }).first()).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(page.getByRole("heading", { name: "项目管理", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "项目栏目" })).toHaveCount(0);
   await db
     .update(schema.socialPublication)
     .set({ status: "unknown" })
     .where(eq(schema.socialPublication.id, publication));
   await page.goto("/workspace");
   await expect(
-    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href="${receiptHref}"]`),
+    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href^="${receiptHref}"]`),
   ).toContainText("需要排查");
   await page.getByRole("link", { name: /系统处理中/ }).click();
   await expect(
-    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href="${receiptHref}"]`),
+    page.locator("#my-tasks").filter({ visible: true }).locator(`a[href^="${receiptHref}"]`),
   ).toHaveCount(0);
 });
 
@@ -605,9 +625,9 @@ test("object libraries retain project scope, reference ownership and stable reco
     .where(eq(schema.workspaceProjectMember.projectId, hidden));
   await page.goto(`/workspace/products?project=${marketing}`);
   const chosenHref = `/workspace/${marketing}/records/product/${product}`;
-  await expect(page.locator(`a[href="${chosenHref}"]`).filter({ visible: true })).toBeVisible();
+  await expect(page.locator(`a[href^="${chosenHref}"]`).filter({ visible: true })).toBeVisible();
   await expect(page.getByText("SYNTHETIC library inaccessible")).toHaveCount(0);
-  await page.locator(`a[href="${chosenHref}"]`).filter({ visible: true }).click();
+  await page.locator(`a[href^="${chosenHref}"]`).filter({ visible: true }).click();
   await expect(
     page.getByRole("cell", { name: "SYNTHETIC library selected", exact: true }),
   ).toBeVisible();
@@ -618,20 +638,19 @@ test("object libraries retain project scope, reference ownership and stable reco
   await page.goBack();
   await expect(page.getByLabel("归属项目")).toHaveValue(marketing);
   await page.goForward();
-  await expect(page).toHaveURL(new RegExp(`${product}$`));
+  await expect(page).toHaveURL(new RegExp(`${product}(?:[?].*)?$`));
   await page.goto(`/workspace/products?project=${sales}`);
   await expect(page.getByText(/引用资料，只读/).filter({ visible: true })).toBeVisible();
   await page
-    .locator(`a[href="/workspace/${sales}/records/product/${product}"]`)
+    .locator(`a[href^="/workspace/${sales}/records/product/${product}"]`)
     .filter({ visible: true })
     .click();
   await expect(
     page
-      .getByRole("region", { name: "引用的产品详情与审批" })
-      .getByText("当前为只读视图。请由项目编辑者处理写入或审核。"),
+      .getByRole("region", { name: "业务记录" })
+      .getByText("当前为只读视图。写入和审核由有权限的项目编辑者处理。"),
   ).toBeVisible();
-  await page.getByRole("link", { name: "引用的产品", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/records/product/${product}$`));
+  await expect(page.getByRole("navigation", { name: "项目栏目" })).toHaveCount(0);
   await page.goto(`/workspace/products?project=${hidden}`);
   await expect(page.getByText("这个项目不可访问").filter({ visible: true })).toBeVisible();
   await expect(page.getByText("SYNTHETIC library inaccessible")).toHaveCount(0);
@@ -651,14 +670,12 @@ test("malformed or contradictory object links never substitute a form or another
     `/workspace/${id}/records/product/${chosen}?item=${randomUUID()}`,
     `/workspace/${id}/records/product/${chosen}?product=${chosen}`,
     `/workspace/${id}/new/content?product=invalid`,
-    `/workspace/${id}?panel=product&item=invalid`,
-    `/workspace/${id}?panel=content&product=invalid`,
   ]) {
     await page.goto(path);
     await expect(
       page.getByText("这条记录已不可用", { exact: true }).filter({ visible: true }),
     ).toBeVisible();
-    await expect(page.getByRole("region", { name: /详情与审批/ }).locator("form")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "业务记录" }).locator("form")).toHaveCount(0);
   }
 });
 
@@ -696,7 +713,94 @@ test("new work reuses an explicit project and creates ownership only when select
   const createdId = new URL(page.url()).pathname.split("/")[2];
   projectIds.push(createdId);
   await expect(
-    page.getByRole("heading", { name: "SYNTHETIC explicit new ownership" }),
+    page.getByText("SYNTHETIC explicit new ownership · 营销项目", { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
+});
+
+test("filtered library returns retain type and state across refresh, back and forward", async ({
+  page,
+}) => {
+  const id = await project();
+  const chosen = await record(id, "rfq", "RFQ_COLLECTING", rfq, "sales_rfq");
+  const other = await record(id, "rfq", "RFQ_READY", rfq, "sales_rfq");
+  const source = "/workspace/customers?project=" + id + "&type=rfq&state=RFQ_COLLECTING";
+  await page.goto(source);
+  const main = page.getByRole("main");
+  await expect(main.getByLabel("记录类型")).toHaveValue("rfq");
+  await expect(main.getByLabel("状态", { exact: true })).toHaveValue("RFQ_COLLECTING");
+  await expect(main.locator('a[href*="' + other + '"]')).toHaveCount(0);
+  await main.locator('a[href*="' + chosen + '"]').click();
+  await expect(main.getByRole("link", { name: "返回清单" })).toHaveAttribute("href", source);
+  await page.reload();
+  await main.getByRole("link", { name: "返回清单" }).click();
+  await expect(page).toHaveURL(new URL(source, "http://127.0.0.1:3100").href);
+  await main.getByRole("button", { name: "记录询盘", exact: true }).click();
+  await expect(main.locator("#create-rfq")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "开始新工作" })).toHaveCount(0);
+  await page.goBack();
+  await expect(main.getByLabel("状态", { exact: true })).toHaveValue("RFQ_COLLECTING");
+  await page.goForward();
+  await expect(main.locator("#create-rfq")).toBeVisible();
+});
+
+test("legacy stage parameters stop without selecting records or new forms", async ({ page }) => {
+  const id = await project();
+  for (const param of [
+    "panel=rfq",
+    "item=" + randomUUID(),
+    "lead=" + randomUUID(),
+    "product=" + randomUUID(),
+    "rfq=" + randomUUID(),
+  ]) {
+    await page.goto("/workspace/" + id + "?" + param);
+    await expect(page.getByText("旧阶段链接已停用", { exact: true })).toBeVisible();
+    await expect(page.locator("#create-rfq")).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "项目栏目" })).toHaveCount(0);
+  }
+});
+
+test("project names are owner managed and archived metadata stays editable", async ({ page }) => {
+  const id = await project();
+  await page.goto("/workspace/" + id);
+  await page.getByLabel("项目名称", { exact: true }).fill("SYNTHETIC renamed project");
+  await page.getByRole("button", { name: "保存名称" }).click();
+  await expect
+    .poll(
+      async () =>
+        (
+          await db.select().from(schema.workspaceProject).where(eq(schema.workspaceProject.id, id))
+        )[0].title,
+    )
+    .toBe("SYNTHETIC renamed project");
+  await page.getByRole("button", { name: "归档项目", exact: true }).click();
+  await expect(page.getByRole("button", { name: "重开项目", exact: true })).toBeVisible();
+  await page.getByLabel("项目名称", { exact: true }).fill("SYNTHETIC archived metadata");
+  await page.getByRole("button", { name: "保存名称" }).click();
+  await expect
+    .poll(
+      async () =>
+        (
+          await db.select().from(schema.workspaceProject).where(eq(schema.workspaceProject.id, id))
+        )[0].title,
+    )
+    .toBe("SYNTHETIC archived metadata");
+  await db
+    .update(schema.workspaceProjectMember)
+    .set({ role: "editor" })
+    .where(eq(schema.workspaceProjectMember.projectId, id));
+  await page.reload();
+  await expect(page.getByRole("button", { name: "保存名称" })).toHaveCount(0);
+});
+
+test("channel settings owns old account and browser management entries", async ({ page }) => {
+  for (const path of ["/workspace/facebook", "/workspace/browsers"]) {
+    await page.goto(path);
+    await page.getByRole("main").getByRole("link", { name: /渠道/ }).click();
+    await expect(page).toHaveURL(/settings[?]section=channels$/);
+    await expect(page.getByRole("tab", { name: "渠道", exact: true })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  }
 });

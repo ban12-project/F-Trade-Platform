@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
-
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { z } from "zod";
-
 import { getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
@@ -14,6 +12,10 @@ import {
 import type { rfqFormSchema } from "@/lib/form-schemas";
 import { assessRfq, promoteRfqReady, updateRfqDraft } from "@/lib/rfq/completeness";
 import { assertTransition } from "@/lib/workflow/transitions";
+import {
+  assertAggregateWorkspaceWrite,
+  assertWorkspaceProjectAccess,
+} from "@/lib/workspace/access";
 
 export type RfqFormInput = z.infer<typeof rfqFormSchema>;
 export type RfqEntry = {
@@ -109,12 +111,13 @@ export async function createRfq(input: RfqFormInput, actorId: string, projectId?
   const draft = rfqFromInput(input, id);
   await getDatabase().transaction(async (tx) => {
     if (projectId) {
+      await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
       const [project] = await tx
         .select({ kind: workspaceProject.kind })
         .from(workspaceProject)
         .where(eq(workspaceProject.id, projectId))
         .for("update");
-      if (!project || project.kind !== "sales") throw new Error("询盘只能关联到销售机会项目。");
+      if (project?.kind !== "sales") throw new Error("询盘只能关联到销售机会项目。");
       if (input.leadId) {
         const [lead] = await tx
           .select({ id: aggregateRecord.id })
@@ -177,7 +180,10 @@ export async function listRfqEntries(limit = 50): Promise<RfqEntry[]> {
   return rows.flatMap((row) => entryFromRecord(row) ?? []);
 }
 
-export async function listProjectRfqEntries(projectId: string): Promise<RfqEntry[]> {
+export async function listProjectRfqEntries(
+  projectId: string,
+  ids?: readonly string[],
+): Promise<RfqEntry[]> {
   const rows = await getDatabase()
     .select({ record: aggregateRecord })
     .from(workspaceProjectItem)
@@ -188,6 +194,7 @@ export async function listProjectRfqEntries(projectId: string): Promise<RfqEntry
         eq(workspaceProjectItem.role, "sales_rfq"),
         eq(workspaceProjectItem.relation, "owned"),
         eq(aggregateRecord.type, "rfq"),
+        ids ? inArray(aggregateRecord.id, [...ids]) : undefined,
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));
@@ -202,7 +209,9 @@ export async function reviseRfq(
 ) {
   const now = new Date();
   return getDatabase().transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(rfqId, tx, actorId);
     if (projectId) {
+      await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
       const [link] = await tx
         .select({ id: workspaceProjectItem.id })
         .from(workspaceProjectItem)
@@ -223,8 +232,7 @@ export async function reviseRfq(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.type, "rfq")))
       .for("update");
-    if (!record || record.state !== "RFQ_COLLECTING")
-      throw new Error("只有收集中的 RFQ 可以补充资料。");
+    if (record?.state !== "RFQ_COLLECTING") throw new Error("只有收集中的 RFQ 可以补充资料。");
     const draft = rfqFromInput(input, rfqId);
     const [updated] = await tx
       .update(aggregateRecord)
@@ -261,7 +269,9 @@ export async function submitRfqReady(
   const now = new Date();
   const eventId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(rfqId, tx, actorId);
     if (projectId) {
+      await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
       const [link] = await tx
         .select({ id: workspaceProjectItem.id })
         .from(workspaceProjectItem)
@@ -283,8 +293,7 @@ export async function submitRfqReady(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.type, "rfq")))
       .for("update");
-    if (!record || record.state !== "RFQ_COLLECTING")
-      throw new Error("该 RFQ 当前不处于信息收集状态。");
+    if (record?.state !== "RFQ_COLLECTING") throw new Error("该 RFQ 当前不处于信息收集状态。");
     const assessment = assessRfq(record.payload);
     if (!assessment.ready)
       return { state: "RFQ_COLLECTING" as const, missingFields: assessment.missing_fields };

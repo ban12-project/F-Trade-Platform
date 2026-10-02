@@ -104,6 +104,20 @@ export function validateFacebookProfile(value, now = Date.now()) {
     throw new Error("facebook_profile_selector_invalid");
   if (value.textOnly !== undefined && typeof value.textOnly !== "boolean")
     throw new Error("facebook_profile_format_invalid");
+  if (value.videoReceipt !== undefined) {
+    if (
+      !value.videoReceipt ||
+      ["container", "link", "successText"].some(
+        (key) =>
+          typeof value.videoReceipt[key] !== "string" ||
+          !value.videoReceipt[key].trim() ||
+          value.videoReceipt[key].length > 500,
+      ) ||
+      value.videoReceipt.container.includes(",") ||
+      value.videoReceipt.link.includes(",")
+    )
+      throw new Error("facebook_video_receipt_unreviewed");
+  }
   if (value.receiptUrl !== undefined) {
     const receipt = new URL(value.receiptUrl);
     if (
@@ -155,6 +169,40 @@ async function json(response) {
   }
 }
 
+/** A video thumbnail may appear before Facebook enables the composer. */
+export async function awaitVideoPreview(inspect, expected, signal) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (signal.aborted) throw new Error("facebook_cancelled");
+    let preview;
+    try {
+      preview = await inspect();
+    } catch (error) {
+      if (error?.message !== "facebook_evaluation_failed") throw error;
+    }
+    if (preview) {
+      if (
+        preview.accountRef !== expected.accountRef ||
+        preview.channelRef !== expected.channelRef ||
+        preview.text !== expected.text
+      )
+        return preview;
+      if (
+        preview.attachmentCount > 1 ||
+        (preview.attachmentSha256 && preview.attachmentSha256 !== expected.attachmentSha256)
+      )
+        throw new Error("facebook_video_preview_mismatch");
+      if (
+        preview.readyToPublish === true &&
+        preview.attachmentCount === 1 &&
+        preview.attachmentSha256 === expected.attachmentSha256
+      )
+        return preview;
+    }
+    if (attempt < 59) await delay(500, undefined, { signal });
+  }
+  throw new Error("facebook_video_preview_unready");
+}
+
 export function createFacebookDriver(input, browserRequest) {
   const profile = validateFacebookProfile(input);
   const evaluate = async (session, action) => {
@@ -187,7 +235,7 @@ export function createFacebookDriver(input, browserRequest) {
     await waitFor(session, "identity-ready");
     await evaluate(session, { kind: "identity" });
   };
-  const readPosts = async (session, text) => {
+  const readPosts = async (session, text, resolveExisting = false) => {
     if (profile.receiptUrl && !session.readingReceipts) {
       await navigate(session, profile.receiptUrl);
       session.readingReceipts = true;
@@ -215,13 +263,17 @@ export function createFacebookDriver(input, browserRequest) {
         }
       }
     };
-    if (text === undefined) return evaluate(session, { kind: "posts" });
+    if (text === undefined && !resolveExisting) return evaluate(session, { kind: "posts" });
     await resolveLinks();
     for (let attempt = 0; attempt < 20; attempt++) {
       if (attempt === 5) await resolveLinks();
       try {
         const posts = await evaluate(session, { kind: "posts", text });
         if (posts.every((post) => post.externalPublicationRef !== null)) return posts;
+        // An unrelated old placeholder may never expose a permalink. Keep its
+        // author/text in the duplicate guard and only baseline verified links.
+        // A new post observed by exact text still requires its own permalink.
+        if (resolveExisting && attempt === 19) return posts;
       } catch (error) {
         // Reading can race the timestamp replacement. Retry observations only;
         // every successful observation still validates identity and exact DOM.
@@ -231,10 +283,21 @@ export function createFacebookDriver(input, browserRequest) {
     }
     throw new Error("facebook_permalink_unresolved");
   };
+  const retryableBaselineErrors = new Set([
+    "browser_request_failed",
+    "facebook_browser_response_invalid",
+    "facebook_composer_transition_timeout",
+    "facebook_evaluation_failed",
+    "facebook_navigation_invalid",
+    "facebook_permalink_hover_failed",
+    "facebook_permalink_unresolved",
+  ]);
   return {
     async open(run, signal) {
       if (profile.textOnly && run.publication?.format !== "text")
         throw new Error("facebook_profile_format_unreviewed");
+      if (run.publication?.format === "video" && !profile.videoReceipt)
+        throw new Error("facebook_video_receipt_unreviewed");
       if (
         run.accountRef !== profile.accountRef ||
         run.channelRef !== profile.channelRef ||
@@ -265,7 +328,20 @@ export function createFacebookDriver(input, browserRequest) {
       return evaluate(session, { kind: "identity" });
     },
     async existingPublicationRefs(session) {
-      const posts = await readPosts(session);
+      let posts;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          posts = await readPosts(session, undefined, profile.resolvePostLinks === true);
+          break;
+        } catch (error) {
+          if (
+            attempt === 1 ||
+            session.signal.aborted ||
+            !retryableBaselineErrors.has(error?.message)
+          )
+            throw error;
+        }
+      }
       session.baseline = new Set(posts.map((post) => post.externalPublicationRef).filter(Boolean));
       session.existingTexts = new Set(
         posts.filter((post) => post.accountRef === profile.accountRef).map((post) => post.text),
@@ -273,7 +349,7 @@ export function createFacebookDriver(input, browserRequest) {
       return [...session.baseline];
     },
     async prepare(session, payload, upload) {
-      if (session.existingTexts?.has(payload.text))
+      if (payload.text && session.existingTexts?.has(payload.text))
         throw new Error("facebook_matching_post_already_exists");
       if (session.readingReceipts) {
         await navigate(session, profile.url);
@@ -281,28 +357,36 @@ export function createFacebookDriver(input, browserRequest) {
       }
       await evaluate(session, { kind: "open" });
       await waitFor(session, "composer-ready");
-      if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
-        await waitFor(session, "audience-picker-ready");
-        await evaluate(session, { kind: "audience-select" });
-        await waitFor(session, "audience-selection-ready");
-        await evaluate(session, { kind: "audience-confirm" });
-        await waitFor(session, "audience-applied");
-      }
-      await evaluate(session, { kind: "inspect" });
+      const ensureAudience = async () => {
+        if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
+          await waitFor(session, "audience-picker-ready");
+          await evaluate(session, { kind: "audience-select" });
+          await waitFor(session, "audience-selection-ready");
+          await evaluate(session, { kind: "audience-confirm" });
+          await waitFor(session, "audience-applied");
+        }
+        await evaluate(session, { kind: "inspect" });
+      };
+      await ensureAudience();
       if (upload) {
         await evaluate(session, { kind: "upload-check" });
         const attached = await json(
           await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/upload`, {
             userId: session.accountId,
             path: upload.path,
+            inputSelector: `${profile.selectors.composer} ${profile.selectors.fileInput}`,
           }),
         );
         if (!attached.ok || attached.attached?.length !== 1 || attached.attached[0] !== upload.path)
           throw new Error("facebook_upload_failed");
       }
-      // Upload may replace the composer and discard its earlier text. Recheck
-      // the active composer after attaching, then type into that composer only.
-      await evaluate(session, { kind: "inspect" });
+      // Upload may replace the composer, text and audience. Recheck the active
+      // account and restore the reviewed audience before typing into it.
+      if (upload) {
+        await waitFor(session, "composer-ready");
+        await evaluate(session, { kind: "identity" });
+        await ensureAudience();
+      }
       const active =
         ':not([aria-hidden="true"]):not([aria-hidden="true"] *):not([inert]):not([inert] *)';
       const selector = `${profile.selectors.composer}${active} ${profile.selectors.textbox}${active}`;
@@ -325,12 +409,31 @@ export function createFacebookDriver(input, browserRequest) {
       }
       session.expected = {
         kind: "publish",
+        accountRef: profile.accountRef,
+        channelRef: profile.channelRef,
         text: payload.text,
         attachmentCount: upload ? 1 : 0,
         attachmentName: upload?.path.split("/").at(-1),
+        attachmentFormat: upload ? payload.format : undefined,
+        attachmentSha256: upload?.media?.sha256,
       };
     },
-    inspect: (session) => evaluate(session, { kind: "inspect" }),
+    inspect: (session) => {
+      const inspect = async () => {
+        if (
+          session.expected?.attachmentFormat === "video" &&
+          (await evaluate(session, { kind: "video-receipt" }))
+        )
+          throw new Error("facebook_video_receipt_stale");
+        return evaluate(session, {
+          kind: "inspect",
+          attachmentFormat: session.expected?.attachmentFormat,
+        });
+      };
+      return session.expected?.attachmentFormat === "video"
+        ? awaitVideoPreview(inspect, session.expected, session.signal)
+        : inspect();
+    },
     async publish(session, authorization) {
       if (!session.expected || session.clicked)
         throw new Error("facebook_publish_already_attempted");
@@ -341,6 +444,20 @@ export function createFacebookDriver(input, browserRequest) {
       });
     },
     async observe(session, payload, signal) {
+      if (payload.format === "video") {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const ref = await evaluate(session, { kind: "video-receipt" });
+          if (ref)
+            return {
+              accountRef: profile.accountRef,
+              channelRef: profile.channelRef,
+              text: payload.text,
+              externalPublicationRef: ref,
+            };
+          await delay(500, undefined, { signal });
+        }
+        throw new Error("facebook_video_receipt_not_observed");
+      }
       if (profile.receiptUrl) await waitFor(session, "composer-closed");
       for (let attempt = 0; attempt < 20; attempt++) {
         const posts = await readPosts(session, payload.text);

@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/auth-guard";
 import { hasPermission } from "@/lib/authz";
 import { listUnassignedInboundConversations } from "@/lib/social/inbound-routing-store";
 import {
-  readWorkspacePipeline,
+  readWorkspaceProjectOverview,
   readWorkspaceProjects,
   readWorkspaceTasks,
 } from "@/lib/workspace/read-model";
@@ -16,10 +16,10 @@ export const prefetch = "partial";
 async function WorkspaceContent({ searchParams }: Props) {
   await connection();
   const session = await requirePermission("workspace:view");
-  const [projects, tasks, pipeline, inbound] = await Promise.all([
+  const [projects, tasks, overview, inbound] = await Promise.all([
     readWorkspaceProjects(session.user.id),
     readWorkspaceTasks(session.user.id),
-    readWorkspacePipeline(session.user.id),
+    readWorkspaceProjectOverview(session.user.id),
     hasPermission(session.user.role, "sales:write")
       ? listUnassignedInboundConversations()
       : Promise.resolve([]),
@@ -28,7 +28,7 @@ async function WorkspaceContent({ searchParams }: Props) {
     <WorkspaceDashboard
       projects={projects}
       tasks={tasks}
-      pipeline={pipeline}
+      overview={overview}
       inbound={inbound}
       currentTime={Date.now()}
       view={(await searchParams).view}

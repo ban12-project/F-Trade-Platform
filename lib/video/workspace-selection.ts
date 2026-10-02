@@ -5,6 +5,7 @@ const querySchema = z
     item: z.uuid().optional(),
     product: z.uuid().optional(),
     new: z.literal("1").optional(),
+    returnTo: z.string().optional(),
   })
   .refine((value) => !(value.item && (value.product || value.new)));
 
@@ -12,6 +13,7 @@ export type VideoSelectionQuery = {
   item?: string | string[];
   product?: string | string[];
   new?: string | string[];
+  returnTo?: string | string[];
 };
 export type VideoWorkspaceSelection =
   | { mode: "collection" }

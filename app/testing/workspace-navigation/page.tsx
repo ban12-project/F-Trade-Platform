@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { WorkspaceLink } from "@/components/workspace/workspace-link";
 import { navigationProject } from "./data";
 import { NavigationEditor } from "./editor";
 export default function Page() {
@@ -6,6 +7,9 @@ export default function Page() {
   return (
     <main className="min-h-screen pb-24">
       <h1>导航测试起点</h1>
+      <WorkspaceLink href={`/testing/workspace-navigation/${navigationProject.id}`}>
+        {navigationProject.title}
+      </WorkspaceLink>
       <NavigationEditor href={`/testing/workspace-navigation/${navigationProject.id}?slow=1`} />
     </main>
   );

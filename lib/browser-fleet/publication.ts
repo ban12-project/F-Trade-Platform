@@ -25,6 +25,49 @@ import {
   requestStop,
 } from "./policy";
 
+/** Called under the node lock shared with human reconciliation. This only
+ * resolves the login-confirmation blocker; original receipts and channel pause
+ * remain unchanged, and this is never a new publication authorization. */
+export async function hasHumanReconciledPublication(
+  tx: DatabaseTransaction,
+  nodeId: string,
+  ownerId: string,
+  account: Account,
+  run: Run,
+) {
+  if (run.kind !== "publish" || run.status !== "unknown" || !run.jobRef) return false;
+  const result = await tx.execute(sql`
+    SELECT r.payload, r.receipt
+    FROM browser_fleet_publication r
+    JOIN social_browser_job j ON j.id = r.job_id
+    JOIN social_publication p ON p.browser_job_id = j.id AND p.id = j.payload_ref
+    WHERE r.node_id = ${nodeId} AND r.run_id = ${run.id} AND r.job_id = ${run.jobRef}
+      AND j.kind = 'publish' AND j.status = 'succeeded' AND p.status = 'published'
+      AND j.account_ref = ${account.accountRef} AND p.account_ref = j.account_ref
+      AND j.channel_ref = ${account.channelRef} AND p.channel_ref = j.channel_ref
+      AND p.external_publication_ref IS NOT NULL AND j.result_ref = p.external_publication_ref
+      AND r.authorization_id IS NOT NULL AND r.received_at IS NOT NULL
+      AND r.receipt->>'outcome' = 'unknown'
+      AND r.receipt->>'authorizationId' = r.authorization_id
+      AND EXISTS (
+        SELECT 1 FROM audit_event e
+        WHERE e.subject_id = p.id AND e.subject_type = 'social_publication'
+          AND e.action = 'social_publication.reconciled' AND e.actor_type = 'human'
+          AND e.actor_id = ${ownerId} AND e.aggregate_id = p.content_ref
+          AND e.metadata->>'job_id' = j.id
+          AND e.metadata->>'payload_digest' = r.receipt->>'payloadDigest'
+          AND e.metadata->>'evidence_ref' <> ''
+          AND e.metadata->'original_receipt_preserved' = 'true'::jsonb
+          AND e.metadata->'retry_allowed' = 'false'::jsonb
+      )`);
+  const row = result.rows[0];
+  if (!row?.payload || !row.receipt) return false;
+  return (
+    digestSocialWorkerPayload(row.payload as Record<string, unknown>) ===
+    (row.receipt as Record<string, unknown>).payloadDigest
+  );
+}
+
 /** Called under the node row lock. The job lock and unique reservation exclude
  * legacy workers and duplicate polls, including after terminal run pruning. */
 export async function schedulePublications(
@@ -56,6 +99,7 @@ export async function schedulePublications(
         and(
           eq(socialBrowserJob.kind, "publish"),
           eq(socialBrowserJob.status, "queued"),
+          sql`EXISTS (SELECT 1 FROM social_publication p JOIN workspace_project w ON w.id = p.project_id WHERE p.browser_job_id = ${socialBrowserJob.id} AND w.status = 'active')`,
           eq(socialBrowserJob.channelRef, account.channelRef),
           eq(socialBrowserJob.accountRef, account.accountRef),
           sql`EXISTS (SELECT 1 FROM browser_fleet_binding b WHERE b.node_id = ${nodeId} AND b.channel_ref = ${socialBrowserJob.channelRef} AND b.account_ref = ${socialBrowserJob.accountRef})`,
@@ -77,6 +121,7 @@ export async function schedulePublications(
         authSessionId: null,
       },
       now,
+      true, // The queued job had no reservation; only a proven pre-authorization failure may be bypassed.
     );
     await tx.execute(
       sql`INSERT INTO browser_fleet_publication (job_id, node_id, run_id) VALUES (${job.id}, ${nodeId}, ${run.id})`,
@@ -173,7 +218,7 @@ export async function reconcilePublications(
     )
       continue;
     const reservation = await tx.execute(
-      sql`SELECT job_id FROM browser_fleet_publication WHERE node_id = ${nodeId} AND run_id = ${run.id} AND job_id = ${run.jobRef}`,
+      sql`SELECT job_id, authorization_id FROM browser_fleet_publication WHERE node_id = ${nodeId} AND run_id = ${run.id} AND job_id = ${run.jobRef}`,
     );
     if (!reservation.rows.length) continue;
     const [job] = await tx
@@ -182,21 +227,40 @@ export async function reconcilePublications(
       .where(eq(socialBrowserJob.id, run.jobRef))
       .for("update");
     if (!job || !["queued", "claimed"].includes(job.status)) continue;
-    const unknown = job.status === "claimed";
+    // A stopped, reviewed executor cannot click Publish without a persisted
+    // authorization. A quarantined run may still have a live browser.
+    const preClickFailure =
+      job.status === "claimed" &&
+      run.status !== "quarantined" &&
+      !reservation.rows[0].authorization_id;
+    const unknown = job.status === "claimed" && !preClickFailure;
     await tx
       .update(socialBrowserJob)
       .set({
         status: "paused",
-        failureCode: unknown ? "fleet_publication_result_unknown" : "fleet_publication_cancelled",
+        failureCode: preClickFailure
+          ? "fleet_publication_not_authorized"
+          : unknown
+            ? "fleet_publication_result_unknown"
+            : "fleet_publication_cancelled",
         updatedAt: new Date(now),
       })
       .where(eq(socialBrowserJob.id, job.id));
     await tx
       .update(socialPublication)
-      .set({ status: unknown ? "unknown" : "paused", updatedAt: new Date(now) })
+      .set({
+        status: preClickFailure ? "failed" : unknown ? "unknown" : "paused",
+        updatedAt: new Date(now),
+      })
       .where(
         and(eq(socialPublication.id, job.payloadRef), eq(socialPublication.browserJobId, job.id)),
       );
+    if (preClickFailure) {
+      run.status = "failed";
+      run.failure = "publication_not_authorized";
+      const account = state.accounts.find((item) => item.id === run.accountId);
+      if (account?.authState === "result_unknown") account.authState = "ready";
+    }
     if (unknown)
       await tx
         .update(socialChannelControl)
@@ -379,7 +443,12 @@ export async function recordPublicationReceipt(
   )
     throw new Error("publication_scope_invalid");
   if (receipt.outcome === "published") {
-    const payload = await buildFacebookPublicationPayload(tx, publication, new Date(now));
+    const payload = await buildFacebookPublicationPayload(
+      tx,
+      publication,
+      new Date(now),
+      "receipt",
+    );
     if (
       digestSocialWorkerPayload(payload) !== receipt.payloadDigest ||
       !receipt.externalPublicationRef

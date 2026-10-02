@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Field,
@@ -63,7 +64,7 @@ const failures: Record<CatalogFailureCode, string> = {
   SOURCE_UNAVAILABLE: "无法读取或核验原件，请重新上传。",
   PREPROCESS_FAILED: "目录解析失败，可重试或更换可提取文字的文件。",
   MODEL_FAILED: "抽取未通过，请检查模型配置后重试。",
-  MODEL_CONFIG_UNAVAILABLE: "模型配置不可用，请在账号与工具中检查配置。",
+  MODEL_CONFIG_UNAVAILABLE: "模型配置不可用，请在工作区设置中检查配置。",
   MODEL_OUTPUT_REJECTED: "模型输出未通过格式或来源校验，未保存草稿。可以重试或更换模型。",
   ACCESS_REVOKED: "登录或项目权限已失效，请恢复权限后重试。",
   DISPATCH_FAILED: "后台任务未能启动，请重试。",
@@ -346,53 +347,62 @@ export function ProductCatalogImport({
                   }}
                 >
                   <FieldGroup>
-                    <Field
-                      data-invalid={Boolean(
-                        selection.formState.errors.modelConfigId ||
-                          selection.formState.errors.model,
-                      )}
-                    >
-                      <FieldLabel htmlFor="catalog-model">抽取模型</FieldLabel>
-                      <NativeSelect
-                        id="catalog-model"
-                        value={JSON.stringify([modelConfigId, model])}
-                        disabled={pending || !choices.length}
-                        aria-invalid={Boolean(
-                          selection.formState.errors.modelConfigId ||
-                            selection.formState.errors.model,
-                        )}
-                        onChange={(event) => {
-                          const choice = choices.find((item) => item.value === event.target.value);
-                          if (choice) {
-                            selection.setValue("modelConfigId", choice.configId, {
-                              shouldValidate: true,
-                              shouldDirty: true,
-                            });
-                            selection.setValue("model", choice.model, {
-                              shouldValidate: true,
-                              shouldDirty: true,
-                            });
-                          }
-                        }}
-                      >
-                        {!choices.length && (
-                          <NativeSelectOption value={JSON.stringify(["", ""])}>
-                            请先在账号与工具配置模型
-                          </NativeSelectOption>
-                        )}
-                        {choices.map((choice) => (
-                          <NativeSelectOption key={choice.value} value={choice.value}>
-                            {choice.label}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                      <FieldError
-                        errors={[
-                          selection.formState.errors.modelConfigId,
-                          selection.formState.errors.model,
-                        ]}
-                      />
-                    </Field>
+                    <Collapsible>
+                      <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
+                        高级设置：抽取模型
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-4">
+                        <Field
+                          data-invalid={Boolean(
+                            selection.formState.errors.modelConfigId ||
+                              selection.formState.errors.model,
+                          )}
+                        >
+                          <FieldLabel htmlFor="catalog-model">抽取模型</FieldLabel>
+                          <NativeSelect
+                            id="catalog-model"
+                            value={JSON.stringify([modelConfigId, model])}
+                            disabled={pending || !choices.length}
+                            aria-invalid={Boolean(
+                              selection.formState.errors.modelConfigId ||
+                                selection.formState.errors.model,
+                            )}
+                            onChange={(event) => {
+                              const choice = choices.find(
+                                (item) => item.value === event.target.value,
+                              );
+                              if (choice) {
+                                selection.setValue("modelConfigId", choice.configId, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                selection.setValue("model", choice.model, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                              }
+                            }}
+                          >
+                            {!choices.length && (
+                              <NativeSelectOption value={JSON.stringify(["", ""])}>
+                                请先在工作区设置配置模型
+                              </NativeSelectOption>
+                            )}
+                            {choices.map((choice) => (
+                              <NativeSelectOption key={choice.value} value={choice.value}>
+                                {choice.label}
+                              </NativeSelectOption>
+                            ))}
+                          </NativeSelect>
+                          <FieldError
+                            errors={[
+                              selection.formState.errors.modelConfigId,
+                              selection.formState.errors.model,
+                            ]}
+                          />
+                        </Field>
+                      </CollapsibleContent>
+                    </Collapsible>
                     <FieldSet>
                       <FieldLegend>
                         选择目录记录（已选 {selected.length}/{maximumCatalogBatchRecords}）

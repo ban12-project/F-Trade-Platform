@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from "node:crypto";
-
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { type Database, getDatabase } from "@/lib/db/client";
@@ -16,7 +15,10 @@ import {
 import type { videoProjectDraftFormSchema, videoReviewFormSchema } from "@/lib/form-schemas";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
-import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import {
+  assertAggregateWorkspaceWrite,
+  assertWorkspaceProjectAccess,
+} from "@/lib/workspace/access";
 import type { VideoCanvasDocument } from "./canvas-contracts";
 import { isPrivateTestOnlyVideo, type VideoProject, videoProjectSchema } from "./contracts";
 import { buildVideoCreative } from "./creative";
@@ -81,6 +83,7 @@ function factOptions(product: ProductReady) {
 
 export async function listReadyVideoProductSources(
   projectId?: string,
+  productId?: string,
 ): Promise<ReadyVideoProductSource[]> {
   const rows = projectId
     ? (
@@ -93,6 +96,7 @@ export async function listReadyVideoProductSources(
               eq(workspaceProjectItem.projectId, projectId),
               eq(aggregateRecord.type, "product"),
               eq(aggregateRecord.state, "PRODUCT_READY"),
+              productId ? eq(aggregateRecord.id, productId) : undefined,
             ),
           )
           .orderBy(desc(workspaceProjectItem.createdAt))
@@ -136,13 +140,13 @@ export async function createMarketingVideoEditProject(
   const id = randomUUID();
   const now = new Date();
   return getDatabase().transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
     const [workspace] = await tx
       .select({ id: workspaceProject.id, kind: workspaceProject.kind })
       .from(workspaceProject)
       .where(eq(workspaceProject.id, value.projectId))
       .for("update");
-    if (!workspace || workspace.kind !== "marketing")
-      throw new Error("只能在产品营销项目中创建营销视频。");
+    if (workspace?.kind !== "marketing") throw new Error("只能在产品营销项目中创建营销视频。");
     const [product] = await tx
       .select({
         id: aggregateRecord.id,
@@ -152,7 +156,7 @@ export async function createMarketingVideoEditProject(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, value.productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
+    if (product?.state !== "PRODUCT_READY")
       throw new Error("只能从已通过 Gate 01 的产品创建营销视频。");
     const ready = product.payload as unknown as ProductReady;
     const selectedFacts = ["product.product_name", value.factPath].filter(
@@ -234,6 +238,7 @@ export async function createMarketingVideoEditProject(
 export async function listProjectMarketingVideoEntries(
   projectId: string,
   database: Database = getDatabase(),
+  id?: string,
 ): Promise<MarketingVideoEditorEntry[]> {
   const rows = await database
     .select({ record: aggregateRecord, createdAt: workspaceProjectItem.createdAt })
@@ -245,6 +250,7 @@ export async function listProjectMarketingVideoEntries(
         eq(workspaceProjectItem.role, "marketing_video"),
         eq(workspaceProjectItem.relation, "owned"),
         eq(aggregateRecord.type, "video"),
+        id ? eq(aggregateRecord.id, id) : undefined,
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));
@@ -365,8 +371,7 @@ export async function copyMarketingVideoDraftToProject(
       .from(workspaceProject)
       .where(eq(workspaceProject.id, projectId))
       .for("update");
-    if (!workspace || workspace.kind !== "marketing")
-      throw new Error("视频只能复制到产品营销项目。");
+    if (workspace?.kind !== "marketing") throw new Error("视频只能复制到产品营销项目。");
     const [source] = await tx
       .select({ payload: aggregateRecord.payload, ownerProjectId: workspaceProjectItem.projectId })
       .from(aggregateRecord)
@@ -390,8 +395,7 @@ export async function copyMarketingVideoDraftToProject(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, current.productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
-      throw new Error("源视频引用的产品已不再可用于新草稿。");
+    if (product?.state !== "PRODUCT_READY") throw new Error("源视频引用的产品已不再可用于新草稿。");
     await tx
       .insert(workspaceProjectItem)
       .values({
@@ -487,6 +491,7 @@ export async function updateMarketingVideoEditDraft(
 ) {
   const draft = marketingVideoDraftSchema.parse(draftInput);
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(videoId, tx, actorId);
     const [record] = await tx
       .select()
       .from(aggregateRecord)
@@ -539,6 +544,7 @@ export async function beginMarketingVideoRender(
   const now = new Date();
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(videoId, tx, actorId);
     const [record] = await tx
       .select()
       .from(aggregateRecord)
@@ -621,7 +627,7 @@ export async function completeMarketingVideoRender(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
       .for("update");
-    if (!record || record.state !== "VIDEO_RENDERING")
+    if (record?.state !== "VIDEO_RENDERING")
       throw new Error("视频合成状态已发生变化，请刷新后重试。");
     const project = videoProjectSchema.parse(record.payload);
     const evidenceRefs = [
@@ -703,7 +709,7 @@ export async function failMarketingVideoRender(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
       .for("update");
-    if (!record || record.state !== "VIDEO_RENDERING") return;
+    if (record?.state !== "VIDEO_RENDERING") return;
     const project = videoProjectSchema.parse(record.payload);
     const evidenceRefs = [...new Set(project.sourceAssets.map((asset) => asset.rightsEvidenceRef))];
     assertTransition({
@@ -760,6 +766,7 @@ export async function createVideoProject(
   const approvalId = randomUUID();
   const eventId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(input.productId, tx, actorId);
     const [product] = await tx
       .select({
         id: aggregateRecord.id,
@@ -769,7 +776,7 @@ export async function createVideoProject(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, input.productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
+    if (product?.state !== "PRODUCT_READY")
       throw new Error("只能从已通过 Gate 01 的产品创建视频项目。 ");
     const ready = product.payload as unknown as ProductReady;
     if (ready.record_id !== product.id || ready.verification_status !== "verified")
@@ -908,6 +915,7 @@ export async function createVideoProjectFromCanvas(document: VideoCanvasDocument
   const approvalId = randomUUID();
   const eventId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(document.factBinding!.productId, tx, actorId);
     const [product] = await tx
       .select({
         id: aggregateRecord.id,
@@ -922,8 +930,7 @@ export async function createVideoProjectFromCanvas(document: VideoCanvasDocument
         ),
       )
       .for("update");
-    if (!product || product.state !== "PRODUCT_READY")
-      throw new Error("所选产品不再是已核验产品。");
+    if (product?.state !== "PRODUCT_READY") throw new Error("所选产品不再是已核验产品。");
     const ready = product.payload as unknown as ProductReady;
     if (ready.record_id !== product.id || ready.verification_status !== "verified")
       throw new Error("产品就绪记录不完整，无法创建视频项目。");
@@ -1018,6 +1025,7 @@ export async function decideVideoReview(input: VideoReviewInput, actorId: string
   const now = new Date();
   const eventId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(input.videoId, tx, actorId);
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,
@@ -1028,7 +1036,7 @@ export async function decideVideoReview(input: VideoReviewInput, actorId: string
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, input.videoId), eq(aggregateRecord.type, "video")))
       .for("update");
-    if (!aggregate || aggregate.state !== "VIDEO_REVIEW_REQUIRED")
+    if (aggregate?.state !== "VIDEO_REVIEW_REQUIRED")
       throw new Error("该视频计划当前不处于待确认状态。");
     const [pendingApproval] = await tx
       .select()

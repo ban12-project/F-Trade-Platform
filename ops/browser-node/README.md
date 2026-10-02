@@ -1,5 +1,7 @@
 # 按需 Browser 节点（PR #323 / Part of #322）
 
+当前生产验收边界与视频／DM 的逐项执行步骤见 [MVP1 真实账号验收手册](ACCEPTANCE.md)。下文保留各阶段的设计与测试记录；遇到旧阶段描述时，以当前代码、最新生产验收报告及该手册为准。
+
 这是多账号隔离浏览器的控制面和按需运行节点。一个 VPS 配置一个平台 Access Key，自动同步该节点的全部账号授权及资源策略；不是给每个浏览器配置一套平台密钥。不同 VPS 必须分别创建节点/Key，防止共享 Key 后无法单独撤销。Key 只允许访问绑定的账号，不能读取平台主加密密钥、其他节点账号或所有人的密码。
 
 ## 已实现与明确边界
@@ -8,8 +10,8 @@
 - PostgreSQL 节点行锁串行预留容量；队列和租约持久化，不依赖 Vercel 进程内存。不同节点各自调度。
 - 常驻的是轻量 Agent 与 HTTPS 网关，不是所有 Firefox。每个获租约账号启动独立容器/网络，使用账号独立 volume；结束后删除容器和网络，保留 volume。
 - 一次性平台票据换取短期 viewer / WebSocket 能力；不依赖第三方 Cookie，不把节点 Key 或 Camofox API Key 发给前端。VNC 密码是每次运行生成的临时值，只在已授权 iframe 中使用。
-- 内置执行能力仅 `interactive`。`inbox` 周期排队和 `publish` 优先级/未知结果策略已在调度核心实现，但不包含经过真实 Facebook 验证的入站采集、图片/视频发布或自动填入密码执行器。不能把开浏览器等同于完成原 Issue 的业务闭环。
-- 账号密码可加密保存，当前不批量下发，也不自动输入；当前登录/2FA 在远程页面手动完成。验证码、TOTP 种子、恢复码不进入该协议。
+- Agent 可按私有审核配置声明 `interactive`、`publish`、`inbox`；当前生产节点只声明 `interactive, publish`，收件箱尚未启用。真实图片／视频发布和入站 DM 仍需独立验收，不能把开浏览器等同于完成业务闭环。
+- 账号密码、Base32 TOTP 长期密钥和 Messenger PIN 可按账号加密保存。version 2 的 interactive 运行先观察现有会话，仅在确认需要恢复且完整页面契约已复核时才领取并提交因素；version 1 保留人工填充。当前生产使用 version 2 `observe-only`，跨任务与 Sandbox 停启保持就绪已通过；生产因素恢复尚未验收。
 - 新节点授权使用独立、带拥有者的记录。旧单账号环境变量和旧 Vault 不会自动变成全量节点授权；在新界面明确授权并保存配置后才能同步。旧 Worker 不得同时操作同一个账号。
 
 ## 资源和队列策略
@@ -22,7 +24,7 @@
 
 过期但未确认停止的租约进入隔离状态，仍占用容量，不能仅看 TTL 就重复发任务。Agent 重启先停止自身节点标签的旧容器，再向平台确认恢复。发布结果不明不自动重试，也不会由“容器正常退出”产生发布成功记录。
 
-账号不在线时无法实时接收浏览器私信。开启收件箱适配器后按 `pollSeconds`（至少 300 秒，默认 900 秒，0 停用）轮询，界面显示上次成功检查时间；实际延迟包含排队和启动时间。历史补采完整性取决于 Messenger 会话、可见窗口和适配器，不能保证离线期间所有消息均能恢复。
+账号不在线时无法实时接收浏览器私信。开启收件箱适配器后按 `pollSeconds`（至少 300 秒，默认 900 秒，0 停用）轮询，界面显示上次成功检查时间；实际延迟包含排队和启动时间。托管 Sandbox 停止后，五分钟调度器会在账号 ready、审核范围有效、渠道开启时为到期轮询创建启动意图；启动前和释放密钥前均复核授权。历史补采完整性取决于 Messenger 会话、可见窗口和适配器，不能保证离线期间所有消息均能恢复。生产真实 DM 仍需单独验收。
 
 ## 平台准备
 
@@ -221,7 +223,7 @@ CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose �
 
 分页测试使用 Chromium 的真实容器滚动，覆盖四会话／二十消息的跨页合并（十个消息批次）、缺失边界、页面断层、消息冲突、取消及滚动前变化。真实回环 HTTP／PostgreSQL 组合回归也跨页采集，并在首次入库后丢失回执，验证下一轮重扫不会重复落库。页数上限测试首轮夹具仍只有四个会话，未触达上限而失败；修正夹具为一百个会话后，完整 27 项浏览器回归通过，并确认最多 39 次滚动、40 页收集，原失败不记为通过。实际 Camofox、真实平台页面和持久化跨轮游标仍未验证或实现。
 
-### 已保存登录的独立填充边界（按账号显式配置）
+### 已保存登录的独立填充边界（version 1，按账号显式配置）
 
 固定上游通用 `/tabs/:id/type` 会将输入全文交给 `tab:type` 插件事件，其异常还可能包含输入值；因此保存密码不能直接通过该接口执行。新增 `login-plugin/` 作为浏览器镜像内的独立插件，模块随镜像加载，但没有匹配运行的私有登录页面配置时不注册路由。Agent 与人工入口已接通；真实 Camofox 容器及页面契约尚未验证。
 
@@ -273,6 +275,8 @@ Agent 仅向匹配的 interactive 运行注入非凭据页面配置。人工接�
 
 A reviewed Sandbox template containing this runtime can load node-specific Facebook configuration from `/var/lib/ftrade-sandbox/facebook`. The startup script creates this directory as root with mode `0700`; Compose mounts it read-only at `/run/facebook-config` inside the Agent. An empty directory retains interactive-only operation. Missing directories, symlinks, permissive ownership/modes, invalid manifests and conflicting legacy adapter environment settings fail startup rather than silently changing capabilities.
 
+Native Firefox profiles require a separate, explicit Sandbox opt-in. After the account's existing `ftbrowser-<node>-<account>` volume has been backed up and initialized with its reviewed `owner.json`, and while no account run is active, place a root-owned `0600` file named `native-profile.enabled` containing exactly `1` in `/var/lib/ftrade-sandbox/facebook`. The Sandbox startup script reads this persistent marker and passes `BROWSER_NATIVE_PROFILES=1` to the Agent. Missing marker means the mode stays off; a symlink, unexpected owner/mode or any other content aborts startup. The Agent still requires an image labeled `io.ftrade.native-profile=1`, and a missing or wrong account manifest rejects the browser launch. A Sandbox stop/resume keeps this marker; a replacement VM must be migrated and opted in explicitly. Never remove the marker to force a task onto an older JSON snapshot without a separate account-by-account rollback review.
+
 Provision only while the node has no running or unknown leases. Use the existing authorized Sandbox administration channel, never a task payload, public repository, template snapshot, or browser form. Place private files owned by root with mode `0600` in this directory. Write the selected profile files first and atomically rename `manifest.json` last:
 
 ```json
@@ -287,23 +291,25 @@ Provision only while the node has no running or unknown leases. Use the existing
 
 The example node ID is synthetic and all capabilities are disabled. The real `nodeId` must equal the node encoded in the Agent access key. Enabled switches select fixed filenames only: `publication.json` uses the existing publication-profile array schema, `inbox.json` the inbox-profile array schema, and `login.json` the saved-login profile array schema documented above. Disabled files are not loaded. Each selected file is limited to 64 KB and 1–16 entries; existing loaders still enforce reviewed selectors, account/channel scope, duplicate rejection and expiry. The loader cannot select arbitrary adapter code. Private files remain in this dedicated VM across ordinary stops/starts; provision them again if the VM is replaced. Never include them in a reusable template.
 
-Start a fresh operation after provisioning and verify the node's reported capabilities and expiring scopes before queuing a test. Updating files does not change a running Agent; stop through the platform and start a new operation. To disable automation, set all manifest switches to false before that new start. Login configuration only enables the existing explicitly requested, once-per-interactive-run saved-credential fill flow; it does not bypass 2FA or checkpoints. This provisioning support does not implement DM reply execution and is not evidence of real Facebook automation acceptance.
+Start a fresh operation after provisioning and verify the node's reported capabilities and expiring scopes before queuing a test. Updating files does not change a running Agent; stop through the platform and start a new operation. To disable automation, set all manifest switches to false before that new start. Version 1 login profiles retain the explicitly requested, once-per-interactive-run saved-credential fill flow. Version 2 profiles support session-first observation and, only with separately reviewed recovery pages, bounded password/TOTP/PIN submission. The production `observe-only` profile never releases or submits those factors. Checkpoints still require human action; this provisioning support does not implement DM replies or establish real inbound acceptance.
 
 发布受众必须在编辑器预检与最终点击的同一次页面执行中匹配 `audienceText`；控件缺失、歧义或文字改变均拒绝点击。缺少受众声明的旧发布配置必须重新审核后补齐，不能默认沿用 Facebook 当前受众。合成测试覆盖授权期间与最终点击前受众变化，但不能替代真实账号受众与回执验收。
 
 可选的 `audienceSelection` 包含 `dialog`、`option`、`defaultCheckbox`、`confirm` 四个已审核选择器；原生 radio 可用 `optionLabel` 按关联 label 的完整文字匹配。驱动只选择本次帖子的受众，默认受众复选框仍被勾选时拒绝确认。`openComposerText` 可对没有 aria-label 的打开按钮做完整文字匹配；仍须唯一。`selectors.composerIdentity` 可指定编辑器中的当前作者链接；身份比较只移除 Facebook 的 `__tn__` 导航跟踪参数，账号 ID、路径和其他查询参数均必须一致。异步界面切换只轮询可见状态，不重试发布点击。
 
-A privately reviewed profile can set `resolvePostLinks: true` when Facebook resolves timestamps on native hover. The driver hovers only the scoped post links and then requires a recognized Facebook post permalink; navigation tracking is removed consistently from the baseline and receipt. An unresolved placeholder, changed author, or duplicate new post cannot produce a published receipt. `textOnly: true` restricts a partially reviewed production profile to text before opening a browser tab. Keep this restriction until the live media input and attachment preview are independently reviewed; the global file-input ambiguity guard remains active.
+A privately reviewed profile can set `resolvePostLinks: true` when Facebook resolves timestamps on native hover. The driver hovers only the scoped post links and then requires a recognized Facebook post permalink; navigation tracking is removed consistently from the baseline and receipt. An unresolved placeholder, changed author, or duplicate new post cannot produce a published receipt. `textOnly: true` restricts a partially reviewed production profile to text before opening a browser tab. Keep this restriction until the live media input and attachment preview are independently reviewed. The pinned browser upload route targets exactly one input inside the reviewed composer, rejecting ambiguous or missing inputs even when unrelated page-level inputs exist. Video preview must contain exactly one visible blob-backed video whose SHA-256 matches the staged asset, both before authorization and immediately before the single publish click.
 
 `receiptUrl`, when configured, must equal the reviewed account `identityHref` and have a separate `selectors.receiptIdentity`. Baseline and receipt scans use that page; the driver returns to the publishing page and rechecks the acting identity before preparing. After the single publish click it waits for the composer to close before navigating to read the receipt. `selectors.postHover` can target a reviewed timestamp wrapper when the link itself is replaced during hover.
 
-The optional `selectors.postsReady` marks the reviewed profile feed readiness before its baseline is read. The baseline also records existing author/text pairs and refuses an identical text before preparing, even if an old timestamp has not resolved. Receipt resolution applies to the requested text, so unrelated old video placeholders cannot be mistaken for or prevent observation of the new post. Read-only timestamp observations have bounded retries; the publish click is never retried.
+The optional `selectors.postsReady` marks the reviewed profile feed readiness before its baseline is read. The baseline also records existing author/text pairs and refuses identical **nonempty** text before preparing, even if an old timestamp has not resolved. An empty video caption is not an identity key; its receipt must come from a reviewed `videoReceipt` success container with one canonical Reel link. That container must be absent before the click. If the real composer offers no scoped link tied to this submission, keep the profile text-only and leave automatic video acceptance open. Text and image receipt resolution still applies to the requested text, so unrelated old video placeholders cannot be mistaken for or prevent observation of the new post. Read-only observations have bounded retries; the publish click is never retried.
 
 ### 发布冷启动与回执传输
 
 已确认发布提交后，应用在响应结束后尝试唤醒其绑定的受管节点。每五分钟的认证调度入口也会扫描持久化发布队列，恢复提交后进程中断的情况；扫描只预留原任务、保存启动 outbox，不创建人工交互任务。启动前、取得唯一 dispatch claim 后和释放节点密钥前，分别重新验证节点所有者、明确的未过期发布 scope、账号授权与登录状态、原确认人的当前项目编辑权限、启用的渠道、有效内容确认及 Gate 01。项目归档、未知结果和已披露任务不授权新的冷启动。外部效果仍由原发布授权与租约规则控制。
 
 执行器在成功观察后最多传输同一份回执三次，不重新授权或重复点击。无法确认回执仍为 unknown；已保存的 unknown 不被此次改动覆盖。失败代码仅包含固定阶段 `publication_publish_unknown`、`publication_observe_unknown` 或 `publication_validate_unknown`，不保存异常正文、账号或页面内容。这些阶段诊断与合成回归不能证明既有生产 unknown 已确认，也不等同于真实视频和 DM 验收。
+
+发布点击前失败时，Agent 只记录 `browser_publication_preclick_failed:<stage>:<code>`，其中 stage 与 code 都来自执行器固定枚举；无法识别的异常统一记为 `unclassified`。不记录异常正文、页面内容或凭据；诊断回调失败也不能改变“未点击”的执行结果。读取旧帖子基线时，仅对已知的临时页面／传输错误重试一次完整只读读取，失败后停止，不点击或重排原发布任务。2026-09-24 的生产尝试及其证据边界见 [验收记录](../../docs/testing/reports/mvp1-production-publication-attempt-20260924.md)。
 
 ### 未知文字发布的人工核对
 
@@ -319,24 +325,56 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 
 创建事件不等于握手成功，收发帧也不等于聊天恢复成功；零计数不能证明连接正常。计数只为排查提供证据，不改变账号、渠道、收件箱同步或安全存储状态。合成 Chromium 测试通过本地拒绝连接的代理验证实际 socket 错误，未连接 Facebook；真实 Messenger 诊断和修复仍需单独验收。
 
-### Firefox 155 接管网关重授权边界
 
-同一 run 的新 broker 授权到达网关后，网关先撤销旧 HTTP 资源能力、WebSocket 能力和已建立／待握手连接，再返回新能力。连接清理幂等；旧连接的迟到关闭事件不会重新写入当前连接的断线时间，新连接成功后清除旧断线标记。
+## 自动登录配置 version 2（#423，生产待验收）
 
-`node --import tsx --test scripts/test-browser-node.mjs scripts/test-browser-review-gateway.mjs` 当前 32 项通过。新增回归使用真实本地 HTTP/WebSocket 传输与合成 broker 授权；旧实现无法关闭旧连接而失败。此结果仅验证网关连接替换，尚未证明 broker 重新签票、viewer 重连、自动化互斥或真实 noVNC 同会话接管；这些仍是 Firefox 155 完整验收缺口。
+节点在首次导航前必须等待 `/health` 同时返回 Camoufox 引擎、浏览器运行和连接就绪；HTTP 监听成功不代表 Firefox 预启动完成。检查受当前租约和取消信号约束，最多进行 60 次，不重发创建标签页请求。固定版本上游创建标签页请求超时后仍可能在后台完成，因此不得仅凭超时断言没有创建页面。
 
-Broker 重新授权现允许原 owner 的同一有效登录 session 为仍有效的交互 run 取得新票。事务内替换票据哈希，签票截止时间不超过租约和 run 截止时间；消费后清空哈希。旧票、被替代的票、并发重放、其他 session 和账号撤销后的取票均拒绝。ticketUsed 保留“曾经完成接入”的含义，不能代替当前票据哈希的一次性校验。
 
-真实 PostgreSQL 17.11 测试使用现有 broker 和完整迁移，新增重授权／并发消费／撤销断言通过；相关协议及网关组件 50 项通过。首次本地类型检查因稀疏检出缺失依赖目录而失败。前端重新取票流程、真实 noVNC 联调及人工／自动化互斥仍未完成；服务端签票成功不是完整接管通过。
+按 ADR 0002 的 2026-09-23 修订，保存账号时可以同时保存 Base32 TOTP 密钥及六位 Messenger PIN。二者复用账号登录凭据的加密封装与账号/渠道绑定，不另存明文；表单留空保留原值，清除登录会同时移除所有因素。这里的 Base32 是长期密钥，不是短信码或当前六位 OTP。节点本地生成 TOTP，不调用第三方 OTP API。
 
-平台任务行现在为已接入、仍 running 且未请求停止的交互任务显示“重新授权连接”。按钮再次调用原有服务端 ticket 命令，收到新 token 后以 token 为 key 重建 viewer iframe；不会重复使用已消费票据。断线提示引导用户在资源释放前重新授权，租约、原 owner/session 与网关撤销规则不变。
+`FACEBOOK_LOGIN_PROFILES_FILE` 仍是私有页面契约数组。将匹配账号的 profile 设为 `version: 2`，保留 version 1 的全部字段并增加 `automation`：
 
-本地 Next16.3.2/Turbopack 已启动，MCP 的路由与编译检查确认稀疏检出缺少接管页面及组件/工作流依赖，因此未宣称真实 UI 重连通过。完整检出 CI 和候选浏览器联调仍是必要验收。
+- `accountRef`：目标 Facebook 数字账号 ID，必须等于运行绑定账号。
+- `identity: { selector, attribute }`：唯一可见身份元素；属性只允许 `data-account-id`、`data-profile-id` 或可解析为数字账号的同源 `href`。 对没有可见身份元素的 Messenger PIN 页，可审核后使用 `attribute: "facebook-current-user"` 和固定 `selector: 'script[type="application/json"]'`：只解析结构化 `CurrentUserInitialData`，要求所有非匿名记录的 USER_ID/ACCOUNT_ID 与目标账号一致，并由插件逐次核对浏览器会话的 c_user 及可选 i_user。Cookie 值不传给页面或写入结果；缺少 Cookie、冲突记录或切换身份不能确认就绪。解析有节点数、深度和字节上限。
+- `passwordSubmit`：密码登录的唯一提交按钮选择器。
+- `totp: { url, marker, input, submit }`：TOTP 页精确 URL、阶段标记、输入框和按钮。 对已审核的 Facebook 验证器页面，可增加 `mode: "facebook-authenticator"`，URL 固定为 `/two_step_verification/two_factor/` 的完整 Facebook 地址。此模式只接受唯一的 encrypted_context、flow、next 参数及已知登录流程，核对英文验证器标题与唯一 Continue 按钮，允许输入后最多等待 1.5 秒启用按钮；始终禁用、页面改变或超时均不点击。它只点击审核过的 ARIA 按钮，不原生提交页面上的 GET 表单。其他语言或验证方式须另行审核。
+- `pin: { url, marker, input, submit }`：PIN 对话框契约；输入后自动提交的页面可以将 `submit` 设为 `null`。
+- `ready: { url, marker, empty, emptyText, thread }`：Messenger 就绪页面、唯一列表根节点、列表内的空状态选择器与精确文案、列表内会话项选择器。必须看到唯一空状态或至少一个会话项，两者冲突、只有标题/加载壳或存在可见对话框都不能就绪；必须同时验证当前账号身份。
+- `checkpoint`、`rejected`、`loading`：安全挑战、拒绝及加载状态的选择器。
 
-### Firefox 155 acceptance branch: controlled input dependency
+若只有现有 Messenger 会话的就绪页面得到当前复核，可在 version 2 的 `automation` 中显式设置 `mode: "observe-only"`。此模式直接打开已复核的 Messenger 页面，仍要求账号身份、出口和就绪状态全部通过，并可产生零凭据领取的 `ready` 回执；密码、TOTP、PIN 的领取与提交全部拒绝。登录页或 PIN 页出现时，本轮停在需要重新复核的状态，不能把仅就绪页的复核时间当作恢复页面的复核时间。移除该模式前须重新审核完整恢复契约。
 
-This branch pins Camofox service `8ac249cf510711996decb00fb478f466fed72916` from the integration fork, based on upstream1.16 commit `79d425be26743883a06613eaa3be5e38e7ab5409` with the same dependency lockfile. Controlled VNC starts without an input listener. Gateway admission must acquire a backend lease before issuing viewer capabilities; disconnect, expiry and revocation close input, and replacement waits for prior cleanup. The access key and release capability stay in the node process. An uncertain grant/release leaves automation paused and causes the agent to stop the affected container.
+所有 URL 必须是 `https://www.facebook.com` 来源，选择器和 URL 必须来自实际页面审核；不能直接将测试夹具选择器用于真实账号。配置仍有最长 30 天有效期，更新后重启 Agent。仅配置因素但未安装匹配 version 2 页面契约不会启用自动提交。模板和 Git 中不得包含真实账号、私有规则或任何凭据。
 
-Periodic browser egress probes pause during manual control. An explicitly authorized saved-login operation first closes/revokes the viewer, waits for cleanup, then fills the login; the user reconnects with a fresh broker ticket. This preserves the login feature without simultaneous manual and automated input.
+所有者打开账号后，匹配 version 2 范围的 interactive 运行在就绪心跳中获得一次性授权，不要求先连接 VNC。平台重新检查有效所有者会话、节点/账号绑定、凭据版本、代理出口配置及租约；普通同步、容器环境和日志不包含因素明文。自动授权和凭据释放的绝对截止时间最多 180 秒，不能通过心跳无限续期，并受运行及配置期限限制。容器租约仍为独立的 90 秒：每次观察或提交重新读取当前租约并将页面操作期限截断到该租约；租约过期会立即拒绝操作。人工填充仍最多 30 秒。过期的自动授权不能提交 ready 回执。旧版填充运行只获得用户名和密码，不能读取 TOTP/PIN 或回报自动登录就绪。
 
-**Acceptance is incomplete.** HTTP gateway/control tests use a synthetic input backend; real Firefox155 + gateway + broker acceptance remains required. The existing local/Bake image build still selects Firefox152.0.4 and must not be used as Firefox155 candidate evidence. A build path that consumes the verified complete candidate is still required before this branch can be deployed or considered accepted. No release or production deployment is authorized by these tests.
+节点通过专用鉴权插件观察页面并单次提交密码、当前 TOTP 和 PIN。PIN 输入前要求账号身份匹配；就绪要求身份与 Messenger 页面同时匹配。提交后的页面上下文销毁只允许有限重试读取，不重发密码或验证码。缺少因素、凭据拒绝、不支持的验证方式、页面不匹配、撤销及未知结果停止本轮；自动拒绝或未知结果以 `page_contract_failed` 暂停后台任务并回收容器；加载超时、观察失败和回执丢失不构成确认掉线的证据。具体挑战仍保留在受限回执字段中。已领取凭据的自动运行可随拒绝回执报告受限枚举 `checkpoint`、`rejected` 或 `unsupported_factor`；平台保存并显示对应处理提示，拒绝任意自由文本及冲突重放。遇到人机或设备验证时，节点先提交受限的 `login-challenge` 回执，界面提示接入远程页面；在本次自动授权剩余时间内只观察页面，人工完成后继续原流程，不重新领取凭据、不重复提交已执行因素、不延长授权。自动任务仍执行时关闭远程查看窗口不会触发查看器断线回收；显式停止、撤销、租约或授权到期仍终止运行。该交接已通过合成执行器、数据库与 UI 测试，真实全流程仍待验收。只有有效的 `ready` 回执可更新账号登录状态，不能自动解除渠道暂停或授权内容发布。
+
+验证证据：加密因素保留/轮换/清除测试、RFC TOTP 向量、PostgreSQL 无 VNC 授权/并发单次领取/旧版隔离/撤销检查，以及 Chromium 完整执行器密码→TOTP→PIN→Chats 链路。合成浏览器网络全部拦截；另有真实本地密码、TOTP、PIN 和 CAPTCHA 人工处理后恢复证据，见 `docs/testing/reports/facebook-automatic-pin-local-20260923.md`。本地正式 broker 的已登录会话→PIN→持久化 ready 续跑，以及需重新认证会话的一次授权密码→TOTP→PIN→持久化 ready 均已通过。后者复用前次 CAPTCHA 会话资料但重新提交全部因素；真实 CAPTCHA 在原运行内人工完成后的续跑及生产部署仍待验收。
+## Native Firefox profile 试验接入（#414）
+
+`BROWSER_NATIVE_PROFILES=1` 为节点级显式开关，默认关闭。镜像必须带
+`io.ftrade.native-profile=1` 标签。启用后，所有任务仍挂载同一账号的
+`ftbrowser-<node UUID>-<account UUID>` 卷，但使用其中的 `native-profile-v1/firefox`
+作为原生 Firefox profile；任务不能指定任意路径。缺少初始化记录、账号/节点不匹配、
+源快照改变或 profile 被占用时拒绝启动，不退回临时 profile。
+
+迁移前停止该账号的任务，确认所有访问该卷的容器均已停止，并保留受保护的卷备份。
+在受信任的本机管理环境将**已有**账号卷挂载为 `/data`，使用已审核镜像中的
+`/app/ftrade-native-profile.mjs` 导出的 `initializeNativeProfile`，传入绑定的
+`accountId`、`nodeId` 和 `source: "legacy-json"`。该操作不能由任务调用。
+初始化记录源快照摘要；首次启动导入一次，之后只使用 native profile。
+原 JSON 文件保留，不再由旧 persistence 插件恢复或覆盖。包含 IndexedDB 的旧 JSON
+会拒绝迁移，因为这不能证明其中的加密密钥可恢复。
+
+只有确认不存在旧会话的新账号才可显式选择 `source: "empty"`。不要因登录检查失败、
+CAPTCHA 或网络错误重新初始化。Native 模式关闭了旧 persistence 插件的重置接口；
+重置必须作为单独的人工运维操作，在停止任务并确认备份后执行，不能依赖旧接口清除
+原生状态。回滚时停止容器、关闭开关并恢复已确认的备份；旧 JSON 不包含迁移后的活动，
+因此回滚后必须重新检查会话有效性。
+
+该开关目前仍在验收中。原生 profile 保留不等于网站会话永不失效，尤其不能保证
+session-only Cookie 跨浏览器退出保留。每次任务应先观察账号身份和 Messenger 状态，
+确认失效后才进入有限恢复；本地同账号连续性已验证，先观察再领取凭据的执行器及数据库门控也已接入测试；
+组合版本联调和生产接入仍待验收，不应仅凭本地证据开启生产自动恢复。

@@ -1,14 +1,13 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-
 import { type Database, getDatabase } from "@/lib/db/client";
 import { productMediaAsset } from "@/lib/db/product-media-schema";
 import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
+import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
 
 import { assertVideoPublicationEligible, type VideoProject, videoProjectSchema } from "./contracts";
 import { approveReviewVideoExport, type ReviewVideoExport } from "./export-artifact";
@@ -72,6 +71,7 @@ export async function beginGuardedMarketingVideoRender(
   const now = new Date();
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(videoId, tx, actorId);
     const [record] = await tx
       .select()
       .from(aggregateRecord)
@@ -258,6 +258,7 @@ export async function decideGuardedVideoReview(
   const now = new Date();
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(value.videoId, tx, actorId);
     const [aggregate] = await tx
       .select({
         id: aggregateRecord.id,

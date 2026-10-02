@@ -1,7 +1,7 @@
 "use client";
 import { type ReactNode, Suspense } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import type { WorkspaceProjectSummary } from "@/lib/workspace/store";
+import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 import { WorkspaceDirtyProvider } from "./dirty-state";
 import { NewWorkProvider } from "./new-work";
 import { WorkspaceNavigation } from "./workspace-navigation";
@@ -26,11 +26,7 @@ export function WorkspaceShell({
         <SidebarProvider>
           {navigation ?? (
             <Suspense fallback={null}>
-              <WorkspaceNavigation
-                projects={projects ?? []}
-                canManage={canManage}
-                basePath={basePath}
-              />
+              <WorkspaceNavigation canManage={canManage} basePath={basePath} />
             </Suspense>
           )}
           <div className="min-w-0 flex-1">

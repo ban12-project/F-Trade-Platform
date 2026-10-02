@@ -46,6 +46,29 @@ async function boundedJson(response) {
     reader.releaseLock();
   }
 }
+export async function waitForBrowserReady(browserRequest, { assertActive, sleep }) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    assertActive();
+    let status;
+    try {
+      const response = await browserRequest("/health", undefined, 2000);
+      if (response.ok) status = await boundedJson(response);
+      else await response.body?.cancel();
+    } catch {
+      // The HTTP listener may start before Firefox's prewarm finishes.
+    }
+    assertActive();
+    if (
+      status?.ok === true &&
+      status.engine === "camoufox" &&
+      status.browserConnected === true &&
+      status.browserRunning === true
+    )
+      return;
+    if (attempt < 59) await sleep(1000);
+  }
+  throw new Error("browser_start_timeout");
+}
 export async function verifyBrowserEgress(browserRequest, run, tabId) {
   canonicalIp(run.expectedEgressIp);
   if (typeof tabId !== "string" || !tabId || tabId.length > 200)

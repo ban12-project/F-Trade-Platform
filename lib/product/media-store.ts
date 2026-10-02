@@ -1,8 +1,8 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
 
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import productReadySchema from "../../contracts/data/product-ready.schema.json";
@@ -140,12 +140,13 @@ export async function registerProductMediaAsset(
   if (!actorId.trim()) throw new Error("创建产品媒体需要明确的人工账号。");
 
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(value.productId, tx, actorId);
     const [productRow] = await tx
       .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, value.productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!productRow || productRow.state !== "PRODUCT_READY") {
+    if (productRow?.state !== "PRODUCT_READY") {
       throw new Error("只能为当前 ProductReady 产品登记可复用媒体。");
     }
     const product = parseProductReady(productRow.payload);
@@ -196,6 +197,11 @@ export async function reviewProductMediaAsset(
   if (!reviewerId.trim()) throw new Error("素材审核必须由明确的人工账号执行。");
 
   return database.transaction(async (tx) => {
+    const [owner] = await tx
+      .select({ productId: productMediaAsset.productId })
+      .from(productMediaAsset)
+      .where(eq(productMediaAsset.id, value.assetId));
+    if (owner) await assertAggregateWorkspaceWrite(owner.productId, tx, reviewerId);
     const [row] = await tx
       .select()
       .from(productMediaAsset)
@@ -209,7 +215,7 @@ export async function reviewProductMediaAsset(
         .from(aggregateRecord)
         .where(and(eq(aggregateRecord.id, row.productId), eq(aggregateRecord.type, "product")))
         .for("update");
-      if (!productRow || productRow.state !== "PRODUCT_READY") {
+      if (productRow?.state !== "PRODUCT_READY") {
         throw new Error("产品已不再处于 ProductReady，不能批准其媒体。");
       }
     }

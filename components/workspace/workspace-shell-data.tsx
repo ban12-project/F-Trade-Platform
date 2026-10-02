@@ -10,10 +10,7 @@ export async function WorkspaceNavigationData() {
   return (
     <>
       <NewWorkProjects projects={projects} />
-      <WorkspaceNavigation
-        projects={projects}
-        canManage={hasPermission(session.user.role, "settings:manage")}
-      />
+      <WorkspaceNavigation canManage={hasPermission(session.user.role, "settings:manage")} />
     </>
   );
 }

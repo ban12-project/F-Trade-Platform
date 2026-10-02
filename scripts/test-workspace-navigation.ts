@@ -1,135 +1,95 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { workspaceTaskHref } from "../lib/workspace/navigation";
-import { defaultProjectStage, requestedProjectStage } from "../lib/workspace/stages";
-import type { WorkspaceTaskSummary } from "../lib/workspace/store";
+import { existsSync, readFileSync } from "node:fs";
+import {
+  workspaceCreateHref,
+  workspaceRecordHref,
+  workspaceReturnTo,
+  workspaceTaskHref,
+} from "../lib/workspace/navigation";
+import type { WorkspaceTaskSummary } from "../lib/workspace/types";
 
-assert.equal(requestedProjectStage("marketing", "content"), "content");
-assert.equal(requestedProjectStage("marketing", "quotation"), undefined);
-assert.equal(requestedProjectStage("sales", "lead", "opportunity"), "opportunity");
-assert.equal(requestedProjectStage("sales", "lead", "follow_up"), "follow-up");
-assert.equal(requestedProjectStage("sales", "lead", "rfq"), "rfq");
-assert.equal(requestedProjectStage("sales", "delivery"), "delivery");
-assert.equal(defaultProjectStage("marketing", [], [], false), "product");
-assert.equal(
-  defaultProjectStage("marketing", [], [{ type: "content", state: "CONTENT_DRAFT" }], false),
-  "content",
-);
-assert.equal(
-  defaultProjectStage("marketing", [], [{ type: "video", state: "VIDEO_DRAFT" }], false),
-  "video",
-);
-assert.equal(defaultProjectStage("marketing", [], [], true), "publication");
 const task: WorkspaceTaskSummary = {
   id: "task",
   projectId: "project",
   projectTitle: "Synthetic",
-  nodeKind: "product",
+  recordKind: "product",
   title: "Review",
   detail: "Synthetic",
   priority: "review",
-  createdAt: new Date("2026-09-04T00:00:00Z"),
+  createdAt: new Date("2026-09-04"),
+  destination: { type: "record", kind: "product", id: "object" },
 };
+assert.equal(workspaceTaskHref(task), "/workspace/project/records/product/object");
 assert.equal(
-  defaultProjectStage("marketing", [task], [{ type: "video", state: "VIDEO_DRAFT" }], true),
-  "product",
-);
-assert.equal(defaultProjectStage("sales", [], [], false), "inbound");
-assert.equal(
-  defaultProjectStage("sales", [], [{ type: "lead", state: "LEAD_RECEIVED" }], false),
-  "rfq",
+  workspaceTaskHref({ ...task, recordKind: "lead", taskType: "opportunity" }),
+  "/workspace/project/records/product/object",
+  "Display metadata cannot rewrite a destination",
 );
 assert.equal(
-  defaultProjectStage(
-    "sales",
-    [],
-    [
-      { type: "lead", state: "FOLLOW_UP" },
-      { type: "quotation", state: "QUOTE_REVIEW_REQUIRED" },
-    ],
-    false,
-  ),
-  "quotation",
+  workspaceTaskHref({
+    ...task,
+    destination: { type: "create", kind: "rfq", source: { kind: "lead", id: "lead" } },
+  }),
+  "/workspace/project/new/rfq?lead=lead",
+);
+assert.equal(workspaceRecordHref("project", "video", "v"), "/workspace/project/video?item=v");
+assert.equal(
+  workspaceCreateHref("project", "video", { kind: "product", id: "p" }),
+  "/workspace/project/video?new=1&product=p",
+);
+const returnTo =
+  "/workspace/content?project=00000000-0000-4000-8000-000000000101&type=content&state=CONTENT_APPROVED";
+assert.equal(workspaceReturnTo(returnTo), returnTo);
+assert.equal(workspaceReturnTo("/workspace?view=waiting"), "/workspace?view=waiting");
+for (const bad of [
+  "https://example.org",
+  "//example.org",
+  "/workspace/settings",
+  "/workspace/x",
+  "/workspace/content#x",
+  "/workspace/content?next=https://example.org",
+  "/workspace/content?project=a&project=b",
+  "/workspace\\content",
+  "/workspace/products/../content",
+  "/workspace/%2e%2e/workspace",
+  "/workspace/content#",
+  "/workspace?view=%00",
+  "/workspace?view=%5c",
+  ["/workspace"],
+])
+  assert.equal(workspaceReturnTo(bad), undefined);
+assert.equal(
+  workspaceTaskHref(task, returnTo),
+  `/workspace/project/records/product/object?returnTo=${encodeURIComponent(returnTo)}`,
 );
 assert.equal(
-  defaultProjectStage(
-    "sales",
-    [{ ...task, nodeKind: "quotation", taskType: "approval" }],
-    [{ type: "lead", state: "FOLLOW_UP" }],
-    false,
-  ),
-  "quotation",
-);
-assert.equal(
-  workspaceTaskHref({ ...task, nodeKind: "lead", taskType: "rfq" }),
-  "/workspace/project/new/rfq?lead=task",
-);
-assert.equal(
-  workspaceTaskHref({ ...task, nodeKind: "lead", taskType: "opportunity" }),
-  "/workspace/project/records/lead/task",
-);
-assert.equal(
-  defaultProjectStage("sales", [], [{ type: "quotation", state: "QUOTE_DRAFT" }], false),
-  "quotation",
-);
-assert.equal(
-  defaultProjectStage("sales", [], [{ type: "lead", state: "FOLLOW_UP" }], false),
-  "follow-up",
-);
-assert.equal(
-  defaultProjectStage(
-    "sales",
-    [],
-    [
-      { type: "lead", state: "FOLLOW_UP" },
-      { type: "delivery_confirmation", state: "DELIVERY_CONFIRMATION_PENDING" },
-    ],
-    false,
-  ),
-  "delivery",
-);
-assert.equal(
-  defaultProjectStage(
-    "sales",
-    [],
-    [
-      { type: "lead", state: "OPPORTUNITY" },
-      { type: "delivery_confirmation", state: "DELIVERY_CONFIRMATION_PENDING" },
-    ],
-    false,
-  ),
-  "delivery",
+  workspaceTaskHref(task, "/testing/project-workspace"),
+  "/workspace/project/records/product/object",
 );
 const source = (path: string) => readFileSync(path, "utf8");
 assert.match(source("app/workspace/layout.tsx"), /WorkspaceShell/);
-assert.match(source("app/workspace/layout.tsx"), /Suspense/);
-for (const path of [
-  "components/workspace/project-workspace.tsx",
-  "components/workspace/workspace-dashboard.tsx",
-])
-  assert.doesNotMatch(source(path), /WorkspaceActionDock/);
-const page = source("components/workspace/project-page.tsx");
-assert.match(page, /StageTasks/);
-assert.match(page, /ProjectStagePanel/);
+assert.match(source("components/workspace/project-page.tsx"), /旧阶段链接已停用/);
 assert.doesNotMatch(
-  page,
-  /listProjectProductCatalogEntries|listProjectPublicationData|listStoredProductAgentModelSettings/,
+  source("components/workspace/project-page.tsx"),
+  /ProjectStage|readWorkspaceLibrary|defaultStage/,
 );
-assert.match(source("components/workspace/project-stage-panel.tsx"), /switch\s*\(stage\)/);
+assert.doesNotMatch(
+  source("components/workspace/record-page.tsx"),
+  /ProjectStage|readWorkspaceLibrary/,
+);
+assert.match(source("components/workspace/record-page.tsx"), /readWorkspaceRecord/);
 assert.match(source("lib/auth-guard.ts"), /getRequestSession\s*=\s*cache\(/);
 assert.doesNotMatch(source("lib/auth-guard.ts"), /["']use cache["']/);
 assert.match(source("components/workspace/workspace-link.tsx"), /onNavigate=/);
-assert.match(source("lib/actions/workspace.ts"), /revalidatePath\("\/workspace",\s*"layout"\)/);
-console.log(
-  "PASS workspace stage defaults, legacy task links, persistent shell, and scoped loading contracts",
-);
-
+assert.match(source("lib/action-boundary.ts"), /revalidatePath\("\/workspace",\s*"layout"\)/);
+assert.ok(existsSync("app/workspace/projects/page.tsx"));
 const packageConfig = JSON.parse(source("package.json"));
 const biomeConfig = JSON.parse(source("biome.json"));
-assert.match(packageConfig.devDependencies["@biomejs/biome"], /^\d+\.\d+\.\d+$/);
 assert.equal(
   biomeConfig.$schema,
   `https://biomejs.dev/schemas/${packageConfig.devDependencies["@biomejs/biome"]}/schema.json`,
 );
 assert.match(packageConfig.scripts.build, /^pnpm check &&/);
-console.log("PASS pinned Biome schema and deployment build quality gate");
+console.log(
+  "PASS explicit record/create destinations, restricted return context, project management and auth cache boundaries",
+);

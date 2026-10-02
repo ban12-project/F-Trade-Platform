@@ -1,7 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { actionError, refreshWorkspace } from "@/lib/action-boundary";
 
 import { auth } from "@/lib/auth";
 import { socialControlChangeSchema } from "@/lib/social/control-record";
@@ -31,15 +31,12 @@ export async function saveSocialChannelControlAction(
     };
   try {
     const result = await saveSocialChannelControl(parsed.data);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return {
       status: "success",
       message: `渠道已${result.circuitStatus === "active" ? "启用" : "暂停"}；操作已写入审计记录。`,
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法保存社交渠道控制状态。",
-    };
+    return actionError(error, "无法保存社交渠道控制状态。");
   }
 }

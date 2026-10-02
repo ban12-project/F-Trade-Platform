@@ -332,17 +332,19 @@ async function testReviewSnapshot() {
       select() {
         let isRun = false;
         let isImage = false;
+        let isWorkspaceLink = false;
         const query = {
           from(table: Parameters<typeof getTableName>[0]) {
             isRun = getTableName(table) === "product_agent_stream_run";
             isImage = getTableName(table) === "product_source_image";
+            isWorkspaceLink = getTableName(table) === "workspace_project_item";
             return query;
           },
           where() {
             return query;
           },
           async orderBy() {
-            assert.equal(isImage, true);
+            assert.ok(isImage || isWorkspaceLink); // This fixture is a legacy unlinked aggregate.
             return [];
           },
           async for(mode: string) {

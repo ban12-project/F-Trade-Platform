@@ -1,9 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
-
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-
 import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord, videoProcessingJob } from "@/lib/db/schema";
+import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
 import { videoProcessingFailureMessage } from "./processing-failures";
 
 export type VideoProcessingKind = "ai_draft" | "render";
@@ -21,29 +20,32 @@ export async function queueVideoProcessingJob(
   actorId: string,
   database: Database = getDatabase(),
 ) {
-  const [record] = await database
-    .select({ version: aggregateRecord.version })
-    .from(aggregateRecord)
-    .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
-    .limit(1);
-  if (!record) throw new Error("营销视频不存在。");
-  const requestKey = createHash("sha256")
-    .update(`${videoId}:${kind}:${record.version}`)
-    .digest("hex");
-  const id = randomUUID();
-  const inserted = await database
-    .insert(videoProcessingJob)
-    .values({ id, videoProjectId: videoId, kind, requestKey, createdBy: actorId })
-    .onConflictDoNothing({ target: videoProcessingJob.requestKey })
-    .returning();
-  if (inserted[0]) return { job: inserted[0], created: true };
-  const [existing] = await database
-    .select()
-    .from(videoProcessingJob)
-    .where(eq(videoProcessingJob.requestKey, requestKey))
-    .limit(1);
-  if (!existing) throw new Error("无法创建视频处理任务。");
-  return { job: existing, created: false };
+  return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(videoId, tx, actorId);
+    const [record] = await tx
+      .select({ version: aggregateRecord.version })
+      .from(aggregateRecord)
+      .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
+      .limit(1);
+    if (!record) throw new Error("营销视频不存在。");
+    const requestKey = createHash("sha256")
+      .update(`${videoId}:${kind}:${record.version}`)
+      .digest("hex");
+    const id = randomUUID();
+    const inserted = await tx
+      .insert(videoProcessingJob)
+      .values({ id, videoProjectId: videoId, kind, requestKey, createdBy: actorId })
+      .onConflictDoNothing({ target: videoProcessingJob.requestKey })
+      .returning();
+    if (inserted[0]) return { job: inserted[0], created: true };
+    const [existing] = await tx
+      .select()
+      .from(videoProcessingJob)
+      .where(eq(videoProcessingJob.requestKey, requestKey))
+      .limit(1);
+    if (!existing) throw new Error("无法创建视频处理任务。");
+    return { job: existing, created: false };
+  });
 }
 
 export async function reserveVideoWorkflowStart(
@@ -51,18 +53,26 @@ export async function reserveVideoWorkflowStart(
   claimId: string,
   database: Database = getDatabase(),
 ) {
-  const [claimed] = await database
-    .update(videoProcessingJob)
-    .set({ workflowRunId: claimId })
-    .where(
-      and(
-        eq(videoProcessingJob.id, jobId),
-        eq(videoProcessingJob.status, "queued"),
-        isNull(videoProcessingJob.workflowRunId),
-      ),
-    )
-    .returning({ id: videoProcessingJob.id });
-  return Boolean(claimed);
+  return database.transaction(async (tx) => {
+    const [context] = await tx
+      .select({ videoId: videoProcessingJob.videoProjectId })
+      .from(videoProcessingJob)
+      .where(eq(videoProcessingJob.id, jobId));
+    if (!context) throw new Error("视频处理任务不存在。");
+    await assertAggregateWorkspaceWrite(context.videoId, tx);
+    const [claimed] = await tx
+      .update(videoProcessingJob)
+      .set({ workflowRunId: claimId })
+      .where(
+        and(
+          eq(videoProcessingJob.id, jobId),
+          eq(videoProcessingJob.status, "queued"),
+          isNull(videoProcessingJob.workflowRunId),
+        ),
+      )
+      .returning({ id: videoProcessingJob.id });
+    return Boolean(claimed);
+  });
 }
 
 export async function attachVideoWorkflowRun(
@@ -97,25 +107,33 @@ export async function releaseVideoWorkflowStart(
 }
 
 export async function markVideoJobRunning(jobId: string, database: Database = getDatabase()) {
-  const [job] = await database
-    .update(videoProcessingJob)
-    .set({
-      status: "running",
-      startedAt: new Date(),
-      attempts: sql`${videoProcessingJob.attempts} + 1`,
-      failureCode: null,
-      failureMessage: null,
-    })
-    .where(and(eq(videoProcessingJob.id, jobId), eq(videoProcessingJob.status, "queued")))
-    .returning();
-  if (job) return job;
-  const [existing] = await database
-    .select()
-    .from(videoProcessingJob)
-    .where(eq(videoProcessingJob.id, jobId))
-    .limit(1);
-  if (!existing) throw new Error("视频处理任务不存在。");
-  return existing;
+  return database.transaction(async (tx) => {
+    const [context] = await tx
+      .select({ videoId: videoProcessingJob.videoProjectId })
+      .from(videoProcessingJob)
+      .where(eq(videoProcessingJob.id, jobId));
+    if (!context) throw new Error("视频处理任务不存在。");
+    await assertAggregateWorkspaceWrite(context.videoId, tx);
+    const [job] = await tx
+      .update(videoProcessingJob)
+      .set({
+        status: "running",
+        startedAt: new Date(),
+        attempts: sql`${videoProcessingJob.attempts} + 1`,
+        failureCode: null,
+        failureMessage: null,
+      })
+      .where(and(eq(videoProcessingJob.id, jobId), eq(videoProcessingJob.status, "queued")))
+      .returning();
+    if (job) return job;
+    const [existing] = await tx
+      .select()
+      .from(videoProcessingJob)
+      .where(eq(videoProcessingJob.id, jobId))
+      .limit(1);
+    if (!existing) throw new Error("视频处理任务不存在。");
+    return existing;
+  });
 }
 
 export async function completeVideoJob(jobId: string, database: Database = getDatabase()) {

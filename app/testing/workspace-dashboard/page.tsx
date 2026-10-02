@@ -4,10 +4,10 @@ import { WorkspaceDashboard } from "@/components/workspace/workspace-dashboard";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import type {
-  WorkspacePipelineSummary,
+  WorkspaceProjectOverview,
   WorkspaceProjectSummary,
   WorkspaceTaskSummary,
-} from "@/lib/workspace/store";
+} from "@/lib/workspace/types";
 
 const projects: WorkspaceProjectSummary[] = [
   {
@@ -28,9 +28,10 @@ const projects: WorkspaceProjectSummary[] = [
 const tasks: WorkspaceTaskSummary[] = [
   {
     id: "00000000-0000-4000-8000-000000000711",
-    projectId: projects[0]!.id,
-    projectTitle: projects[0]!.title,
-    nodeKind: "publication",
+    projectId: projects[0]?.id,
+    projectTitle: projects[0]?.title,
+    recordKind: "publication",
+    destination: { type: "record", kind: "content", id: "00000000-0000-4000-8000-000000000711" },
     title: "批准内容等待发布",
     detail: "需要逐帖人工确认",
     priority: "review",
@@ -40,9 +41,10 @@ const tasks: WorkspaceTaskSummary[] = [
   },
   {
     id: "00000000-0000-4000-8000-000000000713",
-    projectId: projects[0]!.id,
-    projectTitle: projects[0]!.title,
-    nodeKind: "video",
+    projectId: projects[0]?.id,
+    projectTitle: projects[0]?.title,
+    recordKind: "video",
+    destination: { type: "record", kind: "video", id: "00000000-0000-4000-8000-000000000713" },
     title: "营销视频等待成片审核",
     detail: "打开对应剪辑版本并完成人工审核",
     priority: "review",
@@ -52,9 +54,10 @@ const tasks: WorkspaceTaskSummary[] = [
   },
   {
     id: "00000000-0000-4000-8000-000000000712",
-    projectId: projects[1]!.id,
-    projectTitle: projects[1]!.title,
-    nodeKind: "lead",
+    projectId: projects[1]?.id,
+    projectTitle: projects[1]?.title,
+    recordKind: "lead",
+    destination: { type: "record", kind: "lead", id: "00000000-0000-4000-8000-000000000712" },
     title: "客户跟进到期",
     detail: "计划跟进已到期",
     priority: "complete",
@@ -71,9 +74,14 @@ for (const [id, state, title, detail] of [
 ] as const) {
   tasks.push({
     id: `00000000-0000-4000-8000-000000000${id}`,
-    projectId: projects[0]!.id,
-    projectTitle: projects[0]!.title,
-    nodeKind: "publication",
+    projectId: projects[0]?.id,
+    projectTitle: projects[0]?.title,
+    recordKind: "publication",
+    destination: {
+      type: "record",
+      kind: "publication",
+      id: `00000000-0000-4000-8000-000000000${id}`,
+    },
     title,
     detail,
     state,
@@ -83,10 +91,11 @@ for (const [id, state, title, detail] of [
     createdAt: new Date("2026-09-03T00:00:00Z"),
   });
 }
-const pipeline: WorkspacePipelineSummary[] = [
+const overview: WorkspaceProjectOverview[] = [
   {
     ...projects[0]!,
-    currentStage: "已有发布成果",
+    taskCount: 1,
+    statusLabel: "已有发布成果",
     nextAction: "查看成果与入站转化",
     recordCount: 4,
     publishedCount: 1,
@@ -95,13 +104,14 @@ const pipeline: WorkspacePipelineSummary[] = [
   },
   {
     ...projects[1]!,
-    currentStage: "跟进",
+    taskCount: 1,
+    statusLabel: "跟进",
     nextAction: "执行下一次人工跟进",
     recordCount: 3,
     publishedCount: 0,
     leadCount: 1,
     opportunityCount: 0,
-    relatedMarketingProjectTitle: projects[0]!.title,
+    relatedMarketingProjectTitle: projects[0]?.title,
   },
 ];
 const inbound: InboundRoutingSummary[] = [
@@ -125,7 +135,7 @@ async function Content({
       <WorkspaceDashboard
         projects={query.empty ? [] : projects}
         tasks={query.empty ? [] : tasks}
-        pipeline={query.empty ? [] : pipeline}
+        overview={query.empty ? [] : overview}
         inbound={query.empty ? [] : inbound}
         view={query.view}
         basePath="/testing/workspace-dashboard"

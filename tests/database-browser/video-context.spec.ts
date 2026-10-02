@@ -204,21 +204,17 @@ test("video collection, exact draft and sourced creation remain distinct with mu
   page,
 }) => {
   await page.goto(path);
-  await expect(page.getByRole("heading", { name: "营销视频", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "内容与发布", exact: true })).toBeVisible();
   await expect(page.getByLabel("成片时长（秒）")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "制作新视频" })).toHaveAttribute(
-    "href",
-    `${path}?new=1`,
-  );
-  await page
-    .getByRole("link", { name: /SYNTHETIC secondary disc · SYNTHETIC video objective 1/ })
-    .click();
-  await expect(page).toHaveURL(`${path}?item=${videoIds[1]}`);
+  await expect(page).toHaveURL(`/workspace/content?project=${projectId}&type=video`);
+  await expect(page.getByRole("button", { name: "按需制作视频", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: /SYNTHETIC video objective 1/ }).click();
+  await expect(page).toHaveURL(new RegExp(`${path}[?]item=${videoIds[1]}&returnTo=`));
   await expect(page.getByRole("heading", { name: names[1], exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: names[0], exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "返回内容与发布" })).toHaveAttribute(
     "href",
-    `/workspace/content?project=${projectId}`,
+    `/workspace/content?project=${projectId}&type=video`,
   );
   await page.goto(`${path}?new=1`);
   await expect(page.getByLabel("视频目标")).toBeVisible();
@@ -255,11 +251,30 @@ test("invalid, conflicting and cross-project video links never select another re
     "new=0",
   ]) {
     await page.goto(`${path}?${query}`);
-    await expect(page.getByText("无法打开指定工作", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText("无法打开指定工作", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByLabel("成片时长（秒）")).toHaveCount(0);
     await expect(page.getByLabel("视频目标")).toHaveCount(0);
     expect(await page.content()).not.toContain(names[3]);
   }
+});
+
+test("canonical video addresses reject legacy selection parameters before redirecting", async ({
+  page,
+}) => {
+  for (const href of [
+    `/workspace/${projectId}/records/video/${videoIds[0]}?item=${videoIds[1]}`,
+    `/workspace/${projectId}/new/video?item=${videoIds[0]}`,
+  ]) {
+    await page.goto(href);
+    await expect(page.getByRole("heading", { name: "记录已不可用", exact: true })).toBeVisible();
+    await expect(page.getByLabel("视频目标")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: names[0], exact: true })).toHaveCount(0);
+  }
+  await page.goto(`/workspace/${projectId}/records/video/${videoIds[0]}`);
+  await expect(page).toHaveURL(new RegExp(`/video\\?item=${videoIds[0]}(?:&|$)`));
+  await expect(page.getByRole("heading", { name: names[0], exact: true })).toBeVisible();
 });
 
 test("copy opens its returned draft, protects other input, and repeated saves clear dirty state", async ({
@@ -269,6 +284,9 @@ test("copy opens its returned draft, protects other input, and repeated saves cl
   await expect(page.getByLabel("视频目标")).toHaveValue("展示已核实产品，引导客户咨询");
   await page.getByLabel("视频目标").fill("SYNTHETIC unsaved separate creation");
   await page.getByRole("button", { name: "复制为新剪辑稿" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "继续编辑" }).click();
   const open = page.getByRole("link", { name: "打开复制的剪辑稿" });
   await expect(open).toBeVisible();
   const href = await open.getAttribute("href");
@@ -282,7 +300,6 @@ test("copy opens its returned draft, protects other input, and repeated saves cl
   expect(copy.state).toBe("VIDEO_DRAFT");
   expect(copy.payload).toMatchObject({ id: copiedId, productId: productIds[2] });
   await open.click();
-  const dialog = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "继续编辑" }).click();
   await expect(page.getByLabel("视频目标")).toHaveValue("SYNTHETIC unsaved separate creation");
@@ -292,9 +309,9 @@ test("copy opens its returned draft, protects other input, and repeated saves cl
   await expect(page.getByRole("heading", { name: names[2], exact: true })).toBeVisible();
   for (const ctaText of ["Ask our team", "Contact the team"]) {
     await page.getByLabel("最后两秒 CTA").fill(ctaText);
-    await expect(page.getByText("有未保存修改", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("有未保存修改", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "保存", exact: true }).click();
-    await expect(page.getByText("已同步", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("已同步", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
     const [saved] = await db
       .select()
@@ -322,7 +339,7 @@ test("viewer and archived project show read-only controls even for an app admini
       .set({ status: kind === "archived" ? "archived" : "active" })
       .where(eq(schema.workspaceProject.id, projectId));
     await page.goto(`${path}?item=${videoIds[0]}`);
-    await expect(page.getByText("只读", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("只读", { exact: true })).toBeVisible();
     await expect(page.getByLabel("成片时长（秒）")).toBeDisabled();
     await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeDisabled();
     await expect(page.getByRole("button", { name: "合成预览", exact: true })).toBeDisabled();
@@ -342,7 +359,7 @@ test("viewer and archived project show read-only controls even for an app admini
       .where(eq(schema.aggregateRecord.id, videoIds[1]));
     await page.goto(`${path}?item=${videoIds[1]}`);
     await expect(
-      page.getByText("私有预览", { exact: true }).filter({ visible: true }),
+      page.getByRole("main").getByText("私有预览", { exact: true }).filter({ visible: true }),
     ).toBeVisible();
     await expect(page.getByLabel("审核证据")).toHaveCount(0);
   }
@@ -353,7 +370,7 @@ test("narrow video creation protects source, return and global navigation", asyn
   await page.goto(`${path}?new=1&product=${productIds[0]}`);
   await expect(page.getByLabel("视频目标")).toHaveValue("展示已核实产品，引导客户咨询");
   await page.getByLabel("视频目标").fill("SYNTHETIC mobile unsaved draft");
-  await expect(page.getByText("有未保存修改", { exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByText("有未保存修改", { exact: true })).toBeVisible();
   for (const link of [
     page.getByRole("link", { name: names[0], exact: true }),
     page.getByRole("link", { name: "返回内容与发布" }),

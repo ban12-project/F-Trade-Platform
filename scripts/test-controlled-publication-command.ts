@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import {
+  assertFacebookMediaPreview,
+  facebookMediaPreviewDigest,
+} from "../lib/social/facebook-media-confirmation";
 import { createControlledPublicationCommand } from "../lib/social/publication-command";
 
 const policy = {
@@ -47,3 +51,27 @@ assert.throws(
 console.log(
   "PASS controlled publication requires Gate 01, per-post human confirmation, and active circuit",
 );
+
+const mediaPreview = {
+  contentRef: "synthetic-content",
+  format: "image" as const,
+  mediaId: "synthetic-media",
+  contentVersion: 1,
+  caption: "SYNTHETIC reviewed caption",
+};
+const mediaConfirmation = {
+  contentVersion: 1,
+  previewDigest: facebookMediaPreviewDigest(mediaPreview),
+};
+assertFacebookMediaPreview(mediaConfirmation, mediaPreview);
+for (const changed of [
+  { ...mediaPreview, contentVersion: 2 },
+  { ...mediaPreview, caption: "SYNTHETIC changed" },
+  { ...mediaPreview, mediaId: "other-media" },
+]) {
+  assert.throws(
+    () => assertFacebookMediaPreview(mediaConfirmation, changed),
+    /changed_since_preview/,
+  );
+}
+console.log("PASS media preview confirmation rejects changed versions, captions and assets");

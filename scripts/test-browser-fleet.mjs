@@ -21,6 +21,8 @@ import {
   matches,
   secureOrigin,
 } from "../lib/browser-fleet/security.ts";
+import { loginStopOutcome } from "../ops/browser-node/login.mjs";
+import { runFacebookLoginFlow } from "../ops/browser-node/login-flow.mjs";
 
 function fixture(slots = 1) {
   const state = initialState({ maxBrowsers: slots, memoryBudgetMb: 4096, browserMemoryMb: 2048 });
@@ -399,4 +401,100 @@ test("reopening a healthy interactive run still coalesces", () => {
   claim(state);
   assert.equal(enqueue(state, "a", "interactive", 2000).id, original.id);
   assert.equal(state.runs.length, 1);
+});
+
+test("loading and unknown session observations pause work without declaring logout", async () => {
+  for (const observation of [{ state: "loading", originVerified: true }, { outcome: "unknown" }]) {
+    let time = 0,
+      claims = 0,
+      submissions = 0;
+    const result = await runFacebookLoginFlow({
+      observe: async () => observation,
+      acquireCredentials: async () => {
+        claims++;
+        throw Error("must_not_claim");
+      },
+      submit: async () => {
+        submissions++;
+        return "submitted";
+      },
+      assertActive() {},
+      deadline: 1000,
+      now: () => time,
+      sleep: async (ms) => {
+        time += ms;
+      },
+    });
+    const state = fixture();
+    enqueue(state);
+    const run = claim(state);
+    finishRun(state, run.id, loginStopOutcome(2, result.outcome), true, 1100);
+    assert.equal(claims, 0);
+    assert.equal(submissions, 0);
+    assert.equal(state.accounts[0].authState, "page_contract_failed");
+    assert.equal(run.status, "failed");
+    scheduleInbox(state, 2000, randomUUID);
+    assert.equal(state.runs.filter((r) => r.accountId === "a").length, 1);
+  }
+});
+
+test("observe-only waits for Messenger hydration and never submits or claims factors", async () => {
+  let reads = 0;
+  let claims = 0;
+  let submissions = 0;
+  let time = 0;
+  const result = await runFacebookLoginFlow({
+    observeOnly: true,
+    observe: async () =>
+      ++reads === 1
+        ? { state: "messenger", originVerified: true, identityVerified: true }
+        : {
+            state: "ready",
+            originVerified: true,
+            identityVerified: true,
+            messengerRestored: true,
+          },
+    acquireCredentials: async () => {
+      claims++;
+      return null;
+    },
+    submit: async () => {
+      submissions++;
+      return "submitted";
+    },
+    assertActive() {},
+    deadline: 2000,
+    now: () => time,
+    sleep: async (ms) => {
+      time += ms;
+    },
+  });
+  assert.deepEqual(result, { outcome: "ready" });
+  assert.equal(reads, 2);
+  assert.equal(claims, 0);
+  assert.equal(submissions, 0);
+});
+
+test("observe-only stops on a confirmed recovery page without claiming factors", async () => {
+  for (const phase of ["password", "totp", "pin"]) {
+    let claims = 0;
+    let submissions = 0;
+    const result = await runFacebookLoginFlow({
+      observeOnly: true,
+      observe: async () => ({ state: phase, originVerified: true, identityVerified: true }),
+      acquireCredentials: async () => {
+        claims++;
+        return null;
+      },
+      submit: async () => {
+        submissions++;
+        return "submitted";
+      },
+      assertActive() {},
+      deadline: Date.now() + 1000,
+    });
+    assert.deepEqual(result, { outcome: "refused", reason: "recovery_required" });
+    assert.equal(claims, 0);
+    assert.equal(submissions, 0);
+  }
 });

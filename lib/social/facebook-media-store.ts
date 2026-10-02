@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { get } from "@vercel/blob";
 import { and, eq, sql } from "drizzle-orm";
+import { type FleetState, publicationScopeActive } from "@/lib/browser-fleet/policy";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { facebookPublicationManifest } from "@/lib/db/facebook-runtime-schema";
 import { productMediaAsset } from "@/lib/db/product-media-schema";
@@ -13,12 +14,18 @@ import {
   socialBrowserJob,
   socialPublication,
   videoGeneratedAsset,
+  workspaceProject,
   workspaceProjectItem,
+  workspaceProjectMember,
 } from "@/lib/db/schema";
 import { videoProjectSchema } from "@/lib/video/contracts";
 import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { facebookMediaSubmitFormSchema } from "./facebook-account-forms";
+import {
+  assertFacebookMediaPreview,
+  facebookMediaPreviewDigest,
+} from "./facebook-media-confirmation";
 import {
   FACEBOOK_MEDIA_LIMITS,
   type FacebookMediaPayload,
@@ -39,6 +46,7 @@ import {
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type ReadDb = Pick<Database, "select">;
+type ScopeDb = Pick<Database, "execute">;
 type Selection = {
   projectId: string;
   contentRef: string;
@@ -161,6 +169,101 @@ async function digestVideo(blobKey: string, sizeBytes: number) {
   }
 }
 
+/** Resolve the current, unique account binding. Legacy Worker scope is used
+ * only while that Worker is explicitly enabled; fleet media jobs never borrow
+ * its environment identifiers. */
+export async function resolveFacebookMediaSubmissionScope(
+  actorId: string,
+  database: ScopeDb = getDatabase(),
+  now = Date.now(),
+) {
+  if (process.env.SOCIAL_FACEBOOK_WORKER_ENABLED === "1") {
+    const scope = configuredFacebookWorkerScope();
+    return { channelRef: scope.channelRef, accountRef: scope.accountRef };
+  }
+  const result = await database.execute(sql`SELECT b.channel_ref, b.account_ref, n.document
+    FROM browser_fleet_binding b
+    JOIN browser_fleet_node n ON n.id = b.node_id
+    JOIN social_channel_control c ON c.channel_ref = b.channel_ref AND c.account_ref = b.account_ref
+    WHERE n.owner_id = ${actorId} AND n.status = 'active'
+      AND c.enabled = true AND c.circuit_status = 'active'`);
+  if (result.rows.length !== 1) throw new Error("facebook_media_scope_ambiguous");
+  const row = result.rows[0];
+  const state = row.document as FleetState;
+  const accounts = Array.isArray(state?.accounts)
+    ? state.accounts.filter(
+        (account) =>
+          account.channelRef === row.channel_ref && account.accountRef === row.account_ref,
+      )
+    : [];
+  const account = accounts[0];
+  if (
+    accounts.length !== 1 ||
+    !account.enabled ||
+    account.authState !== "ready" ||
+    !account.expectedEgressIp ||
+    !state.capabilities?.includes("publish") ||
+    !publicationScopeActive(state, account, now)
+  )
+    throw new Error("facebook_media_scope_inactive");
+  return { channelRef: account.channelRef, accountRef: account.accountRef };
+}
+
+/** Reuse the original publication only when the broker can prove that no
+ * publish authorization was ever issued. A new user confirmation is still
+ * required through submitFacebookMediaPublication before this is called. */
+export async function requeueUnsentFacebookMediaPublication(
+  tx: Tx,
+  jobId: string,
+  publicationId: string,
+  actorId: string,
+) {
+  const result = await tx.execute(sql`SELECT p.run_id, p.authorization_id, p.receipt,
+    j.status AS job_status, j.failure_code, s.status AS publication_status,
+    s.external_publication_ref, n.document
+    FROM browser_fleet_publication p
+    JOIN social_browser_job j ON j.id = p.job_id
+    JOIN social_publication s ON s.id = j.payload_ref AND s.browser_job_id = j.id
+    JOIN browser_fleet_node n ON n.id = p.node_id
+    WHERE p.job_id = ${jobId} AND s.id = ${publicationId} AND n.owner_id = ${actorId}
+    FOR UPDATE OF p, j, s`);
+  const row = result.rows[0];
+  const state = row?.document as FleetState | undefined;
+  const run = state?.runs.find((item) => item.id === row.run_id);
+  if (
+    result.rows.length !== 1 ||
+    row.job_status !== "paused" ||
+    row.failure_code !== "fleet_publication_not_authorized" ||
+    row.publication_status !== "failed" ||
+    row.external_publication_ref !== null ||
+    row.authorization_id !== null ||
+    row.receipt !== null ||
+    run?.status !== "failed" ||
+    run.failure !== "publication_not_authorized" ||
+    run.jobRef !== jobId
+  )
+    throw new Error("facebook_media_retry_not_proven_unsent");
+  await tx.execute(sql`DELETE FROM browser_fleet_publication WHERE job_id = ${jobId}`);
+  await tx
+    .update(socialBrowserJob)
+    .set({ status: "queued", failureCode: null, updatedAt: new Date() })
+    .where(eq(socialBrowserJob.id, jobId));
+  await tx
+    .update(socialPublication)
+    .set({ status: "submitted", updatedAt: new Date() })
+    .where(eq(socialPublication.id, publicationId));
+  await tx.insert(auditEvent).values({
+    id: randomUUID(),
+    actorType: "human",
+    actorId,
+    action: "facebook_media.preclick_requeued",
+    subjectType: "social_publication",
+    subjectId: publicationId,
+    metadata: { reason: "no_publish_authorization" },
+    occurredAt: new Date(),
+  });
+}
+
 export async function submitFacebookMediaPublication(
   input: unknown,
   actorId: string,
@@ -169,9 +272,15 @@ export async function submitFacebookMediaPublication(
   if (actorId !== process.env.SOCIAL_FACEBOOK_OWNER_USER_ID)
     throw new Error("facebook_account_owner_required");
   const value = facebookMediaSubmitFormSchema.parse(input);
-  const scope = configuredFacebookWorkerScope();
   await assertWorkspaceProjectAccess(value.projectId, actorId, "write", database);
   const selected = await sourceFor(value, database, new Date());
+  assertFacebookMediaPreview(value, {
+    contentRef: value.contentRef,
+    format: value.format,
+    mediaId: value.mediaId,
+    contentVersion: selected.content.version,
+    caption: selected.text,
+  });
   if (value.format === "video") {
     await assertCurrentProductFactsForVideo(
       videoProjectSchema.parse(selected.content.payload),
@@ -185,6 +294,9 @@ export async function submitFacebookMediaPublication(
     sha256: selected.sha256 ?? (await digestVideo(selected.blobKey, selected.sizeBytes)),
   });
   return database.transaction(async (tx) => {
+    const scope = await resolveFacebookMediaSubmissionScope(actorId, tx);
+    if (scope.channelRef !== value.channelRef || scope.accountRef !== value.accountRef)
+      throw new Error("media_account_changed_since_preview");
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
     await assertPublicationEligible(
       { ...value, channelRef: scope.channelRef, accountRef: scope.accountRef },
@@ -204,10 +316,29 @@ export async function submitFacebookMediaPublication(
     }
     const idempotencyKey = `facebook-media:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}`;
     const [existing] = await tx
-      .select({ id: socialBrowserJob.payloadRef })
+      .select({
+        id: socialBrowserJob.payloadRef,
+        jobId: socialBrowserJob.id,
+        status: socialBrowserJob.status,
+        failureCode: socialBrowserJob.failureCode,
+      })
       .from(socialBrowserJob)
-      .where(eq(socialBrowserJob.idempotencyKey, idempotencyKey));
-    if (existing) return { publicationId: existing.id };
+      .where(eq(socialBrowserJob.idempotencyKey, idempotencyKey))
+      .for("update");
+    if (existing) {
+      if (
+        existing.status === "paused" &&
+        existing.failureCode !== "fleet_publication_not_authorized"
+      )
+        throw new Error("facebook_media_existing_attempt_requires_review");
+      if (
+        existing.status === "paused" &&
+        existing.failureCode === "fleet_publication_not_authorized"
+      ) {
+        await requeueUnsentFacebookMediaPublication(tx, existing.jobId, existing.id, actorId);
+      }
+      return { publicationId: existing.id };
+    }
     const publicationId = randomUUID();
     const jobId = randomUUID();
     await tx.insert(socialBrowserJob).values({
@@ -258,6 +389,7 @@ export async function buildFacebookPublicationPayload(
   tx: Tx,
   publication: typeof socialPublication.$inferSelect,
   now: Date,
+  purpose: "dispatch" | "receipt" = "dispatch",
 ): Promise<Record<string, unknown>> {
   if (!["text", "image", "video"].includes(publication.format)) {
     throw new Error("publication_format_invalid");
@@ -266,6 +398,7 @@ export async function buildFacebookPublicationPayload(
     { ...publication, format: publication.format as "text" | "image" | "video" },
     tx,
     now,
+    purpose,
   );
   if (publication.format !== "text") {
     return buildFacebookMediaPayload(tx, publication, now);
@@ -430,18 +563,27 @@ export async function listFacebookMediaOptions(
   projectId: string,
   actorId: string,
   database: Database = getDatabase(),
+  contentRef?: string,
 ) {
   await assertWorkspaceProjectAccess(projectId, actorId, "write", database);
   const records = await database
     .select({ record: aggregateRecord })
     .from(workspaceProjectItem)
     .innerJoin(aggregateRecord, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
-    .where(eq(workspaceProjectItem.projectId, projectId));
+    .where(
+      and(
+        eq(workspaceProjectItem.projectId, projectId),
+        contentRef ? eq(aggregateRecord.id, contentRef) : undefined,
+      ),
+    );
   const result: Array<{
     contentRef: string;
     mediaId: string;
     format: "image" | "video";
     label: string;
+    preview: string;
+    contentVersion: number;
+    previewDigest: string;
   }> = [];
   for (const { record } of records) {
     if (record.type === "video" && record.state === "VIDEO_APPROVED") {
@@ -452,6 +594,15 @@ export async function listFacebookMediaOptions(
           mediaId: video.renderedAssetRef,
           format: "video",
           label: `视频 · ${video.objective}`,
+          preview: "已批准 MP4 成片；无附加文案。",
+          contentVersion: record.version,
+          previewDigest: facebookMediaPreviewDigest({
+            contentRef: record.id,
+            format: "video",
+            mediaId: record.payload.renderedAssetRef as string,
+            contentVersion: record.version,
+            caption: "",
+          }),
         });
       }
     } else if (
@@ -476,6 +627,15 @@ export async function listFacebookMediaOptions(
           mediaId: asset.id,
           format: "image",
           label: `图片 · ${String(record.payload.hook ?? "已审核文案")} · ${asset.description || asset.id.slice(0, 8)}`,
+          preview: String(record.payload.body ?? ""),
+          contentVersion: record.version,
+          previewDigest: facebookMediaPreviewDigest({
+            contentRef: record.id,
+            format: "image",
+            mediaId: asset.id,
+            contentVersion: record.version,
+            caption: String(record.payload.body ?? ""),
+          }),
         });
       }
     }
@@ -575,4 +735,21 @@ export async function openFacebookMediaSource(source: FacebookMediaSource) {
     throw new Error("media_unavailable");
   }
   return { stream: blob.stream, media: source.media };
+}
+
+export async function listFacebookMarketingProjects(
+  actorId: string,
+  database: Database = getDatabase(),
+) {
+  return database
+    .select({ id: workspaceProject.id, title: workspaceProject.title })
+    .from(workspaceProject)
+    .innerJoin(workspaceProjectMember, eq(workspaceProjectMember.projectId, workspaceProject.id))
+    .where(
+      and(
+        eq(workspaceProjectMember.userId, actorId),
+        eq(workspaceProject.kind, "marketing"),
+        eq(workspaceProject.status, "active"),
+      ),
+    );
 }

@@ -71,6 +71,7 @@ import {
 } from "@/lib/video/upload-contracts";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
+import { useCreatedRecord } from "./use-created-record";
 import { WorkspaceLink } from "./workspace-link";
 
 type CreateValues = z.infer<typeof createMarketingVideoUiFormSchema>;
@@ -157,6 +158,8 @@ export function MarketingVideoCreateForm({
     setUploadProgress(0);
     router.refresh();
   }, [form, router, state]);
+
+  useCreatedRecord(projectId, "video", state.status, state.videoId);
 
   function selectSourceMode(value: string[]) {
     const next = value[0] as CreateValues["sourceMode"] | undefined;

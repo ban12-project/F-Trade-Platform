@@ -1,10 +1,7 @@
 "use server";
+import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
-import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { saveProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
 import { productAgentModelSettingsSchema } from "@/lib/form-schemas";
 
 export type AgentSettingsActionState = {
@@ -22,8 +19,8 @@ export async function saveProductAgentModelSettingsAction(
   _previousState: AgentSettingsActionState,
   formData: FormData,
 ): Promise<AgentSettingsActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "settings:manage")) {
+  const session = await authorizedActionSession("settings:manage");
+  if (!session) {
     return { status: "error", message: "无权修改 Agent 配置。" };
   }
   const parsed = productAgentModelSettingsSchema.safeParse({
@@ -54,16 +51,13 @@ export async function saveProductAgentModelSettingsAction(
       authToken: parsed.data.authToken || undefined,
       actorId: session.user.id,
     });
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return {
       status: "success",
       message: "Agent 模型配置已保存。密钥不会显示或返回给浏览器。",
       savedConfigId,
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法保存 Agent 配置。",
-    };
+    return actionError(error, "无法保存 Agent 配置。");
   }
 }

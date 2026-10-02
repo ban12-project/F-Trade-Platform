@@ -5,11 +5,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
-import { withAutomationControl } from "./control.mjs";
+import { checkedBrowserResponse } from "./browser-response.mjs";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
-import { openEgressCheckedSession, verifyBrowserEgress } from "./egress.mjs";
+import { openEgressCheckedSession, verifyBrowserEgress, waitForBrowserReady } from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
-import { createIdleExitPolicy } from "./idle.mjs";
+import { createIdleExitPolicy, viewerGraceExpired } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import {
@@ -18,6 +18,7 @@ import {
   loadLoginProfiles,
   loginProfileForRun,
   loginScopes,
+  loginStopOutcome,
 } from "./login.mjs";
 import { managedFacebookEnvironment } from "./managed-facebook.mjs";
 import { readPublicationMedia } from "./media.mjs";
@@ -55,6 +56,11 @@ if (image.Config?.Labels?.["io.ftrade.lease-watchdog"] !== "1")
 // Resolve the local tag once. Platform payloads cannot choose images, mounts,
 // shell commands, host ports, or a Docker API endpoint.
 const imageId = image.Id;
+const nativeProfileMode = process.env.BROWSER_NATIVE_PROFILES ?? "0";
+if (!["0", "1"].includes(nativeProfileMode)) throw new Error("native_profile_mode_invalid");
+const nativeProfiles = nativeProfileMode === "1";
+if (nativeProfiles && image.Config?.Labels?.["io.ftrade.native-profile"] !== "1")
+  throw new Error("reviewed_native_profile_image_required");
 Object.assign(
   process.env,
   await managedFacebookEnvironment(process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR, nodeId),
@@ -125,11 +131,7 @@ async function browserRequest(slot, path, body, timeout = 30_000) {
     ...(body ? { body: JSON.stringify(body) } : {}),
     signal: AbortSignal.any([slot.abort.signal, AbortSignal.timeout(timeout)]),
   });
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error("browser_request_failed");
-  }
-  return response;
+  return checkedBrowserResponse(response, path, body);
 }
 const sync = await nodeCall("sync");
 if (sync.nodeId !== nodeId) throw new Error("node_identity_mismatch");
@@ -162,19 +164,14 @@ console.log("browser_node_ready");
 async function stop(slot, outcome = "failed") {
   if (slot.stopPromise) return slot.stopPromise;
   slot.stopping = true;
-  const inputCleanup = gateway.closeRun(slot.run.id);
-  inputCleanup.catch(() => {});
+  gateway.closeRun(slot.run.id);
   slot.stopPromise = (async () => {
     if (!slot.stopped) {
-      const inputStopped = await inputCleanup.then(
-        () => true,
-        () => false,
-      );
       // Wait for create/start to settle; never acknowledge a slot while a late
       // Docker create could still bring a browser online.
       slot.abort.abort();
       if (slot.startPromise) await slot.startPromise.catch(() => {});
-      if (inputStopped && slot.apiPort && slot.expiresAt > Date.now()) {
+      if (slot.apiPort && slot.expiresAt > Date.now()) {
         try {
           const response = await fetch(
             `http://127.0.0.1:${slot.apiPort}/sessions/${slot.run.accountId}/storage_state`,
@@ -232,17 +229,13 @@ async function launch(slot) {
   const details = await docker("GET", `/containers/${created.Id}/json`);
   slot.apiPort = Number(details.NetworkSettings.Ports["9377/tcp"][0].HostPort);
   slot.vncPort = Number(details.NetworkSettings.Ports["6080/tcp"][0].HostPort);
-  for (let i = 0; i < 60; i++) {
-    if (slot.stopping || slot.expiresAt <= Date.now()) throw new Error("start_cancelled");
-    try {
-      const response = await browserRequest(slot, "/health", undefined, 2000);
-      await response.body?.cancel();
-      break;
-    } catch {
-      if (i === 59) throw new Error("browser_start_timeout");
-      await sleep(1000, undefined, { signal: slot.abort.signal });
-    }
-  }
+  await waitForBrowserReady((path, body, timeout) => browserRequest(slot, path, body, timeout), {
+    assertActive() {
+      if (slot.stopping || slot.abort.signal.aborted || slot.expiresAt <= Date.now())
+        throw new Error("start_cancelled");
+    },
+    sleep: (ms) => sleep(ms, undefined, { signal: slot.abort.signal }),
+  });
   slot.egressTabId = await openEgressCheckedSession(
     (path, body) => browserRequest(slot, path, body),
     slot.run,
@@ -252,8 +245,7 @@ async function launch(slot) {
   for (let i = 0; i < 30; i++) {
     const response = await browserRequest(slot, "/vnc/status");
     const status = await response.json();
-    if (status.enabled === true && status.running === false && status.watcherRunning === false)
-      break;
+    if (status.running === true) break;
     if (i === 29) throw new Error("vnc_not_ready");
     await sleep(1000, undefined, { signal: slot.abort.signal });
   }
@@ -272,10 +264,6 @@ async function launch(slot) {
   delete slot.spec;
 }
 async function heartbeat(slot) {
-  if (slot.controlFailure) {
-    await stop(slot, "unknown");
-    return;
-  }
   if (slot.stopping) {
     await stop(slot, slot.outcome ?? "failed");
     return;
@@ -285,13 +273,7 @@ async function heartbeat(slot) {
     await stop(slot, "unknown");
     return;
   }
-  if (
-    slot.ready &&
-    !slot.controlPaused &&
-    !slot.automationHandoff &&
-    Date.now() - slot.egressCheckedAt >= 30_000
-  ) {
-    slot.automationHandoff = true;
+  if (slot.ready && Date.now() - slot.egressCheckedAt >= 30_000) {
     try {
       await verifyBrowserEgress(
         (path, body) => browserRequest(slot, path, body),
@@ -303,8 +285,6 @@ async function heartbeat(slot) {
       slot.outcome = "egress_mismatch";
       await stop(slot, slot.outcome);
       return;
-    } finally {
-      slot.automationHandoff = false;
     }
   }
   const renewed = await nodeCall("heartbeat", {
@@ -321,8 +301,17 @@ async function heartbeat(slot) {
   if (
     slot.ready &&
     slot.run.kind === "interactive" &&
-    ((!slot.connected && !pendingConnection && Date.now() - slot.readyAt > 60_000) ||
-      (slot.disconnectedAt && !slot.automationHandoff && Date.now() - slot.disconnectedAt > 15_000))
+    viewerGraceExpired(
+      {
+        connected: slot.connected,
+        disconnectedAt: slot.disconnectedAt,
+        readyAt: slot.readyAt,
+        loginTask: Boolean(slot.loginTask),
+        pendingConnection,
+        automatic: loginProfileForRun(loginProfiles, slot.run)?.version === 2,
+      },
+      Date.now(),
+    )
   ) {
     await stop(slot, "completed");
     return;
@@ -337,8 +326,8 @@ async function heartbeat(slot) {
   if (slot.containerId) await renewWatchdog(docker, slot.containerId, slot.expiresAt);
   if (
     slot.ready &&
-    slot.connected &&
-    !slot.disconnectedAt &&
+    (loginProfileForRun(loginProfiles, slot.run)?.version === 2 ||
+      (slot.connected && !slot.disconnectedAt)) &&
     slot.run.kind === "interactive" &&
     renewed.loginAuthorization &&
     !slot.loginTask
@@ -351,7 +340,7 @@ async function heartbeat(slot) {
       assertActive() {
         if (
           !slot.ready ||
-          (!slot.automationHandoff && (!slot.connected || slot.disconnectedAt)) ||
+          (profile.version !== 2 && (!slot.connected || slot.disconnectedAt)) ||
           slot.stopping ||
           slot.abort.signal.aborted ||
           slot.expiresAt <= Date.now()
@@ -375,11 +364,15 @@ async function heartbeat(slot) {
       browserRequest: (path, body) => browserRequest(slot, path, body),
     });
     // Run independently so slow navigation cannot starve other slots' lease heartbeats.
-    slot.loginTask = withAutomationControl(slot, gateway, () => execute(renewed.loginAuthorization))
+    slot.loginTask = execute(renewed.loginAuthorization)
       .then(async (outcome) => {
-        if (outcome === "unknown") await stop(slot, "unknown");
+        const reason = loginStopOutcome(profile.version, outcome);
+        if (reason) await stop(slot, reason);
       })
-      .catch(() => stop(slot, "unknown"));
+      .catch(() => stop(slot, loginStopOutcome(profile.version, "unknown")))
+      .finally(() => {
+        slot.loginTask = null;
+      });
   }
 }
 let ticking = false;
@@ -418,7 +411,7 @@ async function tick() {
       result,
       (claim) => {
         const expiresAt = localDeadline(claim, claim.run.leaseUntil);
-        const spec = containerSpec(nodeId, claim.run, imageId, expiresAt);
+        const spec = containerSpec(nodeId, claim.run, imageId, expiresAt, nativeProfiles);
         configureLoginRuntime(spec, claim.run, loginProfileForRun(loginProfiles, claim.run));
         return { expiresAt, spec };
       },
@@ -501,6 +494,9 @@ async function tick() {
                   },
                   body: JSON.stringify({ operation, installationId, bootId, ...fields }),
                 }),
+            }).catch((error) => {
+              if (/^publication_(media_|lease_)/.test(error?.message ?? "")) throw error;
+              throw new Error("publication_media_transport_failed");
             });
             return mediaRead.then((asset) => {
               assertPublicationActive();
@@ -517,6 +513,10 @@ async function tick() {
                 containerId: slot.containerId,
                 asset,
                 assertActive: assertPublicationActive,
+              }).catch((error) => {
+                if (/^publication_(upload_|container_|lease_)/.test(error?.message ?? ""))
+                  throw error;
+                throw new Error("publication_upload_transport_failed");
               }),
             );
             return mediaPreparation.then((upload) => {
@@ -548,6 +548,10 @@ async function tick() {
             authorizePublication,
             preparePublicationMedia,
             reportPublication: createPublicationReporter({ run: slot.run, request: nodeCall }),
+            onPreclickFailure(stage, code) {
+              // Both fields come from fixed executor enums; never log raw page text.
+              console.error(`browser_publication_preclick_failed:${stage}:${code}`);
+            },
             readPublicationMedia: readAssignedMedia,
             signal: slot.abort.signal,
             browserRequest: (path, body) => browserRequest(slot, path, body),

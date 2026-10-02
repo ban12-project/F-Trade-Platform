@@ -32,6 +32,7 @@ services:
       FTRADE_URL: ${FTRADE_URL:?Set the HTTPS platform origin}
       BROWSER_NODE_ACCESS_KEY: ${BROWSER_NODE_ACCESS_KEY:?Set the platform node key}
       BROWSER_IMAGE: ${BROWSER_IMAGE:-ghcr.io/ban12-project/f-trade-platform-browser:main}
+      BROWSER_NATIVE_PROFILES: ${BROWSER_NATIVE_PROFILES:-0}
       MAX_RUNNING_BROWSERS: ${MAX_RUNNING_BROWSERS:-2}
       HOST_RESERVE_MB: ${HOST_RESERVE_MB:-1024}
       GATEWAY_PORT: "9400"

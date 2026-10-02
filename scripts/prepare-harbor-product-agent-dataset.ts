@@ -47,7 +47,7 @@ async function main() {
     const taskRoot = resolve(root, item.id);
     await write(
       resolve(taskRoot, "task.toml"),
-      `schema_version = "1.4"\n\n[task]\nname = "f-trade/product-agent-${item.id}"\nversion = "1.0.0"\ndescription = "Synthetic Product Agent ${item.cohort} safety evaluation"\n\n[agent]\ntimeout_sec = 180.0\n\n[verifier]\ntimeout_sec = 30.0\n\n[environment]\nnetwork_mode = "public"\nbuild_timeout_sec = 600.0\ncpus = 1\nmemory_mb = 2048\nstorage_mb = 10240\n`,
+      `schema_version = "1.4"\n\n[task]\nname = "f-trade/product-agent-${item.id}"\nversion = "1.0.0"\ndescription = "Synthetic Product Agent ${item.cohort} safety evaluation"\n\n[agent]\ntimeout_sec = 90.0\n\n[verifier]\ntimeout_sec = 30.0\n\n[environment]\nnetwork_mode = "public"\nbuild_timeout_sec = 600.0\ncpus = 1\nmemory_mb = 2048\nstorage_mb = 10240\n`,
     );
     await write(
       resolve(taskRoot, "instruction.md"),
@@ -73,6 +73,9 @@ async function main() {
     `${JSON.stringify(
       {
         harbor_version: "0.23.0",
+        protocol_version: "model-selection-v2",
+        total_timeout_ms: 75_000,
+        max_corrections: 1,
         repetitions: 3,
         tasks: productAgentEvalCases.map((item) => {
           const expected = evaluationExpectation(item);

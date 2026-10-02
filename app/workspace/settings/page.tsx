@@ -12,6 +12,8 @@ async function Settings() {
     <WorkspaceSettingsPanel
       settings={canManage ? await readWorkspaceModelSettings() : []}
       currentUser={session.user}
+      legacyWorker={process.env.SOCIAL_FACEBOOK_WORKER_ENABLED === "1"}
+      sandboxEnabled={process.env.BROWSER_SANDBOX_ENABLED === "1"}
       canManage={canManage}
     />
   );
@@ -19,7 +21,7 @@ async function Settings() {
 export default function Page() {
   return (
     <main id="main-content" className="mx-auto max-w-4xl p-4 sm:p-6">
-      <h1 className="mb-6 text-2xl font-semibold">账号与工具</h1>
+      <h1 className="mb-6 text-2xl font-semibold">工作区设置</h1>
       <Suspense fallback={<WorkspacePanelSkeleton label="正在加载账号设置" />}>
         <Settings />
       </Suspense>

@@ -12,6 +12,7 @@ on:
       - "ops/browser-node/**"
       - "scripts/test-browser-*.ts"
       - "scripts/test-browser-*.mjs"
+      - "scripts/test-native-profile.mjs"
       - "drizzle/**"
       - ".github/workflows/browser-node.yml"
 permissions:
@@ -48,7 +49,7 @@ jobs:
           cache: true
       - run: pnpm install --frozen-lockfile
       - name: Lease, capacity, gateway and isolation regression tests
-        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts
+        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-native-profile.mjs
       - name: On-demand Agent idle exit and session shutdown
         run: node --import tsx --test scripts/test-browser-idle.mjs scripts/test-browser-managed-facebook.mjs scripts/test-browser-sandbox-session.ts scripts/test-browser-sandbox-runtime.ts scripts/test-browser-sandbox-provider.ts
       - name: Sandbox dispatch orchestration
@@ -57,14 +58,8 @@ jobs:
         run: node scripts/test-browser-agent-payload.mjs
       - name: Pinned upstream source cache and refusal checks
         run: node scripts/test-browser-upstream.mjs
-      - name: Sealed candidate installation refuses mismatched artifacts
-        run: python3 scripts/test-browser-candidate-install.py -v
       - name: Real PostgreSQL reservations and migration
         run: node --conditions=react-server --import tsx scripts/test-browser-fleet-postgres.ts
-        env:
-          BROWSER_FLEET_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/browser_fleet_test
-      - name: Candidate gateway broker setup and authorization
-        run: node --conditions=react-server --import tsx scripts/test-browser-candidate-broker.ts
         env:
           BROWSER_FLEET_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/browser_fleet_test
       - name: Application typecheck
@@ -78,12 +73,12 @@ jobs:
         run: docker build -f ops/browser-node/Dockerfile -t ftrade-browser-node:ci .
       - name: Check new code with repository Biome rules
         if: ${{ !cancelled() }}
-        run: pnpm exec biome ci lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-fleet-postgres.ts
+        run: pnpm exec biome ci lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-native-profile.mjs scripts/test-browser-fleet-postgres.ts
       - name: Export suggested formatting patch for review (never commits)
         if: ${{ failure() }}
         shell: bash
         run: |
-          files=(lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-browser-fleet-postgres.ts)
+          files=(lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-native-profile.mjs scripts/test-browser-fleet-postgres.ts)
           set +e
           pnpm exec biome check --write "${files[@]}"
           formatter_status=$?

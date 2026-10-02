@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-
 import { and, asc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
-
 import { type Database, getDatabase } from "@/lib/db/client";
 import { auditEvent, videoJob as videoJobTable, videoProviderConfig } from "@/lib/db/schema";
+import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
 import { type VideoProviderId, videoGenerationRequestSchema } from "./provider-capabilities";
 
 export type VideoJobRecord = typeof videoJobTable.$inferSelect;
@@ -73,6 +72,7 @@ export async function enqueueVideoJob(
     throw new Error("expected video cost must be a positive integer");
   const now = new Date();
   return database.transaction(async (tx) => {
+    await assertAggregateWorkspaceWrite(input.videoProjectId, tx, input.actorId);
     const [created] = await tx
       .insert(videoJobTable)
       .values({
@@ -161,6 +161,7 @@ export async function claimConfiguredVideoJob(
       .where(
         and(
           eq(videoJobTable.provider, provider),
+          sql`NOT EXISTS (SELECT 1 FROM workspace_project_item i JOIN workspace_project p ON p.id = i.project_id WHERE i.aggregate_id = ${videoJobTable.videoProjectId} AND i.relation = 'owned' AND p.status = 'archived')`,
           lte(videoJobTable.attempts, config.maximumAttempts - 1),
           or(
             and(
@@ -175,6 +176,7 @@ export async function claimConfiguredVideoJob(
       .limit(1)
       .for("update");
     if (!candidate) return undefined;
+    await assertAggregateWorkspaceWrite(candidate.videoProjectId, tx);
     const reserve = candidate.reservedCostCents === 0 ? candidate.expectedCostCents : 0;
     if (config.budgetCommittedCents + reserve > config.budgetLimitCents) {
       const [rejected] = await tx
@@ -248,6 +250,7 @@ export async function claimNextVideoJob(
       .from(videoJobTable)
       .where(
         and(
+          sql`NOT EXISTS (SELECT 1 FROM workspace_project_item i JOIN workspace_project p ON p.id = i.project_id WHERE i.aggregate_id = ${videoJobTable.videoProjectId} AND i.relation = 'owned' AND p.status = 'archived')`,
           lte(videoJobTable.attempts, maximumAttempts - 1),
           or(
             and(
@@ -262,6 +265,7 @@ export async function claimNextVideoJob(
       .limit(1)
       .for("update");
     if (!candidate) return undefined;
+    await assertAggregateWorkspaceWrite(candidate.videoProjectId, tx);
     const [claimed] = await tx
       .update(videoJobTable)
       .set({

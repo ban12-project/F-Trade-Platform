@@ -20,6 +20,28 @@ export type PublicationReceipt = {
   externalPublicationRef?: string;
   failureCode?: string;
 };
+export type PublicationPreclickStage =
+  | "open"
+  | "identity"
+  | "baseline"
+  | "media"
+  | "prepare"
+  | "preview"
+  | "authorize"
+  | "recheck"
+  | "authorization_deadline";
+export type PublicationPreclickCode =
+  | "browser_request_failed"
+  | "facebook_browser_response_invalid"
+  | "facebook_composer_transition_timeout"
+  | "facebook_evaluation_failed"
+  | "facebook_navigation_invalid"
+  | "facebook_permalink_hover_failed"
+  | "facebook_permalink_unresolved"
+  | "facebook_profile_expired"
+  | "publication_authorization_expired"
+  | "publication_lease_inactive"
+  | "unclassified";
 export type PublicationDriver<Session> = {
   open(run: PublicationRun, signal: AbortSignal): Promise<Session>;
   identity(session: Session): Promise<{ accountRef: string; channelRef: string }>;
@@ -36,6 +58,7 @@ export type PublicationDriver<Session> = {
     readyToPublish: boolean;
     attachmentCount: number;
     attachmentName?: string;
+    attachmentSha256?: string;
   }>;
   publish(
     session: Session,
@@ -61,4 +84,5 @@ export function createPublicationExecutor<Session>(
   preparePublicationMedia(): Promise<PreparedUpload>;
   authorizePublication(): Promise<{ authorizationId: string; localExpiresAt: number }>;
   reportPublication(receipt: PublicationReceipt): Promise<unknown>;
+  onPreclickFailure?(stage: PublicationPreclickStage, code: PublicationPreclickCode): void;
 }) => Promise<"completed" | "failed" | "unknown">;

@@ -1,11 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { z } from "zod";
+import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
 import { rfqFormSchema, rfqReadyFormSchema } from "@/lib/form-schemas";
 import { rfqMissingLabel } from "@/lib/sales/journey";
 import { createRfq, reviseRfq, submitRfqReady } from "@/lib/sales/store";
@@ -27,9 +25,8 @@ export async function createRfqAction(
   _previous: SalesActionState,
   formData: FormData,
 ): Promise<SalesActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "sales:write"))
-    return { status: "error", message: "无权录入询盘。" };
+  const session = await authorizedActionSession("sales:write");
+  if (!session) return { status: "error", message: "无权录入询盘。" };
   const parsed = rfqFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success)
     return { status: "error", message: parsed.error.issues[0]?.message ?? "询盘资料格式不正确。" };
@@ -37,7 +34,7 @@ export async function createRfqAction(
     const projectId = projectIdFrom(formData);
     if (projectId) await assertWorkspaceProjectKind(projectId, "sales", session.user.id);
     const result = await createRfq(parsed.data, session.user.id, projectId);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return {
       status: "success",
@@ -47,7 +44,7 @@ export async function createRfqAction(
       rfqId: result.id,
     };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法保存询盘。" };
+    return actionError(error, "无法保存询盘。");
   }
 }
 
@@ -55,9 +52,8 @@ export async function submitRfqReadyAction(
   _previous: SalesActionState,
   formData: FormData,
 ): Promise<SalesActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "sales:write"))
-    return { status: "error", message: "无权确认客户需求。" };
+  const session = await authorizedActionSession("sales:write");
+  if (!session) return { status: "error", message: "无权确认客户需求。" };
   const parsed = rfqReadyFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success)
     return { status: "error", message: parsed.error.issues[0]?.message ?? "询盘或确认凭据无效。" };
@@ -67,7 +63,7 @@ export async function submitRfqReadyAction(
     if (projectId)
       await assertWorkspaceAggregateLink(projectId, rfqId, "sales", "rfq", session.user.id);
     const result = await submitRfqReady(rfqId, evidenceRef, session.user.id, projectId);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return result.state === "RFQ_READY"
       ? { status: "success", message: "需求已确认完整，可以创建人工报价。", rfqId }
@@ -76,10 +72,7 @@ export async function submitRfqReadyAction(
           message: `需求仍缺少：${result.missingFields.map(rfqMissingLabel).join("、")}。`,
         };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法确认客户需求。",
-    };
+    return actionError(error, "无法确认客户需求。");
   }
 }
 
@@ -87,9 +80,8 @@ export async function reviseRfqAction(
   _previous: SalesActionState,
   formData: FormData,
 ): Promise<SalesActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "sales:write"))
-    return { status: "error", message: "无权补充询盘。" };
+  const session = await authorizedActionSession("sales:write");
+  if (!session) return { status: "error", message: "无权补充询盘。" };
   const rfqId = formData.get("rfqId");
   if (typeof rfqId !== "string" || !z.uuid().safeParse(rfqId).success)
     return { status: "error", message: "RFQ 标识无效。" };
@@ -101,7 +93,7 @@ export async function reviseRfqAction(
     if (projectId)
       await assertWorkspaceAggregateLink(projectId, rfqId, "sales", "rfq", session.user.id);
     const result = await reviseRfq(rfqId, parsed.data, session.user.id, projectId);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     if (projectId) revalidatePath(`/workspace/${projectId}`);
     return {
       status: "success",
@@ -111,6 +103,6 @@ export async function reviseRfqAction(
       rfqId,
     };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法更新询盘。" };
+    return actionError(error, "无法更新询盘。");
   }
 }

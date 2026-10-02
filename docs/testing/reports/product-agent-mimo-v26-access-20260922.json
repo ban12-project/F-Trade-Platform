@@ -1,0 +1,68 @@
+{
+  "checked_date": "2026-09-22",
+  "endpoint_type": "MiMo Token Plan China",
+  "model_list": {
+    "status": 200,
+    "models": [
+      "mimo-v2.5",
+      "mimo-v2.5-asr",
+      "mimo-v2.5-pro",
+      "mimo-v2.5-tts",
+      "mimo-v2.5-tts-voiceclone",
+      "mimo-v2.5-tts-voicedesign",
+      "mimo-v2.6-flash",
+      "mimo-v2.6-pro"
+    ]
+  },
+  "smoke_tests": [
+    {
+      "requested_model": "mimo-v2.6-pro",
+      "status": 200,
+      "model": "mimo-v2.6-pro",
+      "answer": "Red",
+      "usage": {
+        "completion_tokens": 75,
+        "prompt_tokens": 41,
+        "total_tokens": 116,
+        "completion_tokens_details": {
+          "reasoning_tokens": 72
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "image_tokens": 16
+        }
+      }
+    },
+    {
+      "requested_model": "mimo-v2.6-flash",
+      "status": 200,
+      "model": "mimo-v2.6-flash",
+      "answer": "Red",
+      "usage": {
+        "completion_tokens": 34,
+        "prompt_tokens": 41,
+        "total_tokens": 75,
+        "completion_tokens_details": {
+          "reasoning_tokens": 31
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "image_tokens": 16
+        }
+      }
+    },
+    {
+      "requested_model": "mimo-v2.6-pro-ultraspeed",
+      "status": 400,
+      "error": {
+        "code": "400",
+        "message": "Not supported model mimo-v2.6-pro-ultraspeed"
+      }
+    }
+  ],
+  "ultraspeed_evaluation": "not_run_unsupported_model",
+  "official_sources": [
+    "https://mimo.mi.com/docs/zh-CN/updates/model",
+    "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model"
+  ]
+}

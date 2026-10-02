@@ -121,3 +121,14 @@ export function configuredFacebookWorkerScope() {
     accountRef: process.env.SOCIAL_WORKER_ACCOUNT_REF,
   });
 }
+
+/** Optional legacy status UI; strict worker/mutation scope validation stays unchanged. */
+export function configuredFacebookStatusScope() {
+  if (process.env.SOCIAL_FACEBOOK_WORKER_ENABLED !== "1") return null;
+  const result = facebookWorkerScopeSchema.safeParse({
+    workerId: process.env.SOCIAL_WORKER_ID,
+    channelRef: process.env.SOCIAL_WORKER_CHANNEL_REF,
+    accountRef: process.env.SOCIAL_WORKER_ACCOUNT_REF,
+  });
+  return result.success ? result.data : null;
+}

@@ -7,7 +7,14 @@ test("shared navigation stays mounted and interactive while a child route stream
   page,
 }) => {
   await page.goto(root);
+  // Capture the persistent layout after hydration, before the client-side transition.
+  await page.getByRole("button", { name: "开始新工作", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "开始新工作", exact: true });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
   const dock = page.getByTestId("workspace-navigation");
+  await expect(dock).toHaveCount(1);
   await expect(dock).toBeVisible();
   const original = await dock.elementHandle();
   const click = page.getByRole("link", { name: "切换测试页面" }).click({ noWaitAfter: true });
@@ -28,10 +35,8 @@ test("shared navigation stays mounted and interactive while a child route stream
       original,
     ),
   ).toBe(true);
-  await expect(page.getByRole("link", { name: /Synthetic persistent workspace/ })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(page.getByTestId("record-frame")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "项目栏目" })).toHaveCount(0);
   await page.goBack();
   await expect(page.getByRole("heading", { name: "导航测试起点" })).toBeVisible();
   expect(
@@ -112,13 +117,20 @@ test("starting work from a dirty page asks once and cancelling keeps the origina
   await page.getByLabel("测试草稿").fill("Keep this until I choose to leave");
   const start = page.getByRole("button", { name: "开始新工作", exact: true });
   await start.click();
+  await page.getByLabel("归属项目").selectOption(projectId);
   await page.getByRole("button", { name: "在此项目开始录入产品" }).click();
   const confirmation = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
   await confirmation.getByRole("button", { name: "继续编辑" }).click();
   await expect(page.getByLabel("测试草稿")).toHaveValue("Keep this until I choose to leave");
   await start.click();
+  await page.getByLabel("归属项目").selectOption(projectId);
   await page.getByRole("button", { name: "在此项目开始录入产品" }).click();
+  const destination = page.waitForRequest(
+    (request) => new URL(request.url()).pathname === `/workspace/${projectId}/new/product`,
+  );
   await confirmation.getByRole("button", { name: "放弃修改并离开" }).click();
-  await expect(page).toHaveURL(new RegExp(`${projectId}[?]panel=product$`));
+  await destination;
+  // This fixture has no session: prove the exact create destination before the real auth guard redirects.
+  await expect(page).toHaveURL(/\/auth$/);
   await expect(confirmation).toHaveCount(0);
 });

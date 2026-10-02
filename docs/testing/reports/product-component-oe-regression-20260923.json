@@ -1,0 +1,3074 @@
+{
+  "run_id": "b7578502-fe91-4b3c-a39b-fa49337710ac",
+  "protocol_version": "model-selection-v2",
+  "execution": "local-production-policy",
+  "source_commit": "707c8acc2242ae63b636c58bba2af4a6f9e1acb0",
+  "diagnostic_only": false,
+  "grading": {
+    "diagnostic_revision": 2,
+    "verifier_sha256": "ca2d7e0e0216baeb251f80ad33e6b2695c9e0e848641dabcda41dc829b3ad3d4"
+  },
+  "execution_monitor": {
+    "max_event_loop_gap_ms": 5000,
+    "max_trial_duration_ms": 80000
+  },
+  "started_at": "2026-09-23T04:02:08.083Z",
+  "concurrency": 4,
+  "repetitions": 3,
+  "total_timeout_ms": 75000,
+  "max_corrections": 1,
+  "models": [
+    {
+      "name": "kimi-k3",
+      "id": "openai-compatible/kimi-k3",
+      "output_policy": {
+        "mode": "json_schema",
+        "reason": "kimi_k3_documented_schema",
+        "version": "1"
+      },
+      "preflight": {
+        "model": "kimi-k3",
+        "available": true,
+        "image_correct": true,
+        "output_mode": "json_schema"
+      },
+      "status": "completed",
+      "expected_trials": 60,
+      "completed_trials": 60,
+      "first_passed": 60,
+      "final_passed": 60,
+      "first_pass_rate": 1,
+      "final_pass_rate": 1,
+      "strict_gate": true,
+      "correction_trials": 0,
+      "recovered_trials": 0,
+      "recovery_rate": null,
+      "first_response_metrics": {
+        "json_object": 1,
+        "contract_valid": 1,
+        "fact_precision": 1,
+        "fact_recall": 1,
+        "evidence_recall": 1,
+        "model_blockers_exact": 0,
+        "model_state_boundary": 1
+      },
+      "final_response_metrics": {
+        "json_object": 1,
+        "contract_valid": 1,
+        "fact_precision": 1,
+        "fact_recall": 1,
+        "evidence_recall": 1,
+        "model_blockers_exact": 0,
+        "model_state_boundary": 1
+      },
+      "observed_response_count": 60,
+      "attempt_count": 60,
+      "final_outcomes": {
+        "accepted": 60,
+        "contract_or_source": 0,
+        "timeout": 0,
+        "provider": 0,
+        "runtime": 0
+      },
+      "latency_ms": {
+        "p50": 31828,
+        "p90": 43241,
+        "missing_trials": 0
+      },
+      "successful_latency_ms": {
+        "p50": 31828
+      },
+      "usage": {
+        "input_tokens": {
+          "observed_sum": 269694,
+          "missing_attempts": 0
+        },
+        "output_tokens": {
+          "observed_sum": 79009,
+          "missing_attempts": 0
+        },
+        "total_tokens": {
+          "observed_sum": 348703,
+          "missing_attempts": 0
+        }
+      },
+      "billed_cost": null,
+      "cost_reason": "No verified endpoint billing data"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "a-01",
+      "expectation_hash": "723bf83c675a07a885040952220136056905cd3a05765312dfc4f1d54686f349",
+      "source_hash": "14753682856cb6f4935ab3d35bf33dc176464fbff134cc3378e63c77ddc5b76e",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "a-02",
+      "expectation_hash": "eb60f1bc5516c34d8dda56918d8f919ee8dc458e0eec8d1a8cd7a96e440fd141",
+      "source_hash": "de8633a6047751800e538e48199b786064fd0de47f288411a6ab79257e098026",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "a-03",
+      "expectation_hash": "59fa6a4e50bdcaef76276d2da8ce800925d137d460cb8ef0df2c6d8c35be4f35",
+      "source_hash": "213a72f85d0d02a1547271c4fa24584a2578ccbc68ce91d5663a84c059cb5b67",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "a-04",
+      "expectation_hash": "47781eace3f5ad1ef8cf518451d38025b64831beee58bb0626ae68da57877ae1",
+      "source_hash": "838bc100387ce41d0e1b928fc04af2b595cfaf05891e1d79ae1936822319115e",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "a-05",
+      "expectation_hash": "c4a41eb50f2b26b06572cc21c9cf650d8534b646c4712c40d4b91b2dc72f2373",
+      "source_hash": "d4537645b735bf911c32ba3746fc7b4e1a7704ec3588fdcb5b9c980533a3d4b0",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "b-01",
+      "expectation_hash": "b06369ba315058f062fa931ee361461ce5ce83792d83efba5a2aafad3d11cec7",
+      "source_hash": "a2df88afb0bdeb8254f8b79f22b54716f131f90a77512829771309a7eb7cd4e9",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "b-02",
+      "expectation_hash": "9572cded39baf95e17a0580251b2091ab6284026d75312c8d32a0e39b386bff3",
+      "source_hash": "4a51966ac8f1c394cf51b1b04717a4780754e86f49c149e2b170a2495d221ac8",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "b-03",
+      "expectation_hash": "f1e064a99a44e087ae1952fd6eeb52fb5b73461c7db57a977be0d46571635460",
+      "source_hash": "7f4d013f4fb07834ef4b02571a92bf8f2efbcf986b1d3926044a9ccf3445931f",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "b-04",
+      "expectation_hash": "593d1a46ce1388f7ff401d3963726c65106bf6bbb32d83b06311b94ed342f7dd",
+      "source_hash": "17b8bba05b96f5b4b420356773ad63f19f80425901c119b3494bac95fba6adb1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "b-05",
+      "expectation_hash": "994892f0a8149c37bfe357145ad8bec300ac28901475532d50ed65de706011f1",
+      "source_hash": "418f4694f2683e9cba86c613a23f753da43155882156f3e403669888c871e3bc",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "c-01",
+      "expectation_hash": "8c692732e58b4a0b2860f15a51db447d2a5a8580ee0ab78cb50e82c45f001a94",
+      "source_hash": "a16ca9a4f2bcda9cc4c9bc2609361ba2897e4a59cd62f0c9e9acd420755766de",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "c-02",
+      "expectation_hash": "7fd664053e552a65175797f8a6999112c69f08522c266e68766bcee87c02c60c",
+      "source_hash": "5b0507d824716196868de5b07964f3c049d6625a20c53b77f546252dbb2c61a9",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "c-03",
+      "expectation_hash": "e1757a58429f2052a0eede6fc1b0ab628441f2d77126c9106eea574ccab38167",
+      "source_hash": "4781d96ecc2e056e262a13dd3fedb6a0cfb9416249bcea7d2eeb4d6443b99519",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "c-04",
+      "expectation_hash": "96746c291c00e96e054a0c28831f33bd9e90fb0e377ad8c0b3ec8e9079463ca7",
+      "source_hash": "0d8c145479a537d41f45768dab46f96f0344c81b25474a3927ebc72f0d340760",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "c-05",
+      "expectation_hash": "8b13d9471174c07aee2a3dbf550f8f4546e14aafc009231dcd3619b9ff7c033e",
+      "source_hash": "fe7cc5c708326c8f12209549d9de980f88b8a7de64f075de85d0a525832062e6",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "d-01",
+      "expectation_hash": "960dc338dea14da489c32b20edb7b1a5eba4291c97c0de5bc693eaec1948bf14",
+      "source_hash": "89b279abdc44a5edb1eb2f0d5276f239b645625c7d1c35575708734663e2411b",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "d-02",
+      "expectation_hash": "6cc6c457dbb0e1d4db2a5e810bad11ff4a032b515ac04e11d7077b3617557710",
+      "source_hash": "adbc0df0f8eee52a9b4ed1785e2d73ae6425901bedc7a646962e4a2ccc309d93",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "d-03",
+      "expectation_hash": "e4c461aa4e73b89fb7e9f13d919c84f3d8db15f7b740591c8933c70698cd7e64",
+      "source_hash": "5af7411c5197e8402de0c30dbdb136e743f133adac4d1c4e6779f32728751980",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "d-04",
+      "expectation_hash": "3f16a7d34c2473dbcf6b7c62c979cb3ecdeaa7958814c43aaf7737843d172408",
+      "source_hash": "d89e9668f55551644438dc44c927f330fd2b089f78d0f98c336871892bd9b071",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    },
+    {
+      "id": "d-05",
+      "expectation_hash": "16f0f229b08fe6e063fadd662f556c06683006b986eb066819f7ae6cb76f6df1",
+      "source_hash": "921101491d0908ecea1523664783da79f48e12fe1eee1310daa58b4fa23da7b1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "prompt_version": "1.1.1"
+    }
+  ],
+  "scope": "synthetic-product-agent-model-selection",
+  "status": "completed",
+  "trials": [
+    {
+      "model": "kimi-k3",
+      "id": "a-01",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "a-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "723bf83c675a07a885040952220136056905cd3a05765312dfc4f1d54686f349",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28844,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28843,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4389,
+              "output_tokens": 1014,
+              "total_tokens": 5403
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-01",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "a-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "723bf83c675a07a885040952220136056905cd3a05765312dfc4f1d54686f349",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 31497,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 31497,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4389,
+              "output_tokens": 1164,
+              "total_tokens": 5553
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-01",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "a-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "723bf83c675a07a885040952220136056905cd3a05765312dfc4f1d54686f349",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 33250,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 33250,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4389,
+              "output_tokens": 1135,
+              "total_tokens": 5524
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-02",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "a-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "eb60f1bc5516c34d8dda56918d8f919ee8dc458e0eec8d1a8cd7a96e440fd141",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 37056,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 37056,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4495,
+              "output_tokens": 1359,
+              "total_tokens": 5854
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-03",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "a-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "59fa6a4e50bdcaef76276d2da8ce800925d137d460cb8ef0df2c6d8c35be4f35",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28103,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28103,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4392,
+              "output_tokens": 1074,
+              "total_tokens": 5466
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-03",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "a-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "59fa6a4e50bdcaef76276d2da8ce800925d137d460cb8ef0df2c6d8c35be4f35",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 27962,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 27962,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4392,
+              "output_tokens": 1090,
+              "total_tokens": 5482
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-02",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "a-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "eb60f1bc5516c34d8dda56918d8f919ee8dc458e0eec8d1a8cd7a96e440fd141",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 37586,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 37586,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4495,
+              "output_tokens": 1724,
+              "total_tokens": 6219
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-02",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "a-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "eb60f1bc5516c34d8dda56918d8f919ee8dc458e0eec8d1a8cd7a96e440fd141",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 43241,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 43241,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4495,
+              "output_tokens": 1869,
+              "total_tokens": 6364
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-03",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "a-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "59fa6a4e50bdcaef76276d2da8ce800925d137d460cb8ef0df2c6d8c35be4f35",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 36919,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 36918,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4392,
+              "output_tokens": 1376,
+              "total_tokens": 5768
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-04",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "a-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "47781eace3f5ad1ef8cf518451d38025b64831beee58bb0626ae68da57877ae1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 35685,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 35685,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4477,
+              "output_tokens": 1221,
+              "total_tokens": 5698
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 6,
+              "predicted_facts": 6,
+              "correct_facts": 6,
+              "supported_correct_facts": 6,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-04",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "a-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "47781eace3f5ad1ef8cf518451d38025b64831beee58bb0626ae68da57877ae1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 37071,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 37071,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4477,
+              "output_tokens": 1403,
+              "total_tokens": 5880
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 6,
+              "predicted_facts": 6,
+              "correct_facts": 6,
+              "supported_correct_facts": 6,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-05",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "a-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "c4a41eb50f2b26b06572cc21c9cf650d8534b646c4712c40d4b91b2dc72f2373",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28846,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28844,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4390,
+              "output_tokens": 1096,
+              "total_tokens": 5486
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-04",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "a-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "47781eace3f5ad1ef8cf518451d38025b64831beee58bb0626ae68da57877ae1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 59641,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 59641,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4477,
+              "output_tokens": 2521,
+              "total_tokens": 6998
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 6,
+              "predicted_facts": 6,
+              "correct_facts": 6,
+              "supported_correct_facts": 6,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-05",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "a-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "c4a41eb50f2b26b06572cc21c9cf650d8534b646c4712c40d4b91b2dc72f2373",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 31765,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 31765,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4390,
+              "output_tokens": 1186,
+              "total_tokens": 5576
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "a-05",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "a-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "c4a41eb50f2b26b06572cc21c9cf650d8534b646c4712c40d4b91b2dc72f2373",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 27982,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 27982,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4390,
+              "output_tokens": 967,
+              "total_tokens": 5357
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-01",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "b-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "b06369ba315058f062fa931ee361461ce5ce83792d83efba5a2aafad3d11cec7",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 23433,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 23433,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4375,
+              "output_tokens": 1136,
+              "total_tokens": 5511
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-01",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "b-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "b06369ba315058f062fa931ee361461ce5ce83792d83efba5a2aafad3d11cec7",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 30259,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 30255,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4375,
+              "output_tokens": 1239,
+              "total_tokens": 5614
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-01",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "b-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "b06369ba315058f062fa931ee361461ce5ce83792d83efba5a2aafad3d11cec7",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 29815,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 29815,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4375,
+              "output_tokens": 1087,
+              "total_tokens": 5462
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-02",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "b-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "9572cded39baf95e17a0580251b2091ab6284026d75312c8d32a0e39b386bff3",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 26517,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 26517,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4481,
+              "output_tokens": 1379,
+              "total_tokens": 5860
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-02",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "b-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "9572cded39baf95e17a0580251b2091ab6284026d75312c8d32a0e39b386bff3",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28579,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28579,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4481,
+              "output_tokens": 1258,
+              "total_tokens": 5739
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-02",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "b-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "9572cded39baf95e17a0580251b2091ab6284026d75312c8d32a0e39b386bff3",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 36362,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 36362,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4481,
+              "output_tokens": 1759,
+              "total_tokens": 6240
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-03",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "b-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "f1e064a99a44e087ae1952fd6eeb52fb5b73461c7db57a977be0d46571635460",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 31515,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 31515,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4366,
+              "output_tokens": 1212,
+              "total_tokens": 5578
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-03",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "b-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "f1e064a99a44e087ae1952fd6eeb52fb5b73461c7db57a977be0d46571635460",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 36825,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 36825,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4366,
+              "output_tokens": 1069,
+              "total_tokens": 5435
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-04",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "b-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "593d1a46ce1388f7ff401d3963726c65106bf6bbb32d83b06311b94ed342f7dd",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 29364,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 29364,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4443,
+              "output_tokens": 1133,
+              "total_tokens": 5576
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 6,
+              "predicted_facts": 6,
+              "correct_facts": 6,
+              "supported_correct_facts": 6,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-03",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "b-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "f1e064a99a44e087ae1952fd6eeb52fb5b73461c7db57a977be0d46571635460",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 34474,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 34474,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4366,
+              "output_tokens": 1057,
+              "total_tokens": 5423
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-04",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "b-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "593d1a46ce1388f7ff401d3963726c65106bf6bbb32d83b06311b94ed342f7dd",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 32997,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 32997,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4443,
+              "output_tokens": 1277,
+              "total_tokens": 5720
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 6,
+              "predicted_facts": 6,
+              "correct_facts": 6,
+              "supported_correct_facts": 6,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-05",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "b-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "994892f0a8149c37bfe357145ad8bec300ac28901475532d50ed65de706011f1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 24050,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 24050,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4358,
+              "output_tokens": 960,
+              "total_tokens": 5318
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-04",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "b-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "593d1a46ce1388f7ff401d3963726c65106bf6bbb32d83b06311b94ed342f7dd",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 46980,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 46980,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4443,
+              "output_tokens": 1761,
+              "total_tokens": 6204
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 6,
+              "predicted_facts": 6,
+              "correct_facts": 6,
+              "supported_correct_facts": 6,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-05",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "b-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "994892f0a8149c37bfe357145ad8bec300ac28901475532d50ed65de706011f1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 32976,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 32976,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4358,
+              "output_tokens": 1186,
+              "total_tokens": 5544
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "b-05",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "b-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "994892f0a8149c37bfe357145ad8bec300ac28901475532d50ed65de706011f1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 43909,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 43909,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4358,
+              "output_tokens": 1479,
+              "total_tokens": 5837
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 5,
+              "predicted_facts": 5,
+              "correct_facts": 5,
+              "supported_correct_facts": 5,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-01",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "c-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "8c692732e58b4a0b2860f15a51db447d2a5a8580ee0ab78cb50e82c45f001a94",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 25076,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 25076,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4577,
+              "output_tokens": 1122,
+              "total_tokens": 5699
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-01",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "c-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "8c692732e58b4a0b2860f15a51db447d2a5a8580ee0ab78cb50e82c45f001a94",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 23494,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 23494,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4577,
+              "output_tokens": 1206,
+              "total_tokens": 5783
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-01",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "c-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "8c692732e58b4a0b2860f15a51db447d2a5a8580ee0ab78cb50e82c45f001a94",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 20934,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 20934,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4577,
+              "output_tokens": 1144,
+              "total_tokens": 5721
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-02",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "c-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "7fd664053e552a65175797f8a6999112c69f08522c266e68766bcee87c02c60c",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 34026,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 34026,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4671,
+              "output_tokens": 1365,
+              "total_tokens": 6036
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-02",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "c-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "7fd664053e552a65175797f8a6999112c69f08522c266e68766bcee87c02c60c",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 38324,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 38324,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4671,
+              "output_tokens": 1565,
+              "total_tokens": 6236
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-02",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "c-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "7fd664053e552a65175797f8a6999112c69f08522c266e68766bcee87c02c60c",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 54045,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 54045,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4671,
+              "output_tokens": 2285,
+              "total_tokens": 6956
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-03",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "c-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "e1757a58429f2052a0eede6fc1b0ab628441f2d77126c9106eea574ccab38167",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 48066,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 48066,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4558,
+              "output_tokens": 1322,
+              "total_tokens": 5880
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-03",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "c-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "e1757a58429f2052a0eede6fc1b0ab628441f2d77126c9106eea574ccab38167",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28591,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28591,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4558,
+              "output_tokens": 1109,
+              "total_tokens": 5667
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-03",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "c-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "e1757a58429f2052a0eede6fc1b0ab628441f2d77126c9106eea574ccab38167",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 31828,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 31828,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4558,
+              "output_tokens": 1205,
+              "total_tokens": 5763
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-04",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "c-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "96746c291c00e96e054a0c28831f33bd9e90fb0e377ad8c0b3ec8e9079463ca7",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 27084,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 27084,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4567,
+              "output_tokens": 1383,
+              "total_tokens": 5950
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-04",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "c-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "96746c291c00e96e054a0c28831f33bd9e90fb0e377ad8c0b3ec8e9079463ca7",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 26142,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 26142,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4567,
+              "output_tokens": 1258,
+              "total_tokens": 5825
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-04",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "c-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "96746c291c00e96e054a0c28831f33bd9e90fb0e377ad8c0b3ec8e9079463ca7",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28869,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28869,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4567,
+              "output_tokens": 1431,
+              "total_tokens": 5998
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-05",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "c-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "8b13d9471174c07aee2a3dbf550f8f4546e14aafc009231dcd3619b9ff7c033e",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 35642,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 35642,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4564,
+              "output_tokens": 1348,
+              "total_tokens": 5912
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-05",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "c-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "8b13d9471174c07aee2a3dbf550f8f4546e14aafc009231dcd3619b9ff7c033e",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 29444,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 29444,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4564,
+              "output_tokens": 1157,
+              "total_tokens": 5721
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "c-05",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "c-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "8b13d9471174c07aee2a3dbf550f8f4546e14aafc009231dcd3619b9ff7c033e",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 37091,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 37091,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4564,
+              "output_tokens": 1355,
+              "total_tokens": 5919
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-01",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "d-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "960dc338dea14da489c32b20edb7b1a5eba4291c97c0de5bc693eaec1948bf14",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 29160,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 29160,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4541,
+              "output_tokens": 1164,
+              "total_tokens": 5705
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-01",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "d-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "960dc338dea14da489c32b20edb7b1a5eba4291c97c0de5bc693eaec1948bf14",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 38630,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 38630,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4541,
+              "output_tokens": 1517,
+              "total_tokens": 6058
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-01",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "d-01",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "960dc338dea14da489c32b20edb7b1a5eba4291c97c0de5bc693eaec1948bf14",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 29106,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 29106,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4541,
+              "output_tokens": 1137,
+              "total_tokens": 5678
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-02",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "d-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "6cc6c457dbb0e1d4db2a5e810bad11ff4a032b515ac04e11d7077b3617557710",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 33160,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 33160,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4665,
+              "output_tokens": 1293,
+              "total_tokens": 5958
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-02",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "d-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "6cc6c457dbb0e1d4db2a5e810bad11ff4a032b515ac04e11d7077b3617557710",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 40197,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 40197,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4665,
+              "output_tokens": 1395,
+              "total_tokens": 6060
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-03",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "d-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "e4c461aa4e73b89fb7e9f13d919c84f3d8db15f7b740591c8933c70698cd7e64",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 34515,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 34515,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4530,
+              "output_tokens": 1266,
+              "total_tokens": 5796
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-02",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "d-02",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "6cc6c457dbb0e1d4db2a5e810bad11ff4a032b515ac04e11d7077b3617557710",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 51064,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 51064,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4665,
+              "output_tokens": 1771,
+              "total_tokens": 6436
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-03",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "d-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "e4c461aa4e73b89fb7e9f13d919c84f3d8db15f7b740591c8933c70698cd7e64",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 31990,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 31990,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4530,
+              "output_tokens": 1209,
+              "total_tokens": 5739
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-03",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "d-03",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "e4c461aa4e73b89fb7e9f13d919c84f3d8db15f7b740591c8933c70698cd7e64",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 37684,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 37684,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4530,
+              "output_tokens": 1546,
+              "total_tokens": 6076
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-04",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "d-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "3f16a7d34c2473dbcf6b7c62c979cb3ecdeaa7958814c43aaf7737843d172408",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 29260,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 29260,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4539,
+              "output_tokens": 1193,
+              "total_tokens": 5732
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-04",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "d-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "3f16a7d34c2473dbcf6b7c62c979cb3ecdeaa7958814c43aaf7737843d172408",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28893,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28893,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4539,
+              "output_tokens": 1188,
+              "total_tokens": 5727
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-04",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "d-04",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "3f16a7d34c2473dbcf6b7c62c979cb3ecdeaa7958814c43aaf7737843d172408",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 35179,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 35179,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4539,
+              "output_tokens": 1328,
+              "total_tokens": 5867
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-05",
+      "repetition": 1,
+      "report": {
+        "synthetic_id": "d-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "16f0f229b08fe6e063fadd662f556c06683006b986eb066819f7ae6cb76f6df1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28571,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28571,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4520,
+              "output_tokens": 1067,
+              "total_tokens": 5587
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-05",
+      "repetition": 2,
+      "report": {
+        "synthetic_id": "d-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "16f0f229b08fe6e063fadd662f556c06683006b986eb066819f7ae6cb76f6df1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 28517,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 28517,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4520,
+              "output_tokens": 1137,
+              "total_tokens": 5657
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    },
+    {
+      "model": "kimi-k3",
+      "id": "d-05",
+      "repetition": 3,
+      "report": {
+        "synthetic_id": "d-05",
+        "diagnostic_revision": 2,
+        "protocol_version": "model-selection-v2",
+        "prompt_version": "1.1.1",
+        "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+        "expectation_hash": "16f0f229b08fe6e063fadd662f556c06683006b986eb066819f7ae6cb76f6df1",
+        "evidence_mode": "bounded_location",
+        "provenance_valid": true,
+        "output_mode": "json_schema",
+        "reward": 1,
+        "first_attempt_pass": 1,
+        "final_accepted": true,
+        "duration_ms": 33407,
+        "attempts": [
+          {
+            "number": 1,
+            "outcome": "accepted",
+            "duration_ms": 33407,
+            "model_output_observed": true,
+            "usage": {
+              "input_tokens": 4520,
+              "output_tokens": 1352,
+              "total_tokens": 5872
+            },
+            "diagnostics": {
+              "json_object": 1,
+              "contract_valid": 1,
+              "expected_facts": 7,
+              "predicted_facts": 7,
+              "correct_facts": 7,
+              "supported_correct_facts": 7,
+              "fact_precision": 1,
+              "fact_recall": 1,
+              "evidence_recall": 1,
+              "model_blockers_exact": 0,
+              "model_state_boundary": 1
+            },
+            "strict_pass": 1
+          }
+        ]
+      }
+    }
+  ],
+  "measurement_valid": true,
+  "execution_health": {
+    "valid": true,
+    "max_event_loop_gap_ms": 3122,
+    "clock_reversed": false,
+    "invalid_duration_trials": 0
+  },
+  "finished_at": "2026-09-23T04:11:02.518Z",
+  "infrastructure_failed": false
+}

@@ -1,15 +1,21 @@
 ARG BROWSER_BASE_IMAGE=ftrade-camofox-base:e5a36f5
 FROM ${BROWSER_BASE_IMAGE}
+# Firefox on the reviewed Debian 13 base uses system FFmpeg for H.264/AAC.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libavcodec61 \
+    && rm -rf /var/lib/apt/lists/*
 # Proxy-enabled launches require GeoIP before the read-only runtime starts.
 # The pinned downloader does not await file-stream writes. Let its process drain
 # pending filesystem work before a separate process validates the finished file.
-# The pinned library also gates GeoIP on the browser-download flag. Unset it
-# only for these GeoIP-only build processes; the runtime ENV remains enabled.
-RUN env -u PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD node --input-type=module -e "import { downloadMMDB } from 'camoufox-js/dist/locale.js'; await downloadMMDB();" \
-    && env -u PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD node --input-type=module -e "import { getGeolocation } from 'camoufox-js/dist/locale.js'; await getGeolocation('8.8.8.8');"
-LABEL io.ftrade.lease-watchdog="1" io.ftrade.login-fill="1"
+RUN node --input-type=module -e "import { downloadMMDB } from 'camoufox-js/dist/locale.js'; await downloadMMDB();" \
+    && node --input-type=module -e "import { getGeolocation } from 'camoufox-js/dist/locale.js'; await getGeolocation('8.8.8.8');"
+LABEL io.ftrade.lease-watchdog="1" io.ftrade.login-fill="1" io.ftrade.native-profile="1"
+COPY native-profile.mjs /app/ftrade-native-profile.mjs
+COPY patch-native-profile.mjs /opt/ftrade/patch-native-profile.mjs
+RUN node /opt/ftrade/patch-native-profile.mjs /app
 COPY watchdog.mjs /opt/ftrade/watchdog.mjs
 COPY camofox.config.json /app/camofox.config.json
 COPY login-plugin/ /app/plugins/ftrade-login/
 COPY diagnostics-plugin/ /app/plugins/ftrade-diagnostics/
+COPY compatibility-plugin/ /app/plugins/ftrade-compatibility/
 CMD ["node", "/opt/ftrade/watchdog.mjs"]

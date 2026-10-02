@@ -1,0 +1,567 @@
+{
+  "scope": "synthetic-product-agent-model-evaluation",
+  "harbor_version": "0.23.0",
+  "provider": "openai-compatible",
+  "model": "openai-compatible/gpt-6-luna",
+  "status": "passed",
+  "expected_trial_count": 60,
+  "completed_trial_count": 60,
+  "passed_trial_count": 60,
+  "errors": [],
+  "trials": [
+    {
+      "synthetic_id": "a-01",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "723bf83c675a07a885040952220136056905cd3a05765312dfc4f1d54686f349"
+    },
+    {
+      "synthetic_id": "a-01",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "723bf83c675a07a885040952220136056905cd3a05765312dfc4f1d54686f349"
+    },
+    {
+      "synthetic_id": "a-01",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "723bf83c675a07a885040952220136056905cd3a05765312dfc4f1d54686f349"
+    },
+    {
+      "synthetic_id": "a-02",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "eb60f1bc5516c34d8dda56918d8f919ee8dc458e0eec8d1a8cd7a96e440fd141"
+    },
+    {
+      "synthetic_id": "a-02",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "eb60f1bc5516c34d8dda56918d8f919ee8dc458e0eec8d1a8cd7a96e440fd141"
+    },
+    {
+      "synthetic_id": "a-02",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "eb60f1bc5516c34d8dda56918d8f919ee8dc458e0eec8d1a8cd7a96e440fd141"
+    },
+    {
+      "synthetic_id": "a-03",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "59fa6a4e50bdcaef76276d2da8ce800925d137d460cb8ef0df2c6d8c35be4f35"
+    },
+    {
+      "synthetic_id": "a-03",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "59fa6a4e50bdcaef76276d2da8ce800925d137d460cb8ef0df2c6d8c35be4f35"
+    },
+    {
+      "synthetic_id": "a-03",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "59fa6a4e50bdcaef76276d2da8ce800925d137d460cb8ef0df2c6d8c35be4f35"
+    },
+    {
+      "synthetic_id": "a-04",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "47781eace3f5ad1ef8cf518451d38025b64831beee58bb0626ae68da57877ae1"
+    },
+    {
+      "synthetic_id": "a-04",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "47781eace3f5ad1ef8cf518451d38025b64831beee58bb0626ae68da57877ae1"
+    },
+    {
+      "synthetic_id": "a-04",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "47781eace3f5ad1ef8cf518451d38025b64831beee58bb0626ae68da57877ae1"
+    },
+    {
+      "synthetic_id": "a-05",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "c4a41eb50f2b26b06572cc21c9cf650d8534b646c4712c40d4b91b2dc72f2373"
+    },
+    {
+      "synthetic_id": "a-05",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "c4a41eb50f2b26b06572cc21c9cf650d8534b646c4712c40d4b91b2dc72f2373"
+    },
+    {
+      "synthetic_id": "a-05",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "c4a41eb50f2b26b06572cc21c9cf650d8534b646c4712c40d4b91b2dc72f2373"
+    },
+    {
+      "synthetic_id": "b-01",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "b06369ba315058f062fa931ee361461ce5ce83792d83efba5a2aafad3d11cec7"
+    },
+    {
+      "synthetic_id": "b-01",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "b06369ba315058f062fa931ee361461ce5ce83792d83efba5a2aafad3d11cec7"
+    },
+    {
+      "synthetic_id": "b-01",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "b06369ba315058f062fa931ee361461ce5ce83792d83efba5a2aafad3d11cec7"
+    },
+    {
+      "synthetic_id": "b-02",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "9572cded39baf95e17a0580251b2091ab6284026d75312c8d32a0e39b386bff3"
+    },
+    {
+      "synthetic_id": "b-02",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "9572cded39baf95e17a0580251b2091ab6284026d75312c8d32a0e39b386bff3"
+    },
+    {
+      "synthetic_id": "b-02",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "9572cded39baf95e17a0580251b2091ab6284026d75312c8d32a0e39b386bff3"
+    },
+    {
+      "synthetic_id": "b-03",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "f1e064a99a44e087ae1952fd6eeb52fb5b73461c7db57a977be0d46571635460"
+    },
+    {
+      "synthetic_id": "b-03",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "f1e064a99a44e087ae1952fd6eeb52fb5b73461c7db57a977be0d46571635460"
+    },
+    {
+      "synthetic_id": "b-03",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "f1e064a99a44e087ae1952fd6eeb52fb5b73461c7db57a977be0d46571635460"
+    },
+    {
+      "synthetic_id": "b-04",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "593d1a46ce1388f7ff401d3963726c65106bf6bbb32d83b06311b94ed342f7dd"
+    },
+    {
+      "synthetic_id": "b-04",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "593d1a46ce1388f7ff401d3963726c65106bf6bbb32d83b06311b94ed342f7dd"
+    },
+    {
+      "synthetic_id": "b-04",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "593d1a46ce1388f7ff401d3963726c65106bf6bbb32d83b06311b94ed342f7dd"
+    },
+    {
+      "synthetic_id": "b-05",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "994892f0a8149c37bfe357145ad8bec300ac28901475532d50ed65de706011f1"
+    },
+    {
+      "synthetic_id": "b-05",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "994892f0a8149c37bfe357145ad8bec300ac28901475532d50ed65de706011f1"
+    },
+    {
+      "synthetic_id": "b-05",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "994892f0a8149c37bfe357145ad8bec300ac28901475532d50ed65de706011f1"
+    },
+    {
+      "synthetic_id": "c-01",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "8c692732e58b4a0b2860f15a51db447d2a5a8580ee0ab78cb50e82c45f001a94"
+    },
+    {
+      "synthetic_id": "c-01",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "8c692732e58b4a0b2860f15a51db447d2a5a8580ee0ab78cb50e82c45f001a94"
+    },
+    {
+      "synthetic_id": "c-01",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "8c692732e58b4a0b2860f15a51db447d2a5a8580ee0ab78cb50e82c45f001a94"
+    },
+    {
+      "synthetic_id": "c-02",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "7fd664053e552a65175797f8a6999112c69f08522c266e68766bcee87c02c60c"
+    },
+    {
+      "synthetic_id": "c-02",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "7fd664053e552a65175797f8a6999112c69f08522c266e68766bcee87c02c60c"
+    },
+    {
+      "synthetic_id": "c-02",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "7fd664053e552a65175797f8a6999112c69f08522c266e68766bcee87c02c60c"
+    },
+    {
+      "synthetic_id": "c-03",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "e1757a58429f2052a0eede6fc1b0ab628441f2d77126c9106eea574ccab38167"
+    },
+    {
+      "synthetic_id": "c-03",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "e1757a58429f2052a0eede6fc1b0ab628441f2d77126c9106eea574ccab38167"
+    },
+    {
+      "synthetic_id": "c-03",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "e1757a58429f2052a0eede6fc1b0ab628441f2d77126c9106eea574ccab38167"
+    },
+    {
+      "synthetic_id": "c-04",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "96746c291c00e96e054a0c28831f33bd9e90fb0e377ad8c0b3ec8e9079463ca7"
+    },
+    {
+      "synthetic_id": "c-04",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "96746c291c00e96e054a0c28831f33bd9e90fb0e377ad8c0b3ec8e9079463ca7"
+    },
+    {
+      "synthetic_id": "c-04",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "96746c291c00e96e054a0c28831f33bd9e90fb0e377ad8c0b3ec8e9079463ca7"
+    },
+    {
+      "synthetic_id": "c-05",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "8b13d9471174c07aee2a3dbf550f8f4546e14aafc009231dcd3619b9ff7c033e"
+    },
+    {
+      "synthetic_id": "c-05",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "8b13d9471174c07aee2a3dbf550f8f4546e14aafc009231dcd3619b9ff7c033e"
+    },
+    {
+      "synthetic_id": "c-05",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "8b13d9471174c07aee2a3dbf550f8f4546e14aafc009231dcd3619b9ff7c033e"
+    },
+    {
+      "synthetic_id": "d-01",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "960dc338dea14da489c32b20edb7b1a5eba4291c97c0de5bc693eaec1948bf14"
+    },
+    {
+      "synthetic_id": "d-01",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "960dc338dea14da489c32b20edb7b1a5eba4291c97c0de5bc693eaec1948bf14"
+    },
+    {
+      "synthetic_id": "d-01",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "960dc338dea14da489c32b20edb7b1a5eba4291c97c0de5bc693eaec1948bf14"
+    },
+    {
+      "synthetic_id": "d-02",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "6cc6c457dbb0e1d4db2a5e810bad11ff4a032b515ac04e11d7077b3617557710"
+    },
+    {
+      "synthetic_id": "d-02",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "6cc6c457dbb0e1d4db2a5e810bad11ff4a032b515ac04e11d7077b3617557710"
+    },
+    {
+      "synthetic_id": "d-02",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "6cc6c457dbb0e1d4db2a5e810bad11ff4a032b515ac04e11d7077b3617557710"
+    },
+    {
+      "synthetic_id": "d-03",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "e4c461aa4e73b89fb7e9f13d919c84f3d8db15f7b740591c8933c70698cd7e64"
+    },
+    {
+      "synthetic_id": "d-03",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "e4c461aa4e73b89fb7e9f13d919c84f3d8db15f7b740591c8933c70698cd7e64"
+    },
+    {
+      "synthetic_id": "d-03",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "e4c461aa4e73b89fb7e9f13d919c84f3d8db15f7b740591c8933c70698cd7e64"
+    },
+    {
+      "synthetic_id": "d-04",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "3f16a7d34c2473dbcf6b7c62c979cb3ecdeaa7958814c43aaf7737843d172408"
+    },
+    {
+      "synthetic_id": "d-04",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "3f16a7d34c2473dbcf6b7c62c979cb3ecdeaa7958814c43aaf7737843d172408"
+    },
+    {
+      "synthetic_id": "d-04",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "3f16a7d34c2473dbcf6b7c62c979cb3ecdeaa7958814c43aaf7737843d172408"
+    },
+    {
+      "synthetic_id": "d-05",
+      "repetition": 1,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "16f0f229b08fe6e063fadd662f556c06683006b986eb066819f7ae6cb76f6df1"
+    },
+    {
+      "synthetic_id": "d-05",
+      "repetition": 2,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "16f0f229b08fe6e063fadd662f556c06683006b986eb066819f7ae6cb76f6df1"
+    },
+    {
+      "synthetic_id": "d-05",
+      "repetition": 3,
+      "passed": true,
+      "prompt_version": "1.1.1",
+      "prompt_hash": "3a9c86a90eeade1efe8d12694fc724bb53b86ef34670145187d7538dc020edf8",
+      "expectation_hash": "16f0f229b08fe6e063fadd662f556c06683006b986eb066819f7ae6cb76f6df1"
+    }
+  ],
+  "classification": "sanitized_aggregate",
+  "provenance": {
+    "sourceCommit": "27866ffe4957358cc62a19987d09309f1c299f45",
+    "model": "openai-compatible/gpt-6-luna",
+    "harborVersion": "0.23.0",
+    "imageId": "sha256:4e78c6fe6e8df18a1de947814e442ac3ac4943d65c09d4320152973cde1cd0b3",
+    "sha256": {
+      "config.json": "8d5f0075e0b773c061bfdc49c1b0be9bda4a7e225dd78478604d90789d24313a",
+      "f-trade-harbor-product-agent/acceptance-manifest.json": "0337aea368d372c3a2c4cf611c71d595c96560f98ed0d8f0646072e69811b5ab"
+    }
+  },
+  "metrics": {
+    "firstAttemptPass": 59,
+    "finalAccepted": 60,
+    "attemptCount": 61,
+    "correctionTrials": 1,
+    "modelBlockersExactAttempts": 0,
+    "modelStateBoundaryAttempts": 60,
+    "rawExpectedFacts": 371,
+    "rawPredictedFacts": 366,
+    "rawCorrectFacts": 366,
+    "rawSupportedCorrectFacts": 366,
+    "usage": {
+      "input_tokens": 216708,
+      "output_tokens": 56428,
+      "total_tokens": 273136
+    },
+    "missingUsageFields": 0,
+    "billedCost": null,
+    "durationMs": {
+      "min": 13479,
+      "p50": 19292,
+      "p95": 34035,
+      "max": 56692
+    }
+  },
+  "retainedLocalLogHashes": {
+    "build.log": "7b11d30b59539e78c30eabeee3b1fc1271677f8433f5bb157e3c09e75cbcc805",
+    "harbor-contracts.log": "8c99d20c91d9f034b63abe63b6e114bd716380d027a8d891df4688d7c7032681",
+    "output-policy.log": "8b17eea71f91c8a5d8336b51913fde2983f414997d7aba53c171e4e5c46e09cc",
+    "harbor-contracts-recheck.log": "145f2998e43322ff6c155f1a5bec981d9bae21bd9bef2384c6fe939657d22d79",
+    "output-policy-recheck.log": "d4534cd7a4188b4de28f601c8491b7b99025252c4219c1e1d8c431e6ce55ac5a"
+  },
+  "limitations": [
+    "fixed_seen_synthetic_regression_not_factory_holdout",
+    "requested_gateway_model_id_not_independently_attested_backend",
+    "raw_model_blocker_classification_reported_separately",
+    "no_production_config_or_business_write",
+    "no_go_decision"
+  ],
+  "initialFailures": [
+    "first build invocation referenced not-yet-created temporary cwd; no build started",
+    "pnpm supplementary tests tried to write read-only dependency mount; direct installed Node/tsx recheck passed unchanged tests",
+    "First summary validation rejected Harbor naive finished_at as RFC3339 date-time; summary now uses the UTC report observation timestamp without inferring Harbor timezone"
+  ],
+  "jobFinishedAt": "2026-09-27T14:36:17.735535",
+  "correctedTrial": {
+    "syntheticId": "b-03",
+    "firstOutcome": "contract_or_source",
+    "firstJsonObject": false,
+    "firstDurationMs": 17466,
+    "secondOutcome": "accepted",
+    "secondDurationMs": 16569,
+    "totalDurationMs": 34035,
+    "productionBudgetMs": 75000
+  },
+  "jobFinishedAtClock": "Harbor local naive timestamp; timezone not inferred",
+  "cleanup": {
+    "containersRemaining": 0,
+    "dedicatedPodmanApiStopped": true,
+    "credentialFileRemoved": true,
+    "otherFilesContainingCredential": 0,
+    "postTrialContainerStop": "SIGTERM timeout followed by SIGKILL; synthetic containers only"
+  }
+}

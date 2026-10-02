@@ -361,10 +361,6 @@ try {
     join(temp, "viewer.js"),
     await readFile(join(root, "ops/browser-node/viewer.js")),
   );
-  await writeFile(
-    join(temp, "control.mjs"),
-    await readFile(join(root, "ops/browser-node/control.mjs")),
-  );
   const gatewayVariants = [
     ["full", sources.gateway, 0],
     [
@@ -394,12 +390,10 @@ try {
     const suite = join(temp, `test-${name}.mjs`);
     await writeFile(
       suite,
-      gatewaySuite
-        .replace('"../ops/browser-node/gateway.mjs"', JSON.stringify(pathToFileURL(file).href))
-        .replace(
-          '"../ops/browser-node/control.mjs"',
-          JSON.stringify(pathToFileURL(join(temp, "control.mjs")).href),
-        ),
+      gatewaySuite.replace(
+        '"../ops/browser-node/gateway.mjs"',
+        JSON.stringify(pathToFileURL(file).href),
+      ),
     );
     const run = spawnSync(process.execPath, ["--test", "--test-reporter=tap", suite], {
       encoding: "utf8",
@@ -408,7 +402,7 @@ try {
     const failed = Number(/# fail (\d+)/.exec(run.stdout)?.[1] ?? -1);
     const passed = Number(/# pass (\d+)/.exec(run.stdout)?.[1] ?? -1);
     assert.equal(failed, expectedFailures, `${name}: ${run.stdout}\n${run.stderr}`);
-    assert.equal(passed + failed, 13);
+    assert.equal(passed + failed, 7);
     assert.equal(run.status, expectedFailures ? 1 : 0);
     report.gateway.push({
       variant: name,

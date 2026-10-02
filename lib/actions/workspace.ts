@@ -1,19 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { z } from "zod";
+import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
 import {
   removeWorkspaceProjectMember,
   upsertWorkspaceProjectMember,
   workspaceMemberFormSchema,
   workspaceMemberRemovalSchema,
 } from "@/lib/workspace/access";
-import { createWorkspaceProjectSchema } from "@/lib/workspace/contracts";
-import { createWorkspaceProject, linkReadyProductToSalesProject } from "@/lib/workspace/store";
+import {
+  createWorkspaceProjectSchema,
+  workspaceProjectNameChangeSchema,
+  workspaceProjectStatusChangeSchema,
+} from "@/lib/workspace/contracts";
+import {
+  changeWorkspaceProjectName,
+  changeWorkspaceProjectStatus,
+  createWorkspaceProject,
+  linkReadyProductToSalesProject,
+} from "@/lib/workspace/store";
 
 export type WorkspaceActionState = {
   status: "idle" | "success" | "error";
@@ -22,9 +29,8 @@ export type WorkspaceActionState = {
 };
 
 async function requireWorkspaceUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "workspace:view"))
-    throw new Error("无权访问项目工作区。");
+  const session = await authorizedActionSession("workspace:view");
+  if (!session) throw new Error("无权访问项目工作区。");
   return session;
 }
 
@@ -38,10 +44,10 @@ export async function createWorkspaceProjectAction(
     if (!parsed.success)
       return { status: "error", message: parsed.error.issues[0]?.message ?? "项目资料无效。" };
     const project = await createWorkspaceProject(parsed.data, session.user.id);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return { status: "success", message: "项目已创建。", projectId: project.id };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法创建项目。" };
+    return actionError(error, "无法创建项目。");
   }
 }
 
@@ -50,21 +56,20 @@ export async function linkReadyProductToSalesProjectAction(
   productIdInput: string,
 ): Promise<WorkspaceActionState> {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session || !hasPermission(session.user.role, "sales:write"))
-      throw new Error("无权为销售项目引用产品。");
+    const session = await authorizedActionSession("sales:write");
+    if (!session) throw new Error("无权为销售项目引用产品。");
     const projectId = z.uuid("项目标识无效。").parse(projectIdInput);
     const productId = z.uuid("产品记录标识无效。").parse(productIdInput);
     await linkReadyProductToSalesProject(projectId, productId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return {
       status: "success",
       message: "已引用 Product Ready，不会复制或改写产品事实。",
       projectId,
     };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : "无法引用产品。" };
+    return actionError(error, "无法引用产品。");
   }
 }
 
@@ -79,13 +84,10 @@ export async function upsertWorkspaceProjectMemberAction(
       return { status: "error", message: parsed.error.issues[0]?.message ?? "成员资料无效。" };
     await upsertWorkspaceProjectMember(parsed.data, session.user.id);
     revalidatePath(`/workspace/${parsed.data.projectId}`);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return { status: "success", message: "项目成员角色已保存。", projectId: parsed.data.projectId };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法保存项目成员。",
-    };
+    return actionError(error, "无法保存项目成员。");
   }
 }
 
@@ -100,12 +102,41 @@ export async function removeWorkspaceProjectMemberAction(
       return { status: "error", message: parsed.error.issues[0]?.message ?? "成员资料无效。" };
     await removeWorkspaceProjectMember(parsed.data, session.user.id);
     revalidatePath(`/workspace/${parsed.data.projectId}`);
-    revalidatePath("/workspace", "layout");
+    refreshWorkspace();
     return { status: "success", message: "项目成员已移除。", projectId: parsed.data.projectId };
   } catch (error) {
+    return actionError(error, "无法移除项目成员。");
+  }
+}
+
+export async function changeWorkspaceProjectStatusAction(
+  input: unknown,
+): Promise<WorkspaceActionState> {
+  try {
+    const session = await requireWorkspaceUser();
+    const value = workspaceProjectStatusChangeSchema.parse(input);
+    const project = await changeWorkspaceProjectStatus(value, session.user.id);
+    refreshWorkspace();
     return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法移除项目成员。",
+      status: "success",
+      projectId: project.id,
+      message: project.status === "archived" ? "项目已归档，新业务写入已冻结。" : "项目已重开。",
     };
+  } catch (error) {
+    return actionError(error, "无法更新项目状态。");
+  }
+}
+
+export async function changeWorkspaceProjectNameAction(
+  input: unknown,
+): Promise<WorkspaceActionState> {
+  try {
+    const session = await requireWorkspaceUser();
+    const value = workspaceProjectNameChangeSchema.parse(input);
+    const project = await changeWorkspaceProjectName(value, session.user.id);
+    refreshWorkspace();
+    return { status: "success", projectId: project.id, message: "项目名称已更新。" };
+  } catch (error) {
+    return actionError(error, "无法更新项目名称。");
   }
 }

@@ -1,5 +1,5 @@
-import { ProjectPage, type ProjectPageProps } from "@/components/workspace/project-page";
+import { RecordPage, type RecordPageProps } from "@/components/workspace/record-page";
 export const prefetch = "partial";
-export default function Page(props: ProjectPageProps) {
-  return <ProjectPage {...props} mode="record" />;
+export default function Page(props: RecordPageProps) {
+  return <RecordPage {...props} mode="record" />;
 }

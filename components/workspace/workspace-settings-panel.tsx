@@ -8,12 +8,12 @@ import {
   SaveIcon,
   Settings2Icon,
   ShieldAlertIcon,
-  ShieldCheckIcon,
   UserRoundIcon,
 } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useActionState, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import type { z } from "zod";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -51,14 +51,13 @@ import { saveSocialChannelControlAction } from "@/lib/actions/social-controls";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { authClient } from "@/lib/auth-client";
 import { invitationFormSchema, productAgentModelSettingsSchema } from "@/lib/form-schemas";
+import { socialControlChangeSchema } from "@/lib/social/control-record";
+import { BrowserNodesPanel } from "./browser-nodes-panel";
+import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
+import { FacebookAccountPanel } from "./facebook-account-panel";
 
 type AgentValues = z.infer<typeof productAgentModelSettingsSchema>;
-const socialSchema = z.object({
-  channelRef: z.string().trim().min(1, "需要渠道引用。"),
-  accountRef: z.string().trim().min(1, "需要账户引用。"),
-  action: z.enum(["enable", "pause", "resume"]),
-  evidenceRef: z.string().trim().min(1, "需要脱敏证据引用。"),
-});
+const socialSchema = socialControlChangeSchema.omit({ actorType: true, actorId: true });
 type SocialValues = z.infer<typeof socialSchema>;
 const newAgentValues: AgentValues = {
   configId: "",
@@ -107,6 +106,7 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
     resolver: zodResolver(productAgentModelSettingsSchema),
     defaultValues: initial ? agentValues(initial) : { ...newAgentValues, isDefault: true },
   });
+  useWorkspaceDirty("agent-settings", form.formState.isDirty);
   useEffect(() => {
     const saved = settings.find((item) => item.id === state.savedConfigId);
     if (state.status === "success" && saved) {
@@ -365,6 +365,7 @@ function TeamSettings() {
     resolver: zodResolver(invitationFormSchema),
     defaultValues: { email: "" },
   });
+  useWorkspaceDirty("team-settings", form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") form.reset();
   }, [form, state.status]);
@@ -503,6 +504,10 @@ function ChannelSettings() {
     resolver: zodResolver(socialSchema),
     defaultValues: { channelRef: "", accountRef: "", action: "pause", evidenceRef: "" },
   });
+  useWorkspaceDirty("channel-settings", form.formState.isDirty);
+  useEffect(() => {
+    if (state.status === "success") form.reset(form.getValues());
+  }, [form, state]);
   function submit(values: SocialValues) {
     const data = new FormData();
     for (const [key, value] of Object.entries(values)) data.set(key, value);
@@ -587,72 +592,74 @@ export function WorkspaceSettingsPanel({
   settings = [],
   canManage,
   currentUser,
+  legacyWorker = false,
+  sandboxEnabled = false,
 }: {
   settings?: ProductAgentModelSettings[];
   canManage: boolean;
+  legacyWorker?: boolean;
+  sandboxEnabled?: boolean;
   currentUser?: { name?: string | null; email?: string | null; role?: string | null };
 }) {
+  const query = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { requestNavigation } = useWorkspaceDirtyState();
+  const requested = query.get("section");
+  const section =
+    canManage && ["team", "agent", "channels"].includes(requested ?? "") ? requested! : "account";
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">工作区设置</Badge>
-          <Badge variant="outline">全局配置</Badge>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          账号、Agent 和渠道属于工作区，不应成为项目流程节点。
-        </p>
-      </div>
-      <AccountSettings user={currentUser} />
-      <Alert>
-        <ShieldCheckIcon />
-        <AlertTitle>视频生成仍未启用</AlertTitle>
-        <AlertDescription>这里没有视频供应商、生成任务、预算或重试配置。</AlertDescription>
-      </Alert>
-      <Tabs defaultValue="security">
-        <TabsList className={canManage ? "grid w-full grid-cols-4" : "grid w-full grid-cols-1"}>
-          {canManage ? (
-            <>
-              <TabsTrigger value="agent">
-                <Settings2Icon />
-                Agent
-              </TabsTrigger>
-              <TabsTrigger value="team">
-                <MailPlusIcon />
-                团队
-              </TabsTrigger>
-            </>
-          ) : null}
-          <TabsTrigger value="security">
-            <KeyRoundIcon />
-            安全
-          </TabsTrigger>
-          {canManage ? (
-            <TabsTrigger value="channel">
+    <Tabs
+      value={section}
+      onValueChange={(value) =>
+        requestNavigation(() => {
+          const next = new URLSearchParams(query);
+          next.set("section", value);
+          router.push(pathname + "?" + next.toString());
+        })
+      }
+    >
+      <TabsList className={canManage ? "grid h-auto w-full grid-cols-2 sm:grid-cols-4" : "w-full"}>
+        <TabsTrigger value="account">
+          <KeyRoundIcon />
+          账号与安全
+        </TabsTrigger>
+        {canManage ? (
+          <>
+            <TabsTrigger value="team">
+              <MailPlusIcon />
+              团队
+            </TabsTrigger>
+            <TabsTrigger value="agent">
+              <Settings2Icon />
+              Agent
+            </TabsTrigger>
+            <TabsTrigger value="channels">
               <ShieldAlertIcon />
               渠道
             </TabsTrigger>
-          ) : null}
-        </TabsList>
-        {canManage ? (
-          <>
-            <TabsContent value="agent">
-              <AgentSettings settings={settings} />
-            </TabsContent>
-            <TabsContent value="team">
-              <TeamSettings />
-            </TabsContent>
           </>
         ) : null}
-        <TabsContent value="security">
-          <SecuritySettings />
-        </TabsContent>
-        {canManage ? (
-          <TabsContent value="channel">
-            <ChannelSettings />
+      </TabsList>
+      <TabsContent value="account" className="space-y-4">
+        <AccountSettings user={currentUser} />
+        <SecuritySettings />
+      </TabsContent>
+      {canManage ? (
+        <>
+          <TabsContent value="team">
+            <TeamSettings />
           </TabsContent>
-        ) : null}
-      </Tabs>
-    </div>
+          <TabsContent value="agent">
+            <AgentSettings settings={settings} />
+          </TabsContent>
+          <TabsContent value="channels" className="space-y-4">
+            {legacyWorker ? <FacebookAccountPanel /> : null}
+            <ChannelSettings />
+            <BrowserNodesPanel sandboxEnabled={sandboxEnabled} />
+          </TabsContent>
+        </>
+      ) : null}
+    </Tabs>
   );
 }

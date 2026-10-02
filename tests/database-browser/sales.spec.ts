@@ -173,8 +173,7 @@ for (const inbound of [false, true]) {
     const [rfq] = await records("rfq");
     expect(rfq.state).toBe("RFQ_COLLECTING");
     if (inbound) expect(rfq.payload.lead_ref).toBe(receivedLeadId);
-    if (!inbound) await page.getByRole("link", { name: "打开客户需求", exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/records/rfq/${rfq.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/records/rfq/${rfq.id}(?:[?].*)?$`));
     await expect(page.getByRole("button", { name: "确认需求完整", exact: true })).toBeDisabled();
     expect(await records("quotation")).toHaveLength(0);
     const revise = page.locator(`form#revise-rfq-${rfq.id}`).filter({ visible: true });
@@ -212,8 +211,7 @@ for (const inbound of [false, true]) {
       product_id: productId,
       quote: { unit_price: 12.5, currency: "USD", moq: 10, lead_time_days: 30 },
     });
-    await page.getByRole("link", { name: "打开人工报价", exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/records/quotation/${draft.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/records/quotation/${draft.id}(?:[?].*)?$`));
     const staleContext = await browser.newContext({ baseURL });
     await staleContext.addCookies(await context.cookies());
     const stalePage = await staleContext.newPage();
@@ -316,7 +314,7 @@ for (const inbound of [false, true]) {
     await page.reload();
     // Streaming SSR may temporarily stage another copy under a hidden S:* container.
     // Scope to the accessible panel, never select an arbitrary first duplicate.
-    const quotationDetails = page.getByRole("region", { name: "报价详情与审批" });
+    const quotationDetails = page.getByRole("region", { name: "业务记录" });
     const send = quotationDetails.locator(`form#quote-send-${draft.id}`);
     await expect(send).toHaveCount(1);
     await expect(send).toBeVisible();
@@ -533,3 +531,49 @@ for (const inbound of [false, true]) {
     // No worker is connected: queued is not delivered, and all confirmations are simulated.
   });
 }
+
+test("stale RFQ form rejects after archival and owner can reopen", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+  await context.addCookies([
+    {
+      name: "better-auth.session_token",
+      value: encodeURIComponent(`${token}.${signature}`),
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  await page.goto(`/workspace/${projectId}/new/rfq`);
+  const form = page.locator("form#create-rfq").filter({ visible: true });
+  await form.getByLabel("客户名称", { exact: true }).fill("SYNTHETIC stale form");
+  await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+  // Archive in another request after the browser has already obtained a writable form.
+  await db
+    .update(schema.workspaceProject)
+    .set({ status: "archived" })
+    .where(eq(schema.workspaceProject.id, projectId));
+  await page.getByRole("button", { name: "保存询盘", exact: true }).click();
+  await expect(
+    page.getByText("项目已归档，请重开后再写入业务资料。", { exact: true }),
+  ).toBeVisible();
+  expect(
+    await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(
+        and(
+          eq(schema.aggregateRecord.createdById, actorId),
+          eq(schema.aggregateRecord.type, "rfq"),
+        ),
+      ),
+  ).toHaveLength(0);
+  await page.goto(`/workspace/${projectId}`);
+  await page.getByRole("button", { name: "重开项目", exact: true }).click();
+  await expect(page.getByRole("button", { name: "归档项目", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "归档项目", exact: true }).click();
+  await expect(page.getByRole("button", { name: "重开项目", exact: true })).toBeVisible();
+});
