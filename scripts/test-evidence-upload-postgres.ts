@@ -8,6 +8,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { closeDatabase, type Database, getDatabase } from "../lib/db/client";
 import {
   evidence,
+  evidenceUploadIntent,
   user,
   videoUploadReceipt,
   workspaceProject,
@@ -210,7 +211,7 @@ void (async () => {
     };
     const count = memory.values.size;
     await assert.rejects(persistUploadedEvidence(failureInput, db, store));
-    assert.equal(memory.values.size, count, "Rejected insert must delete its unreferenced blob");
+    assert.equal(memory.values.size, count, "Invalid metadata must not create a blob");
     const lostAck = new Proxy(db, {
       get(target, key, receiver) {
         if (key === "transaction")
@@ -229,6 +230,20 @@ void (async () => {
       memory.values.size,
       count + 1,
       "A lost acknowledgement must preserve a possibly committed blob",
+    );
+    const [committed] = await db
+      .select()
+      .from(evidence)
+      .where(eq(evidence.sha256, failureInput.sha256));
+    assert.ok(committed);
+    const [committedIntent] = await db
+      .select()
+      .from(evidenceUploadIntent)
+      .where(eq(evidenceUploadIntent.id, committed.id));
+    assert.equal(
+      committedIntent.status,
+      "attached",
+      "lost commit response retains atomic attached state",
     );
     await testUploadReconciliation(db, actors[0]);
     console.log(
