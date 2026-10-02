@@ -26,3 +26,8 @@ The first type check identified missing node IDs in the synthetic UI fixture;
 the fixture was updated and the check passed. CI also exercises an unauthenticated
 inspection request through the actual Server Action and keeps the unknown-state
 warning visible. A production inspection is still required after deployment.
+
+First CI passed the new inspection browser check and 48 database browser cases,
+but an existing legacy-link assertion found both a hidden retained page and the
+visible page. Its assertion now requires exactly one visible warning, preserving
+the user-facing requirement while accounting for retained navigation state.
