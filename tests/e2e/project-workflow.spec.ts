@@ -96,10 +96,14 @@ test("editor uses the main document width and appears before related tasks", asy
   await expect(page.getByRole("navigation", { name: "项目栏目" })).toHaveCount(0);
 });
 
-for (const zeroAccepted of [false, true]) {
-  test(`streamed product fields keep actionable feedback after ${zeroAccepted ? "zero accepted fields" : "partial failure"}`, async ({
-    page,
-  }) => {
+for (const outcome of [
+  "partial failure",
+  "zero accepted fields",
+  "source format",
+  "private failure",
+]) {
+  test(`streamed product fields keep actionable feedback after ${outcome}`, async ({ page }) => {
+    const zeroAccepted = outcome === "zero accepted fields";
     const runId = "00000000-0000-4000-8000-000000000117";
     const productId = "00000000-0000-4000-8000-000000000118";
     const sourceBytes = Buffer.from("Product name,Synthetic streamed clutch");
@@ -186,6 +190,15 @@ for (const zeroAccepted of [false, true]) {
       expect(body).toContain(receiptId);
       expect(body).not.toContain("filename=");
       expect(body).not.toContain(sourceBytes.toString());
+      if (outcome === "source format" || outcome === "private failure")
+        return route.fulfill({
+          status: 400,
+          headers: {
+            "x-product-intake-error":
+              outcome === "source format" ? "source_labels_missing" : "unknown",
+          },
+          json: { error: "SYNTHETIC_PRIVATE_PROVIDER_BODY_MUST_NOT_APPEAR" },
+        });
       return route.fulfill({
         contentType: "application/x-ndjson",
         body:
@@ -209,6 +222,22 @@ for (const zeroAccepted of [false, true]) {
       buffer: sourceBytes,
     });
     await page.getByRole("button", { name: "生成待审核草稿", exact: true }).click();
+    if (outcome === "source format" || outcome === "private failure") {
+      await expect(
+        page.getByText(
+          outcome === "source format"
+            ? "资料中未找到可核对的字段标签。请为表头或正文标明 Product name、Product type、Internal SKU 等字段后重新导入；也可改用手动录入。"
+            : "无法开始生成，请检查项目权限、证据和模型配置。",
+          { exact: true },
+        ),
+      ).toBeVisible();
+      await expect(page.getByText("SYNTHETIC_PRIVATE_PROVIDER_BODY_MUST_NOT_APPEAR")).toHaveCount(
+        0,
+      );
+      await expect(page.getByRole("link", { name: "打开已保存草稿（新窗口）" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "生成待审核草稿", exact: true })).toBeEnabled();
+      return;
+    }
     const progress = page.getByRole("region", { name: "生成字段状态" });
     if (!zeroAccepted) {
       await expect(progress.getByText("Synthetic streamed clutch", { exact: true })).toBeVisible();
