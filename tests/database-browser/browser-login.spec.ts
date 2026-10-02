@@ -187,6 +187,23 @@ test("saved password fill uses the actual owner action and never returns credent
     return result.json();
   };
   await nodeCall({ operation: "admit", ticket });
+  const reconnect = page.getByRole("button", { name: "重新授权连接", exact: true });
+  await expect(reconnect).toBeVisible({ timeout: 15000 });
+  await reconnect.click();
+  await expect
+    .poll(async () => {
+      const value = await viewer.locator("body").getAttribute("data-ticket");
+      return Boolean(value && value !== ticket);
+    })
+    .toBe(true);
+  const freshTicket = await viewer.locator("body").getAttribute("data-ticket");
+  expect(freshTicket).not.toBe(ticket);
+  const replay = await page.request.post(`${baseURL}/api/browser-nodes`, {
+    headers: { authorization: `Bearer ${accessKey}` },
+    data: { installationId, bootId, operation: "admit", ticket },
+  });
+  expect(replay.ok()).toBe(false);
+  await nodeCall({ operation: "admit", ticket: freshTicket });
   const button = page.getByRole("button", { name: "填入已保存账号和密码", exact: true });
   await expect(button).toBeEnabled();
   await button.click();
