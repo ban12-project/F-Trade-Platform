@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { ProductSourceError } from "./intake-errors";
 import { containsFitmentLabel } from "./source-labels";
 
 import type { ProductDraft } from "./verification";
@@ -66,9 +67,7 @@ function locationRef(
 
 function assertLocationLimit(locations: ProductAgentEvidenceLocation[]) {
   if (locations.length > MAX_EVIDENCE_LOCATIONS) {
-    throw new Error(
-      `Product Agent source contains more than ${MAX_EVIDENCE_LOCATIONS} labelled evidence locations; split the catalog before extraction`,
-    );
+    throw new ProductSourceError("source_locations_exceeded");
   }
 }
 
@@ -152,7 +151,7 @@ export function buildProductAgentEvidenceLocations(
   }
 
   if (!locations.length) {
-    throw new Error("Product Agent source contains no explicitly labelled evidence locations");
+    throw new ProductSourceError("source_labels_missing");
   }
   const seen = new Set<string>();
   return locations.filter((location) => {

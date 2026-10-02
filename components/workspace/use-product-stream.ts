@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ProductAgentActionState } from "@/lib/actions/product-agent";
+import {
+  PRODUCT_INTAKE_ERROR_HEADER,
+  productIntakeErrorMessage,
+} from "@/lib/product/intake-errors";
 import { consumeProductStream } from "@/lib/product/stream-client";
 import type { ProductStreamEvent } from "@/lib/product/stream-contract";
 
@@ -25,8 +29,12 @@ export function useProductStream() {
         body: data,
         signal: active.signal,
       });
-      if (!response.ok || !response.body)
-        throw new Error("无法开始生成，请检查管理员权限、证据和模型配置。");
+      if (!response.ok || !response.body) {
+        void response.body?.cancel().catch(() => {});
+        throw new Error(
+          productIntakeErrorMessage(response.headers.get(PRODUCT_INTAKE_ERROR_HEADER)),
+        );
+      }
       await consumeProductStream(response.body, (event) => {
         if (event.type === "draft")
           setState((previous) => ({ ...previous, productId: event.productId }));
