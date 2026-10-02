@@ -1,6 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
 import { z } from "zod";
 import {
+  type BrowserSandboxNetworkPolicy,
   browserSandboxNetworkPolicyMatches,
   browserSandboxNetworkPolicySchema,
 } from "./sandbox-network-policy";
@@ -47,6 +48,26 @@ export type BrowserSandboxProvider = {
   get(input: Parameters<typeof Sandbox.get>[0]): Promise<BrowserSandboxProviderHandle>;
 };
 
+export function browserSandboxPreflightChecks(
+  sandbox: BrowserSandboxProviderHandle,
+  nodeId: string,
+  policy: BrowserSandboxNetworkPolicy,
+) {
+  return {
+    ownership:
+      sandbox.name === `ftrade-browser-${nodeId}` &&
+      sandbox.persistent === true &&
+      sandbox.tags?.["ftrade-node"] === nodeId,
+    resources: sandbox.vcpus === 2,
+    timeout:
+      typeof sandbox.timeout === "number" &&
+      Number.isFinite(sandbox.timeout) &&
+      sandbox.timeout > 0 &&
+      sandbox.timeout <= 20 * 60 * 1000,
+    networkPolicy: browserSandboxNetworkPolicyMatches(sandbox.networkPolicy, policy),
+  };
+}
+
 /** Execute once for an exclusively claimed database operation. The caller must
  * persist intent BEFORE this call. Ambiguous outcomes must go to inspection;
  * repeating create/resume on a workflow retry is not permitted.
@@ -78,28 +99,17 @@ export async function provisionBrowserSandbox(
       // Inspect first. Never use getOrCreate: a lost snapshot must not turn an
       // established account profile into a fresh, empty runtime.
       const existing = await provider.get({ name, resume: false });
-      if (
-        existing.name !== name ||
-        !existing.persistent ||
-        existing.status !== "stopped" ||
-        existing.tags?.["ftrade-node"] !== request.nodeId
-      )
+      const checks = browserSandboxPreflightChecks(existing, request.nodeId, request.networkPolicy);
+      if (!checks.ownership || existing.status !== "stopped")
         throw new Error("sandbox_requires_reconciliation");
       // A stopped sandbox retains externally edited resource configuration. Do
       // not wake a larger VM (or guess when resource metadata is missing).
-      if (existing.vcpus !== 2) throw new Error("sandbox_resources_require_reconciliation");
+      if (!checks.resources) throw new Error("sandbox_resources_require_reconciliation");
       // Persistent configuration can be edited outside this application. Refuse
       // to resume if its stored deadline no longer satisfies our compute bound.
       // Do not repair it by extending an already running session's timeout.
-      if (
-        typeof existing.timeout !== "number" ||
-        !Number.isFinite(existing.timeout) ||
-        existing.timeout <= 0 ||
-        existing.timeout > 20 * 60 * 1000
-      )
-        throw new Error("sandbox_timeout_requires_reconciliation");
-      if (!browserSandboxNetworkPolicyMatches(existing.networkPolicy, request.networkPolicy))
-        throw new Error("sandbox_network_policy_requires_reconciliation");
+      if (!checks.timeout) throw new Error("sandbox_timeout_requires_reconciliation");
+      if (!checks.networkPolicy) throw new Error("sandbox_network_policy_requires_reconciliation");
       sandbox = await provider.get({ name, resume: true });
     }
     if (sandbox.name !== name || !sandbox.persistent || sandbox.status !== "running")

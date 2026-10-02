@@ -473,7 +473,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <SandboxStatus sandbox={node.sandbox} />
+            <SandboxStatus sandbox={node.sandbox} nodeId={node.id} />
             <Collapsible>
               <CollapsibleTrigger render={<Button variant="outline" />}>
                 高级：节点授权

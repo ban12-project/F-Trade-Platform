@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { ownerCommandSchema } from "@/lib/browser-fleet/contracts";
+import { inspectOwnedBrowserSandbox } from "@/lib/browser-fleet/sandbox-inspection";
 import { deliverQueuedBrowserSandboxes } from "@/lib/browser-fleet/sandbox-workflow-delivery";
 import { listBrowserNodes, ownerBrowserCommand } from "@/lib/browser-fleet/store";
 
@@ -15,6 +16,14 @@ async function actor() {
 }
 export async function browserNodesAction() {
   return listBrowserNodes((await actor()).id);
+}
+export async function inspectBrowserSandboxAction(input: unknown) {
+  try {
+    const current = await actor();
+    return { ok: true as const, inspection: await inspectOwnedBrowserSandbox(input, current.id) };
+  } catch {
+    return { ok: false as const, message: "无法检查该节点，请确认管理权限与节点归属。" };
+  }
 }
 export async function browserNodeCommandAction(input: unknown) {
   const current = await actor();

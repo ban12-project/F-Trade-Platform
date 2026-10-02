@@ -14,5 +14,8 @@ test("stored lifecycle remains distinguishable while provisioning is disabled", 
     "datetime",
     "2026-09-01T00:00:00.000Z",
   );
-  await expect(states.getByRole("button")).toHaveCount(0);
+  await expect(states.getByRole("button", { name: "检查云端状态" })).toHaveCount(5);
+  await states.getByRole("button", { name: "检查云端状态" }).first().click();
+  await expect(states.getByText("无法检查该节点，请确认管理权限与节点归属。")).toBeVisible();
+  await expect(states.getByText("尚未确认云端是否停止，请先核对，勿重复启动。")).toBeVisible();
 });
