@@ -58,3 +58,10 @@ and cross-origin/unauthenticated rejection. Final remote CI is recorded on the P
   directory to the repository fixed the harness. The subsequent 15-test run passed.
 - Original factory inputs, full source/OCR accuracy, large-file desktop acceptance and real
   business Gates remain unverified. This synthetic slice does not close #307 or #348.
+
+## Post-deployment confirmation
+
+#493 passed all six remote checks and squash-merged as `2314e5f`. The production alias was
+verified READY at that commit. A fresh authenticated UI upload of the original negative fixture
+showed the explicit missing-label guidance and restored the import button. See
+[video and UI follow-up](synthetic-video-and-ui-20261002.md) for the bounded production checks.
