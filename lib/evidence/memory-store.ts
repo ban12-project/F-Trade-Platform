@@ -1,5 +1,5 @@
 import type { EvidenceRead, EvidenceStore, EvidenceWrite, StoredEvidence } from "./store";
-import { safeEvidencePathSegment } from "./store";
+import { safeEvidencePathSegment, validateReservedEvidencePath } from "./store";
 
 interface MemoryValue {
   body: Blob;
@@ -18,7 +18,10 @@ export class MemoryEvidenceStore implements EvidenceStore {
   readonly values = new Map<string, MemoryValue>();
 
   async put(input: EvidenceWrite): Promise<StoredEvidence> {
-    const pathname = `synthetic/${safeEvidencePathSegment(input.evidenceId)}/${safeEvidencePathSegment(input.filename)}`;
+    const pathname =
+      validateReservedEvidencePath(input) ??
+      `synthetic/${safeEvidencePathSegment(input.evidenceId)}/${safeEvidencePathSegment(input.filename)}`;
+    if (this.values.has(pathname)) throw new Error("Evidence already exists");
     this.values.set(pathname, {
       body: await toBlob(input.body),
       contentType: input.contentType,
