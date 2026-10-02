@@ -11,6 +11,7 @@ import { openEgressCheckedSession, verifyBrowserEgress, waitForBrowserReady } fr
 import { createGateway } from "./gateway.mjs";
 import { createIdleExitPolicy, viewerGraceExpired } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
+import { describeBrowserLaunchFailure } from "./launch-diagnostics.mjs";
 import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import {
   configureLoginRuntime,
@@ -212,23 +213,29 @@ async function stop(slot, outcome = "failed") {
 }
 async function launch(slot) {
   const spec = slot.spec;
+  slot.launchStage = "volume";
   await docker("POST", "/volumes/create", {
     Name: spec.volume,
     Labels: { "io.ftrade.node": nodeId, "io.ftrade.account": slot.run.accountId },
   });
+  slot.launchStage = "network";
   await docker("POST", "/networks/create", {
     Name: spec.name,
     Driver: "bridge",
     Labels: spec.labels,
   });
   if (slot.stopping) return;
+  slot.launchStage = "container-create";
   const created = await docker("POST", `/containers/create?name=${spec.name}`, spec.body);
   slot.containerId = created.Id;
   if (slot.stopping) return;
+  slot.launchStage = "container-start";
   await docker("POST", `/containers/${created.Id}/start`);
+  slot.launchStage = "container-inspect";
   const details = await docker("GET", `/containers/${created.Id}/json`);
   slot.apiPort = Number(details.NetworkSettings.Ports["9377/tcp"][0].HostPort);
   slot.vncPort = Number(details.NetworkSettings.Ports["6080/tcp"][0].HostPort);
+  slot.launchStage = "browser-health";
   await waitForBrowserReady((path, body, timeout) => browserRequest(slot, path, body, timeout), {
     assertActive() {
       if (slot.stopping || slot.abort.signal.aborted || slot.expiresAt <= Date.now())
@@ -236,12 +243,14 @@ async function launch(slot) {
     },
     sleep: (ms) => sleep(ms, undefined, { signal: slot.abort.signal }),
   });
+  slot.launchStage = "egress";
   slot.egressTabId = await openEgressCheckedSession(
     (path, body) => browserRequest(slot, path, body),
     slot.run,
   );
   slot.egressCheckedAt = Date.now();
   if (slot.stopping) return;
+  slot.launchStage = "vnc";
   for (let i = 0; i < 30; i++) {
     const response = await browserRequest(slot, "/vnc/status");
     const status = await response.json();
@@ -249,6 +258,7 @@ async function launch(slot) {
     if (i === 29) throw new Error("vnc_not_ready");
     await sleep(1000, undefined, { signal: slot.abort.signal });
   }
+  slot.launchStage = "heartbeat";
   const renewed = await nodeCall("heartbeat", {
     runId: slot.run.id,
     leaseId: slot.run.leaseId,
@@ -256,6 +266,7 @@ async function launch(slot) {
   });
   if (!renewed.active || slot.stopping) throw new Error("lease_revoked");
   slot.expiresAt = localDeadline(renewed, renewed.leaseUntil);
+  slot.launchStage = "watchdog";
   await renewWatchdog(docker, slot.containerId, slot.expiresAt);
   slot.ready = true;
   slot.readyAt = Date.now();
@@ -573,6 +584,8 @@ async function tick() {
         await stop(slot, slot.outcome);
       })
       .catch((error) => {
+        if (!slot.ready)
+          console.error(JSON.stringify(describeBrowserLaunchFailure(slot.launchStage, error)));
         slot.outcome = error.message?.startsWith("egress_") ? "egress_mismatch" : "failed";
         void stop(slot, slot.outcome).catch(() => {});
       });
