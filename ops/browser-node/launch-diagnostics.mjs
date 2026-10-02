@@ -12,6 +12,17 @@ const stages = new Set([
 ]);
 const requests = new Set(["open-tab", "navigate", "snapshot", "vnc-status", "other"]);
 const codes = new Set([
+  // Reviewed from the pinned Camofox server's structured error contract.
+  "ssl_error",
+  "page_crashed",
+  "tab_destroyed",
+  "tab_unresponsive",
+  "tab_timeout",
+  "navigation_race",
+  "session_expired",
+  "concurrency_timeout",
+  "browser_launch_timeout",
+  "admission_rejected",
   "native_profile_scope_invalid",
   "native_profile_directory_invalid",
   "native_profile_file_invalid",

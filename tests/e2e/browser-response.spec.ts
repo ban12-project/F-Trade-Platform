@@ -99,3 +99,25 @@ test("failed-response diagnostics are size and time bounded and cancel the strea
   expect(Date.now() - started).toBeLessThan(2000);
   expect(cancelled).toBe(2);
 });
+
+test("structured production failure codes do not expose error messages or grant retries", async () => {
+  for (const code of ["ssl_error", "session_expired", "browser_launch_timeout"]) {
+    const error = await checkedBrowserResponse(
+      Response.json(
+        { code, error: "private-page-and-proxy-canary", retryable: true },
+        { status: 503 },
+      ),
+      "/tabs",
+    ).catch((failure) => failure);
+    expect(describeBrowserLaunchFailure("egress", error)).toEqual({
+      event: "browser_launch_failed",
+      stage: "egress",
+      request: "open-tab",
+      code,
+      httpStatus: 503,
+    });
+    expect(error.message).toBe("browser_request_failed");
+    expect(error).not.toHaveProperty("retryable");
+    expect(JSON.stringify(error)).not.toContain("canary");
+  }
+});

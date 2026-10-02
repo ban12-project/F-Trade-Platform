@@ -19,7 +19,7 @@ async function failureCode(response) {
       chunks.push(value);
     }
     const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    return sanitizeBrowserFailureCode(body?.error);
+    return sanitizeBrowserFailureCode(body?.code ?? body?.error);
   } catch {
     return "unclassified";
   } finally {

@@ -96,7 +96,7 @@ after a real viewer connection. No login credential, factor, post or DM was subm
 
 The Agent now logs fixed launch-stage/request enums and a numeric HTTP status. For
 a rejected browser response it accepts only an exact allowlisted native-profile
-error code; bodies, URLs, stack traces, account identifiers and arbitrary errors
+or pinned Camofox structured error code; bodies, URLs, stack traces, account identifiers and arbitrary errors
 are never logged. JSON inspection is limited to 2 KiB and 250 ms. Failure outcome,
 lease enforcement, cleanup and browser-container logging policy are unchanged.
 
