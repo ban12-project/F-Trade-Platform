@@ -70,9 +70,19 @@ async function run() {
       ),
     );
   }
-  await assert.rejects(
-    verifyDocumentUploadBytes(new Blob(["<svg></svg>"]).stream(), "fake.png", 11),
-  );
+  // With the SVG loader blocked, a declaration mismatch must fail before decoding.
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+  sharp.block({ operation: ["VipsForeignLoadSvg"] });
+  try {
+    for (const name of ["fake.png", "fake.jpg"]) {
+      await assert.rejects(
+        verifyDocumentUploadBytes(new Blob([svg]).stream(), name, svg.length),
+        /图片内容与声明的类型不一致/,
+      );
+    }
+  } finally {
+    sharp.unblock({ operation: ["VipsForeignLoadSvg"] });
+  }
   const ref = randomUUID();
   assert.throws(() => productImageReceiptIdsSchema.parse([ref, ref]));
   assert.throws(() =>

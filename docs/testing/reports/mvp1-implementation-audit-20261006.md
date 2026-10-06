@@ -47,15 +47,15 @@ Product/Content 已有模型适配器与结构化输出边界；本轮 Sales 需
 
 ## 剩余依赖风险（#498）
 
+**10 月 7 日补充**：[兼容补丁及图片入口复测](workflow-security-patches-20261007.md)已将 core 的 devalue 更新至 5.9.3、local/vercel 两个 world 的 undici 更新至 7.29.1、sharp 更新至 0.35.5；解码前增加 PNG/JPEG 文件头检查。新扫描从 10 high / 13 moderate / 4 low 降至 3 high / 1 moderate，均为 0 critical。下表保留当前剩余项；旧版本清单可从本报告历史修订核对。
+
 | 包与当前版本 | 可核对的最短依赖路径 | 后续处理条件 |
 | --- | --- | --- |
-| undici 7.28.0 | workflow → @workflow/cli → @workflow/world-local → undici | 公告修复到 7.29.0/7.29.1；核对 runtime 实际用法、上游约束及兼容升级 |
-| nanoid 5.1.6 | workflow → @workflow/core → nanoid | 公告修复到 5.1.11/5.1.16；上游固定版本，不能用普通兼容刷新消除 |
-| devalue 5.8.1 | workflow → @workflow/core → devalue | 公告修复到 5.9.1/5.9.3；核对序列化/反序列化入口及上游固定约束 |
+| nanoid 5.1.6 | workflow → @workflow/core → nanoid | 5.1.16 尝试改变固定重放 ID，已撤回；需要上游兼容迁移或经验证的重放版本策略 |
 | esbuild 0.18.20 | better-auth → drizzle-kit → @esbuild-kit/esm-loader → @esbuild-kit/core-utils → esbuild | 开发服务器公告；需判断该工具路径的实际暴露，不等同生产 HTTP 入口 |
 | braces 3.0.3 | shadcn → fast-glob → micromatch → braces | 本次公告未列补丁；需区分本地 CLI 的模式输入与公开应用输入 |
 
-Next 的 [ImageResponse SVG 公告](https://github.com/vercel/next.js/security/advisories/GHSA-vcvr-r3jv-pc5j)需要攻击者控制相关 SVG；当前应用未发现 `next/og`/`next/image` 使用，另一命中涉及 Windows 托管。升级消除版本命中，不将路径适用性未知包装成已确认攻击。剩余依赖风险由 #498 保持开放，兼容刷新没有强制覆盖上游精确固定依赖。
+Next 的 [ImageResponse SVG 公告](https://github.com/vercel/next.js/security/advisories/GHSA-vcvr-r3jv-pc5j)需要攻击者控制相关 SVG；当前应用未发现 `next/og`/`next/image` 使用，另一命中涉及 Windows 托管。升级消除版本命中，不将路径适用性未知包装成已确认攻击。剩余依赖风险由 #498 保持开放；10 月 7 日仅对经过兼容验证的精确父版本增加限定 override。
 
 ## 真实验收交接
 

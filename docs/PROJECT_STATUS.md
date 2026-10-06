@@ -31,6 +31,8 @@ GitHub Issues 和 Milestones 是状态的事实来源；本页只保留阶段说
 
 2026-10-06 的[实现核对与补缺](testing/reports/mvp1-implementation-audit-20261006.md)记录跨项目报价修订隔离、过期交期续申请、非空 Go 校验、生产询盘建议入口和安全补丁。技术回归与正式业务验收分别记录；本轮真实验收仍为 pending，剩余依赖风险见 [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498)。
 
+2026-10-07 的[Workflow 与图片安全补缺](testing/reports/workflow-security-patches-20261007.md)更新 devalue、两个 Workflow world 的 undici 和 sharp，并在解码前拒绝伪装图片。固定重放 ID、旧数据回读、HTTP 兼容及真实页面拒绝通过；扫描剩余 3 high / 1 moderate。nanoid 强制补丁改变重放 ID，已撤回并保留风险。
+
 同日的[reference 复测与自动审核](testing/reports/reference-test-review-20261006.md)采用用户授权的本机资料，测试审核由 Agent 完成。资料和测试审批授权均已具备，不能继续将等待 #6 或人工测试确认列为这条路径的阻塞项；#32 的生产渠道和真实客户样本单独记录。
 
 后续[应用复测](testing/reports/reference-application-20261006.md)验证 4 份参考 PDF 的真实浏览器私有上传、回读和本机数据库保存，以及当前模型的一批 20 条新草稿。20 条均通过来源检查，缺失门禁也全部拒绝直接 Ready。9 月已有 A–D 20 个槽位、实际模型内容及同批销售闭环的[汇总证据](testing/reports/reference-acceptance-20260917.md)；剩余缺口应区分当前环境复测、生产用户验证和真实工厂事实，不将这些已完成的受控测试全部列为未实现。

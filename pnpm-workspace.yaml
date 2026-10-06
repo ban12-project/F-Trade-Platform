@@ -3,3 +3,10 @@ allowBuilds:
   '@swc/core': false
   cbor-extract: false
   esbuild: false
+
+# Reviewed same-major patches for Workflow's exact pins; see #498.
+# Remove these when the selected upstream runtime pins equivalent patched versions.
+overrides:
+  '@workflow/core@4.8.4>devalue': 5.9.3
+  '@workflow/world-local@4.3.0>undici': 7.29.1
+  '@workflow/world-vercel@4.7.0>undici': 7.29.1

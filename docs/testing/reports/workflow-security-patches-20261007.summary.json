@@ -1,0 +1,49 @@
+{
+  "classification": "synthetic_security_compatibility_review",
+  "review_date": "2026-10-07",
+  "baseline_commit": "f3b7a22aeddcc9adbdde49431863c71817492bb3",
+  "issue": 498,
+  "audit_before": { "critical": 0, "high": 10, "moderate": 13, "low": 4 },
+  "audit_after": { "critical": 0, "high": 3, "moderate": 1, "low": 0 },
+  "patches": {
+    "devalue": "5.9.3",
+    "undici_world_local": "7.29.1",
+    "undici_world_vercel": "7.29.1",
+    "sharp": "0.35.5"
+  },
+  "compatibility": {
+    "replay_seeds": 8,
+    "replay_ids": 64,
+    "legacy_wire_read": "passed",
+    "buffer_visible_bytes": 4,
+    "old_backing_bytes": 128,
+    "patched_backing_bytes": 4,
+    "http_worlds_checked": 2,
+    "get_attempts_per_world": 2,
+    "post_attempts_per_world": 1,
+    "nanoid_patch_attempt": "rejected_replay_mismatch",
+    "nanoid_retained": "5.1.6"
+  },
+  "application": {
+    "synthetic_private_uploads": 2,
+    "private_blob_hash_matches": 2,
+    "intake_http_status": 400,
+    "intake_failure_stage": "images",
+    "document_evidence_saved": 1,
+    "disguised_image_evidence_saved": 0,
+    "product_stream_runs": 0,
+    "next_compilation_issues": 0,
+    "next_runtime_errors": 0,
+    "react_tree": "passed",
+    "react_fiber_inspect": "passed"
+  },
+  "cleanup": {
+    "new_test_blobs_deleted": 2,
+    "independent_absence_checks": 2,
+    "local_test_project_archived": true
+  },
+  "production_database_writes": 0,
+  "historical_blobs_modified": 0,
+  "formal_mvp_acceptance": "pending",
+  "dependency_risk": "open"
+}
