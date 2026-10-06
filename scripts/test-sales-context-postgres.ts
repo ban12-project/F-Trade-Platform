@@ -7,6 +7,7 @@ import rfqFixture from "../data/fixtures/rfq-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
 import { listProjectLeads } from "../lib/sales/closing-store";
+import { suggestFromLatestInquiry } from "../lib/sales/inquiry-suggestions";
 import { salesRelations } from "../lib/sales/journey";
 import { readSalesJourney } from "../lib/sales/journey-store";
 import { listProjectRfqEntries } from "../lib/sales/store";
@@ -136,6 +137,115 @@ void (async () => {
     const entries = await listProjectLeads(project, owner, db, { timelineLeadId });
     assert(entries.every((entry) => entry.timeline.length === 0));
   }
+  const suggestionMessageId = randomUUID();
+  const structuredBody =
+    "MOCK customer requirement: 500 pcs Toyota Corolla clutch kit; OE: SYN-OE-499; Destination: Synthetic Port. USD 5, delivery in 10 days.";
+  const receivedAt = new Date();
+  await db.insert(schema.socialMessage).values([
+    createStoredSocialMessageRecord({
+      id: suggestionMessageId,
+      conversationId: conversationB,
+      externalMessageRef: `synthetic-${randomUUID()}`,
+      direction: "inbound",
+      identityQuality: "manual",
+      body: structuredBody,
+      receivedAt,
+    }),
+    {
+      ...createStoredSocialMessageRecord({
+        id: randomUUID(),
+        conversationId: conversationB,
+        externalMessageRef: `synthetic-${randomUUID()}`,
+        direction: "outbound",
+        identityQuality: "manual",
+        body: "5000 pcs",
+        receivedAt: new Date(),
+      }),
+      bodyCiphertext: "synthetic-forbidden-to-decrypt",
+    },
+  ]);
+  const beforeSuggestions = await db.select().from(schema.aggregateRecord);
+  const input = { projectId: project, leadId: leadB };
+  const suggestion = await suggestFromLatestInquiry(input, owner, db);
+  assert.deepEqual(suggestion.source, {
+    ...input,
+    conversationId: conversationB,
+    messageId: suggestionMessageId,
+    receivedAt: receivedAt.toISOString(),
+  });
+  assert.deepEqual(suggestion.fields, {
+    quantity: "500",
+    oeNumber: "SYN-OE-499",
+    vehicleBrand: "Toyota",
+    vehicleModel: "Corolla",
+    destination: "Synthetic Port",
+  });
+  assert(
+    !JSON.stringify(suggestion).includes(structuredBody),
+    "No raw message body or DB record is returned",
+  );
+  for (const actor of [viewer, outsider])
+    await assert.rejects(suggestFromLatestInquiry(input, actor, db), /编辑权限/);
+  for (const leadId of [leadA, leadC, foreignLead, randomUUID()])
+    await assert.rejects(suggestFromLatestInquiry({ ...input, leadId }, owner, db), /没有|会话/);
+  await assert.rejects(
+    suggestFromLatestInquiry({ ...input, message: "untrusted client text" }, owner, db),
+  );
+  await db
+    .update(schema.socialMessage)
+    .set({ deletedAt: new Date() })
+    .where(eq(schema.socialMessage.id, suggestionMessageId));
+  const fallback = await suggestFromLatestInquiry(input, owner, db);
+  assert.deepEqual(fallback.fields, {}, "Deleted/outbound messages must not be parsed");
+  await db
+    .update(schema.socialMessage)
+    .set({ deletedAt: new Date() })
+    .where(eq(schema.socialMessage.id, fallback.source.messageId));
+  await assert.rejects(suggestFromLatestInquiry(input, owner, db), /保留期/);
+  await db
+    .update(schema.socialMessage)
+    .set({ deletedAt: null })
+    .where(eq(schema.socialMessage.id, fallback.source.messageId));
+  await db
+    .update(schema.socialMessage)
+    .set({ deletedAt: null })
+    .where(eq(schema.socialMessage.id, suggestionMessageId));
+  await db
+    .update(schema.workspaceProject)
+    .set({ status: "archived" })
+    .where(eq(schema.workspaceProject.id, project));
+  await assert.rejects(suggestFromLatestInquiry(input, owner, db), /已归档/);
+  await db
+    .update(schema.workspaceProject)
+    .set({ status: "active", kind: "marketing" })
+    .where(eq(schema.workspaceProject.id, project));
+  await assert.rejects(suggestFromLatestInquiry(input, owner, db), /销售机会/);
+  await db
+    .update(schema.workspaceProject)
+    .set({ kind: "sales" })
+    .where(eq(schema.workspaceProject.id, project));
+  await db.insert(schema.workspaceProjectMember).values({
+    id: randomUUID(),
+    projectId: project,
+    userId: outsider,
+    role: "editor",
+    createdById: owner,
+  });
+  assert.deepEqual((await suggestFromLatestInquiry(input, outsider, db)).fields, suggestion.fields);
+  await db
+    .delete(schema.workspaceProjectMember)
+    .where(
+      and(
+        eq(schema.workspaceProjectMember.projectId, project),
+        eq(schema.workspaceProjectMember.userId, outsider),
+      ),
+    );
+  await assert.rejects(suggestFromLatestInquiry(input, outsider, db), /编辑权限/);
+  assert.deepEqual(
+    await db.select().from(schema.aggregateRecord),
+    beforeSuggestions,
+    "Suggestions must not write RFQ, gates or business state",
+  );
   // Recent messages from another valid conversation must not displace the selected customer's history.
   const conversationA = randomUUID();
   const [originalA] = await db

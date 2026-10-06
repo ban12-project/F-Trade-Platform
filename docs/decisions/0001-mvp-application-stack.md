@@ -35,4 +35,4 @@ MVP 需要在一个可审计系统中实现产品数据、内容、RFQ、人工�
 
 优点是部署面较小、类型和事务边界清晰，并能在同一代码库内端到端验证 Human Gate。代价是对 Vercel/Neon 的托管能力有依赖；业务模块仍需保持清晰边界，以便未来按经过验证的负载拆分。
 
-Next.js 16.3 当前存在已公告的安全更新窗口。试点部署前必须完成 [#36](https://github.com/ban12-project/F-Trade-Platform/issues/36) 并重新验证，不把当前锁定版本视为可直接上线版本。
+初始安全更新窗口 [#36](https://github.com/ban12-project/F-Trade-Platform/issues/36) 已关闭。2026-10-06 的后续审计将 Next 更新到 16.3.8 并重新验证，剩余传递依赖风险由 [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 跟踪。技术补丁不替代真实业务与生产部署验收，详见[当前实现审计](../testing/reports/mvp1-implementation-audit-20261006.md)。

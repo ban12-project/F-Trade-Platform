@@ -28,7 +28,7 @@ MVP1 视频从内容列表或已核验产品按需进入独立编辑器，把用
 - GitHub 只跟踪研发交付，不保存真实客户、RFQ、报价、目的港或其他业务流水。
 - `docs/reference/目录总表.pdf` 是制动盘/刹车片目录，仅作为跨品类表格格式参考，不是离合器数据源。
 - MVP1 已接受一个受控 Facebook Personal Profile 传输实验；它不是已证明的生产发布通道，仍受逐帖人工确认、固定出口和熔断边界约束。
-- MVP 应用技术栈已经通过 ADR 0001 确定；试点部署前仍必须完成 Next.js 安全更新风险项。
+- MVP 应用技术栈已经通过 ADR 0001 确定；Next 安全补丁已更新到 16.3.8，剩余传递依赖风险由 [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 跟踪，真实业务验收保持 pending。
 
 ## 导航
 
@@ -41,6 +41,7 @@ MVP1 视频从内容列表或已核验产品按需进入独立编辑器，把用
 - [ADR 0005：工作台与项目采用线性引导流程](docs/decisions/0005-guided-workspace-navigation.md)（导航已由 ADR 0008 取代）
 - [ADR 0008：工作区按对象一次性切换](docs/decisions/0008-object-workspace-cutover.md)
 - [工作区迁移验收](docs/testing/workspace-cutover-482.md)
+- [MVP1 当前实现核对与补缺](docs/testing/reports/mvp1-implementation-audit-20261006.md)
 - [研发工作约定](CONTRIBUTING.md)
 - [安全与数据分级](SECURITY.md)
 - [项目状态](docs/PROJECT_STATUS.md)

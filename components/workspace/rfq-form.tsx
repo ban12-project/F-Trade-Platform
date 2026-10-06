@@ -3,8 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon, RotateCcwIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { startTransition, useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -35,9 +35,12 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { initialSalesActionState } from "@/lib/action-states";
-import { createRfqAction, reviseRfqAction } from "@/lib/actions/sales";
-import { rfqFormSchema } from "@/lib/form-schemas";
+import { createRfqAction, reviseRfqAction, suggestInquiryAction } from "@/lib/actions/sales";
+import { inquirySuggestionRequestSchema, rfqFormSchema } from "@/lib/form-schemas";
+import { updateRfqDraft } from "@/lib/rfq/assessment";
+import { nextClarification } from "@/lib/sales/clarification";
 import type { LeadEntry } from "@/lib/sales/closing-store";
+import type { InquirySuggestion } from "@/lib/sales/inquiry-suggestions";
 import type { RfqEntry } from "@/lib/sales/store";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
@@ -88,6 +91,82 @@ export function RfqForm({
       ? { ...entry.formValues, evidenceRef: "" }
       : { ...emptyRfq, leadId: selectedLeadId ?? "" },
   });
+  const values = useWatch({ control: form.control });
+  const [suggesting, startSuggesting] = useTransition();
+  const [suggestion, setSuggestion] = useState<InquirySuggestion | null>(null);
+  const [suggestionMessage, setSuggestionMessage] = useState("");
+  const suggestionRequest = useRef(0);
+  const suggestionContext = `${projectId}:${entry?.id ?? "new"}:${values.leadId ?? ""}`;
+  const suggestionContextRef = useRef(suggestionContext);
+  useEffect(() => {
+    suggestionContextRef.current = suggestionContext;
+    setSuggestion(null);
+    setSuggestionMessage("");
+    suggestionRequest.current += 1;
+    return () => {
+      suggestionRequest.current += 1;
+    };
+  }, [suggestionContext]);
+  const clarification = nextClarification(
+    updateRfqDraft(
+      {
+        product: {
+          product_type: values.productType,
+          oe_number: values.oeNumber,
+          vehicle_brand: values.vehicleBrand,
+          vehicle_model: values.vehicleModel,
+        },
+        commercial: { quantity: Number(values.quantity), destination: values.destination },
+      },
+      {},
+    ),
+  );
+  function suggestInquiry() {
+    const parsed = inquirySuggestionRequestSchema.safeParse({
+      projectId,
+      leadId: form.getValues("leadId"),
+    });
+    if (!parsed.success) {
+      setSuggestionMessage("请先选择来源客户会话。");
+      return;
+    }
+    const requestId = ++suggestionRequest.current;
+    const requestContext = suggestionContext;
+    setSuggestionMessage("");
+    startSuggesting(async () => {
+      try {
+        const result = await suggestInquiryAction(parsed.data);
+        if (
+          requestId !== suggestionRequest.current ||
+          requestContext !== suggestionContextRef.current ||
+          form.getValues("leadId") !== parsed.data.leadId
+        )
+          return;
+        if (result.status === "error") {
+          setSuggestionMessage(result.message);
+          return;
+        }
+        // Read the current values after the response: edits made while waiting must also survive.
+        let applied = 0;
+        for (const [key, value] of Object.entries(result.suggestion.fields)) {
+          const field = key as keyof InquirySuggestion["fields"];
+          if (value && !form.getValues(field).trim()) {
+            form.setValue(field, value, { shouldDirty: true, shouldValidate: true });
+            applied += 1;
+          }
+        }
+        setSuggestion(result.suggestion);
+        setSuggestionMessage(
+          applied
+            ? `已整理 ${applied} 项建议到空白字段，请核对后保存。`
+            : "没有可补入的明确需求；已有填写保持原样，请继续核对客户会话。",
+        );
+      } catch {
+        if (requestId === suggestionRequest.current)
+          setSuggestionMessage("无法整理客户需求，请稍后重试或手动录入。");
+      }
+    });
+  }
   useWorkspaceDirty(`rfq-${entry?.id ?? "new"}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
@@ -159,6 +238,47 @@ export function RfqForm({
                 </FieldDescription>
                 <FieldError errors={[form.formState.errors.leadId]} />
               </Field>
+            ) : null}
+            {values.leadId ? (
+              <FieldSet>
+                <FieldLegend>整理客户消息</FieldLegend>
+                <FieldDescription>
+                  按规则整理最新客户入站消息中的数量、目的地和产品身份，仅填入空白字段。客户提出的适配需求尚未核验，请逐项核对后保存。
+                </FieldDescription>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={suggesting || pending}
+                  onClick={suggestInquiry}
+                >
+                  {suggesting ? <Spinner /> : null}
+                  从最新客户消息整理建议
+                </Button>
+                <WorkspaceLink
+                  href={workspaceRecordHref(projectId, "lead", values.leadId)}
+                  className="text-sm underline underline-offset-4"
+                >
+                  查看客户会话
+                </WorkspaceLink>
+                {suggestionMessage ? (
+                  <p role="status" className="text-sm">
+                    {suggestionMessage}
+                  </p>
+                ) : null}
+                {suggestion ? (
+                  <FieldDescription>
+                    来源消息 {suggestion.source.messageId.slice(0, 8)} ·{" "}
+                    {new Date(suggestion.source.receivedAt).toLocaleString("zh-CN")}
+                  </FieldDescription>
+                ) : null}
+                {clarification.status === "clarification_required" ? (
+                  <FieldDescription>可向客户补问：{clarification.message}</FieldDescription>
+                ) : (
+                  <FieldDescription>
+                    字段已完整；仍需保存并人工确认需求，才能交接报价。
+                  </FieldDescription>
+                )}
+              </FieldSet>
             ) : null}
             <FieldSet>
               <FieldLegend>客户与需求</FieldLegend>
@@ -294,7 +414,7 @@ export function RfqForm({
         <Button
           form={revising ? `revise-rfq-${entry?.id}` : "create-rfq"}
           type="submit"
-          disabled={pending}
+          disabled={pending || suggesting}
         >
           {pending ? (
             <Spinner data-icon="inline-start" />
