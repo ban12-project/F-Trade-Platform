@@ -242,6 +242,12 @@ const rules: readonly TransitionRule[] = [
     toState: "DELIVERY_CONFIRMATION_EXPIRED",
     actors: ["system"],
   },
+  {
+    entityType: "delivery_confirmation",
+    fromState: "DELIVERY_CONFIRMATION_CONFIRMED",
+    toState: "DELIVERY_CONFIRMATION_EXPIRED",
+    actors: ["system"],
+  },
 ];
 
 function fail(message: string): never {

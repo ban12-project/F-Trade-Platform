@@ -372,9 +372,8 @@ function LeadActions({
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-4">
           {delivery &&
-          ["DELIVERY_CONFIRMATION_PENDING", "DELIVERY_CONFIRMATION_CONFIRMED"].includes(
-            delivery.state,
-          ) ? (
+          (delivery.state === "DELIVERY_CONFIRMATION_PENDING" ||
+            (delivery.state === "DELIVERY_CONFIRMATION_CONFIRMED" && entry.confirmedDelivery)) ? (
             <div className="space-y-3">
               <p className="text-sm">
                 {stateLabel(delivery.state)}。
@@ -401,7 +400,9 @@ function LeadActions({
               })}
             >
               <p className="text-sm text-muted-foreground">
-                客户需要交期或样品时，向工厂申请确认。未经确认的交期不能写入承诺。
+                {delivery?.state === "DELIVERY_CONFIRMATION_CONFIRMED"
+                  ? "上次交期确认已过期或不再适用于该需求，请重新申请工厂确认。"
+                  : "客户需要交期或样品时，向工厂申请确认。未经确认的交期不能写入承诺。"}
               </p>
               {delivery?.reviewNotes ? (
                 <p className="text-sm text-destructive">上次未通过：{delivery.reviewNotes}</p>
