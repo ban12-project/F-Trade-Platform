@@ -80,7 +80,11 @@ void (async () => {
         sameSite: "Lax",
       },
     ]);
-    await page.goto(`${baseURL}/workspace/${projectId}`);
+    await page.goto(`${baseURL}/workspace/${projectId}/new/product?method=manual`);
+    await expect(page.getByRole("tab", { name: "手动录入" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     const sizes = [1048577, 26214400];
     for (const size of sizes) {
       const buffer = Buffer.alloc(size, 65);

@@ -43,6 +43,8 @@ node --import tsx scripts/test-document-upload-browser.ts
 
 这些结果证明本地应用经真实 Blob 的浏览器上传与回读，不代表生产部署、参考原件导入、Product Agent 大文档解析或 MVP1 最终验收全部通过。
 
+2026-10-06 [当前工作区复测](reports/reference-application-20261006.md)再次通过大文件与超限检查。复现脚本已改为当前产品新建页的手动录入入口；开发服务器测试须使用启动信息中的主机名，以满足 Next 的开发资源来源限制。
+
 ## 参考 PDF 的实际浏览器回读（2026-09-15）
 
 用户已明确授权参考文件临时上传到本项目 Vercel 私有 Blob，并在验证后删除。
