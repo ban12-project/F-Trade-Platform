@@ -13,6 +13,7 @@ import {
   documentUploadPayloadSchema,
 } from "./document-upload-contracts";
 import { logProductIntakeFailure, productIntakeFailureDiagnostic } from "./intake-diagnostics";
+import { ProductUploadError } from "./intake-errors";
 
 const retryableReadCodes = new Set([
   "ETIMEDOUT",
@@ -96,14 +97,14 @@ export async function claimDocumentUpload(
       }
       try {
         const blob = await readBlob(row.blobPath, { access: "private", useCache: false });
-        if (
-          !blob ||
-          blob.statusCode !== 200 ||
-          !blob.stream ||
-          blob.blob.contentType !== row.contentType
-        ) {
-          await blob?.stream?.cancel().catch(() => {});
-          throw new Error("无法核验私有文件，请重新上传。");
+        const cancelRead = () => blob?.stream?.cancel().catch(() => {});
+        if (blob?.statusCode !== 200 || !blob.stream) {
+          await cancelRead();
+          throw new ProductUploadError("upload_unavailable");
+        }
+        if (blob.blob.contentType !== row.contentType) {
+          await blob.stream.cancel().catch(() => {});
+          throw new ProductUploadError("upload_type_mismatch");
         }
         // Each attempt owns a fresh stream and byte buffer; partial reads are discarded.
         return await verifyDocumentUploadBytes(blob.stream, row.originalFilename, row.sizeBytes);
@@ -131,7 +132,7 @@ export async function claimDocumentUpload(
     if (current.evidenceId) {
       const [saved] = await tx.select().from(evidence).where(eq(evidence.id, current.evidenceId));
       if (!saved || saved.sha256 !== verified.sha256 || saved.sizeBytes !== verified.sizeBytes)
-        throw new Error("文件在核验后发生变化，请重新上传。");
+        throw new ProductUploadError("upload_changed");
       await assertAndLinkProjectEvidence(row.projectId, [saved.id], actorId, tx);
       return saved.id;
     }

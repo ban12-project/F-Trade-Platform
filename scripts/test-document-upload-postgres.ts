@@ -21,6 +21,7 @@ import {
   claimDocumentUpload,
   issueDocumentUploadReceipt,
 } from "../lib/product/document-upload-receipts";
+import { ProductUploadError, productIntakeFailureMessage } from "../lib/product/intake-errors";
 import { removeWorkspaceProjectMember } from "../lib/workspace/access";
 
 const url = process.env.DOCUMENT_UPLOAD_TEST_DATABASE_URL;
@@ -117,7 +118,10 @@ void (async () => {
     blobBytes = Buffer.alloc(bytes.length, 0);
     await assert.rejects(claim(second.id), /类型/);
     blobBytes = Buffer.alloc(bytes.length, 65);
-    await assert.rejects(claim(second.id), /变化/);
+    await assert.rejects(
+      claim(second.id),
+      (error: unknown) => error instanceof ProductUploadError && error.code === "upload_changed",
+    );
     blobBytes = bytes;
     const transportError = () =>
       Object.assign(new Error("SYNTHETIC transport failure"), { code: "ECONNRESET" });
@@ -184,7 +188,19 @@ void (async () => {
           stream: new Blob([Buffer.alloc(bytes.length, 0)]).stream(),
         };
       }) as typeof get;
-      await assert.rejects(runWithReader(failed.id, reader));
+      await assert.rejects(runWithReader(failed.id, reader), (error: unknown) => {
+        if (["missing", "mime", "bytes"].includes(mode)) {
+          assert.ok(error instanceof ProductUploadError);
+          assert.equal(
+            error.code,
+            mode === "missing" ? "upload_unavailable" : "upload_type_mismatch",
+          );
+        } else {
+          assert.ok(!(error instanceof ProductUploadError));
+          assert.equal(productIntakeFailureMessage(error), productIntakeFailureMessage(null));
+        }
+        return true;
+      });
       assert.equal(attempts, mode === "persistent" ? 2 : 1, `${mode}: bounded retry policy`);
       const [saved] = await db.select().from(receipt).where(eq(receipt.id, failed.id));
       assert.equal(saved.evidenceId, null, "failed reads must not attach evidence");

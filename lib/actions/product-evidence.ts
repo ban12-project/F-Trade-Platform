@@ -1,9 +1,10 @@
 "use server";
 
 import { z } from "zod";
-import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
+import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 import type { ProductEvidenceActionState } from "@/lib/action-states";
 import { claimDocumentUpload } from "@/lib/product/document-upload-receipts";
+import { productIntakeFailureMessage } from "@/lib/product/intake-errors";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export async function uploadProductEvidenceAction(
@@ -22,6 +23,9 @@ export async function uploadProductEvidenceAction(
     refreshWorkspace();
     return { status: "success", message: "证据已持久化并加入当前项目，可在字段选择器中使用。" };
   } catch (error) {
-    return actionError(error, "无法上传产品证据。");
+    return {
+      status: "error",
+      message: productIntakeFailureMessage(error, "无法上传产品证据，请检查项目权限及上传回执。"),
+    };
   }
 }

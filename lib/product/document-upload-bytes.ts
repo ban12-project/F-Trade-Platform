@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { documentContentType, maximumProductDocumentBytes } from "./document-upload-contracts";
+import { ProductUploadError } from "./intake-errors";
 import {
   maximumProductImageBytes,
   productImageContentType,
@@ -18,9 +19,10 @@ export async function verifyDocumentUploadBytes(
     expectedSize < 1 ||
     expectedSize > maximumProductDocumentBytes
   )
-    throw new Error("文件大小超出限制。");
+    throw new ProductUploadError("upload_size_mismatch");
   const isImage = productImageFilenameSchema.safeParse(filename).success;
-  if (isImage && expectedSize > maximumProductImageBytes) throw new Error("图片超过 5 MiB 限制。");
+  if (isImage && expectedSize > maximumProductImageBytes)
+    throw new ProductUploadError("upload_size_mismatch");
   const contentType = isImage ? productImageContentType(filename) : documentContentType(filename);
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
@@ -30,14 +32,14 @@ export async function verifyDocumentUploadBytes(
       const { value, done } = await reader.read();
       if (done) break;
       length += value.byteLength;
-      if (length > expectedSize) throw new Error("文件大小与上传回执不一致。");
+      if (length > expectedSize) throw new ProductUploadError("upload_size_mismatch");
       chunks.push(value);
     }
   } finally {
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
-  if (length !== expectedSize) throw new Error("文件大小与上传回执不一致。");
+  if (length !== expectedSize) throw new ProductUploadError("upload_size_mismatch");
   const bytes = Buffer.concat(chunks, length);
   const prefix = bytes.subarray(0, 8);
   let valid = false;
@@ -47,23 +49,28 @@ export async function verifyDocumentUploadBytes(
         ? prefix.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
         : prefix.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
     // Reject disguised SVG and other formats before libvips selects a decoder.
-    if (!imageSignatureMatches) throw new Error("图片内容与声明的类型不一致。");
+    if (!imageSignatureMatches) throw new ProductUploadError("upload_type_mismatch");
     if (contentType === "image/png") {
       // libvips can decode an APNG's default frame without reporting all frames.
       // Reject the animation control chunk before accepting the original container.
       for (let offset = 8; offset + 12 <= bytes.length; ) {
         if (bytes.toString("ascii", offset + 4, offset + 8) === "acTL")
-          throw new Error("产品图片不能包含多帧或动画。");
+          throw new ProductUploadError("upload_image_animated");
         offset += bytes.readUInt32BE(offset) + 12;
       }
     }
     const expectedFormat = contentType === "image/png" ? "png" : "jpeg";
-    const decoder = sharp(bytes, { limitInputPixels: 25_000_000, failOn: "warning" });
-    const metadata = await decoder.metadata();
-    if (metadata.format !== expectedFormat || (metadata.pages ?? 1) !== 1)
-      throw new Error("图片类型不匹配或包含多帧。");
-    // Decode every pixel to reject truncated/corrupt files, but preserve the original bytes.
-    await decoder.stats();
+    try {
+      const decoder = sharp(bytes, { limitInputPixels: 25_000_000, failOn: "warning" });
+      const metadata = await decoder.metadata();
+      if (metadata.format !== expectedFormat) throw new ProductUploadError("upload_type_mismatch");
+      if ((metadata.pages ?? 1) !== 1) throw new ProductUploadError("upload_image_animated");
+      // Decode every pixel to reject truncated/corrupt files, but preserve the original bytes.
+      await decoder.stats();
+    } catch (error) {
+      if (error instanceof ProductUploadError) throw error;
+      throw new ProductUploadError("upload_image_invalid");
+    }
     valid = true;
   } else if (contentType === "application/pdf")
     valid = prefix.subarray(0, 5).toString() === "%PDF-";
@@ -85,6 +92,6 @@ export async function verifyDocumentUploadBytes(
       valid = false;
     }
   }
-  if (!valid) throw new Error("文件内容与声明的文档类型不一致。");
+  if (!valid) throw new ProductUploadError("upload_type_mismatch");
   return { bytes, sha256: createHash("sha256").update(bytes).digest("hex"), sizeBytes: length };
 }
