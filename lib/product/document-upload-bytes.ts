@@ -42,6 +42,12 @@ export async function verifyDocumentUploadBytes(
   const prefix = bytes.subarray(0, 8);
   let valid = false;
   if (isImage) {
+    const imageSignatureMatches =
+      contentType === "image/png"
+        ? prefix.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+        : prefix.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
+    // Reject disguised SVG and other formats before libvips selects a decoder.
+    if (!imageSignatureMatches) throw new Error("图片内容与声明的类型不一致。");
     if (contentType === "image/png") {
       // libvips can decode an APNG's default frame without reporting all frames.
       // Reject the animation control chunk before accepting the original container.

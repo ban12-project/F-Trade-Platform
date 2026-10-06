@@ -1,0 +1,115 @@
+{
+  "classification": "synthetic_runtime_compatibility",
+  "source_versions": {
+    "core": "4.8.4",
+    "nanoid": "5.1.6",
+    "devalue": "5.8.1"
+  },
+  "replay": [
+    {
+      "seed": "synthetic-wrun-0:syntheticWorkflow:1700000000000",
+      "ids": [
+        "_psH__1v8NjgKF75uN8Mx",
+        "dVkn4zZDXkDsKtPleYnLe",
+        "50TGA3T795SzkFDh3vcuA",
+        "vZoQvwu-X3mL-jB8-C5fM",
+        "l1tLgsXEZsFtLn0nU2cGP",
+        "-fAZog-FxuIJMy0Ugyhul",
+        "n81JWiBkkfJNpIzbGaqJB",
+        "hzaJvekuwOQil8wz-oObe"
+      ]
+    },
+    {
+      "seed": "synthetic-wrun-1:syntheticWorkflow:1700000000001",
+      "ids": [
+        "8pgHhbenET2L0ANfFc3fV",
+        "JFrG7r64WTbAnrfcY7cN0",
+        "wMnU42Rrc85F9r7dXS9eQ",
+        "cu0RRoX7OmPRmqNfPl_6N",
+        "YZ8F_NMh4wlAigtr7973Q",
+        "37RmVPMEjNvbUR7wmt8Tl",
+        "-bKofwnoknco6XOqkSJ1G",
+        "CXuOHtvbLkUGeLGQiGomz"
+      ]
+    },
+    {
+      "seed": "synthetic-wrun-2:syntheticWorkflow:1700000000002",
+      "ids": [
+        "nQkv-ZaZHW2rasA9iNVuD",
+        "nZcPju4HsI0QXEbY_eCgh",
+        "XsZvOSrjk_F2gy_Qp7Xwe",
+        "lSLaV3nQIpY9c1kHmfkNr",
+        "8xzGdjskHselGhEGx2TSw",
+        "WEOglHn3nPg1mYNyeqBgF",
+        "vtIb8d_Kb9bs7moVmCYAZ",
+        "7QRVXFosCDggzRRt8mj6d"
+      ]
+    },
+    {
+      "seed": "synthetic-wrun-3:syntheticWorkflow:1700000000003",
+      "ids": [
+        "8gJ8kZKL0FpEEmUwGvfXh",
+        "W6_mebao6WrapHV36MdpN",
+        "koWRCMBG4_DxJNNPxEgUo",
+        "5jzz8SB7lCR8oOHifCdrD",
+        "uxWXVJSBSrD502hQf2EFj",
+        "byaNT-_8XyWVcuyH9pjXL",
+        "padwvHdTOF_TcCfRQvkKt",
+        "EBKHXGDmfbNi17dQEfV_h"
+      ]
+    },
+    {
+      "seed": "synthetic-wrun-4:syntheticWorkflow:1700000000004",
+      "ids": [
+        "JBLsGjI1X7Tt5Pjm7O67A",
+        "2UDx-xAPz35Bx3fkcvpHI",
+        "XAjxLdoaqZRnN_Zhli9XE",
+        "mC9xsWwnYCIcIXDCCTo2T",
+        "Vlm0D419YoneLiGi1gk7z",
+        "pv_nzkcezPlDbqJz4Cja6",
+        "mTpziJc-z2aK2tx6pcuMu",
+        "vuw5UGRykqv9VtwxnWK0q"
+      ]
+    },
+    {
+      "seed": "synthetic-wrun-5:syntheticWorkflow:1700000000005",
+      "ids": [
+        "W1wOfueK3STMfYul8ebx5",
+        "2HkmhtEnHjrXSOw6ajb0S",
+        "ukcvIDhWmzxpb3VVXwJbJ",
+        "KyOpILYXyKOE4s6AUMchd",
+        "5Ol8nE2CwaaYsCibzfZbu",
+        "F1M0iuwjvCGe6V-Pp3w0M",
+        "0Cx1ZCp91Pu_apcqAoWW9",
+        "iXKB3RpHwDH0tbBYjPOu8"
+      ]
+    },
+    {
+      "seed": "synthetic-wrun-6:syntheticWorkflow:1700000000006",
+      "ids": [
+        "bPTADcOytbzDJDOFNFYyq",
+        "uGs0lMljZ8Dd6qAHdHhU8",
+        "-78VTaC0WFHw3w1Y9FeO5",
+        "zvIWEUWZE790Bb_GQriRw",
+        "tVCj5c1Cst11mgcSZ7Q8x",
+        "NB7dlUntkx-EeElrm-z_O",
+        "-wNKxiXOjnuJI3r5IEmKL",
+        "cNcOF-p644_N7X7qdE_mc"
+      ]
+    },
+    {
+      "seed": "synthetic-wrun-7:syntheticWorkflow:1700000000007",
+      "ids": [
+        "9Xjt-hALkN1PirkT3-oZx",
+        "P2NACdKrcdu2CxUajoYLv",
+        "XsNMt9tMTlbWdSz0IcUAv",
+        "6aBGTuiPHB6kRaThrBsnu",
+        "s8xQhio3CUaGWFzVyye-i",
+        "5B7ma58GA-6kAmlIB2fNn",
+        "JAKCVG9bNgG6CL_JqMzci",
+        "EpmBZG9Aami7bJniS8tNN"
+      ]
+    }
+  ],
+  "devalue_wire": "[{\"name\":1,\"createdAt\":2,\"count\":3,\"labels\":4,\"lookup\":7,\"bytes\":9,\"nested\":11,\"self\":0},\"SYNTHETIC workflow data\",[\"Date\",\"2026-01-01T00:00:00.000Z\"],[\"BigInt\",\"42\"],[\"Set\",5,6],\"mock\",\"reference\",[\"Map\",5,8],7,[\"Uint8Array\",10],[\"ArrayBuffer\",\"AQID\"],{\"enabled\":12},true]"
+}
