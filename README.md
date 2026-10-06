@@ -42,6 +42,7 @@ MVP1 视频从内容列表或已核验产品按需进入独立编辑器，把用
 - [ADR 0008：工作区按对象一次性切换](docs/decisions/0008-object-workspace-cutover.md)
 - [工作区迁移验收](docs/testing/workspace-cutover-482.md)
 - [MVP1 当前实现核对与补缺](docs/testing/reports/mvp1-implementation-audit-20261006.md)
+- [Reference 资料复测与 Agent 自动审核](docs/testing/reports/reference-test-review-20261006.md)
 - [研发工作约定](CONTRIBUTING.md)
 - [安全与数据分级](SECURITY.md)
 - [项目状态](docs/PROJECT_STATUS.md)

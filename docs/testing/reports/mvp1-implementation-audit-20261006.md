@@ -2,6 +2,8 @@
 
 关联 [#496](https://github.com/ban12-project/F-Trade-Platform/issues/496)，正式总验收仍为 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32)。本轮核对当前实现、修复可复现缺陷并更新验收口径；**正式业务验收保持 pending**。合成测试通过不能替代真实工厂资料、渠道授权或人工 Go/No-Go。
 
+**同日补充：reference 资料测试已获持续授权，本次测试审核由用户委托 Agent 自动完成。** [复测与自动审核报告](reference-test-review-20261006.md)记录 20 条来源校验、独立 mock 补缺与模拟商机闭环，以及目录和素材检查。下文真实生产验收的依赖表只适用于其对应范围，不能用 #6 或等待人工测试确认阻断已授权的 reference 测试；本报告的六项 `not_run` 仅指未执行的真实业务样本。
+
 ## 基线与范围
 
 - 初始远端基线 `main@1b99d53`。在独立 worktree 工作，未改动用户原分支及未提交内容；第一批修复 [PR #500](https://github.com/ban12-project/F-Trade-Platform/pull/500) 已在 CI 全绿后 squash 合并为 `e9865a5`。

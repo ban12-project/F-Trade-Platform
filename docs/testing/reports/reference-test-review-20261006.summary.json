@@ -1,0 +1,134 @@
+{
+  "classification": "sanitized_aggregate",
+  "run_id": "sanitized-reference-test-review-20261006",
+  "executed_at": "2026-10-06T14:32:44.097207+00:00",
+  "code_revision": "e83bddcbafefaf002a1c3231d467b16b3a52e300",
+  "execution_mode": "local_domain_simulation_and_local_file_processing",
+  "authorization": {
+    "reference_test_use": true,
+    "missing_field_mock_supplements": true,
+    "agent_test_review": true
+  },
+  "review": {
+    "actor_type": "agent",
+    "decision": "passed",
+    "scope": "authorized_reference_tests"
+  },
+  "checks": {
+    "reference_draft_source_and_field_evidence": {
+      "status": "passed",
+      "distinct_drafts": 20
+    },
+    "incomplete_ready_rejection": {
+      "status": "passed",
+      "executions": 20
+    },
+    "missing_evidence_ready_rejection": {
+      "status": "passed",
+      "executions": 20
+    },
+    "reference_with_mock_domain_workflows": {
+      "status": "passed",
+      "executions": 20,
+      "transitions": 280,
+      "final_states": {
+        "product": "PRODUCT_READY",
+        "content": "CONTENT_PUBLISHED",
+        "video": "VIDEO_APPROVED",
+        "rfq": "RFQ_READY",
+        "quotation": "QUOTE_SENT",
+        "lead": "OPPORTUNITY",
+        "delivery": "DELIVERY_CONFIRMATION_CONFIRMED"
+      },
+      "gate_decisions": "explicitly_simulated_human_test_actor"
+    },
+    "pdf_preprocessing": {
+      "status": "passed",
+      "native_pages": 48,
+      "native_layout_recovered_pages": 21,
+      "native_candidates": 62,
+      "duplicate_identifier_records": 4,
+      "scanned_documents": [
+        {
+          "source": "scanned-clutch-reference-1",
+          "candidates": 72,
+          "ocr_enabled": true,
+          "physical_pages": 32,
+          "candidate_page_trace_checks": 72,
+          "original_file_unchanged": true,
+          "decision": "pass"
+        },
+        {
+          "source": "scanned-clutch-reference-2",
+          "candidates": 115,
+          "ocr_enabled": true,
+          "physical_pages": 32,
+          "candidate_page_trace_checks": 115,
+          "original_file_unchanged": true,
+          "decision": "pass"
+        },
+        {
+          "source": "brake-format-reference",
+          "candidates": 0,
+          "ocr_enabled": true,
+          "physical_pages": 10,
+          "candidate_page_trace_checks": 0,
+          "original_file_unchanged": true,
+          "decision": "pass"
+        }
+      ],
+      "candidate_counts_are_accuracy_claims": false
+    },
+    "local_media": {
+      "status": "passed",
+      "photos_decoded": 9,
+      "videos_probed": 6,
+      "video_frames_visually_sampled": 12,
+      "normalized_jpeg_upload_checks": 9,
+      "raw_heic_expected_rejections": 9,
+      "raw_mov_expected_size_rejections": 3,
+      "normalized_video": {
+        "duration_seconds": 15,
+        "width": 1080,
+        "height": 1920,
+        "fps": 30,
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "bytes": 23277535,
+        "export_validation": "pass"
+      },
+      "sku_image_bindings": 0
+    },
+    "original_file_hash_checks": {
+      "status": "passed",
+      "pdf_files": 4,
+      "media_files": 15
+    },
+    "synthetic_demo_regression": {
+      "status": "passed"
+    }
+  },
+  "mocked_field_counts": {
+    "product.product_name": 20,
+    "product.product_type": 20,
+    "product.oe_numbers": 13
+  },
+  "historical_model_runs": [
+    {
+      "date": "2026-09-05",
+      "succeeded": 18,
+      "failed": 2
+    },
+    {
+      "date": "2026-09-05",
+      "succeeded": 2,
+      "failed": 0
+    }
+  ],
+  "new_model_requests": 0,
+  "private_uploads": 0,
+  "business_database_writes": 0,
+  "live_publications": 0,
+  "real_customer_rfq_samples": 0,
+  "production_business_decision": "not_run"
+}
