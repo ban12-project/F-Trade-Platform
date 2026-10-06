@@ -71,4 +71,25 @@ assertTransition(rfqReady);
 assert.throws(() => assertTransition({ ...rfqReady, toState: "QUOTE_APPROVED" }), /cannot move/);
 assert.throws(() => assertTransition({ ...rfqReady, evidenceRefs: [] }), /at least one reference/);
 
+const deliveryExpired: WorkflowEventInput = {
+  eventId: "event-delivery-expired-01",
+  entityType: "delivery_confirmation",
+  entityId: "synthetic-delivery-01",
+  fromState: "DELIVERY_CONFIRMATION_CONFIRMED",
+  toState: "DELIVERY_CONFIRMATION_EXPIRED",
+  actorType: "system",
+  actorId: "delivery-confirmation-expiry",
+  occurredAt: "2026-10-06T08:00:00Z",
+  evidenceRefs: ["evidence-synthetic-delivery-renewal"],
+};
+assertTransition(deliveryExpired);
+for (const actorType of ["agent", "human"] as const)
+  assert.throws(() => assertTransition({ ...deliveryExpired, actorType }), /cannot perform/);
+assert.equal(
+  replayTransitions("delivery_confirmation", deliveryExpired.entityId, deliveryExpired.fromState, [
+    { event: deliveryExpired },
+  ]),
+  "DELIVERY_CONFIRMATION_EXPIRED",
+);
+
 console.log("PASS workflow transition rules and replay");

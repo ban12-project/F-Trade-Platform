@@ -33,6 +33,7 @@ const REQUIRED_CRITERIA = new Set<MvpAcceptanceCriterionId>([
 export function assertMvpAcceptanceDecision(summary: MvpAcceptanceSummary) {
   const criterionIds = new Set(summary.criteria.map((criterion) => criterion.criterion_id));
   if (
+    summary.criteria.length !== REQUIRED_CRITERIA.size ||
     criterionIds.size !== REQUIRED_CRITERIA.size ||
     [...REQUIRED_CRITERIA].some((id) => !criterionIds.has(id))
   ) {
@@ -42,6 +43,9 @@ export function assertMvpAcceptanceDecision(summary: MvpAcceptanceSummary) {
     throw new Error("RFQ Ready count cannot exceed RFQ total");
   }
   if (summary.decision.status !== "go") return;
+  if (summary.metrics.rfq_total === 0) {
+    throw new Error("Go decision requires at least one RFQ acceptance sample");
+  }
   if (summary.criteria.some((criterion) => criterion.status !== "passed")) {
     throw new Error("Go decision requires every acceptance criterion to pass");
   }

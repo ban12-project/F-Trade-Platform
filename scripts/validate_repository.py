@@ -236,6 +236,8 @@ def check_mvp_acceptance_summary() -> None:
     if metrics["rfq_ready"] > metrics["rfq_total"]:
         raise AssertionError("RFQ Ready count cannot exceed RFQ total")
     if summary["decision"]["status"] == "go":
+        if metrics["rfq_total"] == 0:
+            raise AssertionError("Go decision requires at least one RFQ acceptance sample")
         if any(item["status"] != "passed" for item in criteria):
             raise AssertionError("Go decision requires every acceptance criterion to pass")
         if metrics["factual_error_count"] or metrics["gate_bypass_count"]:

@@ -109,5 +109,30 @@
         }
       ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "type": "object",
+            "properties": { "status": { "const": "go" } },
+            "required": ["status"]
+          }
+        },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "rfq_total": { "type": "integer", "minimum": 1 },
+              "rfq_ready": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

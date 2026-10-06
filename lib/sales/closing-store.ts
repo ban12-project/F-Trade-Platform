@@ -20,6 +20,7 @@ import {
 } from "@/lib/db/schema";
 import {
   decideDeliveryConfirmation,
+  expireDeliveryConfirmation,
   requestDeliveryConfirmation,
   validateDeliveryConfirmation,
 } from "@/lib/delivery/confirmation";
@@ -218,8 +219,18 @@ export async function createOrReviseQuotation(
           version: aggregateRecord.version,
         })
         .from(aggregateRecord)
-        .where(and(eq(aggregateRecord.id, id), eq(aggregateRecord.type, "quotation")))
+        .innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
+        .where(
+          and(
+            eq(aggregateRecord.id, id),
+            eq(aggregateRecord.type, "quotation"),
+            eq(workspaceProjectItem.projectId, value.projectId),
+            eq(workspaceProjectItem.role, "sales_quotation"),
+            eq(workspaceProjectItem.relation, "owned"),
+          ),
+        )
         .for("update");
+      if (!current) throw new Error("报价不属于当前项目，不能修订。");
       if (current?.state !== "QUOTE_REVISION_REQUIRED")
         throw new Error("只有被退回的报价可以修订。");
       const existing = current.payload as unknown as QuotationHandoff;
@@ -983,22 +994,78 @@ export async function createDeliveryRequest(
     if (!leadPayload.rfq_ref) throw new Error("交期确认必须引用当前线索的 RFQ。");
     if (leadPayload.delivery_confirmation_ref) {
       const [existing] = await tx
-        .select({ state: aggregateRecord.state })
+        .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
         .from(aggregateRecord)
+        .innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
         .where(
           and(
             eq(aggregateRecord.id, leadPayload.delivery_confirmation_ref),
             eq(aggregateRecord.type, "delivery_confirmation"),
+            eq(workspaceProjectItem.projectId, value.projectId),
+            eq(workspaceProjectItem.role, "delivery_confirmation"),
+            eq(workspaceProjectItem.relation, "owned"),
           ),
         )
         .for("update");
-      if (
-        existing &&
-        ["DELIVERY_CONFIRMATION_PENDING", "DELIVERY_CONFIRMATION_CONFIRMED"].includes(
-          existing.state,
-        )
-      )
+      if (!existing) throw new Error("交期确认不属于当前项目，请核对线索关联。");
+      const confirmation = validateDeliveryConfirmation(existing.payload);
+      const matchesRfq =
+        confirmation.related_entity_type === "rfq" &&
+        confirmation.related_entity_id === leadPayload.rfq_ref;
+      if (matchesRfq && existing.state === "DELIVERY_CONFIRMATION_PENDING")
         return { id: leadPayload.delivery_confirmation_ref };
+      if (
+        existing.state === "DELIVERY_CONFIRMATION_CONFIRMED" &&
+        confirmation.status === "confirmed"
+      ) {
+        const validUntil = Date.parse(confirmation.result?.valid_until ?? "");
+        if (matchesRfq && validUntil > now.getTime())
+          return { id: leadPayload.delivery_confirmation_ref };
+        if (validUntil <= now.getTime()) {
+          const eventId = randomUUID();
+          const systemActor = "delivery-confirmation-expiry";
+          assertTransition({
+            eventId,
+            entityType: "delivery_confirmation",
+            entityId: confirmation.confirmation_id,
+            fromState: "DELIVERY_CONFIRMATION_CONFIRMED",
+            toState: "DELIVERY_CONFIRMATION_EXPIRED",
+            actorType: "system",
+            actorId: systemActor,
+            occurredAt: now.toISOString(),
+            evidenceRefs: [value.evidenceRef],
+          });
+          await tx
+            .update(aggregateRecord)
+            .set({
+              state: "DELIVERY_CONFIRMATION_EXPIRED",
+              payload: expireDeliveryConfirmation(confirmation, "system"),
+              version: sql`${aggregateRecord.version} + 1`,
+            })
+            .where(eq(aggregateRecord.id, leadPayload.delivery_confirmation_ref));
+          await tx.insert(workflowEvent).values({
+            id: eventId,
+            aggregateId: leadPayload.delivery_confirmation_ref,
+            fromState: "DELIVERY_CONFIRMATION_CONFIRMED",
+            toState: "DELIVERY_CONFIRMATION_EXPIRED",
+            actorType: "system",
+            actorId: systemActor,
+            evidenceRefs: [value.evidenceRef],
+            occurredAt: now,
+          });
+          await tx.insert(auditEvent).values({
+            id: randomUUID(),
+            action: "delivery_confirmation.expired_before_renewal",
+            actorType: "system",
+            actorId: systemActor,
+            aggregateId: leadPayload.delivery_confirmation_ref,
+            subjectType: "delivery_confirmation",
+            subjectId: leadPayload.delivery_confirmation_ref,
+            metadata: { project_id: value.projectId, evidence_ref: value.evidenceRef },
+            occurredAt: now,
+          });
+        }
+      }
     }
     const id = randomUUID();
     const approvalId = randomUUID();

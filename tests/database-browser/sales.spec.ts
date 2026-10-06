@@ -5,9 +5,14 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import readyProduct from "../../data/fixtures/product-ready.synthetic.json";
+import readyRfq from "../../data/fixtures/rfq-ready.synthetic.json";
 import type { Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
-import { decideQuotation } from "../../lib/sales/closing-store";
+import {
+  createDeliveryRequest,
+  decideDelivery,
+  decideQuotation,
+} from "../../lib/sales/closing-store";
 import { decryptSocialMessageBody } from "../../lib/social/message-crypto";
 import { createStoredSocialMessageRecord } from "../../lib/social/message-record";
 import { authSecret, databaseURL, socialMessageKey } from "../../playwright.database.config";
@@ -86,6 +91,126 @@ test.beforeEach(async () => {
 
 test.afterAll(async () => {
   await pool.end();
+});
+
+test("expired delivery can be requested again through the authenticated UI without approval", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const rfqId = randomUUID();
+  const leadId = randomUUID();
+  await db.insert(schema.aggregateRecord).values([
+    {
+      id: rfqId,
+      type: "rfq",
+      state: "RFQ_READY",
+      payload: { ...readyRfq, rfq_id: rfqId },
+      createdByType: "human",
+      createdById: actorId,
+    },
+    {
+      id: leadId,
+      type: "lead",
+      state: "FOLLOW_UP",
+      payload: {
+        lead_id: leadId,
+        rfq_ref: rfqId,
+        status: "follow_up",
+        follow_up_context: "asks_lead_time",
+        score: 0,
+        score_reasons: [],
+        next_action: "confirm_delivery",
+      },
+      createdByType: "human",
+      createdById: actorId,
+    },
+  ]);
+  await db.insert(schema.workspaceProjectItem).values([
+    { id: randomUUID(), projectId, aggregateId: rfqId, role: "sales_rfq", relation: "owned" },
+    { id: randomUUID(), projectId, aggregateId: leadId, role: "sales_lead", relation: "owned" },
+  ]);
+  const database = db as unknown as Database;
+  const original = await createDeliveryRequest(
+    { projectId, leadId, evidenceRef: evidenceId },
+    actorId,
+    database,
+  );
+  await decideDelivery(
+    {
+      projectId,
+      confirmationId: original.id,
+      decision: "confirmed",
+      leadTimeDays: "20",
+      evidenceRef: evidenceId,
+      notes: "SYNTHETIC expired approval",
+    },
+    actorId,
+    database,
+  );
+  const [confirmed] = await db
+    .select()
+    .from(schema.aggregateRecord)
+    .where(eq(schema.aggregateRecord.id, original.id));
+  await db
+    .update(schema.aggregateRecord)
+    .set({
+      payload: {
+        ...confirmed.payload,
+        result: {
+          ...(confirmed.payload.result as object),
+          valid_until: new Date(Date.now() - 1_000).toISOString(),
+        },
+      },
+    })
+    .where(eq(schema.aggregateRecord.id, original.id));
+  const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+  await context.addCookies([
+    {
+      name: "better-auth.session_token",
+      value: encodeURIComponent(`${token}.${signature}`),
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  await page.goto(`/workspace/${projectId}/records/lead/${leadId}`);
+  await expect(
+    page.getByText("上次交期确认已过期或不再适用于该需求，请重新申请工厂确认。"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("请求证据", { exact: true }).fill(evidenceId);
+  await page.getByRole("button", { name: "申请工厂确认交期", exact: true }).click();
+  const readLead = async () =>
+    (
+      await db.select().from(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, leadId))
+    )[0];
+  await expect
+    .poll(async () => (await readLead()).payload.delivery_confirmation_ref)
+    .not.toBe(original.id);
+  const freshId = String((await readLead()).payload.delivery_confirmation_ref);
+  const [fresh] = await db
+    .select()
+    .from(schema.aggregateRecord)
+    .where(eq(schema.aggregateRecord.id, freshId));
+  expect(fresh.state).toBe("DELIVERY_CONFIRMATION_PENDING");
+  expect(fresh.payload.result).toBeUndefined();
+  expect(fresh.payload.approval_ref).toBeUndefined();
+  const [pending] = await db
+    .select()
+    .from(schema.approval)
+    .where(eq(schema.approval.aggregateId, freshId));
+  expect(pending.status).toBe("pending");
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByRole("link", { name: "查看交期确认", exact: true })).toHaveAttribute(
+    "href",
+    `/workspace/${projectId}/records/delivery/${freshId}`,
+  );
 });
 
 for (const inbound of [false, true]) {

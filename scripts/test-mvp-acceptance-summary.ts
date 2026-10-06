@@ -19,10 +19,52 @@ async function main() {
       "utf8",
     ),
   ]);
-  const validSummary = compileContract<MvpAcceptanceSummary>(JSON.parse(schemaContents))(
-    JSON.parse(fixtureContents),
-  );
+  const validate = compileContract<MvpAcceptanceSummary>(JSON.parse(schemaContents));
+  const fixture = JSON.parse(fixtureContents);
+  const validSummary = validate(fixture);
   assert.doesNotThrow(() => assertMvpAcceptanceDecision(validSummary));
+  const zeroSamples = {
+    ...fixture,
+    metrics: { ...fixture.metrics, rfq_total: 0, rfq_ready: 0 },
+  };
+  assert.throws(() => validate(zeroSamples), /rfq_total must be >= 1/);
+  assert.throws(
+    () => assertMvpAcceptanceDecision(zeroSamples),
+    /at least one RFQ acceptance sample/,
+  );
+  for (const status of ["pending", "no_go"] as const) {
+    const decision = status === "pending" ? { status } : { ...fixture.decision, status };
+    const summary = validate({ ...zeroSamples, decision });
+    assert.doesNotThrow(() => assertMvpAcceptanceDecision(summary));
+  }
+  for (const criteria of [
+    [...validSummary.criteria, validSummary.criteria[0]],
+    validSummary.criteria.slice(1),
+    [...validSummary.criteria.slice(0, -1), validSummary.criteria[0]],
+  ]) {
+    assert.throws(
+      () => assertMvpAcceptanceDecision({ ...validSummary, criteria }),
+      /every required criterion exactly once/,
+    );
+  }
+  for (const metric of ["factual_error_count", "gate_bypass_count"] as const) {
+    assert.throws(
+      () =>
+        assertMvpAcceptanceDecision({
+          ...validSummary,
+          metrics: { ...validSummary.metrics, [metric]: 1 },
+        }),
+      /zero factual errors and gate bypasses/,
+    );
+  }
+  assert.throws(
+    () =>
+      assertMvpAcceptanceDecision({
+        ...validSummary,
+        metrics: { ...validSummary.metrics, rfq_total: 2 },
+      }),
+    /every RFQ to be ready/,
+  );
   assert.throws(
     () =>
       assertMvpAcceptanceDecision({
