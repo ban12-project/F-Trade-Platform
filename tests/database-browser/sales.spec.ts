@@ -15,6 +15,7 @@ import {
 } from "../../lib/sales/closing-store";
 import { decryptSocialMessageBody } from "../../lib/social/message-crypto";
 import { createStoredSocialMessageRecord } from "../../lib/social/message-record";
+import { workspaceCreateHref } from "../../lib/workspace/navigation";
 import { authSecret, databaseURL, socialMessageKey } from "../../playwright.database.config";
 
 process.env.SOCIAL_MESSAGE_ENCRYPTION_KEY = socialMessageKey;
@@ -91,6 +92,137 @@ test.beforeEach(async () => {
 
 test.afterAll(async () => {
   await pool.end();
+});
+
+test("latest inbound suggestions preserve manual edits and require a separate RFQ save", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const leadId = randomUUID();
+  const conversationId = randomUUID();
+  const now = Date.now();
+  await db.insert(schema.aggregateRecord).values({
+    id: leadId,
+    type: "lead",
+    state: "LEAD_RECEIVED",
+    createdByType: "human",
+    createdById: actorId,
+    payload: {
+      lead_id: leadId,
+      conversation_ref: conversationId,
+      status: "received",
+      score: 0,
+      score_reasons: [],
+      next_action: "collect_rfq_facts",
+    },
+  });
+  await db.insert(schema.workspaceProjectItem).values({
+    id: randomUUID(),
+    projectId,
+    aggregateId: leadId,
+    role: "sales_lead",
+    relation: "owned",
+  });
+  await db.insert(schema.socialConversation).values({
+    id: conversationId,
+    channelRef: `synthetic-${projectId}`,
+    accountRef: `synthetic-${projectId}`,
+    externalConversationRef: `synthetic-${conversationId}`,
+    leadId,
+    lastMessageAt: new Date(now),
+  });
+  const message = (
+    body: string,
+    receivedAt: number,
+    direction: "inbound" | "outbound" = "inbound",
+  ) =>
+    createStoredSocialMessageRecord({
+      id: randomUUID(),
+      conversationId,
+      externalMessageRef: `synthetic-${randomUUID()}`,
+      direction,
+      identityQuality: "manual",
+      body,
+      receivedAt: new Date(receivedAt),
+    });
+  const newest = message(
+    "MOCK: 500 pcs Toyota Corolla clutch kit; OE: SYN-499; Destination: Synthetic Port. USD 5, delivery 10 days.",
+    now - 2_000,
+  );
+  await db.insert(schema.socialMessage).values([
+    message("900 pcs; Destination: Wrong Port", now - 3_000),
+    newest,
+    message("800 pcs; Destination: Outbound Port", now - 1_000, "outbound"),
+    { ...message("700 pcs; Destination: Deleted Port", now), deletedAt: new Date() },
+    {
+      ...message("600 pcs; Destination: Expired Port", now - 4_000),
+      expiresAt: new Date(now - 3_500),
+    },
+  ]);
+  const readRfqs = () =>
+    db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(
+        and(
+          eq(schema.aggregateRecord.type, "rfq"),
+          eq(schema.aggregateRecord.createdById, actorId),
+        ),
+      );
+  const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+  await context.addCookies([
+    {
+      name: "better-auth.session_token",
+      value: encodeURIComponent(`${token}.${signature}`),
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  await page.goto(workspaceCreateHref(projectId, "rfq", { kind: "lead", id: leadId }));
+  await page.getByLabel("OE / OEM 编号", { exact: true }).fill("SYN-MANUAL");
+  let releaseResponse: () => void = () => {};
+  const responseGate = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  let held = false;
+  await page.route("**/workspace/**", async (route) => {
+    if (!held && route.request().method() === "POST" && route.request().headers()["next-action"]) {
+      const response = await route.fetch();
+      held = true;
+      await responseGate;
+      await route.fulfill({ response });
+    } else await route.continue();
+  });
+  await page.getByRole("button", { name: "从最新客户消息整理建议", exact: true }).click();
+  try {
+    await expect.poll(() => held).toBe(true);
+    await expect(page.getByRole("button", { name: "保存询盘", exact: true })).toBeDisabled();
+    await page.getByLabel("数量", { exact: true }).fill("750");
+  } finally {
+    releaseResponse();
+  }
+  await expect(page.locator('p[role="status"]')).toContainText("已整理 3 项建议到空白字段");
+  await expect(page.getByLabel("OE / OEM 编号", { exact: true })).toHaveValue("SYN-MANUAL");
+  await expect(page.getByLabel("数量", { exact: true })).toHaveValue("750");
+  await expect(page.getByLabel("车辆品牌", { exact: true })).toHaveValue("Toyota");
+  await expect(page.getByLabel("车型", { exact: true })).toHaveValue("Corolla");
+  await expect(page.getByLabel("目的地国家或港口", { exact: true })).toHaveValue("Synthetic Port");
+  await expect(page.getByText(`来源消息 ${newest.id.slice(0, 8)}`, { exact: false })).toBeVisible();
+  expect(await readRfqs()).toEqual([]);
+  await page.getByLabel("目的地国家或港口", { exact: true }).fill("");
+  await expect(
+    page.getByText("可向客户补问：What is the destination country or port?", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("目的地国家或港口", { exact: true }).fill("Human Confirmed Port");
+  await page.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+  await page.getByRole("button", { name: "保存询盘", exact: true }).click();
+  await expect.poll(async () => (await readRfqs()).length).toBe(1);
+  const [rfq] = await readRfqs();
+  expect(rfq.state).toBe("RFQ_COLLECTING");
+  expect(rfq.payload.product).toMatchObject({ oe_number: "SYN-MANUAL" });
+  expect(rfq.payload.commercial).toEqual({ quantity: 750, destination: "Human Confirmed Port" });
 });
 
 test("expired delivery can be requested again through the authenticated UI without approval", async ({

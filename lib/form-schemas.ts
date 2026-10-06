@@ -211,6 +211,23 @@ export const rfqFormSchema = z.object({
   evidenceRef: privateReference,
 });
 
+export const inquirySuggestionRequestSchema = z
+  .object({
+    projectId: z.uuid("项目标识无效。"),
+    leadId: z.uuid("入站线索标识无效。"),
+  })
+  .strict();
+export const inquirySuggestionFieldsSchema = rfqFormSchema
+  .pick({
+    oeNumber: true,
+    vehicleBrand: true,
+    vehicleModel: true,
+    quantity: true,
+    destination: true,
+  })
+  .partial()
+  .strict();
+
 const positiveMoney = z
   .string()
   .trim()

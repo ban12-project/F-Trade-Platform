@@ -128,7 +128,12 @@ export async function SalesCreate({ context }: { context: RecordContext }) {
     return linked.length > 1 ? (
       <RfqChooser projectId={projectId} entries={linked} />
     ) : (
-      <RfqForm projectId={projectId} leads={data.leads} selectedLeadId={sourceId} />
+      <RfqForm
+        key={`${projectId}:${sourceId ?? "manual"}`}
+        projectId={projectId}
+        leads={data.leads}
+        selectedLeadId={sourceId}
+      />
     );
   }
   if (kind !== "quotation") notFound();

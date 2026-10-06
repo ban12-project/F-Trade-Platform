@@ -4,7 +4,16 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
-import { rfqFormSchema, rfqReadyFormSchema } from "@/lib/form-schemas";
+import {
+  inquirySuggestionRequestSchema,
+  rfqFormSchema,
+  rfqReadyFormSchema,
+} from "@/lib/form-schemas";
+import {
+  type InquirySuggestion,
+  InquiryUnavailableError,
+  suggestFromLatestInquiry,
+} from "@/lib/sales/inquiry-suggestions";
 import { rfqMissingLabel } from "@/lib/sales/journey";
 import { createRfq, reviseRfq, submitRfqReady } from "@/lib/sales/store";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
@@ -18,6 +27,32 @@ function projectIdFrom(formData: FormData) {
   const value = formData.get("projectId");
   if (value === null || value === "") return undefined;
   return z.uuid("项目标识无效。").parse(value);
+}
+
+export async function suggestInquiryAction(
+  input: unknown,
+): Promise<
+  { status: "success"; suggestion: InquirySuggestion } | { status: "error"; message: string }
+> {
+  const session = await authorizedActionSession("sales:write");
+  if (!session) return { status: "error", message: "无权整理客户需求。" };
+  const parsed = inquirySuggestionRequestSchema.safeParse(input);
+  if (!parsed.success)
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "客户会话标识无效。" };
+  try {
+    return {
+      status: "success",
+      suggestion: await suggestFromLatestInquiry(parsed.data, session.user.id),
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof InquiryUnavailableError
+          ? error.message
+          : "无法整理客户需求，请确认项目可编辑后重试，或手动录入。",
+    };
+  }
 }
 
 /** Untrusted UI boundary for intake only. It cannot create a quotation. */

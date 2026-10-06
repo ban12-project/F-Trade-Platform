@@ -1,0 +1,68 @@
+# MVP1 实现核对与补缺 — 2026-10-06
+
+关联 [#496](https://github.com/ban12-project/F-Trade-Platform/issues/496)，正式总验收仍为 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32)。本轮核对当前实现、修复可复现缺陷并更新验收口径；**正式业务验收保持 pending**。合成测试通过不能替代真实工厂资料、渠道授权或人工 Go/No-Go。
+
+## 基线与范围
+
+- 初始远端基线 `main@1b99d53`。在独立 worktree 工作，未改动用户原分支及未提交内容；第一批修复 [PR #500](https://github.com/ban12-project/F-Trade-Platform/pull/500) 已在 CI 全绿后 squash 合并为 `e9865a5`。
+- 以产品背景、ADR 0002/0004/0008 和当前契约为范围依据：单品类离合器，受控 Facebook Personal Profile 实验，已有授权素材的最长 15 秒剪辑，验收终点 `OPPORTUNITY`。视频生成、官方 API 全面接入、自动成交不属于本轮补缺目标。
+- Node 24.21.0 / pnpm 12.3.4 / TypeScript 7.0.2 / Next 16.3.8；保持 Cache Components、默认 Turbopack、两个 React Compiler 开关与默认 TypeScript CLI。新建本机 PostgreSQL 17.11 合成集群，未连接生产数据库。
+- 没有发布生产帖子、发送真实 DM、批准真实业务对象、修改生产账号或替真人作 Go/No-Go。GitHub 仅保存脱敏技术状态，原始本地输出及合成会话保留在仓库外。
+
+## 实现矩阵
+
+| MVP1 要求 | 当前可验证实现与证据入口 | 仍不能据此宣称完成的部分 |
+| --- | --- | --- |
+| 产品导入、缺失识别、Product Ready | 私有上传、目录候选、来源定位、Product Agent 结构化输出、手动修订、Gate 01；`lib/product`、`lib/catalog` 与产品数据库/浏览器测试 | 20 真实 SKU 的授权、A–D 分组、原资料及实物图核验仍待 #6/#268/#307/#463 |
+| 三类内容与短视频 | 来源约束内容、人工审核；授权已有素材、可编辑 AI 剪辑初稿、FFmpeg 私有渲染、成片测量与审核；内容/视频浏览器测试 | 真实素材可访问性、权利和具名审核、目标平台规则仍待 #122/#126/#318/#463 |
+| 单渠道发布与入站 | 逐帖确认、固定出口与受控 browser job、签名回执、unknown 禁止自动重试、入站加密/去重/关联；发布 PostgreSQL 与协议测试 | 当前生产镜像/账号/页面、自动视频回执及独立发送者 DM 持久化仍待 #383/#322/#156；当前 viewer/runtime 另见 #480/#490 |
+| 询盘整理、澄清与 RFQ Ready | #499 将原演示中的规则整理接入生产 RFQ 表单；服务端绑定项目→线索→会话→最新有效入站消息，建议只补空白字段；人工保存及独立确认 Ready；`lib/sales/inquiry-suggestions.ts` 与销售测试 | 只支持明确数量、带标签的 OE/目的地和有限车型表达；歧义及其他语言需人工录入。客户需求不是已核验的产品适配事实；真实 RFQ 完成率尚无本轮样本 |
+| 人工报价交接 | 当前项目 RFQ Ready 与 Product Ready 引用、人工价格/条款、Gate 02、发送凭据、事务与审计；`lib/sales/closing-store.ts` | 真实报价与发送由人工确认；不接受 AI 自动生成工程事实、价格或交期 |
+| 跟单、评分与商机 | 规则化情境、节奏、可解释评分、交期 Gate 03、人工商机认定；合成销售闭环 | 生产跟单业务效果与真人确认尚待总验收；模块命名不证明四个 Agent 均为自主模型驱动 |
+| 状态编排与隔离 | 数据库聚合、显式关联、审批版本、幂等回执、事务内成员/归档授权、中心状态规则；数据库权限回归 | 不替代具名责任人、生产运维权限与业务验收证据 |
+
+Product/Content 已有模型适配器与结构化输出边界；本轮 Sales 需求整理和 FollowUp 节奏/评分采用确定性规则及人工操作。不能把可重复合成闭环描述成四个自主 AI Agent 已经完成真实业务协作。
+
+## 已修复的确认缺口
+
+1. **报价修订跨项目越权（#497，已由 #500 修复）**：编辑者可用自己的项目/RFQ/Product 修改另一项目的被拒绝报价。现在要求当前项目拥有该报价；同时覆盖共享 owner 也不能混用两个项目的对象。拒绝时报价、审批、事件、审计和项目时间戳不变。
+2. **过期交期无法续申请（#500）**：原逻辑将过期 confirmed 当作可复用结果，UI 也隐藏申请入口。现在原确认通过 system-only 转移到 expired，留下事件/审计，再产生一次新的 pending Gate 03；并发申请返回同一新请求，旧人工审批保留，重新批准前不能承诺交期。
+3. **空样本误判 Go（#500）**：原 schema/domain 可让零 RFQ 的报告满足 Go；domain 还接受第七个重复 criterion。现在必须恰好六个验收项，Go 至少有一条 RFQ 且全部 Ready；pending/no_go 仍可如实记录零样本。TypeScript、JSON Schema 与 Python 总校验保持一致。
+4. **生产询盘整理入口缺失（#499）**：原 `applyInquiryMessage`/`nextClarification` 只有演示和测试调用。新增显式操作通过共享 Zod 与 Server Action，事务内重新授权后解析最新保留期内入站消息；返回来源引用及允许的需求字段，不返回原始消息/数据库记录，不写 RFQ、不跨 Gate、不发送消息。现有人工值及等待期间编辑均保留，切换上下文或卸载后忽略旧响应，保存需独立确认。
+5. **已公告依赖安全版本命中（#498，部分修复）**：Next 与测试适配器更新到 16.3.8，并刷新兼容传递补丁。生产依赖审计由 `4 critical / 18 high / 21 moderate / 5 low` 变为 `0 critical / 9 high / 13 moderate / 4 low`。这是公告版本匹配数，不能当作已证明的应用可利用漏洞数，也不能宣称依赖风险清零。
+
+## 技术验证与限制
+
+- #500 的生产构建、仓库总校验、PostgreSQL、Chromium、Harbor 兼容性及 review 工作流均成功。PR 中的 Vercel 状态成功对应 skipped deployment，不能据此宣称生产部署已更新。
+- 锁文件兼容刷新后本地 Chromium **252/252** 通过；第一批修复的数据库浏览器 **50/50** 通过，13 组独立 PostgreSQL 套件全部通过。新增询盘边界用例在原销售上下文数据库套件中验证 viewer/非成员/归档/错误项目类型、错误关联、过期/删除/出站、最新消息、撤销成员，以及不写业务状态。
+- 新询盘入口在 `next dev` 的真实合成登录态浏览器通过：保留响应期间人工编辑、仅补空白、标明精确消息引用、缺失字段补问、另行保存后仍为 `RFQ_COLLECTING`。Next MCP 编译问题与最终会话错误为空；React tree 显示 `Forget(RfqForm)`，但单 fiber inspect 工具失败，不据此宣称 props/state 检查通过。
+- 新入口的完整生产数据库浏览器批次 **51/51** 通过，包括销售闭环、隔离、归档、审批和硬/软导航。等待建议时禁止提交另有独立浏览器检查；完整 CI 记录由 #496 的交付 PR 关联。仓库契约/domain 总校验、销售规则、RFQ 与 synthetic demo 均通过；不把 synthetic 的 Gate、素材和消息计入真实验收指标。
+- 实际合成 MP4 的成片检查通过。本机 FFmpeg 默认安装缺少 subtitles/libass；另一安装缺少 whisper-cpp 动态库，完整 renderer 本地未通过。#500 的 CI 在 Ubuntu 支持环境中执行真实 FFmpeg renderer 并通过。未以模拟测量替代编码。
+- 早期 Node 26 / Python 3.14 环境与测试启动器不作为正式基线；有效验证明确使用 Node 24 / Python 3.12。新增浏览器测试初次因合成 key 配置和标签定位错误失败，修正测试环境/定位后通过；未放宽业务验证。
+- 原有 Biome 警告仍存在，本轮不声称全仓库零警告。
+
+## 剩余依赖风险（#498）
+
+| 包与当前版本 | 可核对的最短依赖路径 | 后续处理条件 |
+| --- | --- | --- |
+| undici 7.28.0 | workflow → @workflow/cli → @workflow/world-local → undici | 公告修复到 7.29.0/7.29.1；核对 runtime 实际用法、上游约束及兼容升级 |
+| nanoid 5.1.6 | workflow → @workflow/core → nanoid | 公告修复到 5.1.11/5.1.16；上游固定版本，不能用普通兼容刷新消除 |
+| devalue 5.8.1 | workflow → @workflow/core → devalue | 公告修复到 5.9.1/5.9.3；核对序列化/反序列化入口及上游固定约束 |
+| esbuild 0.18.20 | better-auth → drizzle-kit → @esbuild-kit/esm-loader → @esbuild-kit/core-utils → esbuild | 开发服务器公告；需判断该工具路径的实际暴露，不等同生产 HTTP 入口 |
+| braces 3.0.3 | shadcn → fast-glob → micromatch → braces | 本次公告未列补丁；需区分本地 CLI 的模式输入与公开应用输入 |
+
+Next 的 [ImageResponse SVG 公告](https://github.com/vercel/next.js/security/advisories/GHSA-vcvr-r3jv-pc5j)需要攻击者控制相关 SVG；当前应用未发现 `next/og`/`next/image` 使用，另一命中涉及 Windows 托管。升级消除版本命中，不将路径适用性未知包装成已确认攻击。剩余依赖风险由 #498 保持开放，兼容刷新没有强制覆盖上游精确固定依赖。
+
+## 真实验收交接
+
+下表列的是责任角色，**相关 Issue 当前均未指定 GitHub assignee**；不能把角色描述视为已有具名承诺。关闭条件必须落在受控证据库和脱敏验收记录中，不能上传真实业务流水到 GitHub。
+
+| 独立依赖组 | 责任角色（待具名）与 Issue | 完成条件 |
+| --- | --- | --- |
+| 当前生产身份、页面、固定出口与渠道收发 | 渠道负责人 / 运维：#383/#322/#156/#480/#490 | 当前镜像/账号授权、viewer/runtime 可用、签名自动回执、独立发送者 DM 去重与正确 RFQ 关联；unknown 历史不得改作自动成功 |
+| 工厂资料、私有原件与素材权利 | 工厂资料责任人：#6/#268/#307/#463/#348 | 20 真实 SKU 及 A–D 分组授权；明确上传目的地；原件/图像字节与哈希可回读；目录识别和候选完整性人工核验 |
+| 视频政策、平台参数与审核责任 | 业务审核人 / 渠道负责人：#122/#126/#318 | 具名权利/保留期限/审核和预算决定；目标传输接口及当前规则版本核实；真实授权素材制作和回读 |
+| 真实设备和辅助技术 | UI 验收责任人：#391 | 实机、VoiceOver/NVDA、文本缩放/对比度及受控生产性能记录 |
+| 真实 RFQ、Human Gate 与 Go/No-Go | 业务 / 工厂 / 总验收人：#32 | 六项业务验收有真实样本及证据；至少一条 RFQ 且全部 Ready；无事实错误/绕 Gate；明确人工决策及责任人 |
+
+[本轮聚合摘要](mvp1-acceptance-20261006.summary.json) 保留六项 `not_run`、零真实 RFQ、五组独立外部依赖、decision `pending`。零事实错误/绕 Gate 仅表示没有执行本轮真实业务样本，不能解读为 100% 正确率。#498 的技术风险另外跟踪，不混入外部依赖组计数。

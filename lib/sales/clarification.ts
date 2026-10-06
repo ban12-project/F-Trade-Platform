@@ -1,20 +1,22 @@
-import { updateRfqDraft } from "../rfq/completeness";
+import { updateRfqDraft } from "../rfq/assessment";
 
 type Rfq = Record<string, any>;
 
 export function applyInquiryMessage(rfq: Rfq, message: string) {
   const patch: Rfq = { product: {}, commercial: {} };
-  const quantity = message.match(/\b(\d+)\s*(?:pcs?|pieces?)\b/i);
-  if (quantity) patch.commercial.quantity = Number(quantity[1]);
-  const oe = message.match(/\b(?:oe|oem)\s*[:#-]?\s*([A-Za-z0-9-]{3,})\b/i);
+  // Only a single unambiguous explicit value is suggested. Unsupported prose stays manual.
+  const unique = (pattern: RegExp) => {
+    const matches = [...message.matchAll(pattern)];
+    return matches.length === 1 ? matches[0] : undefined;
+  };
+  const quantity = unique(/(?<![\w.,+-])([1-9]\d*)\s*(?:pcs?|pieces?)\b/gi);
+  if (quantity && Number.isSafeInteger(Number(quantity[1])))
+    patch.commercial.quantity = Number(quantity[1]);
+  const oe = unique(/\b(?:oe|oem)\s*[:#-]\s*([A-Za-z0-9-]{3,240})\b/gi);
   if (oe) patch.product.oe_number = oe[1];
-  const destination = message.match(
-    /\b(?:to\s+|destination\s*[:=-]?\s*)([A-Za-z][A-Za-z -]{2,})\b/i,
-  );
+  const destination = unique(/\bdestination\s*[:=]\s*([A-Za-z][A-Za-z -]{2,239})(?=[,;.\n]|$)/gi);
   if (destination) patch.commercial.destination = destination[1].trim();
-  const vehicle = message.match(
-    /\b(Toyota|Honda|Ford|Volkswagen)\s+([A-Za-z0-9 -]{2,}?)(?:\s+clutch|,|\.|$)/i,
-  );
+  const vehicle = unique(/\b(Toyota|Honda|Ford|Volkswagen)\s+([A-Za-z0-9 -]{2,100}?)\s+clutch\b/gi);
   if (vehicle) {
     patch.product.vehicle_brand = vehicle[1];
     patch.product.vehicle_model = vehicle[2].trim();
