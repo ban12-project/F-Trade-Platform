@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
+import { contentDraftFailureMessage } from "@/lib/content/draft-write-access";
 import { contentReviewFailureMessage } from "@/lib/content/review-write-access";
 import {
   copyContentDraftToProject,
@@ -39,9 +40,13 @@ export async function createContentDraftAction(
   if (!parsed.success)
     return { status: "error", message: parsed.error.issues[0]?.message ?? "内容资料格式不正确。" };
   try {
-    const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
-    const result = await createContentDraft(parsed.data, session.user.id, projectId);
+    const projectId = z.uuid("项目标识无效。").parse(formData.get("projectId"));
+    await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
+    const result = await createContentDraft(parsed.data, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId,
+    });
     revalidateContentPaths(projectId, result.id);
     return {
       status: "success",
@@ -49,7 +54,7 @@ export async function createContentDraftAction(
       contentId: result.id,
     };
   } catch (error) {
-    return actionError(error, "无法创建内容草稿。");
+    return { status: "error", message: contentDraftFailureMessage(error) };
   }
 }
 
