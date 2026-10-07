@@ -162,6 +162,21 @@ test("ordinary editor receives safe AI errors through real Actions and can edit 
         sameSite: "Lax",
       },
     ]);
+    const actionBodies: string[] = [];
+    await page.route(
+      (url) => url.pathname === `/workspace/${projectId}/new/content`,
+      async (route) => {
+        const request = route.request();
+        if (request.method() !== "POST" || !request.headers()["next-action"])
+          return route.continue();
+        // Capture the real upstream body before forwarding it unchanged. Chromium can
+        // evict a completed Flight response before response.text() retrieves it over CDP.
+        const response = await route.fetch();
+        const body = await response.body();
+        actionBodies.push(body.toString("utf8"));
+        await route.fulfill({ response, body });
+      },
+    );
     await page.goto(`/workspace/${projectId}/new/content?product=${productId}`);
     const form = page.locator("form#create-content").filter({ visible: true });
     await expect(form).toBeVisible();
@@ -185,19 +200,24 @@ test("ordinary editor receives safe AI errors through real Actions and can edit 
     release();
     const failed = await failedResponse;
     expect(failed.ok()).toBe(true);
-    expect(await failed.text()).not.toContain(marker);
+    expect(actionBodies).toHaveLength(1);
+    expect(actionBodies[0]).not.toContain(marker);
     await expect(page.getByText(/AI 初稿生成失败.*重试.*管理员/)).toBeVisible();
     await expect(form.getByLabel("正文", { exact: true })).toHaveValue(manual);
     await expect(generate).toBeEnabled();
     const malformedResponse = actionResponse();
     await generate.click();
-    expect(await (await malformedResponse).text()).not.toContain(marker);
+    expect((await malformedResponse).ok()).toBe(true);
+    expect(actionBodies).toHaveLength(2);
+    expect(actionBodies[1]).not.toContain(marker);
     await expect(page.getByText(/AI 初稿生成失败.*重试.*管理员/)).toBeVisible();
     await expect(form.getByLabel("正文", { exact: true })).toHaveValue(manual);
     await expect(generate).toBeEnabled();
     const retryResponse = actionResponse();
     await generate.click();
-    expect(await (await retryResponse).text()).not.toContain(marker);
+    expect((await retryResponse).ok()).toBe(true);
+    expect(actionBodies).toHaveLength(3);
+    expect(actionBodies[2]).not.toContain(marker);
     await expect(form.getByLabel("正文", { exact: true })).toHaveValue(draft.body);
     await expect(page.getByText("AI 初稿已生成；请人工核对后再创建待审内容。")).toBeVisible();
     expect(requests).toBe(3);
