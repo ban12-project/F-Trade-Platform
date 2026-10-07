@@ -6,7 +6,10 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import { productCatalogCandidate, productCatalogImport } from "../lib/db/product-catalog-schema";
 import * as schema from "../lib/db/schema";
-import { issueDocumentUploadReceipt } from "../lib/product/document-upload-receipts";
+import {
+  claimDocumentUpload,
+  issueDocumentUploadReceipt,
+} from "../lib/product/document-upload-receipts";
 import { prepareProductAgentEvidenceSource } from "../lib/product/evidence-locations";
 import { listProductEvidencePreviews, readProductEvidence } from "../lib/product/evidence-preview";
 
@@ -173,6 +176,149 @@ void (async () => {
       undefined,
     );
     assert.equal(previews[0].href, `/api/product-evidence/${project}/${product}/${sourceId}`);
+    // Use the actual receipt/claim path: uploads deliberately retain a generic evidence label.
+    // Identical bytes still represent independent uploads with independent original names.
+    const namedProduct = randomUUID();
+    const claims = [];
+    for (const [projectId, originalFilename] of [
+      [project, "MOCK 原目录.csv"],
+      [project, "MOCK 第二份规格.csv"],
+      [foreignProject, "MOCK 未关联来源.csv"],
+    ]) {
+      const issued = await issueDocumentUploadReceipt(
+        {
+          receiptId: randomUUID(),
+          projectId,
+          purpose: "evidence",
+          originalFilename,
+          contentType: "text/csv",
+          sizeBytes: bytes.length,
+        },
+        owner,
+        db,
+      );
+      const claimed = await claimDocumentUpload(
+        { receiptId: issued.id, projectId, purpose: "evidence" },
+        owner,
+        db,
+        reader(),
+      );
+      claims.push({ ...claimed, receipt: issued });
+    }
+    const [first, second, foreign] = claims;
+    assert.notEqual(first.evidenceId, second.evidenceId);
+    assert.equal(first.sha256, second.sha256);
+    await db.insert(schema.aggregateRecord).values({
+      id: namedProduct,
+      type: "product",
+      state: "PRODUCT_REVIEW_REQUIRED",
+      payload: {
+        source_ref: `source-${digest}`,
+        field_evidence: {
+          "product.product_name": first.evidenceId,
+          "product.internal_sku": second.evidenceId,
+          "commercial.moq": foreign.evidenceId,
+        },
+      },
+      createdByType: "human",
+      createdById: owner,
+    });
+    await db.insert(schema.workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId: project,
+      aggregateId: namedProduct,
+      role: "product_source",
+    });
+    for (const actor of [owner, viewer]) {
+      const named = await listProductEvidencePreviews(project, namedProduct, actor, db);
+      assert.equal(named.length, 2, "own uploads outside the project remain excluded");
+      for (const claim of [first, second]) {
+        const preview = named.find((item) => item.id === claim.evidenceId);
+        assert.equal(preview?.label, claim.filename, "source previews retain original filenames");
+        assert.deepEqual(Object.keys(preview ?? {}).sort(), [
+          "contentType",
+          "fields",
+          "href",
+          "id",
+          "label",
+        ]);
+        assert.equal(
+          preview?.href,
+          `/api/product-evidence/${project}/${namedProduct}/${claim.evidenceId}`,
+        );
+      }
+    }
+    const firstLabel = async () =>
+      (await listProductEvidencePreviews(project, namedProduct, viewer, db)).find(
+        (item) => item.id === first.evidenceId,
+      )?.label;
+    const receipt = schema.productDocumentUploadReceipt;
+    for (const mismatch of [
+      { blobPath: `synthetic-mismatch/${randomUUID()}` },
+      { ownerId: viewer },
+      { evidenceId: second.evidenceId },
+    ]) {
+      await db.update(receipt).set(mismatch).where(eq(receipt.id, first.receipt.id));
+      assert.equal(await firstLabel(), "uploaded:csv", "mismatched receipt cannot rename a source");
+      await db
+        .update(receipt)
+        .set({
+          blobPath: first.receipt.blobPath,
+          ownerId: owner,
+          evidenceId: first.evidenceId,
+        })
+        .where(eq(receipt.id, first.receipt.id));
+    }
+    await db
+      .update(schema.evidence)
+      .set({ uploadedByType: "agent" })
+      .where(eq(schema.evidence.id, first.evidenceId));
+    assert.equal(
+      await firstLabel(),
+      "uploaded:csv",
+      "non-human provenance cannot use a human receipt",
+    );
+    await db
+      .update(schema.evidence)
+      .set({ uploadedByType: "human" })
+      .where(eq(schema.evidence.id, first.evidenceId));
+    await db
+      .update(receipt)
+      .set({ expiresAt: new Date(0) })
+      .where(eq(receipt.id, first.receipt.id));
+    assert.equal(
+      await firstLabel(),
+      first.filename,
+      "claimed provenance survives signing-token expiry",
+    );
+    assert.equal(
+      previews[0].label,
+      `SYNTHETIC source ${sourceId}`,
+      "legacy sources retain their label",
+    );
+    assert.deepEqual(await listProductEvidencePreviews(project, namedProduct, outsider, db), []);
+    await db.update(schema.user).set({ banned: true }).where(eq(schema.user.id, viewer));
+    assert.deepEqual(await listProductEvidencePreviews(project, namedProduct, viewer, db), []);
+    await db.update(schema.user).set({ banned: false }).where(eq(schema.user.id, viewer));
+    const namedRead = await readProductEvidence(
+      project,
+      namedProduct,
+      first.evidenceId,
+      viewer,
+      db,
+      reader(),
+    );
+    assert.deepEqual(
+      namedRead?.bytes,
+      bytes,
+      "original names do not alter private-byte verification",
+    );
+    const beforeUnlinked = reads;
+    assert.equal(
+      await readProductEvidence(project, namedProduct, foreign.evidenceId, owner, db, reader()),
+      null,
+    );
+    assert.equal(reads, beforeUnlinked);
     for (const actor of [owner, viewer]) {
       const file = await readProductEvidence(project, product, sourceId, actor, db, reader());
       assert.deepEqual(file?.bytes, bytes);
@@ -252,7 +398,7 @@ void (async () => {
       );
     assert.equal(await readProductEvidence(project, product, sourceId, owner, db, reader()), null);
     console.log(
-      "PASS private evidence: exact excerpts, minimal DTO, owner/viewer access, project/product/source binding, banned/nonmember denial, byte/MIME integrity and mid-read revocation",
+      "PASS private evidence: original upload names, mismatched receipt fallback, exact excerpts, minimal DTO, owner/viewer access, project/product/source binding, banned/nonmember denial, byte/MIME integrity and mid-read revocation",
     );
   } finally {
     await closeDatabase();

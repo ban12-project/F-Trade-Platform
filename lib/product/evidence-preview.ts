@@ -1,12 +1,13 @@
 import "server-only";
 import { get } from "@vercel/blob";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { productCatalogCandidate } from "@/lib/db/product-catalog-schema";
 import {
   aggregateRecord,
   evidence,
+  productDocumentUploadReceipt,
   user,
   workspaceProjectEvidence,
   workspaceProjectItem,
@@ -62,7 +63,7 @@ async function authorizedSources(
   const rows = await database
     .select({
       id: evidence.id,
-      label: evidence.sourceLabel,
+      label: sql<string>`coalesce(${productDocumentUploadReceipt.originalFilename}, ${evidence.sourceLabel})`,
       contentType: evidence.contentType,
       sha256: evidence.sha256,
       sizeBytes: evidence.sizeBytes,
@@ -70,6 +71,15 @@ async function authorizedSources(
     })
     .from(workspaceProjectEvidence)
     .innerJoin(evidence, eq(evidence.id, workspaceProjectEvidence.evidenceId))
+    .leftJoin(
+      productDocumentUploadReceipt,
+      and(
+        eq(productDocumentUploadReceipt.blobPath, evidence.blobKey),
+        eq(productDocumentUploadReceipt.evidenceId, evidence.id),
+        eq(productDocumentUploadReceipt.ownerId, evidence.uploadedById),
+        eq(evidence.uploadedByType, "human"),
+      ),
+    )
     .where(eq(workspaceProjectEvidence.projectId, projectId));
   return rows.flatMap((row) => {
     if (!filenames[row.contentType]) return [];
