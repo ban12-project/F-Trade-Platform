@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
+import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
@@ -11,6 +11,7 @@ import { productAgentRunFormSchema } from "@/lib/form-schemas";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
 import { EvidenceLocatedProductAgent } from "@/lib/product/evidence-located-agent";
+import { productIntakeFailureMessage } from "@/lib/product/intake-errors";
 import { createProductAgentDraft } from "@/lib/products";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
@@ -101,6 +102,6 @@ export async function runProductAgentAction(
       productId: saved.id,
     };
   } catch (error) {
-    return actionError(error, "Product Agent 运行失败。");
+    return { status: "error", message: productIntakeFailureMessage(error) };
   }
 }

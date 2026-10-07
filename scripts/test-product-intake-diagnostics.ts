@@ -5,7 +5,10 @@ import { productIntakeFailureDiagnostic } from "../lib/product/intake-diagnostic
 import {
   PRODUCT_INTAKE_ERROR_HEADER,
   ProductSourceError,
+  ProductUploadError,
+  type ProductUploadErrorCode,
   productIntakeErrorMessage,
+  productIntakeFailureMessage,
   productIntakeFailureResponse,
 } from "../lib/product/intake-errors";
 
@@ -24,6 +27,8 @@ assert.deepEqual(
 );
 for (const error of [
   new Error(secret),
+  { code: "upload_unavailable", message: secret },
+  new Error("upload_unavailable", { cause: new ProductUploadError("upload_unavailable") }),
   { code: secret, stack: secret, message: secret },
   secret,
   null,
@@ -44,6 +49,28 @@ console.log(
 );
 
 async function verifySourceFailures() {
+  for (const code of [
+    "upload_unavailable",
+    "upload_type_mismatch",
+    "upload_size_mismatch",
+    "upload_image_invalid",
+    "upload_image_animated",
+    "upload_changed",
+  ] satisfies ProductUploadErrorCode[]) {
+    const failure = new ProductUploadError(code);
+    Object.assign(failure, { message: secret, cause: { code: "ECONNRESET", message: secret } });
+    assert.deepEqual(productIntakeFailureDiagnostic("private_blob_read", failure), {
+      stage: "private_blob_read",
+      category: "upload",
+      code,
+    });
+    const response = productIntakeFailureResponse(failure);
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get(PRODUCT_INTAKE_ERROR_HEADER), code);
+    assert.deepEqual(await response.json(), { error: productIntakeErrorMessage(code) });
+    assert.equal(productIntakeFailureMessage(failure), productIntakeErrorMessage(code));
+    assert.ok(!productIntakeFailureMessage(failure).includes(secret));
+  }
   for (const [input, code, guidance] of [
     [
       "| product_name | category |\n| --- | --- |\n| TEST ONLY SYNTHETIC | fixture |",
@@ -80,6 +107,17 @@ async function verifySourceFailures() {
   assert.ok(!(await response.text()).includes(secret));
   for (const code of [null, "__proto__", secret, "unknown"])
     assert.equal(productIntakeErrorMessage(code), productIntakeErrorMessage(null));
+  for (const failure of [
+    new Error(secret),
+    { code: "upload_type_mismatch", message: secret },
+    Object.assign(new ProductUploadError("upload_unavailable"), { code: secret }),
+  ]) {
+    assert.equal(productIntakeFailureMessage(failure), productIntakeErrorMessage(null));
+    assert.equal(productIntakeFailureMessage(failure, "catalog fallback"), "catalog fallback");
+    assert.ok(
+      !JSON.stringify(productIntakeFailureDiagnostic("document", failure)).includes(secret),
+    );
+  }
   assert.equal(
     buildProductAgentEvidenceLocations("synthetic-evidence", "Product name: TEST ONLY SYNTHETIC")
       .length,

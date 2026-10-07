@@ -4,12 +4,15 @@ import { crc32 } from "node:zlib";
 import sharp from "sharp";
 import { verifyDocumentUploadBytes } from "../lib/product/document-upload-bytes";
 import { documentUploadPayloadSchema } from "../lib/product/document-upload-contracts";
+import { ProductUploadError, type ProductUploadErrorCode } from "../lib/product/intake-errors";
 import {
   maximumProductImageBytes,
   productImageReceiptIdsSchema,
 } from "../lib/product/source-image-contracts";
 
 async function run() {
+  const hasCode = (code: ProductUploadErrorCode) => (error: unknown) =>
+    error instanceof ProductUploadError && error.code === code;
   const raw = sharp({ create: { width: 8, height: 8, channels: 3, background: "red" } });
   for (const format of ["png", "jpeg"] as const) {
     const bytes = await raw.clone().toFormat(format).toBuffer();
@@ -32,7 +35,7 @@ async function run() {
       const animated = Buffer.concat([bytes.subarray(0, 33), animation, bytes.subarray(33)]);
       await assert.rejects(
         verifyDocumentUploadBytes(new Blob([animated]).stream(), "animated.png", animated.length),
-        /多帧或动画/,
+        hasCode("upload_image_animated"),
       );
     }
 
@@ -60,6 +63,7 @@ async function run() {
         format === "png" ? "wrong.jpg" : "wrong.png",
         bytes.length,
       ),
+      hasCode("upload_type_mismatch"),
     );
     const corrupt = bytes.subarray(0, Math.floor(bytes.length / 2));
     await assert.rejects(
@@ -68,6 +72,7 @@ async function run() {
         payload.originalFilename,
         corrupt.length,
       ),
+      hasCode("upload_image_invalid"),
     );
   }
   // With the SVG loader blocked, a declaration mismatch must fail before decoding.
@@ -77,12 +82,26 @@ async function run() {
     for (const name of ["fake.png", "fake.jpg"]) {
       await assert.rejects(
         verifyDocumentUploadBytes(new Blob([svg]).stream(), name, svg.length),
-        /图片内容与声明的类型不一致/,
+        hasCode("upload_type_mismatch"),
       );
     }
   } finally {
     sharp.unblock({ operation: ["VipsForeignLoadSvg"] });
   }
+  const oversizedPixels = await sharp({
+    create: { width: 5001, height: 5000, channels: 3, background: "red" },
+  })
+    .png()
+    .toBuffer();
+  assert.ok(oversizedPixels.length < maximumProductImageBytes);
+  await assert.rejects(
+    verifyDocumentUploadBytes(
+      new Blob([oversizedPixels]).stream(),
+      "oversized-pixels.png",
+      oversizedPixels.length,
+    ),
+    hasCode("upload_image_invalid"),
+  );
   const ref = randomUUID();
   assert.throws(() => productImageReceiptIdsSchema.parse([ref, ref]));
   assert.throws(() =>
@@ -97,7 +116,10 @@ async function run() {
       canceled = true;
     },
   });
-  await assert.rejects(verifyDocumentUploadBytes(tooLarge, "source.png", 10));
+  await assert.rejects(
+    verifyDocumentUploadBytes(tooLarge, "source.png", 10),
+    hasCode("upload_size_mismatch"),
+  );
   assert.ok(canceled);
   console.log(
     "PASS source image MIME/purpose/byte bounds, full decoding, corruption and receipt limits",

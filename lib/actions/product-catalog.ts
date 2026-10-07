@@ -25,6 +25,7 @@ import {
   selectCatalogRecords,
 } from "@/lib/product/catalog-import-store";
 import { logProductIntakeFailure } from "@/lib/product/intake-diagnostics";
+import { productIntakeFailureMessage } from "@/lib/product/intake-errors";
 import { productCatalogImportWorkflow } from "@/workflows/product-catalog-import";
 
 async function identity(projectId: string): Promise<CatalogIdentity> {
@@ -53,7 +54,13 @@ export async function intakeProductCatalogAction(input: unknown): Promise<Catalo
     return { status: "success", view: await dispatch(await intakeCatalog(value, actor), actor) };
   } catch (error) {
     logProductIntakeFailure("catalog_intake", error);
-    return { status: "error", message: "无法创建目录任务，请确认项目权限及上传回执仍有效。" };
+    return {
+      status: "error",
+      message: productIntakeFailureMessage(
+        error,
+        "无法创建目录任务，请确认项目权限及上传回执仍有效。",
+      ),
+    };
   }
 }
 

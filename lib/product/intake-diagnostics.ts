@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ProductSourceError } from "./intake-errors";
+import { ProductSourceError, ProductUploadError, productIntakeErrorCode } from "./intake-errors";
 
 export type ProductIntakeStage =
   | "input"
@@ -25,8 +25,11 @@ const transportCodes = new Set([
 
 /** Never include exception messages, source values, URLs, credentials or actor IDs. */
 export function productIntakeFailureDiagnostic(stage: ProductIntakeStage, error: unknown) {
-  if (error instanceof ProductSourceError)
-    return { stage, category: "source" as const, code: error.code };
+  const code = productIntakeErrorCode(error);
+  if (error instanceof ProductSourceError && code)
+    return { stage, category: "source" as const, code };
+  if (error instanceof ProductUploadError && code)
+    return { stage, category: "upload" as const, code };
   if (error instanceof z.ZodError) return { stage, category: "validation" as const };
   let cause = error;
   for (let depth = 0; depth < 5 && cause && typeof cause === "object"; depth++) {
