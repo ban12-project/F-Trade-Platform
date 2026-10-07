@@ -21,3 +21,6 @@ patchedDependencies:
   # Preserve old implicit-hook tokens and the shared seeded RNG on patched nanoid.
   # Remove only after the upstream migration passes the frozen SDK state fixture.
   '@workflow/core@4.8.8': patches/@workflow__core@4.8.8.patch
+  # Bound this installed dependency's parser and AST walks; standalone dlx is separate.
+  # Keep #498 open until an upstream fix and the independent CLI are verified.
+  braces@3.0.3: patches/braces@3.0.3.patch
