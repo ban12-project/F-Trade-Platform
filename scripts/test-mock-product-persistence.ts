@@ -10,6 +10,7 @@ import {
 } from "../lib/db/schema";
 import { finalizeProductAgentDraft } from "../lib/product/agent";
 import { prepareProductAgentEvidenceSource } from "../lib/product/evidence-locations";
+import type { ProductReviewIdentity } from "../lib/product/review-write-access";
 import { type ProductDraft, reviewProductDraft } from "../lib/product/verification";
 import { decideProductCatalogReview, insertProductAgentDraft } from "../lib/products";
 import { runReferenceMockWorkflow } from "./reference-mock-workflow";
@@ -17,9 +18,9 @@ import { runReferenceMockWorkflow } from "./reference-mock-workflow";
 /** Called only by the dedicated loopback PostgreSQL test. No reference data or business DB. */
 export async function testMockProductPersistence(
   database: Database,
-  actorId: string,
-  projectId: string,
+  identity: ProductReviewIdentity,
 ) {
+  const { actorId, projectId } = identity;
   let missingEvidenceDraft: ProductDraft | undefined;
   for (let slot = 1; slot <= 20; slot++) {
     const source = {
@@ -70,14 +71,14 @@ export async function testMockProductPersistence(
       notes: "SIMULATED PostgreSQL test decision",
     };
     await assert.rejects(
-      () => decideProductCatalogReview({ ...decision, reviewedVersion: "0" }, actorId, database),
+      () => decideProductCatalogReview({ ...decision, reviewedVersion: "0" }, identity, database),
       /版本/,
     );
     await assert.rejects(
       () =>
         decideProductCatalogReview(
           { ...decision, approvalId: "wrong-approval" },
-          actorId,
+          identity,
           database,
         ),
       /审核请求已变更/,
@@ -104,8 +105,8 @@ export async function testMockProductPersistence(
     );
     if (slot === 20) {
       const concurrent = await Promise.allSettled([
-        decideProductCatalogReview(decision, actorId, database),
-        decideProductCatalogReview(decision, actorId, database),
+        decideProductCatalogReview(decision, identity, database),
+        decideProductCatalogReview(decision, identity, database),
       ]);
       assert.equal(concurrent.filter((x) => x.status === "fulfilled").length, 1);
       assert.equal(concurrent.filter((x) => x.status === "rejected").length, 1);
@@ -114,7 +115,7 @@ export async function testMockProductPersistence(
       assert.match(String(rejected.reason), /版本|待审核状态/);
     } else {
       assert.equal(
-        (await decideProductCatalogReview(decision, actorId, database)).state,
+        (await decideProductCatalogReview(decision, identity, database)).state,
         "PRODUCT_READY",
       );
     }
@@ -187,7 +188,7 @@ export async function testMockProductPersistence(
           evidenceRef: "evidence-synthetic",
           notes: "Synthetic missing-evidence rejection",
         },
-        actorId,
+        identity,
         database,
       ),
     /field_evidence/,

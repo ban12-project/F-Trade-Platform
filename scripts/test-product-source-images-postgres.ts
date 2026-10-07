@@ -42,12 +42,24 @@ void (async () => {
     await migrate(db as unknown as Parameters<typeof migrate>[0], {
       migrationsFolder: "./drizzle",
     });
+    const sessionIds = [randomUUID(), randomUUID()];
+    const reviewIdentity = {
+      actorId: actors[0]!,
+      sessionId: sessionIds[0]!,
+      projectId: projects[0]!,
+    };
     for (let index = 0; index < 2; index++) {
       await db.insert(schema.user).values({
         id: actors[index],
         name: "SYNTHETIC image test",
         email: `${actors[index]}@example.invalid`,
         role: "admin",
+      });
+      await db.insert(schema.session).values({
+        id: sessionIds[index],
+        token: randomUUID(),
+        userId: actors[index],
+        expiresAt: new Date(Date.now() + 3_600_000),
       });
       await db.insert(schema.workspaceProject).values({
         id: projects[index],
@@ -157,11 +169,11 @@ void (async () => {
       evidenceRef: image.evidenceId,
       notes: "SYNTHETIC simulated confirmation only",
     };
-    await assert.rejects(decideProductCatalogReview(decision, actors[0]!, db), /图片/);
+    await assert.rejects(decideProductCatalogReview(decision, reviewIdentity, db), /图片/);
     await assert.rejects(
       decideProductCatalogReview(
         { ...decision, imageConsistencyConfirmed: "false" },
-        actors[0]!,
+        reviewIdentity,
         db,
       ),
       /图片/,
@@ -176,7 +188,7 @@ void (async () => {
       (
         await decideProductCatalogReview(
           { ...decision, imageConsistencyConfirmed: "true" },
-          actors[0]!,
+          reviewIdentity,
           db,
         )
       ).state,
@@ -198,7 +210,7 @@ void (async () => {
       (
         await decideProductCatalogReview(
           { ...decision, productId: noImage.id, approvalId: noImage.approvalId },
-          actors[0]!,
+          reviewIdentity,
           db,
         )
       ).state,
@@ -214,7 +226,7 @@ void (async () => {
             approvalId: rejected.approvalId,
             decision: "rejected",
           },
-          actors[0]!,
+          reviewIdentity,
           db,
         )
       ).state,

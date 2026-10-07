@@ -6,6 +6,7 @@ import { decideContentReview } from "../lib/content/store";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import {
   aggregateRecord,
+  session,
   user,
   videoProcessingJob,
   workspaceProject,
@@ -115,6 +116,13 @@ void (async () => {
       "PASS reopening, owner enforcement, archived reads, stale RFQ save and receipt membership",
     );
 
+    const reviewSessionId = randomUUID();
+    await db.insert(session).values({
+      id: reviewSessionId,
+      token: randomUUID(),
+      userId: actorId,
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
     const marketing = randomUUID();
     await db.insert(workspaceProject).values({
       id: marketing,
@@ -164,7 +172,11 @@ void (async () => {
       notes: "",
     };
     await assert.rejects(
-      decideProductCatalogReview({ ...review, productId: ids.product }, actorId, db),
+      decideProductCatalogReview(
+        { ...review, productId: ids.product },
+        { actorId, sessionId: reviewSessionId, projectId: marketing },
+        db,
+      ),
       /已归档/,
     );
     await assert.rejects(

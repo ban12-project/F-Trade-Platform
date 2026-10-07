@@ -231,7 +231,7 @@ export function ProductReview({
                     render={({ field }) => (
                       <Select
                         items={{ approved: "批准产品事实", rejected: "退回产品事实" }}
-                        value={field.value}
+                        value={field.value ?? null}
                         onValueChange={field.onChange}
                       >
                         <SelectTrigger
