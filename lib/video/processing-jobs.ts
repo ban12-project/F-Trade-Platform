@@ -14,6 +14,14 @@ export type VideoProcessingSummary = {
   failureMessage: string | null;
 };
 
+export function videoProcessingRequestKey(
+  videoId: string,
+  kind: VideoProcessingKind,
+  version: number,
+) {
+  return createHash("sha256").update(`${videoId}:${kind}:${version}`).digest("hex");
+}
+
 export async function queueVideoProcessingJob(
   videoId: string,
   kind: VideoProcessingKind,
@@ -28,9 +36,7 @@ export async function queueVideoProcessingJob(
       .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
       .limit(1);
     if (!record) throw new Error("营销视频不存在。");
-    const requestKey = createHash("sha256")
-      .update(`${videoId}:${kind}:${record.version}`)
-      .digest("hex");
+    const requestKey = videoProcessingRequestKey(videoId, kind, record.version);
     const id = randomUUID();
     const inserted = await tx
       .insert(videoProcessingJob)

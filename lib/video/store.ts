@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
-import type { z } from "zod";
+import { z } from "zod";
 import { type Database, getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
@@ -453,13 +453,17 @@ export async function getMarketingVideoEditProject(
   database: Database = getDatabase(),
 ) {
   const [record] = await database
-    .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
+    .select({
+      state: aggregateRecord.state,
+      payload: aggregateRecord.payload,
+      version: aggregateRecord.version,
+    })
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")));
   if (!record) throw new Error("营销视频不存在。");
   const project = videoProjectSchema.parse(record.payload);
   if (!project.editDraft) throw new Error("该视频不是 MVP1 剪辑项目。");
-  return { state: record.state, project };
+  return { state: record.state, project, version: record.version };
 }
 
 export async function assertMarketingVideoProjectLink(
@@ -489,6 +493,35 @@ export async function updateMarketingVideoEditDraft(
   actorId: string,
   database: Database = getDatabase(),
 ) {
+  return saveMarketingVideoEditDraft(videoId, draftInput, actorId, database);
+}
+
+export class MarketingVideoDraftChangedError extends Error {
+  constructor() {
+    super("剪辑草稿版本已更新。");
+    this.name = "MarketingVideoDraftChangedError";
+  }
+}
+
+/** AI output may only replace the exact draft snapshot used for generation. */
+export async function applyMarketingVideoAiDraft(
+  videoId: string,
+  draftInput: unknown,
+  actorId: string,
+  expectedVersion: number,
+  database: Database = getDatabase(),
+) {
+  const version = z.number().int().positive().parse(expectedVersion);
+  return saveMarketingVideoEditDraft(videoId, draftInput, actorId, database, version);
+}
+
+async function saveMarketingVideoEditDraft(
+  videoId: string,
+  draftInput: unknown,
+  actorId: string,
+  database: Database,
+  expectedVersion?: number,
+) {
   const draft = marketingVideoDraftSchema.parse(draftInput);
   return database.transaction(async (tx) => {
     await assertAggregateWorkspaceWrite(videoId, tx, actorId);
@@ -499,6 +532,8 @@ export async function updateMarketingVideoEditDraft(
       .for("update");
     if (!record || !["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(record.state))
       throw new Error("当前视频状态不能修改剪辑稿。");
+    if (expectedVersion !== undefined && record.version !== expectedVersion)
+      throw new MarketingVideoDraftChangedError();
     const current = videoProjectSchema.parse(record.payload);
     const assetRefs = new Set(current.sourceAssets.map((asset) => asset.assetRef));
     const claimRefs = new Set(current.factualClaims.map((claim) => claim.field));
@@ -529,6 +564,7 @@ export async function updateMarketingVideoEditDraft(
       metadata: {
         duration_ms: draft.clips.reduce((sum, clip) => sum + clip.durationMs, 0),
         clip_count: draft.clips.length,
+        ...(expectedVersion === undefined ? {} : { generated_from_version: expectedVersion }),
       },
       occurredAt: new Date(),
     });

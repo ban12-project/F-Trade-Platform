@@ -42,6 +42,14 @@ void (async () => {
       failureMessage: secret,
     },
     {
+      id: "stale",
+      videoProjectId: "video-5",
+      kind: "ai_draft",
+      status: "failed",
+      failureCode: "AI_DRAFT_STALE",
+      failureMessage: secret,
+    },
+    {
       id: "legacy",
       videoProjectId: "video-3",
       kind: "render",
@@ -75,6 +83,10 @@ void (async () => {
   );
   assert.equal(result.get("video-3")?.failureMessage, videoProcessingFailureMessage(null));
   assert.equal(result.get("video-4")?.failureMessage, null);
+  assert.equal(
+    result.get("video-5")?.failureMessage,
+    videoProcessingFailureMessage("AI_DRAFT_STALE"),
+  );
   assert.equal(JSON.stringify([...result]).includes("SYNTHETIC-SECRET"), false);
   assert.equal(JSON.stringify([...result]).includes("private.example"), false);
   console.log(
