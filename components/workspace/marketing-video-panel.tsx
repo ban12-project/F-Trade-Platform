@@ -510,6 +510,7 @@ function EditVideo({
             <Input
               id="video-cta"
               maxLength={40}
+              disabled={pending || processing}
               value={draft.ctaText}
               onChange={(event) => setDraft({ ...draft, ctaText: event.target.value })}
             />
