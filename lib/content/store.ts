@@ -3,6 +3,11 @@ import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { z } from "zod";
 import contentSchema from "@/contracts/content/content.schema.json";
 import {
+  authorizeLockedContentDraft,
+  type ContentDraftIdentity,
+  parseContentDraftIdentity,
+} from "@/lib/content/draft-write-access";
+import {
   authorizeLockedContentReview,
   ContentReviewAccessError,
   type ContentReviewIdentity,
@@ -274,34 +279,33 @@ export async function listReadyProductContentSources(
 
 export async function createContentDraft(
   input: ContentDraftInput,
-  actorId: string,
-  projectId?: string,
+  identityInput: ContentDraftIdentity,
+  database: Database = getDatabase(),
 ) {
-  const now = new Date();
+  const identity = parseContentDraftIdentity(identityInput);
+  const { actorId, projectId } = identity;
   const id = randomUUID();
   const approvalId = randomUUID();
   const eventId = randomUUID();
-  return getDatabase().transaction(async (tx) => {
-    if (projectId) await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
-    else await assertAggregateWorkspaceWrite(input.productId, tx, actorId);
-    if (projectId) {
-      const [workspace] = await tx
-        .select({ kind: workspaceProject.kind })
-        .from(workspaceProject)
-        .where(eq(workspaceProject.id, projectId))
-        .for("update");
-      if (workspace?.kind !== "marketing") throw new Error("内容草稿只能关联到产品营销项目。");
-      const [productLink] = await tx
-        .select({ id: workspaceProjectItem.id })
-        .from(workspaceProjectItem)
-        .where(
-          and(
-            eq(workspaceProjectItem.projectId, projectId),
-            eq(workspaceProjectItem.aggregateId, input.productId),
-          ),
-        );
-      if (!productLink) throw new Error("只能使用当前营销项目中已核验的产品。");
-    }
+  return database.transaction(async (tx) => {
+    await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
+    const [workspace] = await tx
+      .select({ kind: workspaceProject.kind })
+      .from(workspaceProject)
+      .where(eq(workspaceProject.id, projectId))
+      .for("update");
+    if (workspace?.kind !== "marketing") throw new Error("内容草稿只能关联到产品营销项目。");
+    const [productLink] = await tx
+      .select({ id: workspaceProjectItem.id })
+      .from(workspaceProjectItem)
+      .where(
+        and(
+          eq(workspaceProjectItem.projectId, projectId),
+          eq(workspaceProjectItem.aggregateId, input.productId),
+        ),
+      );
+    if (!productLink) throw new Error("只能使用当前营销项目中已核验的产品。");
+
     const [product] = await tx
       .select({
         id: aggregateRecord.id,
@@ -314,6 +318,8 @@ export async function createContentDraft(
     if (product?.state !== "PRODUCT_READY") throw new Error("只能引用已通过 Gate 01 的产品。");
     const readyProduct = product.payload as unknown as ProductReady;
     const content = buildContentDraft(input, readyProduct, id);
+    await authorizeLockedContentDraft(tx, identity);
+    const now = new Date();
     assertTransition({
       eventId,
       entityType: "content",
@@ -333,14 +339,13 @@ export async function createContentDraft(
       createdByType: "human",
       createdById: actorId,
     });
-    if (projectId)
-      await tx.insert(workspaceProjectItem).values({
-        id: randomUUID(),
-        projectId,
-        aggregateId: id,
-        role: "marketing_content",
-        relation: "owned",
-      });
+    await tx.insert(workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId,
+      aggregateId: id,
+      role: "marketing_content",
+      relation: "owned",
+    });
     await tx.insert(approval).values({
       id: approvalId,
       aggregateId: id,

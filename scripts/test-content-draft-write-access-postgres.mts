@@ -7,15 +7,15 @@ import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import {
-  authorizeLockedContentReview,
-  CONTENT_REVIEW_ACCESS_MESSAGE,
-  ContentReviewAccessError,
-} from "../lib/content/review-write-access";
+  authorizeLockedContentDraft,
+  CONTENT_DRAFT_ACCESS_MESSAGE,
+  ContentDraftAccessError,
+} from "../lib/content/draft-write-access";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
 import { reviewProductDraft } from "../lib/product/verification";
 
-const connection = process.env.CONTENT_REVIEW_TEST_DATABASE_URL;
+const connection = process.env.CONTENT_DRAFT_TEST_DATABASE_URL;
 if (
   !connection ||
   new URL(connection).hostname !== "127.0.0.1" ||
@@ -54,8 +54,8 @@ mock.module(moduleUrl("../lib/auth.ts"), {
   },
 });
 const { createProductAgentDraft, decideProductCatalogReview } = await import("../lib/products");
-const { createContentDraft, decideContentReview } = await import("../lib/content/store");
-const { decideContentReviewAction } = await import("../lib/actions/content");
+const { createContentDraft } = await import("../lib/content/store");
+const { createContentDraftAction } = await import("../lib/actions/content");
 const source = JSON.parse(
   await readFile("data/fixtures/product-draft-complete.synthetic.json", "utf8"),
 );
@@ -66,7 +66,6 @@ async function fixture(lifetime = 3_600_000) {
     sid = randomUUID(),
     productId = randomUUID();
   const evidenceId = `evidence-synthetic-review-source-${randomUUID()}`;
-  const decisionRef = `evidence-synthetic-review-decision-${randomUUID()}`;
   for (const [id, role] of [
     [actorId, "admin"],
     [ownerId, "user"],
@@ -97,7 +96,7 @@ async function fixture(lifetime = 3_600_000) {
     await db
       .insert(schema.workspaceProjectMember)
       .values({ id: randomUUID(), projectId, userId, role, createdById: ownerId });
-  for (const id of [evidenceId, decisionRef])
+  for (const id of [evidenceId])
     await db.insert(schema.evidence).values({
       id,
       classification: "internal",
@@ -147,59 +146,66 @@ async function fixture(lifetime = 3_600_000) {
     hashtags: "#Synthetic",
     visualInstruction: "SYNTHETIC text card",
   };
-  const saved = await createContentDraft(contentInput, identity);
-  const input = {
-    contentId: saved.id,
-    approvalId: saved.approvalId,
-    reviewedVersion: "1",
-    decision: "approved" as const,
-    evidenceRef: decisionRef,
-    notes: "SYNTHETIC simulated content review only",
-  };
   const form = new FormData();
-  for (const [key, value] of Object.entries({ projectId, ...input })) form.set(key, value);
+  for (const [key, value] of Object.entries({ projectId, ...contentInput })) form.set(key, value);
   sessionId = sid;
   return {
     actorId,
     ownerId,
     projectId,
-    contentId: saved.id,
     productId,
     identity,
-    input,
+    input: contentInput,
     form,
-    content: saved.content,
-    decisionRef,
+    draft,
+    evidenceId,
   };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 function run(f: Fixture) {
-  return decideContentReviewAction({ status: "idle", message: "" }, f.form);
+  return createContentDraftAction({ status: "idle", message: "" }, f.form);
 }
 async function state(f: Fixture) {
-  const [contents, gates, events, audits, links] = await Promise.all([
-    db.select().from(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, f.contentId)),
-    db.select().from(schema.approval).where(eq(schema.approval.aggregateId, f.contentId)),
-    db.select().from(schema.workflowEvent).where(eq(schema.workflowEvent.aggregateId, f.contentId)),
-    db.select().from(schema.auditEvent).where(eq(schema.auditEvent.aggregateId, f.contentId)),
+  const [products, contents, gates, events, audits, links, items] = await Promise.all([
+    db.select().from(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, f.productId)),
+    db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(
+        and(
+          eq(schema.aggregateRecord.type, "content"),
+          eq(schema.aggregateRecord.createdById, f.actorId),
+        ),
+      ),
+    db.select().from(schema.approval).where(eq(schema.approval.requestedById, f.actorId)),
+    db.select().from(schema.workflowEvent).where(eq(schema.workflowEvent.actorId, f.actorId)),
+    db.select().from(schema.auditEvent).where(eq(schema.auditEvent.actorId, f.actorId)),
     db
       .select()
       .from(schema.workspaceProjectEvidence)
       .where(eq(schema.workspaceProjectEvidence.projectId, f.projectId)),
+    db
+      .select()
+      .from(schema.workspaceProjectItem)
+      .where(eq(schema.workspaceProjectItem.projectId, f.projectId)),
   ]);
-  return { contents, gates, events, audits, links };
+  return { products, contents, gates, events, audits, links, items };
 }
 async function unchanged(f: Fixture, before: Awaited<ReturnType<typeof state>>) {
   assert.deepEqual(
     await state(f),
     before,
-    "Content, Gate, workflow, audit and decision-evidence links remain unchanged",
+    "Source ProductReady, contents, Gates, workflows, audits and project links remain unchanged",
   );
 }
 const changes: Array<[string, (f: Fixture) => Promise<unknown>]> = [
   [
-    "reviewer role removed",
-    (f) => db.update(schema.user).set({ role: "user" }).where(eq(schema.user.id, f.actorId)),
+    "writer role invalidated",
+    (f) =>
+      db
+        .update(schema.user)
+        .set({ role: "unknown-synthetic-role" })
+        .where(eq(schema.user.id, f.actorId)),
   ],
   [
     "session revoked",
@@ -232,40 +238,69 @@ async function observeBlocked(pid: number) {
   } while (performance.now() < deadline);
   throw new Error("Expected actual PostgreSQL lock wait was not observed");
 }
-async function assertAllowed(f: Fixture, decision: "approved" | "rejected") {
-  f.form.set("decision", decision);
-  assert.equal((await run(f)).status, "success");
+async function assertAllowed(f: Fixture) {
+  const before = await state(f);
+  const result = await run(f);
+  assert.equal(result.status, "success");
   const after = await state(f);
-  assert.equal(
-    after.contents[0].state,
-    decision === "approved" ? "CONTENT_APPROVED" : "CONTENT_REVISION_REQUIRED",
+  assert.deepEqual(
+    after.products,
+    before.products,
+    "Source ProductReady and evidence remain immutable",
   );
-  assert.equal(after.contents[0].version, 2);
-  assert.deepEqual(after.contents[0].payload.product_facts, f.content.product_facts);
-  assert.equal(after.contents[0].payload.body, f.content.body);
-  assert.equal(after.gates[0].status, decision);
-  assert.equal(after.events.length, 2);
-  assert.equal(after.audits.filter((row) => row.action === "content_gate_01_decided").length, 1);
-  assert(after.links.some((row) => row.evidenceId === f.decisionRef));
+  assert.equal(after.contents.length, 1);
+  const content = after.contents[0];
+  assert.equal(content.id, result.contentId);
+  assert.equal(content.state, "CONTENT_REVIEW_REQUIRED");
+  assert.equal(content.version, 1);
+  assert.deepEqual(content.payload.product_facts, [
+    {
+      field: "product.product_name",
+      value: f.draft.product.product_name,
+      evidence_ref: f.evidenceId,
+    },
+  ]);
+  assert.equal(content.payload.body, f.input.body);
+  assert.equal(after.gates.filter((r) => r.aggregateId === content.id)[0].status, "pending");
+  assert.equal(after.events.filter((r) => r.aggregateId === content.id).length, 1);
+  assert.equal(
+    after.audits.filter((r) => r.aggregateId === content.id && r.action === "content_draft_created")
+      .length,
+    1,
+  );
+  assert.equal(
+    after.items.filter(
+      (r) =>
+        r.aggregateId === content.id && r.role === "marketing_content" && r.relation === "owned",
+    ).length,
+    1,
+  );
+  assert.deepEqual(after.links, before.links);
 }
+
 try {
   await migrate(db, { migrationsFolder: "./drizzle" });
-  await assertAllowed(await fixture(), "approved");
-  await assertAllowed(await fixture(), "rejected");
+  await assertAllowed(await fixture());
+  const businessUser = await fixture();
+  await db
+    .update(schema.user)
+    .set({ role: "user" })
+    .where(eq(schema.user.id, businessUser.actorId));
+  await assertAllowed(businessUser);
   console.log(
-    "PASS actual Gate 01 Action: normal admin/editor approves and rejects with exact facts, evidence and audit",
+    "PASS actual manual content Action: admin/user editors create pending drafts from unchanged ProductReady facts",
   );
-  for (const decision of ["approved", "rejected"] as const) {
+  for (const role of ["admin", "user"] as const) {
     for (const [label, change] of changes) {
       const f = await fixture();
-      f.form.set("decision", decision);
+      await db.update(schema.user).set({ role }).where(eq(schema.user.id, f.actorId));
       const before = await state(f);
       const blocker = await lockPool.connect();
       let pending: ReturnType<typeof run> | undefined;
       try {
         await blocker.query("BEGIN");
         await blocker.query("SELECT id FROM aggregate_record WHERE id=$1 FOR UPDATE", [
-          f.contentId,
+          f.productId,
         ]);
         const {
           rows: [backend],
@@ -276,11 +311,11 @@ try {
         await blocker.query("COMMIT");
         assert.deepEqual(await pending, {
           status: "error",
-          message: CONTENT_REVIEW_ACCESS_MESSAGE,
+          message: CONTENT_DRAFT_ACCESS_MESSAGE,
         });
         await unchanged(f, before);
         console.log(
-          `PASS in-flight ${decision}/${label}: observed content lock wait, zero review and evidence-link changes`,
+          `PASS in-flight ${role}/${label}: observed product source lock wait, zero content creation or project-link changes`,
         );
       } finally {
         await blocker.query("ROLLBACK");
@@ -296,18 +331,21 @@ try {
     assert(snapshot);
     cachedSession = snapshot;
     await change(f);
-    assert.deepEqual(await run(f), { status: "error", message: CONTENT_REVIEW_ACCESS_MESSAGE });
+    assert.deepEqual(await run(f), { status: "error", message: CONTENT_DRAFT_ACCESS_MESSAGE });
     cachedSession = undefined;
     await unchanged(f, before);
     console.log(
       `PASS stale initial authentication transport/${label}: current DB authorization wins`,
     );
   }
-  for (const change of ["user", "viewer", "outsider", "archived", "sales"] as const) {
+  for (const change of ["invalid role", "viewer", "outsider", "archived", "sales"] as const) {
     const f = await fixture();
     const before = await state(f);
-    if (change === "user")
-      await db.update(schema.user).set({ role: "user" }).where(eq(schema.user.id, f.actorId));
+    if (change === "invalid role")
+      await db
+        .update(schema.user)
+        .set({ role: "unknown-synthetic-role" })
+        .where(eq(schema.user.id, f.actorId));
     if (change === "viewer")
       await db
         .update(schema.workspaceProjectMember)
@@ -351,94 +389,44 @@ try {
   const direct = await fixture();
   const before = await state(direct);
   await assert.rejects(
-    decideContentReview(direct.input, { ...direct.identity, sessionId: "" }),
-    ContentReviewAccessError,
+    createContentDraft(direct.input, { ...direct.identity, sessionId: "" }),
+    ContentDraftAccessError,
   );
   await assert.rejects(
-    decideContentReview(direct.input, { ...direct.identity, actorId: direct.ownerId }),
-    ContentReviewAccessError,
-  );
-  await unchanged(direct, before);
-  await db
-    .delete(schema.workspaceProjectItem)
-    .where(eq(schema.workspaceProjectItem.aggregateId, direct.contentId));
-  await assert.rejects(
-    decideContentReview(direct.input, direct.identity),
-    ContentReviewAccessError,
+    createContentDraft(direct.input, { ...direct.identity, actorId: direct.ownerId }),
+    ContentDraftAccessError,
   );
   await unchanged(direct, before);
   console.log(
-    "PASS user/viewer/outsider/archive/kind/project/identity and unowned aggregate review denials are atomic",
+    "PASS invalid-role/viewer/outsider/archive/kind/project/session-identity draft denials are atomic",
   );
-
   for (const invalid of [
-    "missing evidence",
-    "foreign evidence",
-    "stale version",
-    "wrong approval",
+    "wrong project source",
+    "product no longer Ready",
+    "unknown fact",
   ] as const) {
     const f = await fixture();
-    if (invalid === "foreign evidence")
+    if (invalid === "wrong project source")
       await db
-        .update(schema.evidence)
-        .set({ uploadedById: f.ownerId })
-        .where(eq(schema.evidence.id, f.decisionRef));
-    if (invalid === "missing evidence")
-      f.form.set("evidenceRef", `evidence-synthetic-missing-${randomUUID()}`);
-    if (invalid === "stale version") f.form.set("reviewedVersion", "2");
-    if (invalid === "wrong approval") f.form.set("approvalId", randomUUID());
+        .delete(schema.workspaceProjectItem)
+        .where(eq(schema.workspaceProjectItem.aggregateId, f.productId));
+    if (invalid === "product no longer Ready")
+      await db
+        .update(schema.aggregateRecord)
+        .set({ state: "PRODUCT_REVISION_REQUIRED" })
+        .where(eq(schema.aggregateRecord.id, f.productId));
+    if (invalid === "unknown fact") f.form.set("factPath", "product.unsupported");
     const before = await state(f);
-    const result = await run(f);
-    assert.equal(result.status, "error");
-    assert.equal(
-      result.message,
-      invalid.endsWith("evidence")
-        ? "部分证据不存在或无权用于当前项目。"
-        : invalid === "stale version"
-          ? "内容已更新，请刷新后重新审核当前版本。"
-          : "审核请求已更新，请刷新后重新审核。",
-    );
+    assert.equal((await run(f)).status, "error");
     await unchanged(f, before);
-    console.log(`PASS ${invalid}: zero review changes or evidence links`);
+    console.log(`PASS ${invalid}: no content writes or source changes`);
   }
-  const sharedEvidence = await fixture();
-  await db
-    .update(schema.evidence)
-    .set({ uploadedById: sharedEvidence.ownerId })
-    .where(eq(schema.evidence.id, sharedEvidence.decisionRef));
-  await db.insert(schema.workspaceProjectEvidence).values({
-    id: randomUUID(),
-    projectId: sharedEvidence.projectId,
-    evidenceId: sharedEvidence.decisionRef,
-    linkedById: sharedEvidence.ownerId,
-  });
-  await assertAllowed(sharedEvidence, "approved");
-  console.log("PASS existing current-project evidence remains reviewable for a different uploader");
-
-  const simultaneous = await fixture();
-  const responses = await Promise.all([run(simultaneous), run(simultaneous)]);
-  assert.equal(responses.filter((r) => r.status === "success").length, 1);
-  assert.equal(responses.filter((r) => r.status === "error").length, 1);
-  const committed = await state(simultaneous);
-  assert.equal(committed.contents[0].version, 2);
-  assert.equal(committed.gates[0].status, "approved");
-  assert.equal(committed.events.length, 2);
-  assert.equal(committed.audits.filter((r) => r.action === "content_gate_01_decided").length, 1);
-  console.log("PASS simultaneous review decisions commit exactly once");
 
   // Date only is controlled; async waits, business/authorization row locks and DB are real.
   const clockStart = Date.now();
   mock.timers.enable({ apis: ["Date"], now: clockStart });
   try {
-    for (const table of [
-      "workspace_project",
-      "aggregate_record",
-      "approval",
-      "user",
-      "session",
-      "workspace_project_item",
-      "evidence",
-    ] as const) {
+    for (const table of ["workspace_project", "aggregate_record", "user", "session"] as const) {
       mock.timers.setTime(clockStart);
       const f = await fixture(60_000);
       const before = await state(f);
@@ -446,24 +434,14 @@ try {
       let pending: ReturnType<typeof run> | undefined;
       try {
         await blocker.query("BEGIN");
-        const [ownedLink] = await db
-          .select({ id: schema.workspaceProjectItem.id })
-          .from(schema.workspaceProjectItem)
-          .where(eq(schema.workspaceProjectItem.aggregateId, f.contentId));
         const id =
           table === "workspace_project"
             ? f.projectId
             : table === "aggregate_record"
-              ? f.contentId
-              : table === "approval"
-                ? f.input.approvalId
-                : table === "user"
-                  ? f.actorId
-                  : table === "session"
-                    ? f.identity.sessionId
-                    : table === "evidence"
-                      ? f.decisionRef
-                      : ownedLink.id;
+              ? f.productId
+              : table === "user"
+                ? f.actorId
+                : f.identity.sessionId;
         await blocker.query(`SELECT id FROM "${table}" WHERE id=$1 FOR UPDATE`, [id]);
         const {
           rows: [backend],
@@ -474,11 +452,11 @@ try {
         await blocker.query("COMMIT");
         assert.deepEqual(await pending, {
           status: "error",
-          message: CONTENT_REVIEW_ACCESS_MESSAGE,
+          message: CONTENT_DRAFT_ACCESS_MESSAGE,
         });
         await unchanged(f, before);
         console.log(
-          `PASS natural session expiry after observed ${table} lock wait: zero review changes`,
+          `PASS natural session expiry after observed ${table} lock wait: zero content creation`,
         );
       } finally {
         await blocker.query("ROLLBACK");
@@ -497,9 +475,9 @@ try {
       await tx
         .select()
         .from(schema.aggregateRecord)
-        .where(eq(schema.aggregateRecord.id, held.contentId))
+        .where(eq(schema.aggregateRecord.id, held.productId))
         .for("update");
-      await authorizeLockedContentReview(tx, held.identity, held.contentId);
+      await authorizeLockedContentDraft(tx, held.identity);
       // A separate connection's update must wait until the authorization transaction ends.
       const revoker = await lockPool.connect();
       try {
@@ -507,7 +485,7 @@ try {
           rows: [pid],
         } = await revoker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
         revocation = revoker
-          .query('UPDATE "user" SET role=$1 WHERE id=$2', ["user", held.actorId])
+          .query('UPDATE "user" SET role=$1 WHERE id=$2', ["unknown-synthetic-role", held.actorId])
           .finally(() => revoker.release());
         const deadline = performance.now() + 5_000;
         let blocked = false;
@@ -532,10 +510,10 @@ try {
     await revocation;
   }
   console.log(
-    "PASS current review authorization locks serialize revocation until transaction completion",
+    "PASS current draft authorization locks serialize revocation until transaction completion",
   );
   console.log(
-    "PASS synthetic Gate 01 current authorization; no remote requests; append-only audits retained",
+    "PASS synthetic manual content current authorization; no remote requests; append-only audits retained",
   );
 } finally {
   cachedSession = undefined;

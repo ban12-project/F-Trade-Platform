@@ -5,10 +5,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool, type PoolClient } from "pg";
 import complete from "../../data/fixtures/product-draft-complete.synthetic.json";
-import { CONTENT_REVIEW_ACCESS_MESSAGE } from "../../lib/content/review-write-access";
-import { createContentDraft } from "../../lib/content/store";
+import { CONTENT_DRAFT_ACCESS_MESSAGE } from "../../lib/content/draft-write-access";
 import type { Database } from "../../lib/db/client";
-import { closeDatabase } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
 import { reviewProductDraft } from "../../lib/product/verification";
 import { createProductAgentDraft, decideProductCatalogReview } from "../../lib/products";
@@ -16,8 +14,6 @@ import { authSecret, databaseURL } from "../../playwright.database.config";
 
 // Real signed auth, review UI, Action, authorization locks and DB. Synthetic only;
 // no model, Workflow, media processing, cloud storage or outbound business request.
-process.env.DATABASE_URL = databaseURL;
-process.env.DATABASE_TRANSPORT = "postgres";
 const pool = new Pool({ connectionString: databaseURL });
 const db = drizzle(pool, { schema });
 test.beforeAll(async () => {
@@ -25,19 +21,17 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => {
   await pool.end();
-  await closeDatabase();
 });
 
 for (const change of [
-  "unchanged approve",
-  "unchanged reject",
-  "role removed",
+  "unchanged admin",
+  "unchanged user",
+  "invalid role",
   "session revoked",
   "banned",
   "expired",
-  "missing evidence",
 ] as const) {
-  test(`Content Gate 01 real browser ${change}: authorized decisions or intact pending content`, async ({
+  test(`Manual content draft real browser ${change}: authorized creation or zero content writes`, async ({
     page,
     context,
     baseURL,
@@ -50,22 +44,17 @@ for (const change of [
       productId = randomUUID(),
       token = randomUUID();
     const evidenceId = `evidence-synthetic-review-browser-${randomUUID()}`;
-    const notes = "SYNTHETIC browser reviewer notes retained";
-    const revoke = ["role removed", "session revoked", "banned", "expired"].includes(change);
-    const missingEvidence = change === "missing evidence";
-    const reviewEvidence = missingEvidence
-      ? `evidence-synthetic-missing-${randomUUID()}`
-      : evidenceId;
-    const decision = change === "unchanged reject" ? "rejected" : "approved";
-    const label = decision === "approved" ? "批准营销内容" : "退回营销内容";
-    const selectErrors: string[] = [];
-    page.on("console", (message) => {
-      if (
-        message.type() === "error" &&
-        /uncontrolled[\s\S]*Select|controlled[\s\S]*Select/.test(message.text())
-      )
-        selectErrors.push(message.text());
-    });
+    const values = {
+      objective: "SYNTHETIC browser objective",
+      targetCustomer: "SYNTHETIC browser buyer",
+      hook: "SYNTHETIC browser hook",
+      body: "SYNTHETIC browser body retained",
+      callToAction: "SYNTHETIC contact",
+      hashtags: "#Synthetic",
+      visualInstruction: "SYNTHETIC text card",
+    };
+    const revoke = !change.startsWith("unchanged");
+    const label = "创建待审内容";
     let blocker: PoolClient | undefined;
     let pending: Promise<void> | undefined;
     try {
@@ -143,38 +132,29 @@ for (const change of [
         identity,
         db as unknown as Database,
       );
-      const savedContent = await createContentDraft(
-        {
-          productId,
-          contentType: "product",
-          factPath: "product.product_name",
-          objective: "SYNTHETIC content review",
-          targetCustomer: "SYNTHETIC test-only buyer",
-          hook: "SYNTHETIC marketing copy",
-          body: "SYNTHETIC browser body for review",
-          callToAction: "SYNTHETIC workflow inquiry",
-          hashtags: "#Synthetic",
-          visualInstruction: "SYNTHETIC text card",
-        },
-        identity,
-        db as unknown as Database,
-      );
-      const contentId = savedContent.id;
+      if (change === "unchanged user")
+        await db.update(schema.user).set({ role: "user" }).where(eq(schema.user.id, actorId));
       const snapshot = async () => {
-        const [contents, gates, workflows, audits, links] = await Promise.all([
-          db.select().from(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, contentId)),
-          db.select().from(schema.approval).where(eq(schema.approval.aggregateId, contentId)),
+        const [products, contents, gates, workflows, audits, items] = await Promise.all([
+          db.select().from(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, productId)),
           db
             .select()
-            .from(schema.workflowEvent)
-            .where(eq(schema.workflowEvent.aggregateId, contentId)),
-          db.select().from(schema.auditEvent).where(eq(schema.auditEvent.aggregateId, contentId)),
+            .from(schema.aggregateRecord)
+            .where(
+              and(
+                eq(schema.aggregateRecord.type, "content"),
+                eq(schema.aggregateRecord.createdById, actorId),
+              ),
+            ),
+          db.select().from(schema.approval).where(eq(schema.approval.requestedById, actorId)),
+          db.select().from(schema.workflowEvent).where(eq(schema.workflowEvent.actorId, actorId)),
+          db.select().from(schema.auditEvent).where(eq(schema.auditEvent.actorId, actorId)),
           db
             .select()
-            .from(schema.workspaceProjectEvidence)
-            .where(eq(schema.workspaceProjectEvidence.projectId, projectId)),
+            .from(schema.workspaceProjectItem)
+            .where(eq(schema.workspaceProjectItem.projectId, projectId)),
         ]);
-        return { contents, gates, workflows, audits, links };
+        return { products, contents, gates, workflows, audits, items };
       };
       const before = await snapshot();
       const signature = createHmac("sha256", authSecret).update(token).digest("base64");
@@ -187,20 +167,26 @@ for (const change of [
           sameSite: "Lax",
         },
       ]);
-      const path = `/workspace/${projectId}/records/content/${contentId}`;
+      const path = `/workspace/${projectId}/new/content?product=${productId}`;
       await page.goto(path);
-      const form = page.locator("form#content-review").filter({ visible: true });
+      const form = page.locator("form#create-content").filter({ visible: true });
       await expect(form).toBeVisible();
-      await expect(form.locator('#content-review-decision [data-slot="select-value"]')).toHaveText(
-        "请选择审核决定",
+      await expect(form.locator("#content-source-product [data-slot='select-value']")).toHaveText(
+        `${draft.product.internal_sku} · ${draft.product.product_name}`,
       );
-      await expect(
-        page.getByRole("button", { name: "请先选择决定", exact: true }).filter({ visible: true }),
-      ).toBeDisabled();
-      await form.getByRole("combobox", { name: "决定", exact: true }).click();
-      await page.getByRole("option", { name: label, exact: true }).click();
-      await form.getByLabel("审核证据", { exact: true }).fill(reviewEvidence);
-      await form.locator("#content-review-notes").fill(notes);
+      await form.getByRole("combobox", { name: "允许引用的产品事实", exact: true }).click();
+      await page.getByRole("option", { name: /产品名称/ }).click();
+      const fields = {
+        objective: "#content-objective",
+        targetCustomer: "#target-customer",
+        hook: "#content-hook",
+        body: "#content-body",
+        callToAction: "#content-cta",
+        hashtags: "#content-hashtags",
+        visualInstruction: "#visual-instruction",
+      };
+      for (const [key, selector] of Object.entries(fields))
+        await form.locator(selector).fill(values[key as keyof typeof values]);
       const submit = page
         .getByRole("button", { name: label, exact: true })
         .filter({ visible: true });
@@ -210,7 +196,7 @@ for (const change of [
       if (revoke) {
         blocker = await pool.connect();
         await blocker.query("BEGIN");
-        await blocker.query("SELECT id FROM aggregate_record WHERE id=$1 FOR UPDATE", [contentId]);
+        await blocker.query("SELECT id FROM aggregate_record WHERE id=$1 FOR UPDATE", [productId]);
         const {
           rows: [backend],
         } = await blocker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
@@ -218,7 +204,7 @@ for (const change of [
         await pending;
         await expect(
           page
-            .getByRole("button", { name: "正在加载… 批准营销内容", exact: true })
+            .getByRole("button", { name: "正在加载… 创建待审内容", exact: true })
             .filter({ visible: true }),
         ).toBeDisabled();
         await expect
@@ -232,11 +218,14 @@ for (const change of [
               );
               return row.blocked;
             },
-            { message: "Observe the actual Server Action content-lock wait" },
+            { message: "Observe the actual Server Action source-product lock wait" },
           )
           .toBe(true);
-        if (change === "role removed")
-          await db.update(schema.user).set({ role: "user" }).where(eq(schema.user.id, actorId));
+        if (change === "invalid role")
+          await db
+            .update(schema.user)
+            .set({ role: "unknown-synthetic-role" })
+            .where(eq(schema.user.id, actorId));
         if (change === "session revoked")
           await db.delete(schema.session).where(eq(schema.session.id, sessionId));
         if (change === "banned")
@@ -249,51 +238,62 @@ for (const change of [
         await blocker.query("COMMIT");
       } else await submit.click();
       expect((await response).ok()).toBe(true);
-      expect(selectErrors).toEqual([]);
-      if (revoke || missingEvidence) {
+      if (revoke) {
         await expect(
-          page
-            .getByText(
-              missingEvidence
-                ? "部分证据不存在或无权用于当前项目。"
-                : CONTENT_REVIEW_ACCESS_MESSAGE,
-              { exact: true },
-            )
-            .filter({ visible: true }),
+          page.getByText(CONTENT_DRAFT_ACCESS_MESSAGE, { exact: true }).filter({ visible: true }),
         ).toBeVisible();
-        await expect(form.locator("#content-review-notes")).toHaveValue(notes);
-        await expect(
-          form
-            .getByRole("combobox", { name: "决定", exact: true })
-            .locator('[data-slot="select-value"]'),
-        ).toHaveText(label);
-        await expect(form.getByLabel("审核证据", { exact: true })).toHaveValue(reviewEvidence);
+        for (const [key, selector] of Object.entries(fields))
+          await expect(form.locator(selector)).toHaveValue(values[key as keyof typeof values]);
+        await expect(form.locator("#content-source-product [data-slot='select-value']")).toHaveText(
+          `${draft.product.internal_sku} · ${draft.product.product_name}`,
+        );
+        await expect(form.locator("#content-source-fact [data-slot='select-value']")).toHaveText(
+          "产品名称",
+        );
         await expect(submit).toBeEnabled();
         expect(await snapshot()).toEqual(before);
       } else {
+        await expect(page).toHaveURL(new RegExp(`/workspace/${projectId}/records/content/`));
         await expect(
           page
             .getByRole("region", { name: "业务记录", exact: true })
-            .getByText(decision === "approved" ? "可安排发布" : "待修订", { exact: true })
+            .getByText("待审核", { exact: true })
             .filter({ visible: true }),
         ).toBeVisible();
         const after = await snapshot();
-        expect(after.contents[0].state).toBe(
-          decision === "approved" ? "CONTENT_APPROVED" : "CONTENT_REVISION_REQUIRED",
-        );
-        expect(after.contents[0].version).toBe(2);
-        expect(after.contents[0].payload.product_facts).toEqual(savedContent.content.product_facts);
-        expect(after.contents[0].payload.body).toEqual(savedContent.content.body);
-        expect(after.gates[0].status).toBe(decision);
-        expect(after.workflows).toHaveLength(2);
-        expect(after.audits.filter((row) => row.action === "content_gate_01_decided")).toHaveLength(
-          1,
-        );
+        expect(after.products).toEqual(before.products);
+        expect(after.contents).toHaveLength(1);
+        const content = after.contents[0];
+        expect(content.state).toBe("CONTENT_REVIEW_REQUIRED");
+        expect(content.version).toBe(1);
+        expect(content.payload.product_facts).toEqual([
+          {
+            field: "product.product_name",
+            value: draft.product.product_name,
+            evidence_ref: evidenceId,
+          },
+        ]);
+        expect(content.payload.body).toEqual(values.body);
+        expect(after.gates.filter((r) => r.aggregateId === content.id)[0].status).toBe("pending");
+        expect(after.workflows.filter((r) => r.aggregateId === content.id)).toHaveLength(1);
+        expect(
+          after.audits.filter(
+            (r) => r.aggregateId === content.id && r.action === "content_draft_created",
+          ),
+        ).toHaveLength(1);
+        expect(
+          after.items.filter(
+            (r) =>
+              r.aggregateId === content.id &&
+              r.role === "marketing_content" &&
+              r.relation === "owned",
+          ),
+        ).toHaveLength(1);
         await page.reload();
         await expect(
           page
             .getByRole("region", { name: "业务记录", exact: true })
-            .getByText(decision === "approved" ? "可安排发布" : "待修订", { exact: true })
+            .getByText(values.body, { exact: true })
             .filter({ visible: true }),
         ).toBeVisible();
       }

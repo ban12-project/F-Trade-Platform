@@ -31,6 +31,8 @@
     "scripts/test-product-review-action-errors.mts",
     "scripts/test-content-review-write-access-postgres.mts",
     "scripts/test-content-review-action-errors.mts",
+    "scripts/test-content-draft-write-access-postgres.mts",
+    "scripts/test-content-draft-action-errors.mts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
