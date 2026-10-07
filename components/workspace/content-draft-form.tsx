@@ -2,7 +2,15 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { BotIcon, FilePenLineIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
-import { startTransition, useActionState, useEffect, useEffectEvent } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -36,7 +44,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { initialContentActionState, initialContentAgentActionState } from "@/lib/action-states";
 import { createContentDraftAction, reviseContentDraftAction } from "@/lib/actions/content";
-import { generateContentDraftAction } from "@/lib/actions/content-agent";
+import {
+  type ContentAgentActionState,
+  generateContentDraftAction,
+} from "@/lib/actions/content-agent";
 import type { ContentCatalogDetail, ReadyProductContentSource } from "@/lib/content/store";
 import { contentDraftFormSchema } from "@/lib/form-schemas";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
@@ -98,10 +109,19 @@ export function ContentDraftForm({
     revising ? reviseContentDraftAction : createContentDraftAction,
     initialContentActionState,
   );
-  const [aiState, aiAction, generating] = useActionState(
-    generateContentDraftAction,
-    initialContentAgentActionState,
-  );
+  const [aiState, setAiState] = useState<ContentAgentActionState>(initialContentAgentActionState);
+  const [generating, startGenerating] = useTransition();
+  const generationRequest = useRef(0);
+  const generationContext = `${projectId}:${detail?.id ?? "new"}`;
+  const generationContextRef = useRef(generationContext);
+  useEffect(() => {
+    generationContextRef.current = generationContext;
+    generationRequest.current += 1;
+    setAiState(initialContentAgentActionState);
+    return () => {
+      generationRequest.current += 1;
+    };
+  }, [generationContext]);
   const form = useForm<ContentValues>({
     resolver: zodResolver(contentDraftFormSchema),
     defaultValues: detail ? valuesFromDetail(detail) : defaultValues(products),
@@ -109,14 +129,6 @@ export function ContentDraftForm({
   useWorkspaceDirty(`content-draft-${detail?.id ?? "new"}`, form.formState.isDirty);
   const productId = form.watch("productId");
   const product = products.find((item) => item.id === productId);
-  useEffect(() => {
-    if (!aiState.draft) return;
-    form.setValue("hook", aiState.draft.hook, { shouldDirty: true });
-    form.setValue("body", aiState.draft.body, { shouldDirty: true });
-    form.setValue("callToAction", aiState.draft.callToAction, { shouldDirty: true });
-    form.setValue("hashtags", aiState.draft.hashtags.join(" "), { shouldDirty: true });
-    form.setValue("visualInstruction", aiState.draft.visualInstruction, { shouldDirty: true });
-  }, [aiState.draft, form]);
   const resetSavedDraft = useEffectEvent(() => {
     form.reset(revising ? form.getValues() : defaultValues(products));
   });
@@ -134,6 +146,7 @@ export function ContentDraftForm({
     return result;
   }
   function generate() {
+    if (generating || saving) return;
     const values = form.getValues();
     const subset = contentDraftFormSchema
       .pick({
@@ -148,7 +161,46 @@ export function ContentDraftForm({
       void form.trigger(["productId", "contentType", "factPath", "objective", "targetCustomer"]);
       return;
     }
-    startTransition(() => aiAction(data(values)));
+    const requestId = ++generationRequest.current;
+    const requestContext = generationContext;
+    setAiState(initialContentAgentActionState);
+    startGenerating(async () => {
+      try {
+        const result = await generateContentDraftAction(
+          initialContentAgentActionState,
+          data(values),
+        );
+        if (
+          requestId !== generationRequest.current ||
+          requestContext !== generationContextRef.current
+        )
+          return;
+        if (result.draft) {
+          const current = form.getValues();
+          if (
+            Object.entries(values).some(
+              ([key, value]) => current[key as keyof ContentValues] !== value,
+            )
+          ) {
+            setAiState({
+              status: "error",
+              message: "生成期间产品选择或内容已更改，未覆盖当前填写。请按当前内容重新生成。",
+            });
+            return;
+          }
+          // Apply one matching draft; never mix a stale result with edits made while waiting.
+          form.setValue("hook", result.draft.hook, { shouldDirty: true });
+          form.setValue("body", result.draft.body, { shouldDirty: true });
+          form.setValue("callToAction", result.draft.callToAction, { shouldDirty: true });
+          form.setValue("hashtags", result.draft.hashtags.join(" "), { shouldDirty: true });
+          form.setValue("visualInstruction", result.draft.visualInstruction, { shouldDirty: true });
+        }
+        setAiState(result);
+      } catch {
+        if (requestId === generationRequest.current)
+          setAiState({ status: "error", message: "无法生成内容初稿，请稍后重试或手动填写。" });
+      }
+    });
   }
   if (!products.length)
     return (
@@ -176,7 +228,9 @@ export function ContentDraftForm({
       <CardContent>
         <form
           id={revising ? "revise-content" : "create-content"}
-          onSubmit={form.handleSubmit((values) => startTransition(() => saveAction(data(values))))}
+          onSubmit={form.handleSubmit((values) => {
+            if (!generating && !saving) startTransition(() => saveAction(data(values)));
+          })}
         >
           <FieldGroup>
             <Field data-invalid={!!form.formState.errors.productId}>
@@ -286,7 +340,12 @@ export function ContentDraftForm({
               <Input id="target-customer" {...form.register("targetCustomer")} />
               <FieldError errors={[form.formState.errors.targetCustomer]} />
             </Field>
-            <Button type="button" variant="outline" disabled={generating} onClick={generate}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={generating || saving}
+              onClick={generate}
+            >
               {generating ? (
                 <Spinner data-icon="inline-start" />
               ) : (
@@ -326,7 +385,7 @@ export function ContentDraftForm({
         <Button
           form={revising ? "revise-content" : "create-content"}
           type="submit"
-          disabled={saving}
+          disabled={saving || generating}
         >
           {saving ? (
             <Spinner data-icon="inline-start" />
