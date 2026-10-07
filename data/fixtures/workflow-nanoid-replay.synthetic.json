@@ -1,0 +1,105 @@
+{
+  "classification": "SYNTHETIC ONLY — no factory facts, customer data, production identity or business approval",
+  "provenance": {
+    "core": "4.8.8",
+    "nanoid": "5.1.6",
+    "worldLocal": "4.4.1",
+    "specVersion": 3,
+    "method": "Actual SDK start() and workflowEntrypoint() with local persistent storage and an in-process synthetic bundle; snapshot taken after two implicit hooks suspended. Expected output captured by completing an independent byte-copy with the old library.",
+    "externalHttpRequests": 0
+  },
+  "workflowName": "workflow//./SYNTHETIC-nanoid-replay//probe",
+  "workflowCode": "globalThis.__private_workflows = new Map([[\"workflow//./SYNTHETIC-nanoid-replay//probe\", async function probe() {\n  const createHook = globalThis[Symbol.for('WORKFLOW_CREATE_HOOK')];\n  const stableUlid = globalThis[Symbol.for('WORKFLOW_STABLE_ULID')];\n  const fixedStart = Date.now();\n  const initial = Math.random();\n  const first = createHook({metadata: {synthetic: true, stage: 'first', initial}});\n  const between = Math.random();\n  const interveningUlid = stableUlid(fixedStart + 1);\n  const second = createHook({metadata: {synthetic: true, stage: 'second', between, interveningUlid}});\n  const after = Math.random();\n  const payload1 = await first;\n  const continued = Math.random();\n  const laterUlid = stableUlid(fixedStart + 2);\n  const third = createHook({metadata: {synthetic: true, stage: 'third', continued, laterUlid}});\n  const payload2 = await second;\n  const payload3 = await third;\n  return {synthetic: true, tokens: [first.token, second.token, third.token], initial, between, interveningUlid, after, continued, laterUlid, final: Math.random(), payloads: [payload1, payload2, payload3]};\n}]]);",
+  "runId": "wrun_01M4A284Z6NXZSS6H8RPR5QKYT",
+  "pendingHooks": [
+    {
+      "hookId": "hook_01M4A285024KJF08RCFA0KJDH7",
+      "token": "uw_KRoBWNstKbRu2toTr8",
+      "metadata": {
+        "synthetic": true,
+        "stage": "first",
+        "initial": 0.5431937067178043
+      }
+    },
+    {
+      "hookId": "hook_01M4A28503D8X758SGG4Q9HDG6",
+      "token": "awUe2XG81f4y9jHxMxhUw",
+      "metadata": {
+        "synthetic": true,
+        "stage": "second",
+        "between": 0.8565898860996861,
+        "interveningUlid": "01M4A28503D8X758SGG4Q9HDG5"
+      }
+    }
+  ],
+  "worldFiles": {
+    "events/wrun_01M4A284Z6NXZSS6H8RPR5QKYT-evnt_01M4A285020NQCST8VXTRQTS19.json": {
+      "sha256": "b1352c443ad00243134039868bf019a9780635dcdcd7458e041c941770440013",
+      "contents": "{\n  \"eventType\": \"run_started\",\n  \"specVersion\": 3,\n  \"runId\": \"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\n  \"eventId\": \"evnt_01M4A285020NQCST8VXTRQTS19\",\n  \"createdAt\": \"2026-10-07T02:14:31.170Z\"\n}"
+    },
+    "events/wrun_01M4A284Z6NXZSS6H8RPR5QKYT-evnt_01M4A28505TFB6MB0G2XBJ65GD.json": {
+      "sha256": "82c50fd9b99bf3ee1db837f3e433b4d88635eea049d817541de1cbf288af257f",
+      "contents": "{\n  \"eventType\": \"run_created\",\n  \"runId\": \"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\n  \"eventId\": \"evnt_01M4A28505TFB6MB0G2XBJ65GD\",\n  \"createdAt\": \"2026-10-07T02:14:31.170Z\",\n  \"specVersion\": 3,\n  \"eventData\": {\n    \"deploymentId\": \"dpl_local@4.4.1\",\n    \"workflowName\": \"workflow//./SYNTHETIC-nanoid-replay//probe\",\n    \"input\": {\n      \"__type\": \"Uint8Array\",\n      \"data\": \"ZGV2bFtbXV0=\"\n    },\n    \"executionContext\": {\n      \"traceCarrier\": {},\n      \"workflowCoreVersion\": \"4.8.8\",\n      \"features\": {\n        \"encryption\": false\n      }\n    }\n  }\n}"
+    },
+    "events/wrun_01M4A284Z6NXZSS6H8RPR5QKYT-evnt_01M4A2854VX40MYQBMD73B3FDE.json": {
+      "sha256": "cf246b501ef0cc33fd2de3f076a568c1135ad37509cb1fccb1c81951edf7a2b4",
+      "contents": "{\n  \"eventType\": \"hook_created\",\n  \"specVersion\": 3,\n  \"correlationId\": \"hook_01M4A285024KJF08RCFA0KJDH7\",\n  \"eventData\": {\n    \"token\": \"uw_KRoBWNstKbRu2toTr8\",\n    \"metadata\": {\n      \"__type\": \"Uint8Array\",\n      \"data\": \"ZGV2bFt7InN5bnRoZXRpYyI6MSwic3RhZ2UiOjIsImluaXRpYWwiOjN9LHRydWUsImZpcnN0IiwwLjU0MzE5MzcwNjcxNzgwNDNd\"\n    },\n    \"isWebhook\": false\n  },\n  \"runId\": \"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\n  \"eventId\": \"evnt_01M4A2854VX40MYQBMD73B3FDE\",\n  \"createdAt\": \"2026-10-07T02:14:31.323Z\"\n}"
+    },
+    "events/wrun_01M4A284Z6NXZSS6H8RPR5QKYT-evnt_01M4A2854VX40MYQBMD73B3FDF.json": {
+      "sha256": "e66825a6b29ca52488d8fb8ae531e7f2b5a17b35bdbf6e6982ebf145acab2172",
+      "contents": "{\n  \"eventType\": \"hook_created\",\n  \"specVersion\": 3,\n  \"correlationId\": \"hook_01M4A28503D8X758SGG4Q9HDG6\",\n  \"eventData\": {\n    \"token\": \"awUe2XG81f4y9jHxMxhUw\",\n    \"metadata\": {\n      \"__type\": \"Uint8Array\",\n      \"data\": \"ZGV2bFt7InN5bnRoZXRpYyI6MSwic3RhZ2UiOjIsImJldHdlZW4iOjMsImludGVydmVuaW5nVWxpZCI6NH0sdHJ1ZSwic2Vjb25kIiwwLjg1NjU4OTg4NjA5OTY4NjEsIjAxTTRBMjg1MDNEOFg3NThTR0c0UTlIREc1Il0=\"\n    },\n    \"isWebhook\": false\n  },\n  \"runId\": \"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\n  \"eventId\": \"evnt_01M4A2854VX40MYQBMD73B3FDF\",\n  \"createdAt\": \"2026-10-07T02:14:31.323Z\"\n}"
+    },
+    "hooks/hook_01M4A285024KJF08RCFA0KJDH7.json": {
+      "sha256": "b4a9f310a70b3fce347c5358c2680fb4d23a29041d4270bb6261ded43a0d8159",
+      "contents": "{\n  \"runId\": \"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\n  \"hookId\": \"hook_01M4A285024KJF08RCFA0KJDH7\",\n  \"token\": \"uw_KRoBWNstKbRu2toTr8\",\n  \"metadata\": {\n    \"__type\": \"Uint8Array\",\n    \"data\": \"ZGV2bFt7InN5bnRoZXRpYyI6MSwic3RhZ2UiOjIsImluaXRpYWwiOjN9LHRydWUsImZpcnN0IiwwLjU0MzE5MzcwNjcxNzgwNDNd\"\n  },\n  \"ownerId\": \"local-owner\",\n  \"projectId\": \"local-project\",\n  \"environment\": \"local\",\n  \"createdAt\": \"2026-10-07T02:14:31.323Z\",\n  \"specVersion\": 3,\n  \"isWebhook\": false\n}"
+    },
+    "hooks/hook_01M4A28503D8X758SGG4Q9HDG6.json": {
+      "sha256": "84384f94cf549903f00b304f61e25320d924e38ed89476fdce9914a4d1cf72b3",
+      "contents": "{\n  \"runId\": \"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\n  \"hookId\": \"hook_01M4A28503D8X758SGG4Q9HDG6\",\n  \"token\": \"awUe2XG81f4y9jHxMxhUw\",\n  \"metadata\": {\n    \"__type\": \"Uint8Array\",\n    \"data\": \"ZGV2bFt7InN5bnRoZXRpYyI6MSwic3RhZ2UiOjIsImJldHdlZW4iOjMsImludGVydmVuaW5nVWxpZCI6NH0sdHJ1ZSwic2Vjb25kIiwwLjg1NjU4OTg4NjA5OTY4NjEsIjAxTTRBMjg1MDNEOFg3NThTR0c0UTlIREc1Il0=\"\n  },\n  \"ownerId\": \"local-owner\",\n  \"projectId\": \"local-project\",\n  \"environment\": \"local\",\n  \"createdAt\": \"2026-10-07T02:14:31.323Z\",\n  \"specVersion\": 3,\n  \"isWebhook\": false\n}"
+    },
+    "hooks/tokens/5853b45e1644474bfbaabe73d86e354def0ca791b568a6b2c91fad599eb8739c.json": {
+      "sha256": "b2965ae967266aa860514160f71e435692303987e5233ff993702a38a6900081",
+      "contents": "{\"token\":\"uw_KRoBWNstKbRu2toTr8\",\"hookId\":\"hook_01M4A285024KJF08RCFA0KJDH7\",\"runId\":\"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\"eventId\":\"evnt_01M4A2854VX40MYQBMD73B3FDE\"}"
+    },
+    "hooks/tokens/e63816b2a08af9f5b484af40ed379e948ffa3a8e413fed51e3c6c5e202239295.json": {
+      "sha256": "54e5d4aa9b91ae61915a37caa85e00fbd7f4009f68c2a566e97bc41059e4300d",
+      "contents": "{\"token\":\"awUe2XG81f4y9jHxMxhUw\",\"hookId\":\"hook_01M4A28503D8X758SGG4Q9HDG6\",\"runId\":\"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\"eventId\":\"evnt_01M4A2854VX40MYQBMD73B3FDF\"}"
+    },
+    "runs/wrun_01M4A284Z6NXZSS6H8RPR5QKYT.json": {
+      "sha256": "39a73398926965c3917a5a6ae91023522cd04fae9e7e95e2328e8373f5903535",
+      "contents": "{\n  \"runId\": \"wrun_01M4A284Z6NXZSS6H8RPR5QKYT\",\n  \"deploymentId\": \"dpl_local@4.4.1\",\n  \"workflowName\": \"workflow//./SYNTHETIC-nanoid-replay//probe\",\n  \"specVersion\": 3,\n  \"executionContext\": {\n    \"traceCarrier\": {},\n    \"workflowCoreVersion\": \"4.8.8\",\n    \"features\": {\n      \"encryption\": false\n    }\n  },\n  \"input\": {\n    \"__type\": \"Uint8Array\",\n    \"data\": \"ZGV2bFtbXV0=\"\n  },\n  \"createdAt\": \"2026-10-07T02:14:31.170Z\",\n  \"status\": \"running\",\n  \"startedAt\": \"2026-10-07T02:14:31.170Z\",\n  \"updatedAt\": \"2026-10-07T02:14:31.170Z\"\n}"
+    },
+    "version.txt": {
+      "sha256": "8964925ad95010e4cea004406116aa339515ebd8fd6f63b42901c5d3eafa5416",
+      "contents": "@workflow/world-local@4.4.1"
+    }
+  },
+  "expectedOutput": {
+    "synthetic": true,
+    "tokens": ["uw_KRoBWNstKbRu2toTr8", "awUe2XG81f4y9jHxMxhUw", "oYqEcWeSsnjkaRsyZx5k_"],
+    "initial": 0.5431937067178043,
+    "between": 0.8565898860996861,
+    "interveningUlid": "01M4A28503D8X758SGG4Q9HDG5",
+    "after": 0.22651853927747284,
+    "continued": 0.7931603714974285,
+    "laterUlid": "01M4A285046KMVCJ17ZJJWEX2Z",
+    "final": 0.18032516675138163,
+    "payloads": [
+      {
+        "synthetic": true,
+        "stage": "first",
+        "value": 11
+      },
+      {
+        "synthetic": true,
+        "stage": "second",
+        "value": 22
+      },
+      {
+        "synthetic": true,
+        "stage": "third",
+        "value": 33
+      }
+    ]
+  }
+}

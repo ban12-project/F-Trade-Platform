@@ -1,0 +1,45 @@
+diff --git adist/workflow/replay-nanoid.js b/dist/workflow/replay-nanoid.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..45f7db3739a4dd9131110f5fd5ea6a706af5c4ae
+--- /dev/null
++++ b/dist/workflow/replay-nanoid.js
+@@ -0,0 +1,17 @@
++import { customRandom, urlAlphabet } from 'nanoid';
++
++// Existing Workflow runs share this seeded RNG with Math.random() and ULIDs.
++// nanoid 5.1.6 consumed 34 bytes, then read its final 21 in reverse order.
++// nanoid 5.1.16 requests only 21 bytes for this 64-character alphabet. Preserve
++// both the token and all 34 RNG draws while using the patched library unchanged.
++// This adapter is only for Workflow's fixed 21-character replay token contract.
++export function createReplayNanoid(random) {
++    const generate = customRandom(urlAlphabet, 21, (size) => {
++        if (size !== 21) {
++            throw new RangeError('Workflow replay nanoid requires 21 bytes');
++        }
++        const bytes = new Uint8Array(34).map(() => 256 * random());
++        return bytes.subarray(13);
++    });
++    return () => generate();
++}
+diff --git a/dist/workflow.js b/dist/workflow.js
+index 72e8bf366489ca72354c824d095a41dad79823e0..6f5f62c65aaefc8d96fd96b6fcf7efcc23eb473b 100644
+--- a/dist/workflow.js
++++ b/dist/workflow.js
+@@ -1,7 +1,7 @@
+ import { ERROR_SLUGS, ReplayDivergenceError, WorkflowNotRegisteredError, WorkflowRuntimeError, } from '@workflow/errors';
+ import { createWorkflowBaseUrl, withResolvers } from '@workflow/utils';
+ import { parseWorkflowName } from '@workflow/utils/parse-name';
+-import * as nanoid from 'nanoid';
++import { createReplayNanoid } from './workflow/replay-nanoid.js';
+ import { monotonicFactory } from 'ulid';
+ import { EventConsumerResult, EventsConsumer } from './events-consumer.js';
+ import { ENOTSUP, WorkflowSuspension } from './global.js';
+@@ -83,7 +83,7 @@ stepHydrationCache) {
+         });
+         const workflowDiscontinuation = withResolvers();
+         const ulid = monotonicFactory(() => vmGlobalThis.Math.random());
+-        const generateNanoid = nanoid.customRandom(nanoid.urlAlphabet, 21, (size) => new Uint8Array(size).map(() => 256 * vmGlobalThis.Math.random()));
++        const generateNanoid = createReplayNanoid(() => vmGlobalThis.Math.random());
+         // Create a mutable holder for the promise queue so the EventsConsumer
+         // can access the current queue state via a getter. The queue is mutated
+         // by step/hook/sleep callbacks as events are processed.
