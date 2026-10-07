@@ -9,6 +9,7 @@ export type ProductUploadErrorCode =
 type ProductIntakeErrorCode = ProductSourceErrorCode | ProductUploadErrorCode;
 
 export const PRODUCT_INTAKE_ERROR_HEADER = "x-product-intake-error";
+export const PRODUCT_INTAKE_DIAGNOSTIC_HEADER = "x-product-intake-diagnostic";
 const fallbackMessage = "无法开始生成，请检查项目权限、证据和模型配置。";
 const intakeMessages: Record<ProductIntakeErrorCode, string> = {
   source_labels_missing:

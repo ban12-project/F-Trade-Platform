@@ -80,6 +80,9 @@ jobs:
       - name: Verify Product Agent Action error privacy
         run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-product-agent-action-errors.mts
 
+      - name: Verify pre-run request diagnostics correlate without private data
+        run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-product-intake-request-diagnostics.mts
+
       - name: Test Harbor acceptance gate and synthetic expectations
         run: pnpm test:harbor
 

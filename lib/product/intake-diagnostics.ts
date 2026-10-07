@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ProductSourceError, ProductUploadError, productIntakeErrorCode } from "./intake-errors";
 
@@ -42,5 +43,11 @@ export function productIntakeFailureDiagnostic(stage: ProductIntakeStage, error:
 }
 
 export function logProductIntakeFailure(stage: ProductIntakeStage, error: unknown) {
-  console.warn("[product-intake-failure]", productIntakeFailureDiagnostic(stage, error));
+  // Generated here, never taken from request headers, product data or an actor ID.
+  const diagnosticId = randomUUID();
+  console.warn("[product-intake-failure]", {
+    diagnosticId,
+    ...productIntakeFailureDiagnostic(stage, error),
+  });
+  return diagnosticId;
 }
