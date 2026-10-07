@@ -450,15 +450,13 @@ test("processing locks CTA and a failed job restores editing through a real pend
       await expect(page.getByLabel("成片时长（秒）").first()).toBeDisabled();
       await expect(cta).toBeDisabled();
       await expect(page.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
-      const refresh = async () => {
-        const response = await page.waitForResponse(
+      const refresh = () =>
+        page.waitForResponse(
           (response) =>
             response.request().method() === "GET" &&
             response.request().headers().rsc === "1" &&
             new URL(response.url()).pathname === path,
         );
-        await response.finished();
-      };
       // Observe the actual timer refresh for queued and running jobs.
       await refresh();
       await expect(cta).toBeDisabled();
@@ -469,8 +467,11 @@ test("processing locks CTA and a failed job restores editing through a real pend
       await refresh();
       await expect(cta).toBeDisabled();
       await failVideoJob(jobId, failureCode, db as unknown as Database);
-      await refresh();
-      await expect(page.getByText("后台处理中", { exact: true })).toHaveCount(0);
+      // Production RSC streams may stay open. Visible terminal UI proves the
+      // refresh committed; allow up to three real polling cycles in dev.
+      await expect(page.getByText("后台处理中", { exact: true })).toHaveCount(0, {
+        timeout: 10_000,
+      });
       await expect(cta).toBeEnabled();
       await expect(
         page.getByText(kind === "ai_draft" ? "AI 初稿失败" : "合成失败", { exact: true }),
