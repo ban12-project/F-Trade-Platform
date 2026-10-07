@@ -49,7 +49,7 @@ import {
   generateContentDraftAction,
 } from "@/lib/actions/content-agent";
 import type { ContentCatalogDetail, ReadyProductContentSource } from "@/lib/content/store";
-import { contentDraftFormSchema } from "@/lib/form-schemas";
+import { contentAgentRequestSchema, contentDraftFormSchema } from "@/lib/form-schemas";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
 import { useCreatedRecord } from "./use-created-record";
@@ -148,17 +148,13 @@ export function ContentDraftForm({
   function generate() {
     if (generating || saving) return;
     const values = form.getValues();
-    const subset = contentDraftFormSchema
-      .pick({
-        productId: true,
-        contentType: true,
-        factPath: true,
-        objective: true,
-        targetCustomer: true,
-      })
-      .safeParse(values);
+    const subset = contentAgentRequestSchema.safeParse({ ...values, projectId });
     if (!subset.success) {
       void form.trigger(["productId", "contentType", "factPath", "objective", "targetCustomer"]);
+      setAiState({
+        status: "error",
+        message: subset.error.issues[0]?.message ?? "内容请求格式不正确。",
+      });
       return;
     }
     const requestId = ++generationRequest.current;

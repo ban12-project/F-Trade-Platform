@@ -176,13 +176,15 @@ export const contentDraftFormSchema = z.object({
   visualInstruction: contentText,
 });
 
-export const contentAgentRequestSchema = contentDraftFormSchema.pick({
-  productId: true,
-  contentType: true,
-  factPath: true,
-  objective: true,
-  targetCustomer: true,
-});
+export const contentAgentRequestSchema = contentDraftFormSchema
+  .pick({
+    productId: true,
+    contentType: true,
+    factPath: true,
+    objective: true,
+    targetCustomer: true,
+  })
+  .extend({ projectId: z.uuid("项目标识无效。") });
 
 const optionalRfqText = z.string().trim().max(240, "字段不能超过 240 个字符。");
 export const rfqReadyFormSchema = z.object({
