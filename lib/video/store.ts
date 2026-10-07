@@ -28,6 +28,7 @@ import {
   marketingVideoDraftSchema,
 } from "./edit-contracts";
 import { latestVideoProcessingJobs, type VideoProcessingSummary } from "./processing-jobs";
+import { assertLockedVideoProductContext } from "./product-context-guard";
 import type { UploadedVideoSourceAsset } from "./uploaded-assets";
 
 export type VideoProjectDraftInput = z.infer<typeof videoProjectDraftFormSchema>;
@@ -503,6 +504,13 @@ export class MarketingVideoDraftChangedError extends Error {
   }
 }
 
+export class MarketingVideoSourceInvalidError extends Error {
+  constructor() {
+    super("无法确认当前产品事实与素材授权。");
+    this.name = "MarketingVideoSourceInvalidError";
+  }
+}
+
 /** AI output may only replace the exact draft snapshot used for generation. */
 export async function applyMarketingVideoAiDraft(
   videoId: string,
@@ -535,6 +543,13 @@ async function saveMarketingVideoEditDraft(
     if (expectedVersion !== undefined && record.version !== expectedVersion)
       throw new MarketingVideoDraftChangedError();
     const current = videoProjectSchema.parse(record.payload);
+    if (expectedVersion !== undefined) {
+      try {
+        await assertLockedVideoProductContext(tx, current);
+      } catch {
+        throw new MarketingVideoSourceInvalidError();
+      }
+    }
     const assetRefs = new Set(current.sourceAssets.map((asset) => asset.assetRef));
     const claimRefs = new Set(current.factualClaims.map((claim) => claim.field));
     for (const clip of draft.clips) {

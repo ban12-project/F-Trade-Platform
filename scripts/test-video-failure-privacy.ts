@@ -24,6 +24,11 @@ void (async () => {
   } as unknown as Database;
   await failVideoJob("synthetic-job", "RENDER_FAILED", writeDb);
   assert.equal(saved?.failureMessage, videoProcessingFailureMessage("RENDER_FAILED"));
+  await failVideoJob("synthetic-source-job", "AI_DRAFT_SOURCE_INVALID", writeDb);
+  assert.equal(
+    saved?.failureMessage,
+    "无法确认产品事实或素材授权，AI 初稿未保存。请核对来源后重试。",
+  );
   const rows = [
     {
       id: "render",
@@ -47,6 +52,14 @@ void (async () => {
       kind: "ai_draft",
       status: "failed",
       failureCode: "AI_DRAFT_STALE",
+      failureMessage: secret,
+    },
+    {
+      id: "source",
+      videoProjectId: "video-6",
+      kind: "ai_draft",
+      status: "failed",
+      failureCode: "AI_DRAFT_SOURCE_INVALID",
       failureMessage: secret,
     },
     {
@@ -86,6 +99,10 @@ void (async () => {
   assert.equal(
     result.get("video-5")?.failureMessage,
     videoProcessingFailureMessage("AI_DRAFT_STALE"),
+  );
+  assert.equal(
+    result.get("video-6")?.failureMessage,
+    "无法确认产品事实或素材授权，AI 初稿未保存。请核对来源后重试。",
   );
   assert.equal(JSON.stringify([...result]).includes("SYNTHETIC-SECRET"), false);
   assert.equal(JSON.stringify([...result]).includes("private.example"), false);

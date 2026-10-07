@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mock } from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { Pool } from "pg";
 import ready from "../data/fixtures/product-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
+import { productMediaAsset } from "../lib/db/product-media-schema";
 import * as schema from "../lib/db/schema";
 import { videoProjectSchema } from "../lib/video/contracts";
 import { type MarketingVideoDraft, marketingVideoAiDraftSchema } from "../lib/video/edit-contracts";
@@ -29,7 +32,7 @@ const projectId = randomUUID(),
 let duringGeneration: (() => Promise<void>) | undefined;
 let modelCalls = 0;
 const moduleUrl = (relative: string) => new URL(relative, import.meta.url).href;
-const suggestion = marketingVideoAiDraftSchema.parse({
+let suggestion = marketingVideoAiDraftSchema.parse({
   clips: [
     {
       shotCandidateId: "shot-001-001",
@@ -67,11 +70,11 @@ mock.module(moduleUrl("../lib/video/sandbox-sources.ts"), {
 });
 mock.module(moduleUrl("../lib/video/sandbox-media.ts"), {
   exports: {
-    extractMarketingVisualSamplesInSandbox: async () => ({
+    extractMarketingVisualSamplesInSandbox: async (assets: Array<{ assetRef: string }>) => ({
       candidates: [
         {
           id: "shot-001-001",
-          assetRef: "evidence-synthetic-ai-version-image",
+          assetRef: assets[0].assetRef,
           mediaType: "image",
           trimStartMs: 0,
           maximumDurationMs: 10000,
@@ -94,9 +97,14 @@ const { queueVideoProcessingJob } = await import("../lib/video/processing-jobs.t
 const { generateMarketingVideoAiDraftWorkflow } = await import(
   "../workflows/marketing-video-processing.ts"
 );
+const { registerProductMediaAsset, reviewProductMediaAsset } = await import(
+  "../lib/product/media-store.ts"
+);
 const db = getDatabase();
-async function createVideo() {
+type MediaBinding = { id: string; evidenceRef: string; rightsEvidenceRef: string };
+async function createVideo(media?: MediaBinding) {
   const id = randomUUID();
+  const assetRef = media?.evidenceRef ?? "evidence-synthetic-ai-version-image";
   const project = videoProjectSchema.parse({
     id,
     productId,
@@ -113,9 +121,10 @@ async function createVideo() {
     ],
     sourceAssets: [
       {
-        assetRef: "evidence-synthetic-ai-version-image",
+        assetRef,
         mediaType: "image",
-        rightsEvidenceRef: "evidence-synthetic-ai-version-rights",
+        rightsEvidenceRef: media?.rightsEvidenceRef ?? "evidence-synthetic-ai-version-rights",
+        ...(media ? { productMediaId: media.id } : {}),
       },
     ],
     scenes: [
@@ -124,7 +133,7 @@ async function createVideo() {
         prompt: "MOCK",
         durationSeconds: 3,
         claimRefs: [],
-        assetRefs: ["evidence-synthetic-ai-version-image"],
+        assetRefs: [assetRef],
       },
     ],
     editDraft: {
@@ -135,7 +144,7 @@ async function createVideo() {
       clips: [
         {
           clipId: "clip-synthetic-version",
-          assetRef: "evidence-synthetic-ai-version-image",
+          assetRef,
           mediaType: "image",
           trimStartMs: 0,
           durationMs: 3000,
@@ -186,6 +195,100 @@ async function saves(id: string) {
         eq(schema.auditEvent.action, "marketing_video_edit.saved"),
       ),
     );
+}
+
+async function createEvidence(label: string) {
+  const id = `evidence-synthetic-ai-${label}-${randomUUID()}`;
+  await db.insert(schema.evidence).values({
+    id,
+    classification: "internal",
+    blobKey: `synthetic/${id}`,
+    contentType: label === "image" ? "image/png" : "application/json",
+    sha256: createHash("sha256").update(id).digest("hex"),
+    sizeBytes: 1,
+    sourceLabel: "MOCK AI source guard",
+    uploadedByType: "human",
+    uploadedById: owner,
+  });
+  return id;
+}
+
+async function createApprovedMedia(expiresAt: string | null = null): Promise<MediaBinding> {
+  const evidenceRef = await createEvidence("image");
+  const rightsEvidenceRef = await createEvidence("rights");
+  const media = await registerProductMediaAsset(
+    {
+      productId,
+      evidenceRef,
+      origin: "user_upload",
+      semantic: {
+        role: "product_hero",
+        description: "MOCK approved image",
+        tags: [],
+        productVisible: true,
+        logoVisible: false,
+        textPresent: false,
+      },
+      rights: {
+        rightsEvidenceRef,
+        editingAllowed: true,
+        publicDistributionAllowed: true,
+        paidAdvertisingAllowed: false,
+        imageToVideoAllowed: false,
+        referenceToVideoAllowed: false,
+        expiresAt,
+      },
+    },
+    {
+      mediaType: "image",
+      technical: {
+        contentType: "image/png",
+        width: 100,
+        height: 100,
+        durationMs: null,
+        fps: null,
+        hasAudio: false,
+      },
+    },
+    owner,
+  );
+  await reviewProductMediaAsset(
+    {
+      assetId: media.id,
+      decision: "approved",
+      evidenceRef: await createEvidence("review"),
+      notes: "MOCK controlled approval",
+    },
+    owner,
+  );
+  return { id: media.id, evidenceRef, rightsEvidenceRef };
+}
+
+async function runDraft(videoId: string) {
+  const queued = await queueVideoProcessingJob(videoId, "ai_draft", editor);
+  await generateMarketingVideoAiDraftWorkflow({ videoId, jobId: queued.job.id, actorId: editor });
+  return job(queued.job.id);
+}
+
+const sourceResults: Array<{ label: string; protected: boolean }> = [];
+async function recordSourceResult(
+  label: string,
+  video: Awaited<ReturnType<typeof createVideo>>,
+  completed: Awaited<ReturnType<typeof job>>,
+) {
+  const current = await record(video.id);
+  const protectedResult =
+    completed.status === "failed" &&
+    completed.failureCode === "AI_DRAFT_SOURCE_INVALID" &&
+    completed.failureMessage === "无法确认产品事实或素材授权，AI 初稿未保存。请核对来源后重试。" &&
+    JSON.stringify(video.draft) ===
+      JSON.stringify(videoProjectSchema.parse(current.payload).editDraft) &&
+    (await saves(video.id)).length === 0 &&
+    current.version === 2;
+  sourceResults.push({ label, protected: protectedResult });
+  console.log(
+    `${protectedResult ? "PASS" : "FAIL"} current source ${label}: ${completed.status}/${completed.failureCode}; draft and save audit protection=${protectedResult}`,
+  );
 }
 
 try {
@@ -364,6 +467,204 @@ try {
   assert.equal(modelCalls, 3);
   console.log(
     "PASS fresh editor authorization, archive barrier and invalid version deny without draft writes or save audits",
+  );
+
+  // Actual media registration/review uses a controlled reviewer; generation stays
+  // an ordinary project editor. All sources, facts and evidence are synthetic.
+  await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, owner));
+  suggestion = marketingVideoAiDraftSchema.parse({
+    ...suggestion,
+    clips: suggestion.clips.map((clip) => ({
+      ...clip,
+      caption: { kind: "verified_fact", text: "", claimRef: "product.product_name" },
+    })),
+  });
+  const media = await createApprovedMedia();
+  const approved = await createVideo(media);
+  assert.equal((await runDraft(approved.id)).status, "succeeded");
+  assert.equal((await saves(approved.id)).length, 1);
+  assert.deepEqual(
+    videoProjectSchema.parse((await record(approved.id)).payload).editDraft?.clips[0].caption,
+    { kind: "verified_fact", claimRef: "product.product_name" },
+  );
+  console.log("PASS actual approved media baseline saves a verified factual caption");
+
+  const productBefore = await record(productId);
+  const currentProduct = productBefore.payload as typeof ready;
+  for (const [label, change] of [
+    ["product state changed", { state: "PRODUCT_DRAFT" }],
+    [
+      "product fact changed",
+      {
+        payload: {
+          ...currentProduct,
+          product: { ...currentProduct.product, product_name: "MOCK changed product" },
+        },
+      },
+    ],
+    [
+      "product evidence changed",
+      {
+        payload: {
+          ...currentProduct,
+          evidence_refs: [
+            ...currentProduct.evidence_refs,
+            "evidence-synthetic-ai-replacement-fact",
+          ],
+          field_evidence: {
+            ...currentProduct.field_evidence,
+            "product.product_name": "evidence-synthetic-ai-replacement-fact",
+          },
+        },
+      },
+    ],
+  ] as const) {
+    const video = await createVideo(media);
+    duringGeneration = async () => {
+      await db
+        .update(schema.aggregateRecord)
+        .set(change)
+        .where(eq(schema.aggregateRecord.id, productId));
+    };
+    try {
+      await recordSourceResult(label, video, await runDraft(video.id));
+    } finally {
+      await db
+        .update(schema.aggregateRecord)
+        .set({ state: productBefore.state, payload: productBefore.payload })
+        .where(eq(schema.aggregateRecord.id, productId));
+      duringGeneration = undefined;
+    }
+    if (label === "product fact changed" && sourceResults.at(-1)?.protected) {
+      assert.equal((await runDraft(video.id)).status, "succeeded");
+      assert.equal((await saves(video.id)).length, 1);
+      console.log("PASS explicit retry after source restoration uses a fresh version and succeeds");
+    }
+  }
+
+  // Controlled row changes cover current rights/binding states; revocation below
+  // additionally exercises the actual review domain function and its audit.
+  for (const [label, change] of [
+    ["editing permission removed", { editingAllowed: false }],
+    ["distribution permission removed", { publicDistributionAllowed: false }],
+    [
+      "rights evidence binding changed",
+      { rightsEvidenceRef: await createEvidence("replacement-rights") },
+    ],
+  ] as const) {
+    const changedMedia = await createApprovedMedia();
+    const video = await createVideo(changedMedia);
+    duringGeneration = async () => {
+      await db
+        .update(productMediaAsset)
+        .set(change)
+        .where(eq(productMediaAsset.id, changedMedia.id));
+    };
+    try {
+      await recordSourceResult(label, video, await runDraft(video.id));
+    } finally {
+      duringGeneration = undefined;
+    }
+  }
+
+  const revokedMedia = await createApprovedMedia();
+  const revoked = await createVideo(revokedMedia);
+  duringGeneration = async () => {
+    await reviewProductMediaAsset(
+      {
+        assetId: revokedMedia.id,
+        decision: "rejected",
+        evidenceRef: await createEvidence("revoke"),
+        notes: "MOCK revoke during model generation",
+      },
+      owner,
+    );
+  };
+  await recordSourceResult("actual media review revocation", revoked, await runDraft(revoked.id));
+  duringGeneration = undefined;
+  const repaired = await updateMarketingVideoEditDraft(
+    revoked.id,
+    { ...revoked.draft, ctaText: "MOCK manual source repair" },
+    editor,
+  );
+  assert.equal(repaired.editDraft?.ctaText, "MOCK manual source repair");
+  assert.equal((await saves(revoked.id)).length, 1);
+  console.log("PASS manual draft repair remains available after actual source revocation");
+
+  // Date alone is controlled; database locks and async work remain real.
+  const clockStart = Date.now();
+  mock.timers.enable({ apis: ["Date"], now: clockStart });
+  try {
+    const expiring = await createApprovedMedia(new Date(clockStart + 60_000).toISOString());
+    const video = await createVideo(expiring);
+    duringGeneration = async () => {
+      mock.timers.setTime(clockStart + 60_000);
+    };
+    await recordSourceResult("rights expire during generation", video, await runDraft(video.id));
+    duringGeneration = undefined;
+    mock.timers.setTime(clockStart);
+
+    const waitingMedia = await createApprovedMedia(new Date(clockStart + 60_000).toISOString());
+    const waiting = await createVideo(waitingMedia);
+    const lockPool = new Pool({ connectionString: connection });
+    const blocker = await lockPool.connect();
+    let pending: ReturnType<typeof runDraft> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      const {
+        rows: [backend],
+      } = await blocker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+      await blocker.query("SELECT id FROM product_media_asset WHERE id = $1 FOR UPDATE", [
+        waitingMedia.id,
+      ]);
+      const callsBeforeWait = modelCalls;
+      pending = runDraft(waiting.id);
+      const deadline = performance.now() + 5_000;
+      let observedBlocked = false;
+      do {
+        const {
+          rows: [result],
+        } = await lockPool.query<{ blocked: boolean }>(
+          "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))) AS blocked",
+          [backend.pid],
+        );
+        observedBlocked = result.blocked;
+        if (observedBlocked) break;
+        await delay(10);
+      } while (performance.now() < deadline);
+      assert(observedBlocked, "Observe an actual database lock wait before advancing expiry");
+      assert.equal(
+        modelCalls,
+        callsBeforeWait + 1,
+        "Generation has completed before the observed write lock wait",
+      );
+      mock.timers.setTime(clockStart + 60_000);
+      await blocker.query("COMMIT");
+      await recordSourceResult(
+        "rights expire during observed media row lock wait",
+        waiting,
+        await pending,
+      );
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      try {
+        await pending;
+      } finally {
+        await lockPool.end();
+      }
+    }
+  } finally {
+    duringGeneration = undefined;
+    mock.timers.reset();
+  }
+  assert.equal(sourceResults.length, 9);
+  assert(
+    sourceResults.every((result) => result.protected),
+    JSON.stringify(sourceResults),
+  );
+  console.log(
+    "PASS all 9 current-source changes preserve the draft without an AI save audit; no remote requests",
   );
   // Retain actual domain writes and their append-only audit trail in this isolated DB.
 } finally {
