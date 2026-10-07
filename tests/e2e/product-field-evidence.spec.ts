@@ -67,3 +67,46 @@ test("product error summary focuses the first invalid fact", async ({ page }) =>
   await expect(page.getByRole("alert").getByText(/还有 \d+ 项需要处理/)).toBeVisible();
   await expect(page.getByLabel("产品名称", { exact: true })).toBeFocused();
 });
+
+test("product evidence feedback follows edits and product type without a batch interaction", async ({
+  page,
+}) => {
+  await page.goto("/testing/product-field-evidence");
+  await page.getByRole("tab", { name: "手动录入" }).click();
+  const form = page.locator("form#create-product");
+  const meter = form.getByRole("progressbar", { name: "事实与证据完成度" });
+  const chooseEvidence = async (label: string) => {
+    await form.getByLabel(label, { exact: true }).click();
+    await page.getByRole("option", { name: /合成产品目录/ }).click();
+  };
+
+  await form
+    .getByRole("textbox", { name: "产品名称", exact: true })
+    .fill("MOCK subscription test disc");
+  await form.getByRole("textbox", { name: "内部编号", exact: true }).fill("MOCK-SUBSCRIPTIONS-001");
+  await expect(form.getByRole("checkbox", { name: "产品名称", exact: true })).toBeVisible();
+  await expect(form.getByRole("checkbox", { name: "内部编号", exact: true })).toBeVisible();
+  for (const label of ["产品名称证据", "产品类型证据", "内部编号证据"]) {
+    await chooseEvidence(label);
+  }
+  await expect(meter).toHaveAttribute("aria-valuenow", "16");
+
+  await form.getByRole("textbox", { name: "产品名称", exact: true }).fill("");
+  await expect(form.getByRole("checkbox", { name: "产品名称", exact: true })).toHaveCount(0);
+  await expect(meter).toHaveAttribute("aria-valuenow", "11");
+
+  await form.getByRole("combobox", { name: "产品类型", exact: true }).click();
+  await page.getByRole("option", { name: "离合器套件", exact: true }).click();
+  await expect(form.getByLabel("套件组成证据", { exact: true })).toBeEnabled();
+  await expect(meter).toHaveAttribute("aria-valuenow", "10");
+  await form.getByRole("button", { name: "离合器片", exact: true }).click();
+  await chooseEvidence("套件组成证据");
+  await expect(meter).toHaveAttribute("aria-valuenow", "15");
+
+  await form.getByRole("combobox", { name: "产品类型", exact: true }).click();
+  await page.getByRole("option", { name: "离合器片", exact: true }).click();
+  await expect(form.getByLabel("套件组成证据", { exact: true })).toBeDisabled();
+  await expect(form.getByLabel("套件组成证据", { exact: true })).toContainText("选择已上传证据");
+  await expect(meter).toHaveAttribute("aria-valuenow", "11");
+  await expect(form.getByRole("button", { name: "创建待审核草稿", exact: true })).toBeVisible();
+});

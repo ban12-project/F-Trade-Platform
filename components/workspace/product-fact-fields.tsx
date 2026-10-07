@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Controller, type UseFormReturn, useFormState } from "react-hook-form";
+import { Controller, type UseFormReturn, useFormState, useWatch } from "react-hook-form";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -272,9 +272,9 @@ export function ProductFields({
   const { errors, submitCount } = useFormState({ control: form.control });
   const [batchEvidence, setBatchEvidence] = useState("");
   const [batchTargets, setBatchTargets] = useState<Set<EvidenceFieldName>>(() => new Set());
-  const productType = form.watch("productType");
+  const values = useWatch({ control: form.control });
+  const productType = values.productType;
   const kitDisabled = productType !== "clutch_kit";
-  const values = form.watch();
   const visibleBindings = useMemo(
     () =>
       productEvidenceBindings.filter(([valueName]) => valueName !== "kitContents" || !kitDisabled),
@@ -406,7 +406,7 @@ export function ProductFields({
 
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.productType)}>
-                  <FieldLabel>产品类型</FieldLabel>
+                  <FieldLabel htmlFor="product-type">产品类型</FieldLabel>
                   <Controller
                     control={form.control}
                     name="productType"
@@ -430,6 +430,7 @@ export function ProductFields({
                         }}
                       >
                         <SelectTrigger
+                          id="product-type"
                           className="w-full"
                           aria-invalid={Boolean(form.formState.errors.productType)}
                         >
