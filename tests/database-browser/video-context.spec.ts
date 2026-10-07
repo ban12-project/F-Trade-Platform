@@ -410,7 +410,11 @@ test("processing locks CTA and a failed job restores editing through a real pend
         eq(schema.workspaceProjectMember.userId, actorId),
       ),
     );
-  for (const kind of ["ai_draft", "render"] as const) {
+  for (const { kind, failureCode } of [
+    { kind: "ai_draft", failureCode: "AI_DRAFT_FAILED" },
+    { kind: "ai_draft", failureCode: "AI_DRAFT_STALE" },
+    { kind: "render", failureCode: "RENDER_FAILED" },
+  ] as const) {
     const videoId = randomUUID();
     const jobId = randomUUID();
     const project = videoProjectSchema.parse({ ...payload(0), id: videoId });
@@ -446,13 +450,15 @@ test("processing locks CTA and a failed job restores editing through a real pend
       await expect(page.getByLabel("成片时长（秒）").first()).toBeDisabled();
       await expect(cta).toBeDisabled();
       await expect(page.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
-      const refresh = () =>
-        page.waitForRequest(
-          (request) =>
-            request.method() === "GET" &&
-            request.headers().rsc === "1" &&
-            new URL(request.url()).pathname === path,
+      const refresh = async () => {
+        const response = await page.waitForResponse(
+          (response) =>
+            response.request().method() === "GET" &&
+            response.request().headers().rsc === "1" &&
+            new URL(response.url()).pathname === path,
         );
+        await response.finished();
+      };
       // Observe the actual timer refresh for queued and running jobs.
       await refresh();
       await expect(cta).toBeDisabled();
@@ -462,18 +468,23 @@ test("processing locks CTA and a failed job restores editing through a real pend
         .where(eq(schema.videoProcessingJob.id, jobId));
       await refresh();
       await expect(cta).toBeDisabled();
-      await failVideoJob(
-        jobId,
-        kind === "ai_draft" ? "AI_DRAFT_FAILED" : "RENDER_FAILED",
-        db as unknown as Database,
-      );
+      await failVideoJob(jobId, failureCode, db as unknown as Database);
+      await refresh();
       await expect(page.getByText("后台处理中", { exact: true })).toHaveCount(0);
       await expect(cta).toBeEnabled();
       await expect(
         page.getByText(kind === "ai_draft" ? "AI 初稿失败" : "合成失败", { exact: true }),
       ).toBeVisible();
+      if (failureCode === "AI_DRAFT_STALE") {
+        await expect(
+          page.getByText("剪辑稿已更新，旧 AI 初稿未保存。请确认最新草稿后重新生成。", {
+            exact: true,
+          }),
+        ).toBeVisible();
+        await expect(cta).toHaveValue("Contact us");
+      }
       await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeEnabled();
-      const manual = `MOCK ${kind} saved CTA`;
+      const manual = `MOCK ${failureCode} saved CTA`;
       await cta.fill(manual);
       let started!: () => void;
       const saving = new Promise<void>((resolve) => {
