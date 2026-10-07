@@ -1,5 +1,7 @@
 # 正式生产试点预检 — 2026-10-07
 
+**同日后续观察**：[生产登录及 reference 上传验收](production-reference-upload-20261007.md)已确认实际 admin 登录；04:26:39 UTC 的认证服务器诊断显示实例 stopped，归属、资源、时限、网络策略四项匹配，快照可用。四份参考 PDF 的生产上传、授权领取时回读、硬刷新持久化及独立完整原件比对通过。下文未登录/策略无法比较/未写入的描述保留为 04:01–04:06 UTC 的历史预检，不能再列为当前未完成项。渠道在线和真实业务仍 pending。
+
 关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32)、[#480](https://github.com/ban12-project/F-Trade-Platform/issues/480)、[#490](https://github.com/ban12-project/F-Trade-Platform/issues/490)、[#318](https://github.com/ban12-project/F-Trade-Platform/issues/318)。用户本轮选择优先推进正式生产试点。结论：**部署及停止实例的部分预检通过，当前渠道和正式业务验收仍待执行**。本记录只包含脱敏研发观察。
 
 ## 本轮实际观察
