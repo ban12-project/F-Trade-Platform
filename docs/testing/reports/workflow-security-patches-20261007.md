@@ -2,6 +2,8 @@
 
 关联 [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498)。**本轮兼容补丁与合成回归通过，依赖风险仍开放，正式 MVP 业务验收仍 pending。** 机器计数见[摘要](workflow-security-patches-20261007.summary.json)。
 
+同日后续的[工具依赖补丁](tooling-security-patches-20261007.md)又修复 legacy loader 的 esbuild 及新命中的 MCP SDK 公告；独立同轮扫描为 4 high / 1 moderate → 3 high / 0 moderate，均无 critical。下文保留原批次的版本、结果及剩余清单；其中 esbuild 已由后续补丁消除版本命中，nanoid/braces 继续开放。
+
 ## 基线与修复
 
 基线 `main@f3b7a22`，独立 worktree；保留用户原分支及其 16 个未提交文件。Node 24.21.0、pnpm 12.3.4、Next 16.3.8、TypeScript 7.0.2；Cache Components、默认 Turbopack、两个 React Compiler 开关和默认 TypeScript CLI 均保留。
