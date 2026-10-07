@@ -306,6 +306,30 @@ try {
     "PASS in-flight human CTA and clip edits survive stale AI output; explicit retry succeeds",
   );
 
+  const queued = await createVideo();
+  const queuedJob = await queueVideoProcessingJob(queued.id, "ai_draft", editor);
+  const queuedHumanSave = await updateMarketingVideoEditDraft(
+    queued.id,
+    { ...queued.draft, ctaText: "MOCK human save after queue" },
+    owner,
+  );
+  const callsBeforeQueuedJob = modelCalls;
+  await generateMarketingVideoAiDraftWorkflow({
+    videoId: queued.id,
+    jobId: queuedJob.job.id,
+    actorId: editor,
+  });
+  assert.deepEqual(
+    (await getMarketingVideoEditProject(queued.id)).project.editDraft,
+    queuedHumanSave.editDraft,
+  );
+  assert.equal((await job(queuedJob.job.id)).status, "failed");
+  assert.equal((await job(queuedJob.job.id)).failureCode, "AI_DRAFT_STALE");
+  assert.equal(modelCalls, callsBeforeQueuedJob, "A stale queued task must never call the model");
+  assert.equal((await record(queued.id)).version, 3);
+  assert.equal((await saves(queued.id)).length, 1);
+  console.log("PASS human edits after queue invalidate the old request before any model call");
+
   const concurrent = await createVideo();
   const results = await Promise.allSettled(
     ["MOCK concurrent A", "MOCK concurrent B"].map((ctaText) =>

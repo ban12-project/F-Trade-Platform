@@ -10,7 +10,12 @@ import { createReviewVideoExport } from "@/lib/video/export-artifact";
 import { videoExportPresets } from "@/lib/video/export-presets";
 import { VercelPrivateVideoAssetStore } from "@/lib/video/private-asset-store";
 import { videoProcessingFailureMessage } from "@/lib/video/processing-failures";
-import { completeVideoJob, failVideoJob, markVideoJobRunning } from "@/lib/video/processing-jobs";
+import {
+  completeVideoJob,
+  failVideoJob,
+  markVideoJobRunning,
+  videoProcessingRequestKey,
+} from "@/lib/video/processing-jobs";
 import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
 import {
   beginGuardedMarketingVideoRender,
@@ -42,6 +47,8 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
     const { project, state, version } = await getMarketingVideoEditProject(input.videoId);
     if (!["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(state))
       throw new Error("当前视频状态不能生成 AI 初稿。");
+    if (job.requestKey !== videoProcessingRequestKey(input.videoId, "ai_draft", version))
+      throw new MarketingVideoDraftChangedError();
     await Promise.all([
       assertCurrentProductFactsForVideo(project),
       assertCurrentProductMediaUsageForVideo(project),
