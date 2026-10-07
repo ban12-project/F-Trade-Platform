@@ -59,6 +59,9 @@ jobs:
       - name: Verify patched Workflow replay and serialization compatibility
         run: node scripts/test-workflow-security-compatibility.mjs
 
+      - name: Resume frozen old-nanoid SDK state and check security boundaries
+        run: node --test --test-reporter=tap scripts/test-workflow-nanoid-replay.mjs
+
       - name: Verify Workflow queue deadlines and transport boundaries
         run: node --test --test-reporter=tap scripts/test-workflow-queue-deadlines.mjs
 

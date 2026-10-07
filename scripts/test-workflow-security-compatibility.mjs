@@ -3,12 +3,17 @@ import { once } from "node:events";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const require = createRequire(import.meta.url);
 const workflowRequire = createRequire(require.resolve("workflow/api"));
 const coreRequire = createRequire(workflowRequire.resolve("@workflow/core"));
-const nanoid = await import(pathToFileURL(coreRequire.resolve("nanoid")));
+const { createReplayNanoid } = await import(
+  pathToFileURL(
+    join(dirname(workflowRequire.resolve("@workflow/core/runtime")), "workflow/replay-nanoid.js"),
+  )
+);
 const devalue = await import(pathToFileURL(coreRequire.resolve("devalue")));
 const seedrandom = coreRequire("seedrandom");
 const fixture = JSON.parse(
@@ -21,13 +26,19 @@ const fixture = JSON.parse(
 // Workflow uses this fixed-size generator during replay. A patch must keep existing IDs stable.
 for (const { seed, ids } of fixture.replay) {
   const random = seedrandom(seed);
-  const next = nanoid.customRandom(nanoid.urlAlphabet, 21, (size) =>
-    new Uint8Array(size).map(() => 256 * random()),
-  );
+  let draws = 0;
+  const next = createReplayNanoid(() => {
+    draws++;
+    return random();
+  });
   assert.deepEqual(
     Array.from({ length: ids.length }, () => next()),
     ids,
   );
+  assert.equal(draws, 34 * ids.length);
+  const expectedRandom = seedrandom(seed);
+  for (let i = 0; i < draws; i++) expectedRandom();
+  assert.equal(random(), expectedRandom());
 }
 
 // A payload written by the old runtime must remain readable after the patch.

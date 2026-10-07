@@ -8,6 +8,7 @@ allowBuilds:
 # Remove these when the selected upstream runtime pins equivalent patched versions.
 overrides:
   '@workflow/core@4.8.8>devalue': 5.9.3
+  '@workflow/core@4.8.8>nanoid': 5.1.16
   '@workflow/world-local@4.4.1>undici': 7.29.1
   '@workflow/world-vercel@4.7.4>undici': 7.29.1
 
@@ -15,3 +16,8 @@ overrides:
   # esbuild's 0.x minor API change is checked at the actual legacy loader boundary.
   '@esbuild-kit/core-utils@3.3.2>esbuild': 0.25.12
   'shadcn@4.19.1>@modelcontextprotocol/sdk': 1.31.0
+
+patchedDependencies:
+  # Preserve old implicit-hook tokens and the shared seeded RNG on patched nanoid.
+  # Remove only after the upstream migration passes the frozen SDK state fixture.
+  '@workflow/core@4.8.8': patches/@workflow__core@4.8.8.patch

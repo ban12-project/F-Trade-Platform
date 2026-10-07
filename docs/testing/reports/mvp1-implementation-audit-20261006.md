@@ -54,8 +54,9 @@ Product/Content 已有模型适配器与结构化输出边界；本轮 Sales 需
 
 | 包与当前版本 | 可核对的最短依赖路径 | 后续处理条件 |
 | --- | --- | --- |
-| nanoid 5.1.6 | workflow → @workflow/core → nanoid | 5.1.16 尝试改变固定重放 ID，已撤回；需要上游兼容迁移或经验证的重放版本策略 |
 | braces 3.0.3 | shadcn → fast-glob → micromatch → braces | 本次公告未列补丁；需区分本地 CLI 的模式输入与公开应用输入 |
+
+同日[nanoid 恢复兼容迁移](workflow-nanoid-replay-20261007.md)对 core 4.8.8 限定 nanoid 5.1.16，并保留旧固定 token 回调的 34 次共享随机数消耗。直接升级的实际 SDK 恢复失败保留；经补丁后，升级前实际暂停的合成 run 成功恢复，原始事件不变，3 个隐式 token、随机值与 ULID 的完整旧结果一致。64 个原有冻结 ID 及库安全回归通过。同轮依赖扫描为 **0 critical / 1 high / 0 moderate**，剩余 braces；完整 CI 以交付 PR 最终 head 为准。这不替代当前生产部署或真实业务验收。
 
 legacy esbuild 现为 0.25.12，shadcn 的 MCP SDK 现为 1.31.0；冷/缓存 loader、合成安全拒绝、合法 token 保存和实际 shadcn MCP 服务协议共六项回归通过，原有 Zod 解析和 64 个固定重放 ID 不变。[队列期限修复](workflow-queue-deadlines-20261007.md)核对 [#509](https://github.com/ban12-project/F-Trade-Platform/issues/509)，采用 Workflow 4.8.8 及精确父版本下原安全补丁；旧版本拥塞失败保留，七项队列检查和实际编译审核工作流通过。当前生产部署、fallback/自定义配置适用性仍需独立证据；不将它混入安全公告计数或断言为此前故障根因。
 
