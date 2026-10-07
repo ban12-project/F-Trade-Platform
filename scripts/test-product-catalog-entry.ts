@@ -302,6 +302,11 @@ async function testReviewSnapshot() {
   type Database = import("../lib/db/client").Database;
   const productId = "00000000-0000-4000-8000-000000000001";
   const approvalId = "00000000-0000-4000-8000-000000000302";
+  const identity = {
+    actorId: "synthetic-reviewer",
+    sessionId: "synthetic-review-session",
+    projectId: "00000000-0000-4000-8000-000000000303",
+  };
   const current = productReviewFormSchema.parse({
     productId,
     approvalId,
@@ -327,39 +332,57 @@ async function testReviewSnapshot() {
     run?: { status: string; expiresAt: Date },
   ) {
     const writes: { table: string; values: Record<string, unknown> }[] = [];
-    let reads = 0;
     const tx = {
       select() {
-        let isRun = false;
-        let isImage = false;
-        let isWorkspaceLink = false;
+        let tableName = "";
+        function rows() {
+          if (tableName === "product_agent_stream_run") return run ? [run] : [];
+          if (tableName === "product_source_image") return [];
+          if (tableName === "workspace_project") return [{ kind: "marketing", status: "active" }];
+          if (tableName === "workspace_project_member") return [{ role: "owner" }];
+          if (tableName === "workspace_project_item")
+            return [{ id: "synthetic-link", projectId: identity.projectId }];
+          if (tableName === "user")
+            return [{ role: "admin", banned: false, expiresAt: new Date(Date.now() + 3_600_000) }];
+          if (tableName === "evidence")
+            return [{ id: current.evidenceRef, linkedProjectId: identity.projectId }];
+          if (tableName === "aggregate_record")
+            return [
+              {
+                id: productId,
+                version: 3,
+                state: "PRODUCT_REVIEW_REQUIRED",
+                payload: { ...payload, record_id: productId },
+              },
+            ];
+          assert.equal(tableName, "approval");
+          return [{ id: approvalId, status: "pending" }];
+        }
         const query = {
           from(table: Parameters<typeof getTableName>[0]) {
-            isRun = getTableName(table) === "product_agent_stream_run";
-            isImage = getTableName(table) === "product_source_image";
-            isWorkspaceLink = getTableName(table) === "workspace_project_item";
+            tableName = getTableName(table);
+            return query;
+          },
+          innerJoin() {
+            return query;
+          },
+          leftJoin() {
             return query;
           },
           where() {
             return query;
           },
           async orderBy() {
-            assert.ok(isImage || isWorkspaceLink); // This fixture is a legacy unlinked aggregate.
-            return [];
+            assert.ok(["product_source_image", "workspace_project_item"].includes(tableName));
+            return rows();
           },
           async for(mode: string) {
-            assert.equal(mode, "update");
-            if (isRun) return run ? [run] : [];
-            return reads++ === 0
-              ? [
-                  {
-                    id: productId,
-                    version: 3,
-                    state: "PRODUCT_REVIEW_REQUIRED",
-                    payload: { ...payload, record_id: productId },
-                  },
-                ]
-              : [{ id: approvalId, status: "pending" }];
+            assert.ok(["update", "share"].includes(mode));
+            return rows();
+          },
+          // biome-ignore lint/suspicious/noThenProperty: This fixture models Drizzle's awaited select chain.
+          then(resolve: (value: unknown[]) => unknown) {
+            return Promise.resolve(rows()).then(resolve);
           },
         };
         return query;
@@ -382,10 +405,16 @@ async function testReviewSnapshot() {
       },
       insert(table: Parameters<typeof getTableName>[0]) {
         return {
-          async values(values: Record<string, unknown>) {
+          values(values: Record<string, unknown>) {
+            if (getTableName(table) === "workspace_project_evidence")
+              return { onConflictDoNothing: async () => {} }; // Existing synthetic evidence link.
             writes.push({ table: getTableName(table), values });
+            return Promise.resolve();
           },
         };
+      },
+      async transaction(run: (value: unknown) => Promise<unknown>): Promise<unknown> {
+        return run(tx);
       },
     };
     const database = {
@@ -395,7 +424,7 @@ async function testReviewSnapshot() {
     } as unknown as Database;
     try {
       return {
-        result: await decideProductCatalogReview(input, "synthetic-reviewer", database),
+        result: await decideProductCatalogReview(input, identity, database),
         writes,
       };
     } catch (error) {

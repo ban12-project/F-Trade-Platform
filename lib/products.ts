@@ -17,6 +17,12 @@ import {
   type ProductAgentWriteIdentity,
 } from "@/lib/product/agent-write-access";
 import {
+  authorizeLockedProductReview,
+  ProductReviewAccessError,
+  type ProductReviewIdentity,
+  parseProductReviewIdentity,
+} from "@/lib/product/review-write-access";
+import {
   insertProductSourceImages,
   listProductSourceImages,
 } from "@/lib/product/source-image-store";
@@ -29,6 +35,7 @@ import {
 import { assertTransition } from "@/lib/workflow/transitions";
 import {
   assertAggregateWorkspaceWrite,
+  assertAndLinkProjectEvidence,
   assertWorkspaceProjectAccess,
 } from "@/lib/workspace/access";
 
@@ -510,10 +517,11 @@ export async function getProjectProductCatalogDetail(
 
 export async function decideProductCatalogReview(
   input: ProductReviewInput,
-  actorId: string,
+  identityInput: ProductReviewIdentity,
   database: Database = getDatabase(),
 ) {
-  const now = new Date();
+  const identity = parseProductReviewIdentity(identityInput);
+  const { actorId, projectId } = identity;
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
     await assertAggregateWorkspaceWrite(input.productId, tx, actorId);
@@ -564,6 +572,10 @@ export async function decideProductCatalogReview(
     )
       throw new Error("请先核对原始产品图片，并明确确认与当前产品一致。无法确认时请退回。");
 
+    const authorizationExpiresAt = await authorizeLockedProductReview(tx, identity, aggregate.id);
+    await assertAndLinkProjectEvidence(projectId, [input.evidenceRef], actorId, tx);
+    const now = new Date();
+    if (authorizationExpiresAt <= now) throw new ProductReviewAccessError();
     const productApproval: ProductApproval = {
       approval_id: pendingApproval.id,
       gate: "gate_01_truth",

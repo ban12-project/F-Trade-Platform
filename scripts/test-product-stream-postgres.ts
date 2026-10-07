@@ -131,7 +131,7 @@ async function verify() {
       notes: "Synthetic test rejection",
     };
     await assert.rejects(
-      () => decideProductCatalogReview(decision, identity.actorId, database),
+      () => decideProductCatalogReview(decision, identity, database),
       /资料仍在生成中/,
     );
 
@@ -170,7 +170,7 @@ async function verify() {
     assert.deepEqual(preserved?.payload.product, { product_name: "Synthetic clutch" });
     await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, identity.actorId));
     assert.equal(
-      (await decideProductCatalogReview(decision, identity.actorId, database)).state,
+      (await decideProductCatalogReview(decision, identity, database)).state,
       "PRODUCT_REVISION_REQUIRED",
     );
     await assert.rejects(
@@ -191,7 +191,7 @@ async function verify() {
     console.log(
       "PASS PostgreSQL migrations, incremental persistence, review guard, actual authorization locks and retained interruption audit",
     );
-    await testMockProductPersistence(database, identity.actorId, identity.projectId);
+    await testMockProductPersistence(database, identity);
   } finally {
     await revoker.end();
     await pool.end();

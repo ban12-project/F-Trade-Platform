@@ -9,8 +9,8 @@ import {
   createEvidenceBoundProductCatalogDraft as createProductCatalogDraft,
   reviseEvidenceBoundProductCatalogDraft as reviseProductCatalogDraft,
 } from "@/lib/product/evidence-bound-catalog";
+import { productReviewFailureMessage } from "@/lib/product/review-write-access";
 import { decideProductCatalogReview } from "@/lib/products";
-import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type ProductActionState = {
@@ -72,18 +72,19 @@ export async function decideProductCatalogReviewAction(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "审核资料格式不正确。" };
   }
   try {
-    const projectId = projectIdFrom(formData);
-    if (projectId) {
-      await assertWorkspaceAggregateLink(
-        projectId,
-        parsed.data.productId,
-        "marketing",
-        "product",
-        session.user.id,
-      );
-      await assertAndLinkProjectEvidence(projectId, [parsed.data.evidenceRef], session.user.id);
-    }
-    const result = await decideProductCatalogReview(parsed.data, session.user.id);
+    const projectId = z.uuid("项目标识无效。").parse(formData.get("projectId"));
+    await assertWorkspaceAggregateLink(
+      projectId,
+      parsed.data.productId,
+      "marketing",
+      "product",
+      session.user.id,
+    );
+    const result = await decideProductCatalogReview(parsed.data, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId,
+    });
     revalidateProductPaths(projectId, parsed.data.productId);
     return {
       status: "success",
@@ -93,7 +94,7 @@ export async function decideProductCatalogReviewAction(
           : "Gate 01 已退回，产品需要修订。",
     };
   } catch (error) {
-    return actionError(error, "无法完成 Gate 01 审核。");
+    return { status: "error", message: productReviewFailureMessage(error) };
   }
 }
 

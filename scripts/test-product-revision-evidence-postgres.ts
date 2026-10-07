@@ -35,12 +35,20 @@ void (async () => {
     await migrate(db as unknown as Parameters<typeof migrate>[0], {
       migrationsFolder: "./drizzle",
     });
+    const sessionIds = [randomUUID(), randomUUID()] as const;
+    const reviewIdentity = { actorId: actors[0], sessionId: sessionIds[0], projectId: projects[0] };
     for (const index of [0, 1] as const) {
       await db.insert(schema.user).values({
         id: actors[index],
         name: "SYNTHETIC revision test",
         email: `${actors[index]}@example.invalid`,
         role: "admin",
+      });
+      await db.insert(schema.session).values({
+        id: sessionIds[index],
+        token: randomUUID(),
+        userId: actors[index],
+        expiresAt: new Date(Date.now() + 3_600_000),
       });
       await db.insert(schema.workspaceProject).values({
         id: projects[index],
@@ -139,7 +147,7 @@ void (async () => {
           evidenceRef: baseRef,
           notes: "MOCK simulated rejection",
         },
-        actors[0],
+        reviewIdentity,
         db,
       );
       return { id, draft };
@@ -234,10 +242,10 @@ void (async () => {
       evidenceRef: supplementRef,
       notes: "MOCK simulated approval",
     };
-    await assert.rejects(decideProductCatalogReview(decision, actors[0], db), /图片/);
+    await assert.rejects(decideProductCatalogReview(decision, reviewIdentity, db), /图片/);
     await decideProductCatalogReview(
       { ...decision, imageConsistencyConfirmed: "true" },
-      actors[0],
+      reviewIdentity,
       db,
     );
     assert.equal((await current()).state, "PRODUCT_READY");
