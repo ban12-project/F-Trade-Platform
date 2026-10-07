@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mock } from "node:test";
 import {
+  ProductAgentAccessError,
   ProductSourceError,
   ProductUploadError,
   productIntakeErrorMessage,
@@ -15,9 +16,13 @@ let writes = 0;
 const moduleUrl = (path: string) => new URL(path, import.meta.url).href;
 mock.module(moduleUrl("../lib/action-boundary.ts"), {
   exports: {
-    authorizedActionSession: async () => (authorized ? { user: { id: "synthetic-actor" } } : null),
+    authorizedActionSession: async () =>
+      authorized ? { user: { id: "synthetic-actor" }, session: { id: "synthetic-session" } } : null,
     refreshWorkspace: () => {},
   },
+});
+mock.module(moduleUrl("../lib/product/agent-write-access.ts"), {
+  exports: { assertProductAgentWriteAccess: async () => {} },
 });
 mock.module(moduleUrl("../lib/ai/model-provider.ts"), {
   exports: { createProductAgentModel: () => ({}) },
@@ -88,6 +93,7 @@ const run = () => runProductAgentAction({ status: "idle", message: "" }, form);
 for (const error of [
   new Error(secret),
   Object.assign(new Error(secret), { code: "upload_unavailable" }),
+  Object.assign(new Error(secret), { code: "access_changed" }),
   { message: secret, code: "source_labels_missing" },
 ]) {
   failure = error;
@@ -100,6 +106,12 @@ failure = new ProductSourceError("source_labels_missing");
 assert.deepEqual(await run(), {
   status: "error",
   message: productIntakeErrorMessage("source_labels_missing"),
+});
+failure = new ProductAgentAccessError();
+Object.assign(failure, { message: secret, cause: new Error(secret) });
+assert.deepEqual(await run(), {
+  status: "error",
+  message: "无法确认登录或项目编辑权限，产品草稿未创建。请重新登录并确认权限后重试。",
 });
 imageFailure = new ProductUploadError("upload_type_mismatch");
 assert.deepEqual(await run(), {

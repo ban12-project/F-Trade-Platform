@@ -13,6 +13,10 @@ import {
 } from "@/lib/db/schema";
 import type { productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
 import {
+  authorizeLockedProductAgentWrite,
+  type ProductAgentWriteIdentity,
+} from "@/lib/product/agent-write-access";
+import {
   insertProductSourceImages,
   listProductSourceImages,
 } from "@/lib/product/source-image-store";
@@ -229,14 +233,22 @@ export async function createProductCatalogDraft(
 /** Persists a Product Agent result as review-only work; callers must never promote it to Ready. */
 export async function createProductAgentDraft(
   draft: ProductDraft,
-  actorId: string,
+  identity: ProductAgentWriteIdentity,
   metadata: Record<string, unknown>,
-  projectId?: string,
   sourceImageRefs: readonly string[] = [],
+  database: Database = getDatabase(),
 ) {
-  return getDatabase().transaction((tx) =>
-    insertProductAgentDraft(tx, draft, actorId, metadata, projectId, sourceImageRefs),
-  );
+  return database.transaction(async (tx) => {
+    const current = await authorizeLockedProductAgentWrite(tx, identity);
+    return insertProductAgentDraft(
+      tx,
+      draft,
+      current.actorId,
+      metadata,
+      current.projectId,
+      sourceImageRefs,
+    );
+  });
 }
 
 /** Inserts into the caller's transaction, so stream creation and run tracking are atomic. */

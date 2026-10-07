@@ -4,6 +4,7 @@ import { buildProductAgentEvidenceLocations } from "../lib/product/evidence-loca
 import { productIntakeFailureDiagnostic } from "../lib/product/intake-diagnostics";
 import {
   PRODUCT_INTAKE_ERROR_HEADER,
+  ProductAgentAccessError,
   ProductSourceError,
   ProductUploadError,
   type ProductUploadErrorCode,
@@ -28,6 +29,7 @@ assert.deepEqual(
 for (const error of [
   new Error(secret),
   { code: "upload_unavailable", message: secret },
+  { code: "access_changed", message: secret },
   new Error("upload_unavailable", { cause: new ProductUploadError("upload_unavailable") }),
   { code: secret, stack: secret, message: secret },
   secret,
@@ -49,6 +51,14 @@ console.log(
 );
 
 async function verifySourceFailures() {
+  const denied = new ProductAgentAccessError();
+  Object.assign(denied, { message: secret, cause: new Error(secret) });
+  const deniedResponse = productIntakeFailureResponse(denied);
+  assert.equal(deniedResponse.headers.get(PRODUCT_INTAKE_ERROR_HEADER), "access_changed");
+  assert.deepEqual(await deniedResponse.json(), {
+    error: "无法确认登录或项目编辑权限，产品草稿未创建。请重新登录并确认权限后重试。",
+  });
+  assert.equal(productIntakeFailureMessage(denied).includes(secret), false);
   for (const code of [
     "upload_unavailable",
     "upload_type_mismatch",

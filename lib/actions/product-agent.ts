@@ -8,13 +8,13 @@ import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { productAgentRunFormSchema } from "@/lib/form-schemas";
+import { assertProductAgentWriteAccess } from "@/lib/product/agent-write-access";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
 import { EvidenceLocatedProductAgent } from "@/lib/product/evidence-located-agent";
 import { productIntakeFailureMessage } from "@/lib/product/intake-errors";
 import { createProductAgentDraft } from "@/lib/products";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
-import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type ProductAgentActionState = {
   status: "idle" | "success" | "error";
@@ -40,42 +40,36 @@ export async function runProductAgentAction(
       .min(1, "请选择模型。")
       .max(240, "模型名称无效。")
       .parse(formData.get("model"));
-    const rawProjectId = formData.get("projectId");
-    const projectId =
-      rawProjectId === null || rawProjectId === ""
-        ? undefined
-        : z.uuid("项目标识无效。").parse(rawProjectId);
-    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
+    const projectId = z.uuid("项目标识无效。").parse(formData.get("projectId"));
+    const identity = { actorId: session.user.id, sessionId: session.session.id, projectId };
+    await assertProductAgentWriteAccess(identity);
     const receiptId = formData.get("receiptId");
     if (formData.get("document") instanceof File) throw new Error("请通过私有直传上传文件。");
-    if (receiptId && !projectId) throw new Error("上传资料必须绑定项目。");
-    const baseSource =
-      receiptId && projectId
-        ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
-        : (() => {
-            const parsed = productAgentRunFormSchema.safeParse({
-              ...Object.fromEntries(formData),
-              hasUpload: false,
-            });
-            if (!parsed.success)
-              throw new Error(parsed.error.issues[0]?.message ?? "资料格式不正确。");
-            return {
-              record_id: randomUUID(),
-              source_ref: parsed.data.sourceRef!,
-              evidence_refs: [parsed.data.evidenceRef!],
-              source_text: parsed.data.sourceText,
-              image_availability: "none" as const,
-              image_refs: [],
-            };
-          })();
+    const baseSource = receiptId
+      ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
+      : (() => {
+          const parsed = productAgentRunFormSchema.safeParse({
+            ...Object.fromEntries(formData),
+            hasUpload: false,
+          });
+          if (!parsed.success)
+            throw new Error(parsed.error.issues[0]?.message ?? "资料格式不正确。");
+          return {
+            record_id: randomUUID(),
+            source_ref: parsed.data.sourceRef!,
+            evidence_refs: [parsed.data.evidenceRef!],
+            source_text: parsed.data.sourceText,
+            image_availability: "none" as const,
+            image_refs: [],
+          };
+        })();
     const source = await attachClaimedProductImages(
       baseSource,
       formData.getAll("imageReceiptId"),
       projectId,
       session.user.id,
     );
-    if (projectId)
-      await assertAndLinkProjectEvidence(projectId, source.evidence_refs, session.user.id);
+    await assertAndLinkProjectEvidence(projectId, source.evidence_refs, session.user.id);
     const result = await new EvidenceLocatedProductAgent().run({
       model: createProductAgentModel(
         await resolveProductAgentModelConfig(modelConfigId, selectedModel),
@@ -85,17 +79,16 @@ export async function runProductAgentAction(
     });
     const saved = await createProductAgentDraft(
       result.draft,
-      session.user.id,
+      identity,
       {
         prompt_version: result.metadata.prompt_version,
         prompt_hash: result.metadata.prompt_hash,
         evidence_mode: "bounded_location",
       },
-      projectId,
       source.image_refs,
     );
     refreshWorkspace();
-    if (projectId) revalidatePath(`/workspace/${projectId}`);
+    revalidatePath(`/workspace/${projectId}`);
     return {
       status: "success",
       message: `已生成待 Gate 01 审核草稿（${saved.id.slice(0, 8)}），每个事实均绑定可核查位置。`,

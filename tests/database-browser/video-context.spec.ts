@@ -446,8 +446,9 @@ test("processing locks CTA and a failed job restores editing through a real pend
     try {
       await page.goto(`${path}?item=${videoId}`);
       const cta = page.getByLabel("最后两秒 CTA", { exact: true });
+      const processing = page.getByRole("main").getByText("后台处理中", { exact: true });
       await expect(cta).toHaveValue("Contact us");
-      await expect(page.getByText("后台处理中", { exact: true })).toBeVisible();
+      await expect(processing).toBeVisible();
       await expect(page.getByLabel("成片时长（秒）").first()).toBeDisabled();
       await expect(cta).toBeDisabled();
       await expect(page.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
@@ -470,7 +471,7 @@ test("processing locks CTA and a failed job restores editing through a real pend
       await failVideoJob(jobId, failureCode, db as unknown as Database);
       // Production RSC streams may stay open. Visible terminal UI proves the
       // refresh committed; allow up to three real polling cycles in dev.
-      await expect(page.getByText("后台处理中", { exact: true })).toHaveCount(0, {
+      await expect(processing).toHaveCount(0, {
         timeout: 10_000,
       });
       await expect(cta).toBeEnabled();
