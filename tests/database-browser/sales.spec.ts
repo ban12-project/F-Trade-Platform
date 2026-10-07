@@ -308,12 +308,14 @@ test("expired delivery can be requested again through the authenticated UI witho
   ]);
   await page.goto(`/workspace/${projectId}/records/lead/${leadId}`);
   await expect(
-    page.getByText("上次交期确认已过期或不再适用于该需求，请重新申请工厂确认。"),
+    page
+      .getByText("上次交期确认已过期或不再适用于该需求，请重新申请工厂确认。")
+      .filter({ visible: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel("请求证据", { exact: true }).fill(evidenceId);
+  await page.getByLabel("请求证据", { exact: true }).filter({ visible: true }).fill(evidenceId);
   await page.getByRole("button", { name: "申请工厂确认交期", exact: true }).click();
   const readLead = async () =>
     (
