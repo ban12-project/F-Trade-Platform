@@ -1,22 +1,17 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { type Database, getDatabase } from "@/lib/db/client";
-import { productMediaAsset } from "@/lib/db/product-media-schema";
 import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
 import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
 
-import { assertVideoPublicationEligible, type VideoProject, videoProjectSchema } from "./contracts";
+import { assertVideoPublicationEligible, videoProjectSchema } from "./contracts";
 import { approveReviewVideoExport, type ReviewVideoExport } from "./export-artifact";
-import { assertCurrentProductFacts } from "./product-fact-runtime-policy";
-import {
-  assertCurrentProductMediaUsage,
-  productMediaIdsForVideoProject,
-  productMediaRuntimeRecordFromRow,
-} from "./product-media-runtime-policy";
+import { assertLockedVideoProductContext } from "./product-context-guard";
+import { productMediaIdsForVideoProject } from "./product-media-runtime-policy";
 
 const guardedVideoReviewSchema = z
   .object({
@@ -26,41 +21,6 @@ const guardedVideoReviewSchema = z
     notes: z.string().trim().max(2_000).optional().default(""),
   })
   .strict();
-
-async function assertLockedCurrentProductMedia(
-  tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
-  project: VideoProject,
-  evaluatedAt: Date,
-) {
-  const mediaIds = productMediaIdsForVideoProject(project);
-
-  const [product] = await tx
-    .select({
-      id: aggregateRecord.id,
-      state: aggregateRecord.state,
-      payload: aggregateRecord.payload,
-    })
-    .from(aggregateRecord)
-    .where(and(eq(aggregateRecord.id, project.productId), eq(aggregateRecord.type, "product")))
-    .for("update");
-  if (!product || product.state !== "PRODUCT_READY") {
-    throw new Error("视频引用的产品已不再处于 ProductReady，不能继续处理。");
-  }
-  assertCurrentProductFacts(project, product.payload);
-  if (!mediaIds.length) return;
-
-  const mediaRows = await tx
-    .select()
-    .from(productMediaAsset)
-    .where(inArray(productMediaAsset.id, mediaIds))
-    .for("update");
-  assertCurrentProductMediaUsage(
-    project,
-    mediaRows.map(productMediaRuntimeRecordFromRow),
-    "organic",
-    evaluatedAt,
-  );
-}
 
 /** Starts rendering only while every ProductMedia binding is still valid. */
 export async function beginGuardedMarketingVideoRender(
@@ -82,7 +42,7 @@ export async function beginGuardedMarketingVideoRender(
     }
     const project = videoProjectSchema.parse(record.payload);
     if (!project.editDraft) throw new Error("视频缺少可合成的剪辑稿。");
-    await assertLockedCurrentProductMedia(tx, project, now);
+    await assertLockedVideoProductContext(tx, project);
 
     const evidenceRefs = [
       ...new Set([
@@ -164,7 +124,7 @@ export async function completeGuardedMarketingVideoRender(
       throw new Error("视频合成状态已发生变化，请刷新后重试。");
     }
     const project = videoProjectSchema.parse(record.payload);
-    await assertLockedCurrentProductMedia(tx, project, now);
+    await assertLockedVideoProductContext(tx, project);
     if (
       exportArtifact.status !== "review_required" ||
       exportArtifact.videoId !== videoId ||
@@ -291,7 +251,7 @@ export async function decideGuardedVideoReview(
       if (!current.exportArtifact) {
         throw new Error("成片缺少真实媒体校验记录，必须重新合成后才能批准。");
       }
-      await assertLockedCurrentProductMedia(tx, current, now);
+      await assertLockedVideoProductContext(tx, current);
     }
     const nextState = value.decision === "approved" ? "VIDEO_APPROVED" : "VIDEO_REVISION_REQUIRED";
     const project = videoProjectSchema.parse({

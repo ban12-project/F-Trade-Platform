@@ -413,6 +413,7 @@ test("processing locks CTA and a failed job restores editing through a real pend
   for (const { kind, failureCode } of [
     { kind: "ai_draft", failureCode: "AI_DRAFT_FAILED" },
     { kind: "ai_draft", failureCode: "AI_DRAFT_STALE" },
+    { kind: "ai_draft", failureCode: "AI_DRAFT_SOURCE_INVALID" },
     { kind: "render", failureCode: "RENDER_FAILED" },
   ] as const) {
     const videoId = randomUUID();
@@ -479,6 +480,14 @@ test("processing locks CTA and a failed job restores editing through a real pend
       if (failureCode === "AI_DRAFT_STALE") {
         await expect(
           page.getByText("剪辑稿已更新，旧 AI 初稿未保存。请确认最新草稿后重新生成。", {
+            exact: true,
+          }),
+        ).toBeVisible();
+        await expect(cta).toHaveValue("Contact us");
+      }
+      if (failureCode === "AI_DRAFT_SOURCE_INVALID") {
+        await expect(
+          page.getByText("无法确认产品事实或素材授权，AI 初稿未保存。请核对来源后重试。", {
             exact: true,
           }),
         ).toBeVisible();

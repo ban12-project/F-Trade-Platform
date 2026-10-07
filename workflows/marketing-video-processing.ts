@@ -34,6 +34,7 @@ import {
   failMarketingVideoRender,
   getMarketingVideoEditProject,
   MarketingVideoDraftChangedError,
+  MarketingVideoSourceInvalidError,
 } from "@/lib/video/store";
 import { createMarketingEditTimeline } from "@/lib/video/timeline";
 
@@ -79,7 +80,11 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
   } catch (error) {
     await failVideoJob(
       input.jobId,
-      error instanceof MarketingVideoDraftChangedError ? "AI_DRAFT_STALE" : "AI_DRAFT_FAILED",
+      error instanceof MarketingVideoDraftChangedError
+        ? "AI_DRAFT_STALE"
+        : error instanceof MarketingVideoSourceInvalidError
+          ? "AI_DRAFT_SOURCE_INVALID"
+          : "AI_DRAFT_FAILED",
     );
   }
 }
