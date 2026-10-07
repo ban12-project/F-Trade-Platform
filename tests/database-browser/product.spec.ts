@@ -20,6 +20,7 @@ const db = drizzle(pool, { schema });
 const actorId = `synthetic-browser-${randomUUID()}`;
 const projectId = randomUUID();
 const token = randomUUID();
+const sessionId = randomUUID();
 const evidenceId = `evidence-mock-${randomUUID()}`;
 const channelRef = `synthetic-journey-${randomUUID()}`;
 const accountRef = randomUUID();
@@ -36,7 +37,7 @@ test.beforeAll(async () => {
     role: "admin",
   });
   await db.insert(schema.session).values({
-    id: randomUUID(),
+    id: sessionId,
     token,
     userId: actorId,
     expiresAt: new Date(Date.now() + 3_600_000),
@@ -526,7 +527,7 @@ test("authenticated browser reviews a mock product and its content through real 
         evidenceRef: evidenceId,
         notes: "Synthetic wrong approval ID",
       },
-      actorId,
+      { actorId, sessionId, projectId },
       db as unknown as Database,
     ),
   ).rejects.toThrow("审核请求已更新");

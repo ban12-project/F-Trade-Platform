@@ -29,6 +29,8 @@
     "**/*.tsx",
     "scripts/test-product-review-write-access-postgres.mts",
     "scripts/test-product-review-action-errors.mts",
+    "scripts/test-content-review-write-access-postgres.mts",
+    "scripts/test-content-review-action-errors.mts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]

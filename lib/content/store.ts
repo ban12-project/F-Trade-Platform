@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { z } from "zod";
 import contentSchema from "@/contracts/content/content.schema.json";
+import {
+  authorizeLockedContentReview,
+  ContentReviewAccessError,
+  type ContentReviewIdentity,
+  parseContentReviewIdentity,
+} from "@/lib/content/review-write-access";
 import { compileContract } from "@/lib/contracts/validator";
 import { type Database, getDatabase } from "@/lib/db/client";
 import {
@@ -19,6 +25,7 @@ import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
 import {
   assertAggregateWorkspaceWrite,
+  assertAndLinkProjectEvidence,
   assertWorkspaceProjectAccess,
 } from "@/lib/workspace/access";
 
@@ -685,10 +692,11 @@ export async function getProjectContentCatalogDetail(
 
 export async function decideContentReview(
   input: ContentReviewInput,
-  actorId: string,
+  identityInput: ContentReviewIdentity,
   database: Database = getDatabase(),
 ) {
-  const now = new Date();
+  const identity = parseContentReviewIdentity(identityInput);
+  const { actorId, projectId } = identity;
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
     await assertAggregateWorkspaceWrite(input.contentId, tx, actorId);
@@ -720,6 +728,10 @@ export async function decideContentReview(
     if (!pendingApproval) throw new Error("未找到待处理的 Gate 01 内容审核请求。");
     if (pendingApproval.id !== input.approvalId)
       throw new Error("审核请求已更新，请刷新后重新审核。");
+    const expiresAt = await authorizeLockedContentReview(tx, identity, aggregate.id);
+    await assertAndLinkProjectEvidence(projectId, [input.evidenceRef], actorId, tx);
+    const now = new Date();
+    if (expiresAt <= now) throw new ContentReviewAccessError();
     const nextState =
       input.decision === "approved" ? "CONTENT_APPROVED" : "CONTENT_REVISION_REQUIRED";
     const content = parseContent({

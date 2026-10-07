@@ -180,7 +180,11 @@ void (async () => {
       /已归档/,
     );
     await assert.rejects(
-      decideContentReview({ ...review, contentId: ids.content }, actorId, db),
+      decideContentReview(
+        { ...review, contentId: ids.content },
+        { actorId, sessionId: reviewSessionId, projectId: marketing },
+        db,
+      ),
       /已归档/,
     );
     await assert.rejects(beginMarketingVideoRender(ids.video, actorId, db), /已归档/);
