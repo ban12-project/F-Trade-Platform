@@ -54,13 +54,23 @@ export async function generateContentDraftAction(
     const { projectId, productId, factPath } = parsed.data;
     await assertGenerationAccess(projectId, session.user.id);
     const verifiedFacts = await selectedProductFacts(projectId, productId, factPath);
-    const draft = await generateMarketingContent({
-      model: createProductAgentModel(await resolveProductAgentModelConfig()),
-      contentType: parsed.data.contentType,
-      objective: parsed.data.objective,
-      targetCustomer: parsed.data.targetCustomer,
-      verifiedFacts,
-    });
+    let draft: z.infer<typeof contentGenerationOutputSchema>;
+    try {
+      draft = await generateMarketingContent({
+        model: createProductAgentModel(await resolveProductAgentModelConfig()),
+        contentType: parsed.data.contentType,
+        objective: parsed.data.objective,
+        targetCustomer: parsed.data.targetCustomer,
+        verifiedFacts,
+      });
+    } catch {
+      // Provider/configuration/output failures can contain private connection details.
+      // Keep controlled authorization and fact-change messages separate.
+      return {
+        status: "error",
+        message: "AI 初稿生成失败，请稍后重试或手动填写；如仍失败，请管理员检查模型连接。",
+      };
+    }
     // Model calls can outlive membership, session or fact changes. Do not return an old
     // protected result after its requesting actor or product source loses eligibility.
     const currentSession = await authorizedActionSession("content:write");
