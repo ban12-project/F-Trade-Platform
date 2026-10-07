@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { type DatabaseExecutor, getDatabase } from "@/lib/db/client";
 import {
   auditEvent,
   evidence,
+  productDocumentUploadReceipt,
   user,
   workspaceProject,
   workspaceProjectEvidence,
@@ -230,15 +231,25 @@ export async function listProjectEvidenceOptions(
   database: DatabaseExecutor = getDatabase(),
 ): Promise<EvidenceOption[]> {
   await assertWorkspaceProjectAccess(projectId, actorId, "view", database);
+  const sourceLabel = sql<string>`coalesce(${productDocumentUploadReceipt.originalFilename}, ${evidence.sourceLabel})`;
   return database
     .selectDistinct({
       id: evidence.id,
-      sourceLabel: evidence.sourceLabel,
+      sourceLabel,
       contentType: evidence.contentType,
       classification: evidence.classification,
       createdAt: evidence.createdAt,
     })
     .from(evidence)
+    .leftJoin(
+      productDocumentUploadReceipt,
+      and(
+        eq(productDocumentUploadReceipt.blobPath, evidence.blobKey),
+        eq(productDocumentUploadReceipt.evidenceId, evidence.id),
+        eq(productDocumentUploadReceipt.ownerId, evidence.uploadedById),
+        eq(evidence.uploadedByType, "human"),
+      ),
+    )
     .leftJoin(
       workspaceProjectEvidence,
       and(
@@ -252,7 +263,7 @@ export async function listProjectEvidenceOptions(
         and(eq(evidence.uploadedByType, "human"), eq(evidence.uploadedById, actorId)),
       ),
     )
-    .orderBy(asc(evidence.sourceLabel));
+    .orderBy(asc(sourceLabel), asc(evidence.id));
 }
 
 export async function assertAndLinkProjectEvidence(
