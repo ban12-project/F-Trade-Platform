@@ -5,8 +5,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import readyProduct from "../../data/fixtures/product-ready.synthetic.json";
+import type { Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
 import { videoProjectSchema } from "../../lib/video/contracts";
+import { failVideoJob } from "../../lib/video/processing-jobs";
 import { authSecret, databaseURL } from "../../playwright.database.config";
 
 // This file never reads developer credentials or contacts media/model providers.
@@ -391,4 +393,132 @@ test("narrow video creation protects source, return and global navigation", asyn
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+});
+
+test("processing locks CTA and a failed job restores editing through a real pending save", async ({
+  page,
+}) => {
+  // Ordinary editor, real auth/records/Actions. Job states are controlled fixtures;
+  // no Workflow, media processing, provider or model request is started.
+  await db.update(schema.user).set({ role: "user" }).where(eq(schema.user.id, actorId));
+  await db
+    .update(schema.workspaceProjectMember)
+    .set({ role: "editor" })
+    .where(
+      and(
+        eq(schema.workspaceProjectMember.projectId, projectId),
+        eq(schema.workspaceProjectMember.userId, actorId),
+      ),
+    );
+  for (const kind of ["ai_draft", "render"] as const) {
+    const videoId = randomUUID();
+    const jobId = randomUUID();
+    const project = videoProjectSchema.parse({ ...payload(0), id: videoId });
+    // Retain actual editor saves and their append-only audit trail, as with copies above.
+    await db.insert(schema.aggregateRecord).values({
+      id: videoId,
+      type: "video",
+      state: "VIDEO_DRAFT",
+      payload: project,
+      createdByType: "human",
+      createdById: actorId,
+    });
+    await db.insert(schema.workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId,
+      aggregateId: videoId,
+      role: "marketing_video",
+      relation: "owned",
+    });
+    await db.insert(schema.videoProcessingJob).values({
+      id: jobId,
+      videoProjectId: videoId,
+      kind,
+      requestKey: `synthetic-cta-${jobId}`,
+      createdBy: actorId,
+    });
+    let release!: () => void;
+    try {
+      await page.goto(`${path}?item=${videoId}`);
+      const cta = page.getByLabel("最后两秒 CTA", { exact: true });
+      await expect(cta).toHaveValue("Contact us");
+      await expect(page.getByText("后台处理中", { exact: true })).toBeVisible();
+      await expect(page.getByLabel("成片时长（秒）").first()).toBeDisabled();
+      await expect(cta).toBeDisabled();
+      await expect(page.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
+      const refresh = () =>
+        page.waitForRequest(
+          (request) =>
+            request.method() === "GET" &&
+            request.headers().rsc === "1" &&
+            new URL(request.url()).pathname === path,
+        );
+      // Observe the actual timer refresh for queued and running jobs.
+      await refresh();
+      await expect(cta).toBeDisabled();
+      await db
+        .update(schema.videoProcessingJob)
+        .set({ status: "running", startedAt: new Date() })
+        .where(eq(schema.videoProcessingJob.id, jobId));
+      await refresh();
+      await expect(cta).toBeDisabled();
+      await failVideoJob(
+        jobId,
+        kind === "ai_draft" ? "AI_DRAFT_FAILED" : "RENDER_FAILED",
+        db as unknown as Database,
+      );
+      await expect(page.getByText("后台处理中", { exact: true })).toHaveCount(0);
+      await expect(cta).toBeEnabled();
+      await expect(
+        page.getByText(kind === "ai_draft" ? "AI 初稿失败" : "合成失败", { exact: true }),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeEnabled();
+      const manual = `MOCK ${kind} saved CTA`;
+      await cta.fill(manual);
+      let started!: () => void;
+      const saving = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await page.route(
+        (url) => url.pathname === path,
+        async (route) => {
+          const request = route.request();
+          if (request.method() !== "POST" || !request.headers()["next-action"])
+            return route.continue();
+          // Execute the real Action and forward its original response after inspection.
+          // Holding only transport lets the browser exercise React's pending state.
+          const response = await route.fetch();
+          started();
+          await released;
+          await route.fulfill({ response });
+        },
+      );
+      await page.getByRole("button", { name: "保存", exact: true }).click();
+      await saving;
+      await expect(cta).toBeDisabled();
+      await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeDisabled();
+      release();
+      await expect(page.getByText("剪辑稿已保存。", { exact: true })).toBeVisible();
+      await expect(cta).toBeEnabled();
+      await expect(cta).toHaveValue(manual);
+      const [saved] = await db
+        .select({
+          payload: schema.aggregateRecord.payload,
+          version: schema.aggregateRecord.version,
+        })
+        .from(schema.aggregateRecord)
+        .where(eq(schema.aggregateRecord.id, videoId));
+      expect(videoProjectSchema.parse(saved.payload).editDraft?.ctaText).toBe(manual);
+      expect(saved.version).toBe(3); // original + failed job + actual editor save
+      await page.unrouteAll({ behavior: "wait" });
+      await page.reload();
+      await expect(cta).toHaveValue(manual);
+    } finally {
+      release?.();
+      await db.delete(schema.videoProcessingJob).where(eq(schema.videoProcessingJob.id, jobId));
+    }
+  }
 });
