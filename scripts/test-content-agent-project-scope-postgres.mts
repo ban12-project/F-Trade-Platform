@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mock } from "node:test";
+import { APICallError, NoOutputGeneratedError } from "ai";
 import { eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import ready from "../data/fixtures/product-ready.synthetic.json";
@@ -27,6 +28,8 @@ const modelRequests: Array<{
   verifiedFacts: Array<{ field: string; value: string; evidenceRef: string }>;
 }> = [];
 let generationEffect: (() => Promise<void>) | undefined;
+let failure: { stage: "configuration" | "model" | "generation"; value: unknown } | undefined;
+const privateMarker = "MOCK_PRIVATE_PROVIDER_DO_NOT_USE";
 const moduleUrl = (relative: string) => new URL(relative, import.meta.url).href;
 
 // Replace session transport and model execution only. The real Action boundary, Zod schema,
@@ -41,17 +44,24 @@ mock.module(moduleUrl("../lib/ai/product-agent-model-config.ts"), {
   exports: {
     resolveProductAgentModelConfig: async () => {
       configurations++;
+      if (failure?.stage === "configuration") throw failure.value;
       return {};
     },
   },
 });
 mock.module(moduleUrl("../lib/ai/model-provider.ts"), {
-  exports: { createProductAgentModel: () => ({ provider: "synthetic-only" }) },
+  exports: {
+    createProductAgentModel: () => {
+      if (failure?.stage === "model") throw failure.value;
+      return { provider: "synthetic-only" };
+    },
+  },
 });
 mock.module(moduleUrl("../lib/content/generation.ts"), {
   exports: {
     generateMarketingContent: async (input: (typeof modelRequests)[number]) => {
       modelRequests.push(input);
+      if (failure?.stage === "generation") throw failure.value;
       await generationEffect?.();
       return {
         hook: input.verifiedFacts.map((fact) => fact.value).join(" "),
@@ -196,6 +206,53 @@ try {
   assert.equal(configurations, 2);
   assert.equal(modelRequests.length, 2);
   actor = editor;
+  // Provider/configuration errors are untrusted even for a legitimately authorized editor.
+  // Assert the complete client state, including nested SDK/cause/rejection details.
+  const failures: NonNullable<typeof failure>[] = [
+    { stage: "configuration", value: new Error(`Stored configuration ${privateMarker}`) },
+    { stage: "model", value: new Error(`Provider initialization ${privateMarker}`) },
+    {
+      stage: "generation",
+      value: new APICallError({
+        message: `Provider failure ${privateMarker}`,
+        url: `https://mock.example.invalid/${privateMarker}`,
+        requestBodyValues: { token: privateMarker },
+        statusCode: 401,
+        responseBody: privateMarker,
+      }),
+    },
+    {
+      stage: "generation",
+      value: new NoOutputGeneratedError({
+        message: `Structured output ${privateMarker}`,
+        cause: new Error(privateMarker),
+      }),
+    },
+    { stage: "generation", value: new Error(`Generated fact validation ${privateMarker}`) },
+    { stage: "generation", value: { message: privateMarker, response: { token: privateMarker } } },
+    { stage: "generation", value: privateMarker },
+    { stage: "generation", value: null },
+  ];
+  for (const scenario of failures) {
+    const before = { configurations, requests: modelRequests.length };
+    failure = scenario;
+    const result = await generateContentDraftAction({ status: "idle", message: "" }, request());
+    failure = undefined;
+    assert.equal(result.status, "error");
+    assert.match(result.message, /初稿.*失败.*重试.*管理员/);
+    assert.equal(result.draft, undefined);
+    assert.doesNotMatch(JSON.stringify(result), /MOCK_PRIVATE|mock\.example\.invalid/);
+    assert.equal(configurations, before.configurations + 1);
+    assert.equal(modelRequests.length, before.requests + (scenario.stage === "generation" ? 1 : 0));
+  }
+  const retried = await generateContentDraftAction({ status: "idle", message: "" }, request());
+  assert.equal(
+    retried.status,
+    "success",
+    "an explicit retry must still return an authorized draft",
+  );
+  assert.equal(retried.draft?.hook, "MOCK allowed scope product");
+  const beforeRevocations = { configurations, requests: modelRequests.length };
   async function discard(effect: () => Promise<void>, message: RegExp) {
     const before = modelRequests.length;
     generationEffect = effect;
@@ -258,8 +315,8 @@ try {
       })
       .where(eq(schema.aggregateRecord.id, product));
   }, /事实已更新/);
-  assert.equal(configurations, 8);
-  assert.equal(modelRequests.length, 8);
+  assert.equal(configurations, beforeRevocations.configurations + 6);
+  assert.equal(modelRequests.length, beforeRevocations.requests + 6);
   assert.ok(
     modelRequests.every(
       (input) =>
@@ -269,6 +326,9 @@ try {
   );
   console.log(
     "PASS content generation project scope: missing/empty project, foreign/unlinked product, role/membership/archive/Ready gates reject before credentials/model; owner/editor receive authorized facts; in-flight session/membership/archive/ban/Ready/fact changes discard results",
+  );
+  console.log(
+    "PASS content generation errors: 8 configuration/model/SDK/output/validation/non-Error failures return safe client state; explicit retry succeeds; no real provider requests",
   );
 } finally {
   await closeDatabase();
