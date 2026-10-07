@@ -2,6 +2,8 @@
 
 关联 [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498)，基线 `main@b7982bb3a37273be19c1c1ec698947c1a5952ab3`。**两项工具依赖补丁及六项合成回归通过；剩余风险和正式 MVP 业务验收继续开放。** 本轮没有生产数据库写入、模型调用、资料上传或渠道操作。
 
+同日后续的[队列期限修复](workflow-queue-deadlines-20261007.md)在独立复现后采用 Workflow 4.8.8，保留本报告的安全补丁及兼容夹具。本报告仍记录工具补丁批次的原始版本；队列生产部署与正式业务验收保持独立。
+
 ## 新扫描与范围
 
 同轮生产依赖扫描在改动前为 `0 critical / 4 high / 1 moderate / 0 low`，改动后为 **`0 critical / 3 high / 0 moderate / 0 low`**。新增的 MCP SDK 公告解释了改动前比[上一轮](workflow-security-patches-20261007.md)多出的一个 high；不能将两轮不同公告集混作同一基线。计数是公告版本匹配，不是已证明的应用可利用漏洞数。
