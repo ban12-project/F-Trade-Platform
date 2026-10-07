@@ -1,0 +1,65 @@
+{
+  "contractVersion": "1.0.0",
+  "classification": "sanitized_aggregate",
+  "reviewId": "meta-facebook-source-review-20261007",
+  "reviewedAt": "2026-10-07T04:08:51.681Z",
+  "platform": "facebook",
+  "projectPreset": {
+    "version": "2026-08",
+    "minDurationSeconds": 3,
+    "maxDurationSeconds": 90
+  },
+  "projectPublishingScope": {
+    "path": "facebook_profile_browser",
+    "accountCategory": "personal_profile",
+    "apiVersion": null,
+    "decisionRef": "docs/decisions/0002-camofox-facebook-personal-profile-mvp1.md"
+  },
+  "sources": [
+    {
+      "url": "https://about.fb.com/news/2025/06/making-it-easier-create-videos-facebook/",
+      "kind": "vendor_documentation",
+      "readStatus": "readable",
+      "documentRevision": "announcement-published-2025-06-17-updated-2025-07-14",
+      "ruleVersion": null,
+      "scope": "not_established",
+      "observedSummary": "This vendor announcement describes a gradual unified Reels flow for Profiles and Pages, without length/format restrictions and with audience confirmation. It is an announcement, not a technical rule version or proof that the specific production account has migrated."
+    },
+    {
+      "url": "https://www.postman.com/meta/facebook/folder/simabyk/reels-publishing",
+      "kind": "vendor_collection",
+      "readStatus": "readable",
+      "documentRevision": null,
+      "ruleVersion": null,
+      "scope": "publishing_api",
+      "observedSummary": "The collection body is readable again and explicitly describes Page API publishing. It lists 4–60 seconds, 9:16, at least 540×960 and at least 23 FPS. This does not establish the current Personal Profile browser requirements."
+    },
+    {
+      "url": "https://www.facebook.com/help/www/2862139500770200",
+      "kind": "vendor_documentation",
+      "readStatus": "unavailable",
+      "documentRevision": null,
+      "ruleVersion": null,
+      "scope": "not_established",
+      "observedSummary": "Direct opening redirected to a login/temporary-block page. Search-cache snippets were not treated as a successful current-body reading."
+    }
+  ],
+  "differences": [
+    "The export preset remains 3–90 seconds; the MVP editing policy caps the composed asset at 15 seconds; the readable Page API collection lists 4–60 seconds. They govern different scopes.",
+    "The unified-flow announcement does not prove per-account rollout or replace an applicable technical publishing contract."
+  ],
+  "unresolved": [
+    "The selected production account's current browser publishing flow, audience confirmation and valid reviewed page/receipt contract.",
+    "A current authoritative technical rule version applicable to that Personal Profile browser path.",
+    "Actual target-account media acceptance and durable automatic video receipt.",
+    "Peak bitrate and other properties absent from the current measurements."
+  ],
+  "measurements": {
+    "fileSizeBytes": "available_when_reported",
+    "averageBitrateBps": "available_when_reported",
+    "peakBitrateBps": "not_measured",
+    "missingValue": null
+  },
+  "sourceApplicability": "unverified",
+  "platformAcceptance": "not_evaluated"
+}
