@@ -1,5 +1,7 @@
 # MVP1 实现核对与补缺 — 2026-10-06
 
+**10 月 7 日生产试点预检**：用户选择优先推进正式生产试点。[当前预检](production-pilot-preflight-20261007.md)核实 production 已部署 `3107c262`、现有实例 stopped、所选快照未过期；一次本机中性代理 CONNECT 仍为 407，未冒充 Sandbox 内复验。正式验收浏览器待登录，敏感环境导出不能证明数据库、策略或审核范围已核对；渠道及六项真实业务验收仍 pending。新的 [Meta 来源观察](meta-facebook-source-review-20261007.json)区分统一 Reels 公告、Page API 集合与目标 Profile 的未知当前适用性，保留所有原有预设和审核边界。
+
 关联 [#496](https://github.com/ban12-project/F-Trade-Platform/issues/496)，正式总验收仍为 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32)。本轮核对当前实现、修复可复现缺陷并更新验收口径；**正式业务验收保持 pending**。合成测试通过不能替代真实工厂资料、渠道授权或人工 Go/No-Go。
 
 **同日补充：reference 资料测试已获持续授权，本次测试审核由用户委托 Agent 自动完成。** [复测与自动审核报告](reference-test-review-20261006.md)记录 20 条来源校验、独立 mock 补缺与模拟商机闭环，以及目录和素材检查。下文真实生产验收的依赖表只适用于其对应范围，不能用 #6 或等待人工测试确认阻断已授权的 reference 测试；本报告的六项 `not_run` 仅指未执行的真实业务样本。
