@@ -103,6 +103,34 @@ const syntheticProduct = {
     },
   ],
 };
+const syntheticGenerationProducts = [
+  {
+    ...syntheticProduct,
+    factOptions: [
+      ...syntheticProduct.factOptions,
+      {
+        path: "product.oe_numbers",
+        label: "OE 编号",
+        value: "MOCK-OE-001",
+        evidenceRef: "evidence-product-001",
+      },
+    ],
+  },
+  {
+    ...syntheticProduct,
+    id: "00000000-0000-4000-8000-000000000305",
+    productName: "MOCK second product",
+    internalSku: "SYN-002",
+    factOptions: [
+      {
+        path: "product.product_name",
+        label: "产品名称",
+        value: "MOCK second product",
+        evidenceRef: "evidence-product-002",
+      },
+    ],
+  },
+];
 const syntheticRfq: RfqEntry = {
   id: "00000000-0000-4000-8000-000000000602",
   state: "RFQ_READY",
@@ -389,7 +417,22 @@ async function ProjectWorkflowFixture({
             createdAt: new Date("2026-09-01T00:00:00Z"),
           },
         ]}
-        sourceDocuments={[]}
+        sourceDocuments={[
+          {
+            id: "evidence-product-001",
+            label: "MOCK mixed source coverage",
+            href: "/api/product-evidence/00000000-0000-4000-8000-000000000202/00000000-0000-4000-8000-000000000301/evidence-product-001",
+            contentType: "text/plain",
+            fields: [
+              {
+                path: "product.product_name",
+                reference: "evidence-loc-synthetic-name",
+                excerpt: "MOCK source text: Verified clutch kit",
+              },
+              { path: "product.internal_sku", reference: "evidence-product-001" },
+            ],
+          },
+        ]}
       />
     ) : (
       <ProductIntakePanel
@@ -407,7 +450,10 @@ async function ProjectWorkflowFixture({
         canReview
       />
     ) : (
-      <ContentCreatePanel projectId={syntheticMarketingProject.id} products={[syntheticProduct]} />
+      <ContentCreatePanel
+        projectId={syntheticMarketingProject.id}
+        products={state === "content-generation" ? syntheticGenerationProducts : [syntheticProduct]}
+      />
     ),
     video: (
       <WorkspaceLink href={`/workspace/${syntheticMarketingProject.id}/video?new=1`}>

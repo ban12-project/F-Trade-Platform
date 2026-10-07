@@ -30,29 +30,22 @@ export function ProductEvidenceSources({ sources }: { sources: ProductEvidencePr
                   .map((field) => productFactLabels[field.path] ?? field.path)
                   .join("、")}
               </p>
-              {!source.fields.some((field) => field.excerpt) ? (
-                <p className="text-sm text-muted-foreground">
-                  未保留可直接展示的原文片段，请对照上方原件。
-                </p>
-              ) : null}
-              {source.fields
-                .filter((field) => field.excerpt)
-                .map((field) => (
-                  <div key={field.path} className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">
-                      {productFactLabels[field.path] ?? field.path}
+              {source.fields.map((field) => (
+                <div key={field.path} className="flex flex-col gap-2">
+                  <p className="text-sm font-medium">
+                    {productFactLabels[field.path] ?? field.path}
+                  </p>
+                  {field.excerpt ? (
+                    <blockquote className="whitespace-pre-wrap break-words border-l-2 pl-3 text-sm">
+                      {field.excerpt}
+                    </blockquote>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      未保留可直接展示的原文片段，请对照上方原件。
                     </p>
-                    {field.excerpt ? (
-                      <blockquote className="whitespace-pre-wrap break-words border-l-2 pl-3 text-sm">
-                        {field.excerpt}
-                      </blockquote>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        未保留可直接展示的原文片段，请对照上方原件。
-                      </p>
-                    )}
-                  </div>
-                ))}
+                  )}
+                </div>
+              ))}
             </section>
           ))
         ) : (
