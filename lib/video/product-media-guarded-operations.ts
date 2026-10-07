@@ -2,25 +2,25 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { z } from "zod";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
+import { videoReviewFormSchema } from "@/lib/form-schemas";
 import { assertTransition } from "@/lib/workflow/transitions";
-import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
+import {
+  assertAggregateWorkspaceWrite,
+  assertAndLinkProjectEvidence,
+} from "@/lib/workspace/access";
 
 import { assertVideoPublicationEligible, videoProjectSchema } from "./contracts";
 import { approveReviewVideoExport, type ReviewVideoExport } from "./export-artifact";
 import { assertLockedVideoProductContext } from "./product-context-guard";
 import { productMediaIdsForVideoProject } from "./product-media-runtime-policy";
-
-const guardedVideoReviewSchema = z
-  .object({
-    videoId: z.uuid(),
-    decision: z.enum(["approved", "rejected"]),
-    evidenceRef: z.string().trim().min(1),
-    notes: z.string().trim().max(2_000).optional().default(""),
-  })
-  .strict();
+import {
+  authorizeLockedVideoReview,
+  parseVideoReviewIdentity,
+  VideoReviewAccessError,
+  type VideoReviewIdentity,
+} from "./review-write-access";
 
 /** Starts rendering only while every ProductMedia binding is still valid. */
 export async function beginGuardedMarketingVideoRender(
@@ -211,11 +211,12 @@ export async function completeGuardedMarketingVideoRender(
 /** Approves a rendered video only while all ProductMedia rights remain valid. */
 export async function decideGuardedVideoReview(
   input: unknown,
-  actorId: string,
+  identityInput: VideoReviewIdentity,
   database: Database = getDatabase(),
 ) {
-  const value = guardedVideoReviewSchema.parse(input);
-  const now = new Date();
+  const value = videoReviewFormSchema.parse(input);
+  const identity = parseVideoReviewIdentity(identityInput);
+  const { actorId, projectId } = identity;
   const eventId = randomUUID();
   return database.transaction(async (tx) => {
     await assertAggregateWorkspaceWrite(value.videoId, tx, actorId);
@@ -253,6 +254,10 @@ export async function decideGuardedVideoReview(
       }
       await assertLockedVideoProductContext(tx, current);
     }
+    const expiresAt = await authorizeLockedVideoReview(tx, identity, aggregate.id);
+    await assertAndLinkProjectEvidence(projectId, [value.evidenceRef], actorId, tx);
+    const now = new Date();
+    if (expiresAt <= now) throw new VideoReviewAccessError();
     const nextState = value.decision === "approved" ? "VIDEO_APPROVED" : "VIDEO_REVISION_REQUIRED";
     const project = videoProjectSchema.parse({
       ...current,
