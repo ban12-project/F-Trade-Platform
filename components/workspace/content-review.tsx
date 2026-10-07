@@ -89,7 +89,16 @@ export function ContentReview({
       notes: "",
     },
   });
-  useWorkspaceDirty(`content-review-${detail.id}`, form.formState.isDirty);
+  const canDecide =
+    canReview && detail.state === "CONTENT_REVIEW_REQUIRED" && detail.approvalStatus === "pending";
+  const hasReviewInput = Boolean(
+    form.watch("decision") || form.watch("evidenceRef") || form.watch("notes"),
+  );
+  // Track entered review values across initial field registration and readonly states.
+  useWorkspaceDirty(
+    `content-review-${detail.id}`,
+    canDecide && form.formState.isDirty && hasReviewInput,
+  );
   useEffect(() => {
     if (state.status === "success") {
       form.reset(form.getValues());
@@ -102,8 +111,6 @@ export function ContentReview({
     for (const [key, value] of Object.entries(values)) data.set(key, value);
     startTransition(() => action(data));
   }
-  const canDecide =
-    canReview && detail.state === "CONTENT_REVIEW_REQUIRED" && detail.approvalStatus === "pending";
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">

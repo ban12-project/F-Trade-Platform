@@ -36,6 +36,10 @@ for (const change of [
   "banned",
   "expired",
   "missing evidence",
+  "untouched navigation",
+  "decision navigation",
+  "evidence navigation",
+  "notes navigation",
 ] as const) {
   test(`Content Gate 01 real browser ${change}: authorized decisions or intact pending content`, async ({
     page,
@@ -197,6 +201,42 @@ for (const change of [
       await expect(
         page.getByRole("button", { name: "请先选择决定", exact: true }).filter({ visible: true }),
       ).toBeDisabled();
+      if (change.endsWith("navigation")) {
+        if (change === "decision navigation") {
+          await form.getByRole("combobox", { name: "决定", exact: true }).click();
+          await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
+        }
+        if (change === "evidence navigation")
+          await form.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+        if (change === "notes navigation") await form.locator("#content-review-notes").fill(notes);
+        if (change !== "untouched navigation")
+          await page.waitForLoadState("networkidle", { timeout: 5_000 });
+        const back = page
+          .getByRole("link", { name: "返回清单", exact: true })
+          .filter({ visible: true });
+        await back.click();
+        const dialog = page.getByRole("alertdialog", { name: "放弃未保存的修改？", exact: true });
+        if (change !== "untouched navigation") {
+          await expect(dialog).toBeVisible();
+          await dialog.getByRole("button", { name: "继续编辑", exact: true }).click();
+          await expect(page).toHaveURL(path);
+          if (change === "decision navigation")
+            await expect(form.locator('[data-slot="select-value"]')).toHaveText("退回营销内容");
+          if (change === "evidence navigation")
+            await expect(form.getByLabel("审核证据", { exact: true })).toHaveValue(evidenceId);
+          if (change === "notes navigation")
+            await expect(form.locator("#content-review-notes")).toHaveValue(notes);
+          expect(await snapshot()).toEqual(before);
+          await back.click();
+          await expect(dialog).toBeVisible();
+          await dialog.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
+        }
+        await expect(page).toHaveURL(`/workspace/content?project=${projectId}`);
+        await expect(dialog).toHaveCount(0);
+        expect(await snapshot()).toEqual(before);
+        expect(selectErrors).toEqual([]);
+        return;
+      }
       await form.getByRole("combobox", { name: "决定", exact: true }).click();
       await page.getByRole("option", { name: label, exact: true }).click();
       await form.getByLabel("审核证据", { exact: true }).fill(reviewEvidence);

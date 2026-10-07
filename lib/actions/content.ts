@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
+import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 import { contentDraftFailureMessage } from "@/lib/content/draft-write-access";
 import { contentReviewFailureMessage } from "@/lib/content/review-write-access";
 import {
@@ -18,12 +18,6 @@ export type ContentActionState = {
   message: string;
   contentId?: string;
 };
-
-function projectIdFrom(formData: FormData) {
-  const value = formData.get("projectId");
-  if (value === null || value === "") return undefined;
-  return z.uuid("项目标识无效。").parse(value);
-}
 
 function revalidateContentPaths(projectId: string | undefined, contentId?: string) {
   void contentId;
@@ -111,16 +105,19 @@ export async function reviseContentDraftAction(
   if (!parsed.success)
     return { status: "error", message: parsed.error.issues[0]?.message ?? "内容资料格式不正确。" };
   try {
-    const projectId = projectIdFrom(formData);
-    if (projectId)
-      await assertWorkspaceAggregateLink(
-        projectId,
-        parsedContentId.data,
-        "marketing",
-        "content",
-        session.user.id,
-      );
-    await reviseContentDraft(parsedContentId.data, parsed.data, session.user.id);
+    const projectId = z.uuid("项目标识无效。").parse(formData.get("projectId"));
+    await assertWorkspaceAggregateLink(
+      projectId,
+      parsedContentId.data,
+      "marketing",
+      "content",
+      session.user.id,
+    );
+    await reviseContentDraft(parsedContentId.data, parsed.data, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId,
+    });
     revalidateContentPaths(projectId, parsedContentId.data);
     return {
       status: "success",
@@ -128,7 +125,7 @@ export async function reviseContentDraftAction(
       contentId: parsedContentId.data,
     };
   } catch (error) {
-    return actionError(error, "无法保存内容修订。");
+    return { status: "error", message: contentDraftFailureMessage(error, "revise") };
   }
 }
 
@@ -145,11 +142,11 @@ export async function copyContentDraftToProjectAction(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "复制参数无效。" };
   try {
     await assertWorkspaceProjectKind(parsed.data.projectId, "marketing", session.user.id);
-    const result = await copyContentDraftToProject(
-      parsed.data.sourceContentId,
-      parsed.data.projectId,
-      session.user.id,
-    );
+    const result = await copyContentDraftToProject(parsed.data.sourceContentId, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId: parsed.data.projectId,
+    });
     revalidateContentPaths(parsed.data.projectId, result.id);
     return {
       status: "success",
@@ -157,6 +154,6 @@ export async function copyContentDraftToProjectAction(
       contentId: result.id,
     };
   } catch (error) {
-    return actionError(error, "无法复制内容草稿。");
+    return { status: "error", message: contentDraftFailureMessage(error, "copy") };
   }
 }
