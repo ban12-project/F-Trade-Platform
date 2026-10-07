@@ -68,6 +68,9 @@ jobs:
       - name: Verify patched tooling loaders and MCP credential boundaries
         run: node --test --test-reporter=tap scripts/test-tooling-security-compatibility.mjs
 
+      - name: Verify locked braces depth guard and real glob compatibility
+        run: node --test --test-reporter=tap scripts/test-braces-depth-guard.mjs
+
       - name: Test workspace navigation and query concurrency
         run: pnpm test:workspace && pnpm test:workspace-navigation
 
