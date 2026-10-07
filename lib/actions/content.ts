@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
-
+import { contentReviewFailureMessage } from "@/lib/content/review-write-access";
 import {
   copyContentDraftToProject,
   createContentDraft,
@@ -63,16 +63,19 @@ export async function decideContentReviewAction(
   if (!parsed.success)
     return { status: "error", message: parsed.error.issues[0]?.message ?? "审核资料格式不正确。" };
   try {
-    const projectId = projectIdFrom(formData);
-    if (projectId)
-      await assertWorkspaceAggregateLink(
-        projectId,
-        parsed.data.contentId,
-        "marketing",
-        "content",
-        session.user.id,
-      );
-    const result = await decideContentReview(parsed.data, session.user.id);
+    const projectId = z.uuid("项目标识无效。").parse(formData.get("projectId"));
+    await assertWorkspaceAggregateLink(
+      projectId,
+      parsed.data.contentId,
+      "marketing",
+      "content",
+      session.user.id,
+    );
+    const result = await decideContentReview(parsed.data, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId,
+    });
     revalidateContentPaths(projectId, parsed.data.contentId);
     return {
       status: "success",
@@ -82,7 +85,7 @@ export async function decideContentReviewAction(
           : "Gate 01 已退回，内容需要修订。",
     };
   } catch (error) {
-    return actionError(error, "无法完成内容审核。");
+    return { status: "error", message: contentReviewFailureMessage(error) };
   }
 }
 

@@ -181,7 +181,7 @@ export function ContentReview({
                     render={({ field }) => (
                       <Select
                         items={{ approved: "批准营销内容", rejected: "退回营销内容" }}
-                        value={field.value}
+                        value={field.value ?? null}
                         onValueChange={field.onChange}
                       >
                         <SelectTrigger
