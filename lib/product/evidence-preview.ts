@@ -3,7 +3,7 @@ import { get } from "@vercel/blob";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { type Database, getDatabase } from "@/lib/db/client";
-import { productCatalogCandidate } from "@/lib/db/product-catalog-schema";
+import { productCatalogCandidate, productCatalogImport } from "@/lib/db/product-catalog-schema";
 import {
   aggregateRecord,
   evidence,
@@ -14,7 +14,10 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import { verifyDocumentUploadBytes } from "./document-upload-bytes";
-import { prepareProductAgentEvidenceSource } from "./evidence-locations";
+import {
+  type ProductAgentEvidenceLocation,
+  prepareProductAgentEvidenceSource,
+} from "./evidence-locations";
 
 const filenames: Record<string, string> = {
   "application/pdf": "source.pdf",
@@ -97,7 +100,12 @@ export type ProductEvidencePreview = {
   label: string;
   href: string;
   contentType: string;
-  fields: Array<{ path: string; reference: string; excerpt?: string }>;
+  fields: Array<{
+    path: string;
+    reference: string;
+    excerpt?: string;
+    location?: { physicalPage?: number; recordLine: number };
+  }>;
 };
 
 export async function listProductEvidencePreviews(
@@ -110,15 +118,21 @@ export async function listProductEvidencePreviews(
   if (!sources.length) return [];
   // A retained catalog excerpt is displayed only when its exact reference matches the saved field.
   const [candidate] = await database
-    .select({ source: productCatalogCandidate.source })
+    .select({
+      source: productCatalogCandidate.source,
+      physicalPage: productCatalogCandidate.physicalPage,
+      recordLine: productCatalogCandidate.recordLine,
+      evidenceId: productCatalogImport.evidenceId,
+    })
     .from(productCatalogCandidate)
+    .innerJoin(productCatalogImport, eq(productCatalogImport.id, productCatalogCandidate.importId))
     .where(eq(productCatalogCandidate.productId, productId))
     .limit(1);
-  const excerpts = new Map<string, string>();
+  const locations = new Map<string, ProductAgentEvidenceLocation>();
   if (candidate) {
     try {
       for (const location of prepareProductAgentEvidenceSource(candidate.source).evidence_locations)
-        excerpts.set(location.ref, location.text);
+        locations.set(location.ref, location);
     } catch {
       /* Legacy sources remain available as original files. */
     }
@@ -128,11 +142,42 @@ export async function listProductEvidencePreviews(
     label: source.label,
     contentType: source.contentType,
     href: `/api/product-evidence/${projectId}/${productId}/${encodeURIComponent(source.id)}`,
-    fields: source.linkedFields.map(([path, reference]) => ({
-      path,
-      reference,
-      ...(excerpts.has(reference) ? { excerpt: excerpts.get(reference) } : {}),
-    })),
+    fields: source.linkedFields.map(([path, reference]) => {
+      const retained = locations.get(reference);
+      // A shared byte hash alone cannot associate a separate upload with a catalog record.
+      const bound =
+        retained &&
+        candidate?.evidenceId === source.id &&
+        candidate.source.source_ref === `source-${source.sha256}` &&
+        (retained.source_ref === source.id || retained.source_ref.startsWith(`${source.id}#`));
+      const physicalPage = candidate?.physicalPage ?? null;
+      const recordLine = candidate?.recordLine ?? 0;
+      const expectedRef = `${source.id}#${physicalPage ? `pdf-page=${physicalPage}&` : ""}record-line=${recordLine}`;
+      const located =
+        bound &&
+        Number.isSafeInteger(recordLine) &&
+        recordLine > 0 &&
+        (physicalPage === null ||
+          (source.contentType === "application/pdf" &&
+            Number.isSafeInteger(physicalPage) &&
+            physicalPage > 0)) &&
+        candidate.source.evidence_refs.length === 1 &&
+        candidate.source.evidence_refs[0] === expectedRef &&
+        retained.source_ref === expectedRef;
+      return {
+        path,
+        reference,
+        ...(bound ? { excerpt: retained.text } : {}),
+        ...(located
+          ? {
+              location: {
+                recordLine,
+                ...(physicalPage ? { physicalPage } : {}),
+              },
+            }
+          : {}),
+      };
+    }),
   }));
 }
 

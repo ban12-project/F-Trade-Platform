@@ -1,5 +1,5 @@
 "use client";
-import { Button } from "@/components/ui/button";
+import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProductEvidencePreview } from "@/lib/product/evidence-preview";
 import { productFactLabels } from "@/lib/product/fact-labels";
@@ -18,12 +18,15 @@ export function ProductEvidenceSources({ sources }: { sources: ProductEvidencePr
           sources.map((source) => (
             <section key={source.id} className="flex flex-col gap-3" aria-label={source.label}>
               <p className="break-words text-sm">{source.label}</p>
-              <Button
+              <LinkButton
                 variant="outline"
-                render={<a href={source.href} target="_blank" rel="noopener noreferrer" />}
+                href={source.href}
+                prefetch={false}
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 打开来源原件（新窗口）
-              </Button>
+              </LinkButton>
               <p className="text-sm text-muted-foreground">
                 关联字段（仍需人工核实）：
                 {source.fields
@@ -35,6 +38,28 @@ export function ProductEvidenceSources({ sources }: { sources: ProductEvidencePr
                   <p className="text-sm font-medium">
                     {productFactLabels[field.path] ?? field.path}
                   </p>
+                  {field.location ? (
+                    <p className="text-sm text-muted-foreground">
+                      来源位置：
+                      {field.location.physicalPage
+                        ? `原件第 ${field.location.physicalPage} 页 · `
+                        : ""}
+                      解析文本第 {field.location.recordLine} 行
+                    </p>
+                  ) : null}
+                  {source.contentType === "application/pdf" && field.location?.physicalPage ? (
+                    <LinkButton
+                      variant="outline"
+                      size="sm"
+                      href={`${source.href}#page=${field.location.physicalPage}`}
+                      prefetch={false}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      查看{productFactLabels[field.path] ?? field.path}来源第{" "}
+                      {field.location.physicalPage} 页（新窗口）
+                    </LinkButton>
+                  ) : null}
                   {field.excerpt ? (
                     <blockquote className="whitespace-pre-wrap break-words border-l-2 pl-3 text-sm">
                       {field.excerpt}

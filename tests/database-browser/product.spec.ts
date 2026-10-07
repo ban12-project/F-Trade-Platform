@@ -252,7 +252,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await expect(page).toHaveURL(new RegExp(`/records/product/${created.id}$`));
   await expect(page.getByRole("tab")).toHaveCount(0);
   await expect(page.locator("#create-product").filter({ visible: true })).toHaveCount(0);
-  const original = page.getByRole("button", { name: "打开来源原件（新窗口）", exact: true });
+  const original = page.getByRole("link", { name: "打开来源原件（新窗口）", exact: true });
   await expect(original).toHaveAttribute(
     "href",
     `/api/product-evidence/${projectId}/${created.id}/${evidenceId}`,

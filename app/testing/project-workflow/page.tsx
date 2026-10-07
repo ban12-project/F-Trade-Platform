@@ -400,7 +400,10 @@ async function ProjectWorkflowFixture({
       </WorkspaceDirtyProvider>
     );
   }
-  const productDetail = state === "product-review" ? syntheticProductDetail : null;
+  const productDetail =
+    state === "product-review" || state === "product-review-locations"
+      ? syntheticProductDetail
+      : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
   const panels = {
     product: productDetail ? (
@@ -432,6 +435,39 @@ async function ProjectWorkflowFixture({
               { path: "product.internal_sku", reference: "evidence-product-001" },
             ],
           },
+          ...(state === "product-review-locations"
+            ? [
+                {
+                  id: "evidence-paged-mock",
+                  label: "MOCK PDF source locations",
+                  href: "/api/product-evidence/00000000-0000-4000-8000-000000000202/00000000-0000-4000-8000-000000000301/evidence-paged-mock",
+                  contentType: "application/pdf",
+                  fields: [
+                    {
+                      path: "product.product_name",
+                      reference: "evidence-loc-mock-page-3-name",
+                      excerpt: "Product name: MOCK third-page product",
+                      location: { physicalPage: 3, recordLine: 8 },
+                    },
+                    { path: "product.internal_sku", reference: "evidence-paged-mock" },
+                  ],
+                },
+                {
+                  id: "evidence-csv-mock",
+                  label: "MOCK CSV source locations",
+                  href: "/api/product-evidence/00000000-0000-4000-8000-000000000202/00000000-0000-4000-8000-000000000301/evidence-csv-mock",
+                  contentType: "text/csv",
+                  fields: [
+                    {
+                      path: "product.product_name",
+                      reference: "evidence-loc-mock-csv-name",
+                      excerpt: "MOCK CSV product",
+                      location: { recordLine: 3 },
+                    },
+                  ],
+                },
+              ]
+            : []),
         ]}
       />
     ) : (
