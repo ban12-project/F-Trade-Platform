@@ -36,6 +36,8 @@
 - 实际应用编译的 Human Gate 三个合成案例通过：重复 token 保留原 owner、合法测试 human 决策恢复、Agent actor 拒绝。它们用于应用集成回归；隐式 token 的恢复证据来自上表的实际 SDK 测试。
 - 完整生产构建、PostgreSQL、Harbor 和浏览器 CI 结果以交付 PR 的最终 head checks 为准；本报告不以本地窄测试替代完整 CI 或生产部署证据。
 
+首轮交付 CI 在 Harbor 合成镜像依赖安装处失败：其白名单构建上下文与 Dockerfile 未包含新 `patches/` 文件。已补齐 `.patch` 文件的上下文白名单和安装前复制步骤；原失败保留，以更新后的最终 head 重新执行完整 CI。没有放宽冻结安装、容器隔离或 oracle 验收。
+
 同轮 `pnpm audit --prod`：**0 critical / 3 high / 0 moderate → 0 critical / 1 high / 0 moderate**。移除两个 nanoid 版本匹配；剩余 braces 3.0.3 仍由 #498 跟踪。版本匹配不证明应用可利用性。nanoid 溢出公告需要外部可影响的长度，[维护者公告](https://github.com/ai/nanoid/security/advisories/GHSA-xwg4-73v4-xw9w)说明修补版本；非安全模块的负数循环修复见[维护者 5.1.16 发布](https://github.com/ai/nanoid/releases/tag/5.1.16)。当前 core 只使用固定长度 21 的 seeded `customRandom`，不是接收用户长度的安全 token API。
 
 本轮恢复测试使用临时本机目录与进程内 handler，外部 HTTP 为 0；应用集成仅访问自己的本机开发服务和合成数据库。生产业务写入、模型调用、云端原件上传、渠道操作均为 0。现有生产版本、真实业务 Gate/RFQ 与正式 Go/No-Go 仍需独立证据。
