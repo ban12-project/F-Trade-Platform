@@ -9,7 +9,10 @@ import { productAgentRunFormSchema } from "@/lib/form-schemas";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
 import { logProductIntakeFailure, type ProductIntakeStage } from "@/lib/product/intake-diagnostics";
-import { productIntakeFailureResponse } from "@/lib/product/intake-errors";
+import {
+  PRODUCT_INTAKE_DIAGNOSTIC_HEADER,
+  productIntakeFailureResponse,
+} from "@/lib/product/intake-errors";
 import {
   PRODUCT_STREAM_PROMPT_HASH,
   PRODUCT_STREAM_PROMPT_VERSION,
@@ -105,7 +108,9 @@ export async function POST(request: Request) {
       await finishProductStreamRun(identity, run.runId, "interrupted");
     });
   } catch (error) {
-    logProductIntakeFailure(stage, error);
-    return productIntakeFailureResponse(error);
+    const diagnosticId = logProductIntakeFailure(stage, error);
+    const response = productIntakeFailureResponse(error);
+    response.headers.set(PRODUCT_INTAKE_DIAGNOSTIC_HEADER, diagnosticId);
+    return response;
   }
 }
