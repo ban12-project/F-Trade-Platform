@@ -4,6 +4,8 @@ import type { z } from "zod";
 import contentSchema from "@/contracts/content/content.schema.json";
 import {
   authorizeLockedContentDraft,
+  authorizeOwnedContentDraft,
+  authorizeReadableContentDraftSource,
   type ContentDraftIdentity,
   parseContentDraftIdentity,
 } from "@/lib/content/draft-write-access";
@@ -433,14 +435,15 @@ export async function listCrossProjectContentCandidates(
 
 export async function copyContentDraftToProject(
   sourceContentId: string,
-  projectId: string,
-  actorId: string,
+  identityInput: ContentDraftIdentity,
+  database: Database = getDatabase(),
 ) {
+  const identity = parseContentDraftIdentity(identityInput);
+  const { actorId, projectId } = identity;
   const id = randomUUID();
   const approvalId = randomUUID();
   const eventId = randomUUID();
-  const now = new Date();
-  return getDatabase().transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
     const [workspace] = await tx
       .select({ kind: workspaceProject.kind })
@@ -471,6 +474,9 @@ export async function copyContentDraftToProject(
       .where(and(eq(aggregateRecord.id, current.product_id), eq(aggregateRecord.type, "product")))
       .for("update");
     if (product?.state !== "PRODUCT_READY") throw new Error("源内容引用的产品已不再可用于新草稿。");
+    await authorizeReadableContentDraftSource(tx, identity, source.ownerProjectId);
+    await authorizeLockedContentDraft(tx, identity);
+    const now = new Date();
     await tx
       .insert(workspaceProjectItem)
       .values({
@@ -817,12 +823,14 @@ export async function decideContentReview(
 export async function reviseContentDraft(
   contentId: string,
   input: ContentDraftInput,
-  actorId: string,
+  identityInput: ContentDraftIdentity,
+  database: Database = getDatabase(),
 ) {
-  const now = new Date();
+  const identity = parseContentDraftIdentity(identityInput);
+  const { actorId } = identity;
   const eventId = randomUUID();
   const approvalId = randomUUID();
-  return getDatabase().transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     await assertAggregateWorkspaceWrite(contentId, tx, actorId);
     const [aggregate] = await tx
       .select({
@@ -847,6 +855,8 @@ export async function reviseContentDraft(
     if (product?.state !== "PRODUCT_READY")
       throw new Error("引用产品不再处于 Product Ready，不能重新送审。");
     const content = buildContentDraft(input, product.payload as unknown as ProductReady, contentId);
+    await authorizeOwnedContentDraft(tx, identity, contentId);
+    const now = new Date();
     assertTransition({
       eventId,
       entityType: "content",
