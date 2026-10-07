@@ -22,7 +22,7 @@ import {
   issueDocumentUploadReceipt,
 } from "../lib/product/document-upload-receipts";
 import { ProductUploadError, productIntakeFailureMessage } from "../lib/product/intake-errors";
-import { removeWorkspaceProjectMember } from "../lib/workspace/access";
+import { listProjectEvidenceOptions, removeWorkspaceProjectMember } from "../lib/workspace/access";
 
 const url = process.env.DOCUMENT_UPLOAD_TEST_DATABASE_URL;
 if (
@@ -93,12 +93,125 @@ void (async () => {
     const results = await Promise.all([claim(first.id), claim(first.id)]);
     assert.equal(results[0].evidenceId, results[1].evidenceId, "concurrent claims are idempotent");
     assert.equal(results[0].sha256, createHash("sha256").update(bytes).digest("hex"));
-    const second = await issueDocumentUploadReceipt(payload(), actors[0], db);
+    const second = await issueDocumentUploadReceipt(
+      payload({ originalFilename: "SYNTHETIC 第二份目录.csv" }),
+      actors[0],
+      db,
+    );
+    const secondClaim = await claim(second.id);
     assert.notEqual(
-      (await claim(second.id)).evidenceId,
+      secondClaim.evidenceId,
       results[0].evidenceId,
       "identical bytes retain independent provenance",
     );
+    const options = await listProjectEvidenceOptions(projects[0], actors[0], db);
+    assert.equal(
+      options.find((item) => item.id === results[0].evidenceId)?.sourceLabel,
+      "synthetic.csv",
+    );
+    assert.equal(
+      options.find((item) => item.id === secondClaim.evidenceId)?.sourceLabel,
+      "SYNTHETIC 第二份目录.csv",
+      "distinct original filenames identify identical-byte source uploads",
+    );
+    assert.deepEqual(Object.keys(options[0]).sort(), [
+      "classification",
+      "contentType",
+      "createdAt",
+      "id",
+      "sourceLabel",
+    ]);
+    await assert.rejects(listProjectEvidenceOptions(projects[0], actors[1], db), /不是该项目成员/);
+    const ownedOptions = await listProjectEvidenceOptions(projects[1], actors[0], db);
+    assert.ok(ownedOptions.some((item) => item.id === results[0].evidenceId));
+    assert.equal(
+      ownedOptions.find((item) => item.id === secondClaim.evidenceId)?.sourceLabel,
+      "SYNTHETIC 第二份目录.csv",
+    );
+    const legacyId = `evidence-${randomUUID()}`;
+    const legacyPath = `synthetic:legacy-${randomUUID()}`;
+    await db.insert(evidence).values({
+      id: legacyId,
+      classification: "restricted",
+      blobKey: legacyPath,
+      contentType: "text/csv",
+      sha256: "0".repeat(64),
+      sizeBytes: 1,
+      sourceLabel: "SYNTHETIC legacy source",
+      uploadedByType: "human",
+      uploadedById: actors[0],
+    });
+    await db.insert(workspaceProjectEvidence).values({
+      id: randomUUID(),
+      projectId: projects[0],
+      evidenceId: legacyId,
+      linkedById: actors[0],
+    });
+    const legacyLabel = async () =>
+      (await listProjectEvidenceOptions(projects[0], actors[0], db)).find(
+        (item) => item.id === legacyId,
+      )?.sourceLabel;
+    assert.equal(await legacyLabel(), "SYNTHETIC legacy source", "old sources retain their label");
+    const unmatched = await issueDocumentUploadReceipt(
+      payload({ originalFilename: "SYNTHETIC mismatched receipt.csv" }),
+      actors[0],
+      db,
+    );
+    await db.update(receipt).set({ evidenceId: legacyId }).where(eq(receipt.id, unmatched.id));
+    assert.equal(
+      await legacyLabel(),
+      "SYNTHETIC legacy source",
+      "different blob metadata is ignored",
+    );
+    await db.update(evidence).set({ blobKey: unmatched.blobPath }).where(eq(evidence.id, legacyId));
+    await db.update(receipt).set({ ownerId: actors[1] }).where(eq(receipt.id, unmatched.id));
+    assert.equal(
+      await legacyLabel(),
+      "SYNTHETIC legacy source",
+      "different uploader metadata is ignored",
+    );
+    await db.update(receipt).set({ ownerId: actors[0] }).where(eq(receipt.id, unmatched.id));
+    await db.update(evidence).set({ uploadedByType: "agent" }).where(eq(evidence.id, legacyId));
+    assert.equal(
+      await legacyLabel(),
+      "SYNTHETIC legacy source",
+      "non-human sources retain their label",
+    );
+    await db.update(evidence).set({ uploadedByType: "human" }).where(eq(evidence.id, legacyId));
+    await db
+      .update(receipt)
+      .set({ evidenceId: secondClaim.evidenceId })
+      .where(eq(receipt.id, unmatched.id));
+    assert.equal(
+      await legacyLabel(),
+      "SYNTHETIC legacy source",
+      "different evidence metadata is ignored",
+    );
+    await db.update(receipt).set({ evidenceId: null }).where(eq(receipt.id, unmatched.id));
+    await db.update(evidence).set({ blobKey: legacyPath }).where(eq(evidence.id, legacyId));
+    const viewerMemberships = [randomUUID(), randomUUID()];
+    await db.insert(workspaceProjectMember).values(
+      projects.map((projectId, index) => ({
+        id: viewerMemberships[index],
+        projectId,
+        userId: actors[1],
+        role: "viewer" as const,
+        createdById: actors[0],
+      })),
+    );
+    const sharedOptions = await listProjectEvidenceOptions(projects[0], actors[1], db);
+    assert.equal(
+      sharedOptions.find((item) => item.id === results[0].evidenceId)?.sourceLabel,
+      "synthetic.csv",
+    );
+    assert.deepEqual(
+      await listProjectEvidenceOptions(projects[1], actors[1], db),
+      [],
+      "membership in another project does not reveal unlinked foreign source names",
+    );
+    await db
+      .delete(workspaceProjectMember)
+      .where(inArray(workspaceProjectMember.id, viewerMemberships));
     await assert.rejects(
       issueDocumentUploadReceipt(payload({ receiptId: first.id }), actors[0], db),
       /已使用/,
@@ -113,6 +226,13 @@ void (async () => {
       .update(receipt)
       .set({ expiresAt: new Date(0) })
       .where(eq(receipt.id, first.id));
+    assert.equal(
+      (await listProjectEvidenceOptions(projects[0], actors[0], db)).find(
+        (item) => item.id === results[0].evidenceId,
+      )?.sourceLabel,
+      "synthetic.csv",
+      "receipt expiry does not erase a previously claimed source's identity",
+    );
     await assert.rejects(claim(first.id), /过期/);
     assert.equal(reads, before);
     blobBytes = Buffer.alloc(bytes.length, 0);
@@ -296,7 +416,7 @@ void (async () => {
     assert.throws(() => payload({ originalFilename: "../synthetic.csv" }));
     assert.throws(() => payload({ contentType: "application/pdf" }));
     console.log(
-      "PASS: direct document upload bounds, digest, provenance, concurrent claims, type/purpose/owner/project/expiry and mid-read revocation",
+      "PASS: direct document upload bounds, digest, provenance, source filenames/fallback/metadata isolation, concurrent claims, type/purpose/owner/project/expiry and mid-read revocation",
     );
   } finally {
     await db
