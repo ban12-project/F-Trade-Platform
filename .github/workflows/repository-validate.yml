@@ -59,6 +59,9 @@ jobs:
       - name: Verify patched Workflow replay and serialization compatibility
         run: node scripts/test-workflow-security-compatibility.mjs
 
+      - name: Verify Workflow queue deadlines and transport boundaries
+        run: node --test --test-reporter=tap scripts/test-workflow-queue-deadlines.mjs
+
       - name: Verify patched tooling loaders and MCP credential boundaries
         run: node --test --test-reporter=tap scripts/test-tooling-security-compatibility.mjs
 

@@ -474,7 +474,7 @@ def check_database_baseline() -> None:
 def check_service_adapters() -> None:
     package = load_json(ROOT / "package.json")
     expected = {
-        "workflow": "4.8.4",
+        "workflow": "4.8.8",
         "@vercel/blob": "2.8.0",
         "ai": "7.0.77",
     }
