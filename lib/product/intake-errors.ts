@@ -6,12 +6,13 @@ export type ProductUploadErrorCode =
   | "upload_image_invalid"
   | "upload_image_animated"
   | "upload_changed";
-type ProductIntakeErrorCode = ProductSourceErrorCode | ProductUploadErrorCode;
+type ProductIntakeErrorCode = ProductSourceErrorCode | ProductUploadErrorCode | "access_changed";
 
 export const PRODUCT_INTAKE_ERROR_HEADER = "x-product-intake-error";
 export const PRODUCT_INTAKE_DIAGNOSTIC_HEADER = "x-product-intake-diagnostic";
 const fallbackMessage = "无法开始生成，请检查项目权限、证据和模型配置。";
 const intakeMessages: Record<ProductIntakeErrorCode, string> = {
+  access_changed: "无法确认登录或项目编辑权限，产品草稿未创建。请重新登录并确认权限后重试。",
   source_labels_missing:
     "资料中未找到可核对的字段标签。请为表头或正文标明 Product name、Product type、Internal SKU 等字段后重新导入；也可改用手动录入。",
   source_locations_exceeded: "资料包含过多可核对字段。请拆分文件或使用产品目录选择单个产品后导入。",
@@ -37,6 +38,14 @@ export class ProductSourceError extends Error {
   }
 }
 
+export class ProductAgentAccessError extends Error {
+  readonly code = "access_changed";
+  constructor() {
+    super(intakeMessages.access_changed);
+    this.name = "ProductAgentAccessError";
+  }
+}
+
 /** Only verified file failures may create these codes; never derive them from exception text. */
 export class ProductUploadError extends Error {
   constructor(readonly code: ProductUploadErrorCode) {
@@ -47,7 +56,9 @@ export class ProductUploadError extends Error {
 
 export function productIntakeErrorCode(error: unknown): ProductIntakeErrorCode | null {
   if (
-    (error instanceof ProductSourceError || error instanceof ProductUploadError) &&
+    (error instanceof ProductSourceError ||
+      error instanceof ProductUploadError ||
+      error instanceof ProductAgentAccessError) &&
     Object.hasOwn(intakeMessages, error.code)
   )
     return error.code;
