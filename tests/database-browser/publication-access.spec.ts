@@ -189,6 +189,12 @@ test("Approved video directs to the complete media path and never offers a manif
     },
   ]);
   await page.goto(`/workspace/${f.projectId}/records/video/${f.contentId}`);
+  await expect(page).toHaveURL(
+    new RegExp(`/workspace/${f.projectId}/video\\?item=${f.contentId}(?:&|$)`),
+  );
+  await expect(
+    page.getByRole("heading", { name: "视频编辑器", exact: true }).filter({ visible: true }),
+  ).toHaveCount(1);
   const mediaNotice = page
     .getByText("视频请使用素材发布", { exact: true })
     .filter({ visible: true });
