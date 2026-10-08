@@ -189,7 +189,11 @@ test("Approved video directs to the complete media path and never offers a manif
     },
   ]);
   await page.goto(`/workspace/${f.projectId}/records/video/${f.contentId}`);
-  await expect(page.getByText("视频请使用素材发布", { exact: true })).toBeVisible();
+  const mediaNotice = page
+    .getByText("视频请使用素材发布", { exact: true })
+    .filter({ visible: true });
+  await expect(mediaNotice).toHaveCount(1);
+  await expect(mediaNotice).toBeVisible();
   await expect(page.locator("#publication-confirmation:visible")).toHaveCount(0);
   expect(
     await db
