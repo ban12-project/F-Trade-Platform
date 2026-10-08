@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "decision_status": "accepted",
+  "decided_on": "2026-10-09",
+  "decision_issue": 122,
+  "decision_record": "docs/decisions/0007-marketing-video-release-policy.md",
+  "decision_basis": "user_delegated_review_in_current_session",
+  "accountability": {
+    "business_owner": "coda",
+    "access_owner": "coda",
+    "fact_and_rights_reviewer": "coda",
+    "publication_approver": "coda",
+    "render_quota_owner": "coda",
+    "agent_delegation": "current_session_only"
+  },
+  "retention": {
+    "days": 90,
+    "anchor": "each_object_created_at_utc",
+    "scope": ["video_working_copies", "prompts", "processing_output", "rendered_video"],
+    "earlier_rights_expiry_takes_precedence": true,
+    "reads_and_edits_extend_retention": false,
+    "original_factory_evidence_in_scope": false,
+    "external_platform_copies_in_scope": false,
+    "audit_after_expiry": "minimal_ids_hashes_decisions_and_policy_version_only",
+    "automatic_enforcement_status": "not_implemented"
+  },
+  "access": {
+    "storage": "private",
+    "readers": "authorized_project_members_or_authorized_administrators",
+    "reviewers": "current_authorized_administrators",
+    "public_asset_urls": false
+  },
+  "release": {
+    "initial_channel": "controlled_facebook_personal_profile",
+    "requires_current_product_ready": true,
+    "requires_current_media_rights": true,
+    "requires_rendered_media_inspection": true,
+    "requires_gate_01": true,
+    "requires_separate_per_post_confirmation": true,
+    "automatic_publication": false,
+    "account_acceptance_status": "not_evaluated"
+  },
+  "cost": {
+    "external_video_generation_enabled": false,
+    "external_video_generation_budget_cents": 0,
+    "editing_and_rendering": "existing_authorized_service_quota",
+    "maximum_source_assets": 3,
+    "maximum_output_duration_seconds": 15,
+    "new_paid_service_or_quota_increase": "owner_must_set_explicit_numeric_cap_before_activation",
+    "rendering_is_free": false
+  }
+}
