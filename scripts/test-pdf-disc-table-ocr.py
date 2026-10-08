@@ -3,6 +3,7 @@ import csv
 import io
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -132,6 +133,17 @@ if '--local-ocr' in sys.argv:
         assert '| 999XD902 | SYN-OE-B |' in text
         assert '| 999XD901 | SYN-OE-B |' not in text
         original_run = subprocess.run
+        damaged_headings = []
+        def damage_initial_heading(args, **kwargs):
+            result = original_run(args, **kwargs)
+            if 'tesseract' in Path(args[0]).name and 'tsv' not in args:
+                result.stdout, count = re.subn(r'\bTQ\s*NO\.?', 'TQNE.', result.stdout, flags=re.I)
+                damaged_headings.append(count)
+            return result
+        with patch('markitdown_preprocess.subprocess.run', side_effect=damage_initial_heading):
+            reread = local_pdf_ocr(path)
+        assert damaged_headings == [1] and '> ITEM TQNE.' in reread
+        assert '| 999XD901 | SYN-OE-A |' in reread and '| 999XD902 | SYN-OE-B |' in reread
         failed_passes = []
         def timeout_optional_pass(args, **kwargs):
             if '-r' in args and args[args.index('-r') + 1] == '300':

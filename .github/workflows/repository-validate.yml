@@ -138,7 +138,7 @@ jobs:
         run: pnpm test:product-media && pnpm test:product-media-workflow
 
       - name: Install FFmpeg for rendered-media validation
-        run: sudo apt-get update && sudo apt-get install --yes ffmpeg poppler-utils tesseract-ocr
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg poppler-utils tesseract-ocr fonts-dejavu-core
 
       - name: Inspect real media and render all platform export variants
         run: pnpm test:rendered-video-inspection && pnpm test:ffmpeg-renderer
