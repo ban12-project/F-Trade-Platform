@@ -12,6 +12,7 @@ import { assertProductAgentWriteAccess } from "@/lib/product/agent-write-access"
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
 import { EvidenceLocatedProductAgent } from "@/lib/product/evidence-located-agent";
+import { buildProductEvidenceSourceBinding } from "@/lib/product/evidence-source-binding";
 import { productIntakeFailureMessage } from "@/lib/product/intake-errors";
 import { createProductAgentDraft } from "@/lib/products";
 import { assertAndLinkProjectEvidence } from "@/lib/workspace/access";
@@ -86,6 +87,7 @@ export async function runProductAgentAction(
         prompt_version: result.metadata.prompt_version,
         prompt_hash: result.metadata.prompt_hash,
         evidence_mode: "bounded_location",
+        source_evidence_binding: buildProductEvidenceSourceBinding(source),
       },
       source.image_refs,
     );

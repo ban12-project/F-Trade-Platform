@@ -1,0 +1,98 @@
+{
+  "classification": "sanitized_aggregate",
+  "run_id": "sanitized-reference-real-source-review-20261008",
+  "authorization_ref": "evidence-reference-real-use-20261008",
+  "rights_ref": "evidence-reference-rights-20261008",
+  "review_executor": "agent",
+  "authenticated_application_principal": "human_user_account",
+  "source_confidentiality": "restricted",
+  "assets": {
+    "pdf_files": 4,
+    "clutch_catalogs": 3,
+    "brake_format_only": 1,
+    "factory_context_photos": 9,
+    "factory_context_videos": 6,
+    "user_authorized_assets": 19
+  },
+  "original_pdf_hash_matches": 4,
+  "initial_identity_review": {
+    "run_id": "sanitized-reference-real-identity-first-20261008",
+    "selected": 20,
+    "identity_complete": 5,
+    "identity_blocked": 15,
+    "matrix": {
+      "A": 0,
+      "B": 5,
+      "C": 10,
+      "D": 5
+    },
+    "preserved": true
+  },
+  "reselected_source_cohort": {
+    "run_id": "sanitized-reference-real-ad-source-review-20261008",
+    "selected": 20,
+    "matrix": {
+      "A": 5,
+      "B": 5,
+      "C": 5,
+      "D": 5
+    },
+    "required_identity_complete": 10,
+    "required_identity_blocked": 10,
+    "catalog_image_source_associations": 10,
+    "business_input_images_withheld_in_B_and_D": true,
+    "confidentiality_assigned": 20,
+    "unique_source_candidates": 20,
+    "domain_review_parsed": 20,
+    "source_fact_mutations": 0,
+    "source_selection_complete": true
+  },
+  "production_checkpoint": {
+    "product_records_created": 6,
+    "product_ready": 5,
+    "product_review_required": 1,
+    "product_source_images_bound": 1,
+    "product_gate_01_approved": 5,
+    "product_gate_01_rejected": 1,
+    "source_revision_rounds": 1,
+    "content_records_created": 1,
+    "content_approved": 1,
+    "content_review_unpersisted_evidence_attempt_rejected": 1,
+    "generation_invocations": {
+      "product": 1,
+      "content": 1
+    },
+    "exact_provider_request_count": null,
+    "independent_factory_human_signoff": false,
+    "live_publications": 0,
+    "customer_messages": 0,
+    "quotation_approvals": 0,
+    "delivery_approvals": 0
+  },
+  "production_browser_checkpoint": {
+    "cloud_ownership_and_policy_match": true,
+    "interactive_open_requests": 1,
+    "starting_observed": true,
+    "stopped_observed_after_request": true,
+    "usable_viewer_observed": false,
+    "sandbox_fixed_egress_verified": false,
+    "cause": "unknown"
+  },
+  "local_proxy_checkpoint": {
+    "checked_at": "2026-10-08T13:12:36.435Z",
+    "https_connect_status": 407,
+    "production_configuration_equality_verified": false
+  },
+  "generated_source_preview_regression": {
+    "before_fix_reproduced": true,
+    "postgres_after_fix": "passed",
+    "stream_and_nonstream_covered": true,
+    "production_retest": "pending_after_deployment",
+    "source_text_copied_to_audit": false
+  },
+  "source_field_recognition_rate": null,
+  "full_original_field_extraction_performed": false,
+  "formal_product_acceptance": "pending",
+  "real_rfq_samples": 0,
+  "formal_mvp_acceptance": "pending"
+}
