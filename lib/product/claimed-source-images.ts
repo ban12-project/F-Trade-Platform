@@ -3,6 +3,7 @@ import { inArray } from "drizzle-orm";
 import { getDatabase } from "@/lib/db/client";
 import { evidence } from "@/lib/db/schema";
 import type { ProductAgentSource } from "./agent";
+import type { DocumentUploadIdentity } from "./document-upload-access";
 import { claimDocumentUpload } from "./document-upload-receipts";
 import { productImageContentType, productImageReceiptIdsSchema } from "./source-image-contracts";
 
@@ -10,7 +11,7 @@ export async function attachClaimedProductImages(
   source: ProductAgentSource,
   receiptIds: unknown[],
   projectId: string | undefined,
-  actorId: string,
+  identity: DocumentUploadIdentity,
 ): Promise<ProductAgentSource> {
   const ids = productImageReceiptIdsSchema.parse(receiptIds);
   const baseEvidence = await getDatabase()
@@ -25,7 +26,7 @@ export async function attachClaimedProductImages(
   for (const receiptId of ids) {
     const claimed = await claimDocumentUpload(
       { receiptId, projectId, purpose: "agent_image" },
-      actorId,
+      identity,
     );
     imageInputs.push({
       ref: claimed.evidenceId,

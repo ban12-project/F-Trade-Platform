@@ -27,6 +27,7 @@ const db = getDatabase();
 let sessionId = "",
   generatedId = "";
 let duringGeneration: (() => Promise<void>) | undefined;
+let duringConfiguration: (() => Promise<void>) | undefined;
 let modelCalls = 0,
   configurationCalls = 0;
 let inventedFact = false;
@@ -58,6 +59,7 @@ mock.module(moduleUrl("../lib/ai/product-agent-model-config.ts"), {
   exports: {
     resolveProductAgentModelConfig: async () => {
       configurationCalls++;
+      await duringConfiguration?.();
       return {};
     },
   },
@@ -344,6 +346,33 @@ try {
     assert.equal(audits.length, 0);
     cachedSession = undefined;
     console.log(`PASS preflight ${label} rejects stale transport before credentials or model`);
+  }
+  for (const [label, change] of changes.slice(0, 3)) {
+    const f = await fixture(),
+      before = modelCalls;
+    duringConfiguration = async () => {
+      await change(f);
+    };
+    try {
+      assert.deepEqual(await run(f), { status: "error", message: deniedMessage });
+      assert.equal(
+        modelCalls,
+        before,
+        "Revocation during configuration prevents forwarding source to a model",
+      );
+      assert.equal(
+        (
+          await db
+            .select()
+            .from(schema.approval)
+            .where(eq(schema.approval.requestedById, f.actorId))
+        ).length,
+        0,
+      );
+      console.log(`PASS ${label} during model configuration: zero model calls or Gate creation`);
+    } finally {
+      duringConfiguration = undefined;
+    }
   }
   for (const value of [undefined, "", "not-a-project", randomUUID()]) {
     const f = await fixture();

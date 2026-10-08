@@ -80,6 +80,9 @@ jobs:
       - name: Verify Product Agent Action error privacy
         run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-product-agent-action-errors.mts
 
+      - name: Verify document upload Action and signer current identity and error privacy
+        run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-document-upload-action-errors.mts
+
       - name: Verify Gate 01 review Action error privacy
         run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-product-review-action-errors.mts
 
@@ -219,6 +222,10 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/test-document-upload-postgres.ts
         env:
           DOCUMENT_UPLOAD_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+      - name: Verify document upload current authorization, receipt binding and atomic expiry rollback
+        run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-document-upload-access-postgres.mts
+        env:
+          DOCUMENT_UPLOAD_ACCESS_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
       - name: Verify catalog batch retries, fencing and review-only persistence with PostgreSQL
         run: node --conditions=react-server --import tsx scripts/test-catalog-import-postgres.ts
         env:

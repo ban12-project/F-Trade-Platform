@@ -133,7 +133,7 @@ void (async () => {
         contentType: "text/csv",
         sizeBytes: bytes.length,
       },
-      identity.actorId,
+      identity,
       db,
     );
     const input = { projectId: identity.projectId, receiptId: receipt.id };

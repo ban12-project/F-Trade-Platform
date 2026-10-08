@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { expect, test } from "@playwright/test";
+import { type BrowserContext, expect, test } from "@playwright/test";
+import { getCookies } from "better-auth/cookies";
 import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -22,6 +23,33 @@ test.afterAll(async () => {
   await pool.end();
   await closeDatabase();
 });
+
+async function preventFixtureSessionRenewal(context: BrowserContext, baseURL: string) {
+  // Use Better Auth's non-persistent login cookie so background reads cannot
+  // renew the deadline while the test waits for a genuinely expired session.
+  const cookie = getCookies({ baseURL }).dontRememberToken;
+  const signature = createHmac("sha256", authSecret).update("true").digest("base64");
+  await context.addCookies([
+    {
+      name: cookie.name,
+      value: encodeURIComponent(`true.${signature}`),
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: cookie.attributes.secure,
+    },
+  ]);
+}
+
+async function assertFixtureSessionExpired(sessionId: string) {
+  const [current] = await db
+    .select({ expiresAt: schema.session.expiresAt })
+    .from(schema.session)
+    .where(eq(schema.session.id, sessionId));
+  // Better Auth may already have removed the expired session on a read.
+  expect(current?.expiresAt.getTime() ?? 0).toBeLessThanOrEqual(Date.now());
+}
+
 const cases: Array<{
   op: "save" | "copy";
   role: "admin" | "user";
@@ -85,6 +113,7 @@ for (const { op, role, change } of cases)
         sameSite: "Lax",
       },
     ]);
+    if (change === "expired") await preventFixtureSessionRenewal(context, baseURL);
     let blocker: PoolClient | undefined;
     try {
       await page.goto(
@@ -117,7 +146,8 @@ for (const { op, role, change } of cases)
         const {
           rows: [backend],
         } = await blocker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-        await submit.click();
+        // The Action is deliberately blocked; wait for its response after unlocking.
+        await submit.click({ noWaitAfter: true });
         await expect(submit).toBeDisabled();
         await expect
           .poll(async () => {
@@ -150,6 +180,7 @@ for (const { op, role, change } of cases)
             .set({ expiresAt: expires })
             .where(eq(schema.session.id, f.sessionId));
           await delay(Math.max(1, expires.getTime() - Date.now() + 30));
+          await assertFixtureSessionExpired(f.sessionId);
         }
         await blocker.query("COMMIT");
       } else await submit.click();
@@ -234,6 +265,7 @@ for (const op of ["create", "generate", "render"] as const) {
           sameSite: "Lax",
         },
       ]);
+      if (change === "expired") await preventFixtureSessionRenewal(context, baseURL);
       const snapshot = async () => {
         const [records, audits, links, project] = await Promise.all([
           db
@@ -309,7 +341,8 @@ for (const op of ["create", "generate", "render"] as const) {
         const response = page.waitForResponse(
           (r) => r.request().method() === "POST" && Boolean(r.request().headers()["next-action"]),
         );
-        await button.click();
+        // The Action is deliberately blocked; wait for its response after unlocking.
+        await button.click({ noWaitAfter: true });
         await expect(pendingButton).toBeDisabled();
         await expect
           .poll(async () => {
@@ -333,6 +366,7 @@ for (const op of ["create", "generate", "render"] as const) {
             .set({ expiresAt: expires })
             .where(eq(schema.session.id, f.sessionId));
           await delay(Math.max(1, expires.getTime() - Date.now() + 30));
+          await assertFixtureSessionExpired(f.sessionId);
         }
         await blocker.query("COMMIT");
         expect((await response).status()).toBe(200);

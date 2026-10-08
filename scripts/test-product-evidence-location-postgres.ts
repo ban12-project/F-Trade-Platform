@@ -40,6 +40,7 @@ void (async () => {
     randomUUID(),
     randomUUID(),
   ];
+  const uploadIdentity = { actorId: owner, sessionId: randomUUID(), projectId: project };
   const db = getDatabase();
   let reads = 0;
   function reader(bytes: Buffer, contentType: string): typeof get {
@@ -70,12 +71,12 @@ void (async () => {
         contentType,
         sizeBytes: bytes.length,
       },
-      owner,
+      uploadIdentity,
       db,
     );
     const claimed = await claimDocumentUpload(
       { receiptId: issued.id, projectId: project, purpose: "agent" },
-      owner,
+      uploadIdentity,
       db,
       reader(bytes, contentType),
     );
@@ -161,6 +162,12 @@ void (async () => {
       await db
         .insert(schema.user)
         .values({ id, name: "MOCK source location", email: `${id}@example.invalid`, role: "user" });
+    await db.insert(schema.session).values({
+      id: uploadIdentity.sessionId,
+      userId: owner,
+      token: randomUUID(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
     await db.insert(schema.workspaceProject).values({
       id: project,
       title: "MOCK source location",
@@ -247,12 +254,12 @@ void (async () => {
         contentType: "application/pdf",
         sizeBytes: pdf.bytes.length,
       },
-      owner,
+      uploadIdentity,
       db,
     );
     const alias = await claimDocumentUpload(
       { receiptId: duplicate.id, projectId: project, purpose: "agent" },
-      owner,
+      uploadIdentity,
       db,
       reader(pdf.bytes, "application/pdf"),
     );
