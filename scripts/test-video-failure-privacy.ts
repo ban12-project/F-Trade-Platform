@@ -18,9 +18,24 @@ void (async () => {
       return [];
     },
   };
+  const selectChain = {
+    from() {
+      return this;
+    },
+    where() {
+      return this;
+    },
+    for() {
+      return this;
+    },
+    // biome-ignore lint/suspicious/noThenProperty: matches Drizzle's awaitable query in this privacy test.
+    then(resolve: (rows: Array<{ videoId: string; id: string }>) => unknown) {
+      return Promise.resolve(resolve([{ videoId: "synthetic-video", id: "synthetic-video" }]));
+    },
+  };
   const writeDb = {
     transaction: async (callback: (tx: unknown) => Promise<void>) =>
-      callback({ update: () => chain }),
+      callback({ update: () => chain, select: () => selectChain }),
   } as unknown as Database;
   await failVideoJob("synthetic-job", "RENDER_FAILED", writeDb);
   assert.equal(saved?.failureMessage, videoProcessingFailureMessage("RENDER_FAILED"));

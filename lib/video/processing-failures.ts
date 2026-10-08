@@ -1,5 +1,6 @@
 /** Public messages must never derive from provider errors or signed media URLs. */
 export function videoProcessingFailureMessage(code: string | null) {
+  if (code === "RETENTION_EXPIRED") return "视频或工作素材已超过保留期，处理任务已停止。";
   if (code === "AI_DRAFT_SOURCE_INVALID")
     return "无法确认产品事实或素材授权，AI 初稿未保存。请核对来源后重试。";
   if (code === "AI_DRAFT_STALE")

@@ -81,6 +81,7 @@ export class AiSdkStructuredGenerator implements StructuredGenerator {
       : undefined;
     const result = await generateText({
       model: request.model,
+      telemetry: { isEnabled: false, recordInputs: false, recordOutputs: false },
       instructions: safetyInstruction,
       ...(visualContent
         ? { messages: [{ role: "user" as const, content: visualContent }] }

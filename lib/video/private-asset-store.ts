@@ -7,15 +7,17 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import { get, put } from "@vercel/blob";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { type Database, getDatabase } from "@/lib/db/client";
-import { videoGeneratedAsset } from "@/lib/db/schema";
+import { aggregateRecord, videoGeneratedAsset } from "@/lib/db/schema";
 import { safeEvidencePathSegment } from "@/lib/evidence/store";
 
 import type { PrivateVideoAssetStore } from "./ai-sdk-adapters";
 import type { VideoProviderId } from "./provider-capabilities";
+import { assertVideoRetentionForId } from "./retention-access";
+import { assertVideoObjectRetained, videoRetainedCondition } from "./retention-policy";
 
 export const generatedVideoInputSchema = z.object({
   data: z.instanceof(Uint8Array).refine((value) => value.byteLength > 0, "生成视频不能为空。"),
@@ -78,19 +80,23 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
     const value = generatedVideoInputSchema.parse(input);
     const assetRef = `asset-${randomUUID()}`;
     const pathname = `video/generated/${safeEvidencePathSegment(value.provider)}/${safeEvidencePathSegment(value.modelId)}/${assetRef}.mp4`;
-    const result = await put(pathname, new Blob([value.data], { type: value.contentType }), {
-      access: "private",
-      addRandomSuffix: false,
-      contentType: value.contentType,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
+    // Commit the cleanup anchor before the external write. Failed or lost upload
+    // responses leave a tracked object rather than unowned private bytes.
     await this.database.insert(videoGeneratedAsset).values({
       assetRef,
-      blobPath: result.pathname,
+      blobPath: pathname,
       contentType: value.contentType,
       sizeBytes: value.data.byteLength,
       provider: value.provider,
       modelId: value.modelId,
+    });
+    await put(pathname, new Blob([value.data], { type: value.contentType }), {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: false,
+      contentType: value.contentType,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      abortSignal: AbortSignal.timeout(180_000),
     });
     return assetRef;
   }
@@ -100,31 +106,80 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
     data: Uint8Array;
     contentType: "video/mp4";
     assetRef?: string;
+    videoProjectId?: string;
   }): Promise<string> {
     if (!input.data.byteLength) throw new Error("合成视频不能为空。");
     const assetRef = generatedVideoAssetRefSchema.parse(input.assetRef ?? `asset-${randomUUID()}`);
     const pathname = `video/rendered/mvp1/${assetRef}.mp4`;
-    const result = await put(
-      pathname,
-      new Blob([input.data.slice().buffer as ArrayBuffer], { type: input.contentType }),
-      {
-        access: "private",
-        addRandomSuffix: false,
-        contentType: input.contentType,
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      },
-    );
-    await this.database
-      .insert(videoGeneratedAsset)
-      .values({
-        assetRef,
-        blobPath: result.pathname,
-        contentType: input.contentType,
-        sizeBytes: input.data.byteLength,
-        provider: "ffmpeg",
-        modelId: "mvp1-editor",
-      })
-      .onConflictDoNothing({ target: videoGeneratedAsset.assetRef });
+    const asset = await this.database.transaction(async (tx) => {
+      if (input.videoProjectId) {
+        await tx
+          .select({ id: aggregateRecord.id })
+          .from(aggregateRecord)
+          .where(eq(aggregateRecord.id, input.videoProjectId))
+          .for("update");
+        await assertVideoRetentionForId(tx, input.videoProjectId);
+      }
+      await tx
+        .insert(videoGeneratedAsset)
+        .values({
+          assetRef,
+          videoProjectId: input.videoProjectId,
+          blobPath: pathname,
+          contentType: input.contentType,
+          sizeBytes: input.data.byteLength,
+          provider: "ffmpeg",
+          modelId: "mvp1-editor",
+        })
+        .onConflictDoNothing({ target: videoGeneratedAsset.assetRef });
+      const [row] = await tx
+        .select()
+        .from(videoGeneratedAsset)
+        .where(eq(videoGeneratedAsset.assetRef, assetRef))
+        .for("update");
+      if (
+        !row ||
+        row.blobPath !== pathname ||
+        row.videoProjectId !== (input.videoProjectId ?? null) ||
+        row.provider !== "ffmpeg" ||
+        row.modelId !== "mvp1-editor" ||
+        row.contentType !== input.contentType ||
+        row.sizeBytes !== input.data.byteLength
+      )
+        throw new Error("视频资产引用已绑定其他结果。");
+      assertVideoObjectRetained(row.createdAt);
+      if (input.videoProjectId) await assertVideoRetentionForId(tx, input.videoProjectId);
+      return row;
+    });
+    // A deterministic Workflow retry reuses an immutable stored asset.
+    const stored = await this.getGeneratedVideo(assetRef);
+    if (stored) {
+      await stored.body.cancel();
+      return assetRef;
+    }
+    assertVideoObjectRetained(asset.createdAt);
+    if (input.videoProjectId) await assertVideoRetentionForId(this.database, input.videoProjectId);
+    try {
+      await put(
+        pathname,
+        new Blob([input.data.slice().buffer as ArrayBuffer], { type: input.contentType }),
+        {
+          access: "private",
+          addRandomSuffix: false,
+          allowOverwrite: false,
+          contentType: input.contentType,
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+          abortSignal: AbortSignal.timeout(180_000),
+        },
+      );
+    } catch (error) {
+      // Another retry may have finished, or the write acknowledgement was lost.
+      const storedAfterError = await this.getGeneratedVideo(assetRef);
+      if (!storedAfterError) throw error;
+      await storedAfterError.body.cancel();
+    }
+    assertVideoObjectRetained(asset.createdAt);
+    if (input.videoProjectId) await assertVideoRetentionForId(this.database, input.videoProjectId);
     return assetRef;
   }
 
@@ -137,8 +192,20 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
     const [asset] = await this.database
       .select()
       .from(videoGeneratedAsset)
-      .where(eq(videoGeneratedAsset.assetRef, assetRef));
+      .where(
+        and(
+          eq(videoGeneratedAsset.assetRef, assetRef),
+          videoRetainedCondition(videoGeneratedAsset.createdAt),
+        ),
+      );
     if (!asset) return null;
+    if (asset.videoProjectId) {
+      try {
+        await assertVideoRetentionForId(this.database, asset.videoProjectId);
+      } catch {
+        return null;
+      }
+    }
     const safeRange = range && /^bytes=\d*-\d*$/.test(range) ? range : null;
     const result = await get(asset.blobPath, {
       access: "private",
@@ -150,8 +217,19 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
       ![200, 206].includes(Number(result.statusCode)) ||
       !result.stream ||
       !result.blob.contentType?.startsWith("video/")
-    )
+    ) {
+      await result?.stream?.cancel();
       return null;
+    }
+    // The external read can cross the cutoff. Do not expose a stream afterward.
+    try {
+      assertVideoObjectRetained(asset.createdAt);
+      if (asset.videoProjectId)
+        await assertVideoRetentionForId(this.database, asset.videoProjectId);
+    } catch {
+      await result.stream.cancel();
+      return null;
+    }
     const contentRange = result.headers.get("content-range");
     const responseSizeBytes = Number(result.headers.get("content-length") ?? asset.sizeBytes);
     return {

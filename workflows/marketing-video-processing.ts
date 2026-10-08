@@ -23,6 +23,7 @@ import {
 } from "@/lib/video/product-media-guarded-operations";
 import { assertCurrentProductMediaUsageForVideo } from "@/lib/video/product-media-runtime-store";
 import { renderApprovedMarketingTimeline } from "@/lib/video/rendering";
+import { VideoRetentionError } from "@/lib/video/retention-policy";
 import {
   extractMarketingVisualSamplesInSandbox,
   renderMarketingTimelineInSandbox,
@@ -80,11 +81,13 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
   } catch (error) {
     await failVideoJob(
       input.jobId,
-      error instanceof MarketingVideoDraftChangedError
-        ? "AI_DRAFT_STALE"
-        : error instanceof MarketingVideoSourceInvalidError
-          ? "AI_DRAFT_SOURCE_INVALID"
-          : "AI_DRAFT_FAILED",
+      error instanceof VideoRetentionError
+        ? "RETENTION_EXPIRED"
+        : error instanceof MarketingVideoDraftChangedError
+          ? "AI_DRAFT_STALE"
+          : error instanceof MarketingVideoSourceInvalidError
+            ? "AI_DRAFT_SOURCE_INVALID"
+            : "AI_DRAFT_FAILED",
     );
   }
 }
@@ -147,13 +150,20 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
       data: rendered.data,
       contentType: "video/mp4",
       assetRef: expectedAssetRef,
+      videoProjectId: input.videoId,
     });
     await completeGuardedMarketingVideoRender(input.videoId, assetRef, exportArtifact);
     await completeVideoJob(input.jobId);
-  } catch {
-    const message = videoProcessingFailureMessage("RENDER_FAILED");
-    if (rendering) await failMarketingVideoRender(input.videoId, message);
-    await failVideoJob(input.jobId, "RENDER_FAILED");
+  } catch (error) {
+    const code = error instanceof VideoRetentionError ? "RETENTION_EXPIRED" : "RENDER_FAILED";
+    const message = videoProcessingFailureMessage(code);
+    try {
+      if (rendering) await failMarketingVideoRender(input.videoId, message);
+    } catch (failure) {
+      // The expired payload must not be restored by failure handling.
+      if (!(failure instanceof VideoRetentionError)) throw failure;
+    }
+    await failVideoJob(input.jobId, code);
   }
 }
 

@@ -22,6 +22,8 @@ import {
   productMediaIdsForVideoProject,
   productMediaRuntimeRecordFromRow,
 } from "@/lib/video/product-media-runtime-policy";
+import { assertVideoRetentionForId } from "@/lib/video/retention-access";
+import { aggregateRetentionCondition } from "@/lib/video/retention-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { facebookTextPayloadSchema } from "./facebook-worker-protocol";
 import {
@@ -129,6 +131,7 @@ export async function assertPublicationEligible(
     .for("share");
   if (gate?.status !== "approved") throw new Error("缺少当前 Gate 01 批准记录。");
   if (record.type === "video") {
+    await assertVideoRetentionForId(tx, value.contentRef);
     const video = videoProjectSchema.parse(record.payload);
     assertVideoPublicationEligible(video);
     const mediaIds = productMediaIdsForVideoProject(video);
@@ -152,6 +155,7 @@ export async function assertPublicationEligible(
       "organic",
       typeof now === "function" ? now() : now,
     );
+    await assertVideoRetentionForId(tx, value.contentRef);
   }
   return { control, record, gate };
 }
@@ -171,6 +175,7 @@ export async function listProjectPublicationData(
           eq(workspaceProjectItem.projectId, projectId),
           inArray(workspaceProjectItem.role, ["marketing_content", "marketing_video"]),
           contentId ? eq(aggregateRecord.id, contentId) : undefined,
+          aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
         ),
       ),
     database

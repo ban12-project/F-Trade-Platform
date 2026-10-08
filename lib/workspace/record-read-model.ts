@@ -10,6 +10,7 @@ import {
   socialPublication,
   workspaceProjectItem,
 } from "@/lib/db/schema";
+import { aggregateRetentionCondition } from "@/lib/video/retention-policy";
 import { assertWorkspaceProjectAccess } from "./access";
 import type { WorkspaceRecordKind } from "./navigation";
 import { getWorkspaceProject } from "./store";
@@ -43,6 +44,7 @@ export const readWorkspaceRecord = cache(
         and(
           eq(workspaceProjectItem.projectId, projectId),
           eq(aggregateRecord.id, id),
+          aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
           eq(aggregateRecord.type, kind === "delivery" ? "delivery_confirmation" : kind),
         ),
       )
@@ -97,6 +99,7 @@ export const readWorkspaceRecordTasks = cache(
         .where(
           and(
             eq(workspaceProjectItem.projectId, projectId),
+            aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
             or(
               inArray(aggregateRecord.id, [id, ...refs]),
               sql`${aggregateRecord.payload}->>'product_id' = ${id}`,

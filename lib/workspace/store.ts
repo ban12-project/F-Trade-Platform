@@ -16,6 +16,7 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import type { ProductReady } from "@/lib/product/verification";
+import { aggregateRetentionCondition } from "@/lib/video/retention-policy";
 import { assertWorkspaceProjectAccess } from "./access";
 
 import {
@@ -103,7 +104,12 @@ export async function readWorkspaceTaskSnapshot(
       })
       .from(workspaceProjectItem)
       .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
-      .where(inArray(workspaceProjectItem.projectId, ids)),
+      .where(
+        and(
+          inArray(workspaceProjectItem.projectId, ids),
+          aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
+        ),
+      ),
     database
       .select({
         id: approval.id,
@@ -241,7 +247,11 @@ export async function listWorkspaceProjectAggregateIds(
     .from(workspaceProjectItem)
     .innerJoin(aggregateRecord, eq(aggregateRecord.id, workspaceProjectItem.aggregateId))
     .where(
-      and(eq(workspaceProjectItem.projectId, projectId), eq(aggregateRecord.type, aggregateType)),
+      and(
+        eq(workspaceProjectItem.projectId, projectId),
+        eq(aggregateRecord.type, aggregateType),
+        aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
+      ),
     );
   return rows.map((row) => row.aggregateId);
 }
@@ -308,6 +318,7 @@ export async function assertWorkspaceAggregateLink(
         eq(workspaceProjectItem.projectId, projectId),
         eq(workspaceProjectItem.aggregateId, aggregateId),
         eq(aggregateRecord.type, aggregateType),
+        aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
         inArray(workspaceProjectItem.role, roles),
       ),
     );

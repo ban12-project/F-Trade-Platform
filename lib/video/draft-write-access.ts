@@ -10,6 +10,7 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { VIDEO_RETENTION_MESSAGE } from "./retention-policy";
 
 const identitySchema = z
   .object({
@@ -128,6 +129,7 @@ export async function assertCurrentVideoDraftWriter(
 }
 
 const messages = new Set([
+  VIDEO_RETENTION_MESSAGE,
   "当前视频状态不能提交处理任务。",
   "只能使用当前营销项目中已关联的产品。",
   "只能从已通过 Gate 01 的产品创建营销视频。",

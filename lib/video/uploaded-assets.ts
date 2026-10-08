@@ -14,6 +14,7 @@ import { persistUploadedEvidence, type UploadEvidenceStore } from "@/lib/evidenc
 import { VercelPrivateBlobEvidenceStore } from "@/lib/evidence/vercel-private-blob";
 
 import type { VideoProject } from "./contracts";
+import { assertVideoWorkingEvidenceRetained } from "./retention-access";
 
 const maximumAssetBytes = 20 * 1024 * 1024;
 const maximumAssetCount = 8;
@@ -111,6 +112,7 @@ export async function withTemporaryUploadedVideoAssets<T>(
     .from(evidence)
     .where(inArray(evidence.id, uniqueRefs));
   if (rows.length !== uniqueRefs.length) throw new Error("部分私有营销素材不存在或已被移除。");
+  await assertVideoWorkingEvidenceRetained(getDatabase(), uniqueRefs);
   const directory = await mkdtemp(join(tmpdir(), "f-trade-edit-assets-"));
   try {
     const paths = new Map<string, string>();
@@ -128,6 +130,7 @@ export async function withTemporaryUploadedVideoAssets<T>(
       );
       paths.set(row.id, filePath);
     }
+    await assertVideoWorkingEvidenceRetained(getDatabase(), uniqueRefs);
     return await callback(paths);
   } finally {
     await rm(directory, { recursive: true, force: true });

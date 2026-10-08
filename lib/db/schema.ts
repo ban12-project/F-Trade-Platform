@@ -733,6 +733,9 @@ export const videoGeneratedAsset = pgTable(
   "video_generated_asset",
   {
     assetRef: text("asset_ref").primaryKey(),
+    videoProjectId: text("video_project_id").references(() => aggregateRecord.id, {
+      onDelete: "restrict",
+    }),
     blobPath: text("blob_path").notNull(),
     contentType: text("content_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
@@ -746,9 +749,45 @@ export const videoGeneratedAsset = pgTable(
     check("video_generated_asset_ref_nonempty", sql`length(btrim(${table.assetRef})) > 0`),
     check("video_generated_asset_path_nonempty", sql`length(btrim(${table.blobPath})) > 0`),
     check("video_generated_asset_content_type_video", sql`${table.contentType} LIKE 'video/%'`),
-    check("video_generated_asset_size_positive", sql`${table.sizeBytes} > 0`),
+    check(
+      "video_generated_asset_size_positive",
+      sql`${table.sizeBytes} > 0 OR (${table.sizeBytes} = 0 AND ${table.blobPath} = 'retired/' || ${table.assetRef})`,
+    ),
     check("video_generated_asset_provider_nonempty", sql`length(btrim(${table.provider})) > 0`),
     check("video_generated_asset_model_nonempty", sql`length(btrim(${table.modelId})) > 0`),
+  ],
+);
+
+/** Server-only retention outbox; completed jobs retain no private storage path. */
+export const videoRetentionCleanup = pgTable(
+  "video_retention_cleanup",
+  {
+    id: text("id").primaryKey(),
+    objectKind: text("object_kind").$type<"video" | "asset" | "evidence">().notNull(),
+    objectRef: text("object_ref").notNull(),
+    blobPath: text("blob_path"),
+    status: text("status").$type<"pending" | "purged">().default("pending").notNull(),
+    policyVersion: text("policy_version").notNull(),
+    originalCreatedAt: timestamp("original_created_at", { withTimezone: true }).notNull(),
+    contentHash: text("content_hash"),
+    attempts: integer("attempts").default(0).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("video_retention_cleanup_object_uidx").on(table.objectKind, table.objectRef),
+    index("video_retention_cleanup_pending_idx").on(table.status, table.updatedAt),
+    check(
+      "video_retention_cleanup_kind",
+      sql`${table.objectKind} IN ('video', 'asset', 'evidence')`,
+    ),
+    check("video_retention_cleanup_status", sql`${table.status} IN ('pending', 'purged')`),
+    check(
+      "video_retention_cleanup_completed",
+      sql`(${table.status} = 'pending' AND ${table.completedAt} IS NULL) OR (${table.status} = 'purged' AND ${table.completedAt} IS NOT NULL AND ${table.blobPath} IS NULL)`,
+    ),
+    check("video_retention_cleanup_attempts", sql`${table.attempts} >= 0`),
   ],
 );
 

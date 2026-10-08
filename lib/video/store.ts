@@ -39,6 +39,8 @@ import {
   type VideoProcessingSummary,
 } from "./processing-jobs";
 import { assertLockedVideoProductContext } from "./product-context-guard";
+import { assertVideoRetentionForId } from "./retention-access";
+import { videoRetainedCondition } from "./retention-policy";
 import type { UploadedVideoSourceAsset } from "./uploaded-assets";
 
 export type ReadyVideoProductSource = {
@@ -280,6 +282,7 @@ export async function listProjectMarketingVideoEntries(
         eq(workspaceProjectItem.relation, "owned"),
         eq(aggregateRecord.type, "video"),
         id ? eq(aggregateRecord.id, id) : undefined,
+        videoRetainedCondition(aggregateRecord.createdAt),
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));
@@ -366,6 +369,7 @@ export async function listCrossProjectMarketingVideoCandidates(
         eq(workspaceProjectItem.role, "marketing_video"),
         eq(workspaceProjectItem.relation, "owned"),
         eq(aggregateRecord.type, "video"),
+        videoRetainedCondition(aggregateRecord.createdAt),
       ),
     )
     .orderBy(desc(workspaceProjectItem.createdAt));
@@ -440,6 +444,7 @@ export async function copyMarketingVideoDraftToProject(
       .onConflictDoNothing();
     const now = new Date();
     if (expiresAt <= now) throw new VideoDraftAccessError();
+    await assertVideoRetentionForId(tx, sourceVideoId);
     const project = videoProjectSchema.parse({
       ...current,
       id,
@@ -495,6 +500,7 @@ export async function getMarketingVideoEditProject(
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")));
   if (!record) throw new Error("营销视频不存在。");
+  await assertVideoRetentionForId(database, videoId);
   const project = videoProjectSchema.parse(record.payload);
   if (!project.editDraft) throw new Error("该视频不是 MVP1 剪辑项目。");
   return { state: record.state, project, version: record.version };
@@ -637,6 +643,7 @@ async function saveMarketingVideoEditDraft(
     });
     const now = new Date();
     if (expiresAt && expiresAt <= now) throw new VideoDraftAccessError();
+    await assertVideoRetentionForId(tx, videoId);
     await tx
       .update(aggregateRecord)
       .set({ payload: project, version: sql`${aggregateRecord.version} + 1` })
@@ -681,6 +688,7 @@ export async function beginMarketingVideoRender(
       .for("update");
     if (!record || !["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(record.state))
       throw new Error("当前视频状态不能开始合成。");
+    await assertVideoRetentionForId(tx, videoId);
     const project = videoProjectSchema.parse(record.payload);
     if (!project.editDraft) throw new Error("视频缺少可合成的剪辑稿。");
     const evidenceRefs = [
@@ -758,6 +766,7 @@ export async function completeMarketingVideoRender(
       .for("update");
     if (record?.state !== "VIDEO_RENDERING")
       throw new Error("视频合成状态已发生变化，请刷新后重试。");
+    await assertVideoRetentionForId(tx, videoId);
     const project = videoProjectSchema.parse(record.payload);
     const evidenceRefs = [
       ...new Set([
@@ -826,7 +835,7 @@ export async function completeMarketingVideoRender(
 
 export async function failMarketingVideoRender(
   videoId: string,
-  reason: string,
+  _reason: string,
   database: Database = getDatabase(),
 ) {
   const now = new Date();
@@ -839,6 +848,7 @@ export async function failMarketingVideoRender(
       .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
       .for("update");
     if (record?.state !== "VIDEO_RENDERING") return;
+    await assertVideoRetentionForId(tx, videoId);
     const project = videoProjectSchema.parse(record.payload);
     const evidenceRefs = [...new Set(project.sourceAssets.map((asset) => asset.rightsEvidenceRef))];
     assertTransition({
@@ -879,7 +889,7 @@ export async function failMarketingVideoRender(
       aggregateId: videoId,
       subjectType: "video",
       subjectId: videoId,
-      metadata: { reason: reason.slice(0, 500) },
+      metadata: { failure_code: "RENDER_FAILED" },
       occurredAt: now,
     });
   });
@@ -889,7 +899,9 @@ export async function listVideoWorkspaceEntries(limit = 50): Promise<VideoWorksp
   const rows = await getDatabase()
     .select()
     .from(aggregateRecord)
-    .where(eq(aggregateRecord.type, "video"))
+    .where(
+      and(eq(aggregateRecord.type, "video"), videoRetainedCondition(aggregateRecord.createdAt)),
+    )
     .orderBy(desc(aggregateRecord.createdAt))
     .limit(limit);
   if (!rows.length) return [];
