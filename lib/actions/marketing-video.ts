@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { start } from "workflow/api";
 import { z } from "zod";
 import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
+import { videoReviewFormSchema } from "@/lib/form-schemas";
 import {
   createMarketingVideoDraftFormSchema,
   createMarketingVideoFromInternetSchema,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/video/processing-jobs";
 import { createMarketingVideoEditProjectFromProductMedia } from "@/lib/video/product-media-create";
 import { decideGuardedVideoReview } from "@/lib/video/product-media-guarded-operations";
+import { VideoReviewAccessError, videoReviewFailureMessage } from "@/lib/video/review-write-access";
 import {
   assertMarketingVideoProjectLink,
   copyMarketingVideoDraftToProject,
@@ -330,9 +332,15 @@ export async function reviewMarketingVideoAction(
 ): Promise<MarketingVideoActionState> {
   try {
     const session = await authorizedActionSession("content:review");
-    if (!session) throw new Error("只有管理员可以审核营销视频成片。");
+    if (!session) throw new VideoReviewAccessError();
+    z.uuid().parse(projectId);
+    const review = videoReviewFormSchema.parse({ videoId, decision, evidenceRef, notes });
     await assertMarketingVideoProjectLink(projectId, videoId, session.user.id);
-    await decideGuardedVideoReview({ videoId, decision, evidenceRef, notes }, session.user.id);
+    await decideGuardedVideoReview(review, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId,
+    });
     revalidatePath(`/workspace/${projectId}`);
     refreshWorkspace();
     return {
@@ -341,6 +349,6 @@ export async function reviewMarketingVideoAction(
       videoId,
     };
   } catch (error) {
-    return actionError(error, "无法审核营销视频。");
+    return { status: "error", message: videoReviewFailureMessage(error) };
   }
 }
