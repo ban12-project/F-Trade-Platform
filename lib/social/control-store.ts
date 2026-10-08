@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { type Database, getDatabase } from "@/lib/db/client";
 import { auditEvent, socialChannelControl } from "@/lib/db/schema";
@@ -10,6 +10,13 @@ import {
   type SocialControlRecord,
   socialControlChangeSchema,
 } from "./control-record";
+import {
+  assertSocialAuthorizationAlive,
+  authorizeSocialActor,
+  parseSocialActorIdentity,
+  type SocialActorIdentity,
+  SocialHumanAccessError,
+} from "./human-write-access";
 
 export type SocialChannelControlSummary = SocialControlRecord & {
   id: string;
@@ -21,16 +28,27 @@ export type SocialChannelControlSummary = SocialControlRecord & {
 /** Persists a human-evidenced enable/pause/resume decision and append-only audit event atomically. */
 export async function saveSocialChannelControl(
   input: unknown,
+  identityInput: SocialActorIdentity,
   database: Database = getDatabase(),
 ): Promise<SocialChannelControlSummary> {
   const parsed = socialControlChangeSchema.parse(input);
+  const identity = parseSocialActorIdentity(identityInput);
+  if (parsed.actorId !== identity.actorId) throw new SocialHumanAccessError();
   return database.transaction(async (tx) => {
-    const existing = await tx.query.socialChannelControl.findFirst({
-      where: and(
-        eq(socialChannelControl.channelRef, parsed.channelRef),
-        eq(socialChannelControl.accountRef, parsed.accountRef),
-      ),
-    });
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([parsed.channelRef, parsed.accountRef])}, 0))`,
+    );
+    const [existing] = await tx
+      .select()
+      .from(socialChannelControl)
+      .where(
+        and(
+          eq(socialChannelControl.channelRef, parsed.channelRef),
+          eq(socialChannelControl.accountRef, parsed.accountRef),
+        ),
+      )
+      .for("update");
+    const expiresAt = await authorizeSocialActor(tx, identity, ["settings:manage"]);
     const current: SocialControlRecord = existing
       ? {
           enabled: existing.enabled,
@@ -78,6 +96,7 @@ export async function saveSocialChannelControl(
       },
       occurredAt: now,
     });
+    assertSocialAuthorizationAlive(expiresAt);
     return {
       id: saved.id,
       channelRef: saved.channelRef,

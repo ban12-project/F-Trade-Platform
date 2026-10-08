@@ -9,13 +9,15 @@ export async function testVideoPublicationReconciliation(
   db: Database,
   input: {
     actor: string;
+    sessionId: string;
     projectId: string;
     publicationId: string;
     jobId: string;
     contentRef: string;
   },
 ) {
-  const { actor, projectId, publicationId, jobId, contentRef } = input;
+  const { actor, sessionId, projectId, publicationId, jobId, contentRef } = input;
+  const identity = { actorId: actor, sessionId, projectId };
   const value = {
     projectId,
     publicationId,
@@ -34,21 +36,23 @@ export async function testVideoPublicationReconciliation(
       sql`SELECT receipt, received_at FROM browser_fleet_publication WHERE job_id = ${jobId}`,
     )
   ).rows[0];
-  await assert.rejects(reconcileUnknownVideoPublication(value, randomUUID(), db));
   await assert.rejects(
-    reconcileUnknownVideoPublication({ ...value, projectId: randomUUID() }, actor, db),
+    reconcileUnknownVideoPublication(value, { ...identity, actorId: randomUUID() }, db),
+  );
+  await assert.rejects(
+    reconcileUnknownVideoPublication({ ...value, projectId: randomUUID() }, identity, db),
   );
   await db.execute(sql`UPDATE aggregate_record SET version = version + 1 WHERE id = ${contentRef}`);
-  await assert.rejects(reconcileUnknownVideoPublication(value, actor, db));
+  await assert.rejects(reconcileUnknownVideoPublication(value, identity, db));
   await db.execute(sql`UPDATE aggregate_record SET version = version - 1 WHERE id = ${contentRef}`);
   await db.execute(sql`UPDATE workspace_project SET status = 'archived' WHERE id = ${projectId}`);
   const results = await Promise.all(
-    Array.from({ length: 3 }, () => reconcileUnknownVideoPublication(value, actor, db)),
+    Array.from({ length: 3 }, () => reconcileUnknownVideoPublication(value, identity, db)),
   );
   assert.equal(results.filter((r) => !r.replayed).length, 1);
   assert.equal(results.filter((r) => r.replayed).length, 2);
   await assert.rejects(
-    reconcileUnknownVideoPublication({ ...value, evidenceRef: "evidence-conflict" }, actor, db),
+    reconcileUnknownVideoPublication({ ...value, evidenceRef: "evidence-conflict" }, identity, db),
     /不能覆盖/,
   );
   const current = (

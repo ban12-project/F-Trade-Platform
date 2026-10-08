@@ -1,7 +1,12 @@
 "use server";
 
 import { after } from "next/server";
-import { actionError, refreshWorkspace, requireActionActor } from "@/lib/action-boundary";
+import {
+  actionError,
+  authorizedActionSession,
+  refreshWorkspace,
+  requireActionActor,
+} from "@/lib/action-boundary";
 import type { ClosingActionState } from "@/lib/action-states";
 import {
   deliveryDecisionFormSchema,
@@ -23,6 +28,7 @@ import {
   recordFollowUp,
   sendQuotation,
 } from "@/lib/sales/closing-store";
+import { SocialHumanAccessError, socialHumanFailureMessage } from "@/lib/social/human-write-access";
 import { routeInboundConversation } from "@/lib/social/inbound-routing-store";
 import { submitControlledPublication } from "@/lib/social/publication-store";
 
@@ -162,28 +168,47 @@ export async function confirmPublicationAction(
   formData: FormData,
 ): Promise<ClosingActionState> {
   try {
-    const actorId = await actor("content:write");
+    const current = await authorizedActionSession("content:write");
+    if (!current) throw new SocialHumanAccessError();
     const parsed = publicationConfirmationFormSchema.safeParse(values(formData));
     if (!parsed.success) return resultError(parsed.error);
-    const saved = await submitControlledPublication(parsed.data, actorId);
-    after(async () => {
-      try {
-        const { deliverPublicationSandbox } = await import(
-          "@/lib/browser-fleet/sandbox-workflow-delivery"
-        );
-        await deliverPublicationSandbox(saved.id);
-      } catch {
-        // Publication demand is durable; the dispatch cron recovers it.
-      }
+    const saved = await submitControlledPublication(parsed.data, {
+      actorId: current.user.id,
+      sessionId: current.session.id,
+      projectId: parsed.data.projectId,
     });
-    refresh(parsed.data.projectId);
+    try {
+      after(async () => {
+        try {
+          const { deliverPublicationSandbox } = await import(
+            "@/lib/browser-fleet/sandbox-workflow-delivery"
+          );
+          await deliverPublicationSandbox(saved.id);
+        } catch {
+          // Publication demand is durable; the dispatch cron recovers it.
+        }
+      });
+    } catch {
+      /* The committed job is recovered by authenticated dispatch. */
+    }
+    try {
+      refresh(parsed.data.projectId);
+    } catch {
+      /* Preserve the committed result if cache refresh fails. */
+    }
     return {
       status: "success",
       message: "发布任务已提交；只有平台成功回执才能标记为已发布，未知结果不会自动重试。",
       id: saved.id,
     };
   } catch (error) {
-    return resultError(error);
+    return {
+      status: "error",
+      message: socialHumanFailureMessage(
+        error,
+        "发布未提交。请刷新并核对内容、项目权限和渠道状态后重试。",
+      ),
+    };
   }
 }
 

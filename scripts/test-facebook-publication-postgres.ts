@@ -52,7 +52,9 @@ async function main() {
   const database = db as unknown as Database;
   const now = new Date();
   const actor = randomUUID();
+  const writerSessionId = randomUUID();
   const projectId = randomUUID();
+  const writerIdentity = { actorId: actor, sessionId: writerSessionId, projectId };
   const channelRef = randomUUID();
   let accountRef = randomUUID();
   const workerId = randomUUID();
@@ -113,7 +115,7 @@ async function main() {
               previewDigest: oldPreview.previewDigest,
               confirmationRef: `evidence-stale-${randomUUID()}`,
             },
-            actor,
+            writerIdentity,
             database,
           ),
           /内容已更新/,
@@ -141,7 +143,7 @@ async function main() {
           )?.previewDigest,
           confirmationRef: `evidence-synthetic-${randomUUID()}`,
         },
-        actor,
+        writerIdentity,
         database,
       );
       assert.ok(saved.browserJobId);
@@ -230,6 +232,10 @@ async function main() {
   }
   async function videoFixture() {
     const f = await fixture("video");
+    await db
+      .update(schema.workspaceProjectItem)
+      .set({ role: "marketing_video" })
+      .where(eq(schema.workspaceProjectItem.aggregateId, f.contentRef));
     const productId = randomUUID();
     const assetRef = `asset-synthetic-video-${randomUUID()}`;
     const sha256 = createHash("sha256").update(assetRef).digest("hex");
@@ -337,6 +343,12 @@ async function main() {
     await db
       .insert(schema.user)
       .values({ id: actor, name: "Synthetic", email: `${actor}@example.invalid` });
+    await db.insert(schema.session).values({
+      id: writerSessionId,
+      token: randomUUID(),
+      userId: actor,
+      expiresAt: new Date(Date.now() + 3600000),
+    });
     await db
       .insert(schema.workspaceProject)
       .values({ id: projectId, kind: "marketing", title: "SYNTHETIC", createdById: actor });
@@ -424,7 +436,7 @@ async function main() {
         )?.previewDigest,
         confirmationRef: `evidence-reconfirmed-${randomUUID()}`,
       },
-      actor,
+      writerIdentity,
       database,
     );
     assert.equal(reconfirmed.textConfirmation?.contentVersion, 2);
@@ -1188,6 +1200,7 @@ async function main() {
       if (outcome === "unknown")
         await testPublicationReconciliation(database, {
           actor,
+          sessionId,
           projectId,
           publicationId: target.id,
           jobId: target.jobId,
@@ -1196,6 +1209,7 @@ async function main() {
       if (outcome === "unknown_video")
         await testVideoPublicationReconciliation(database, {
           actor,
+          sessionId,
           projectId,
           publicationId: target.id,
           jobId: target.jobId,

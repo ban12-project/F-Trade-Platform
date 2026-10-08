@@ -10,13 +10,15 @@ export async function testPublicationReconciliation(
   db: Database,
   input: {
     actor: string;
+    sessionId: string;
     projectId: string;
     publicationId: string;
     jobId: string;
     contentRef: string;
   },
 ) {
-  const { actor, projectId, publicationId, jobId, contentRef } = input;
+  const { actor, sessionId, projectId, publicationId, jobId, contentRef } = input;
+  const identity = { actorId: actor, sessionId, projectId };
   const value = {
     projectId,
     publicationId,
@@ -45,21 +47,23 @@ export async function testPublicationReconciliation(
       sql`SELECT receipt, received_at FROM browser_fleet_publication WHERE job_id = ${jobId}`,
     )
   ).rows[0];
-  await assert.rejects(reconcileUnknownTextPublication(value, randomUUID(), db));
   await assert.rejects(
-    reconcileUnknownTextPublication({ ...value, projectId: randomUUID() }, actor, db),
+    reconcileUnknownTextPublication(value, { ...identity, actorId: randomUUID() }, db),
+  );
+  await assert.rejects(
+    reconcileUnknownTextPublication({ ...value, projectId: randomUUID() }, identity, db),
   );
   await db.execute(sql`UPDATE aggregate_record SET version = version + 1 WHERE id = ${contentRef}`);
-  await assert.rejects(reconcileUnknownTextPublication(value, actor, db), /内容或原确认已变化/);
+  await assert.rejects(reconcileUnknownTextPublication(value, identity, db), /内容或原确认已变化/);
   await db.execute(sql`UPDATE aggregate_record SET version = version - 1 WHERE id = ${contentRef}`);
   await db.execute(sql`UPDATE workspace_project SET status = 'archived' WHERE id = ${projectId}`);
   const results = await Promise.all(
-    Array.from({ length: 3 }, () => reconcileUnknownTextPublication(value, actor, db)),
+    Array.from({ length: 3 }, () => reconcileUnknownTextPublication(value, identity, db)),
   );
   assert.equal(results.filter((r) => !r.replayed).length, 1);
   assert.equal(results.filter((r) => r.replayed).length, 2);
   await assert.rejects(
-    reconcileUnknownTextPublication({ ...value, evidenceRef: "evidence-conflict" }, actor, db),
+    reconcileUnknownTextPublication({ ...value, evidenceRef: "evidence-conflict" }, identity, db),
     /不能覆盖/,
   );
   const current = (

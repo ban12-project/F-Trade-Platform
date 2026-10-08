@@ -2,7 +2,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { hasPermission } from "../authz";
 import { type FleetState, LIVE_STATUSES } from "../browser-fleet/policy";
 import { publishContent } from "../content/gate";
 import { type Database, getDatabase } from "../db/client";
@@ -13,12 +12,18 @@ import {
   auditEvent,
   socialBrowserJob,
   socialPublication,
-  user,
 } from "../db/schema";
 import { assertWorkspaceProjectAccess } from "../workspace/access";
 import { parseFacebookMediaPayload } from "./facebook-media-contract";
 import { buildFacebookMediaPayload } from "./facebook-media-store";
 import { facebookTextPayloadSchema } from "./facebook-worker-protocol";
+import {
+  assertSocialAuthorizationAlive,
+  authorizeSocialActor,
+  authorizeSocialProject,
+  parseSocialProjectIdentity,
+  type SocialProjectIdentity,
+} from "./human-write-access";
 import {
   publicationReconciliationSchema,
   videoPublicationReconciliationSchema,
@@ -31,19 +36,13 @@ import { digestSocialWorkerPayload } from "./worker-protocol";
  */
 export async function reconcileUnknownTextPublication(
   input: unknown,
-  actorId: string,
+  identityInput: SocialProjectIdentity,
   db: Database = getDatabase(),
 ) {
   const value = publicationReconciliationSchema.parse(input);
+  const identity = parseSocialProjectIdentity(identityInput, value.projectId);
+  const actorId = identity.actorId;
   return db.transaction(async (tx) => {
-    const [actor] = await tx.select().from(user).where(eq(user.id, actorId));
-    if (
-      !actor ||
-      actor.banned ||
-      !hasPermission(actor.role, "settings:manage") ||
-      !hasPermission(actor.role, "content:review")
-    )
-      throw new Error("需要节点所有者的管理与审核权限。");
     await assertWorkspaceProjectAccess(value.projectId, actorId, "receipt", tx);
     const locations =
       await tx.execute(sql`SELECT p.node_id, p.job_id FROM browser_fleet_publication p
@@ -85,6 +84,11 @@ export async function reconcileUnknownTextPublication(
     )
       throw new Error("本次核对只支持原节点的文字发布记录。");
     if (publication.status === "published") {
+      await authorizeSocialProject(tx, identity, "receipt", publication.contentRef, "text");
+      const expiresAt = await authorizeSocialActor(tx, identity, [
+        "settings:manage",
+        "content:review",
+      ]);
       const [prior] = await tx
         .select()
         .from(auditEvent)
@@ -97,8 +101,10 @@ export async function reconcileUnknownTextPublication(
       if (
         prior?.metadata.evidence_ref === value.evidenceRef &&
         publication.externalPublicationRef === value.externalPublicationRef
-      )
+      ) {
+        assertSocialAuthorizationAlive(expiresAt);
         return { id: publication.id, replayed: true };
+      }
       throw new Error("结果已确认，不能覆盖已有凭证。");
     }
     if (
@@ -129,6 +135,7 @@ export async function reconcileUnknownTextPublication(
           )
           .orderBy(desc(approval.requestedAt), desc(approval.createdAt), desc(approval.id))
           .limit(1)
+          .for("share")
       : [];
     if (
       !confirmation ||
@@ -147,6 +154,11 @@ export async function reconcileUnknownTextPublication(
       gate.status !== "approved"
     )
       throw new Error("内容或原确认已变化，请保留未知结果并人工调查。");
+    await authorizeSocialProject(tx, identity, "receipt", publication.contentRef, "text");
+    const expiresAt = await authorizeSocialActor(tx, identity, [
+      "settings:manage",
+      "content:review",
+    ]);
     const now = new Date();
     await tx
       .update(socialBrowserJob)
@@ -191,6 +203,7 @@ export async function reconcileUnknownTextPublication(
       },
       occurredAt: now,
     });
+    assertSocialAuthorizationAlive(expiresAt);
     return { id: publication.id, replayed: false };
   });
 }
@@ -200,19 +213,13 @@ export async function reconcileUnknownTextPublication(
  */
 export async function reconcileUnknownVideoPublication(
   input: unknown,
-  actorId: string,
+  identityInput: SocialProjectIdentity,
   db: Database = getDatabase(),
 ) {
   const value = videoPublicationReconciliationSchema.parse(input);
+  const identity = parseSocialProjectIdentity(identityInput, value.projectId);
+  const actorId = identity.actorId;
   return db.transaction(async (tx) => {
-    const [actor] = await tx.select().from(user).where(eq(user.id, actorId));
-    if (
-      !actor ||
-      actor.banned ||
-      !hasPermission(actor.role, "settings:manage") ||
-      !hasPermission(actor.role, "content:review")
-    )
-      throw new Error("需要节点所有者的管理与审核权限。");
     await assertWorkspaceProjectAccess(value.projectId, actorId, "receipt", tx);
     const locations =
       await tx.execute(sql`SELECT p.node_id, p.job_id FROM browser_fleet_publication p
@@ -254,6 +261,11 @@ export async function reconcileUnknownVideoPublication(
     )
       throw new Error("本次核对只支持原节点的视频发布记录。");
     if (publication.status === "published") {
+      await authorizeSocialProject(tx, identity, "receipt", publication.contentRef, "video");
+      const expiresAt = await authorizeSocialActor(tx, identity, [
+        "settings:manage",
+        "content:review",
+      ]);
       const [prior] = await tx
         .select()
         .from(auditEvent)
@@ -266,8 +278,10 @@ export async function reconcileUnknownVideoPublication(
       if (
         prior?.metadata.evidence_ref === value.evidenceRef &&
         publication.externalPublicationRef === value.externalPublicationRef
-      )
+      ) {
+        assertSocialAuthorizationAlive(expiresAt);
         return { id: publication.id, replayed: true };
+      }
       throw new Error("结果已确认，不能覆盖已有凭证。");
     }
     const receipt = reservation?.receipt as Record<string, unknown> | null;
@@ -293,7 +307,7 @@ export async function reconcileUnknownVideoPublication(
       .from(aggregateRecord)
       .where(eq(aggregateRecord.id, publication.contentRef))
       .for("update");
-    const expected = await buildFacebookMediaPayload(tx, publication, new Date());
+    const expected = await buildFacebookMediaPayload(tx, publication, new Date(), true);
     const digest = digestSocialWorkerPayload(payload);
     if (
       !manifest ||
@@ -310,6 +324,11 @@ export async function reconcileUnknownVideoPublication(
       receipt.payloadDigest !== digest
     )
       throw new Error("视频或原确认已变化，请保留未知结果并人工调查。");
+    await authorizeSocialProject(tx, identity, "receipt", publication.contentRef, "video");
+    const expiresAt = await authorizeSocialActor(tx, identity, [
+      "settings:manage",
+      "content:review",
+    ]);
     const now = new Date();
     await tx
       .update(socialBrowserJob)
@@ -348,6 +367,7 @@ export async function reconcileUnknownVideoPublication(
       },
       occurredAt: now,
     });
+    assertSocialAuthorizationAlive(expiresAt);
     return { id: publication.id, replayed: false };
   });
 }

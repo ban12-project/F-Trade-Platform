@@ -56,7 +56,8 @@ export function PublicationPanel({
   publications: PublicationEntry[];
 }) {
   const router = useRouter();
-  const current = candidates.length === 1 ? candidates[0] : undefined;
+  const textCandidates = candidates.filter((candidate) => candidate.format === "text");
+  const current = textCandidates.length === 1 ? textCandidates[0] : undefined;
   const [state, action, pending] = useActionState(
     confirmPublicationAction,
     initialClosingActionState,
@@ -168,7 +169,7 @@ export function PublicationPanel({
             <form id="publication-confirmation" onSubmit={form.handleSubmit(submit)}>
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.contentRef}>
-                  <FieldLabel htmlFor="publication-content">已批准内容或视频</FieldLabel>
+                  <FieldLabel htmlFor="publication-content">已批准文字内容</FieldLabel>
                   <p id="publication-content" className="font-medium">
                     {current.title}
                   </p>
@@ -254,9 +255,15 @@ export function PublicationPanel({
       ) : !publications.length ? (
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>尚无可发布内容</EmptyTitle>
+            <EmptyTitle>
+              {candidates.some((candidate) => candidate.format === "video")
+                ? "视频请使用素材发布"
+                : "尚无可发布内容"}
+            </EmptyTitle>
             <EmptyDescription>
-              完成当前内容的人工审核后，再核对渠道与最终文案并确认发布。
+              {candidates.some((candidate) => candidate.format === "video")
+                ? "请在素材发布区域核对已批准成片与目标账户。该区域由账号拥有者使用；未显示时请先核对渠道连接。"
+                : "完成当前内容的人工审核后，再核对渠道与最终文案并确认发布。"}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
