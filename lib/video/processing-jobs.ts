@@ -1,8 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { type Database, getDatabase } from "@/lib/db/client";
+import { z } from "zod";
+import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
 import { aggregateRecord, videoProcessingJob } from "@/lib/db/schema";
 import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
+import {
+  authorizeOwnedVideoDraft,
+  parseVideoDraftIdentity,
+  VideoDraftAccessError,
+  type VideoDraftIdentity,
+} from "./draft-write-access";
 import { videoProcessingFailureMessage } from "./processing-failures";
 
 export type VideoProcessingKind = "ai_draft" | "render";
@@ -22,36 +29,56 @@ export function videoProcessingRequestKey(
   return createHash("sha256").update(`${videoId}:${kind}:${version}`).digest("hex");
 }
 
+/** Human submission reserves the current writer and exact draft version atomically. */
 export async function queueVideoProcessingJob(
   videoId: string,
   kind: VideoProcessingKind,
-  actorId: string,
+  identityInput: VideoDraftIdentity,
   database: Database = getDatabase(),
 ) {
-  return database.transaction(async (tx) => {
-    await assertAggregateWorkspaceWrite(videoId, tx, actorId);
-    const [record] = await tx
-      .select({ version: aggregateRecord.version })
-      .from(aggregateRecord)
-      .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
-      .limit(1);
-    if (!record) throw new Error("营销视频不存在。");
-    const requestKey = videoProcessingRequestKey(videoId, kind, record.version);
-    const id = randomUUID();
-    const inserted = await tx
-      .insert(videoProcessingJob)
-      .values({ id, videoProjectId: videoId, kind, requestKey, createdBy: actorId })
-      .onConflictDoNothing({ target: videoProcessingJob.requestKey })
-      .returning();
-    if (inserted[0]) return { job: inserted[0], created: true };
-    const [existing] = await tx
-      .select()
-      .from(videoProcessingJob)
-      .where(eq(videoProcessingJob.requestKey, requestKey))
-      .limit(1);
-    if (!existing) throw new Error("无法创建视频处理任务。");
-    return { job: existing, created: false };
-  });
+  z.uuid().parse(videoId);
+  z.enum(["ai_draft", "render"]).parse(kind);
+  const identity = parseVideoDraftIdentity(identityInput);
+  return database.transaction((tx) => queueLockedVideoProcessingJob(tx, videoId, kind, identity));
+}
+
+/** Also used inside the owning create/render transaction, before any Workflow dispatch. */
+export async function queueLockedVideoProcessingJob(
+  tx: DatabaseTransaction,
+  videoId: string,
+  kind: VideoProcessingKind,
+  identity: VideoDraftIdentity,
+) {
+  await assertAggregateWorkspaceWrite(videoId, tx, identity.actorId);
+  const [record] = await tx
+    .select({ version: aggregateRecord.version, state: aggregateRecord.state })
+    .from(aggregateRecord)
+    .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
+    .for("update");
+  if (!record || !["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(record.state))
+    throw new Error("当前视频状态不能提交处理任务。");
+  const expiresAt = await authorizeOwnedVideoDraft(tx, identity, videoId);
+  const requestKey = videoProcessingRequestKey(videoId, kind, record.version);
+  if (expiresAt <= new Date()) throw new VideoDraftAccessError();
+  const inserted = await tx
+    .insert(videoProcessingJob)
+    .values({
+      id: randomUUID(),
+      videoProjectId: videoId,
+      kind,
+      requestKey,
+      createdBy: identity.actorId,
+    })
+    .onConflictDoNothing({ target: videoProcessingJob.requestKey })
+    .returning();
+  if (inserted[0]) return { job: inserted[0], created: true };
+  const [existing] = await tx
+    .select()
+    .from(videoProcessingJob)
+    .where(eq(videoProcessingJob.requestKey, requestKey))
+    .limit(1);
+  if (!existing) throw new Error("无法创建视频处理任务。");
+  return { job: existing, created: false };
 }
 
 export async function reserveVideoWorkflowStart(

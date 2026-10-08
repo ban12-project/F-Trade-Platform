@@ -160,9 +160,19 @@ void (async () => {
         relation: "owned",
       });
     }
-    const running = await queueVideoProcessingJob(ids.video, "render", actorId, db);
+    const running = await queueVideoProcessingJob(
+      ids.video,
+      "render",
+      { actorId, sessionId: reviewSessionId, projectId: marketing },
+      db,
+    );
     await markVideoJobRunning(running.job.id, db);
-    const queued = await queueVideoProcessingJob(ids.video, "ai_draft", actorId, db);
+    const queued = await queueVideoProcessingJob(
+      ids.video,
+      "ai_draft",
+      { actorId, sessionId: reviewSessionId, projectId: marketing },
+      db,
+    );
     await changeWorkspaceProjectStatus({ projectId: marketing, status: "archived" }, actorId, db);
     const review = {
       reviewedVersion: "1",
@@ -188,7 +198,15 @@ void (async () => {
       /已归档/,
     );
     await assert.rejects(beginMarketingVideoRender(ids.video, actorId, db), /已归档/);
-    await assert.rejects(queueVideoProcessingJob(ids.video, "render", actorId, db), /已归档/);
+    await assert.rejects(
+      queueVideoProcessingJob(
+        ids.video,
+        "render",
+        { actorId, sessionId: reviewSessionId, projectId: marketing },
+        db,
+      ),
+      /已归档/,
+    );
     await assert.rejects(markVideoJobRunning(queued.job.id, db), /已归档/);
     assert.equal(
       (

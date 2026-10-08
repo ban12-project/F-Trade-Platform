@@ -2,8 +2,11 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
-
+import { VideoDraftAccessError } from "@/lib/video/draft-write-access";
+import {
+  assertAggregateWorkspaceWrite,
+  assertAndLinkProjectEvidence,
+} from "@/lib/workspace/access";
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import productReadySchema from "../../contracts/data/product-ready.schema.json";
 import { compileContract } from "../contracts/validator";
@@ -20,6 +23,11 @@ import {
   registerProductMediaInputSchema,
   reviewProductMediaInputSchema,
 } from "./media-service";
+import {
+  authorizeProductMediaWrite,
+  type ProductMediaIdentity,
+  parseProductMediaIdentity,
+} from "./media-write-access";
 import type { ProductDraft, ProductReady } from "./verification";
 import {
   assessProductVideoReadiness,
@@ -132,12 +140,13 @@ async function loadProduct(productId: string, database: Database) {
 export async function registerProductMediaAsset(
   input: RegisterProductMediaInput,
   probeInput: ProductMediaProbe,
-  actorId: string,
+  identityInput: ProductMediaIdentity,
   database: Database = getDatabase(),
 ): Promise<ProductMediaAsset> {
   const value = registerProductMediaInputSchema.parse(input);
   const probe = productMediaProbeSchema.parse(probeInput);
-  if (!actorId.trim()) throw new Error("创建产品媒体需要明确的人工账号。");
+  const identity = parseProductMediaIdentity(identityInput);
+  const actorId = identity.actorId;
 
   return database.transaction(async (tx) => {
     await assertAggregateWorkspaceWrite(value.productId, tx, actorId);
@@ -156,7 +165,11 @@ export async function registerProductMediaAsset(
     const evidenceRows = await tx
       .select({ id: evidenceTable.id, contentType: evidenceTable.contentType })
       .from(evidenceTable)
-      .where(inArray(evidenceTable.id, requiredEvidence));
+      .where(inArray(evidenceTable.id, requiredEvidence))
+      .for("share");
+    const expiresAt = await authorizeProductMediaWrite(tx, identity, value.productId);
+    await assertAndLinkProjectEvidence(identity.projectId, requiredEvidence, actorId, tx);
+    if (expiresAt <= new Date()) throw new VideoDraftAccessError();
     const asset = createPendingProductMediaAsset(value, probe, product, evidenceRows);
 
     await tx.insert(productMediaAsset).values(insertValues(asset, actorId));
@@ -190,11 +203,12 @@ export async function registerProductMediaAsset(
  */
 export async function reviewProductMediaAsset(
   input: ReviewProductMediaInput,
-  reviewerId: string,
+  identityInput: ProductMediaIdentity,
   database: Database = getDatabase(),
 ): Promise<ProductMediaAsset> {
   const value = reviewProductMediaInputSchema.parse(input);
-  if (!reviewerId.trim()) throw new Error("素材审核必须由明确的人工账号执行。");
+  const identity = parseProductMediaIdentity(identityInput);
+  const reviewerId = identity.actorId;
 
   return database.transaction(async (tx) => {
     const [owner] = await tx
@@ -224,7 +238,11 @@ export async function reviewProductMediaAsset(
       .select({ id: evidenceTable.id, contentType: evidenceTable.contentType })
       .from(evidenceTable)
       .where(eq(evidenceTable.id, value.evidenceRef))
-      .limit(1);
+      .limit(1)
+      .for("share");
+    const expiresAt = await authorizeProductMediaWrite(tx, identity, row.productId, true);
+    await assertAndLinkProjectEvidence(identity.projectId, [value.evidenceRef], reviewerId, tx);
+    if (expiresAt <= new Date()) throw new VideoDraftAccessError();
     const previousStatus = row.reviewStatus;
     const reviewedAt = new Date();
     const reviewed = applyProductMediaReview(

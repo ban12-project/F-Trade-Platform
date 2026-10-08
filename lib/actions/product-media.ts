@@ -1,10 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 
-import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/authz";
+import { authorizedActionSession } from "@/lib/action-boundary";
 import {
   parseProductMediaRegistrationFormData,
   parseProductMediaReviewFormData,
@@ -16,6 +14,8 @@ import {
   registerProductMediaAsset,
   reviewProductMediaAsset,
 } from "@/lib/product/media-store";
+import { productMediaFailureMessage } from "@/lib/product/media-write-access";
+import { VideoDraftAccessError } from "@/lib/video/draft-write-access";
 import { issueSandboxVideoSources } from "@/lib/video/sandbox-sources";
 import { claimCompletedVideoUploads } from "@/lib/video/upload-receipts";
 import { assertWorkspaceAggregateLink } from "@/lib/workspace/store";
@@ -36,12 +36,9 @@ export async function registerProductMediaAction(
   _previousState: ProductMediaActionState,
   formData: FormData,
 ): Promise<ProductMediaActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "product:write")) {
-    return { status: "error", message: "无权登记产品媒体。" };
-  }
-
   try {
+    const session = await authorizedActionSession("product:write");
+    if (!session) throw new VideoDraftAccessError();
     const value = parseProductMediaRegistrationFormData(formData);
     await assertWorkspaceAggregateLink(
       value.projectId,
@@ -53,8 +50,7 @@ export async function registerProductMediaAction(
 
     const [uploaded] = await claimCompletedVideoUploads(
       [value.receiptId],
-      session.user.id,
-      value.projectId,
+      { actorId: session.user.id, sessionId: session.session.id, projectId: value.projectId },
       value.rightsEvidenceRef,
     );
     if (!uploaded) throw new Error("产品媒体上传尚未完成。");
@@ -65,7 +61,11 @@ export async function registerProductMediaAction(
       ...value.input,
       evidenceRef: uploaded.assetRef,
     });
-    const asset = await registerProductMediaAsset(input, probe, session.user.id);
+    const asset = await registerProductMediaAsset(input, probe, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId: value.projectId,
+    });
     revalidateProductMedia(value.projectId);
     return {
       status: "success",
@@ -76,7 +76,7 @@ export async function registerProductMediaAction(
   } catch (error) {
     return {
       status: "error",
-      message: error instanceof Error ? error.message : "无法登记产品媒体。",
+      message: productMediaFailureMessage(error),
     };
   }
 }
@@ -85,12 +85,9 @@ export async function reviewProductMediaAction(
   _previousState: ProductMediaActionState,
   formData: FormData,
 ): Promise<ProductMediaActionState> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || !hasPermission(session.user.role, "product:review")) {
-    return { status: "error", message: "只有管理员可以审核产品媒体。" };
-  }
-
   try {
+    const session = await authorizedActionSession("product:review");
+    if (!session) throw new VideoDraftAccessError();
     const value = parseProductMediaReviewFormData(formData);
     await assertWorkspaceAggregateLink(
       value.projectId,
@@ -104,7 +101,11 @@ export async function reviewProductMediaAction(
       throw new Error("该产品媒体不属于当前项目中的产品。");
     }
 
-    const asset = await reviewProductMediaAsset(value.input, session.user.id);
+    const asset = await reviewProductMediaAsset(value.input, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId: value.projectId,
+    });
     revalidateProductMedia(value.projectId);
     return {
       status: "success",
@@ -118,7 +119,7 @@ export async function reviewProductMediaAction(
   } catch (error) {
     return {
       status: "error",
-      message: error instanceof Error ? error.message : "无法审核产品媒体。",
+      message: productMediaFailureMessage(error),
     };
   }
 }

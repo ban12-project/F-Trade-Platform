@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { type Database, getDatabase } from "@/lib/db/client";
+import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
 import { evidence, evidenceUploadIntent } from "@/lib/db/schema";
 import { type EvidenceStore, evidenceUploadPath } from "./store";
 import { reconcileEvidenceUpload } from "./upload-reconciliation";
@@ -22,7 +22,10 @@ const metadataSchema = z.object({
 
 /** Each upload has its own provenance; unknown outcomes never authorize deletion. */
 export async function persistUploadedEvidence(
-  input: z.input<typeof metadataSchema> & { body: Blob },
+  input: z.input<typeof metadataSchema> & {
+    body: Blob;
+    authorize?: (tx: DatabaseTransaction) => Promise<void>;
+  },
   database: Database = getDatabase(),
   store: UploadEvidenceStore = new VercelPrivateBlobEvidenceStore(),
 ) {
@@ -30,12 +33,17 @@ export async function persistUploadedEvidence(
   const id = `evidence-${randomUUID()}`;
   const pathname = evidenceUploadPath({ evidenceId: id, filename: metadata.filename });
   // If this acknowledgement is lost, no storage operation is attempted.
-  await database.insert(evidenceUploadIntent).values({
-    id,
-    blobKey: pathname,
-    status: "upload_pending",
-  });
+  const intent = { id, blobKey: pathname, status: "upload_pending" as const };
+  if (input.authorize) {
+    await database.transaction(async (tx) => {
+      await input.authorize?.(tx);
+      await tx.insert(evidenceUploadIntent).values(intent);
+    });
+  } else {
+    await database.insert(evidenceUploadIntent).values(intent);
+  }
   let acknowledged = false;
+  let authorizationRejected = false;
   try {
     const stored = await store.put({
       evidenceId: id,
@@ -55,6 +63,12 @@ export async function persistUploadedEvidence(
         .for("update");
       if (!intent || !["upload_pending", "uncertain"].includes(intent.status))
         throw new Error("Upload intent is not attachable");
+      try {
+        await input.authorize?.(tx);
+      } catch (error) {
+        authorizationRejected = true;
+        throw error;
+      }
       await tx.insert(evidence).values({
         id,
         classification: "restricted",
@@ -75,7 +89,9 @@ export async function persistUploadedEvidence(
   } catch (error) {
     const cause = error instanceof Error ? error.cause : null;
     const code = cause && typeof cause === "object" && "code" in cause ? cause.code : null;
-    const definiteFailure = acknowledged && typeof code === "string" && /^23\d{3}$/.test(code);
+    const definiteFailure =
+      acknowledged &&
+      (authorizationRejected || (typeof code === "string" && /^23\d{3}$/.test(code)));
     // Attached status commits atomically with evidence. A lost acknowledgement
     // cannot turn that committed object into a cleanup candidate.
     try {

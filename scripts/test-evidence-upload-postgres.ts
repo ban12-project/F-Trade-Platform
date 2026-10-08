@@ -9,6 +9,7 @@ import { closeDatabase, type Database, getDatabase } from "../lib/db/client";
 import {
   evidence,
   evidenceUploadIntent,
+  session,
   user,
   videoUploadReceipt,
   workspaceProject,
@@ -39,6 +40,7 @@ void (async () => {
   const db = getDatabase();
   const actors = [randomUUID(), randomUUID()];
   const projects = [randomUUID(), randomUUID()];
+  const sessionIds = [randomUUID(), randomUUID()];
   const receiptIds = [randomUUID(), randomUUID()];
   const memory = new MemoryEvidenceStore();
   const store = {
@@ -73,6 +75,12 @@ void (async () => {
         name: "SYNTHETIC",
         email: `${actors[i]}@example.invalid`,
         role: "admin",
+      });
+      await db.insert(session).values({
+        id: sessionIds[i],
+        userId: actors[i],
+        token: randomUUID(),
+        expiresAt: new Date(Date.now() + 3600000),
       });
       await db
         .insert(workspaceProject)
@@ -177,8 +185,7 @@ void (async () => {
     const claim = (i: number) =>
       claimCompletedVideoUploads(
         [receiptIds[i]],
-        actors[i],
-        projects[i],
+        { actorId: actors[i], sessionId: sessionIds[i], projectId: projects[i] },
         "synthetic-rights",
         db,
         readBlob,
