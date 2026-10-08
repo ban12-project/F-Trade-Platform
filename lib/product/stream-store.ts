@@ -14,6 +14,7 @@ import { insertProductAgentDraft } from "../products";
 import { assertAndLinkProjectEvidence } from "../workspace/access";
 import type { ProductAgentSource } from "./agent";
 import { prepareProductAgentEvidenceSource } from "./evidence-locations";
+import { buildProductEvidenceSourceBinding } from "./evidence-source-binding";
 import { emptyProductStreamDraft } from "./stream-validation";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
@@ -80,7 +81,11 @@ export async function startProductStreamRun(
       tx,
       draft,
       identity.actorId,
-      { ...modelMetadata, stream_run_id: runId },
+      {
+        ...modelMetadata,
+        stream_run_id: runId,
+        source_evidence_binding: buildProductEvidenceSourceBinding(source),
+      },
       identity.projectId,
       source.image_refs,
     );

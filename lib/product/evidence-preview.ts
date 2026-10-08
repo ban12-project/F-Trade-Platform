@@ -1,11 +1,12 @@
 import "server-only";
 import { get } from "@vercel/blob";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { productCatalogCandidate, productCatalogImport } from "@/lib/db/product-catalog-schema";
 import {
   aggregateRecord,
+  auditEvent,
   evidence,
   productDocumentUploadReceipt,
   user,
@@ -18,6 +19,7 @@ import {
   type ProductAgentEvidenceLocation,
   prepareProductAgentEvidenceSource,
 } from "./evidence-locations";
+import { parseProductEvidenceSourceBinding } from "./evidence-source-binding";
 
 const filenames: Record<string, string> = {
   "application/pdf": "source.pdf",
@@ -63,6 +65,25 @@ async function authorizedSources(
   const parsed = fieldsSchema.safeParse(record?.payload);
   if (!parsed.success) return [];
   const fields = Object.entries(parsed.data.field_evidence);
+  // Generated location IDs are opaque. Use the association recorded by the server,
+  // never a caller's source label or another upload with matching bytes.
+  const [created] = await database
+    .select({ metadata: auditEvent.metadata })
+    .from(auditEvent)
+    .where(
+      and(
+        eq(auditEvent.aggregateId, productId),
+        eq(auditEvent.subjectType, "product"),
+        eq(auditEvent.subjectId, productId),
+        eq(auditEvent.action, "product_agent_draft_created"),
+        eq(auditEvent.actorType, "agent"),
+        eq(auditEvent.actorId, "product_agent"),
+      ),
+    )
+    .orderBy(desc(auditEvent.occurredAt), desc(auditEvent.id))
+    .limit(1);
+  const binding = parseProductEvidenceSourceBinding(created?.metadata.source_evidence_binding);
+  const hasRecordedBinding = created?.metadata.source_evidence_binding !== undefined;
   const rows = await database
     .select({
       id: evidence.id,
@@ -89,7 +110,12 @@ async function authorizedSources(
     const linkedFields = fields.filter(
       ([, ref]) =>
         ref === row.id ||
-        (parsed.data.source_ref === `source-${row.sha256}` && ref.startsWith("evidence-loc-")),
+        (binding?.source_ref === parsed.data.source_ref &&
+          binding.evidence_ref === row.id &&
+          binding.location_refs.includes(ref)) ||
+        (!hasRecordedBinding &&
+          parsed.data.source_ref === `source-${row.sha256}` &&
+          ref.startsWith("evidence-loc-")),
     );
     return linkedFields.length ? [{ ...row, linkedFields }] : [];
   });

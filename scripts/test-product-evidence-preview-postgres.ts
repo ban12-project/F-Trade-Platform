@@ -12,6 +12,9 @@ import {
 } from "../lib/product/document-upload-receipts";
 import { prepareProductAgentEvidenceSource } from "../lib/product/evidence-locations";
 import { listProductEvidencePreviews, readProductEvidence } from "../lib/product/evidence-preview";
+import { buildProductEvidenceSourceBinding } from "../lib/product/evidence-source-binding";
+import { persistProductStreamDraft, startProductStreamRun } from "../lib/product/stream-store";
+import { createProductAgentDraft } from "../lib/products";
 
 const connection = process.env.DOCUMENT_UPLOAD_TEST_DATABASE_URL;
 if (
@@ -183,6 +186,71 @@ void (async () => {
       undefined,
     );
     assert.equal(previews[0].href, `/api/product-evidence/${project}/${product}/${sourceId}`);
+    // Pasted, authorized text uses a user-supplied source label rather than a byte hash.
+    // Both entry paths must preserve its exact server-generated location association.
+    const pastedSource = {
+      ...source,
+      record_id: randomUUID(),
+      source_ref: "MOCK pasted source label",
+    };
+    const pastedLocations = prepareProductAgentEvidenceSource(pastedSource).evidence_locations;
+    const binding = buildProductEvidenceSourceBinding(pastedSource);
+    assert.equal(binding.evidence_ref, sourceId);
+    assert.ok(!JSON.stringify(binding).includes("SYNTHETIC kit"), "no raw excerpts in audit");
+    const stream = await startProductStreamRun(uploadIdentity, pastedSource, {}, db);
+    const pastedDraft = {
+      record_id: stream.productId,
+      source_ref: pastedSource.source_ref,
+      evidence_refs: pastedLocations.map((location) => location.ref),
+      field_evidence: {
+        "product.product_name": pastedLocations[0].ref,
+        "product.internal_sku": pastedLocations[1].ref,
+      },
+      verification_status: "review_required" as const,
+      blocking_missing_fields: [],
+      optional_missing_fields: [],
+      product: { product_name: "SYNTHETIC kit", internal_sku: "MOCK-401" },
+    };
+    await persistProductStreamDraft(uploadIdentity, stream.runId, pastedDraft, db);
+    const oneShot = await createProductAgentDraft(
+      { ...pastedDraft, record_id: randomUUID() },
+      uploadIdentity,
+      { source_evidence_binding: binding },
+      [],
+      db,
+    );
+    for (const id of [stream.productId, oneShot.id]) {
+      const bound = await listProductEvidencePreviews(project, id, viewer, db);
+      assert.equal(bound.length, 1, "generated locations retain the selected original");
+      assert.equal(bound[0].id, sourceId);
+      assert.equal(bound[0].fields.length, 2);
+      assert.ok(bound[0].fields.every((field) => !field.excerpt && !field.location));
+      const file = await readProductEvidence(project, id, sourceId, viewer, db, reader());
+      assert.deepEqual(file?.bytes, bytes);
+      assert.deepEqual(await listProductEvidencePreviews(project, id, outsider, db), []);
+    }
+    // A changed source label or location must not borrow the retained association.
+    await db
+      .update(schema.aggregateRecord)
+      .set({
+        payload: { ...pastedDraft, source_ref: "MOCK changed label" },
+      })
+      .where(eq(schema.aggregateRecord.id, stream.productId));
+    assert.deepEqual(await listProductEvidencePreviews(project, stream.productId, viewer, db), []);
+    await db
+      .update(schema.aggregateRecord)
+      .set({
+        payload: {
+          ...pastedDraft,
+          field_evidence: { "product.product_name": "evidence-loc-forged" },
+        },
+      })
+      .where(eq(schema.aggregateRecord.id, stream.productId));
+    assert.deepEqual(await listProductEvidencePreviews(project, stream.productId, viewer, db), []);
+    await db
+      .update(schema.aggregateRecord)
+      .set({ payload: pastedDraft })
+      .where(eq(schema.aggregateRecord.id, stream.productId));
     // Use the actual receipt/claim path: uploads deliberately retain a generic evidence label.
     // Identical bytes still represent independent uploads with independent original names.
     const namedProduct = randomUUID();
@@ -215,6 +283,42 @@ void (async () => {
     const [first, second, foreign] = claims;
     assert.notEqual(first.evidenceId, second.evidenceId);
     assert.equal(first.sha256, second.sha256);
+    const canonicalSource = { ...source, evidence_refs: [first.evidenceId] };
+    const canonicalLocation =
+      prepareProductAgentEvidenceSource(canonicalSource).evidence_locations[0];
+    const canonicalBinding = buildProductEvidenceSourceBinding(canonicalSource);
+    const canonical = await createProductAgentDraft(
+      {
+        ...pastedDraft,
+        record_id: randomUUID(),
+        source_ref: canonicalSource.source_ref,
+        evidence_refs: [canonicalLocation.ref],
+        field_evidence: { "product.product_name": canonicalLocation.ref },
+        product: { product_name: "SYNTHETIC kit" },
+      },
+      uploadIdentity,
+      { source_evidence_binding: canonicalBinding },
+      [],
+      db,
+    );
+    const canonicalPreviews = await listProductEvidencePreviews(project, canonical.id, viewer, db);
+    assert.deepEqual(
+      canonicalPreviews.map((item) => item.id),
+      [first.evidenceId],
+      "same-byte uploads do not inherit a new generated binding",
+    );
+    const malformed = await createProductAgentDraft(
+      { ...canonical.draft, record_id: randomUUID() },
+      uploadIdentity,
+      { source_evidence_binding: {} },
+      [],
+      db,
+    );
+    assert.deepEqual(
+      await listProductEvidencePreviews(project, malformed.id, viewer, db),
+      [],
+      "malformed recorded binding cannot fall back to shared-hash provenance",
+    );
     await db.insert(schema.aggregateRecord).values({
       id: namedProduct,
       type: "product",
