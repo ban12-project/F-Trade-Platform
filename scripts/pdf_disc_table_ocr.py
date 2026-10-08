@@ -29,7 +29,7 @@ def read_words(tsv):
             words.append(word)
             if len(words) > 20_000:
                 return []
-    except (KeyError, TypeError, ValueError):
+    except (AttributeError, KeyError, TypeError, ValueError):
         return []
     return words
 

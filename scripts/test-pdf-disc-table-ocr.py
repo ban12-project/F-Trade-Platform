@@ -97,6 +97,7 @@ with TemporaryDirectory() as directory:
         word('999XD901' if psm == 7 else 'SYN-OE-B', 0, 0)])) is None
 
 assert read_words('not tsv') == []
+assert read_words('level\tleft\ttop\twidth\theight\tconf\ttext\n5\t0\t0\t10\t10\t95\n') == []
 assert [item['text'] for item in read_words(tsv([word('"', 0, 0), word('999XD901', 0, 30)]))] == ['"', '999XD901']
 original = 'TQNO. OEMNO.\n999XD901 SYN-OE-A'
 kept = retain_disc_ocr(original, recovered)
