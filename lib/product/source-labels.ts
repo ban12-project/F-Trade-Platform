@@ -1,3 +1,22 @@
+/** Reviewed catalog identity labels; TQ NO./天奇编号 denotes the catalog identifier. */
+export const PRODUCT_IDENTIFIER_LABELS = [
+  "Internal SKU",
+  "Kit No.",
+  "Kit No",
+  "Part No.",
+  "Part No",
+  "Type No.",
+  "Type No",
+  "编号",
+  "TQ NO.",
+  "TQ NO",
+  "TQNO.",
+  "TQNO",
+  "天奇编号",
+];
+
+export const PRODUCT_OE_LABELS = ["OE", "OE No.", "OEM", "OEM No.", "OEMNO."];
+
 /** Reviewed fitment labels. Generic Model/Make and component labels are not aliases. */
 export const PRODUCT_FITMENT_LABELS = {
   "product.application": ["Application"],

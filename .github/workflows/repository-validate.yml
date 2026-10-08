@@ -138,7 +138,7 @@ jobs:
         run: pnpm test:product-media && pnpm test:product-media-workflow
 
       - name: Install FFmpeg for rendered-media validation
-        run: sudo apt-get update && sudo apt-get install --yes ffmpeg poppler-utils tesseract-ocr
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg poppler-utils tesseract-ocr fonts-dejavu-core
 
       - name: Inspect real media and render all platform export variants
         run: pnpm test:rendered-video-inspection && pnpm test:ffmpeg-renderer
@@ -163,7 +163,7 @@ jobs:
         run: python scripts/test-document-image-context.py
 
       - name: Test native PDF physical pages
-        run: python scripts/test-local-ocr-preprocess.py --native-pdf --local-ocr && python scripts/test-pdf-catalog-layout.py --native-pdf && python scripts/test-pdf-kit-ocr.py --native-pdf
+        run: python scripts/test-local-ocr-preprocess.py --native-pdf --local-ocr && python scripts/test-pdf-catalog-layout.py --native-pdf && python scripts/test-pdf-kit-ocr.py --native-pdf && python scripts/test-pdf-disc-table-ocr.py --local-ocr
 
       - name: Test actual PDF catalog preflight
         run: node --import tsx scripts/test-pdf-catalog-preflight.ts

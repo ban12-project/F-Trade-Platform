@@ -216,6 +216,84 @@ const row251Draft = finalizeProductAgentDraft(
   tablePrepared,
 );
 assertProductAgentEvidenceLocations(row251Draft, tablePrepared, finalizeProductAgentDraft);
+
+for (const identifierLabel of ["TQ NO.", "TQNO.", "天奇编号"]) {
+  const discSource = prepareProductAgentEvidenceSource({
+    ...source,
+    source_text: [
+      "<!-- f-trade:pdf-page=7 -->",
+      `| ${identifierLabel} | OEMNO. | PARTNO. | LINING(O.D.*I.D.) | VEHICLE TYPE |`,
+      "| --- | --- | --- | --- | --- |",
+      "| 999XD901 | SYN-OE-A | SYN-PART-A | 1*2 | Synthetic brand A |",
+      "| 999XD902 | SYN-OE-B | SYN-PART-B | 3*4 | Synthetic brand B |",
+    ].join("\n"),
+    candidate_identifier: "999XD901",
+  });
+  const ownRef = discSource.evidence_locations[0]!.ref;
+  assert.match(ownRef, /^evidence-loc-row-page-7-/);
+  const discDraft = finalizeProductAgentDraft(
+    {
+      record_id: discSource.record_id,
+      source_ref: discSource.source_ref,
+      evidence_refs: discSource.evidence_refs,
+      field_evidence: { "product.internal_sku": ownRef, "product.oe_numbers": ownRef },
+      verification_status: "review_required",
+      blocking_missing_fields: [],
+      optional_missing_fields: [],
+      product: { internal_sku: "999XD901", oe_numbers: ["SYN-OE-A"] },
+    },
+    discSource,
+  );
+  assert.equal(discDraft.verification_status, "review_required");
+  assertProductAgentEvidenceLocations(discDraft, discSource, finalizeProductAgentDraft);
+  for (const unsupportedOE of ["SYN-OE-B", "SYN-PART-A"]) {
+    assert.throws(
+      () =>
+        assertProductAgentEvidenceLocations(
+          {
+            ...discDraft,
+            product: { ...discDraft.product, oe_numbers: [unsupportedOE] },
+          },
+          discSource,
+          finalizeProductAgentDraft,
+        ),
+      /OE numbers/,
+    );
+  }
+  assert.throws(
+    () =>
+      assertProductAgentEvidenceLocations(
+        {
+          ...discDraft,
+          product: { ...discDraft.product, vehicle_model: "Synthetic brand A" },
+          field_evidence: { ...discDraft.field_evidence, "product.vehicle_model": ownRef },
+        },
+        discSource,
+        finalizeProductAgentDraft,
+      ),
+    /vehicle_model/,
+  );
+  assert.throws(
+    () =>
+      assertProductAgentEvidenceLocations(
+        {
+          ...discDraft,
+          specifications: { clutch_diameter_mm: 1 },
+          field_evidence: {
+            ...discDraft.field_evidence,
+            "specifications.clutch_diameter_mm": ownRef,
+          },
+        },
+        discSource,
+        finalizeProductAgentDraft,
+      ),
+    /clutch_diameter_mm/,
+  );
+  assert.equal(
+    buildProductAgentEvidenceLocations("synthetic", `${identifierLabel}: 999XD901`).length,
+    1,
+  );
+}
 assert.throws(
   () =>
     assertProductAgentEvidenceLocations(

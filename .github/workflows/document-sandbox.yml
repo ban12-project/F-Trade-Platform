@@ -8,6 +8,8 @@ on:
       - 'scripts/markitdown_preprocess.py'
       - 'scripts/pdf_catalog_layout.py'
       - 'scripts/pdf_kit_ocr.py'
+      - 'scripts/pdf_disc_table_ocr.py'
+      - 'scripts/test-pdf-disc-table-ocr.py'
       - 'scripts/test-pdf-kit-ocr.py'
       - 'scripts/synthetic_pdf_fixture.py'
       - 'scripts/test-document-sandbox.py'
@@ -19,6 +21,8 @@ on:
       - 'scripts/markitdown_preprocess.py'
       - 'scripts/pdf_catalog_layout.py'
       - 'scripts/pdf_kit_ocr.py'
+      - 'scripts/pdf_disc_table_ocr.py'
+      - 'scripts/test-pdf-disc-table-ocr.py'
       - 'scripts/test-pdf-kit-ocr.py'
       - 'scripts/synthetic_pdf_fixture.py'
       - 'scripts/test-document-sandbox.py'
@@ -42,11 +46,12 @@ jobs:
       - name: Build the runtime with only required source files
         run: |
           mkdir -p /tmp/document-image/scripts
-          cp scripts/markitdown_preprocess.py scripts/pdf_catalog_layout.py scripts/pdf_kit_ocr.py /tmp/document-image/scripts/
+          cp scripts/markitdown_preprocess.py scripts/pdf_catalog_layout.py scripts/pdf_kit_ocr.py scripts/pdf_disc_table_ocr.py /tmp/document-image/scripts/
           docker build -f ops/video-sandbox/Dockerfile -t f-trade-document-smoke /tmp/document-image
       - name: Verify the actual image without network access
         run: |
           mkdir -p /tmp/document-image-tests
-          cp scripts/test-document-sandbox.py scripts/test-pdf-kit-ocr.py scripts/synthetic_pdf_fixture.py /tmp/document-image-tests/
+          cp scripts/test-document-sandbox.py scripts/test-pdf-kit-ocr.py scripts/test-pdf-disc-table-ocr.py scripts/synthetic_pdf_fixture.py /tmp/document-image-tests/
           docker run --rm --network none -v /tmp/document-image-tests:/test:ro f-trade-document-smoke /opt/markitdown/bin/python3 /test/test-document-sandbox.py
           docker run --rm --network none -e PYTHONPATH=/opt/f-trade -v /tmp/document-image-tests:/test:ro f-trade-document-smoke /opt/markitdown/bin/python3 /test/test-pdf-kit-ocr.py --native-pdf
+          docker run --rm --network none -e PYTHONPATH=/opt/f-trade -v /tmp/document-image-tests:/test:ro f-trade-document-smoke /opt/markitdown/bin/python3 /test/test-pdf-disc-table-ocr.py --local-ocr

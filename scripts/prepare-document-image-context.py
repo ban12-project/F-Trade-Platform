@@ -10,6 +10,7 @@ FILES = (
     'scripts/markitdown_preprocess.py',
     'scripts/pdf_catalog_layout.py',
     'scripts/pdf_kit_ocr.py',
+    'scripts/pdf_disc_table_ocr.py',
 )
 
 
@@ -44,4 +45,4 @@ if __name__ == '__main__':
     if len(sys.argv) != 2:
         raise SystemExit('Usage: python3 scripts/prepare-document-image-context.py <new-directory>')
     prepare_context(Path(__file__).resolve().parent.parent, Path(sys.argv[1]))
-    print('Created source-only document image context (4 files)')
+    print(f'Created source-only document image context ({len(FILES)} files)')

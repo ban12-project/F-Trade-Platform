@@ -8,7 +8,7 @@ import type { ProductDraft } from "./verification";
 const MAX_EVIDENCE_LOCATIONS = 512;
 const MARKDOWN_SEPARATOR = /^:?-{3,}:?$/;
 const SUPPORTED_LABEL =
-  /\b(?:product\s+name|product\s+type|internal\s+sku|kit\s+no\.?|part\s+no\.?|type\s+no\.?|oe(?:m)?(?:\s+no\.?)?|clutch\s+diameter|spline\s+count|spline\s+size|friction\s+material|kit\s+contents|gross\s+weight|net\s+weight|package\s+size|moq|estimated\s+lead\s+time|lead\s+time|packaging|supported\s+customization|customization|sample\s+available)\b|编号/i;
+  /\b(?:product\s+name|product\s+type|internal\s+sku|kit\s+no\.?|part\s+no\.?|type\s+no\.?|tq\s*no\.?|oe(?:m)?(?:\s*no\.?)?|clutch\s+diameter|spline\s+count|spline\s+size|friction\s+material|kit\s+contents|gross\s+weight|net\s+weight|package\s+size|moq|estimated\s+lead\s+time|lead\s+time|packaging|supported\s+customization|customization|sample\s+available)\b|编号/i;
 
 export type ProductAgentEvidenceLocation = {
   ref: string;

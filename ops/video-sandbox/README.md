@@ -16,7 +16,7 @@ Function before FFmpeg runs.
 2. Authenticate Docker to `vcr.vercel.com` with username `oidc` and the
    `VERCEL_OIDC_TOKEN` as password.
 3. Create a source-only context with the checked-in helper. It copies only the
-   Dockerfile and its three governed Python modules; it rejects symlinks,
+   Dockerfile and its four governed Python modules; it rejects symlinks,
    existing output directories, and changed COPY/ADD inputs. Do not use the
    repository root as the build context.
 

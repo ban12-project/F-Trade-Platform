@@ -17,7 +17,12 @@ import {
   PRODUCT_AGENT_PROMPT_VERSION,
   PRODUCT_AGENT_SYSTEM_PROMPT,
 } from "./product-agent-prompt";
-import { isFitmentField, PRODUCT_FITMENT_LABELS } from "./source-labels";
+import {
+  isFitmentField,
+  PRODUCT_FITMENT_LABELS,
+  PRODUCT_IDENTIFIER_LABELS,
+  PRODUCT_OE_LABELS,
+} from "./source-labels";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
 export interface ProductAgentSource {
@@ -280,7 +285,7 @@ function assertSourceBackedFacts(draft: ProductDraft, sourceText: string) {
   assertLabelledTextFact(
     "product.internal_sku",
     draft.product.internal_sku,
-    ["Internal SKU", "Kit No.", "Kit No", "Part No.", "Part No", "Type No.", "Type No", "编号"],
+    PRODUCT_IDENTIFIER_LABELS,
     sourceText,
   );
   assertLabelledTextFact(
@@ -373,7 +378,7 @@ function assertSourceBackedFacts(draft: ProductDraft, sourceText: string) {
 
 function extractExplicitOeNumbers(sourceText: string) {
   const values = new Set<string>();
-  for (const sourceValue of extractLabelledValues(sourceText, ["OE", "OE No.", "OEM", "OEM No."])) {
+  for (const sourceValue of extractLabelledValues(sourceText, PRODUCT_OE_LABELS)) {
     for (const value of sourceValue.split(/[,;，、]|\t|\s{2,}/)) {
       const normalized = normalizeOeNumber(value.replace(/^[\s([{"']+|[\s)\]}"'.]+$/g, ""));
       if (normalized) values.add(normalized);
