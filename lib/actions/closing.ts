@@ -97,21 +97,37 @@ export async function recordFollowUpAction(
   formData: FormData,
 ): Promise<ClosingActionState> {
   try {
-    const actorId = await actor("sales:write");
+    const current = await authorizedActionSession("sales:write");
+    if (!current) throw new SocialHumanAccessError();
     const parsed = followUpFormSchema.safeParse({
       ...values(formData),
       triggeredRules: formData.getAll("triggeredRules"),
     });
-    if (!parsed.success) return resultError(parsed.error);
-    await recordFollowUp(parsed.data, actorId);
-    refresh(parsed.data.projectId);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查回复信息。" };
+    await recordFollowUp(parsed.data, {
+      actorId: current.user.id,
+      sessionId: current.session.id,
+      projectId: parsed.data.projectId,
+    });
+    try {
+      refresh(parsed.data.projectId);
+    } catch {
+      /* Preserve the committed reply submission. */
+    }
     return {
       status: "success",
       message: "人工确认的回复已安全提交；发送前已重新校验项目权限、渠道状态和回复窗口。",
       id: parsed.data.leadId,
     };
   } catch (error) {
-    return resultError(error);
+    return {
+      status: "error",
+      message: socialHumanFailureMessage(
+        error,
+        "回复未提交。请刷新并核对登录、项目权限、渠道和回复窗口后重试。",
+      ),
+    };
   }
 }
 export async function requestDeliveryAction(

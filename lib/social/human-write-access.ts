@@ -127,6 +127,18 @@ const safeMessages = new Set([
   "该入站消息已完成分流，请刷新工作台。",
   "项目已归档，请重开后再写入业务资料。",
   "你没有该项目的编辑权限。",
+  "该操作只能在销售机会项目中执行。",
+  "只有跟进中的线索可以发送回复。",
+  "该线索没有可发送的渠道会话，请先关联入站消息。",
+  "该线索未关联授权可见的渠道会话。",
+  "渠道未启用或已暂停，不能发送回复。",
+  "没有仍在保留期内的入站消息，不能发送回复。",
+  "已超过渠道回复窗口；当前 MVP 禁止发送，需人工升级处理。",
+  "自由文本不能包含交期承诺；请选择交期场景，由系统插入有效的 Gate 03 结果。",
+  "该场景必须先完成 Gate 03 交期确认。",
+  "Gate 03 尚未批准或已经失效，不能生成交期回复。",
+  "Gate 03 与当前 RFQ 不匹配，不能用于回复。",
+  "Gate 03 交期确认已过期，请重新申请确认。",
 ]);
 export function socialHumanFailureMessage(error: unknown, fallback: string) {
   if (error instanceof SocialHumanAccessError) return SOCIAL_HUMAN_ACCESS_MESSAGE;

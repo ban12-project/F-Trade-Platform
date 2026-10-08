@@ -42,10 +42,16 @@ import {
   type QuotationHandoff,
   sendManualQuotation,
 } from "@/lib/quotation/handoff";
+import {
+  assertSocialAuthorizationAlive,
+  parseSocialProjectIdentity,
+  type SocialProjectIdentity,
+} from "@/lib/social/human-write-access";
 import { assessReplyWindow } from "@/lib/social/inbound-policy";
 import { decryptSocialMessageBody } from "@/lib/social/message-crypto";
 import { createStoredSocialMessageRecord } from "@/lib/social/message-record";
 import { replyResultSchema } from "@/lib/social/reply-result-protocol";
+import { authorizeSalesReply } from "@/lib/social/reply-write-access";
 import { assertTransition } from "@/lib/workflow/transitions";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 
@@ -139,12 +145,21 @@ async function prepareControlledFollowUp(
   lead: LeadRecord,
   context: z.infer<typeof followUpFormSchema>["context"],
   draft: string,
-  now: Date,
 ) {
-  if (context !== "asks_lead_time" && context !== "asks_sample")
-    return buildControlledReply({ draft, context, rfqRef: lead.rfq_ref, delivery: null, now });
-  if (!lead.delivery_confirmation_ref)
-    return buildControlledReply({ draft, context, rfqRef: lead.rfq_ref, delivery: null, now });
+  if (
+    (context !== "asks_lead_time" && context !== "asks_sample") ||
+    !lead.delivery_confirmation_ref
+  )
+    return {
+      draft: buildControlledReply({
+        draft,
+        context,
+        rfqRef: lead.rfq_ref,
+        delivery: null,
+        now: new Date(),
+      }),
+      validUntil: undefined,
+    };
   const [row] = await tx
     .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
     .from(aggregateRecord)
@@ -162,13 +177,16 @@ async function prepareControlledFollowUp(
     row && row.state === "DELIVERY_CONFIRMATION_CONFIRMED"
       ? validateDeliveryConfirmation(row.payload)
       : null;
-  return buildControlledReply({
-    draft,
-    context,
-    rfqRef: lead.rfq_ref,
-    delivery: confirmation,
-    now,
-  });
+  return {
+    draft: buildControlledReply({
+      draft,
+      context,
+      rfqRef: lead.rfq_ref,
+      delivery: confirmation,
+      now: new Date(),
+    }),
+    validUntil: confirmation?.result?.valid_until,
+  };
 }
 
 export async function createOrReviseQuotation(
@@ -621,11 +639,12 @@ export async function sendQuotation(
 
 export async function recordFollowUp(
   input: unknown,
-  actorId: string,
+  access: SocialProjectIdentity,
   database: Database = getDatabase(),
 ) {
   const value = followUpFormSchema.parse(input);
-  const now = new Date();
+  const identity = parseSocialProjectIdentity(access, value.projectId);
+  const actorId = identity.actorId;
   return database.transaction(async (tx) => {
     await assertSalesProject(tx, value.projectId, actorId);
     const [record] = await tx
@@ -638,6 +657,7 @@ export async function recordFollowUp(
           eq(aggregateRecord.type, "lead"),
           eq(workspaceProjectItem.projectId, value.projectId),
           eq(workspaceProjectItem.role, "sales_lead"),
+          eq(workspaceProjectItem.relation, "owned"),
         ),
       )
       .for("update");
@@ -672,6 +692,7 @@ export async function recordFollowUp(
         id: socialMessage.id,
         externalMessageRef: socialMessage.externalMessageRef,
         receivedAt: socialMessage.receivedAt,
+        expiresAt: socialMessage.expiresAt,
       })
       .from(socialMessage)
       .where(
@@ -679,44 +700,63 @@ export async function recordFollowUp(
           eq(socialMessage.conversationId, conversation.id),
           eq(socialMessage.direction, "inbound"),
           isNull(socialMessage.deletedAt),
-          gt(socialMessage.expiresAt, now),
+          gt(socialMessage.expiresAt, new Date()),
         ),
       )
       .orderBy(desc(socialMessage.receivedAt))
       .limit(1)
       .for("update");
     if (!latestInbound) throw new Error("没有仍在保留期内的入站消息，不能发送回复。");
-    const window = assessReplyWindow(
-      {
-        channelRef: conversation.channelRef,
-        accountRef: conversation.accountRef,
-        transport: "camofox_controlled_mvp1",
-        inboundOnly: true,
-        replyWindowMinutes: 60,
-        outsideWindowAction: "block",
-      },
-      {
-        messageId: latestInbound.externalMessageRef,
-        direction: "inbound",
-        receivedAt: latestInbound.receivedAt.toISOString(),
-      },
-      now.toISOString(),
-    );
-    if (window.status !== "within_window")
-      throw new Error("已超过渠道回复窗口；当前 MVP 禁止发送，需人工升级处理。");
-    const controlledDraft = await prepareControlledFollowUp(
+    function assertReplyEligible(now: Date) {
+      if (latestInbound.expiresAt <= now)
+        throw new Error("没有仍在保留期内的入站消息，不能发送回复。");
+      const window = assessReplyWindow(
+        {
+          channelRef: conversation.channelRef,
+          accountRef: conversation.accountRef,
+          transport: "camofox_controlled_mvp1",
+          inboundOnly: true,
+          replyWindowMinutes: 60,
+          outsideWindowAction: "block",
+        },
+        {
+          messageId: latestInbound.externalMessageRef,
+          direction: "inbound",
+          receivedAt: latestInbound.receivedAt.toISOString(),
+        },
+        now.toISOString(),
+      );
+      if (window.status !== "within_window")
+        throw new Error("已超过渠道回复窗口；当前 MVP 禁止发送，需人工升级处理。");
+      return window;
+    }
+    assertReplyEligible(new Date());
+    const prepared = await prepareControlledFollowUp(
       tx,
       value.projectId,
       lead,
       value.context,
       value.draft,
-      now,
     );
+    const expiresAt = await authorizeSalesReply(tx, identity, value.leadId);
+    function assertCurrentEligibility() {
+      assertSocialAuthorizationAlive(expiresAt);
+      const now = new Date();
+      if (prepared.validUntil && Date.parse(prepared.validUntil) <= now.getTime())
+        throw new Error("Gate 03 交期确认已过期，请重新申请确认。");
+      return assertReplyEligible(now);
+    }
+    const window = assertCurrentEligibility();
     const idempotencyKey = `reply:${value.projectId}:${value.leadId}:${value.confirmationRef}`;
     const existingJob = await tx.query.socialBrowserJob.findFirst({
       where: eq(socialBrowserJob.idempotencyKey, idempotencyKey),
     });
-    if (existingJob) return lead;
+    if (existingJob) {
+      assertCurrentEligibility();
+      return lead;
+    }
+    const now = new Date();
+    const controlledDraft = prepared.draft;
     const jobId = randomUUID();
     const messageId = randomUUID();
     const storedMessage = createStoredSocialMessageRecord({
@@ -776,6 +816,7 @@ export async function recordFollowUp(
       },
       occurredAt: now,
     });
+    assertCurrentEligibility();
     return next;
   });
 }

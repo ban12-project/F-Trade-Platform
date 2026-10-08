@@ -657,7 +657,17 @@ for (const inbound of [false, true]) {
     await expect
       .poll(async () => (await records("delivery_confirmation"))[0].state)
       .toBe("DELIVERY_CONFIRMATION_CONFIRMED");
-    await page.getByRole("link", { name: "返回客户跟进", exact: true }).click();
+    // The database commits before the Action response updates the form and dirty guard.
+    await expect(deliveryForm).toHaveCount(0);
+    await expect(
+      page.getByText("工厂确认交期：", { exact: false }).filter({ visible: true }),
+    ).toContainText("21 天");
+    const returnToFollowUp = page.getByRole("link", { name: "返回客户跟进", exact: true });
+    const followUpHref = await returnToFollowUp.getAttribute("href");
+    if (!followUpHref) throw Error("The confirmed delivery must link back to its lead.");
+    await returnToFollowUp.click();
+    await expect(discard).toHaveCount(0);
+    await expect(page).toHaveURL(new URL(followUpHref, page.url()).href);
     await follow.getByRole("combobox").click();
     await page.getByRole("option", { name: "询问交期", exact: true }).click();
     for (const label of ["提供 OE", "明确数量", "询问交期", "询问付款条件"]) {
