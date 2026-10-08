@@ -57,6 +57,23 @@ with TemporaryDirectory() as directory:
                          '| 999XD901 | SYN-OE-A |\n| 999XD902 | SYN-OE-B |')
     assert len(calls) == 4 and all(width < 750 for (width, _), _ in calls)
     assert 'PARTNO.' not in recovered and 'LINING' not in recovered
+    # Whole-page word boxes can include a nearby rule. They only locate a row;
+    # the independently bounded reread must never include the preceding row.
+    crossing_rules = [dict(item) for item in fixture]
+    crossing_rules[-2].update(top=139, height=50)
+    crossing_calls = []
+    def bounded_ocr(crop, psm):
+        crossing_calls.append((crop.size, psm))
+        if crop.height > 240:
+            return tsv([word('999XD901', 5, 5), word('999XD902', 5, 80)])
+        return tsv([word(readings[len(crossing_calls) - 1], 5, 5)])
+    assert recover_disc_table(tsv(crossing_rules), path, bounded_ocr) == recovered
+    assert len(crossing_calls) == 4 and all(height <= 240 for (_, height), _ in crossing_calls)
+    # A center on a rule is ambiguous even when a fabricated reread would pass.
+    on_rules = [dict(item) for item in fixture]
+    on_rules[-4].update(top=130, height=20)
+    on_rules[-2].update(top=130, height=20)
+    assert recover_disc_table(tsv(on_rules), path, lambda *_: tsv([word('999XD901', 5, 5)])) is None
     unsupported_header = [dict(item) for item in fixture]
     unsupported_header[5]['text'] = 'DAMAGED-UNSUPPORTED-HEADER'
     calls.clear()
@@ -149,6 +166,31 @@ if '--local-ocr' in sys.argv:
             reread = local_pdf_ocr(path)
         assert damaged_headings == [1] and '> ITEM TQNE.' in reread
         assert '| 999XD901 | SYN-OE-A |' in reread and '| 999XD902 | SYN-OE-B |' in reread
+        crossed_boxes = []
+        def cross_previous_rule(args, **kwargs):
+            result = original_run(args, **kwargs)
+            if ('tesseract' in Path(args[0]).name and 'tsv' in args
+                    and args[args.index('--psm') + 1] == '3'):
+                reader = csv.DictReader(io.StringIO(result.stdout), delimiter='\t', quoting=csv.QUOTE_NONE)
+                rows = list(reader)
+                for row in rows:
+                    if row['text'] == '999XD902':
+                        bottom = int(row['top']) + int(row['height'])
+                        row.update(top='559', height=str(bottom - 559))
+                        crossed_boxes.append(row)
+                output = io.StringIO()
+                writer = csv.DictWriter(output, fieldnames=reader.fieldnames, delimiter='\t',
+                                        quoting=csv.QUOTE_NONE, escapechar='\\')
+                writer.writeheader()
+                writer.writerows(rows)
+                result.stdout = output.getvalue()
+            return result
+        with patch('markitdown_preprocess.subprocess.run', side_effect=cross_previous_rule):
+            crossing = local_pdf_ocr(path)
+        assert len(crossed_boxes) == 1
+        assert '| 999XD901 | SYN-OE-A |' in crossing
+        assert '| 999XD902 | SYN-OE-B |' in crossing
+        assert '| 999XD902 | SYN-OE-A |' not in crossing
         failed_passes = []
         def timeout_optional_pass(args, **kwargs):
             if '-r' in args and args[args.index('-r') + 1] == '300':
@@ -162,4 +204,5 @@ if '--local-ocr' in sys.argv:
         assert '999XD901' in fallback and '999XD902' in fallback
         assert '<!-- f-trade:pdf-page=1 -->' in fallback
     print('PASS actual offline PDF render + Tesseract + production converter, own-row identity/OEM')
+    print('PASS rule-crossing whole-page boxes retain independently bounded own-row OCR')
     print('PASS optional OCR timeout preserves initial readable text and physical provenance')
