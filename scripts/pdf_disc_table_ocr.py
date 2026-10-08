@@ -157,8 +157,13 @@ def recover_disc_table(tsv, image_path, ocr_crop):
             rules[column] = lines
         rows, retries, visited = [], 0, set()
         for identifier in sorted(candidates, key=lambda w: w["top"]):
-            above = [line for line in rules[1] if line < identifier["top"]]
-            below = [line for line in rules[1] if line > identifier["bottom"]]
+            # Whole-page boxes may absorb a row rule. Use their center only to
+            # locate a cell; independent cell OCR still supplies every value.
+            center = (identifier["top"] + identifier["bottom"]) / 2
+            if any(abs(line - center) <= max(3, heading["height"] / 2) for line in rules[1]):
+                continue
+            above = [line for line in rules[1] if line < center]
+            below = [line for line in rules[1] if line > center]
             if not above or not below:
                 continue
             top, bottom = max(above), min(below)
