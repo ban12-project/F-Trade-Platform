@@ -6,11 +6,11 @@ import type { z } from "zod";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord } from "@/lib/db/schema";
 import { videoJobSubmissionFormSchema } from "@/lib/form-schemas";
-
 import { videoProjectSchema } from "./contracts";
 import { enqueueVideoJob } from "./job-store";
 import { selectVerifiedVideoModel } from "./provider-capabilities";
 import { loadVideoExecutionConfiguration } from "./provider-config-store";
+import { assertVideoRetentionForId } from "./retention-access";
 
 export const videoJobSubmissionSchema = videoJobSubmissionFormSchema;
 export type VideoJobSubmission = z.infer<typeof videoJobSubmissionSchema>;
@@ -52,6 +52,7 @@ export async function submitApprovedVideoJob(
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, submission.videoId), eq(aggregateRecord.type, "video")));
   if (!record) throw new Error("未找到视频计划。");
+  await assertVideoRetentionForId(database, submission.videoId);
   const project = videoProjectSchema.parse(record.payload);
   if (record.state !== "VIDEO_READY_FOR_GENERATION" || project.status !== "ready_for_generation") {
     throw new Error("视频创意尚未准备好生成。 ");

@@ -3,6 +3,8 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
 import { videoProjectSchema } from "./contracts";
+import { assertVideoRetentionForId } from "./retention-access";
+import { videoRetainedCondition } from "./retention-policy";
 
 function ownedVideos(actorId: string, database: Database) {
   return database
@@ -36,7 +38,13 @@ export async function loadWorkspaceVideoForActor(
   database: Database = getDatabase(),
 ) {
   const [row] = await ownedVideos(actorId, database)
-    .where(and(eq(aggregateRecord.type, "video"), eq(aggregateRecord.id, videoId)))
+    .where(
+      and(
+        eq(aggregateRecord.type, "video"),
+        eq(aggregateRecord.id, videoId),
+        videoRetainedCondition(aggregateRecord.createdAt),
+      ),
+    )
     .limit(1);
   return row;
 }
@@ -50,15 +58,24 @@ export async function isWorkspaceRenderedAssetForActor(
     and(
       eq(aggregateRecord.type, "video"),
       eq(sql<string>`${aggregateRecord.payload}->>'renderedAssetRef'`, assetRef),
+      videoRetainedCondition(aggregateRecord.createdAt),
     ),
   );
-  return rows.some((row) => {
+  for (const row of rows) {
     const project = videoProjectSchema.safeParse(row.payload);
-    return (
+    if (
       project.success &&
       project.data.id === row.id &&
-      !!project.data.editDraft &&
+      project.data.editDraft &&
       project.data.renderedAssetRef === assetRef
-    );
-  });
+    ) {
+      try {
+        await assertVideoRetentionForId(database, row.id);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  }
+  return false;
 }

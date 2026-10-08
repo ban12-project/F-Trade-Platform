@@ -58,7 +58,7 @@ void (async () => {
     "not_found",
   );
   const headers = privateVideoPreviewHeaders(asset);
-  assert.equal(headers["Cache-Control"], "private, no-cache");
+  assert.equal(headers["Cache-Control"], "private, no-store");
   assert.equal(headers["Content-Type"], "video/mp4");
   assert.equal(headers["Accept-Ranges"], "bytes");
   assert.equal("Location" in headers, false);

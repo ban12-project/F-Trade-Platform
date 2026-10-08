@@ -22,6 +22,7 @@ import {
   loadVideoExecutionConfiguration,
   resolveVideoProviderCredential,
 } from "./provider-config-store";
+import { assertVideoRetentionForId } from "./retention-access";
 
 export type RunVideoJobResult =
   | { kind: "idle" }
@@ -107,6 +108,7 @@ async function videoProjectForJob(job: VideoJobRecord, database: Database) {
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, job.videoProjectId), eq(aggregateRecord.type, "video")));
   if (!row) throw new Error("video project not found");
+  await assertVideoRetentionForId(database, job.videoProjectId);
   return videoProjectSchema.parse(row.payload);
 }
 

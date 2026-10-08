@@ -22,7 +22,8 @@
     "original_factory_evidence_in_scope": false,
     "external_platform_copies_in_scope": false,
     "audit_after_expiry": "minimal_ids_hashes_decisions_and_policy_version_only",
-    "automatic_enforcement_status": "not_implemented"
+    "automatic_enforcement_status": "implemented_application_scope",
+    "managed_copy_inventory_status": "provider_logs_and_backups_unverified"
   },
   "access": {
     "storage": "private",

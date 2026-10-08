@@ -11,6 +11,7 @@ import {
   type VideoDraftIdentity,
 } from "./draft-write-access";
 import { videoProcessingFailureMessage } from "./processing-failures";
+import { assertVideoRetentionForId } from "./retention-access";
 
 export type VideoProcessingKind = "ai_draft" | "render";
 export type VideoProcessingStatus = "queued" | "running" | "succeeded" | "failed";
@@ -58,6 +59,7 @@ export async function queueLockedVideoProcessingJob(
   if (!record || !["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(record.state))
     throw new Error("当前视频状态不能提交处理任务。");
   const expiresAt = await authorizeOwnedVideoDraft(tx, identity, videoId);
+  await assertVideoRetentionForId(tx, videoId);
   const requestKey = videoProcessingRequestKey(videoId, kind, record.version);
   if (expiresAt <= new Date()) throw new VideoDraftAccessError();
   const inserted = await tx
@@ -93,6 +95,12 @@ export async function reserveVideoWorkflowStart(
       .where(eq(videoProcessingJob.id, jobId));
     if (!context) throw new Error("视频处理任务不存在。");
     await assertAggregateWorkspaceWrite(context.videoId, tx);
+    await tx
+      .select({ id: aggregateRecord.id })
+      .from(aggregateRecord)
+      .where(eq(aggregateRecord.id, context.videoId))
+      .for("update");
+    await assertVideoRetentionForId(tx, context.videoId);
     const [claimed] = await tx
       .update(videoProcessingJob)
       .set({ workflowRunId: claimId })
@@ -147,6 +155,12 @@ export async function markVideoJobRunning(jobId: string, database: Database = ge
       .where(eq(videoProcessingJob.id, jobId));
     if (!context) throw new Error("视频处理任务不存在。");
     await assertAggregateWorkspaceWrite(context.videoId, tx);
+    await tx
+      .select({ id: aggregateRecord.id })
+      .from(aggregateRecord)
+      .where(eq(aggregateRecord.id, context.videoId))
+      .for("update");
+    await assertVideoRetentionForId(tx, context.videoId);
     const [job] = await tx
       .update(videoProcessingJob)
       .set({
@@ -182,6 +196,16 @@ export async function failVideoJob(
   database: Database = getDatabase(),
 ) {
   await database.transaction(async (tx) => {
+    const [context] = await tx
+      .select({ videoId: videoProcessingJob.videoProjectId })
+      .from(videoProcessingJob)
+      .where(eq(videoProcessingJob.id, jobId));
+    if (!context) return;
+    await tx
+      .select({ id: aggregateRecord.id })
+      .from(aggregateRecord)
+      .where(eq(aggregateRecord.id, context.videoId))
+      .for("update");
     const [failed] = await tx
       .update(videoProcessingJob)
       .set({

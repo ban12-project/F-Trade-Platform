@@ -10,6 +10,7 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { VIDEO_RETENTION_MESSAGE } from "./retention-policy";
 
 const identitySchema = z
   .object({
@@ -93,6 +94,7 @@ export async function authorizeLockedVideoReview(
 }
 
 const reviewMessages = new Set([
+  VIDEO_RETENTION_MESSAGE,
   "该视频计划当前不处于待确认状态。",
   "未找到待处理的视频事实确认请求。",
   "视频确认与另一项操作冲突，请刷新后重试。",

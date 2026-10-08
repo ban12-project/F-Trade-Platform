@@ -20,6 +20,11 @@ import {
 } from "@/lib/db/schema";
 import { videoProjectSchema } from "@/lib/video/contracts";
 import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
+import { assertVideoRetentionForId } from "@/lib/video/retention-access";
+import {
+  aggregateRetentionCondition,
+  assertVideoObjectRetained,
+} from "@/lib/video/retention-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { facebookMediaSubmitFormSchema } from "./facebook-account-forms";
 import {
@@ -79,6 +84,7 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date, lock
     if (content.type !== "video" || content.state !== "VIDEO_APPROVED") {
       throw new Error("video_not_approved");
     }
+    await assertVideoRetentionForId(database, content.id);
     const video = videoProjectSchema.parse(content.payload);
     if (lock)
       await database
@@ -100,8 +106,11 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date, lock
     ) {
       throw new Error("video_asset_invalid");
     }
+    assertVideoObjectRetained(asset.createdAt);
+    await assertVideoRetentionForId(database, content.id);
     return {
       blobKey: asset.blobPath,
+      retention: { videoId: content.id, assetCreatedAt: asset.createdAt },
       content,
       contentType: "video/mp4" as const,
       sizeBytes: asset.sizeBytes,
@@ -609,6 +618,15 @@ export async function readFacebookPublicationMedia(
   if (!blob?.stream || blob.statusCode !== 200 || blob.blob.contentType !== source.contentType) {
     throw new Error("media_unavailable");
   }
+  if (source.retention) {
+    try {
+      assertVideoObjectRetained(source.retention.assetCreatedAt);
+      await assertVideoRetentionForId(database, source.retention.videoId);
+    } catch (error) {
+      await blob.stream.cancel();
+      throw error;
+    }
+  }
   return { stream: blob.stream, media: mediaPayload.media };
 }
 
@@ -627,6 +645,7 @@ export async function listFacebookMediaOptions(
       and(
         eq(workspaceProjectItem.projectId, projectId),
         contentRef ? eq(aggregateRecord.id, contentRef) : undefined,
+        aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
       ),
     );
   const result: Array<{
@@ -753,7 +772,11 @@ export async function authorizeFacebookPublication(
   });
 }
 
-export type FacebookMediaSource = { blobKey: string; media: FacebookMediaPayload["media"] };
+export type FacebookMediaSource = {
+  blobKey: string;
+  media: FacebookMediaPayload["media"];
+  retention?: { videoId: string; assetCreatedAt: Date };
+};
 export async function resolveFacebookMediaSource(
   tx: Tx,
   publication: typeof socialPublication.$inferSelect,
@@ -771,9 +794,20 @@ export async function resolveFacebookMediaSource(
     tx,
     now,
   );
-  return { blobKey: source.blobKey, media: mediaPayload.media };
+  return {
+    blobKey: source.blobKey,
+    media: mediaPayload.media,
+    ...(source.retention ? { retention: source.retention } : {}),
+  };
 }
-export async function openFacebookMediaSource(source: FacebookMediaSource) {
+export async function openFacebookMediaSource(
+  source: FacebookMediaSource,
+  database: ReadDb = getDatabase(),
+) {
+  if (source.retention) {
+    assertVideoObjectRetained(source.retention.assetCreatedAt);
+    await assertVideoRetentionForId(database, source.retention.videoId);
+  }
   const blob = await get(source.blobKey, {
     access: "private",
     token: process.env.BLOB_READ_WRITE_TOKEN,
@@ -786,6 +820,15 @@ export async function openFacebookMediaSource(source: FacebookMediaSource) {
   ) {
     await blob?.stream?.cancel();
     throw new Error("media_unavailable");
+  }
+  if (source.retention) {
+    try {
+      assertVideoObjectRetained(source.retention.assetCreatedAt);
+      await assertVideoRetentionForId(database, source.retention.videoId);
+    } catch (error) {
+      await blob.stream.cancel();
+      throw error;
+    }
   }
   return { stream: blob.stream, media: source.media };
 }

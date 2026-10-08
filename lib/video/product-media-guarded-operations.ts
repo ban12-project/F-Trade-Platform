@@ -15,6 +15,7 @@ import { assertVideoPublicationEligible, videoProjectSchema } from "./contracts"
 import { approveReviewVideoExport, type ReviewVideoExport } from "./export-artifact";
 import { assertLockedVideoProductContext } from "./product-context-guard";
 import { productMediaIdsForVideoProject } from "./product-media-runtime-policy";
+import { assertVideoRetentionForId } from "./retention-access";
 import {
   authorizeLockedVideoReview,
   parseVideoReviewIdentity,
@@ -246,6 +247,7 @@ export async function decideGuardedVideoReview(
       .for("update");
     if (!pendingApproval) throw new Error("未找到待处理的视频事实确认请求。");
 
+    await assertVideoRetentionForId(tx, aggregate.id);
     const current = videoProjectSchema.parse(aggregate.payload);
     if (value.decision === "approved") {
       assertVideoPublicationEligible(current);
@@ -258,6 +260,7 @@ export async function decideGuardedVideoReview(
     await assertAndLinkProjectEvidence(projectId, [value.evidenceRef], actorId, tx);
     const now = new Date();
     if (expiresAt <= now) throw new VideoReviewAccessError();
+    await assertVideoRetentionForId(tx, aggregate.id);
     const nextState = value.decision === "approved" ? "VIDEO_APPROVED" : "VIDEO_REVISION_REQUIRED";
     const project = videoProjectSchema.parse({
       ...current,

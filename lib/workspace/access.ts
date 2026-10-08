@@ -15,6 +15,12 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 
+import {
+  assertVideoObjectRetained,
+  isVideoWorkingEvidence,
+  videoWorkingEvidenceRetainedCondition,
+} from "@/lib/video/retention-policy";
+
 export type WorkspaceMemberRole = "owner" | "editor" | "viewer";
 export type WorkspaceAccess = "view" | "write" | "manage" | "receipt";
 export type WorkspaceMemberSummary = {
@@ -258,9 +264,13 @@ export async function listProjectEvidenceOptions(
       ),
     )
     .where(
-      or(
-        eq(workspaceProjectEvidence.projectId, projectId),
-        and(eq(evidence.uploadedByType, "human"), eq(evidence.uploadedById, actorId)),
+      and(
+        videoWorkingEvidenceRetainedCondition(evidence.sourceLabel, evidence.createdAt),
+        sql`${evidence.blobKey} NOT LIKE 'retired/%'`,
+        or(
+          eq(workspaceProjectEvidence.projectId, projectId),
+          and(eq(evidence.uploadedByType, "human"), eq(evidence.uploadedById, actorId)),
+        ),
       ),
     )
     .orderBy(asc(sourceLabel), asc(evidence.id));
@@ -279,6 +289,9 @@ export async function assertAndLinkProjectEvidence(
     const rows = await tx
       .select({
         id: evidence.id,
+        sourceLabel: evidence.sourceLabel,
+        createdAt: evidence.createdAt,
+        blobKey: evidence.blobKey,
         linkedProjectId: workspaceProjectEvidence.projectId,
         uploadedByType: evidence.uploadedByType,
         uploadedById: evidence.uploadedById,
@@ -291,7 +304,14 @@ export async function assertAndLinkProjectEvidence(
           eq(workspaceProjectEvidence.projectId, projectId),
         ),
       )
-      .where(inArray(evidence.id, uniqueIds));
+      .where(inArray(evidence.id, uniqueIds))
+      .orderBy(asc(evidence.id))
+      .for("share", { of: evidence });
+    // Hold the evidence locks until the enclosing business write commits.
+    for (const row of rows) {
+      if (row.blobKey.startsWith("retired/")) throw new Error("部分证据不存在或无权用于当前项目。");
+      if (isVideoWorkingEvidence(row.sourceLabel)) assertVideoObjectRetained(row.createdAt);
+    }
     const allowed = new Set(
       rows
         .filter(

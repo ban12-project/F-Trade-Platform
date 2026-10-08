@@ -9,6 +9,7 @@ import {
   productMediaIdsForVideoProject,
   productMediaRuntimeRecordFromRow,
 } from "./product-media-runtime-policy";
+import { assertVideoRetentionForId } from "./retention-access";
 
 /** Caller holds the video lock; keep its current product and media valid until commit. */
 export async function assertLockedVideoProductContext(
@@ -28,7 +29,10 @@ export async function assertLockedVideoProductContext(
     throw new Error("视频引用的产品已不再处于 ProductReady，不能继续处理。");
   assertCurrentProductFacts(project, product.payload);
   const mediaIds = productMediaIdsForVideoProject(project);
-  if (!mediaIds.length) return;
+  if (!mediaIds.length) {
+    await assertVideoRetentionForId(tx, project.id);
+    return;
+  }
   const mediaRows = await tx
     .select()
     .from(productMediaAsset)
@@ -41,4 +45,5 @@ export async function assertLockedVideoProductContext(
     "organic",
     new Date(),
   );
+  await assertVideoRetentionForId(tx, project.id);
 }

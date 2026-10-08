@@ -5,6 +5,12 @@ import { inArray } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/db/client";
 import { evidence } from "@/lib/db/schema";
+import { assertVideoWorkingEvidenceRetained } from "./retention-access";
+import {
+  assertVideoObjectRetained,
+  isVideoWorkingEvidence,
+  videoRetentionMilliseconds,
+} from "./retention-policy";
 
 export type SandboxVideoSource = {
   assetRef: string;
@@ -35,15 +41,28 @@ export async function issueSandboxVideoSources(assetRefs: string[]) {
   )
     throw new Error("只能处理已认领的私有营销素材。");
   const rows = await getDatabase()
-    .select({ id: evidence.id, blobKey: evidence.blobKey, contentType: evidence.contentType })
+    .select({
+      id: evidence.id,
+      blobKey: evidence.blobKey,
+      contentType: evidence.contentType,
+      createdAt: evidence.createdAt,
+      sourceLabel: evidence.sourceLabel,
+    })
     .from(evidence)
     .where(inArray(evidence.id, uniqueRefs));
   if (rows.length !== uniqueRefs.length) throw new Error("部分私有营销素材不存在或已被移除。");
-  const validUntil = Date.now() + 10 * 60 * 1_000;
+  await assertVideoWorkingEvidenceRetained(getDatabase(), uniqueRefs);
+
   const result = new Map<string, SandboxVideoSource>();
   for (const row of rows) {
     const extension = extensionForContentType(row.contentType);
     if (!extension) throw new Error("营销素材类型不受 Sandbox 支持。");
+    const working = isVideoWorkingEvidence(row.sourceLabel);
+    if (working) assertVideoObjectRetained(row.createdAt);
+    const validUntil = Math.min(
+      Date.now() + 10 * 60 * 1000,
+      working ? row.createdAt.getTime() + videoRetentionMilliseconds : Number.POSITIVE_INFINITY,
+    );
     const token = await issueSignedToken({
       pathname: row.blobKey,
       operations: ["get"],
@@ -56,6 +75,7 @@ export async function issueSandboxVideoSources(assetRefs: string[]) {
       validUntil,
       useCache: false,
     });
+    if (working) assertVideoObjectRetained(row.createdAt);
     const url = new URL(presignedUrl);
     result.set(row.id, {
       assetRef: row.id,

@@ -59,7 +59,7 @@ export function privateVideoPreviewHeaders(
 ) {
   return {
     "Accept-Ranges": "bytes",
-    "Cache-Control": "private, no-cache",
+    "Cache-Control": "private, no-store",
     "Content-Disposition": "inline",
     "Content-Length": String(asset.responseSizeBytes),
     ...(asset.contentRange ? { "Content-Range": asset.contentRange } : {}),
