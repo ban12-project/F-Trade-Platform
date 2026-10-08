@@ -193,7 +193,9 @@ test("HOT task opens its candidate, including legacy links, without unrelated le
   await panel.getByLabel("商机确认凭据").fill("evidence-synthetic-task-navigation");
   await expect(panel.getByRole("button", { name: "确认有效商机", exact: true })).toBeEnabled();
   await page.goto(`/workspace/${id}?panel=lead&item=${hot}`);
-  await expect(page.getByText("旧阶段链接已停用", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("旧阶段链接已停用", { exact: true }).filter({ visible: true }),
+  ).toBeVisible();
   await expect(page.locator(`#follow-up-${hot}`)).toHaveCount(0);
   await page.goto(`/workspace/customers?project=${id}&type=lead`);
   await page

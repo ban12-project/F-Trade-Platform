@@ -217,11 +217,20 @@ export async function routeInboundConversationAction(
   formData: FormData,
 ): Promise<ClosingActionState> {
   try {
-    const actorId = await actor("sales:write");
+    const current = await authorizedActionSession("sales:write");
+    if (!current) throw new SocialHumanAccessError();
     const parsed = inboundRoutingFormSchema.safeParse(values(formData));
-    if (!parsed.success) return resultError(parsed.error);
-    const saved = await routeInboundConversation(parsed.data, actorId);
-    refresh(saved.projectId);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查分流信息。" };
+    const saved = await routeInboundConversation(parsed.data, {
+      actorId: current.user.id,
+      sessionId: current.session.id,
+    });
+    try {
+      refresh(saved.projectId);
+    } catch {
+      /* Preserve the committed routing result. */
+    }
     return {
       status: "success",
       message:
@@ -232,6 +241,12 @@ export async function routeInboundConversationAction(
       projectId: saved.projectId,
     };
   } catch (error) {
-    return resultError(error);
+    return {
+      status: "error",
+      message: socialHumanFailureMessage(
+        error,
+        "入站消息未分流。请刷新并核对登录、消息状态和销售项目权限后重试。",
+      ),
+    };
   }
 }

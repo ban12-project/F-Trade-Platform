@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import leadSchema from "@/contracts/sales/lead.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
@@ -17,6 +17,13 @@ import {
 } from "@/lib/db/schema";
 import { inboundRoutingFormSchema } from "@/lib/form-schemas";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import {
+  assertSocialAuthorizationAlive,
+  authorizeSocialActor,
+  parseSocialActorIdentity,
+  type SocialActorIdentity,
+  SocialHumanAccessError,
+} from "./human-write-access";
 
 type InitialLead = {
   lead_id: string;
@@ -63,10 +70,12 @@ export async function listUnassignedInboundConversations(
 
 export async function routeInboundConversation(
   input: unknown,
-  actorId: string,
+  identityInput: SocialActorIdentity,
   database: Database = getDatabase(),
 ) {
   const value = inboundRoutingFormSchema.parse(input);
+  const identity = parseSocialActorIdentity(identityInput);
+  const actorId = identity.actorId;
   return database.transaction(async (tx) => {
     const [conversation] = await tx
       .select({
@@ -81,6 +90,28 @@ export async function routeInboundConversation(
     if (conversation.leadId) throw new Error("该入站消息已完成分流，请刷新工作台。");
 
     let projectId = value.projectId || "";
+    if (value.mode === "link") {
+      await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
+      const [project] = await tx
+        .select({ kind: workspaceProject.kind, status: workspaceProject.status })
+        .from(workspaceProject)
+        .where(eq(workspaceProject.id, projectId))
+        .for("share");
+      const [member] = await tx
+        .select({ id: workspaceProjectMember.id })
+        .from(workspaceProjectMember)
+        .where(
+          and(
+            eq(workspaceProjectMember.projectId, projectId),
+            eq(workspaceProjectMember.userId, actorId),
+            inArray(workspaceProjectMember.role, ["owner", "editor"]),
+          ),
+        )
+        .for("share");
+      if (project?.kind !== "sales" || project.status !== "active" || !member)
+        throw new SocialHumanAccessError();
+    }
+    const expiresAt = await authorizeSocialActor(tx, identity, ["sales:write"]);
     if (value.mode === "create") {
       projectId = randomUUID();
       const now = new Date();
@@ -107,14 +138,6 @@ export async function routeInboundConversation(
         metadata: { source: "inbound_routing" },
         occurredAt: now,
       });
-    } else {
-      await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
-      const [project] = await tx
-        .select({ kind: workspaceProject.kind })
-        .from(workspaceProject)
-        .where(and(eq(workspaceProject.id, projectId), eq(workspaceProject.kind, "sales")))
-        .for("update");
-      if (!project) throw new Error("只能关联你可编辑的销售项目。");
     }
 
     const leadId = randomUUID();
@@ -161,6 +184,7 @@ export async function routeInboundConversation(
       metadata: { project_id: projectId, mode: value.mode, channel_ref: conversation.channelRef },
       occurredAt: new Date(),
     });
+    assertSocialAuthorizationAlive(expiresAt);
     return { projectId, leadId };
   });
 }

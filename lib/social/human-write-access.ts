@@ -123,6 +123,10 @@ const safeMessages = new Set([
   "渠道未启用或已暂停，不能提交发布。",
   "只有 Gate 01 已批准内容或视频可以发布。",
   "缺少当前 Gate 01 批准记录。",
+  "入站消息不存在或已过期。",
+  "该入站消息已完成分流，请刷新工作台。",
+  "项目已归档，请重开后再写入业务资料。",
+  "你没有该项目的编辑权限。",
 ]);
 export function socialHumanFailureMessage(error: unknown, fallback: string) {
   if (error instanceof SocialHumanAccessError) return SOCIAL_HUMAN_ACCESS_MESSAGE;

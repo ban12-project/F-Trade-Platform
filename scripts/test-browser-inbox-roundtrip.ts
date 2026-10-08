@@ -10,6 +10,7 @@ import { POST } from "../app/api/browser-nodes/route";
 import { handleBrowserNodeRequest } from "../lib/browser-fleet/store";
 import type { Database } from "../lib/db/client";
 import { aggregateRecord, socialConversation, socialMessage } from "../lib/db/schema";
+import type { SocialActorIdentity } from "../lib/social/human-write-access";
 import { routeInboundConversation } from "../lib/social/inbound-routing-store";
 import { decryptSocialMessageBody } from "../lib/social/message-crypto";
 import { createFacebookInbox } from "../ops/browser-node/facebook-inbox.mjs";
@@ -19,7 +20,7 @@ export async function testInboxRoundTrip(
   database: Database,
   node: { nodeId: string; accessKey: string },
   identity: { installationId: string; bootId: string },
-  actorId: string,
+  humanIdentity: SocialActorIdentity,
 ) {
   const threadRef = randomUUID(),
     messageRef = randomUUID();
@@ -262,7 +263,7 @@ export async function testInboxRoundTrip(
     assert.equal(conversation.leadId, null);
     const routed = await routeInboundConversation(
       { conversationId: conversation.id, mode: "create" },
-      actorId,
+      humanIdentity,
       database,
     );
     const [lead] = await database
@@ -274,7 +275,7 @@ export async function testInboxRoundTrip(
     await assert.rejects(
       routeInboundConversation(
         { conversationId: conversation.id, mode: "create" },
-        actorId,
+        humanIdentity,
         database,
       ),
       /已完成分流/,
