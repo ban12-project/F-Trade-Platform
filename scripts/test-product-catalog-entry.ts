@@ -345,7 +345,15 @@ async function testReviewSnapshot() {
           if (tableName === "user")
             return [{ role: "admin", banned: false, expiresAt: new Date(Date.now() + 3_600_000) }];
           if (tableName === "evidence")
-            return [{ id: current.evidenceRef, linkedProjectId: identity.projectId }];
+            return [
+              {
+                id: current.evidenceRef,
+                linkedProjectId: identity.projectId,
+                sourceLabel: "synthetic-factory-source",
+                blobKey: `evidence/${current.evidenceRef}/synthetic.txt`,
+                createdAt: new Date(),
+              },
+            ];
           if (tableName === "aggregate_record")
             return [
               {
@@ -372,9 +380,11 @@ async function testReviewSnapshot() {
           where() {
             return query;
           },
-          async orderBy() {
-            assert.ok(["product_source_image", "workspace_project_item"].includes(tableName));
-            return rows();
+          orderBy() {
+            assert.ok(
+              ["product_source_image", "workspace_project_item", "evidence"].includes(tableName),
+            );
+            return query;
           },
           async for(mode: string) {
             assert.ok(["update", "share"].includes(mode));
