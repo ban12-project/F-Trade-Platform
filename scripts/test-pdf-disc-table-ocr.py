@@ -57,6 +57,10 @@ with TemporaryDirectory() as directory:
                          '| 999XD901 | SYN-OE-A |\n| 999XD902 | SYN-OE-B |')
     assert len(calls) == 4 and all(width < 750 for (width, _), _ in calls)
     assert 'PARTNO.' not in recovered and 'LINING' not in recovered
+    unsupported_header = [dict(item) for item in fixture]
+    unsupported_header[5]['text'] = 'DAMAGED-UNSUPPORTED-HEADER'
+    calls.clear()
+    assert recover_disc_table(tsv(unsupported_header), path, crop_ocr) == recovered
     # Whole-page text chooses a region; fresh same-cell OCR supplies the value.
     damaged = [dict(item) for item in fixture]
     damaged[-4]['text'] = '999xD9O1'

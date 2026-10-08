@@ -11,8 +11,7 @@ import math
 import re
 
 IDENTIFIER = re.compile(r"^\d+(?:XDC|XD|XC)\d+[A-Z]?$")
-STARTS = [r"ITEM\.?", r"TQ(?:NO\.?)?", r"OEM(?:NO\.?)?", r"PART(?:NO\.?)?",
-          r"LINING(?:\(.*)?", r"SPLINE(?:\(.*)?", r"SPRING.*", r"VEHICLE"]
+STARTS = [r"ITEM\.?", r"TQ(?:NO\.?)?", r"OEM(?:NO\.?)?", r"PART(?:NO\.?)?"]
 
 
 def read_words(tsv):
@@ -84,7 +83,11 @@ def recover_disc_table(tsv, image_path, ocr_crop):
             starts.append(found[0])
         if starts != sorted(starts):
             return None
-        columns = [band[start:starts[i + 1] if i + 1 < len(starts) else len(band)] for i, start in enumerate(starts)]
+        columns = [band[start:starts[i + 1]] for i, start in enumerate(starts[:-1])]
+        part_end = starts[-1] + 1
+        if part_end < len(band) and re.fullmatch(r"NO\.?", band[part_end]["text"], re.I):
+            part_end += 1
+        columns.append(band[starts[-1]:part_end])
         for column in columns[:4]:
             if min(w["confidence"] for w in column) >= 60:
                 continue
@@ -101,7 +104,9 @@ def recover_disc_table(tsv, image_path, ocr_crop):
             for word in column:
                 word["confidence"] = min(w["confidence"] for w in reread)
         headers = [" ".join(w["text"] for w in column) for column in columns]
-        if not re.fullmatch(r"TQ\s*NO\.?", headers[1], re.I) or not re.fullmatch(r"OEM\s*NO\.?", headers[2], re.I):
+        if (not re.fullmatch(r"TQ\s*NO\.?", headers[1], re.I)
+                or not re.fullmatch(r"OEM\s*NO\.?", headers[2], re.I)
+                or not re.fullmatch(r"PART\s*NO\.?", headers[3], re.I)):
             return None
         if min(w["confidence"] for column in columns[:4] for w in column) < 60:
             return None
