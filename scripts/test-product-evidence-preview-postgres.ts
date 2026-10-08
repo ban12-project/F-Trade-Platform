@@ -32,6 +32,7 @@ void (async () => {
     randomUUID(),
     randomUUID(),
   ];
+  const uploadIdentity = { actorId: owner, sessionId: randomUUID(), projectId: project };
   const [sourceId, unrelatedId, foreignId] = [randomUUID(), randomUUID(), randomUUID()];
   const bytes = Buffer.from("Product name: SYNTHETIC kit\nInternal SKU: MOCK-401\n");
   const digest = createHash("sha256").update(bytes).digest("hex");
@@ -73,6 +74,12 @@ void (async () => {
         email: `${id}@example.invalid`,
         role: id === owner ? "admin" : "user",
       });
+    await db.insert(schema.session).values({
+      id: uploadIdentity.sessionId,
+      userId: owner,
+      token: randomUUID(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
     for (const id of [project, foreignProject])
       await db
         .insert(schema.workspaceProject)
@@ -131,7 +138,7 @@ void (async () => {
         contentType: "text/csv",
         sizeBytes: bytes.length,
       },
-      owner,
+      uploadIdentity,
       db,
     );
     const importId = randomUUID();
@@ -194,12 +201,12 @@ void (async () => {
           contentType: "text/csv",
           sizeBytes: bytes.length,
         },
-        owner,
+        { ...uploadIdentity, projectId },
         db,
       );
       const claimed = await claimDocumentUpload(
         { receiptId: issued.id, projectId, purpose: "evidence" },
-        owner,
+        { ...uploadIdentity, projectId },
         db,
         reader(),
       );

@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       hasUpload: Boolean(receiptId),
     });
     const projectId = z.uuid("项目标识无效。").parse(data.get("projectId"));
+    const identity = { actorId: session.user.id, sessionId: session.session.id, projectId };
     stage = "project_access";
     await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
     stage = "model_config";
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     const model = createProductAgentModel(config);
     stage = "document";
     const baseSource = receiptId
-      ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
+      ? (await prepareClaimedProductDocument(receiptId, projectId, identity)).source
       : {
           record_id: randomUUID(),
           source_ref: z.string().min(1).parse(parsed.sourceRef),
@@ -71,11 +72,10 @@ export async function POST(request: Request) {
       baseSource,
       data.getAll("imageReceiptId"),
       projectId,
-      session.user.id,
+      identity,
     );
     stage = "start_run";
     request.signal.throwIfAborted();
-    const identity = { actorId: session.user.id, sessionId: session.session.id, projectId };
     const run = await startProductStreamRun(identity, source, {
       config_id: parsed.modelConfigId,
       provider: config.provider,

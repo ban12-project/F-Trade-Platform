@@ -7,6 +7,7 @@ import { closeDatabase, getDatabase } from "../lib/db/client";
 import {
   evidence,
   productDocumentUploadReceipt as receipt,
+  session,
   user,
   workspaceProject,
   workspaceProjectEvidence,
@@ -36,6 +37,12 @@ process.env.DATABASE_TRANSPORT = "postgres";
 const db = getDatabase();
 const actors = [randomUUID(), randomUUID()];
 const projects = [randomUUID(), randomUUID()];
+const sessionIds = [randomUUID(), randomUUID()];
+const identity = (index: number) => ({
+  actorId: actors[index],
+  sessionId: sessionIds[index],
+  projectId: projects[0],
+});
 const bytes = Buffer.from("SYNTHETIC,UPLOAD\nMOCK,ONLY\n");
 let blobBytes = bytes;
 let reads = 0;
@@ -60,7 +67,7 @@ const payload = (overrides = {}) =>
 const claim = (id: string, overrides = {}) =>
   claimDocumentUpload(
     { receiptId: id, projectId: projects[0], purpose: "evidence", ...overrides },
-    actors[0],
+    identity(0),
     db,
     readBlob,
   );
@@ -74,6 +81,14 @@ void (async () => {
       await db
         .insert(user)
         .values({ id: actor, name: "SYNTHETIC", email: `${actor}@example.invalid`, role: "admin" });
+    await db.insert(session).values(
+      actors.map((userId, index) => ({
+        id: sessionIds[index],
+        userId,
+        token: randomUUID(),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      })),
+    );
     for (const project of projects) {
       await db.insert(workspaceProject).values({
         id: project,
@@ -89,13 +104,13 @@ void (async () => {
         createdById: actors[0],
       });
     }
-    const first = await issueDocumentUploadReceipt(payload(), actors[0], db);
+    const first = await issueDocumentUploadReceipt(payload(), identity(0), db);
     const results = await Promise.all([claim(first.id), claim(first.id)]);
     assert.equal(results[0].evidenceId, results[1].evidenceId, "concurrent claims are idempotent");
     assert.equal(results[0].sha256, createHash("sha256").update(bytes).digest("hex"));
     const second = await issueDocumentUploadReceipt(
       payload({ originalFilename: "SYNTHETIC 第二份目录.csv" }),
-      actors[0],
+      identity(0),
       db,
     );
     const secondClaim = await claim(second.id);
@@ -154,7 +169,7 @@ void (async () => {
     assert.equal(await legacyLabel(), "SYNTHETIC legacy source", "old sources retain their label");
     const unmatched = await issueDocumentUploadReceipt(
       payload({ originalFilename: "SYNTHETIC mismatched receipt.csv" }),
-      actors[0],
+      identity(0),
       db,
     );
     await db.update(receipt).set({ evidenceId: legacyId }).where(eq(receipt.id, unmatched.id));
@@ -213,13 +228,13 @@ void (async () => {
       .delete(workspaceProjectMember)
       .where(inArray(workspaceProjectMember.id, viewerMemberships));
     await assert.rejects(
-      issueDocumentUploadReceipt(payload({ receiptId: first.id }), actors[0], db),
+      issueDocumentUploadReceipt(payload({ receiptId: first.id }), identity(0), db),
       /已使用/,
     );
-    await assert.rejects(issueDocumentUploadReceipt(payload(), actors[1], db), /权限/);
+    await assert.rejects(issueDocumentUploadReceipt(payload(), identity(1), db), /权限/);
     let before = reads;
     await assert.rejects(claim(first.id, { purpose: "agent" }), /无效/);
-    await assert.rejects(claim(first.id, { projectId: projects[1] }), /无效/);
+    await assert.rejects(claim(first.id, { projectId: projects[1] }), /权限/);
     await assert.rejects(claim(first.id, { blobPath: first.blobPath }));
     assert.equal(reads, before, "invalid authority must not read the blob");
     await db
@@ -248,12 +263,12 @@ void (async () => {
     const runWithReader = (id: string, reader: typeof get) =>
       claimDocumentUpload(
         { receiptId: id, projectId: projects[0], purpose: "evidence" },
-        actors[0],
+        identity(0),
         db,
         reader,
       );
     for (const mode of ["initial", "partial"] as const) {
-      const retryReceipt = await issueDocumentUploadReceipt(payload(), actors[0], db);
+      const retryReceipt = await issueDocumentUploadReceipt(payload(), identity(0), db);
       let attempts = 0;
       const flaky = (async () => {
         attempts++;
@@ -287,7 +302,7 @@ void (async () => {
       assert.equal(saved.evidenceId, result.evidenceId);
     }
     for (const mode of ["persistent", "missing", "mime", "bytes", "dns", "expired"] as const) {
-      const failed = await issueDocumentUploadReceipt(payload(), actors[0], db);
+      const failed = await issueDocumentUploadReceipt(payload(), identity(0), db);
       let attempts = 0;
       const reader = (async () => {
         attempts++;
@@ -325,7 +340,7 @@ void (async () => {
       const [saved] = await db.select().from(receipt).where(eq(receipt.id, failed.id));
       assert.equal(saved.evidenceId, null, "failed reads must not attach evidence");
     }
-    const revoked = await issueDocumentUploadReceipt(payload(), actors[0], db);
+    const revoked = await issueDocumentUploadReceipt(payload(), identity(0), db);
     await db.insert(workspaceProjectMember).values({
       id: randomUUID(),
       projectId: projects[0],
@@ -345,7 +360,7 @@ void (async () => {
     await assert.rejects(
       claimDocumentUpload(
         { receiptId: revoked.id, projectId: projects[0], purpose: "evidence" },
-        actors[0],
+        identity(0),
         db,
         revokeOnRead,
       ),
@@ -363,7 +378,7 @@ void (async () => {
       role: "owner",
       createdById: actors[1],
     });
-    const retryRevoked = await issueDocumentUploadReceipt(payload(), actors[0], db);
+    const retryRevoked = await issueDocumentUploadReceipt(payload(), identity(0), db);
     let revokedAttempts = 0;
     await assert.rejects(
       runWithReader(retryRevoked.id, (async () => {

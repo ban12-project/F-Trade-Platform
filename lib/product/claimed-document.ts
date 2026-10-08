@@ -5,14 +5,15 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { preprocessProductAgentDocument } from "./document-source";
+import type { DocumentUploadIdentity } from "./document-upload-access";
 import { claimDocumentUpload } from "./document-upload-receipts";
 
 export async function prepareClaimedProductDocument(
   receiptId: unknown,
   projectId: string,
-  actorId: string,
+  identity: DocumentUploadIdentity,
 ) {
-  const claimed = await claimDocumentUpload({ receiptId, projectId, purpose: "agent" }, actorId);
+  const claimed = await claimDocumentUpload({ receiptId, projectId, purpose: "agent" }, identity);
   const directory = await mkdtemp(join(tmpdir(), "f-trade-claimed-document-"));
   try {
     const path = join(directory, `document${extname(claimed.filename).toLowerCase()}`);

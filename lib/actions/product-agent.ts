@@ -46,7 +46,7 @@ export async function runProductAgentAction(
     const receiptId = formData.get("receiptId");
     if (formData.get("document") instanceof File) throw new Error("请通过私有直传上传文件。");
     const baseSource = receiptId
-      ? (await prepareClaimedProductDocument(receiptId, projectId, session.user.id)).source
+      ? (await prepareClaimedProductDocument(receiptId, projectId, identity)).source
       : (() => {
           const parsed = productAgentRunFormSchema.safeParse({
             ...Object.fromEntries(formData),
@@ -67,13 +67,15 @@ export async function runProductAgentAction(
       baseSource,
       formData.getAll("imageReceiptId"),
       projectId,
-      session.user.id,
+      identity,
     );
     await assertAndLinkProjectEvidence(projectId, source.evidence_refs, session.user.id);
+    const model = createProductAgentModel(
+      await resolveProductAgentModelConfig(modelConfigId, selectedModel),
+    );
+    await assertProductAgentWriteAccess(identity);
     const result = await new EvidenceLocatedProductAgent().run({
-      model: createProductAgentModel(
-        await resolveProductAgentModelConfig(modelConfigId, selectedModel),
-      ),
+      model,
       source,
       timeout_ms: 75_000,
     });

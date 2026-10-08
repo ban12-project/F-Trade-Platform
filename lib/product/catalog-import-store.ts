@@ -176,7 +176,7 @@ export async function intakeCatalog(
     return queueParsing(tx, row, identity);
   });
   if (existing) return existing;
-  const claimed = await claim({ ...parsed, purpose: "agent" }, identity.actorId, database);
+  const claimed = await claim({ ...parsed, purpose: "agent" }, identity, database);
   return database.transaction(async (tx) => {
     await authorize(tx, identity);
     const [existingRow] = await tx

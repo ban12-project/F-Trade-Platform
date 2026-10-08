@@ -84,17 +84,24 @@ void (async () => {
       contentType: "image/png",
       sizeBytes: bytes.length,
     };
-    await issueDocumentUploadReceipt(payload, actors[0]!, db);
+    await issueDocumentUploadReceipt(payload, reviewIdentity, db);
     const claim = { receiptId, projectId: projects[0], purpose: "agent_image" };
     for (const invalid of [
       { ...claim, purpose: "agent" },
       { ...claim, projectId: projects[1] },
     ])
-      await assert.rejects(claimDocumentUpload(invalid, actors[0]!, db, reader));
-    await assert.rejects(claimDocumentUpload(claim, actors[1]!, db, reader));
-    const image = await claimDocumentUpload(claim, actors[0]!, db, reader);
+      await assert.rejects(claimDocumentUpload(invalid, reviewIdentity, db, reader));
+    await assert.rejects(
+      claimDocumentUpload(
+        claim,
+        { actorId: actors[1], sessionId: sessionIds[1], projectId: projects[0] },
+        db,
+        reader,
+      ),
+    );
+    const image = await claimDocumentUpload(claim, reviewIdentity, db, reader);
     assert.equal(
-      (await claimDocumentUpload(claim, actors[0]!, db, reader)).evidenceId,
+      (await claimDocumentUpload(claim, reviewIdentity, db, reader)).evidenceId,
       image.evidenceId,
     );
     const changed = await sharp({ create: { width: 8, height: 8, channels: 3, background: "red" } })
@@ -105,7 +112,7 @@ void (async () => {
       stream: new Blob([changed]).stream(),
       blob: { contentType: "image/png" },
     })) as unknown as typeof get;
-    await assert.rejects(claimDocumentUpload(claim, actors[0]!, db, alteredReader));
+    await assert.rejects(claimDocumentUpload(claim, reviewIdentity, db, alteredReader));
     async function makeDraft(refs: string[], index = 0) {
       const id = randomUUID();
       productIds.push(id);
