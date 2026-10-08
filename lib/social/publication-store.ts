@@ -24,6 +24,13 @@ import {
 } from "@/lib/video/product-media-runtime-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { facebookTextPayloadSchema } from "./facebook-worker-protocol";
+import {
+  assertSocialAuthorizationAlive,
+  authorizeSocialActor,
+  authorizeSocialProject,
+  parseSocialProjectIdentity,
+  type SocialProjectIdentity,
+} from "./human-write-access";
 import { createControlledPublicationCommand } from "./publication-command";
 import { digestSocialWorkerPayload } from "./worker-protocol";
 
@@ -69,7 +76,7 @@ export async function assertPublicationEligible(
     accountRef: string;
   },
   tx: DatabaseTransaction,
-  now: Date,
+  now: Date | (() => Date),
   purpose: "dispatch" | "receipt" = "dispatch",
 ) {
   const [project] = await tx
@@ -118,7 +125,8 @@ export async function assertPublicationEligible(
     .from(approval)
     .where(and(eq(approval.aggregateId, value.contentRef), eq(approval.gate, "gate_01_truth")))
     .orderBy(desc(approval.requestedAt), desc(approval.createdAt), desc(approval.id))
-    .limit(1);
+    .limit(1)
+    .for("share");
   if (gate?.status !== "approved") throw new Error("缺少当前 Gate 01 批准记录。");
   if (record.type === "video") {
     const video = videoProjectSchema.parse(record.payload);
@@ -142,7 +150,7 @@ export async function assertPublicationEligible(
       video,
       mediaRows.map(productMediaRuntimeRecordFromRow),
       "organic",
-      now,
+      typeof now === "function" ? now() : now,
     );
   }
   return { control, record, gate };
@@ -259,26 +267,35 @@ export async function listProjectPublicationData(
 
 export async function submitControlledPublication(
   input: unknown,
-  actorId: string,
+  identityInput: SocialProjectIdentity,
   database: Database = getDatabase(),
 ) {
   const value = publicationConfirmationFormSchema.parse(input);
-  const now = new Date();
+  const identity = parseSocialProjectIdentity(identityInput, value.projectId);
+  if (value.format !== "text")
+    throw new Error("图片和视频请在素材发布区域核对素材与目标账户后提交。");
+  const actorId = identity.actorId;
   return database.transaction(async (tx) => {
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
-    const { control, record, gate } = await assertPublicationEligible(value, tx, now);
+    const { control, record, gate } = await assertPublicationEligible(value, tx, () => new Date());
     if (value.previewDigest !== previewDigest({ ...record, id: value.contentRef }, value.format)) {
       throw new Error("内容已更新，请刷新页面、核对新预览后重新确认。");
     }
     const idempotencyKey = `publish:${value.projectId}:${value.contentRef}:${value.channelRef}:${value.accountRef}:${value.confirmationRef}`;
-    const existingJob = await tx.query.socialBrowserJob.findFirst({
-      where: eq(socialBrowserJob.idempotencyKey, idempotencyKey),
-    });
+    const [existingJob] = await tx
+      .select()
+      .from(socialBrowserJob)
+      .where(eq(socialBrowserJob.idempotencyKey, idempotencyKey))
+      .for("update");
+    await authorizeSocialProject(tx, identity, "write", value.contentRef, value.format);
+    const expiresAt = await authorizeSocialActor(tx, identity, ["content:write"]);
+    const now = new Date();
     if (existingJob) {
       const existing = await tx.query.socialPublication.findFirst({
         where: eq(socialPublication.browserJobId, existingJob.id),
       });
       if (!existing) throw new Error("发布任务存在但发布记录缺失，请暂停渠道并人工核对。");
+      assertSocialAuthorizationAlive(expiresAt);
       return existing;
     }
     const id = randomUUID();
@@ -363,6 +380,7 @@ export async function submitControlledPublication(
       },
       occurredAt: now,
     });
+    assertSocialAuthorizationAlive(expiresAt);
     return saved;
   });
 }

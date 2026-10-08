@@ -36,6 +36,14 @@ import {
   configuredFacebookWorkerScope,
   facebookTextPayloadSchema,
 } from "./facebook-worker-protocol";
+import {
+  assertSocialAuthorizationAlive,
+  authorizeSocialActor,
+  authorizeSocialProject,
+  parseSocialProjectIdentity,
+  SocialHumanAccessError,
+  type SocialProjectIdentity,
+} from "./human-write-access";
 import { assertPublicationEligible } from "./publication-store";
 import {
   digestSocialWorkerPayload,
@@ -54,7 +62,7 @@ type Selection = {
   mediaId: string;
 };
 
-async function sourceFor(selection: Selection, database: ReadDb, now: Date) {
+async function sourceFor(selection: Selection, database: ReadDb, now: Date, lock = false) {
   const [record] = await database
     .select({ content: aggregateRecord })
     .from(aggregateRecord)
@@ -72,12 +80,19 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date) {
       throw new Error("video_not_approved");
     }
     const video = videoProjectSchema.parse(content.payload);
+    if (lock)
+      await database
+        .select({ id: aggregateRecord.id })
+        .from(aggregateRecord)
+        .where(eq(aggregateRecord.id, video.productId))
+        .for("share");
     await assertCurrentProductFactsForVideo(video, database);
     if (selection.mediaId !== video.renderedAssetRef) throw new Error("video_not_approved");
-    const [asset] = await database
+    const query = database
       .select()
       .from(videoGeneratedAsset)
       .where(eq(videoGeneratedAsset.assetRef, selection.mediaId));
+    const [asset] = await (lock ? query.for("share") : query);
     if (
       asset?.contentType !== "video/mp4" ||
       asset.sizeBytes <= 0 ||
@@ -102,11 +117,12 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date) {
   ) {
     throw new Error("image_content_not_approved");
   }
-  const [asset] = await database
+  const query = database
     .select({ asset: productMediaAsset, evidence })
     .from(productMediaAsset)
     .innerJoin(evidence, eq(evidence.id, productMediaAsset.evidenceId))
     .where(eq(productMediaAsset.id, selection.mediaId));
+  const [asset] = await (lock ? query.for("share") : query);
   const productId = content.payload.product_id;
   if (
     !asset ||
@@ -116,18 +132,19 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date) {
     !asset.asset.reviewedBy ||
     !asset.asset.reviewedAt ||
     !asset.asset.reviewEvidenceRef ||
-    !asset.asset.publicDistributionAllowed ||
-    (asset.asset.rightsExpiresAt && asset.asset.rightsExpiresAt <= now)
+    !asset.asset.publicDistributionAllowed
   ) {
     throw new Error("image_rights_invalid");
   }
-  const [product] = await database
+  const productQuery = database
     .select({ state: aggregateRecord.state })
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, asset.asset.productId), eq(aggregateRecord.type, "product")));
+  const [product] = await (lock ? productQuery.for("share") : productQuery);
   if (
     product?.state !== "PRODUCT_READY" ||
-    !["image/jpeg", "image/png"].includes(asset.evidence.contentType)
+    !["image/jpeg", "image/png"].includes(asset.evidence.contentType) ||
+    (asset.asset.rightsExpiresAt && asset.asset.rightsExpiresAt <= (lock ? new Date() : now))
   ) {
     throw new Error("image_product_invalid");
   }
@@ -266,12 +283,19 @@ export async function requeueUnsentFacebookMediaPublication(
 
 export async function submitFacebookMediaPublication(
   input: unknown,
-  actorId: string,
+  identityInput: SocialProjectIdentity,
   database: Database = getDatabase(),
 ) {
-  if (actorId !== process.env.SOCIAL_FACEBOOK_OWNER_USER_ID)
-    throw new Error("facebook_account_owner_required");
+  const candidateIdentity = parseSocialProjectIdentity(identityInput, identityInput?.projectId);
+  if (candidateIdentity.actorId !== process.env.SOCIAL_FACEBOOK_OWNER_USER_ID)
+    throw new SocialHumanAccessError();
   const value = facebookMediaSubmitFormSchema.parse(input);
+  const identity = parseSocialProjectIdentity(candidateIdentity, value.projectId);
+  const actorId = identity.actorId;
+  await database.transaction(async (tx) => {
+    await authorizeSocialProject(tx, identity, "write", value.contentRef, value.format);
+    await authorizeSocialActor(tx, identity, ["content:review"], true);
+  });
   await assertWorkspaceProjectAccess(value.projectId, actorId, "write", database);
   const selected = await sourceFor(value, database, new Date());
   assertFacebookMediaPreview(value, {
@@ -301,19 +325,9 @@ export async function submitFacebookMediaPublication(
     await assertPublicationEligible(
       { ...value, channelRef: scope.channelRef, accountRef: scope.accountRef },
       tx,
-      new Date(),
+      () => new Date(),
     );
-    const current = await sourceFor(value, tx, new Date());
-    if (
-      current.content.version !== selected.content.version ||
-      current.blobKey !== selected.blobKey ||
-      current.assetRef !== media.assetRef ||
-      current.contentType !== media.contentType ||
-      current.sizeBytes !== media.sizeBytes ||
-      (current.sha256 && current.sha256 !== media.sha256)
-    ) {
-      throw new Error("media_changed_during_confirmation");
-    }
+    await sourceFor(value, tx, new Date(), true);
     const idempotencyKey = `facebook-media:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}`;
     const [existing] = await tx
       .select({
@@ -325,6 +339,40 @@ export async function submitFacebookMediaPublication(
       .from(socialBrowserJob)
       .where(eq(socialBrowserJob.idempotencyKey, idempotencyKey))
       .for("update");
+    await authorizeSocialProject(tx, identity, "write", value.contentRef, value.format);
+    const expiresAt = await authorizeSocialActor(tx, identity, ["content:review"], true);
+    const currentScope = await resolveFacebookMediaSubmissionScope(actorId, tx);
+    if (
+      currentScope.channelRef !== scope.channelRef ||
+      currentScope.accountRef !== scope.accountRef
+    )
+      throw new Error("media_account_changed_since_preview");
+    await assertPublicationEligible(
+      { ...value, channelRef: scope.channelRef, accountRef: scope.accountRef },
+      tx,
+      () => new Date(),
+    );
+    const current = await sourceFor(value, tx, new Date(), true);
+    const assertCurrentCommit = async () => {
+      assertSocialAuthorizationAlive(expiresAt);
+      await assertPublicationEligible(
+        { ...value, channelRef: scope.channelRef, accountRef: scope.accountRef },
+        tx,
+        () => new Date(),
+      );
+      await sourceFor(value, tx, new Date(), true);
+      assertSocialAuthorizationAlive(expiresAt);
+    };
+    if (
+      current.content.version !== selected.content.version ||
+      current.blobKey !== selected.blobKey ||
+      current.assetRef !== media.assetRef ||
+      current.contentType !== media.contentType ||
+      current.sizeBytes !== media.sizeBytes ||
+      (current.sha256 && current.sha256 !== media.sha256)
+    ) {
+      throw new Error("media_changed_during_confirmation");
+    }
     if (existing) {
       if (
         existing.status === "paused" &&
@@ -337,6 +385,7 @@ export async function submitFacebookMediaPublication(
       ) {
         await requeueUnsentFacebookMediaPublication(tx, existing.jobId, existing.id, actorId);
       }
+      await assertCurrentCommit();
       return { publicationId: existing.id };
     }
     const publicationId = randomUUID();
@@ -380,6 +429,7 @@ export async function submitFacebookMediaPublication(
       metadata: { format: value.format, digest: media.sha256 },
       occurredAt: new Date(),
     });
+    await assertCurrentCommit();
     return { publicationId };
   });
 }
@@ -431,11 +481,13 @@ export async function buildFacebookMediaPayload(
   tx: Tx,
   publication: typeof socialPublication.$inferSelect,
   now: Date,
+  lock = false,
 ): Promise<FacebookMediaPayload> {
-  const [manifest] = await tx
+  const query = tx
     .select()
     .from(facebookPublicationManifest)
     .where(eq(facebookPublicationManifest.publicationId, publication.id));
+  const [manifest] = await (lock ? query.for("share") : query);
   if (
     !manifest ||
     !["image", "video"].includes(manifest.format) ||
@@ -451,6 +503,7 @@ export async function buildFacebookMediaPayload(
     },
     tx,
     now,
+    lock,
   );
   if (
     source.content.version !== manifest.contentVersion ||

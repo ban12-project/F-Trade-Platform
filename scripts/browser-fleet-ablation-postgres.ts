@@ -28,6 +28,7 @@ import {
 } from "../lib/social/facebook-account-store";
 import { signInteractiveEvent } from "../lib/social/facebook-interactive-protocol";
 import { submitFacebookMediaPublication } from "../lib/social/facebook-media-store";
+import { SocialHumanAccessError } from "../lib/social/human-write-access";
 import { testBrowserLogin } from "./test-browser-login-postgres";
 
 type ClaimResult = {
@@ -400,7 +401,7 @@ type NodeRow = {`,
         loginUsername: "synthetic-login",
         loginPassword: "synthetic-password-not-real",
       },
-      actor.id,
+      { actorId: actor.id, sessionId: actor.sessionId },
     );
     const status = await readFacebookAccountStatus();
     assert.ok(status);
@@ -420,8 +421,7 @@ type NodeRow = {`,
     process.env.SOCIAL_FACEBOOK_WORKER_ENABLED = "1";
     const interactive = await openFacebookInteractive(
       { useSavedLogin: true },
-      actor.id,
-      actor.sessionId,
+      { actorId: actor.id, sessionId: actor.sessionId },
     );
     await handleFacebookInteractiveEvent({
       operation: "claim",
@@ -450,7 +450,13 @@ type NodeRow = {`,
     const allowed = await interactiveEndpoint(loginRequest());
     assert.equal(allowed.status, 200);
     assert.equal((await allowed.json()).credential.username, "synthetic-login");
-    await assert.rejects(submitFacebookMediaPublication({}, outsider.id), /account_owner_required/);
+    await assert.rejects(
+      submitFacebookMediaPublication(
+        {},
+        { actorId: outsider.id, sessionId: outsider.sessionId, projectId: randomUUID() },
+      ),
+      SocialHumanAccessError,
+    );
     checks.push(
       "legacy encrypted credential store works after migration; disable switch and owner check deny access",
     );

@@ -8,13 +8,7 @@ import {
   facebookInteractiveSession,
   facebookRequestReceipt,
 } from "@/lib/db/facebook-runtime-schema";
-import {
-  auditEvent,
-  session as authSession,
-  socialBrowserJob,
-  socialChannelControl,
-  user,
-} from "@/lib/db/schema";
+import { auditEvent, socialBrowserJob, socialChannelControl } from "@/lib/db/schema";
 import {
   facebookConnectFormSchema,
   facebookCredentialFormSchema,
@@ -36,6 +30,13 @@ import {
   configuredFacebookStatusScope,
   configuredFacebookWorkerScope,
 } from "./facebook-worker-protocol";
+import {
+  assertSocialAuthorizationAlive,
+  authorizeSocialActor,
+  parseSocialActorIdentity,
+  type SocialActorIdentity,
+  SocialHumanAccessError,
+} from "./human-write-access";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const key = () => process.env.FACEBOOK_INTERACTIVE_SIGNING_KEY ?? "";
@@ -95,10 +96,12 @@ export async function readFacebookAccountStatus(database: Database = getDatabase
 }
 export async function saveFacebookCredentials(
   input: unknown,
-  actorId: string,
+  identityInput: SocialActorIdentity,
   database: Database = getDatabase(),
 ) {
   const value = facebookCredentialFormSchema.parse(input);
+  const identity = parseSocialActorIdentity(identityInput);
+  const actorId = identity.actorId;
   return database.transaction(async (tx) => {
     const { scope, where } = await lockControl(tx);
     const [record] = await tx
@@ -107,6 +110,7 @@ export async function saveFacebookCredentials(
       .where(eq(facebookAccountRuntime.accountRef, scope.accountRef))
       .for("update");
     if (record && record.channelRef !== scope.channelRef) throw new Error("账号范围不匹配。");
+    const expiresAt = await authorizeSocialActor(tx, identity, ["settings:manage"], true);
     const ring = configuredFacebookKeyring();
     const loginCiphertext = updateFacebookLoginCiphertext(
       value,
@@ -169,18 +173,22 @@ export async function saveFacebookCredentials(
       })
       .where(where);
     await audit(tx, actorId, "facebook_credentials.updated", scope.accountRef);
+    assertSocialAuthorizationAlive(expiresAt);
   });
 }
 export async function openFacebookInteractive(
   input: unknown,
-  actorId: string,
-  authSessionId: string,
+  identityInput: SocialActorIdentity,
   database: Database = getDatabase(),
 ) {
   const value = facebookConnectFormSchema.parse(input);
-  const now = Date.now();
+  const identity = parseSocialActorIdentity(identityInput);
+  const actorId = identity.actorId,
+    authSessionId = identity.sessionId;
   return database.transaction(async (tx) => {
     const { scope, where } = await lockControl(tx);
+    const expiresAt = await authorizeSocialActor(tx, identity, ["settings:manage"], true);
+    const now = Date.now();
     const busy = await tx
       .select({ id: socialBrowserJob.id })
       .from(socialBrowserJob)
@@ -250,15 +258,18 @@ export async function openFacebookInteractive(
       expiresAt: new Date(ticket.expiresAt),
     });
     await audit(tx, actorId, "facebook_interactive.opened", scope.accountRef);
+    assertSocialAuthorizationAlive(expiresAt);
     return { id: ticket.id, token, origin: ticket.gatewayOrigin, expiresAt: ticket.expiresAt };
   });
 }
 export async function closeFacebookInteractive(
   id: string,
-  actorId: string,
+  identityInput: SocialActorIdentity,
   database: Database = getDatabase(),
 ) {
   const scope = configuredScope();
+  const identity = parseSocialActorIdentity(identityInput);
+  const actorId = identity.actorId;
   await database.transaction(async (tx) => {
     const [row] = await tx
       .select()
@@ -272,6 +283,7 @@ export async function closeFacebookInteractive(
       )
       .for("update");
     if (!row) throw new Error("会话不存在。");
+    const expiresAt = await authorizeSocialActor(tx, identity, ["settings:manage"], true);
     // Revocation never releases the worker's filesystem lease; only the gateway
     // releases it after both sockets close. Heartbeats enforce revocation.
     await tx
@@ -279,9 +291,15 @@ export async function closeFacebookInteractive(
       .set({ status: "closed" })
       .where(eq(facebookInteractiveSession.id, id));
     await audit(tx, actorId, "facebook_interactive.closed", scope.accountRef);
+    assertSocialAuthorizationAlive(expiresAt);
   });
 }
-export async function resumeFacebookAccount(actorId: string, database: Database = getDatabase()) {
+export async function resumeFacebookAccount(
+  identityInput: SocialActorIdentity,
+  database: Database = getDatabase(),
+) {
+  const identity = parseSocialActorIdentity(identityInput);
+  const actorId = identity.actorId;
   await database.transaction(async (tx) => {
     const { scope, control, where } = await lockControl(tx);
     if (!control.enabled) throw new Error("请先在渠道控制中启用账号。");
@@ -320,6 +338,7 @@ export async function resumeFacebookAccount(actorId: string, database: Database 
       );
     if (!verified || active || pending)
       throw new Error("请完成账号校验并关闭连接；未知结果或暂停任务必须先人工处理。");
+    const expiresAt = await authorizeSocialActor(tx, identity, ["settings:manage"], true);
     await tx
       .update(socialChannelControl)
       .set({
@@ -331,6 +350,7 @@ export async function resumeFacebookAccount(actorId: string, database: Database 
       })
       .where(where);
     await audit(tx, actorId, "facebook_interactive.resumed", scope.accountRef);
+    assertSocialAuthorizationAlive(expiresAt);
   });
 }
 /** Gateway-only callback. Fresh signed request, durable replay rejection, and
@@ -342,7 +362,6 @@ export async function handleFacebookInteractiveEvent(
 ) {
   return database.transaction(async (tx) => {
     const scope = configuredScope();
-    const now = new Date();
     const [row] = await tx
       .select()
       .from(facebookInteractiveSession)
@@ -355,26 +374,25 @@ export async function handleFacebookInteractiveEvent(
         ),
       )
       .for("update");
+    const now = new Date();
     if (!row || row.expiresAt <= now || !activeSessions.includes(row.status))
       return { active: false };
-    const [login] = await tx
-      .select({ id: user.id, role: user.role, banned: user.banned })
-      .from(authSession)
-      .innerJoin(user, eq(user.id, authSession.userId))
-      .where(
-        and(
-          eq(authSession.id, row.authSessionId),
-          eq(authSession.userId, row.userId),
-          gt(authSession.expiresAt, now),
-        ),
+    let expiresAt: Date;
+    try {
+      expiresAt = await authorizeSocialActor(
+        tx,
+        { actorId: row.userId, sessionId: row.authSessionId },
+        ["settings:manage"],
+        true,
       );
-    if (
-      !login ||
-      login.banned ||
-      login.role !== "admin" ||
-      login.id !== process.env.SOCIAL_FACEBOOK_OWNER_USER_ID
-    )
-      return { active: false };
+    } catch (error) {
+      if (error instanceof SocialHumanAccessError) return { active: false };
+      throw error;
+    }
+    const assertCurrent = () => {
+      assertSocialAuthorizationAlive(expiresAt);
+      assertSocialAuthorizationAlive(row.expiresAt);
+    };
     const claimed = await tx
       .insert(facebookRequestReceipt)
       .values({ requestId: event.requestId, expiresAt: new Date(Date.now() + 600_000) })
@@ -382,12 +400,14 @@ export async function handleFacebookInteractiveEvent(
       .returning({ id: facebookRequestReceipt.requestId });
     if (!claimed.length) throw new Error("interactive_event_replayed");
     await tx.delete(facebookRequestReceipt).where(lt(facebookRequestReceipt.expiresAt, now));
+    assertCurrent();
     if (event.operation === "claim") {
-      if (row.status !== "issued" || row.connectBefore <= now) return { active: false };
+      if (row.status !== "issued" || row.connectBefore <= new Date()) return { active: false };
       await tx
         .update(facebookInteractiveSession)
         .set({ status: "connected", heartbeatAt: now })
         .where(eq(facebookInteractiveSession.id, row.id));
+      assertCurrent();
       return { active: true, expiresAt: row.expiresAt.getTime(), useSavedLogin: row.useSavedLogin };
     }
     if (row.status !== "connected") return { active: false };
@@ -396,6 +416,7 @@ export async function handleFacebookInteractiveEvent(
         .update(facebookInteractiveSession)
         .set({ status: "closed" })
         .where(eq(facebookInteractiveSession.id, row.id));
+      assertCurrent();
       return { active: false };
     }
     if (event.operation === "login") {
@@ -420,6 +441,7 @@ export async function handleFacebookInteractiveEvent(
         .set({ credentialClaimed: true })
         .where(eq(facebookInteractiveSession.id, row.id));
       await audit(tx, row.userId, "facebook_credentials.login_used", scope.accountRef);
+      assertCurrent();
       return { active: true, credential };
     }
     if (event.operation === "attention" || event.operation === "verified") {
@@ -438,6 +460,7 @@ export async function handleFacebookInteractiveEvent(
         .update(facebookInteractiveSession)
         .set({ heartbeatAt: now })
         .where(eq(facebookInteractiveSession.id, row.id));
+    assertCurrent();
     return { active: true };
   });
 }
