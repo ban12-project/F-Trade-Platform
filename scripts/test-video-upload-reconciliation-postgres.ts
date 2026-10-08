@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import {
   evidence,
+  session,
   user,
   videoUploadReceipt,
   workspaceProject,
@@ -29,6 +30,7 @@ process.env.DATABASE_URL = url;
 process.env.DATABASE_TRANSPORT = "postgres";
 const db = getDatabase(),
   actorId = randomUUID(),
+  sessionId = randomUUID(),
   projectId = randomUUID(),
   rights = "evidence-synthetic-video-rights";
 const bytes = Buffer.alloc(32);
@@ -71,12 +73,18 @@ const make = async (overrides = {}) => {
     rightsEvidenceRef: rights,
     ...overrides,
   });
-  const issued = await issueVideoUploadReceipt(payload, actorId, db);
+  const issued = await issueVideoUploadReceipt(payload, { actorId, sessionId, projectId }, db);
   objects.set(issued.blobPath, bytes);
   return { ...payload, actorId, blobPath: issued.blobPath };
 };
 const claim = (id: string, actor = actorId, project = projectId, right = rights) =>
-  claimCompletedVideoUploads([id], actor, project, right, db, readBlob);
+  claimCompletedVideoUploads(
+    [id],
+    { actorId: actor, sessionId, projectId: project },
+    right,
+    db,
+    readBlob,
+  );
 const receipt = async (id: string) =>
   (await db.select().from(videoUploadReceipt).where(eq(videoUploadReceipt.id, id)))[0];
 void (async () => {
@@ -87,6 +95,12 @@ void (async () => {
       name: "SYNTHETIC",
       email: `${actorId}@example.invalid`,
       role: "admin",
+    });
+    await db.insert(session).values({
+      id: sessionId,
+      userId: actorId,
+      token: randomUUID(),
+      expiresAt: new Date(Date.now() + 3600000),
     });
     await db.insert(workspaceProject).values({
       id: projectId,

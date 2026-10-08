@@ -2,9 +2,15 @@ import { createHash } from "node:crypto";
 
 import { z } from "zod";
 
-import { type Database, getDatabase } from "@/lib/db/client";
+import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
 import { persistUploadedEvidence } from "@/lib/evidence/persist-upload";
 
+import {
+  authorizeLockedVideoDraft,
+  parseVideoDraftIdentity,
+  VideoDraftAccessError,
+  type VideoDraftIdentity,
+} from "./draft-write-access";
 import { prepareUploadedVideoAssets, type UploadedVideoSourceAsset } from "./uploaded-assets";
 
 const commonsApiUrl = "https://commons.wikimedia.org/w/api.php";
@@ -291,6 +297,7 @@ async function storeProvenanceEvidence(
   results: InternetMediaSearchResult[],
   actorId: string,
   database: Database,
+  authorize: (tx: DatabaseTransaction) => Promise<void>,
 ) {
   const manifest = JSON.stringify(
     {
@@ -326,6 +333,7 @@ async function storeProvenanceEvidence(
       sizeBytes: bytes.byteLength,
       sourceLabel: "internet-search:wikimedia-commons:private-test-only",
       body: new Blob([bytes], { type: "application/json" }),
+      authorize,
     },
     database,
   );
@@ -333,12 +341,19 @@ async function storeProvenanceEvidence(
 
 export async function importInternetVideoMedia(
   input: z.infer<typeof internetMediaImportInputSchema>,
-  actorId: string,
+  identityInput: VideoDraftIdentity,
   options: { fetcher?: InternetMediaFetcher; database?: Database } = {},
 ): Promise<UploadedVideoSourceAsset[]> {
   const value = internetMediaImportInputSchema.parse(input);
+  const identity = parseVideoDraftIdentity(identityInput);
+  if (identity.projectId !== value.projectId) throw new VideoDraftAccessError();
+  const actorId = identity.actorId;
+  const authorize = async (tx: DatabaseTransaction) => {
+    await authorizeLockedVideoDraft(tx, identity);
+  };
   const fetcher = options.fetcher ?? fetch;
   const database = options.database ?? getDatabase();
+  await database.transaction(authorize);
   const { results: resolved, files } = await resolveInternetVideoMediaFiles(
     value.resultIds,
     fetcher,
@@ -348,7 +363,15 @@ export async function importInternetVideoMedia(
     resolved,
     actorId,
     database,
+    authorize,
   );
-  const assets = await prepareUploadedVideoAssets(files, actorId, provenanceEvidenceRef, database);
+  const assets = await prepareUploadedVideoAssets(
+    files,
+    actorId,
+    provenanceEvidenceRef,
+    database,
+    undefined,
+    authorize,
+  );
   return assets.map((asset) => ({ ...asset, usagePolicy: "private_test_only" as const }));
 }

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
+import { videoDraftFailureMessage } from "@/lib/video/draft-write-access";
 import {
   completedVideoUploadTokenSchema,
   videoPresignedUploadPayloadSchema,
@@ -32,7 +33,11 @@ export async function POST(request: Request) {
         );
         const expectedPath = videoUploadBlobPath(payload);
         if (pathname !== expectedPath) throw new Error("上传路径不符合授权范围。");
-        const receipt = await issueVideoUploadReceipt(payload, session.user.id);
+        const receipt = await issueVideoUploadReceipt(payload, {
+          actorId: session.user.id,
+          sessionId: session.session.id,
+          projectId: payload.projectId,
+        });
         const tokenPayload = completedVideoUploadTokenSchema.parse({
           ...payload,
           actorId: session.user.id,
@@ -69,9 +74,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(response);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to authorize upload" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: videoDraftFailureMessage(error, "upload") }, { status: 400 });
   }
 }

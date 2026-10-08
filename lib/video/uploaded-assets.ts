@@ -8,7 +8,7 @@ import { pipeline } from "node:stream/promises";
 
 import { inArray } from "drizzle-orm";
 
-import { type Database, getDatabase } from "@/lib/db/client";
+import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
 import { evidence } from "@/lib/db/schema";
 import { persistUploadedEvidence, type UploadEvidenceStore } from "@/lib/evidence/persist-upload";
 import { VercelPrivateBlobEvidenceStore } from "@/lib/evidence/vercel-private-blob";
@@ -48,6 +48,7 @@ export async function prepareUploadedVideoAssets(
   rightsEvidenceRef: string,
   database: Database = getDatabase(),
   store?: UploadEvidenceStore,
+  authorize?: (tx: DatabaseTransaction) => Promise<void>,
 ): Promise<UploadedVideoSourceAsset[]> {
   if (files.length > maximumAssetCount)
     throw new Error(`一次最多上传 ${maximumAssetCount} 个营销素材。`);
@@ -69,6 +70,7 @@ export async function prepareUploadedVideoAssets(
         sizeBytes: data.byteLength,
         sourceLabel: `marketing-upload:${metadata.mediaType}`,
         body: new Blob([data], { type: file.type }),
+        authorize,
       },
       database,
       store,

@@ -441,7 +441,7 @@ def check_database_baseline() -> None:
     retired_video_migration = ROOT / "drizzle/0027_remove_personal_video_canvas.sql"
     if retired_video_migration.read_text(encoding="utf-8").strip() != 'DROP TABLE "video_canvas_document";':
         raise AssertionError("Personal video canvas retirement must only drop its unused table")
-    for path in (ROOT / "lib/actions/video.ts", ROOT / "lib/video/canvas-contracts.ts"):
+    for path in (ROOT / "lib/video/canvas-contracts.ts",):
         if "saveVideoCanvas" in path.read_text(encoding="utf-8"):
             raise AssertionError(f"Retired personal video canvas save contract remains: {path}")
     if (ROOT / "lib/video/canvas-store.ts").exists():

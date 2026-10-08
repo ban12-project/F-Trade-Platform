@@ -39,6 +39,7 @@ mock.module(moduleUrl("../lib/video/store.ts"), {
     copyMarketingVideoDraftToProject: async () => {},
     createMarketingVideoEditProject: async () => {},
     updateMarketingVideoEditDraft: async () => {},
+    saveMarketingVideoRenderRequest: async () => {},
   },
 });
 mock.module(moduleUrl("../workflows/marketing-video-processing.ts"), {
@@ -57,6 +58,13 @@ mock.module(moduleUrl("../lib/video/product-media-guarded-operations.ts"), {
         projectId,
       });
       if (failure) throw failure;
+    },
+  },
+});
+mock.module("workflow/api", {
+  exports: {
+    start: async () => {
+      throw Error("External Workflow execution forbidden in Action privacy tests");
     },
   },
 });

@@ -27,6 +27,8 @@ globalThis.fetch = async () => {
 };
 
 const [owner, editor, viewer, outsider] = Array.from({ length: 4 }, () => randomUUID());
+const ownerSessionId = randomUUID(),
+  editorSessionId = randomUUID();
 const projectId = randomUUID(),
   productId = randomUUID();
 let duringGeneration: (() => Promise<void>) | undefined;
@@ -250,7 +252,7 @@ async function createApprovedMedia(expiresAt: string | null = null): Promise<Med
         hasAudio: false,
       },
     },
-    owner,
+    { actorId: owner, sessionId: ownerSessionId, projectId },
   );
   await reviewProductMediaAsset(
     {
@@ -259,13 +261,17 @@ async function createApprovedMedia(expiresAt: string | null = null): Promise<Med
       evidenceRef: await createEvidence("review"),
       notes: "MOCK controlled approval",
     },
-    owner,
+    { actorId: owner, sessionId: ownerSessionId, projectId },
   );
   return { id: media.id, evidenceRef, rightsEvidenceRef };
 }
 
 async function runDraft(videoId: string) {
-  const queued = await queueVideoProcessingJob(videoId, "ai_draft", editor);
+  const queued = await queueVideoProcessingJob(videoId, "ai_draft", {
+    actorId: editor,
+    sessionId: editorSessionId,
+    projectId,
+  });
   await generateMarketingVideoAiDraftWorkflow({ videoId, jobId: queued.job.id, actorId: editor });
   return job(queued.job.id);
 }
@@ -294,9 +300,26 @@ async function recordSourceResult(
 try {
   await migrate(db, { migrationsFolder: "./drizzle" });
   for (const id of [owner, editor, viewer, outsider])
-    await db
-      .insert(schema.user)
-      .values({ id, name: "MOCK video draft", email: `${id}@example.invalid`, role: "user" });
+    await db.insert(schema.user).values({
+      id,
+      name: "MOCK video draft",
+      email: `${id}@example.invalid`,
+      role: id === owner ? "admin" : "user",
+    });
+  await db.insert(schema.session).values([
+    {
+      id: ownerSessionId,
+      userId: owner,
+      token: randomUUID(),
+      expiresAt: new Date(Date.now() + 3600000),
+    },
+    {
+      id: editorSessionId,
+      userId: editor,
+      token: randomUUID(),
+      expiresAt: new Date(Date.now() + 3600000),
+    },
+  ]);
   await db.insert(schema.workspaceProject).values({
     id: projectId,
     title: "MOCK video draft versions",
@@ -337,7 +360,11 @@ try {
   });
 
   const normal = await createVideo();
-  const normalJob = await queueVideoProcessingJob(normal.id, "ai_draft", editor);
+  const normalJob = await queueVideoProcessingJob(normal.id, "ai_draft", {
+    actorId: editor,
+    sessionId: editorSessionId,
+    projectId,
+  });
   await generateMarketingVideoAiDraftWorkflow({
     videoId: normal.id,
     jobId: normalJob.job.id,
@@ -362,12 +389,16 @@ try {
         ctaText: "MOCK newer human CTA",
         clips: changed.draft.clips.map((clip) => ({ ...clip, durationMs: 4000 })),
       },
-      owner,
+      { actorId: owner, sessionId: ownerSessionId, projectId },
     );
     humanDraft = saved.editDraft;
     assert.equal((await record(changed.id)).version, 2);
   };
-  const oldJob = await queueVideoProcessingJob(changed.id, "ai_draft", editor);
+  const oldJob = await queueVideoProcessingJob(changed.id, "ai_draft", {
+    actorId: editor,
+    sessionId: editorSessionId,
+    projectId,
+  });
   await generateMarketingVideoAiDraftWorkflow({
     videoId: changed.id,
     jobId: oldJob.job.id,
@@ -394,7 +425,11 @@ try {
     "Discarded AI output must not append a save audit",
   );
   duringGeneration = undefined;
-  const retry = await queueVideoProcessingJob(changed.id, "ai_draft", editor);
+  const retry = await queueVideoProcessingJob(changed.id, "ai_draft", {
+    actorId: editor,
+    sessionId: editorSessionId,
+    projectId,
+  });
   assert.equal(retry.created, true);
   assert.notEqual(retry.job.id, oldJob.job.id);
   await generateMarketingVideoAiDraftWorkflow({
@@ -410,11 +445,15 @@ try {
   );
 
   const queued = await createVideo();
-  const queuedJob = await queueVideoProcessingJob(queued.id, "ai_draft", editor);
+  const queuedJob = await queueVideoProcessingJob(queued.id, "ai_draft", {
+    actorId: editor,
+    sessionId: editorSessionId,
+    projectId,
+  });
   const queuedHumanSave = await updateMarketingVideoEditDraft(
     queued.id,
     { ...queued.draft, ctaText: "MOCK human save after queue" },
-    owner,
+    { actorId: owner, sessionId: ownerSessionId, projectId },
   );
   const callsBeforeQueuedJob = modelCalls;
   await generateMarketingVideoAiDraftWorkflow({
@@ -577,7 +616,7 @@ try {
         evidenceRef: await createEvidence("revoke"),
         notes: "MOCK revoke during model generation",
       },
-      owner,
+      { actorId: owner, sessionId: ownerSessionId, projectId },
     );
   };
   await recordSourceResult("actual media review revocation", revoked, await runDraft(revoked.id));
@@ -585,7 +624,7 @@ try {
   const repaired = await updateMarketingVideoEditDraft(
     revoked.id,
     { ...revoked.draft, ctaText: "MOCK manual source repair" },
-    editor,
+    { actorId: editor, sessionId: editorSessionId, projectId },
   );
   assert.equal(repaired.editDraft?.ctaText, "MOCK manual source repair");
   assert.equal((await saves(revoked.id)).length, 1);

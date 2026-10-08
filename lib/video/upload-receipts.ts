@@ -4,10 +4,14 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { get } from "@vercel/blob";
 import { and, eq, inArray } from "drizzle-orm";
-import { hasPermission } from "@/lib/authz";
-import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
-import { evidence, user, videoUploadReceipt, workspaceProject } from "@/lib/db/schema";
-import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { type Database, getDatabase } from "@/lib/db/client";
+import { evidence, videoUploadReceipt } from "@/lib/db/schema";
+import {
+  authorizeLockedVideoDraft,
+  parseVideoDraftIdentity,
+  VideoDraftAccessError,
+  type VideoDraftIdentity,
+} from "./draft-write-access";
 
 import {
   claimVideoUploadReceiptsSchema,
@@ -23,37 +27,27 @@ import type { UploadedVideoSourceAsset } from "./uploaded-assets";
 const imageUploadLifetimeMs = 15 * 60 * 1_000;
 const videoUploadLifetimeMs = 60 * 60 * 1_000;
 
-async function authorizeUpload(tx: DatabaseTransaction, actorId: string, projectId: string) {
-  const [actor] = await tx.select().from(user).where(eq(user.id, actorId)).for("share");
-  if (!actor || actor.banned || !hasPermission(actor.role, "video:write"))
-    throw new Error("无权上传营销素材。");
-  const [project] = await tx
-    .select()
-    .from(workspaceProject)
-    .where(eq(workspaceProject.id, projectId))
-    .for("update");
-  if (project?.kind !== "marketing" || project.status !== "active")
-    throw new Error("只能向进行中的产品营销项目上传视频素材。");
-  await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
-}
-
 export async function issueVideoUploadReceipt(
   input: VideoPresignedUploadPayload,
-  actorId: string,
+  identityInput: VideoDraftIdentity,
   database: Database = getDatabase(),
 ) {
+  const identity = parseVideoDraftIdentity(identityInput);
+  if (identity.projectId !== input.projectId) throw new VideoDraftAccessError();
+  const actorId = identity.actorId;
   const blobPath = videoUploadBlobPath(input);
   let expiresAt = new Date(
     Date.now() +
       (input.contentType.startsWith("video/") ? videoUploadLifetimeMs : imageUploadLifetimeMs),
   );
   await database.transaction(async (tx) => {
-    await authorizeUpload(tx, actorId, input.projectId);
     const [existing] = await tx
       .select()
       .from(videoUploadReceipt)
       .where(eq(videoUploadReceipt.id, input.receiptId))
       .for("update");
+    const sessionExpiresAt = await authorizeLockedVideoDraft(tx, identity);
+    if (sessionExpiresAt <= new Date()) throw new VideoDraftAccessError();
     if (existing) {
       const sameReceipt =
         existing.ownerId === actorId &&
@@ -176,17 +170,19 @@ async function hashPrivateBlob(
   return { sha256: hash.digest("hex"), sizeBytes };
 }
 
+/** Read blobs without DB locks; claim the complete batch under current authorization. */
 export async function claimCompletedVideoUploads(
   receiptIdsInput: unknown,
-  actorId: string,
-  projectId: string,
+  identityInput: VideoDraftIdentity,
   rightsEvidenceRef: string,
   database: Database = getDatabase(),
   readBlob: typeof get = get,
 ): Promise<UploadedVideoSourceAsset[]> {
   const receiptIds = claimVideoUploadReceiptsSchema.parse(receiptIdsInput);
+  const identity = parseVideoDraftIdentity(identityInput);
+  const { actorId, projectId } = identity;
   const rows = await database.transaction(async (tx) => {
-    await authorizeUpload(tx, actorId, projectId);
+    await authorizeLockedVideoDraft(tx, identity);
     return tx
       .select()
       .from(videoUploadReceipt)
@@ -205,72 +201,78 @@ export async function claimCompletedVideoUploads(
     throw new Error("部分上传回执不存在或不属于当前项目。");
   if (rows.reduce((total, row) => total + row.sizeBytes, 0) > maximumVideoUploadBatchBytes)
     throw new Error("一次素材总计必须小于 3GB。");
-  if (rows.some((row) => row.expiresAt.getTime() < Date.now()))
-    throw new Error("上传回执已过期，请重新上传素材。");
-
-  const result: UploadedVideoSourceAsset[] = [];
+  const verified = new Map<string, { sha256: string; sizeBytes: number }>();
   for (const row of rows) {
-    if (row.status === "claimed" && row.evidenceId) {
+    if (row.expiresAt.getTime() <= Date.now()) throw new Error("上传回执已过期，请重新上传素材。");
+    if (row.status === "claimed" && row.evidenceId) continue;
+    if (!["issued", "uploaded"].includes(row.status)) throw new Error("上传回执不可认领。");
+    const hash = await hashPrivateBlob(row.blobPath, row.contentType, row.sizeBytes, readBlob);
+    if (hash.sizeBytes !== row.sizeBytes) throw new Error("素材大小与上传签名不一致。");
+    verified.set(row.id, hash);
+  }
+  return database.transaction(async (tx) => {
+    const current = await tx
+      .select()
+      .from(videoUploadReceipt)
+      .where(inArray(videoUploadReceipt.id, receiptIds))
+      .orderBy(videoUploadReceipt.id)
+      .for("update");
+    const expiresAt = await authorizeLockedVideoDraft(tx, identity);
+    const now = new Date();
+    if (expiresAt <= now) throw new VideoDraftAccessError();
+    const byId = new Map(current.map((row) => [row.id, row]));
+    const result: UploadedVideoSourceAsset[] = [];
+    for (const id of receiptIds) {
+      const row = byId.get(id),
+        original = rows.find((row) => row.id === id);
+      if (
+        !row ||
+        !original ||
+        !["issued", "uploaded", "claimed"].includes(row.status) ||
+        row.expiresAt <= now ||
+        row.ownerId !== actorId ||
+        row.projectId !== projectId ||
+        row.rightsEvidenceRef !== rightsEvidenceRef ||
+        row.blobPath !== original.blobPath ||
+        row.contentType !== original.contentType ||
+        row.sizeBytes !== original.sizeBytes
+      )
+        throw new Error("素材上传状态已发生变化。");
+      const hash = verified.get(id);
+      let evidenceId = row.evidenceId;
+      if (row.status === "claimed" && evidenceId) {
+        if (hash && row.sha256 !== hash.sha256) throw new Error("素材在并发核验时发生变化。");
+      } else {
+        if (!hash) throw new Error("素材上传状态已发生变化。");
+        evidenceId = `evidence-${randomUUID()}`;
+        await tx.insert(evidence).values({
+          id: evidenceId,
+          classification: "restricted",
+          blobKey: row.blobPath,
+          contentType: row.contentType,
+          sha256: hash.sha256,
+          sizeBytes: hash.sizeBytes,
+          sourceLabel: `marketing-upload:${mediaTypeForVideoUpload(videoUploadContentTypeSchema.parse(row.contentType))}`,
+          uploadedByType: "human",
+          uploadedById: actorId,
+        });
+        await tx
+          .update(videoUploadReceipt)
+          .set({
+            status: "claimed",
+            sha256: hash.sha256,
+            evidenceId,
+            claimedAt: now,
+            uploadedAt: row.uploadedAt ?? now,
+          })
+          .where(eq(videoUploadReceipt.id, id));
+      }
       result.push({
-        assetRef: row.evidenceId,
+        assetRef: evidenceId,
         mediaType: mediaTypeForVideoUpload(videoUploadContentTypeSchema.parse(row.contentType)),
         rightsEvidenceRef,
       });
-      continue;
     }
-    if (!["issued", "uploaded"].includes(row.status)) throw new Error("上传回执不可认领。");
-    const verified = await hashPrivateBlob(row.blobPath, row.contentType, row.sizeBytes, readBlob);
-    if (verified.sizeBytes !== row.sizeBytes) throw new Error("素材大小与上传签名不一致。");
-    const evidenceId = `evidence-${randomUUID()}`;
-    let resolvedEvidenceId = evidenceId;
-    await database.transaction(async (tx) => {
-      await authorizeUpload(tx, actorId, projectId);
-      const [current] = await tx
-        .select()
-        .from(videoUploadReceipt)
-        .where(eq(videoUploadReceipt.id, row.id))
-        .for("update");
-      if (
-        !current ||
-        !["issued", "uploaded", "claimed"].includes(current.status) ||
-        current.expiresAt.getTime() <= Date.now() ||
-        current.ownerId !== actorId ||
-        current.projectId !== projectId ||
-        current.rightsEvidenceRef !== rightsEvidenceRef
-      )
-        throw new Error("素材上传状态已发生变化。");
-      if (current.status === "claimed" && current.evidenceId) {
-        if (current.sha256 !== verified.sha256) throw new Error("素材在并发核验时发生变化。");
-        resolvedEvidenceId = current.evidenceId;
-        return;
-      }
-      await tx.insert(evidence).values({
-        id: evidenceId,
-        classification: "restricted",
-        blobKey: row.blobPath,
-        contentType: row.contentType,
-        sha256: verified.sha256,
-        sizeBytes: verified.sizeBytes,
-        sourceLabel: `marketing-upload:${mediaTypeForVideoUpload(videoUploadContentTypeSchema.parse(row.contentType))}`,
-        uploadedByType: "human",
-        uploadedById: actorId,
-      });
-      await tx
-        .update(videoUploadReceipt)
-        .set({
-          status: "claimed",
-          sha256: verified.sha256,
-          evidenceId: resolvedEvidenceId,
-          claimedAt: new Date(),
-          uploadedAt: current.uploadedAt ?? new Date(),
-        })
-        .where(eq(videoUploadReceipt.id, row.id));
-    });
-    result.push({
-      assetRef: resolvedEvidenceId,
-      mediaType: mediaTypeForVideoUpload(videoUploadContentTypeSchema.parse(row.contentType)),
-      rightsEvidenceRef,
-    });
-  }
-  return result;
+    return result;
+  });
 }

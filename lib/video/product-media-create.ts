@@ -18,13 +18,19 @@ import {
 import type { ProductReady } from "@/lib/product/verification";
 import { selectProductVideoMedia } from "@/lib/product/video-media-selection";
 import { type ProductMediaAsset, productMediaAssetSchema } from "@/lib/product/video-readiness";
-
 import { videoProjectSchema } from "./contracts";
 import { buildVideoCreative } from "./creative";
+import {
+  authorizeLockedVideoDraft,
+  parseVideoDraftIdentity,
+  VideoDraftAccessError,
+  type VideoDraftIdentity,
+} from "./draft-write-access";
 import {
   createMarketingVideoFromProductMediaSchema,
   marketingVideoDraftSchema,
 } from "./edit-contracts";
+import { queueLockedVideoProcessingJob } from "./processing-jobs";
 
 const parseProductReady = compileContract<ProductReady>(productReadySchema);
 type ProductMediaRow = typeof productMediaAsset.$inferSelect;
@@ -79,14 +85,15 @@ function mediaFromRow(row: ProductMediaRow): ProductMediaAsset {
  */
 export async function createMarketingVideoEditProjectFromProductMedia(
   input: unknown,
-  actorId: string,
+  identityInput: VideoDraftIdentity,
   database: Database = getDatabase(),
 ) {
   const value = createMarketingVideoFromProductMediaSchema.parse(input);
-  if (!actorId.trim()) throw new Error("创建营销视频需要明确的人工账号。");
+  const identity = parseVideoDraftIdentity(identityInput);
+  if (identity.projectId !== value.projectId) throw new VideoDraftAccessError();
+  const actorId = identity.actorId;
 
   const id = randomUUID();
-  const now = new Date();
   return database.transaction(async (tx) => {
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
     const [workspace] = await tx
@@ -135,6 +142,9 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       .from(productMediaAsset)
       .where(inArray(productMediaAsset.id, value.productMediaIds))
       .for("update");
+    const expiresAt = await authorizeLockedVideoDraft(tx, identity);
+    const now = new Date();
+    if (expiresAt <= now) throw new VideoDraftAccessError();
     const selected = selectProductVideoMedia(
       ready,
       mediaRows.map(mediaFromRow),
@@ -205,6 +215,7 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       .update(workspaceProject)
       .set({ updatedAt: now })
       .where(eq(workspaceProject.id, value.projectId));
+    const processingJob = await queueLockedVideoProcessingJob(tx, id, "ai_draft", identity);
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       action: "marketing_video_edit.created",
@@ -222,6 +233,6 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       },
       occurredAt: now,
     });
-    return { id, project };
+    return { id, project, processingJob: processingJob.job };
   });
 }
