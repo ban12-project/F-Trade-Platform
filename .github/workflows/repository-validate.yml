@@ -110,6 +110,9 @@ jobs:
       - name: Verify inbound routing Action current identity and private failure handling
         run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-inbound-routing-action-errors.mts
 
+      - name: Verify controlled reply Action current identity and private failure handling
+        run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-follow-up-action-errors.mts
+
       - name: Verify pre-run request diagnostics correlate without private data
         run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-product-intake-request-diagnostics.mts
 
@@ -264,6 +267,10 @@ jobs:
         run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-inbound-routing-access-postgres.mts
         env:
           INBOUND_ROUTING_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+      - name: Verify current human reply authorization and expiry rollback
+        run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-follow-up-access-postgres.mts
+        env:
+          FOLLOW_UP_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
       - name: Verify video upload recovery without completion callbacks
         run: node --conditions=react-server --import tsx scripts/test-video-upload-reconciliation-postgres.ts
         env:
