@@ -21,6 +21,9 @@ for (const [label, identifier] of [
   ["Kit No.", "999 999 9999"],
   ["Part No.", "RYC-SYN001"],
   ["Internal SKU", "999XDC999"],
+  ["TQ NO.", "998XD999"],
+  ["TQNO.", "998XD999"],
+  ["天奇编号", "998XD999"],
 ]) {
   assert.equal(
     discover(`${label}: ${identifier}\nSource: synthetic-only`)[0]?.identifier,

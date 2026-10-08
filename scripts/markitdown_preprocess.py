@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ALLOWED_EXTENSIONS = {
@@ -68,6 +69,22 @@ def pdf_page_count(pdfinfo: str, path: Path) -> int:
 
 
 PDF_PAGE_MARKER = re.compile(r"^<!-- f-trade:pdf-page=\d+ -->$", re.MULTILINE)
+
+
+def retain_disc_ocr(text: str, recovered: str | None) -> str:
+    if recovered is None:
+        return text
+    # Do not replace independent explicitly labelled records with a partial table.
+    original_ids = set(re.findall(
+        r"^\s*(?:Internal\s+SKU|Kit\s+No\.?|Part\s+No\.?|Type\s+No\.?|TQ\s*NO\.?|天奇编号|编号)"
+        r"\s*[:：]\s*([^\n]+?)\s*$", text, re.MULTILINE | re.IGNORECASE,
+    ))
+    if original_ids:
+        return text
+    original = "\n".join("> " + line for line in text.splitlines())
+    return ("Original OCR (unverified):\n" + original + "\n\n"
+            "Recovered identity/OEM cells (unverified; other columns require original-page review):\n"
+            + recovered)
 
 
 def pdf_page_text(page: int, text: str) -> str:
@@ -148,6 +165,7 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
         if [int(image.stem.rsplit("-", 1)[1]) for image in pages_as_images] != selected:
             raise RuntimeError("local OCR rendered an unexpected number of PDF pages")
         text_parts = []
+        disc_pass_budget = 120.0
         for image in pages_as_images:
             result = subprocess.run(
                 [tesseract, str(image), "stdout", "-l", language, "--psm", "3"],
@@ -155,8 +173,51 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
             )
             number = int(image.stem.rsplit("-", 1)[1])
             text = result.stdout
-            # Only explicit kit pages receive the additional sparse/coordinate pass.
-            # All other document layouts keep the existing OCR behavior.
+            disc_table_hint = (re.search(r"\bTQ\s*NO\.?", text, re.I)
+                               or (re.search(r"\bOEM\s*NO\.?", text, re.I)
+                                   and re.search(r"\bPART\s*NO\.?", text, re.I)))
+            if disc_pass_budget > 0 and disc_table_hint and re.search(r"\bclutch\s+(?:disc|disk)\b", text, re.I):
+                from pdf_disc_table_ocr import recover_disc_table
+
+                table_prefix = Path(directory) / f"disc-{number}"
+                # This optional pass has its own deadline; failure keeps the initial
+                # OCR intact rather than failing an otherwise readable document.
+                pass_started = time.monotonic()
+                deadline = pass_started + min(60, disc_pass_budget)
+                try:
+                    subprocess.run(
+                        [pdftoppm, "-f", str(number), "-l", str(number), "-singlefile",
+                         "-r", "300", "-png", str(path), str(table_prefix)],
+                        check=True, capture_output=True, text=True,
+                        timeout=max(.1, min(15, deadline - time.monotonic())),
+                    )
+                    table_words = subprocess.run(
+                        [tesseract, str(table_prefix.with_suffix(".png")), "stdout", "-l", language,
+                         "--psm", "3", "tsv"],
+                        check=True, capture_output=True, text=True,
+                        timeout=max(.1, min(15, deadline - time.monotonic())),
+                    ).stdout
+
+                    def ocr_cell(crop, psm):
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise TimeoutError("disc table OCR deadline exceeded")
+                        crop_path = Path(directory) / "disc-cell.png"
+                        crop.save(crop_path)
+                        return subprocess.run(
+                            [tesseract, str(crop_path), "stdout", "-l", language,
+                             "--psm", str(psm), "tsv"],
+                            check=True, capture_output=True, text=True, timeout=min(5, remaining),
+                        ).stdout
+
+                    text = retain_disc_ocr(text, recover_disc_table(
+                        table_words, table_prefix.with_suffix(".png"), ocr_cell,
+                    ))
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    pass
+                finally:
+                    disc_pass_budget -= time.monotonic() - pass_started
+            # Explicit kit pages receive their separate sparse/coordinate pass.
             if re.search(r"Kit No\.:", text) and re.search(r"Part No\.:", text):
                 from pdf_kit_ocr import recover_kit_captions, recover_kit_labels, refine_caption_lines
 

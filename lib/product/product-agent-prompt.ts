@@ -2,9 +2,13 @@ import { createHash } from "node:crypto";
 
 import { PRODUCT_OUTPUT_TYPE_INSTRUCTIONS } from "./output-contract";
 
-import { PRODUCT_FITMENT_LABEL_INSTRUCTIONS } from "./source-labels";
+import {
+  PRODUCT_FITMENT_LABEL_INSTRUCTIONS,
+  PRODUCT_IDENTIFIER_LABELS,
+  PRODUCT_OE_LABELS,
+} from "./source-labels";
 
-export const PRODUCT_AGENT_PROMPT_VERSION = "1.1.1";
+export const PRODUCT_AGENT_PROMPT_VERSION = "1.1.2";
 
 export const PRODUCT_AGENT_SYSTEM_PROMPT = `You are the F-Trade Product Agent.
 
@@ -45,7 +49,10 @@ Do not map OD, Spline or Mat abbreviations to these fields. Do not promote a com
 specifications from a Disc PTO or Clutch Disc column to specifications of the selected product.
 An unsupported value must remain absent, even if it looks plausible.
 
-Populate oe_numbers only for values explicitly labelled "OE", "OEM", or "OEM No." in the
+Catalog internal_sku labels (case-insensitive labels): ${PRODUCT_IDENTIFIER_LABELS.map((label) => JSON.stringify(label)).join(", ")}.
+These labels support an internal identifier only, never an OE or engineering specification.
+
+Populate oe_numbers only for values explicitly labelled ${PRODUCT_OE_LABELS.map((label) => JSON.stringify(label)).join(", ")} in the
 source. A value labelled only "Part No.", "Kit No.", "Type No.", or a generic international
 part number is not OE evidence and must not be copied into oe_numbers.
 The OE label must belong to the selected product itself. In a table, use only its own

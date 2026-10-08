@@ -1,4 +1,5 @@
 import type { ProductAgentSource } from "./agent";
+import { PRODUCT_IDENTIFIER_LABELS } from "./source-labels";
 
 export interface CatalogCandidate {
   identifier: string;
@@ -9,7 +10,12 @@ export interface CatalogCandidate {
 
 // Identifier shape alone is never enough: only explicitly labelled record fields qualify.
 const IDENTIFIER = /^(?:(?:RYC|RYD|RY)[A-Z0-9.-]{2,}|[0-9]+(?:XDC|XD|XC)[0-9]+[A-Z]?)$/;
-const LABEL = /^(?:internal\s+sku|kit\s+no\.?|part\s+no\.?|type\s+no\.?|编号)$/i;
+const LABEL = new RegExp(
+  `^(?:${PRODUCT_IDENTIFIER_LABELS.map((label) =>
+    label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+"),
+  ).join("|")})$`,
+  "i",
+);
 const NON_CLUTCH = /\b(?:brake\s*(?:disc|disk|pad|rotor)s?)\b|制动盘|刹车片|刹车盘/i;
 const PAGE = /^<!-- f-trade:pdf-page=(\d+) -->$/;
 
