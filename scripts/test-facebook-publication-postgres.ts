@@ -687,7 +687,7 @@ async function main() {
       database,
       { nodeId: node.nodeId, accessKey: node.accessKey },
       identity,
-      actor,
+      { actorId: actor, sessionId: writerSessionId },
     );
     await testInboxWakeup(database, {
       nodeId: node.nodeId,
@@ -1286,7 +1286,7 @@ async function main() {
     console.log(
       "PASS receipt authorization binding, success/unknown persistence, duplicate replay, conflict rejection, lease expiry and shutdown preservation",
     );
-    await testFacebookInbound(database, actor);
+    await testFacebookInbound(database, { actorId: actor, sessionId: writerSessionId });
   } finally {
     await closeDatabase();
     await pool.end();

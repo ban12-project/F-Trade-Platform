@@ -11,13 +11,15 @@ import {
   workspaceProject,
 } from "../lib/db/schema";
 import { ingestFacebookInboundBatch } from "../lib/social/facebook-inbound-store";
+import type { SocialActorIdentity } from "../lib/social/human-write-access";
 import {
   listUnassignedInboundConversations,
   routeInboundConversation,
 } from "../lib/social/inbound-routing-store";
 import { decryptSocialMessageBody } from "../lib/social/message-crypto";
 
-export async function testFacebookInbound(database: Database, actorId: string) {
+export async function testFacebookInbound(database: Database, identity: SocialActorIdentity) {
+  const actorId = identity.actorId;
   process.env.SOCIAL_MESSAGE_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
   const now = new Date();
   const channelRef = randomUUID();
@@ -69,7 +71,7 @@ export async function testFacebookInbound(database: Database, actorId: string) {
   );
   const routed = await routeInboundConversation(
     { conversationId: conversation.id, mode: "create" },
-    actorId,
+    identity,
     database,
   );
   const [project] = await database
@@ -86,7 +88,7 @@ export async function testFacebookInbound(database: Database, actorId: string) {
   await assert.rejects(
     routeInboundConversation(
       { conversationId: conversation.id, mode: "create" },
-      actorId,
+      identity,
       database,
     ),
     /已完成分流/,

@@ -2,7 +2,7 @@
 
 import { FolderInputIcon, FolderPlusIcon, InboxIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { initialClosingActionState } from "@/lib/action-states";
+import { type ClosingActionState, initialClosingActionState } from "@/lib/action-states";
 import { routeInboundConversationAction } from "@/lib/actions/closing";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
@@ -42,16 +42,17 @@ function RoutingDialog({
   const [open, setOpen] = useState(false);
   const [projectId, setProjectId] = useState("");
   const [state, action, pending] = useActionState(
-    routeInboundConversationAction,
+    async (previous: ClosingActionState, formData: FormData) => {
+      const result = await routeInboundConversationAction(previous, formData);
+      // Workspace refresh can remove this row before a state effect can navigate.
+      if (result.status === "success" && result.projectId && result.id) {
+        setOpen(false);
+        router.push(workspaceRecordHref(result.projectId, "lead", result.id, "/workspace"));
+      }
+      return result;
+    },
     initialClosingActionState,
   );
-  useEffect(() => {
-    if (state.status === "success" && state.projectId && state.id) {
-      setOpen(false);
-      router.push(workspaceRecordHref(state.projectId, "lead", state.id, "/workspace"));
-      router.refresh();
-    }
-  }, [router, state]);
   const creating = mode === "create";
   return (
     <Dialog open={open} onOpenChange={setOpen}>
