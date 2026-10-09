@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from PIL import Image, ImageDraw, ImageFont
 from pdf_disc_table_ocr import read_words, recover_disc_table, UNRECOVERED
-from markitdown_preprocess import local_pdf_ocr, retain_disc_ocr
+from markitdown_preprocess import local_pdf_ocr, retain_disc_ocr, precise_ocr_data, PRECISE_OCR_DATA
 
 
 def word(text, x, y, width=100, confidence=95):
@@ -173,6 +173,52 @@ with TemporaryDirectory() as directory:
     joined_headers[8]['text'] = 'VEHICLETYPE'
     joined = recover_disc_table(tsv(joined_headers), path, source_cell_ocr)
     assert 'SPRINGORRUBBER | VEHICLETYPE |' in joined and all(value in joined for value in source_rows[0])
+    # A whole-page glyph can be confidently wrong. The optional English model
+    # rereads only proven part/spring cells; raw results supply the replacements.
+    wrong_spring = [*full_fixture, word('$8', edges[6] + 20, 180, width=45),
+                   word('SYN-PARTB', edges[3] + 20, 180, width=100)]
+    precise_calls = []
+    def precise_spring(crop, psm):
+        pixels = set(crop.get_flattened_data() if hasattr(crop, 'get_flattened_data') else crop.getdata())
+        present = [value for color, value in colors.items() if color in pixels]
+        assert len(present) == 1, 'Precision must reread exactly its own source marker'
+        column = next(values.index(present[0]) for values in source_rows if present[0] in values)
+        assert column in (3, 6)
+        assert crop.width == (edges[column + 1] - edges[column] - 6) * (2 if column == 3 else 3)
+        value = tsv([word(present[0], 5, 5)])
+        precise_calls.append(value)
+        return value
+    precise = recover_disc_table(tsv(wrong_spring), path, source_cell_ocr,
+                                  precise_ocr_crop=precise_spring)
+    assert precise == full_source and len(precise_calls) == 4
+    assert recover_disc_table(tsv(wrong_spring), path, source_cell_ocr) != full_source
+    # Missing/failed optional precision keeps the preexisting literal reading;
+    # it never inserts an S, space, dimension symbol, unit or neighboring value.
+    def unavailable_precision(*_):
+        raise subprocess.TimeoutExpired('synthetic precise OCR', 1)
+    fallback_spring = recover_disc_table(tsv(wrong_spring), path, source_cell_ocr,
+                                         precise_ocr_crop=unavailable_precision)
+    assert '| 8-9*10 | $8 | Synthetic B |' in fallback_spring
+    unreadable_precision = recover_disc_table(tsv(wrong_spring), path, source_cell_ocr,
+        precise_ocr_crop=lambda *_: tsv([word('SYN-UNREADABLE', 5, 5, confidence=20)]))
+    assert unreadable_precision == fallback_spring
+    # Repeated dimension retries can exhaust a page's budget. Save already
+    # readable cells and complete ITEM/part/spring rereads before those retries.
+    exhausted = [False]
+    def budgeted_read(crop, psm, precise=False):
+        if exhausted[0]:
+            raise subprocess.TimeoutExpired('synthetic page budget', 1)
+        value = precise_spring(crop, psm) if precise else source_cell_ocr(crop, psm)
+        if any(token in value for token in ['1*2', '3-4*5', '6*7', '8-9*10']):
+            exhausted[0] = True
+            raise subprocess.TimeoutExpired('synthetic dimension retry', 1)
+        return value
+    budget_fixture = [*full_fixture, word('Synthetic B', edges[7] + 20, 180, width=100)]
+    budgeted = recover_disc_table(tsv(budget_fixture), path, budgeted_read,
+        precise_ocr_crop=lambda crop, psm: budgeted_read(crop, psm, precise=True))
+    assert f'| 1 | 999XD901 | SYN-OE-A | SYN-PART-A | {UNRECOVERED} | {UNRECOVERED} | S6(+6) |' in budgeted
+    assert f'| 2 | 999XD902 | SYN-OE-B | SYN-PART-B | {UNRECOVERED} | {UNRECOVERED} | S8 |' in budgeted
+    assert '| S8 | Synthetic B |' in budgeted, 'A later readable cell survives earlier retry exhaustion'
     # An unreadable suffix must not discard a separately readable primary label.
     # The damaged TYPE token supplies no header or factory value.
     damaged_suffix = [*full_fixture, word('TYPE', 1755, 50, width=40, confidence=20)]
@@ -260,6 +306,15 @@ with TemporaryDirectory() as directory:
     assert f'| 2 | 999XD902 | SYN-OE-B | {UNRECOVERED} |' in missing_rule
 print('PASS all eight explicitly headed columns retain their own literal source cells')
 
+with TemporaryDirectory() as directory:
+    data = Path(directory)
+    with patch('markitdown_preprocess.PRECISE_OCR_DATA', data):
+        assert precise_ocr_data('eng') is None
+        (data / 'eng.traineddata').write_bytes(b'\0' * 15_400_601)
+        assert precise_ocr_data('eng') is None, 'Correct file size cannot bypass the pinned checksum'
+        assert precise_ocr_data('eng+ell') is None
+print('PASS missing/corrupt/unconfigured precision models are never used')
+
 if '--local-ocr' in sys.argv:
     with TemporaryDirectory() as directory:
         image = Image.new('RGB', (1800, 550), 'white')
@@ -282,17 +337,29 @@ if '--local-ocr' in sys.argv:
         path = Path(directory) / 'synthetic-scan.pdf'
         image.save(path, 'PDF', resolution=150)
         os.environ['F_TRADE_LOCAL_OCR_LANGUAGE'] = 'eng'
-        text = local_pdf_ocr(path)
+        assert precise_ocr_data('eng') == PRECISE_OCR_DATA
+        original_run = subprocess.run
+        precise_reads = []
+        def record_precision(args, **kwargs):
+            result = original_run(args, **kwargs)
+            if '--tessdata-dir' in args:
+                assert args[args.index('--tessdata-dir') + 1] == str(PRECISE_OCR_DATA)
+                assert result.stdout.startswith('level\t'), 'A standalone model must emit structured raw OCR'
+                precise_reads.append(result)
+            return result
+        with patch('markitdown_preprocess.subprocess.run', side_effect=record_precision):
+            text = local_pdf_ocr(path)
+        assert len(precise_reads) == 4
         assert '<!-- f-trade:pdf-page=1 -->' in text
         assert 'Original OCR (unverified):' in text
         assert '| 1 | 999XD901 | SYN-OE-A | SYN-PART-A | 1*2 | 3*4 | 8 | Synthetic A |' in text
         assert '| 2 | 999XD902 | SYN-OE-B | SYN-PART-B | 5*6 | 7*8 | 9 | Synthetic B |' in text
         assert '| 999XD901 | SYN-OE-B |' not in text
-        original_run = subprocess.run
         damaged_headings = []
         def damage_initial_heading(args, **kwargs):
             result = original_run(args, **kwargs)
-            if 'tesseract' in Path(args[0]).name and 'tsv' not in args:
+            if ('tesseract' in Path(args[0]).name and 'tsv' not in args
+                    and args[args.index('--psm') + 1] == '3'):
                 result.stdout, count = re.subn(r'\bTQ\s*NO\.?', 'TQNE.', result.stdout, flags=re.I)
                 damaged_headings.append(count)
             return result
