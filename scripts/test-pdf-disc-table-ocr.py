@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from PIL import Image, ImageDraw, ImageFont
-from pdf_disc_table_ocr import read_words, recover_disc_table
+from pdf_disc_table_ocr import read_words, recover_disc_table, UNRECOVERED
 from markitdown_preprocess import local_pdf_ocr, retain_disc_ocr
 
 
@@ -32,7 +32,7 @@ edges = [30, 100, 350, 600, 850, 1100, 1350, 1600, 1800]
 headers = ['ITEM', 'TQNO.', 'OEMNO.', 'PARTNO.', 'LINING(O.D.*I.D.)',
            'SPLINE(NO.-O.D.*I.D.)', 'SPRING', 'VEHICLE']
 fixture = [word('Clutch Disc', 30, 10)]
-fixture += [word(text, (left + right) // 2 - (30 if i == 0 else 100) // 2,
+fixture += [word(text if i < 4 else 'UNSUPPORTED-' + text, (left + right) // 2 - (30 if i == 0 else 100) // 2,
                  50, width=30 if i == 0 else 100)
             for i, (text, left, right) in enumerate(zip(headers, edges, edges[1:]))]
 fixture += [word('999XD901', 175, 90), word('SYN-OE-A', 380, 90),
@@ -86,8 +86,9 @@ with TemporaryDirectory() as directory:
     # Low-confidence OEM and wrong/ambiguous identifiers never become facts.
     assert recover_disc_table(tsv(fixture), path, lambda *_: tsv([word('999xD901', 0, 0)])) is None
     assert recover_disc_table(tsv(fixture), path, lambda *_: tsv([word('999XD901', 0, 0, confidence=20)])) is None
-    assert recover_disc_table(tsv(fixture), path, lambda _, psm: tsv([
-        word('999XD901' if psm == 7 else 'SYN-OE-A', 0, 0, confidence=95 if psm == 7 else 20)])) is None
+    low_oe = recover_disc_table(tsv(fixture), path, lambda _, psm: tsv([
+        word('999XD901' if psm == 7 else 'SYN-OE-A', 0, 0, confidence=95 if psm == 7 else 20)]))
+    assert low_oe is not None and 'SYN-OE-A' not in low_oe and low_oe.count(UNRECOVERED) == 2
     # A failed line segmentation gets one independent block-segmentation reading.
     # Neither the malformed first reading nor the neighboring OEM is substituted.
     segmentation_calls = []
@@ -110,8 +111,9 @@ with TemporaryDirectory() as directory:
     # Missing row rules cannot borrow a neighboring OEM cell.
     draw.rectangle((351, 137, 599, 143), fill=255)
     image.save(path)
-    assert recover_disc_table(tsv(fixture), path, lambda _, psm: tsv([
-        word('999XD901' if psm == 7 else 'SYN-OE-B', 0, 0)])) is None
+    broken_oe = recover_disc_table(tsv(fixture), path, lambda _, psm: tsv([
+        word('999XD901' if psm == 7 else 'SYN-OE-B', 0, 0)]))
+    assert broken_oe is not None and 'SYN-OE-B' not in broken_oe and broken_oe.count(UNRECOVERED) == 2
 
 assert read_words('not tsv') == []
 assert read_words('level\tleft\ttop\twidth\theight\tconf\ttext\n5\t0\t0\t10\t10\t95\n') == []
@@ -125,6 +127,89 @@ assert retain_disc_ocr(independent, recovered) == independent
 already_labelled = original + '\n\nTQ NO.: 999XD901\nProduct name: Synthetic named disc'
 assert retain_disc_ocr(already_labelled, recovered) == already_labelled
 print('PASS bounded identity/OEM cells, fresh literal reading, ambiguity and original-record preservation')
+
+# Each synthetic cell has its own marker. The fake OCR derives a value from the
+# crop's marker, so borrowing a neighboring rectangle cannot pass this check.
+with TemporaryDirectory() as directory:
+    path = Path(directory) / 'full-source-grid.png'
+    image = Image.new('RGB', (1850, 320), 'white')
+    draw = ImageDraw.Draw(image)
+    for x in edges:
+        draw.line((x, 40, x, 260), fill=(180, 180, 180), width=3)
+    # A long gray page border is not a table's outer cell boundary.
+    for x in [3, 1847]:
+        draw.line((x, 0, x, 319), fill=(180, 180, 180), width=3)
+    for y in [70, 140, 220, 260]:
+        draw.line((edges[0], y, edges[-1], y), fill=(180, 180, 180), width=3)
+    source_rows = [
+        ['1', '999XD901', 'SYN-OE-A', 'SYN-PART-A', '1*2', '3-4*5', 'S6(+6)', 'Synthetic A'],
+        ['2', '999XD902', 'SYN-OE-B', 'SYN-PART-B', '6*7', '8-9*10', 'S8', 'Synthetic B'],
+    ]
+    colors = {}
+    for row, values in enumerate(source_rows):
+        for column, value in enumerate(values):
+            color = (30 + column * 20, 35 + row * 90, 40 + column * 10)
+            colors[color] = value
+            x, y = edges[column] + 15, [100, 180][row]
+            draw.rectangle((x, y, x + 8, y + 8), fill=color)
+    image.save(path)
+    def source_cell_ocr(crop, _):
+        pixels = set(crop.get_flattened_data() if hasattr(crop, 'get_flattened_data') else crop.getdata())
+        present = [value for color, value in colors.items()
+                   if color in pixels]
+        assert len(present) == 1, 'A cell reread must contain exactly its own source marker'
+        column = next(values.index(present[0]) for values in source_rows if present[0] in values)
+        assert crop.width == (edges[column + 1] - edges[column] - 6) * 3
+        return tsv([word(present[0], 5, 5)])
+    full_fixture = [dict(item) for item in fixture]
+    for index, header in enumerate(headers):
+        full_fixture[index + 1]['text'] = header
+    full_source = recover_disc_table(tsv(full_fixture), path, source_cell_ocr)
+    assert full_source == '\n'.join('| ' + ' | '.join(row) + ' |'
+                                   for row in [headers, ['---'] * 8, *source_rows])
+    assert '| 999XD901 | SYN-OE-B |' not in full_source
+    joined_headers = [dict(item) for item in full_fixture]
+    joined_headers[7]['text'] = 'SPRINGORRUBBER'
+    joined_headers[8]['text'] = 'VEHICLETYPE'
+    joined = recover_disc_table(tsv(joined_headers), path, source_cell_ocr)
+    assert 'SPRINGORRUBBER | VEHICLETYPE |' in joined and all(value in joined for value in source_rows[0])
+    def unreadable_part(crop, psm):
+        if crop.mode == 'L':
+            return tsv([word('synthetic-unreadable', 5, 5, confidence=20)])
+        result = source_cell_ocr(crop, psm)
+        if 'SYN-PART-A' in result:
+            return tsv([word('SYN-PART-A', 5, 5, confidence=20)])
+        return result
+    unreadable = recover_disc_table(tsv(full_fixture), path, unreadable_part)
+    assert f'| 1 | 999XD901 | SYN-OE-A | {UNRECOVERED} |' in unreadable
+    assert '| 2 | 999XD902 | SYN-OE-B | SYN-PART-B |' in unreadable
+    crossed_extra = [*full_fixture, dict(word('SYN-WRONG-NEIGHBOR', edges[3] + 15, 135), height=30)]
+    assert recover_disc_table(tsv(crossed_extra), path, source_cell_ocr) == full_source
+    missing_oe_calls = []
+    def no_own_oe(crop, psm):
+        missing_oe_calls.append(1)
+        if len(missing_oe_calls) == 4:
+            return ''
+        return source_cell_ocr(crop, psm)
+    partial = recover_disc_table(tsv(full_fixture), path, no_own_oe)
+    assert f'| 2 | 999XD902 | {UNRECOVERED} | SYN-PART-B |' in partial
+    assert 'SYN-OE-B' not in partial
+    timed_reads = []
+    def timeout_after_core(crop, psm):
+        timed_reads.append(1)
+        if len(timed_reads) > 4:
+            raise TimeoutError('synthetic optional cell deadline')
+        return source_cell_ocr(crop, psm)
+    timeout = recover_disc_table(tsv(full_fixture), path, timeout_after_core)
+    assert '| 999XD901 | SYN-OE-A |' in timeout and '| 999XD902 | SYN-OE-B |' in timeout
+    assert timeout.count(UNRECOVERED) == 12
+    # A missing boundary in one optional column cannot borrow the next row's part.
+    draw.rectangle((edges[3] + 1, 137, edges[4] - 1, 143), fill='white')
+    image.save(path)
+    missing_rule = recover_disc_table(tsv(full_fixture), path, source_cell_ocr)
+    assert f'| 1 | 999XD901 | SYN-OE-A | {UNRECOVERED} |' in missing_rule
+    assert f'| 2 | 999XD902 | SYN-OE-B | {UNRECOVERED} |' in missing_rule
+print('PASS all eight explicitly headed columns retain their own literal source cells')
 
 if '--local-ocr' in sys.argv:
     with TemporaryDirectory() as directory:
@@ -151,8 +236,8 @@ if '--local-ocr' in sys.argv:
         text = local_pdf_ocr(path)
         assert '<!-- f-trade:pdf-page=1 -->' in text
         assert 'Original OCR (unverified):' in text
-        assert '| 999XD901 | SYN-OE-A |' in text
-        assert '| 999XD902 | SYN-OE-B |' in text
+        assert '| 1 | 999XD901 | SYN-OE-A | SYN-PART-A | 1*2 | 3*4 | 8 | Synthetic A |' in text
+        assert '| 2 | 999XD902 | SYN-OE-B | SYN-PART-B | 5*6 | 7*8 | 9 | Synthetic B |' in text
         assert '| 999XD901 | SYN-OE-B |' not in text
         original_run = subprocess.run
         damaged_headings = []
@@ -200,7 +285,7 @@ if '--local-ocr' in sys.argv:
         with patch('markitdown_preprocess.subprocess.run', side_effect=timeout_optional_pass):
             fallback = local_pdf_ocr(path)
         assert len(failed_passes) == 1
-        assert 'Recovered identity/OEM cells' not in fallback
+        assert 'Recovered source cells' not in fallback
         assert '999XD901' in fallback and '999XD902' in fallback
         assert '<!-- f-trade:pdf-page=1 -->' in fallback
     print('PASS actual offline PDF render + Tesseract + production converter, own-row identity/OEM')
