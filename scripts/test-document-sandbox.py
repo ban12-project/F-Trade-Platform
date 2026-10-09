@@ -9,6 +9,10 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from synthetic_pdf_fixture import build_pdf, text_command
 
+sys.path.insert(0, "/opt/f-trade")
+from markitdown_preprocess import precise_ocr_data, PRECISE_OCR_DATA
+assert precise_ocr_data("eng") == PRECISE_OCR_DATA, "The actual document image must contain its verified English model"
+
 with tempfile.TemporaryDirectory() as directory:
     table = b"".join(text_command(value, x, y) for y, values in [
         (550, ["Part No.", "OEM No.", "Fit Model"]),
