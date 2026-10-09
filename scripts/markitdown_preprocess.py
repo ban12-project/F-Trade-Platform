@@ -203,6 +203,7 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                 # OCR intact rather than failing an otherwise readable document.
                 pass_started = time.monotonic()
                 deadline = pass_started + min(60, disc_pass_budget)
+                cell_session = None
                 try:
                     subprocess.run(
                         [pdftoppm, "-f", str(number), "-l", str(number), "-singlefile",
@@ -219,10 +220,33 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                         timeout=max(.1, min(15, deadline - time.monotonic())),
                     ).stdout
 
+                    # Initialize only after page rendering/reading. A native
+                    # library fault is confined to a child; the CLI is retained
+                    # when a reusable verified session is unavailable.
+                    try:
+                        from pdf_tesseract_ocr import CellOcrSession
+                        cell_session = CellOcrSession(language, deadline)
+                    except (ImportError, OSError, ValueError, EOFError):
+                        pass
+
                     def ocr_cell(crop, psm, tessdata=None):
+                        nonlocal cell_session
                         remaining = deadline - time.monotonic()
                         if remaining <= 0:
                             raise TimeoutError("disc table OCR deadline exceeded")
+                        if cell_session is not None:
+                            try:
+                                return cell_session.read(crop, psm, tessdata)
+                            except TimeoutError:
+                                cell_session.close()
+                                cell_session = None
+                                raise
+                            except (OSError, EOFError):
+                                cell_session.close()
+                                cell_session = None
+                                remaining = deadline - time.monotonic()
+                                if remaining <= 0:
+                                    raise TimeoutError("disc table OCR deadline exceeded")
                         crop_path = Path(directory) / "disc-cell.png"
                         crop.save(crop_path)
                         return subprocess.run(
@@ -241,6 +265,8 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                 except (OSError, ValueError, subprocess.SubprocessError):
                     pass
                 finally:
+                    if cell_session is not None:
+                        cell_session.close()
                     disc_pass_budget -= time.monotonic() - pass_started
             # Explicit kit pages receive their separate sparse/coordinate pass.
             if re.search(r"Kit No\.:", text) and re.search(r"Part No\.:", text):

@@ -1,0 +1,33 @@
+{
+  "run_id": "synthetic-final-review-v2-blocked-001",
+  "slot_id": "pilot-slot-16",
+  "cohort": "D",
+  "status": "passed",
+  "started_at": "2026-08-24T10:00:00Z",
+  "completed_at": "2026-08-24T10:03:00Z",
+  "metrics": {
+    "sourced_field_recognition": 0.4,
+    "oe_preservation": 0,
+    "vehicle_fidelity": 0.5,
+    "blocking_missing_detection": 0.5,
+    "review_elapsed_seconds": 180
+  },
+  "revision_rounds": 0,
+  "ready": false,
+  "notes": "Synthetic negative case: missing OE and complete confirmed fitment remain blocked. This passing block check is not ProductReady.",
+  "policy_version": "2.0.0",
+  "expected_disposition": "blocked",
+  "correction_audit_refs": [],
+  "final_review": {
+    "reviewer_ref": "user-synthetic-reviewer",
+    "review_record_ref": "review-synthetic-block-01",
+    "evidence_refs": ["evidence-synthetic-original", "evidence-synthetic-correction"],
+    "critical_fields_complete": false,
+    "supplied_facts_source_verified": true,
+    "blocking_missing_fields": ["product.oe_numbers_or_complete_fitment"],
+    "approved": false,
+    "product_version": 4,
+    "reviewed_at": "2026-08-24T10:03:00Z",
+    "source_manifest_ref": "manifest-synthetic-original-v1"
+  }
+}

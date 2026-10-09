@@ -1,0 +1,37 @@
+{
+  "run_id": "synthetic-final-review-v2-001",
+  "slot_id": "pilot-slot-01",
+  "cohort": "A",
+  "status": "passed",
+  "started_at": "2026-08-24T10:00:00Z",
+  "completed_at": "2026-08-24T10:03:00Z",
+  "metrics": {
+    "sourced_field_recognition": 0.4,
+    "oe_preservation": 0,
+    "vehicle_fidelity": 0.5,
+    "blocking_missing_detection": 0.5,
+    "review_elapsed_seconds": 180
+  },
+  "revision_rounds": 3,
+  "ready": true,
+  "notes": "Synthetic only. Automatic extraction errors were corrected against uploaded originals; final sourced facts were approved.",
+  "policy_version": "2.0.0",
+  "expected_disposition": "ready",
+  "correction_audit_refs": [
+    "audit-synthetic-correction-01",
+    "audit-synthetic-correction-02",
+    "audit-synthetic-correction-03"
+  ],
+  "final_review": {
+    "reviewer_ref": "user-synthetic-reviewer",
+    "review_record_ref": "approval-synthetic-gate-01",
+    "evidence_refs": ["evidence-synthetic-original", "evidence-synthetic-correction"],
+    "critical_fields_complete": true,
+    "supplied_facts_source_verified": true,
+    "blocking_missing_fields": [],
+    "approved": true,
+    "product_version": 4,
+    "reviewed_at": "2026-08-24T10:03:00Z",
+    "source_manifest_ref": "manifest-synthetic-original-v1"
+  }
+}

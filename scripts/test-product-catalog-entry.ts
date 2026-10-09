@@ -1,11 +1,61 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+import productAcceptanceResultSchema from "../contracts/testing/product-acceptance-result.schema.json";
+import { compileContract } from "../lib/contracts/validator";
 
 import { productReviewFormSchema } from "../lib/form-schemas";
 import { productCatalogFormSchema } from "../lib/product/catalog-form-schema";
 import { buildEvidenceBoundProductCatalogDraft } from "../lib/product/evidence-bound-catalog";
+import {
+  ProductFactRevisionError,
+  productFactRevision,
+  productRevisionFailureMessage,
+} from "../lib/product/retained-evidence";
 import { approveProductDraft, rejectProductDraft } from "../lib/product/verification";
 import { productCatalogDisplayIdentity } from "../lib/products";
 import { assertTransition } from "../lib/workflow/transitions";
+
+const parseAcceptanceResult = compileContract(productAcceptanceResultSchema);
+const acceptanceFixture = (name: string) =>
+  JSON.parse(
+    readFileSync(
+      new URL(`../data/fixtures/product-acceptance-${name}.json`, import.meta.url),
+      "utf8",
+    ),
+  );
+for (const name of [
+  "passed.synthetic",
+  "failed.synthetic",
+  "reviewed-v2.synthetic",
+  "blocked-v2.synthetic",
+]) {
+  const record = acceptanceFixture(name);
+  assert.deepEqual(parseAcceptanceResult(record), record);
+}
+assert.throws(() => parseAcceptanceResult(acceptanceFixture("false-pass-invalid")));
+for (const [field, value] of [
+  ["critical_fields_complete", false],
+  ["supplied_facts_source_verified", false],
+  ["approved", false],
+  ["blocking_missing_fields", ["product.oe_numbers"]],
+  ["evidence_refs", []],
+  ["reviewer_ref", ""],
+] as const) {
+  const record = acceptanceFixture("reviewed-v2.synthetic");
+  record.metrics.sourced_field_recognition = 1;
+  record.final_review[field] = value;
+  assert.throws(() => parseAcceptanceResult(record));
+}
+const unrecordedCorrection = acceptanceFixture("reviewed-v2.synthetic");
+unrecordedCorrection.correction_audit_refs = [];
+assert.throws(() => parseAcceptanceResult(unrecordedCorrection));
+const promotedMissingFacts = acceptanceFixture("blocked-v2.synthetic");
+promotedMissingFacts.ready = true;
+assert.throws(() => parseAcceptanceResult(promotedMissingFacts));
+console.log(
+  "PASS strict application contract validates final fact review independently of automatic scores",
+);
 
 const validInput = productCatalogFormSchema.parse({
   productName: "Synthetic clutch disc",
@@ -85,6 +135,68 @@ assert.deepEqual(draft.evidence_refs, [
 assert.equal(
   Object.values(draft.field_evidence).every((ref) => draft.evidence_refs.includes(ref)),
   true,
+);
+
+const correctedDraft = buildEvidenceBoundProductCatalogDraft(
+  {
+    ...validInput,
+    clutchDiameterMm: "250",
+    clutchDiameterMmEvidenceRef: "evidence-corrected-diameter",
+    splineSize: "",
+    splineSizeEvidenceRef: "",
+    frictionMaterialEvidenceRef: "evidence-reconfirmed-material",
+    sampleAvailable: "no",
+    sampleAvailableEvidenceRef: "evidence-confirmed-sample",
+  },
+  draft.record_id,
+);
+const correction = productFactRevision(draft, correctedDraft, 2);
+assert.equal(correction.from_version, 2);
+assert.equal(correction.to_version, 3);
+assert.deepEqual(correction.changes, [
+  {
+    path: "commercial.sample_available",
+    before: { value: null, evidence_ref: null },
+    after: { value: false, evidence_ref: "evidence-confirmed-sample" },
+  },
+  {
+    path: "specifications.clutch_diameter_mm",
+    before: { value: 240, evidence_ref: "evidence-catalog-diameter-001" },
+    after: { value: 250, evidence_ref: "evidence-corrected-diameter" },
+  },
+  {
+    path: "specifications.friction_material",
+    before: { value: "Synthetic material", evidence_ref: "evidence-catalog-material-001" },
+    after: { value: "Synthetic material", evidence_ref: "evidence-reconfirmed-material" },
+  },
+  {
+    path: "specifications.spline_size",
+    before: { value: "20 x 18", evidence_ref: "evidence-catalog-spline-size-001" },
+    after: { value: null, evidence_ref: null },
+  },
+]);
+assert.deepEqual(productFactRevision(draft, draft, 4).changes, []);
+const rebound = productFactRevision(draft, { ...draft, source_ref: "source-synthetic-new" }, 4);
+assert.equal(rebound.source_ref_before, draft.source_ref);
+assert.equal(rebound.source_ref_after, "source-synthetic-new");
+assert.deepEqual(rebound.changes, []);
+const privateDatabaseFailure = Object.assign(
+  new Error("SYNTHETIC private before/after SQL params"),
+  {
+    cause: new Error("SYNTHETIC private database details"),
+  },
+);
+assert.equal(
+  productRevisionFailureMessage(privateDatabaseFailure),
+  "无法保存产品修订，请确认字段证据并重试。",
+);
+assert.equal(
+  productRevisionFailureMessage(
+    Object.assign(new ProductFactRevisionError("changed_location"), {
+      message: "SYNTHETIC private replacement",
+    }),
+  ),
+  "修改字段值或来源后，请为该字段重新选择已上传证据。",
 );
 
 assert.equal(

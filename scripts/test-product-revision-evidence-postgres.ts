@@ -234,6 +234,54 @@ void (async () => {
         ),
       );
     assert.equal(audit?.metadata.retained_evidence_location_count, 19);
+    assert.ok(audit);
+    assert.equal(audit?.actorId, actors[0]);
+    assert.equal(audit?.metadata.approval_id, success.value.approvalId);
+    assert.deepEqual(audit?.metadata.fact_revision, {
+      schema_version: "1.0.0",
+      from_version: 2,
+      to_version: 3,
+      source_ref_before: saved.draft.source_ref,
+      source_ref_after: saved.draft.source_ref,
+      changes: [
+        {
+          path: "commercial.packaging",
+          before: {
+            value: form.packaging,
+            evidence_ref: saved.draft.field_evidence["commercial.packaging"],
+          },
+          after: { value: success.value.draft.commercial?.packaging, evidence_ref: supplementRef },
+        },
+      ],
+    });
+    const correctionAudits = await db
+      .select({ id: schema.auditEvent.id })
+      .from(schema.auditEvent)
+      .where(
+        and(
+          eq(schema.auditEvent.aggregateId, saved.id),
+          eq(schema.auditEvent.action, "product_draft_revised"),
+        ),
+      );
+    assert.equal(
+      correctionAudits.length,
+      1,
+      "Rejected and competing revisions cannot leave false history",
+    );
+    await assert.rejects(
+      db.update(schema.auditEvent).set({ metadata: {} }).where(eq(schema.auditEvent.id, audit.id)),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.cause instanceof Error &&
+        /append-only/.test(error.cause.message),
+    );
+    await assert.rejects(
+      db.delete(schema.auditEvent).where(eq(schema.auditEvent.id, audit.id)),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.cause instanceof Error &&
+        /append-only/.test(error.cause.message),
+    );
     const decision = {
       productId: saved.id,
       approvalId: success.value.approvalId,
@@ -257,6 +305,17 @@ void (async () => {
       projects[0],
     );
     assert.deepEqual(retained.draft.field_evidence, unchanged.draft.field_evidence);
+    const [unchangedAudit] = await db
+      .select()
+      .from(schema.auditEvent)
+      .where(
+        and(
+          eq(schema.auditEvent.aggregateId, unchanged.id),
+          eq(schema.auditEvent.action, "product_draft_revised"),
+        ),
+      );
+    assert.ok(unchangedAudit);
+    assert.deepEqual((unchangedAudit.metadata.fact_revision as { changes: unknown[] }).changes, []);
     console.log(
       "PASS locked revision preserves unchanged locations, rejects changed/foreign/rebound facts, serializes competing edits and retains image Gate",
     );

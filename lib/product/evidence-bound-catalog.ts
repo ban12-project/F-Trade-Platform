@@ -21,7 +21,11 @@ import {
   type ProductCatalogForm,
   productCatalogFormSchema,
 } from "./catalog-form-schema";
-import { partitionRevisionEvidence } from "./retained-evidence";
+import {
+  ProductFactRevisionError,
+  partitionRevisionEvidence,
+  productFactRevision,
+} from "./retained-evidence";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
 export type EvidenceBoundProductCatalogInput = ProductCatalogForm;
@@ -383,13 +387,11 @@ export async function reviseEvidenceBoundProductCatalogDraft(
       .innerJoin(user, and(eq(user.id, workspaceProjectMember.userId), eq(user.banned, false)))
       .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!aggregate) throw new Error("产品草稿不存在，或无权在当前项目修订。");
+    if (!aggregate) throw new ProductFactRevisionError("missing_product");
     if (aggregate.state !== "PRODUCT_REVISION_REQUIRED")
-      throw new Error("该产品当前不处于待修订状态。");
-    const revisionEvidence = partitionRevisionEvidence(
-      reviewProductDraft(aggregate.payload),
-      draft,
-    );
+      throw new ProductFactRevisionError("not_revisable");
+    const previousDraft = reviewProductDraft(aggregate.payload);
+    const revisionEvidence = partitionRevisionEvidence(previousDraft, draft);
     if (revisionEvidence.uploaded.length)
       await assertAndLinkProjectEvidence(projectId, revisionEvidence.uploaded, actorId, tx);
 
@@ -415,7 +417,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
         and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version)),
       )
       .returning({ id: aggregateRecord.id });
-    if (!updated) throw new Error("产品修订与另一项操作冲突，请刷新后重试。");
+    if (!updated) throw new ProductFactRevisionError("write_conflict");
     await tx.insert(approval).values({
       id: approvalId,
       aggregateId: productId,
@@ -445,6 +447,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
       subjectId: productId,
       metadata: {
         approval_id: approvalId,
+        fact_revision: productFactRevision(previousDraft, draft, aggregate.version),
         retained_evidence_location_count: revisionEvidence.retained.length,
         blocking_field_count: draft.blocking_missing_fields.length,
         field_evidence_count: Object.keys(draft.field_evidence).length,
