@@ -16,6 +16,7 @@ import {
   authorizeLockedProductAgentWrite,
   type ProductAgentWriteIdentity,
 } from "@/lib/product/agent-write-access";
+import { productFactRevision } from "@/lib/product/retained-evidence";
 import {
   authorizeLockedProductReview,
   ProductReviewAccessError,
@@ -695,6 +696,7 @@ export async function reviseProductCatalogDraft(
         id: aggregateRecord.id,
         state: aggregateRecord.state,
         version: aggregateRecord.version,
+        payload: aggregateRecord.payload,
       })
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
@@ -704,6 +706,7 @@ export async function reviseProductCatalogDraft(
       throw new Error("该产品当前不处于待修订状态。");
 
     const draft = buildProductCatalogDraft(input, productId);
+    const previousDraft = reviewProductDraft(aggregate.payload);
     assertTransition({
       eventId,
       entityType: "product",
@@ -756,6 +759,7 @@ export async function reviseProductCatalogDraft(
       subjectId: productId,
       metadata: {
         approval_id: approvalId,
+        fact_revision: productFactRevision(previousDraft, draft, aggregate.version),
         blocking_field_count: draft.blocking_missing_fields.length,
       },
       occurredAt: now,

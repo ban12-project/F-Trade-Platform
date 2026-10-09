@@ -11,6 +11,7 @@ FILES = (
     'scripts/pdf_catalog_layout.py',
     'scripts/pdf_kit_ocr.py',
     'scripts/pdf_disc_table_ocr.py',
+    'scripts/pdf_tesseract_ocr.py',
 )
 
 

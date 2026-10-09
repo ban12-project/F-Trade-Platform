@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import csv
 import json
 import re
@@ -64,6 +65,8 @@ def check_schemas() -> None:
         "product-acceptance-result.schema.json": [
             "product-acceptance-passed.synthetic.json",
             "product-acceptance-failed.synthetic.json",
+            "product-acceptance-reviewed-v2.synthetic.json",
+            "product-acceptance-blocked-v2.synthetic.json",
         ],
         "mvp-acceptance-summary.schema.json": ["mvp-acceptance-summary.synthetic.json"],
         "channel-inbound-policy.schema.json": ["channel-inbound-policy.synthetic.json"],
@@ -206,6 +209,8 @@ def check_product_acceptance_config() -> None:
         raise AssertionError(f"Product acceptance cohorts must be balanced: {cohort_counts}")
     if any(case["status"] != "planned" for case in cases):
         raise AssertionError("Unexecuted acceptance slots must remain planned")
+    if config["version"] != "2.0.0":
+        raise AssertionError("New acceptance runs must use final-fact-review policy v2")
     criteria = config["criteria"]
     for name in (
         "sourced_field_recognition",
@@ -213,14 +218,53 @@ def check_product_acceptance_config() -> None:
         "vehicle_fidelity",
         "blocking_missing_detection",
     ):
-        if criteria[name]["pass_threshold"] != 1.0:
-            raise AssertionError(f"{name} must require 100%")
+        if criteria[name]["pass_threshold"] is not None:
+            raise AssertionError(f"Automatic {name} must not gate final fact approval")
     if criteria["review_elapsed_seconds"]["pass_threshold"] is not None:
-        raise AssertionError("Review time must remain baseline-only before the real cohort")
-    if not criteria["failure_record"]["requires_new_github_issue"]:
-        raise AssertionError("Failed acceptance runs must require a new GitHub issue")
+        raise AssertionError("Review time is an efficiency metric")
+    review = criteria["final_fact_review"]
+    if review["max_human_revision_rounds"] is not None:
+        raise AssertionError("Revision rounds must not gate final fact approval")
+    for name in (
+        "requires_complete_critical_fields", "requires_zero_blocking_fields",
+        "requires_human_gate_01_approval", "requires_field_evidence_for_every_supplied_fact",
+        "requires_source_verified_facts", "requires_correction_audit_records",
+        "expected_blocked_case_is_not_product_ready",
+    ):
+        if review[name] is not True:
+            raise AssertionError(f"Final fact review must require {name}")
+    if not criteria["failure_record"]["requires_github_issue"]:
+        raise AssertionError("Failed acceptance runs must reference a development issue")
+    if not criteria["failure_record"]["allows_existing_issue"]:
+        raise AssertionError("The same issue may contain additional failure runs and PRs")
     if criteria["failure_record"]["overwrite_previous_run"]:
         raise AssertionError("Failed acceptance runs must remain immutable")
+
+    schema = load_json(SCHEMA_DIR / "testing" / "product-acceptance-result.schema.json")
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    reviewed = load_json(FIXTURE_DIR / "product-acceptance-reviewed-v2.synthetic.json")
+    # High automatic scores cannot compensate for a failed final review.
+    for property_name, invalid_value in (
+        ("critical_fields_complete", False), ("supplied_facts_source_verified", False),
+        ("approved", False), ("blocking_missing_fields", ["product.oe_numbers"]),
+        ("evidence_refs", []), ("reviewer_ref", ""),
+    ):
+        invalid = copy.deepcopy(reviewed)
+        invalid["metrics"].update({name: 1 for name in (
+            "sourced_field_recognition", "oe_preservation", "vehicle_fidelity",
+            "blocking_missing_detection",
+        )})
+        invalid["final_review"][property_name] = invalid_value
+        if validator.is_valid(invalid):
+            raise AssertionError(f"Final review must reject invalid {property_name}")
+    invalid = copy.deepcopy(reviewed)
+    invalid["correction_audit_refs"] = []
+    if validator.is_valid(invalid):
+        raise AssertionError("Corrected records must retain correction audit references")
+    blocked = load_json(FIXTURE_DIR / "product-acceptance-blocked-v2.synthetic.json")
+    blocked["ready"] = True
+    if validator.is_valid(blocked):
+        raise AssertionError("An expected missing-fact block cannot become ProductReady")
 
 
 def check_mvp_acceptance_summary() -> None:

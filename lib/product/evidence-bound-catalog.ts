@@ -21,7 +21,7 @@ import {
   type ProductCatalogForm,
   productCatalogFormSchema,
 } from "./catalog-form-schema";
-import { partitionRevisionEvidence } from "./retained-evidence";
+import { partitionRevisionEvidence, productFactRevision } from "./retained-evidence";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
 export type EvidenceBoundProductCatalogInput = ProductCatalogForm;
@@ -386,10 +386,8 @@ export async function reviseEvidenceBoundProductCatalogDraft(
     if (!aggregate) throw new Error("产品草稿不存在，或无权在当前项目修订。");
     if (aggregate.state !== "PRODUCT_REVISION_REQUIRED")
       throw new Error("该产品当前不处于待修订状态。");
-    const revisionEvidence = partitionRevisionEvidence(
-      reviewProductDraft(aggregate.payload),
-      draft,
-    );
+    const previousDraft = reviewProductDraft(aggregate.payload);
+    const revisionEvidence = partitionRevisionEvidence(previousDraft, draft);
     if (revisionEvidence.uploaded.length)
       await assertAndLinkProjectEvidence(projectId, revisionEvidence.uploaded, actorId, tx);
 
@@ -445,6 +443,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
       subjectId: productId,
       metadata: {
         approval_id: approvalId,
+        fact_revision: productFactRevision(previousDraft, draft, aggregate.version),
         retained_evidence_location_count: revisionEvidence.retained.length,
         blocking_field_count: draft.blocking_missing_fields.length,
         field_evidence_count: Object.keys(draft.field_evidence).length,

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { productReviewFormSchema } from "../lib/form-schemas";
 import { productCatalogFormSchema } from "../lib/product/catalog-form-schema";
 import { buildEvidenceBoundProductCatalogDraft } from "../lib/product/evidence-bound-catalog";
+import { productFactRevision } from "../lib/product/retained-evidence";
 import { approveProductDraft, rejectProductDraft } from "../lib/product/verification";
 import { productCatalogDisplayIdentity } from "../lib/products";
 import { assertTransition } from "../lib/workflow/transitions";
@@ -86,6 +87,50 @@ assert.equal(
   Object.values(draft.field_evidence).every((ref) => draft.evidence_refs.includes(ref)),
   true,
 );
+
+const correctedDraft = buildEvidenceBoundProductCatalogDraft(
+  {
+    ...validInput,
+    clutchDiameterMm: "250",
+    clutchDiameterMmEvidenceRef: "evidence-corrected-diameter",
+    splineSize: "",
+    splineSizeEvidenceRef: "",
+    frictionMaterialEvidenceRef: "evidence-reconfirmed-material",
+    sampleAvailable: "no",
+    sampleAvailableEvidenceRef: "evidence-confirmed-sample",
+  },
+  draft.record_id,
+);
+const correction = productFactRevision(draft, correctedDraft, 2);
+assert.equal(correction.from_version, 2);
+assert.equal(correction.to_version, 3);
+assert.deepEqual(correction.changes, [
+  {
+    path: "commercial.sample_available",
+    before: { value: null, evidence_ref: null },
+    after: { value: false, evidence_ref: "evidence-confirmed-sample" },
+  },
+  {
+    path: "specifications.clutch_diameter_mm",
+    before: { value: 240, evidence_ref: "evidence-catalog-diameter-001" },
+    after: { value: 250, evidence_ref: "evidence-corrected-diameter" },
+  },
+  {
+    path: "specifications.friction_material",
+    before: { value: "Synthetic material", evidence_ref: "evidence-catalog-material-001" },
+    after: { value: "Synthetic material", evidence_ref: "evidence-reconfirmed-material" },
+  },
+  {
+    path: "specifications.spline_size",
+    before: { value: "20 x 18", evidence_ref: "evidence-catalog-spline-size-001" },
+    after: { value: null, evidence_ref: null },
+  },
+]);
+assert.deepEqual(productFactRevision(draft, draft, 4).changes, []);
+const rebound = productFactRevision(draft, { ...draft, source_ref: "source-synthetic-new" }, 4);
+assert.equal(rebound.source_ref_before, draft.source_ref);
+assert.equal(rebound.source_ref_after, "source-synthetic-new");
+assert.deepEqual(rebound.changes, []);
 
 assert.equal(
   productCatalogFormSchema.safeParse({ ...validInput, sourceRef: "/private/tmp/catalog.pdf" })

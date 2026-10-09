@@ -6,12 +6,14 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from PIL import Image, ImageDraw, ImageFont
 from pdf_disc_table_ocr import read_words, recover_disc_table, UNRECOVERED
 from markitdown_preprocess import local_pdf_ocr, retain_disc_ocr, precise_ocr_data, PRECISE_OCR_DATA
+from pdf_tesseract_ocr import CellOcrSession
 
 
 def word(text, x, y, width=100, confidence=95):
@@ -306,6 +308,31 @@ with TemporaryDirectory() as directory:
     assert f'| 2 | 999XD902 | SYN-OE-B | {UNRECOVERED} |' in missing_rule
 print('PASS all eight explicitly headed columns retain their own literal source cells')
 
+if sys.platform.startswith('linux'):
+    def stalled_worker(connection, language):
+        connection.send(True)
+        connection.recv()
+        time.sleep(30)
+    def crashed_worker(connection, language):
+        connection.send(True)
+        connection.recv()
+        os._exit(1)
+    for target, error_type in [(stalled_worker, TimeoutError), (crashed_worker, OSError)]:
+        started = time.monotonic()
+        with patch('pdf_tesseract_ocr._worker', target):
+            session = CellOcrSession('eng', started + .3)
+            try:
+                session.read(Image.new("L", (20, 20), 255), 7)
+            except error_type:
+                pass
+            else:
+                raise AssertionError('Failed native worker must reject the reading')
+            finally:
+                session.close()
+        assert time.monotonic() - started < 2
+        assert session.process is None and session.connection is None
+    print('PASS native worker crash/timeout isolation and bounded process cleanup')
+
 with TemporaryDirectory() as directory:
     data = Path(directory)
     with patch('markitdown_preprocess.PRECISE_OCR_DATA', data):
@@ -316,6 +343,38 @@ with TemporaryDirectory() as directory:
 print('PASS missing/corrupt/unconfigured precision models are never used')
 
 if '--local-ocr' in sys.argv:
+    # Real engines must agree on literal tokens, confidence and boxes across
+    # repeated models/segmentation modes; model reuse must not learn prior cells.
+    with TemporaryDirectory() as directory:
+        try:
+            session = CellOcrSession('eng', time.monotonic() + 60)
+        except OSError:
+            session = None  # Unverified library versions keep the CLI path.
+        if session is not None:
+            try:
+                font = ImageFont.truetype(os.environ.get('F_TRADE_TEST_FONT', 'DejaVuSans.ttf'), 28)
+                try:
+                    small = session.read(Image.new('L', (2, 36), 0), 7)
+                    assert read_words(small) == []
+                except ValueError:
+                    pass
+                assert session.process.is_alive(), 'One unreadable image discarded a healthy session'
+                for text, psm in [('SYN 01.2', 7), ('S8(+6)', 7), ('999XD901', 8), ('SYN-A\nSYN-B', 6), ('SYN 01.2', 7)]:
+                    for data_directory in [None, *([PRECISE_OCR_DATA] if precise_ocr_data('eng') else [])]:
+                        for mode in ('L', 'RGB'):
+                            scan = Image.new(mode, (350, 100), 'white')
+                            ImageDraw.Draw(scan).text((10, 10), text, fill='black', font=font)
+                            path = Path(directory) / 'source-cell.png'
+                            scan.save(path)
+                            raw = session.read(scan, psm, data_directory)
+                            expected = subprocess.run(['tesseract', str(path), 'stdout', '-l', 'eng', '--psm', str(psm),
+                                *(['--tessdata-dir', str(data_directory), '-c', 'tessedit_create_tsv=1', '-c', 'tessedit_create_txt=0'] if data_directory else ['tsv'])],
+                                check=True, text=True, capture_output=True, env={**os.environ, 'OMP_THREAD_LIMIT': '1'}, timeout=5)
+                            assert read_words(raw) == read_words(expected.stdout), 'Reuse changed raw text/confidence/source bounds'
+            finally:
+                session.close()
+            print('PASS real reusable engine/CLI literal output, confidence, bounds and cell-order isolation')
+
     with TemporaryDirectory() as directory:
         image = Image.new('RGB', (1800, 550), 'white')
         draw = ImageDraw.Draw(image)
@@ -342,6 +401,13 @@ if '--local-ocr' in sys.argv:
         has_precision = precise_ocr_data('eng') == PRECISE_OCR_DATA
         original_run = subprocess.run
         precise_reads = []
+        original_read = CellOcrSession.read
+        def record_session(session, image, psm, data_directory=None):
+            result = original_read(session, image, psm, data_directory)
+            if data_directory == PRECISE_OCR_DATA and psm == 7:
+                assert result.startswith('level\t')
+                precise_reads.append(result)
+            return result
         def record_precision(args, **kwargs):
             result = original_run(args, **kwargs)
             if '--tessdata-dir' in args:
@@ -349,7 +415,7 @@ if '--local-ocr' in sys.argv:
                 assert result.stdout.startswith('level\t'), 'A standalone model must emit structured raw OCR'
                 precise_reads.append(result)
             return result
-        with patch('markitdown_preprocess.subprocess.run', side_effect=record_precision):
+        with patch('markitdown_preprocess.subprocess.run', side_effect=record_precision), patch.object(CellOcrSession, 'read', record_session):
             text = local_pdf_ocr(path)
         assert len(precise_reads) == (4 if has_precision else 0)
         assert '<!-- f-trade:pdf-page=1 -->' in text
@@ -357,6 +423,12 @@ if '--local-ocr' in sys.argv:
         assert '| 1 | 999XD901 | SYN-OE-A | SYN-PART-A | 1*2 | 3*4 | 8 | Synthetic A |' in text
         assert '| 2 | 999XD902 | SYN-OE-B | SYN-PART-B | 5*6 | 7*8 | 9 | Synthetic B |' in text
         assert '| 999XD901 | SYN-OE-B |' not in text
+        # The optional worker cannot make the established conversion dependent
+        # on native-library availability; no input/model changes are involved.
+        with patch('pdf_tesseract_ocr.CellOcrSession', side_effect=OSError('Synthetic unavailable library')):
+            fallback = local_pdf_ocr(path)
+        assert '| 1 | 999XD901 | SYN-OE-A | SYN-PART-A | 1*2 | 3*4 | 8 | Synthetic A |' in fallback
+        assert '| 2 | 999XD902 | SYN-OE-B | SYN-PART-B | 5*6 | 7*8 | 9 | Synthetic B |' in fallback
         damaged_headings = []
         def damage_initial_heading(args, **kwargs):
             result = original_run(args, **kwargs)

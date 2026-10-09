@@ -23,6 +23,6 @@ RUN mkdir -p /opt/f-trade/tessdata-best \
   && cp /usr/share/common-licenses/Apache-2.0 /opt/f-trade/tessdata-best/LICENSE \
   && printf '%s  %s\n' 8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba /opt/f-trade/tessdata-best/eng.traineddata | sha256sum --check
 
-COPY scripts/markitdown_preprocess.py scripts/pdf_catalog_layout.py scripts/pdf_kit_ocr.py scripts/pdf_disc_table_ocr.py /opt/f-trade/
+COPY scripts/markitdown_preprocess.py scripts/pdf_catalog_layout.py scripts/pdf_kit_ocr.py scripts/pdf_disc_table_ocr.py scripts/pdf_tesseract_ocr.py /opt/f-trade/
 
 WORKDIR /vercel/sandbox

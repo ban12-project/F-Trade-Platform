@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://f-trade.example/contracts/product-acceptance-result.schema.json",
   "title": "ProductAcceptanceResult",
+  "description": "Unversioned historical results retain v1 rules. New results explicitly select v2 final fact review; automatic scores are diagnostic only.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,12 +18,28 @@
     "notes"
   ],
   "properties": {
-    "run_id": { "type": "string", "minLength": 1 },
-    "slot_id": { "type": "string", "pattern": "^pilot-slot-(0[1-9]|1[0-9]|20)$" },
-    "cohort": { "enum": ["A", "B", "C", "D"] },
-    "status": { "enum": ["passed", "failed"] },
-    "started_at": { "type": "string", "format": "date-time" },
-    "completed_at": { "type": "string", "format": "date-time" },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slot_id": {
+      "type": "string",
+      "pattern": "^pilot-slot-(0[1-9]|1[0-9]|20)$"
+    },
+    "cohort": {
+      "enum": ["A", "B", "C", "D"]
+    },
+    "status": {
+      "enum": ["passed", "failed"]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "metrics": {
       "type": "object",
       "additionalProperties": false,
@@ -34,50 +51,334 @@
         "review_elapsed_seconds"
       ],
       "properties": {
-        "sourced_field_recognition": { "type": "number", "minimum": 0, "maximum": 1 },
-        "oe_preservation": { "type": "number", "minimum": 0, "maximum": 1 },
-        "vehicle_fidelity": { "type": "number", "minimum": 0, "maximum": 1 },
-        "blocking_missing_detection": { "type": "number", "minimum": 0, "maximum": 1 },
-        "review_elapsed_seconds": { "type": "integer", "minimum": 0 }
+        "sourced_field_recognition": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "oe_preservation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "vehicle_fidelity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blocking_missing_detection": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "review_elapsed_seconds": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
-    "revision_rounds": { "type": "integer", "minimum": 0 },
-    "ready": { "type": "boolean" },
+    "revision_rounds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ready": {
+      "type": "boolean"
+    },
     "failure_issue_url": {
       "type": "string",
       "format": "uri",
       "pattern": "^https://github\\.com/[^/]+/[^/]+/issues/[0-9]+$"
     },
-    "notes": { "type": "string" }
+    "notes": {
+      "type": "string"
+    },
+    "policy_version": {
+      "const": "2.0.0"
+    },
+    "expected_disposition": {
+      "enum": ["ready", "blocked"]
+    },
+    "final_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_ref",
+        "review_record_ref",
+        "evidence_refs",
+        "critical_fields_complete",
+        "supplied_facts_source_verified",
+        "blocking_missing_fields",
+        "approved",
+        "product_version",
+        "reviewed_at",
+        "source_manifest_ref"
+      ],
+      "properties": {
+        "reviewer_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_record_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "critical_fields_complete": {
+          "type": "boolean"
+        },
+        "supplied_facts_source_verified": {
+          "type": "boolean"
+        },
+        "blocking_missing_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "product_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_manifest_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "correction_audit_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
   },
   "allOf": [
     {
-      "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
-      "then": { "required": ["failure_issue_url"] },
-      "else": { "not": { "required": ["failure_issue_url"] } }
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["failure_issue_url"]
+      },
+      "else": {
+        "not": {
+          "required": ["failure_issue_url"]
+        }
+      }
     },
     {
-      "if": { "properties": { "status": { "const": "passed" } }, "required": ["status"] },
+      "if": {
+        "required": ["policy_version"]
+      },
       "then": {
-        "properties": {
-          "metrics": {
-            "type": "object",
-            "properties": {
-              "sourced_field_recognition": { "const": 1 },
-              "oe_preservation": { "const": 1 },
-              "vehicle_fidelity": { "const": 1 },
-              "blocking_missing_detection": { "const": 1 }
+        "required": ["expected_disposition", "final_review", "correction_audit_refs"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "ready": {
+                  "const": true
+                }
+              },
+              "required": ["ready"]
             },
-            "required": [
-              "sourced_field_recognition",
-              "oe_preservation",
-              "vehicle_fidelity",
-              "blocking_missing_detection"
-            ]
+            "then": {
+              "properties": {
+                "final_review": {
+                  "properties": {
+                    "critical_fields_complete": {
+                      "const": true
+                    },
+                    "supplied_facts_source_verified": {
+                      "const": true
+                    },
+                    "blocking_missing_fields": {
+                      "maxItems": 0
+                    },
+                    "approved": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "final_review": {
+                  "properties": {
+                    "approved": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
           },
-          "revision_rounds": { "type": "integer", "maximum": 1 },
-          "ready": { "const": true }
-        }
+          {
+            "if": {
+              "properties": {
+                "revision_rounds": {
+                  "minimum": 1
+                }
+              },
+              "required": ["revision_rounds"]
+            },
+            "then": {
+              "properties": {
+                "correction_audit_refs": {
+                  "minItems": 1
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "correction_audit_refs": {
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "passed"
+                }
+              },
+              "required": ["status"]
+            },
+            "then": {
+              "properties": {
+                "final_review": {
+                  "properties": {
+                    "supplied_facts_source_verified": {
+                      "const": true
+                    }
+                  }
+                }
+              },
+              "oneOf": [
+                {
+                  "properties": {
+                    "expected_disposition": {
+                      "const": "ready"
+                    },
+                    "ready": {
+                      "const": true
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "expected_disposition": {
+                      "const": "blocked"
+                    },
+                    "ready": {
+                      "const": false
+                    },
+                    "final_review": {
+                      "properties": {
+                        "critical_fields_complete": {
+                          "const": false
+                        },
+                        "blocking_missing_fields": {
+                          "minItems": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "else": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "passed"
+                }
+              },
+              "required": ["status"]
+            },
+            "then": {
+              "properties": {
+                "metrics": {
+                  "type": "object",
+                  "properties": {
+                    "sourced_field_recognition": {
+                      "const": 1
+                    },
+                    "oe_preservation": {
+                      "const": 1
+                    },
+                    "vehicle_fidelity": {
+                      "const": 1
+                    },
+                    "blocking_missing_detection": {
+                      "const": 1
+                    }
+                  },
+                  "required": [
+                    "sourced_field_recognition",
+                    "oe_preservation",
+                    "vehicle_fidelity",
+                    "blocking_missing_detection"
+                  ]
+                },
+                "revision_rounds": {
+                  "type": "integer",
+                  "maximum": 1
+                },
+                "ready": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": ["expected_disposition"]
+                },
+                {
+                  "required": ["final_review"]
+                },
+                {
+                  "required": ["correction_audit_refs"]
+                }
+              ]
+            }
+          }
+        ]
       }
     }
   ]
