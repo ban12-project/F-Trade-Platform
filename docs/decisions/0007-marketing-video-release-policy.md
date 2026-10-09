@@ -1,6 +1,6 @@
 # ADR 0007：营销视频保留期与责任人
 
-- 状态：Accepted（业务决定）；到期执行机制尚未交付
+- 状态：Accepted（业务决定）；应用到期执行已上线，托管副本与真实删除验收未完成
 - 版本：1.0.0
 - 日期：2026-10-09
 - 原 Issue：[#122](https://github.com/ban12-project/F-Trade-Platform/issues/122)

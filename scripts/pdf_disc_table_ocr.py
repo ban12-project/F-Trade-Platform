@@ -32,7 +32,7 @@ def literal_cell(words):
     return " ".join(w["text"] for _, line in lines for w in sorted(line, key=lambda w: w["left"]))
 
 
-def source_columns(band, image, ocr_crop, centers, projected, heading):
+def source_columns(band, image, ocr_crop, centers, projected, heading, outer_projected):
     """Optional eight-column source layout; failure preserves core recovery.
 
     A damaged whole-page token can only locate a heading. A fresh own-region
@@ -58,13 +58,16 @@ def source_columns(band, image, ocr_crop, centers, projected, heading):
                 with image.crop(bounds) as crop:
                     with crop.resize((crop.width * 3, crop.height * 3)) as enlarged:
                         value = literal_cell(read_words(ocr_crop(enlarged, 7)))
-                # Recover the primary label alone when a joined parenthetical
-                # remains unreadable. Never invent its dimensions/units suffix.
+                # A separately readable primary label survives an unreadable
+                # suffix. Keep only its literal spelling, without reconstructing
+                # parentheticals, dimensions/units, or a missing TYPE token.
+                if (value is None and index >= 4 and column[0]["confidence"] >= 60
+                        and re.fullmatch(EXTRA_LABELS[index - 4], column[0]["text"], re.I)):
+                    value = column[0]["text"]
+                # A joined parenthetical requires its own raw primary-label crop.
                 if value is None and index in (4, 5):
                     label = ["LINING", "SPLINE"][index - 4]
                     anchor = column[0]
-                    if anchor["confidence"] >= 60 and re.fullmatch(label, anchor["text"], re.I):
-                        value = anchor["text"]
                     for fraction in (.30, .32, .34, .38, .40, .42, .45, .50, .55):
                         if value is not None:
                             break
@@ -82,14 +85,25 @@ def source_columns(band, image, ocr_crop, centers, projected, heading):
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
     all_centers = [*centers, *((column[0]["left"] + column[-1]["right"]) / 2 for column in columns[4:])]
+    # A solid page border may be stronger than scan-damaged table rules. Outer
+    # rules must meet the same minimum projected visibility as the core grid;
+    # a distant border's peak cannot suppress a nearer qualifying table rule.
     extended_edges = {}
     for boundary in range(9):
         left = int(all_centers[boundary - 1]) if boundary else 0
         right = int(all_centers[boundary]) if boundary < 8 else image.width
-        peak = max(projected[left:right], default=0)
+        # An outer rule cannot cross its own heading. Repeated gray glyph
+        # strokes may project strongly enough to resemble a faint vertical rule.
+        if boundary == 0:
+            right = min(w["left"] for w in columns[0])
+        elif boundary == 8:
+            left = max(w["right"] for w in columns[-1])
+        visible = outer_projected if boundary in (0, 8) else projected
+        peak = max(visible[left:right], default=0)
         if peak < 45:
             return None
-        verticals = groups_above(projected[left:right], peak * .75)
+        threshold = 45 if boundary in (0, 8) else peak * .75
+        verticals = groups_above(visible[left:right], threshold)
         if boundary in (0, 8) and len(verticals) > 1:
             # Headers may be left-aligned. Select the nearest actual outer rule,
             # not a reflected midpoint or a stronger distant page border.
@@ -330,7 +344,12 @@ def recover_disc_table(tsv, image_path, ocr_crop):
                 row_bounds.append((top, bottom))
         if not rows:
             return None
-        layout = source_columns(band, image, ocr_crop, centers, projected, heading)
+        # Outer ruling may be paler than the internal grid. This independent
+        # projection still excludes white background and dark glyphs; core row
+        # and column evidence continues to use its original gray range.
+        outer_mask = image.convert("L").point(lambda value: 255 if 140 <= value <= 240 else 0)
+        outer_projected = outer_mask.crop((0, body_top, image.width, body_bottom)).resize((image.width, 1), Image.Resampling.BOX).tobytes()
+        layout = source_columns(band, image, ocr_crop, centers, projected, heading, outer_projected)
         if layout:
             all_headers, all_edges = layout
             extra_rules = {}

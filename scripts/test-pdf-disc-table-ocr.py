@@ -173,6 +173,55 @@ with TemporaryDirectory() as directory:
     joined_headers[8]['text'] = 'VEHICLETYPE'
     joined = recover_disc_table(tsv(joined_headers), path, source_cell_ocr)
     assert 'SPRINGORRUBBER | VEHICLETYPE |' in joined and all(value in joined for value in source_rows[0])
+    # An unreadable suffix must not discard a separately readable primary label.
+    # The damaged TYPE token supplies no header or factory value.
+    damaged_suffix = [*full_fixture, word('TYPE', 1755, 50, width=40, confidence=20)]
+    def heading_suffix_unreadable(crop, psm):
+        pixels = set(crop.get_flattened_data() if hasattr(crop, 'get_flattened_data') else crop.getdata())
+        if not any(color in pixels for color in colors):
+            return ''
+        return source_cell_ocr(crop, psm)
+    assert recover_disc_table(tsv(damaged_suffix), path, heading_suffix_unreadable) == full_source
+    damaged_primary = [dict(item) for item in damaged_suffix]
+    damaged_primary[8]['conf'] = 20
+    conservative = recover_disc_table(tsv(damaged_primary), path, heading_suffix_unreadable)
+    assert conservative is not None and 'LINING' not in conservative
+    # Scan dropout weakens the real outer rules while a distant page border
+    # remains solid. Border strength cannot suppress the nearer table boundary.
+    weak_path = Path(directory) / 'weak-outer-rules.png'
+    weak = image.copy()
+    weak_draw = ImageDraw.Draw(weak)
+    for x in [edges[0], edges[-1]]:
+        for y in range(40, 260, 2):
+            weak_draw.line((x - 1, y, x + 1, y), fill='white')
+    weak.save(weak_path)
+    assert recover_disc_table(tsv(full_fixture), weak_path, source_cell_ocr) == full_source
+    # Repeated gray glyph strokes inside a heading's bounds are not outer rules.
+    stroke_path = Path(directory) / 'repeated-gray-stroke.png'
+    stroke = weak.copy()
+    stroke_draw = ImageDraw.Draw(stroke)
+    for y in range(70, 260, 5):
+        stroke_draw.point((1715, y), fill=(180, 180, 180))
+    stroke.save(stroke_path)
+    assert recover_disc_table(tsv(full_fixture), stroke_path, source_cell_ocr) == full_source
+    # Pale outer ruling is independently visible; internal rules stay unchanged.
+    pale_path = Path(directory) / 'pale-outer-rules.png'
+    pale = image.copy()
+    pale_draw = ImageDraw.Draw(pale)
+    for x in [edges[0], edges[-1]]:
+        pale_draw.line((x, 40, x, 260), fill=(238, 238, 238), width=3)
+    pale.save(pale_path)
+    assert recover_disc_table(tsv(full_fixture), pale_path, source_cell_ocr) == full_source
+    # Two nearby qualifying outer rules remain ambiguous even when one is faint.
+    ambiguous_path = Path(directory) / 'ambiguous-outer-rules.png'
+    ambiguous = weak.copy()
+    ImageDraw.Draw(ambiguous).line((edges[0] - 8, 40, edges[0] - 8, 260),
+                                  fill=(180, 180, 180), width=3)
+    ambiguous.save(ambiguous_path)
+    core_only = recover_disc_table(tsv(full_fixture), ambiguous_path, source_cell_ocr)
+    assert core_only == '\n'.join('| ' + ' | '.join(row) + ' |'
+                                 for row in [headers[1:3], ['---'] * 2,
+                                             *[values[1:3] for values in source_rows]])
     def unreadable_part(crop, psm):
         if crop.mode == 'L':
             return tsv([word('synthetic-unreadable', 5, 5, confidence=20)])
