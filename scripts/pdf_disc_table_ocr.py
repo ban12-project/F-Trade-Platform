@@ -152,7 +152,7 @@ def groups_above(values, threshold):
     return groups
 
 
-def recover_disc_table(tsv, image_path, ocr_crop):
+def recover_disc_table(tsv, image_path, ocr_crop, precise_ocr_crop=None):
     from PIL import Image, ImageOps
     words = read_words(tsv)
     text = " ".join(w["text"] for w in words)
@@ -360,6 +360,7 @@ def recover_disc_table(tsv, image_path, ocr_crop):
                 extra_rules[column] = [body_top - heading["height"] + (group[0] + group[-1]) / 2
                                        for group in groups_above(horizontal, 140) if len(group) <= heading["height"] / 2]
             full_rows = []
+            pending_cells = []
             for values, (top, bottom) in zip(rows, row_bounds):
                 full = [UNRECOVERED, *values, *([UNRECOVERED] * 5)]
                 for column in (0, 3, 4, 5, 6, 7):
@@ -381,36 +382,61 @@ def recover_disc_table(tsv, image_path, ocr_crop):
                     value = literal_cell(contained) if len(contained) == len(intersecting) else None
                     if value is not None:
                         full[column] = value
-                        continue
-                    if retries >= 512:
-                        continue
+                    if value is None or (column in (3, 6) and precise_ocr_crop is not None):
+                        pending_cells.append((len(full_rows), column, left, right, start, end))
+                full_rows.append(full)
+            # Preserve cheap, independently contained values for every row before
+            # spending the finite reread budget. Identity/ITEM, part and spring
+            # source cells take priority over repeatedly unreadable dimension cells.
+            priority = {0: 0, 3: 1, 6: 2, 7: 3, 4: 4, 5: 5}
+            for row_index, column, left, right, start, end in sorted(pending_cells, key=lambda cell: (priority[cell[1]], cell[0])):
+                full = full_rows[row_index]
+                # Whole-page OCR can confidently merge printed part-number
+                # spaces or confuse spring glyphs. Only a separate literal
+                # reading of this proven cell may replace them; no character
+                # or format repair. Other columns retain their existing engine.
+                if column in (3, 6) and precise_ocr_crop is not None and retries < 512:
                     retries += 1
                     try:
                         with image.crop((int(left) + 3, int(start) + 3, int(right) - 3, int(end) - 3)) as crop:
-                            with crop.resize((crop.width * 3, crop.height * 3)) as enlarged:
-                                value = literal_cell(read_words(ocr_crop(enlarged, 7)))
-                                if value is None and retries < 512:
-                                    retries += 1
-                                    value = literal_cell(read_words(ocr_crop(enlarged, 6)))
-                            if value is None and retries < 512:
-                                # Remove pale grid/scan noise for a separate raw-line
-                                # reading. Only literal OCR output can populate a cell.
-                                retries += 1
-                                with crop.convert("L") as monochrome:
-                                    with monochrome.point(lambda pixel: 0 if pixel < 140 else 255) as filtered:
-                                        with filtered.point(lambda pixel: 255 - pixel) as ink:
-                                            box = ink.getbbox()
-                                        if box:
-                                            with filtered.crop(box) as tight:
-                                                with ImageOps.expand(tight, border=5, fill=255) as padded:
-                                                    size = (max(1, round(padded.width * 48 / padded.height)), 48)
-                                                    with padded.resize(size) as enlarged:
-                                                        value = literal_cell(read_words(ocr_crop(enlarged, 8 if column == 0 else 7)))
+                            scale = 2 if column == 3 else 3
+                            with crop.resize((crop.width * scale, crop.height * scale)) as enlarged:
+                                value = literal_cell(read_words(precise_ocr_crop(enlarged, 7)))
                         if value is not None:
                             full[column] = value
+                            continue
                     except (OSError, ValueError, subprocess.SubprocessError):
-                        # Optional extra cells cannot erase already recovered identity/OEM.
-                        continue
-                full_rows.append(full)
+                        pass
+                if full[column] != UNRECOVERED:
+                    continue
+                if retries >= 512:
+                    continue
+                retries += 1
+                try:
+                    with image.crop((int(left) + 3, int(start) + 3, int(right) - 3, int(end) - 3)) as crop:
+                        with crop.resize((crop.width * 3, crop.height * 3)) as enlarged:
+                            value = literal_cell(read_words(ocr_crop(enlarged, 7)))
+                            if value is None and retries < 512:
+                                retries += 1
+                                value = literal_cell(read_words(ocr_crop(enlarged, 6)))
+                        if value is None and retries < 512:
+                            # Remove pale grid/scan noise for a separate raw-line
+                            # reading. Only literal OCR output can populate a cell.
+                            retries += 1
+                            with crop.convert("L") as monochrome:
+                                with monochrome.point(lambda pixel: 0 if pixel < 140 else 255) as filtered:
+                                    with filtered.point(lambda pixel: 255 - pixel) as ink:
+                                        box = ink.getbbox()
+                                    if box:
+                                        with filtered.crop(box) as tight:
+                                            with ImageOps.expand(tight, border=5, fill=255) as padded:
+                                                size = (max(1, round(padded.width * 48 / padded.height)), 48)
+                                                with padded.resize(size) as enlarged:
+                                                    value = literal_cell(read_words(ocr_crop(enlarged, 8 if column == 0 else 7)))
+                    if value is not None:
+                        full[column] = value
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    # Optional extra cells cannot erase already recovered identity/OEM.
+                    continue
             return "\n".join("| " + " | ".join(row) + " |" for row in [all_headers, ["---"] * 8, *full_rows])
         return "\n".join("| " + " | ".join(row) + " |" for row in [headers[1:3], ["---", "---"], *rows])

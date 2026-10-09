@@ -22,6 +22,8 @@ ALLOWED_EXTENSIONS = {
 MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
 MAX_LOCAL_OCR_PAGES = 64
 LOCAL_OCR_LANGUAGE = re.compile(r"^[A-Za-z0-9_.+-]{1,64}$")
+PRECISE_OCR_DATA = Path("/opt/f-trade/tessdata-best")
+PRECISE_OCR_SHA256 = "8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba"
 
 
 def fail(message: str) -> None:
@@ -37,6 +39,21 @@ def local_ocr_language() -> str:
     if not LOCAL_OCR_LANGUAGE.fullmatch(language):
         raise ValueError("F_TRADE_LOCAL_OCR_LANGUAGE must contain only Tesseract language identifiers")
     return language
+
+
+def precise_ocr_data(language: str) -> Path | None:
+    """Use only the pinned English model; absence keeps the existing OCR path."""
+    if language != "eng":
+        return None
+    try:
+        path = PRECISE_OCR_DATA / "eng.traineddata"
+        if path.stat().st_size != 15_400_601:
+            return None
+        if hashlib.sha256(path.read_bytes()).hexdigest() == PRECISE_OCR_SHA256:
+            return PRECISE_OCR_DATA
+    except OSError:
+        pass
+    return None
 
 
 def remote_ocr_config() -> tuple[str, str, str]:
@@ -144,6 +161,7 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
     if not selected:
         return ""
     language = local_ocr_language()
+    precise_data = precise_ocr_data(language)
     with tempfile.TemporaryDirectory(prefix="f-trade-local-ocr-") as directory:
         prefix = Path(directory) / "page"
         # Render only requested contiguous page ranges; native pages are never rasterized.
@@ -201,7 +219,7 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                         timeout=max(.1, min(15, deadline - time.monotonic())),
                     ).stdout
 
-                    def ocr_cell(crop, psm):
+                    def ocr_cell(crop, psm, tessdata=None):
                         remaining = deadline - time.monotonic()
                         if remaining <= 0:
                             raise TimeoutError("disc table OCR deadline exceeded")
@@ -209,13 +227,16 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                         crop.save(crop_path)
                         return subprocess.run(
                             [tesseract, str(crop_path), "stdout", "-l", language,
-                             "--psm", str(psm), "tsv"],
+                             *(["--tessdata-dir", str(tessdata), "-c", "tessedit_create_tsv=1",
+                                "-c", "tessedit_create_txt=0"] if tessdata else []),
+                             "--psm", str(psm), *([] if tessdata else ["tsv"])],
                             check=True, capture_output=True, text=True, timeout=min(5, remaining),
                             env=ocr_environment,
                         ).stdout
 
                     text = retain_disc_ocr(text, recover_disc_table(
                         table_words, table_prefix.with_suffix(".png"), ocr_cell,
+                        precise_ocr_crop=(lambda crop, psm: ocr_cell(crop, psm, precise_data)) if precise_data else None,
                     ))
                 except (OSError, ValueError, subprocess.SubprocessError):
                     pass
