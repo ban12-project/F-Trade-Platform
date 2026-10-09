@@ -10,6 +10,7 @@ import {
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import { getProductOutputPolicy, type ProductOutputMode } from "../ai/product-output-policy";
 import { compileContract } from "../contracts/validator";
+import type { ProductAgentEvidenceLocation } from "./evidence-locations";
 import { PRODUCT_OUTPUT_SCHEMA } from "./output-contract";
 import { canonicalPackaging } from "./packaging";
 import {
@@ -35,6 +36,8 @@ export interface ProductAgentSource {
   image_inputs?: ProductAgentImageInput[];
   /** Trusted caller-supplied selection key; never evidence for a product fact. */
   candidate_identifier?: string;
+  /** Server-rebuilt excerpts; never copied from the model's output. */
+  evidence_locations?: ProductAgentEvidenceLocation[];
 }
 
 export interface ProductAgentImageInput {
@@ -113,10 +116,6 @@ function parseModelJson(text: string): unknown {
   }
 }
 
-function normalizeOeNumber(value: string) {
-  return value.trim().replace(/\s+/g, " ").toUpperCase();
-}
-
 function normalizeSourceValue(value: string) {
   return value
     .trim()
@@ -183,7 +182,7 @@ function extractLabelledValues(sourceText: string, labels: string[]) {
   for (const label of labels) {
     const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(
-      `(?:^|\\n)\\s*(?:[-*]\\s*)?(?:\\|\\s*)?${escapedLabel}\\s*(?:[:：]|\\|)\\s*([^\\r\\n|]+)`,
+      `(?:^|\\n)[ \\t]*(?:[-*][ \\t]*)?(?:\\|[ \\t]*)?${escapedLabel}[ \\t]*(?:[:：]|\\|)[ \\t]*([^\\r\\n|]+)`,
       "gi",
     );
     for (const match of sourceText.matchAll(pattern)) {
@@ -377,24 +376,23 @@ function assertSourceBackedFacts(draft: ProductDraft, sourceText: string) {
 }
 
 function extractExplicitOeNumbers(sourceText: string) {
-  const values = new Set<string>();
-  for (const sourceValue of extractLabelledValues(sourceText, PRODUCT_OE_LABELS)) {
-    for (const value of sourceValue.split(/[,;，、]|\t|\s{2,}/)) {
-      const normalized = normalizeOeNumber(value.replace(/^[\s([{"']+|[\s)\]}"'.]+$/g, ""));
-      if (normalized) values.add(normalized);
-    }
-  }
+  const labelledValues = new Set(extractLabelledValues(sourceText, PRODUCT_OE_LABELS));
   const labelledOeLine =
-    /\b(?:(?:OEM|OE)\s*NO\.?\s*(?:[:：]\s*|\s+)|(?:OEM|OE)\s*[:：]\s*)([^\r\n]+)/gi;
+    /(?:^|\n)[ \t]*(?:[-*][ \t]*)?(?:(?:OEM|OE)[ \t]*NO\.?[ \t]*(?:[:：][ \t]*|[ \t]+(?![ \t:：]))|(?:OEM|OE)[ \t]*[:：][ \t]*)([^\r\n]+)/gi;
   for (const match of sourceText.matchAll(labelledOeLine)) {
-    const lineStart = sourceText.lastIndexOf("\n", match.index ?? 0) + 1;
-    if (sourceText.slice(lineStart, match.index).trimStart().startsWith("|")) continue;
-    for (const value of match[1]!.split(/[,;|，、]|\t|\s{2,}/)) {
-      const normalized = normalizeOeNumber(value.replace(/^[\s([{"']+|[\s)\]}"'.]+$/g, ""));
-      if (normalized) values.add(normalized);
-    }
+    labelledValues.add(match[1]!.trim());
   }
-  return values;
+  // Explicit list delimiters separate identifiers; interior whitespace, case
+  // and punctuation are facts, not normalization or list-splitting hints.
+  const numbers = new Set(
+    [...labelledValues].flatMap((value) =>
+      value
+        .split(/[,;，、]/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+  return numbers;
 }
 
 function assertSafeDraft(draft: ProductDraft, source: ProductAgentSource) {
@@ -405,12 +403,32 @@ function assertSafeDraft(draft: ProductDraft, source: ProductAgentSource) {
     throw new Error("Product Agent may only create review_required product drafts");
   }
   const oeNumbers = draft.product.oe_numbers;
-  if (Array.isArray(oeNumbers) && oeNumbers.length > 0) {
-    const sourcedOeNumbers = extractExplicitOeNumbers(source.source_text);
-    if (oeNumbers.some((oeNumber) => !sourcedOeNumbers.has(normalizeOeNumber(oeNumber)))) {
+  if (Array.isArray(oeNumbers)) {
+    const citedRef = draft.field_evidence["product.oe_numbers"];
+    const citedLocation = source.evidence_locations?.find((location) => location.ref === citedRef);
+    if (source.evidence_locations && !citedLocation) {
+      throw new Error("Product Agent field product.oe_numbers cites an unknown evidence location");
+    }
+    if (
+      source.candidate_identifier &&
+      citedLocation?.kind === "table_row" &&
+      !extractLabelledValues(citedLocation.text, PRODUCT_IDENTIFIER_LABELS).some(
+        (value) => value.trim() === source.candidate_identifier,
+      )
+    ) {
+      throw new Error("Product Agent OE source row must match the selected catalog candidate");
+    }
+    const sourced = extractExplicitOeNumbers(citedLocation?.text ?? source.source_text);
+    const supplied = new Set(oeNumbers.map((value) => value.trim()));
+    if (oeNumbers.some((oeNumber) => !sourced.has(oeNumber.trim()))) {
       throw new Error(
         "Product Agent may populate only OE numbers explicitly listed under an OE or OEM No. source label",
       );
+    }
+    // A whole document may contain neighboring products. Compare the complete
+    // set in the server-rebuilt cited excerpt, or the supplied legacy source.
+    if (supplied.size !== oeNumbers.length || supplied.size !== sourced.size) {
+      throw new Error("Product Agent OE numbers must preserve the complete labelled source set");
     }
   }
   assertSourceBackedFacts(draft, source.source_text);

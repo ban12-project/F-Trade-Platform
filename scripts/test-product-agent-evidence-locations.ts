@@ -13,6 +13,10 @@ import {
   type ProductAgentEvidenceLocatedSource,
   prepareProductAgentEvidenceSource,
 } from "../lib/product/evidence-locations";
+import {
+  emptyProductStreamDraft,
+  validateProductStreamProposal,
+} from "../lib/product/stream-validation";
 import type { ProductDraft } from "../lib/product/verification";
 import { videoFactClaimSchema } from "../lib/video/contracts";
 
@@ -131,6 +135,175 @@ assertProductAgentEvidenceLocations(locatedDraft, prepared, finalizeProductAgent
 const compacted = compactProductAgentEvidenceRefs(locatedDraft);
 assert.deepEqual(compacted.evidence_refs, [productNameRef, productTypeRef, skuRef, oeRef, moqRef]);
 
+// OE is a literal set: only surrounding whitespace and ordering may differ.
+const literalOeSource = prepareProductAgentEvidenceSource({
+  ...source,
+  source_text: "OEM No.: Syn-Oe  901, SYN-OE-902.",
+});
+const literalOeRef = literalOeSource.evidence_refs[0]!;
+function literalOeDraft(oeNumbers: string[]) {
+  return {
+    record_id: literalOeSource.record_id,
+    source_ref: literalOeSource.source_ref,
+    evidence_refs: literalOeSource.evidence_refs,
+    field_evidence: { "product.oe_numbers": literalOeRef },
+    verification_status: "review_required",
+    blocking_missing_fields: [],
+    optional_missing_fields: [],
+    product: { oe_numbers: oeNumbers },
+  };
+}
+const literalOes = ["SYN-OE-902.", " Syn-Oe  901 "];
+assert.deepEqual(
+  finalizeProductAgentDraft(literalOeDraft(literalOes), literalOeSource).product.oe_numbers,
+  literalOes,
+);
+const interiorTabSource = prepareProductAgentEvidenceSource({
+  ...source,
+  source_text: "OEM No.: SYN-OE\t901",
+});
+const interiorTabDraft = {
+  ...literalOeDraft(["SYN-OE\t901"]),
+  evidence_refs: interiorTabSource.evidence_refs,
+  field_evidence: { "product.oe_numbers": interiorTabSource.evidence_refs[0]! },
+};
+assert.deepEqual(
+  finalizeProductAgentDraft(interiorTabDraft, interiorTabSource).product.oe_numbers,
+  ["SYN-OE\t901"],
+  "Interior tabs are whitespace facts, not implicit OE list delimiters",
+);
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      { ...interiorTabDraft, product: { oe_numbers: ["SYN-OE", "901"] } },
+      interiorTabSource,
+    ),
+  /OE numbers/,
+);
+for (const alteredOes of [
+  ["SYN-OE  901", "SYN-OE-902."],
+  ["Syn-Oe 901", "SYN-OE-902."],
+  ["Syn-Oe  901", "SYN-OE-902"],
+  ["Syn-Oe  901"],
+  [],
+  ["Syn-Oe  901", "SYN-OE-902.", " SYN-OE-902. "],
+]) {
+  assert.throws(
+    () => finalizeProductAgentDraft(literalOeDraft(alteredOes), literalOeSource),
+    /OE numbers/,
+    "Changed, omitted, or normalized-duplicate OE values must be rejected",
+  );
+}
+const emptyLiteralStream = emptyProductStreamDraft(literalOeSource);
+assert.ok(
+  emptyLiteralStream.blocking_missing_fields.includes("oe_numbers_or_verified_application"),
+);
+for (const value of [["Syn-Oe  901"], ["SYN-OE  901", "SYN-OE-902."]]) {
+  assert.equal(
+    validateProductStreamProposal(
+      emptyLiteralStream,
+      {
+        field: "product.oe_numbers",
+        value,
+        evidenceRef: literalOeRef,
+      },
+      literalOeSource,
+    ).status,
+    "invalid",
+  );
+}
+assert.equal(
+  validateProductStreamProposal(
+    emptyLiteralStream,
+    {
+      field: "product.oe_numbers",
+      value: literalOes,
+      evidenceRef: literalOeRef,
+    },
+    literalOeSource,
+  ).status,
+  "source_validated",
+);
+
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      {
+        ...locatedDraftInput,
+        product: { ...locatedDraftInput.product, oe_numbers: ["OE-001"] },
+      },
+      prepared,
+    ),
+  /OE numbers/,
+);
+
+const emptyOeLabelSource = { ...source, source_text: "OEM No.:\nPart No.: SYN-BORROWED" };
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      {
+        ...draftEnvelope(),
+        product: { oe_numbers: ["Part No.: SYN-BORROWED"] },
+        field_evidence: { "product.oe_numbers": source.evidence_refs[0] },
+      },
+      emptyOeLabelSource,
+    ),
+  /OE numbers/,
+  "An empty OE label cannot borrow the following line",
+);
+for (const emptyLabel of ["OEM No. :", "OE No. ："]) {
+  assert.throws(
+    () =>
+      finalizeProductAgentDraft(
+        {
+          ...draftEnvelope(),
+          product: { oe_numbers: [emptyLabel.endsWith("：") ? "：" : ":"] },
+          field_evidence: { "product.oe_numbers": source.evidence_refs[0] },
+        },
+        { ...source, source_text: emptyLabel },
+      ),
+    /OE numbers/,
+    "The delimiter of an empty spaced label cannot become an OE fact",
+  );
+}
+for (const labelledOe of ["OEM NO. SYN-OE-901", "OEM No. : SYN-OE-901"]) {
+  assert.deepEqual(
+    finalizeProductAgentDraft(
+      {
+        ...draftEnvelope(),
+        product: { oe_numbers: ["SYN-OE-901"] },
+        field_evidence: { "product.oe_numbers": source.evidence_refs[0] },
+      },
+      { ...source, source_text: labelledOe },
+    ).product.oe_numbers,
+    ["SYN-OE-901"],
+  );
+}
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      {
+        ...draftEnvelope(),
+        product: { product_name: "Internal SKU: SYN-BORROWED" },
+        field_evidence: { "product.product_name": source.evidence_refs[0] },
+      },
+      { ...source, source_text: "Product name:\nInternal SKU: SYN-BORROWED" },
+    ),
+  /explicitly labelled source value/,
+  "An empty fact label cannot borrow the following line",
+);
+
+function draftEnvelope() {
+  return {
+    record_id: source.record_id,
+    source_ref: source.source_ref,
+    evidence_refs: source.evidence_refs,
+    verification_status: "review_required",
+    blocking_missing_fields: [],
+    optional_missing_fields: [],
+  };
+}
+
 const wrongLocationDraft: ProductDraft = {
   ...locatedDraft,
   field_evidence: {
@@ -216,6 +389,31 @@ const row251Draft = finalizeProductAgentDraft(
   tablePrepared,
 );
 assertProductAgentEvidenceLocations(row251Draft, tablePrepared, finalizeProductAgentDraft);
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      {
+        ...row251Draft,
+        product: { ...row251Draft.product, oe_numbers: ["OE-302"] },
+        field_evidence: { ...row251Draft.field_evidence, "product.oe_numbers": row302Ref },
+      },
+      tablePrepared,
+    ),
+  /selected catalog candidate/,
+  "A complete literal set from the neighboring row still belongs to another product",
+);
+assert.equal(
+  validateProductStreamProposal(
+    emptyProductStreamDraft(tablePrepared),
+    {
+      field: "product.oe_numbers",
+      value: ["OE-302"],
+      evidenceRef: row302Ref,
+    },
+    tablePrepared,
+  ).status,
+  "invalid",
+);
 
 for (const identifierLabel of ["TQ NO.", "TQNO.", "天奇编号"]) {
   const discSource = prepareProductAgentEvidenceSource({
