@@ -8,7 +8,7 @@ import {
   PRODUCT_OE_LABELS,
 } from "./source-labels";
 
-export const PRODUCT_AGENT_PROMPT_VERSION = "1.1.2";
+export const PRODUCT_AGENT_PROMPT_VERSION = "1.1.3";
 
 export const PRODUCT_AGENT_SYSTEM_PROMPT = `You are the F-Trade Product Agent.
 
@@ -60,6 +60,10 @@ OE/OEM column in the selected row. Text such as "OEM: ..." inside a Clutch Disc,
 or other component column describes that component, not the selected assembly. When the
 selected product's OE cell is empty, keep oe_numbers absent/null even if component cells
 contain OE labels or numbers. Do not move component identifiers into the product's OE field.
+If you populate oe_numbers, copy the complete set in its cited source excerpt, preserving
+case, punctuation and interior whitespace exactly. Only surrounding whitespace and list
+ordering may differ. Split only explicit comma, semicolon or Chinese list delimiters;
+interior spaces and tabs are not separators. Never emit a partial set or trim trailing punctuation.
 
 When candidate_identifier is supplied outside the source-text delimiters, create a draft only
 for that exact catalog candidate. It is a selection key, not source evidence: do not populate
