@@ -179,20 +179,33 @@
             "const": "failed"
           }
         },
-        "required": ["status"]
+        "required": ["status"],
+        "type": "object"
       },
       "then": {
-        "required": ["failure_issue_url"]
+        "required": ["failure_issue_url"],
+        "properties": {
+          "failure_issue_url": {}
+        },
+        "type": "object"
       },
       "else": {
         "not": {
-          "required": ["failure_issue_url"]
+          "required": ["failure_issue_url"],
+          "properties": {
+            "failure_issue_url": {}
+          },
+          "type": "object"
         }
       }
     },
     {
       "if": {
-        "required": ["policy_version"]
+        "required": ["policy_version"],
+        "properties": {
+          "policy_version": {}
+        },
+        "type": "object"
       },
       "then": {
         "required": ["expected_disposition", "final_review", "correction_audit_refs"],
@@ -204,7 +217,8 @@
                   "const": true
                 }
               },
-              "required": ["ready"]
+              "required": ["ready"],
+              "type": "object"
             },
             "then": {
               "properties": {
@@ -217,14 +231,17 @@
                       "const": true
                     },
                     "blocking_missing_fields": {
-                      "maxItems": 0
+                      "maxItems": 0,
+                      "type": "array"
                     },
                     "approved": {
                       "const": true
                     }
-                  }
+                  },
+                  "type": "object"
                 }
-              }
+              },
+              "type": "object"
             },
             "else": {
               "properties": {
@@ -233,33 +250,41 @@
                     "approved": {
                       "const": false
                     }
-                  }
+                  },
+                  "type": "object"
                 }
-              }
+              },
+              "type": "object"
             }
           },
           {
             "if": {
               "properties": {
                 "revision_rounds": {
-                  "minimum": 1
+                  "minimum": 1,
+                  "type": "integer"
                 }
               },
-              "required": ["revision_rounds"]
+              "required": ["revision_rounds"],
+              "type": "object"
             },
             "then": {
               "properties": {
                 "correction_audit_refs": {
-                  "minItems": 1
+                  "minItems": 1,
+                  "type": "array"
                 }
-              }
+              },
+              "type": "object"
             },
             "else": {
               "properties": {
                 "correction_audit_refs": {
-                  "maxItems": 0
+                  "maxItems": 0,
+                  "type": "array"
                 }
-              }
+              },
+              "type": "object"
             }
           },
           {
@@ -269,7 +294,8 @@
                   "const": "passed"
                 }
               },
-              "required": ["status"]
+              "required": ["status"],
+              "type": "object"
             },
             "then": {
               "properties": {
@@ -278,7 +304,8 @@
                     "supplied_facts_source_verified": {
                       "const": true
                     }
-                  }
+                  },
+                  "type": "object"
                 }
               },
               "oneOf": [
@@ -290,7 +317,8 @@
                     "ready": {
                       "const": true
                     }
-                  }
+                  },
+                  "type": "object"
                 },
                 {
                   "properties": {
@@ -306,16 +334,26 @@
                           "const": false
                         },
                         "blocking_missing_fields": {
-                          "minItems": 1
+                          "minItems": 1,
+                          "type": "array"
                         }
-                      }
+                      },
+                      "type": "object"
                     }
-                  }
+                  },
+                  "type": "object"
                 }
-              ]
+              ],
+              "type": "object"
             }
           }
-        ]
+        ],
+        "properties": {
+          "expected_disposition": {},
+          "final_review": {},
+          "correction_audit_refs": {}
+        },
+        "type": "object"
       },
       "else": {
         "allOf": [
@@ -326,7 +364,8 @@
                   "const": "passed"
                 }
               },
-              "required": ["status"]
+              "required": ["status"],
+              "type": "object"
             },
             "then": {
               "properties": {
@@ -360,20 +399,33 @@
                 "ready": {
                   "const": true
                 }
-              }
+              },
+              "type": "object"
             }
           },
           {
             "not": {
               "anyOf": [
                 {
-                  "required": ["expected_disposition"]
+                  "required": ["expected_disposition"],
+                  "properties": {
+                    "expected_disposition": {}
+                  },
+                  "type": "object"
                 },
                 {
-                  "required": ["final_review"]
+                  "required": ["final_review"],
+                  "properties": {
+                    "final_review": {}
+                  },
+                  "type": "object"
                 },
                 {
-                  "required": ["correction_audit_refs"]
+                  "required": ["correction_audit_refs"],
+                  "properties": {
+                    "correction_audit_refs": {}
+                  },
+                  "type": "object"
                 }
               ]
             }

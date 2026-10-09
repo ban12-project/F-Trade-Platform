@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+import productAcceptanceResultSchema from "../contracts/testing/product-acceptance-result.schema.json";
+import { compileContract } from "../lib/contracts/validator";
 
 import { productReviewFormSchema } from "../lib/form-schemas";
 import { productCatalogFormSchema } from "../lib/product/catalog-form-schema";
@@ -7,6 +11,47 @@ import { productFactRevision } from "../lib/product/retained-evidence";
 import { approveProductDraft, rejectProductDraft } from "../lib/product/verification";
 import { productCatalogDisplayIdentity } from "../lib/products";
 import { assertTransition } from "../lib/workflow/transitions";
+
+const parseAcceptanceResult = compileContract(productAcceptanceResultSchema);
+const acceptanceFixture = (name: string) =>
+  JSON.parse(
+    readFileSync(
+      new URL(`../data/fixtures/product-acceptance-${name}.json`, import.meta.url),
+      "utf8",
+    ),
+  );
+for (const name of [
+  "passed.synthetic",
+  "failed.synthetic",
+  "reviewed-v2.synthetic",
+  "blocked-v2.synthetic",
+]) {
+  const record = acceptanceFixture(name);
+  assert.deepEqual(parseAcceptanceResult(record), record);
+}
+assert.throws(() => parseAcceptanceResult(acceptanceFixture("false-pass-invalid")));
+for (const [field, value] of [
+  ["critical_fields_complete", false],
+  ["supplied_facts_source_verified", false],
+  ["approved", false],
+  ["blocking_missing_fields", ["product.oe_numbers"]],
+  ["evidence_refs", []],
+  ["reviewer_ref", ""],
+] as const) {
+  const record = acceptanceFixture("reviewed-v2.synthetic");
+  record.metrics.sourced_field_recognition = 1;
+  record.final_review[field] = value;
+  assert.throws(() => parseAcceptanceResult(record));
+}
+const unrecordedCorrection = acceptanceFixture("reviewed-v2.synthetic");
+unrecordedCorrection.correction_audit_refs = [];
+assert.throws(() => parseAcceptanceResult(unrecordedCorrection));
+const promotedMissingFacts = acceptanceFixture("blocked-v2.synthetic");
+promotedMissingFacts.ready = true;
+assert.throws(() => parseAcceptanceResult(promotedMissingFacts));
+console.log(
+  "PASS strict application contract validates final fact review independently of automatic scores",
+);
 
 const validInput = productCatalogFormSchema.parse({
   productName: "Synthetic clutch disc",
