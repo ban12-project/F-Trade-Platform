@@ -7,7 +7,11 @@ import { compileContract } from "../lib/contracts/validator";
 import { productReviewFormSchema } from "../lib/form-schemas";
 import { productCatalogFormSchema } from "../lib/product/catalog-form-schema";
 import { buildEvidenceBoundProductCatalogDraft } from "../lib/product/evidence-bound-catalog";
-import { productFactRevision } from "../lib/product/retained-evidence";
+import {
+  ProductFactRevisionError,
+  productFactRevision,
+  productRevisionFailureMessage,
+} from "../lib/product/retained-evidence";
 import { approveProductDraft, rejectProductDraft } from "../lib/product/verification";
 import { productCatalogDisplayIdentity } from "../lib/products";
 import { assertTransition } from "../lib/workflow/transitions";
@@ -176,6 +180,24 @@ const rebound = productFactRevision(draft, { ...draft, source_ref: "source-synth
 assert.equal(rebound.source_ref_before, draft.source_ref);
 assert.equal(rebound.source_ref_after, "source-synthetic-new");
 assert.deepEqual(rebound.changes, []);
+const privateDatabaseFailure = Object.assign(
+  new Error("SYNTHETIC private before/after SQL params"),
+  {
+    cause: new Error("SYNTHETIC private database details"),
+  },
+);
+assert.equal(
+  productRevisionFailureMessage(privateDatabaseFailure),
+  "无法保存产品修订，请确认字段证据并重试。",
+);
+assert.equal(
+  productRevisionFailureMessage(
+    Object.assign(new ProductFactRevisionError("changed_location"), {
+      message: "SYNTHETIC private replacement",
+    }),
+  ),
+  "修改字段值或来源后，请为该字段重新选择已上传证据。",
+);
 
 assert.equal(
   productCatalogFormSchema.safeParse({ ...validInput, sourceRef: "/private/tmp/catalog.pdf" })

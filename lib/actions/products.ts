@@ -9,6 +9,7 @@ import {
   createEvidenceBoundProductCatalogDraft as createProductCatalogDraft,
   reviseEvidenceBoundProductCatalogDraft as reviseProductCatalogDraft,
 } from "@/lib/product/evidence-bound-catalog";
+import { productRevisionFailureMessage } from "@/lib/product/retained-evidence";
 import { productReviewFailureMessage } from "@/lib/product/review-write-access";
 import { decideProductCatalogReview } from "@/lib/products";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
@@ -136,6 +137,6 @@ export async function reviseProductCatalogDraftAction(
       productId: parsedProductId.data,
     };
   } catch (error) {
-    return actionError(error, "无法保存产品修订。");
+    return { status: "error", message: productRevisionFailureMessage(error) };
   }
 }

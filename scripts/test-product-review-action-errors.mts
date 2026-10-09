@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { mock } from "node:test";
+import { productCatalogFormSchema } from "../lib/product/catalog-form-schema";
+import { ProductFactRevisionError } from "../lib/product/retained-evidence";
 import {
   PRODUCT_REVIEW_ACCESS_MESSAGE,
   ProductReviewAccessError,
@@ -11,11 +13,12 @@ let failure: unknown = new Error(secret);
 let boundaryFailure: unknown;
 let attempts = 0;
 let refreshes = 0;
+let revisionFailure: unknown = new Error(secret);
 const moduleUrl = (path: string) => new URL(path, import.meta.url).href;
 mock.module(moduleUrl("../lib/action-boundary.ts"), {
   exports: {
     authorizedActionSession: async (permission: string) => {
-      assert.equal(permission, "product:review");
+      assert.ok(["product:review", "product:write"].includes(permission));
       return authorized
         ? { user: { id: "synthetic-reviewer" }, session: { id: "synthetic-session" } }
         : null;
@@ -42,7 +45,7 @@ mock.module(moduleUrl("../lib/product/evidence-bound-catalog.ts"), {
       throw new Error("Unexpected write");
     },
     reviseEvidenceBoundProductCatalogDraft: async () => {
-      throw new Error("Unexpected write");
+      throw revisionFailure;
     },
   },
 });
@@ -120,4 +123,42 @@ assert.deepEqual(await run(), { status: "success", message: "Gate 01 已批准�
 assert.equal(refreshes, 1);
 console.log(
   "PASS actual Gate 01 Action redacts unknown/private errors, preserves controlled guidance and forwards current identity",
+);
+
+const { reviseProductCatalogDraftAction } = await import("../lib/actions/products");
+const revisionForm = new FormData();
+for (const key of Object.keys(productCatalogFormSchema.shape)) revisionForm.set(key, "");
+for (const [key, value] of Object.entries({
+  projectId,
+  productId: "22222222-2222-4222-8222-222222222222",
+  sourceRef: "source-synthetic-catalog",
+  productName: "SYNTHETIC disc",
+  productType: "clutch_disc",
+  internalSku: "SYNTHETIC-001",
+  productNameEvidenceRef: "evidence-synthetic-original",
+  productTypeEvidenceRef: "evidence-synthetic-original",
+  internalSkuEvidenceRef: "evidence-synthetic-original",
+}))
+  revisionForm.set(key, value);
+const revise = () => reviseProductCatalogDraftAction({ status: "idle", message: "" }, revisionForm);
+for (const error of [
+  new Error(secret),
+  { name: "ProductFactRevisionError", message: secret },
+  Object.assign(new Error(secret), { name: "ProductFactRevisionError", cause: new Error(secret) }),
+]) {
+  revisionFailure = error;
+  assert.deepEqual(await revise(), {
+    status: "error",
+    message: "无法保存产品修订，请确认字段证据并重试。",
+  });
+}
+revisionFailure = Object.assign(new ProductFactRevisionError("changed_location"), {
+  message: secret,
+});
+assert.deepEqual(await revise(), {
+  status: "error",
+  message: "修改字段值或来源后，请为该字段重新选择已上传证据。",
+});
+console.log(
+  "PASS actual revision Action keeps private correction/database failures out of client results",
 );
