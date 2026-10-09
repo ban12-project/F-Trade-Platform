@@ -23,6 +23,7 @@ import {
   PRODUCT_FITMENT_LABELS,
   PRODUCT_IDENTIFIER_LABELS,
   PRODUCT_OE_LABELS,
+  PRODUCT_SOURCE_UNREADABLE_CELL,
 } from "./source-labels";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
@@ -175,7 +176,7 @@ function extractLabelledValues(sourceText: string, labels: string[]) {
       if (!normalizedLabels.has(normalizeSourceValue(header))) return;
       for (const row of table.rows) {
         const value = row[column]?.trim();
-        if (value) values.push(value);
+        if (value && !value.includes(PRODUCT_SOURCE_UNREADABLE_CELL)) values.push(value);
       }
     });
   }
@@ -187,7 +188,7 @@ function extractLabelledValues(sourceText: string, labels: string[]) {
     );
     for (const match of sourceText.matchAll(pattern)) {
       const value = match[1]?.trim();
-      if (value) values.push(value);
+      if (value && !value.includes(PRODUCT_SOURCE_UNREADABLE_CELL)) values.push(value);
     }
   }
   return values;
@@ -380,7 +381,8 @@ function extractExplicitOeNumbers(sourceText: string) {
   const labelledOeLine =
     /(?:^|\n)[ \t]*(?:[-*][ \t]*)?(?:(?:OEM|OE)[ \t]*NO\.?[ \t]*(?:[:：][ \t]*|[ \t]+(?![ \t:：]))|(?:OEM|OE)[ \t]*[:：][ \t]*)([^\r\n]+)/gi;
   for (const match of sourceText.matchAll(labelledOeLine)) {
-    labelledValues.add(match[1]!.trim());
+    const value = match[1]!.trim();
+    if (!value.includes(PRODUCT_SOURCE_UNREADABLE_CELL)) labelledValues.add(value);
   }
   // Explicit list delimiters separate identifiers; interior whitespace, case
   // and punctuation are facts, not normalization or list-splitting hints.

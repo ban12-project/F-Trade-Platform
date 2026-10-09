@@ -13,6 +13,7 @@ import {
   type ProductAgentEvidenceLocatedSource,
   prepareProductAgentEvidenceSource,
 } from "../lib/product/evidence-locations";
+import { PRODUCT_SOURCE_UNREADABLE_CELL } from "../lib/product/source-labels";
 import {
   emptyProductStreamDraft,
   validateProductStreamProposal,
@@ -238,6 +239,67 @@ assert.throws(
 );
 
 const emptyOeLabelSource = { ...source, source_text: "OEM No.:\nPart No.: SYN-BORROWED" };
+for (const text of [
+  `OEM No.: ${PRODUCT_SOURCE_UNREADABLE_CELL}`,
+  `OEM No.: SYN-OE; ${PRODUCT_SOURCE_UNREADABLE_CELL}`,
+  `| TQ NO. | OEM NO. |\n| --- | --- |\n| SYN-ID | ${PRODUCT_SOURCE_UNREADABLE_CELL} |`,
+]) {
+  const unreadableSource = { ...source, source_text: text };
+  const unreadableLocated = prepareProductAgentEvidenceSource(unreadableSource);
+  for (const oe of [PRODUCT_SOURCE_UNREADABLE_CELL, "[OCR unreadable", "review original cell]"]) {
+    assert.throws(
+      () =>
+        finalizeProductAgentDraft(
+          {
+            ...draftEnvelope(),
+            product: { oe_numbers: [oe] },
+            field_evidence: { "product.oe_numbers": source.evidence_refs[0] },
+          },
+          unreadableSource,
+        ),
+      /OE numbers/,
+      "A reserved OCR marker and its delimiter fragments are never OE facts",
+    );
+    assert.equal(
+      validateProductStreamProposal(
+        emptyProductStreamDraft(unreadableLocated),
+        {
+          field: "product.oe_numbers",
+          value: [oe],
+          evidenceRef: unreadableLocated.evidence_refs[0]!,
+        },
+        unreadableLocated,
+      ).status,
+      "invalid",
+    );
+  }
+}
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      {
+        ...draftEnvelope(),
+        product: { internal_sku: `prefix ${PRODUCT_SOURCE_UNREADABLE_CELL}` },
+        field_evidence: { "product.internal_sku": source.evidence_refs[0] },
+      },
+      { ...source, source_text: `Part No.: prefix ${PRODUCT_SOURCE_UNREADABLE_CELL}` },
+    ),
+  /explicitly labelled source value/,
+  "Embedding a reserved failure marker does not turn it into a fact",
+);
+assert.throws(
+  () =>
+    finalizeProductAgentDraft(
+      {
+        ...draftEnvelope(),
+        product: { internal_sku: "[OCR unreadable; review original cell]" },
+        field_evidence: { "product.internal_sku": source.evidence_refs[0] },
+      },
+      { ...source, source_text: "Part No.: [OCR unreadable; review original cell]" },
+    ),
+  /explicitly labelled source value/,
+  "An OCR failure marker cannot become a source-backed product fact",
+);
 assert.throws(
   () =>
     finalizeProductAgentDraft(

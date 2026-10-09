@@ -83,7 +83,7 @@ def retain_disc_ocr(text: str, recovered: str | None) -> str:
         return text
     original = "\n".join("> " + line for line in text.splitlines())
     return ("Original OCR (unverified):\n" + original + "\n\n"
-            "Recovered identity/OEM cells (unverified; other columns require original-page review):\n"
+            "Recovered source cells (unverified; unreadable cells and engineering semantics require original-page review):\n"
             + recovered)
 
 
@@ -166,10 +166,11 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
             raise RuntimeError("local OCR rendered an unexpected number of PDF pages")
         text_parts = []
         disc_pass_budget = 120.0
+        ocr_environment = {**os.environ, "OMP_THREAD_LIMIT": "1"}
         for image in pages_as_images:
             result = subprocess.run(
                 [tesseract, str(image), "stdout", "-l", language, "--psm", "3"],
-                check=True, capture_output=True, text=True,
+                check=True, capture_output=True, text=True, env=ocr_environment,
             )
             number = int(image.stem.rsplit("-", 1)[1])
             text = result.stdout
@@ -189,12 +190,14 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                         [pdftoppm, "-f", str(number), "-l", str(number), "-singlefile",
                          "-r", "300", "-png", str(path), str(table_prefix)],
                         check=True, capture_output=True, text=True,
+                        env=ocr_environment,
                         timeout=max(.1, min(15, deadline - time.monotonic())),
                     )
                     table_words = subprocess.run(
                         [tesseract, str(table_prefix.with_suffix(".png")), "stdout", "-l", language,
                          "--psm", "3", "tsv"],
                         check=True, capture_output=True, text=True,
+                        env=ocr_environment,
                         timeout=max(.1, min(15, deadline - time.monotonic())),
                     ).stdout
 
@@ -208,6 +211,7 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                             [tesseract, str(crop_path), "stdout", "-l", language,
                              "--psm", str(psm), "tsv"],
                             check=True, capture_output=True, text=True, timeout=min(5, remaining),
+                            env=ocr_environment,
                         ).stdout
 
                     text = retain_disc_ocr(text, recover_disc_table(
@@ -226,11 +230,13 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                     [pdftoppm, "-f", str(number), "-l", str(number), "-singlefile",
                      "-r", "300", "-png", str(path), str(sparse_prefix)],
                     check=True, capture_output=True, text=True,
+                    env=ocr_environment,
                 )
                 sparse = subprocess.run(
                     [tesseract, str(sparse_prefix.with_suffix(".png").resolve()), "stdout",
                      "-l", language, "--psm", "11", "tsv"],
                     check=True, capture_output=True, text=True,
+                    env=ocr_environment,
                 )
                 def ocr_crop(crop):
                     crop_path = Path(directory) / "caption.png"
@@ -239,6 +245,7 @@ def local_pdf_ocr(path: Path, page_numbers: list[int] | None = None, expected_pa
                         [tesseract, str(crop_path.resolve()), "stdout", "-l", language,
                          "--psm", "7", "tsv"],
                         check=True, capture_output=True, text=True,
+                        env=ocr_environment,
                     ).stdout
 
                 recovered = recover_kit_captions(

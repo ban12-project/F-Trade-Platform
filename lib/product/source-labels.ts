@@ -1,3 +1,6 @@
+/** Reserved converter marker, never a factory fact. */
+export const PRODUCT_SOURCE_UNREADABLE_CELL = "[OCR unreadable; review original cell]";
+
 /** Reviewed catalog identity labels; TQ NO./天奇编号 denotes the catalog identifier. */
 export const PRODUCT_IDENTIFIER_LABELS = [
   "Internal SKU",
