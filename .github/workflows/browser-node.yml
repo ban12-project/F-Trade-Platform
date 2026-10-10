@@ -9,9 +9,11 @@ on:
       - "workflows/browser-sandbox.ts"
       - "app/workspace/browsers/**"
       - "components/workspace/browser-nodes-panel.tsx"
+      - "components/workspace/publication-page-inspection-panel.tsx"
       - "ops/browser-node/**"
       - "scripts/test-browser-*.ts"
       - "scripts/test-browser-*.mjs"
+      - "scripts/test-browser-*.mts"
       - "scripts/test-native-profile.mjs"
       - "drizzle/**"
       - ".github/workflows/browser-node.yml"
@@ -49,7 +51,7 @@ jobs:
           cache: true
       - run: pnpm install --frozen-lockfile
       - name: Lease, capacity, gateway and isolation regression tests
-        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-native-profile.mjs
+        run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-native-profile.mjs scripts/test-browser-publication-inspection.mjs
       - name: On-demand Agent idle exit and session shutdown
         run: node --import tsx --test scripts/test-browser-idle.mjs scripts/test-browser-managed-facebook.mjs scripts/test-browser-sandbox-session.ts scripts/test-browser-sandbox-runtime.ts scripts/test-browser-sandbox-provider.ts
       - name: Sandbox dispatch orchestration
@@ -62,6 +64,12 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/test-browser-fleet-postgres.ts
         env:
           BROWSER_FLEET_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/browser_fleet_test
+      - name: Page inspection authorization and late revocation on PostgreSQL
+        run: node --conditions=react-server --import tsx scripts/test-browser-publication-inspection-postgres.ts
+        env:
+          BROWSER_FLEET_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/browser_fleet_test
+      - name: Page inspection action authentication and error privacy
+        run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-browser-publication-inspection-action.mts
       - name: Application typecheck
         if: ${{ !cancelled() }}
         run: pnpm typecheck

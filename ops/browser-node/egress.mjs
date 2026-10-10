@@ -85,7 +85,7 @@ export async function verifyBrowserEgress(browserRequest, run, tabId) {
   );
   readEgressSnapshot(await boundedJson(response), run.expectedEgressIp);
 }
-export async function openEgressCheckedSession(browserRequest, run) {
+export async function openEgressCheckedSession(browserRequest, run, onInteractiveTab) {
   // Validate configuration before creating any tab, including the neutral probe.
   canonicalIp(run.expectedEgressIp);
   const opened = await browserRequest("/tabs", {
@@ -104,7 +104,12 @@ export async function openEgressCheckedSession(browserRequest, run) {
       url: "https://www.facebook.com/",
       trace: false,
     });
-    await login.body?.cancel();
+    if (onInteractiveTab) {
+      const page = await boundedJson(login);
+      if (typeof page.tabId !== "string" || !page.tabId || page.tabId.length > 200)
+        throw new Error("interactive_tab_invalid");
+      onInteractiveTab(page.tabId);
+    } else await login.body?.cancel();
   }
   return probe.tabId;
 }
