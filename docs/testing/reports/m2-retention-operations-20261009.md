@@ -2,6 +2,10 @@
 
 对应 [#122](https://github.com/ban12-project/F-Trade-Platform/issues/122)，接续 [PR #572](https://github.com/ban12-project/F-Trade-Platform/pull/572) 和[应用实现核查](m2-retention-enforcement-20261009.md)。沿用已接受的 90 天、coda 责任及本次委托审核，不扩大具体发布、客户消息或新付费服务授权。
 
+## 后续数据库控制面证据（2026-10-10）
+
+用户完成 Neon 登录后，已取得正确生产端点匹配、6 小时 History window、单一生产分支、零派生分支／Read Replica、空快照及无计划、Logical Replication 未启用的当前页面证据，见 [Neon 恢复副本检查点](m2-neon-retention-checkpoint-20261010.md)。下方表格保留 2026-10-09 当时的未知状态；当前这些配置已核对，但真实到期删除、历史副本物理清除与恢复后到期阻断实测仍未完成。
+
 ## 生产应用证据
 
 PR #572 最终提交 `a9be11d0113fbbbb2671427dfa20662761767ab7` 的八项工程检查通过：全仓、生产构建、PostgreSQL、Harbor、Playwright、审查及两项文档沙箱检查。squash 合并 `1b466bc3670a6e3fbb5791cceec71e37acfb1886`。
