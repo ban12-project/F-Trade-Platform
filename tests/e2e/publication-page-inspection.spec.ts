@@ -43,7 +43,7 @@ test("mismatched identity gates further inspection and Messenger pages are refus
   await page.route("https://www.facebook.com/**", (route) =>
     route.fulfill({ contentType: "text/html", body: html }),
   );
-  await page.goto("https://www.facebook.com/synthetic-owned");
+  await page.goto("https://www.facebook.com/");
   const result = await page.evaluate(
     ({ program, profile }) =>
       new Function(`return (${program})`)()({
