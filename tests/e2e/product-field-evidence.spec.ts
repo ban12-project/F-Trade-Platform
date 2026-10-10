@@ -74,7 +74,7 @@ test("product error summary focuses the first invalid fact", async ({ page }) =>
   await page.getByRole("tab", { name: "手动录入" }).click();
   await page.getByRole("button", { name: "创建待审核草稿" }).click();
   await expect(page.getByRole("alert").getByText(/还有 \d+ 项需要处理/)).toBeVisible();
-  await expect(page.getByLabel("产品名称", { exact: true })).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "产品名称", exact: true })).toBeFocused();
 });
 
 test("manual product entry rejects excess images before uploading or saving", async ({ page }) => {
