@@ -55,6 +55,16 @@ runs:
     - name: Test image contents, startup, watchdog and pull-only Compose
       shell: bash
       run: bash scripts/test-browser-images.sh
+    - name: Export the tested pair for restricted Sandbox deployment
+      shell: bash
+      run: bash scripts/export-browser-image-pair.sh "$RUNNER_TEMP/tested-browser-images-$ARCH"
+    - name: Save tested native image pair and checksums
+      uses: actions/upload-artifact@v7
+      with:
+        name: tested-browser-image-pair-${{ inputs.arch }}
+        path: ${{ runner.temp }}/tested-browser-images-${{ inputs.arch }}/
+        if-no-files-found: error
+        retention-days: 7
     - name: Log in to GHCR only after validation
       if: inputs.publish == 'true'
       uses: docker/login-action@v4
