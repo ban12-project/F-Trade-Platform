@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-
+import { FacebookPublicationPrerequisitesNotice } from "@/components/workspace/records/facebook-publication";
 import { VideoWorkspace } from "@/components/workspace/video-workspace";
 import type { MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
 import { resolveVideoSelection, type VideoSelectionQuery } from "@/lib/video/workspace-selection";
@@ -111,6 +111,7 @@ async function VideoWorkspaceFixture({
       entries={[current]}
       copyCandidates={[]}
       canReview
+      publication={state === "approved" ? <FacebookPublicationPrerequisitesNotice /> : null}
       canWrite={query.viewer !== "1"}
       selection={resolveVideoSelection(
         "new" in query || "item" in query || "product" in query ? query : { item: current.id },
