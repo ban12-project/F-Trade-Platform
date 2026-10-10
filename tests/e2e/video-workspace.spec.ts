@@ -1,5 +1,21 @@
 import { expect, test } from "@playwright/test";
 
+test("review copies require an explicit declaration and preserve the original cutoff", async ({
+  page,
+}) => {
+  await page.goto("/testing/video-workspace?state=approved");
+  await expect(page.getByText("已登记工作副本", { exact: true })).toBeVisible();
+  await expect(page.getByText(/2026-11-30.*不续期/)).toBeVisible();
+  await page.getByRole("button", { name: "登记审核工作副本", exact: true }).click();
+  await expect(
+    page.getByText("请确认这份附件是工作副本，不是工厂原件或长期来源。", { exact: true }),
+  ).toBeVisible();
+  const declaration = page.getByRole("checkbox", { name: /这份附件是本视频的审核工作副本/ });
+  await expect(declaration).not.toBeChecked();
+  await declaration.check();
+  await expect(declaration).toBeChecked();
+});
+
 test("video editor opens the selected draft in a dedicated workspace", async ({ page }) => {
   await page.goto("/testing/video-workspace");
   await expect(page.getByRole("heading", { name: "视频编辑器" })).toBeVisible();

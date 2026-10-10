@@ -66,6 +66,7 @@ import type {
 import { workspaceRecordHref, workspaceReturnTo } from "@/lib/workspace/navigation";
 import { useWorkspaceDirtyState } from "./dirty-state";
 import { MarketingVideoCreateForm } from "./marketing-video-create-form";
+import { VideoReviewEvidenceCopies } from "./video-review-evidence-copies";
 import { WorkspaceLink } from "./workspace-link";
 
 export function videoStateLabel(state: string) {
@@ -633,6 +634,13 @@ function EditVideo({
             </Button>
           </CardFooter>
         </Card>
+      ) : null}
+      {canReview ? (
+        <VideoReviewEvidenceCopies
+          projectId={projectId}
+          videoId={entry.id}
+          copies={entry.reviewEvidenceCopies ?? []}
+        />
       ) : null}
       {message ? (
         <p className="text-sm text-muted-foreground" aria-live="polite">

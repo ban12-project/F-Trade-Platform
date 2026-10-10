@@ -302,6 +302,35 @@ export const evidenceUploadIntent = pgTable(
   ],
 );
 
+/** Explicit uploader declaration; original evidence metadata and clocks stay unchanged. */
+export const videoReviewWorkingEvidence = pgTable(
+  "video_review_working_evidence",
+  {
+    id: text("id").primaryKey(),
+    evidenceId: text("evidence_id")
+      .notNull()
+      .references(() => evidence.id, { onDelete: "restrict" }),
+    videoId: text("video_id")
+      .notNull()
+      .references(() => aggregateRecord.id, { onDelete: "restrict" }),
+    declaredById: text("declared_by_id").notNull(),
+    policyVersion: text("policy_version").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("video_review_working_evidence_ref_uidx").on(table.evidenceId),
+    index("video_review_working_evidence_video_idx").on(table.videoId),
+    check(
+      "video_review_working_evidence_actor_nonempty",
+      sql`length(btrim(${table.declaredById})) > 0`,
+    ),
+    check(
+      "video_review_working_evidence_policy_nonempty",
+      sql`length(btrim(${table.policyVersion})) > 0`,
+    ),
+  ],
+);
+
 export const workflowEvent = pgTable(
   "workflow_event",
   {

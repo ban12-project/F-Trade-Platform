@@ -9,12 +9,13 @@ import {
   evidence,
   productDocumentUploadReceipt,
   user,
+  videoReviewWorkingEvidence,
   workspaceProject,
   workspaceProjectEvidence,
   workspaceProjectItem,
   workspaceProjectMember,
 } from "@/lib/db/schema";
-
+import { assertVideoWorkingEvidenceRetained } from "@/lib/video/retention-access";
 import {
   assertVideoObjectRetained,
   isVideoWorkingEvidence,
@@ -265,7 +266,12 @@ export async function listProjectEvidenceOptions(
     )
     .where(
       and(
-        videoWorkingEvidenceRetainedCondition(evidence.sourceLabel, evidence.createdAt),
+        videoWorkingEvidenceRetainedCondition(
+          evidence.sourceLabel,
+          evidence.createdAt,
+          evidence.id,
+        ),
+        sql`NOT EXISTS (SELECT 1 FROM video_review_working_evidence w WHERE w.evidence_id = ${evidence.id})`,
         sql`${evidence.blobKey} NOT LIKE 'retired/%'`,
         or(
           eq(workspaceProjectEvidence.projectId, projectId),
@@ -281,6 +287,7 @@ export async function assertAndLinkProjectEvidence(
   evidenceIds: string[],
   actorId: string,
   database: DatabaseExecutor = getDatabase(),
+  reviewVideoId?: string,
 ) {
   return database.transaction(async (tx) => {
     const uniqueIds = [...new Set(evidenceIds.filter(Boolean))];
@@ -308,6 +315,13 @@ export async function assertAndLinkProjectEvidence(
       .orderBy(asc(evidence.id))
       .for("share", { of: evidence });
     // Hold the evidence locks until the enclosing business write commits.
+    const reviewCopies = await tx
+      .select({ videoId: videoReviewWorkingEvidence.videoId })
+      .from(videoReviewWorkingEvidence)
+      .where(inArray(videoReviewWorkingEvidence.evidenceId, uniqueIds));
+    if (reviewCopies.some((copy) => copy.videoId !== reviewVideoId))
+      throw new Error("视频审核工作副本只能用于所属视频审核，不能作为工厂资料或其他业务证据。");
+    await assertVideoWorkingEvidenceRetained(tx, uniqueIds);
     for (const row of rows) {
       if (row.blobKey.startsWith("retired/")) throw new Error("部分证据不存在或无权用于当前项目。");
       if (isVideoWorkingEvidence(row.sourceLabel)) assertVideoObjectRetained(row.createdAt);

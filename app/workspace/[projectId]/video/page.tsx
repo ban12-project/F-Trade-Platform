@@ -42,7 +42,7 @@ async function VideoContent({
       ? await readWorkspaceRecord(projectId, "video", query.item, session.user.id)
       : null;
   const entries = current
-    ? await listProjectMarketingVideoEntries(projectId, undefined, current.id)
+    ? await listProjectMarketingVideoEntries(projectId, undefined, current.id, session.user.id)
     : [];
   const sourceId = current
     ? entries[0]?.productId

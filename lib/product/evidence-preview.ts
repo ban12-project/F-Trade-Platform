@@ -104,7 +104,12 @@ async function authorizedSources(
         eq(evidence.uploadedByType, "human"),
       ),
     )
-    .where(eq(workspaceProjectEvidence.projectId, projectId));
+    .where(
+      and(
+        eq(workspaceProjectEvidence.projectId, projectId),
+        sql`NOT EXISTS (SELECT 1 FROM video_review_working_evidence w WHERE w.evidence_id = ${evidence.id})`,
+      ),
+    );
   return rows.flatMap((row) => {
     if (!filenames[row.contentType]) return [];
     const linkedFields = fields.filter(

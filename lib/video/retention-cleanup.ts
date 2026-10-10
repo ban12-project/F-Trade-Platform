@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { del } from "@vercel/blob";
-import { and, eq, inArray, notExists, sql } from "drizzle-orm";
+import { and, eq, inArray, notExists, or, sql } from "drizzle-orm";
 import { type Database, getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
@@ -13,6 +13,10 @@ import {
   videoRetentionCleanup,
 } from "@/lib/db/schema";
 import { videoRetentionDays, videoRetentionPolicyVersion } from "./retention-policy";
+import {
+  reviewEvidenceSourceProtectedCondition,
+  videoReviewEvidenceExpiredCondition,
+} from "./review-evidence-policy";
 
 type DeleteStore = { delete(path: string): Promise<void> };
 const privateDeleteStore: DeleteStore = {
@@ -44,7 +48,7 @@ const noCleanup = (
 
 /** Only exact server-created working labels; source, rights and non-video use protect bytes. */
 export function unprotectedWorkingEvidenceCondition() {
-  return sql`(
+  const legacy = sql`(
     ${evidence.sourceLabel} IN ('marketing-upload:image', 'marketing-upload:video', 'internet-search:wikimedia-commons:private-test-only')
     AND NOT EXISTS (SELECT 1 FROM product_media_asset p WHERE p.evidence_id = ${evidence.id} OR p.rights_evidence_ref = ${evidence.id} OR p.review_evidence_ref = ${evidence.id})
     AND NOT EXISTS (SELECT 1 FROM product_source_image p WHERE p.evidence_id = ${evidence.id})
@@ -53,6 +57,17 @@ export function unprotectedWorkingEvidenceCondition() {
     AND NOT EXISTS (SELECT 1 FROM approval p WHERE p.evidence_ref = ${evidence.id})
     AND NOT EXISTS (SELECT 1 FROM aggregate_record p WHERE p.type <> 'video' AND strpos(p.payload::text, ${evidence.id}) > 0)
   )`;
+  return or(
+    legacy,
+    sql`(
+    EXISTS (SELECT 1 FROM video_review_working_evidence w WHERE w.evidence_id = ${evidence.id})
+    AND NOT ${reviewEvidenceSourceProtectedCondition(evidence.id)}
+  )`,
+  )!;
+}
+
+function workingEvidenceExpiredCondition() {
+  return or(expired(evidence.createdAt), videoReviewEvidenceExpiredCondition(evidence.id))!;
 }
 
 /** Enqueue and redact under the same row lock. No raw payload enters the outbox/audit. */
@@ -166,7 +181,7 @@ async function enqueueEvidence(ref: string, database: Database) {
       .where(
         and(
           eq(evidence.id, ref),
-          expired(evidence.createdAt),
+          workingEvidenceExpiredCondition(),
           unprotectedWorkingEvidenceCondition(),
         ),
       )
@@ -216,7 +231,7 @@ export async function purgeVideoRetentionObject(
         .where(
           and(
             eq(evidence.id, job.objectRef),
-            expired(evidence.createdAt),
+            workingEvidenceExpiredCondition(),
             unprotectedWorkingEvidenceCondition(),
           ),
         );
@@ -309,7 +324,7 @@ export async function cleanupExpiredVideoObjects(
     .from(evidence)
     .where(
       and(
-        expired(evidence.createdAt),
+        workingEvidenceExpiredCondition(),
         unprotectedWorkingEvidenceCondition(),
         noCleanup("evidence", evidence.id, database),
       ),
