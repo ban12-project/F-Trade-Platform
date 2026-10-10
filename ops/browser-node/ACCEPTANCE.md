@@ -1,6 +1,6 @@
 # MVP1 真实账号发布与入站验收
 
-本手册针对同一账号的 Vercel Sandbox、持久 Firefox profile 和固定浏览器代理。当前证据见 [生产会话检查点](../../docs/testing/reports/mvp1-production-session-checkpoint-20260924.md)。本地 Podman 的合成回归是开发检查，不代替 Sandbox 中同一镜像、账号卷与代理的生产观察。任何验收都不新建干净 profile，不因 CAPTCHA 循环登录，也不把人工核对的旧帖当作自动回执成功。
+本手册针对同一账号的 Vercel Sandbox、持久 Firefox profile 和固定浏览器代理。当前真实成片及运行边界见 [2026-10-10 成片验收](../../docs/testing/reports/m2-real-catalogue-video-acceptance-20261010.md)，此前发布证据见 [2026-09-24 生产会话检查点](../../docs/testing/reports/mvp1-production-session-checkpoint-20260924.md)。本地 Podman 的合成回归是开发检查，不代替 Sandbox 中同一镜像、账号卷与代理的生产观察。任何验收都不新建干净 profile，不因 CAPTCHA 循环登录，也不把人工核对的旧帖当作自动回执成功。
 
 定位顺序为 Podman 复现、修复和回归，再做一次 Sandbox 一致性核对。Podman 要使用与 Sandbox 对应的 browser/Agent 版本、原生 profile 挂载方式和浏览器内代理配置；分别记录镜像摘要、持久卷、浏览器出口、页面身份及测试结果。若代理只能访问 IP 检查站却不能连 Facebook，记录网络阻塞，不把它解释成页面逻辑缺陷。Sandbox 最终核对须比较实际运行镜像与审核修订，并保留原账号卷；本地合成通过只允许推进代码审查，不允许把视频或 DM 标为生产通过。
 
@@ -22,7 +22,7 @@
 
 ## DM：先取得可核对的真实入站样本
 
-1. 先由获同意的测试发送方给该账号发送一条不含客户资料的入站消息；Agent 不发送私信。当前生产只声明 `interactive, publish`、最近收件箱检查为“尚未执行”，所以不能先打开轮询再推断成功。只读观察同一持久 Messenger 会话中的一个非空线程，逐项复核 `inbox.json` 需要的身份、列表／线程就绪、方向、正文、可解析时间、稳定 `data-*` 会话和消息 ID、加载／挑战及分页边界。空收件箱无法证明消息选择器和稳定 ID。若真实页面不提供可证明稳定的 ID，先修订契约并重测，不以正文指纹代替。
+1. 先由获同意的测试发送方给该账号发送一条不含客户资料的入站消息；Agent 不发送私信。2026-09-24 曾观察到 `interactive, publish`；2026-10-10 实际仅声明 `interactive`，发布／收件箱／登录自动化关闭，旧文字发布审核范围过期，最近收件箱检查仍为“尚未执行”。须重新核对当前范围，不能先打开轮询再推断成功。只读观察同一持久 Messenger 会话中的一个非空线程，逐项复核 `inbox.json` 需要的身份、列表／线程就绪、方向、正文、可解析时间、稳定 `data-*` 会话和消息 ID、加载／挑战及分页边界。空收件箱无法证明消息选择器和稳定 ID。若真实页面不提供可证明稳定的 ID，先修订契约并重测，不以正文指纹代替。
 2. 把已复核的私有配置和期限写入同一 Sandbox，启用 `manifest.inbox` 并确认节点实际声明 inbox 能力；渠道、账号和至少 300 秒的轮询间隔必须匹配。先运行 `pnpm exec playwright test tests/e2e/facebook-inbox.spec.ts`，再按 `.github/workflows/facebook-worker.yml` 的 PostgreSQL 配置运行 `node --conditions=react-server --import tsx scripts/test-facebook-publication-postgres.ts`；后者会执行入站 HTTP／数据库组合回归。然后从停止状态触发一轮真实检查，核对唯一唤醒、签名完成回执的 `coverage: visible_inbox`、消息加密入库及 `lastCheckedAt` 前进；空批次本身不算完成。
 3. 再检查同一条入站消息：数据库应只保留一条，重复轮询返回 duplicate，未分流会话保持 `leadId = null`，不会自动回复、报价或创建销售项目。人工分流才进入现有 Lead/RFQ 流程。暂停渠道、挑战、缺 ID、方向歧义、列表变化、分页断层或回执丢失时，本轮不能标记完成；下一轮从头扫描并按稳定 ID 去重。Messenger `ready` 仅证明可进入页面，不证明历史聊天完整恢复。
 
