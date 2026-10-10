@@ -484,6 +484,7 @@ async function testReviewSnapshot() {
         function rows() {
           if (tableName === "product_agent_stream_run") return run ? [run] : [];
           if (tableName === "product_source_image") return [];
+          if (tableName === "video_review_working_evidence") return [];
           if (tableName === "workspace_project") return [{ kind: "marketing", status: "active" }];
           if (tableName === "workspace_project_member") return [{ role: "owner" }];
           if (tableName === "workspace_project_item")

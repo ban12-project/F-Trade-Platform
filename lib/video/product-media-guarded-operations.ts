@@ -257,7 +257,7 @@ export async function decideGuardedVideoReview(
       await assertLockedVideoProductContext(tx, current);
     }
     const expiresAt = await authorizeLockedVideoReview(tx, identity, aggregate.id);
-    await assertAndLinkProjectEvidence(projectId, [value.evidenceRef], actorId, tx);
+    await assertAndLinkProjectEvidence(projectId, [value.evidenceRef], actorId, tx, value.videoId);
     const now = new Date();
     if (expiresAt <= now) throw new VideoReviewAccessError();
     await assertVideoRetentionForId(tx, aggregate.id);

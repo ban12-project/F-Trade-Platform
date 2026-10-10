@@ -41,6 +41,8 @@ import {
 import { assertLockedVideoProductContext } from "./product-context-guard";
 import { assertVideoRetentionForId } from "./retention-access";
 import { videoRetainedCondition } from "./retention-policy";
+import type { VideoReviewEvidenceCopy } from "./review-evidence-contracts";
+import { listVideoReviewEvidenceCopies } from "./review-evidence-store";
 import type { UploadedVideoSourceAsset } from "./uploaded-assets";
 
 export type ReadyVideoProductSource = {
@@ -61,6 +63,7 @@ export type VideoWorkspaceEntry = {
   previewAssetRef: string | null;
 };
 export type MarketingVideoEditorEntry = VideoWorkspaceEntry & {
+  reviewEvidenceCopies?: VideoReviewEvidenceCopy[];
   draft: MarketingVideoDraft;
   targetAudience: string;
   captionFactOptions: Array<{ field: string; value: string }>;
@@ -270,6 +273,7 @@ export async function listProjectMarketingVideoEntries(
   projectId: string,
   database: Database = getDatabase(),
   id?: string,
+  actorId?: string,
 ): Promise<MarketingVideoEditorEntry[]> {
   const rows = await database
     .select({ record: aggregateRecord, createdAt: workspaceProjectItem.createdAt })
@@ -307,6 +311,13 @@ export async function listProjectMarketingVideoEntries(
     rows.map(({ record }) => record.id),
     database,
   );
+  const reviewCopies = actorId
+    ? await listVideoReviewEvidenceCopies(
+        rows.map(({ record }) => record.id),
+        actorId,
+        database,
+      )
+    : new Map<string, VideoReviewEvidenceCopy[]>();
   return rows.flatMap(({ record, createdAt }) => {
     const project = videoProjectSchema.safeParse(record.payload);
     if (!project.success || !project.data.editDraft) return [];
@@ -337,6 +348,7 @@ export async function listProjectMarketingVideoEntries(
           !privateTestOnly,
         privateTestOnly,
         processingJob: jobsByVideo.get(record.id) ?? null,
+        reviewEvidenceCopies: reviewCopies.get(record.id) ?? [],
       },
     ];
   });

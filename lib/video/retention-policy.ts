@@ -46,6 +46,14 @@ export function isVideoWorkingEvidence(sourceLabel: string) {
 export function videoWorkingEvidenceRetainedCondition(
   sourceLabel: SQLWrapper,
   createdAt: SQLWrapper,
+  evidenceId: SQLWrapper,
 ) {
-  return sql`(${sourceLabel} NOT IN ('marketing-upload:image', 'marketing-upload:video', 'internet-search:wikimedia-commons:private-test-only') OR ${videoRetainedCondition(createdAt)})`;
+  return sql`(
+    (${sourceLabel} NOT IN ('marketing-upload:image', 'marketing-upload:video', 'internet-search:wikimedia-commons:private-test-only') OR ${videoRetainedCondition(createdAt)})
+    AND NOT EXISTS (SELECT 1 FROM video_review_working_evidence w JOIN aggregate_record a ON a.id = w.video_id
+      WHERE w.evidence_id = ${evidenceId} AND (
+        ${createdAt} <= clock_timestamp() - (${videoRetentionDays} * interval '1 day')
+        OR a.type <> 'video' OR a.created_at <= clock_timestamp() - (${videoRetentionDays} * interval '1 day')
+      ))
+  )`;
 }

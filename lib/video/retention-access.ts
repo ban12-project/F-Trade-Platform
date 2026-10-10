@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { DatabaseExecutor } from "@/lib/db/client";
-import { aggregateRecord, evidence } from "@/lib/db/schema";
+import { aggregateRecord, evidence, videoReviewWorkingEvidence } from "@/lib/db/schema";
 import {
   assertVideoObjectRetained,
   isVideoWorkingEvidence,
@@ -35,6 +35,14 @@ export async function assertVideoRetentionForId(
         ];
       })
     : [];
+  const exportArtifact = row.payload.exportArtifact;
+  if (
+    exportArtifact &&
+    typeof exportArtifact === "object" &&
+    "approvalRef" in exportArtifact &&
+    typeof exportArtifact.approvalRef === "string"
+  )
+    refs.push(exportArtifact.approvalRef);
   if (refs.length) await assertVideoWorkingEvidenceRetained(database, refs);
   assertVideoObjectRetained(row.createdAt);
 }
@@ -46,6 +54,7 @@ export async function assertVideoWorkingEvidenceRetained(
   if (!refs.length) return;
   const rows = await database
     .select({
+      id: evidence.id,
       createdAt: evidence.createdAt,
       sourceLabel: evidence.sourceLabel,
       blobKey: evidence.blobKey,
@@ -55,5 +64,20 @@ export async function assertVideoWorkingEvidenceRetained(
   for (const row of rows) {
     if (row.blobKey.startsWith("retired/")) throw new VideoRetentionError();
     if (isVideoWorkingEvidence(row.sourceLabel)) assertVideoObjectRetained(row.createdAt);
+  }
+  const copies = await database
+    .select({
+      createdAt: aggregateRecord.createdAt,
+      type: aggregateRecord.type,
+      evidenceId: videoReviewWorkingEvidence.evidenceId,
+    })
+    .from(videoReviewWorkingEvidence)
+    .innerJoin(aggregateRecord, eq(aggregateRecord.id, videoReviewWorkingEvidence.videoId))
+    .where(inArray(videoReviewWorkingEvidence.evidenceId, refs));
+  for (const copy of copies) {
+    const row = rows.find((item) => item.id === copy.evidenceId);
+    if (!row || copy.type !== "video") throw new VideoRetentionError();
+    assertVideoObjectRetained(row.createdAt);
+    assertVideoObjectRetained(copy.createdAt);
   }
 }

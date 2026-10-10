@@ -41,6 +41,25 @@ function entry(state: "draft" | "review" | "approved"): MarketingVideoEditorEntr
     downloadAvailable: state === "approved",
     privateTestOnly: false,
     processingJob: null,
+    reviewEvidenceCopies:
+      state === "approved"
+        ? [
+            {
+              evidenceRef: "evidence-synthetic-review-copy-001",
+              label: "SYNTHETIC review.csv",
+              canRegister: true,
+              registered: false,
+              expiresAt: "2026-11-30T00:00:00.000Z",
+            },
+            {
+              evidenceRef: "evidence-synthetic-registered-copy-002",
+              label: "SYNTHETIC registered.csv",
+              canRegister: false,
+              registered: true,
+              expiresAt: "2026-11-30T00:00:00.000Z",
+            },
+          ]
+        : [],
     draft: {
       version: 3,
       creativeFramework: "google_abcd",

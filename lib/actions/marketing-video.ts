@@ -34,6 +34,11 @@ import {
 } from "@/lib/video/processing-jobs";
 import { createMarketingVideoEditProjectFromProductMedia } from "@/lib/video/product-media-create";
 import { decideGuardedVideoReview } from "@/lib/video/product-media-guarded-operations";
+import { videoReviewWorkingEvidenceFormSchema } from "@/lib/video/review-evidence-contracts";
+import {
+  registerVideoReviewWorkingEvidence,
+  VideoReviewCopyError,
+} from "@/lib/video/review-evidence-store";
 import { VideoReviewAccessError, videoReviewFailureMessage } from "@/lib/video/review-write-access";
 import {
   assertMarketingVideoProjectLink,
@@ -413,5 +418,32 @@ export async function reviewMarketingVideoAction(
     };
   } catch (error) {
     return { status: "error", message: videoReviewFailureMessage(error) };
+  }
+}
+
+export async function registerVideoReviewWorkingEvidenceAction(
+  input: unknown,
+): Promise<MarketingVideoActionState> {
+  try {
+    const session = await authorizedActionSession("content:review");
+    if (!session) throw new VideoReviewAccessError();
+    const value = videoReviewWorkingEvidenceFormSchema.parse(input);
+    await registerVideoReviewWorkingEvidence(value, {
+      actorId: session.user.id,
+      sessionId: session.session.id,
+      projectId: value.projectId,
+    });
+    revalidatePath(`/workspace/${value.projectId}`);
+    refreshWorkspace();
+    return {
+      status: "success",
+      message: "已登记为本视频的审核工作副本，按原始时间截止；来源原件保留。",
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof VideoReviewCopyError ? error.message : videoReviewFailureMessage(error),
+    };
   }
 }
