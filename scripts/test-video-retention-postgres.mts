@@ -21,6 +21,7 @@ import {
   isVideoObjectRetained,
   VideoRetentionError,
   videoRetentionMilliseconds,
+  videoRetentionPolicyVersion,
 } from "../lib/video/retention-policy";
 import {
   applyMarketingVideoAiDraft,
@@ -332,7 +333,7 @@ try {
   const purged = await videoSnapshot(expired.videoId);
   assert.deepEqual(purged.video.payload, {
     id: expired.videoId,
-    retention: { purged: true, policyVersion: "1.0.0" },
+    retention: { purged: true, policyVersion: videoRetentionPolicyVersion },
   });
   assert.equal(purged.video.createdAt.getTime(), before.video.createdAt.getTime());
   assert.equal(purged.gates[0].notes, null);
@@ -365,7 +366,7 @@ try {
   );
   scenarios++;
 
-  // Purge waits for a concurrent factory binding, then sees its committed protection.
+  // A previous-policy cleanup keeps its version and waits for a concurrent factory binding.
   const race = await evidence();
   const cleanupId = randomUUID();
   await db.insert(schema.videoRetentionCleanup).values({
