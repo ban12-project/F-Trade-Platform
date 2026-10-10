@@ -50,6 +50,10 @@ test("manual product intake exposes evidence-bound specification and commercial 
   await expect(form.locator("#evidence-ref")).toHaveCount(0);
   await expect(form.getByText("系统不会自动复制", { exact: false })).toBeVisible();
   await expect(form.getByText("不得根据经验或图片推断", { exact: false })).toBeVisible();
+  const images = form.getByLabel("产品图片（可选）", { exact: true });
+  await expect(images).toHaveAttribute("multiple", "");
+  await expect(images).toHaveAttribute("accept", ".png,.jpg,.jpeg");
+  await expect(form.getByText("图片随草稿私有保存", { exact: false })).toBeVisible();
   await expect(form.getByRole("progressbar", { name: "事实与证据完成度" })).toBeVisible();
   await expect(form.getByText("批量应用同一证据", { exact: true })).toBeVisible();
   await expect(form.getByRole("button", { name: "应用到 0 个目标字段" })).toBeDisabled();
@@ -66,6 +70,36 @@ test("product error summary focuses the first invalid fact", async ({ page }) =>
   await page.getByRole("button", { name: "创建待审核草稿" }).click();
   await expect(page.getByRole("alert").getByText(/还有 \d+ 项需要处理/)).toBeVisible();
   await expect(page.getByLabel("产品名称", { exact: true })).toBeFocused();
+});
+
+test("manual product entry rejects excess images before uploading or saving", async ({ page }) => {
+  const mutations: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST") mutations.push(request.url());
+  });
+  await page.goto("/testing/product-field-evidence?method=manual");
+  const form = page.locator("form#create-product");
+  await form
+    .getByRole("textbox", { name: "产品名称", exact: true })
+    .fill("SYNTHETIC image limit disc");
+  await form.getByRole("textbox", { name: "内部编号", exact: true }).fill("SYNTHETIC-IMAGE-LIMIT");
+  await form
+    .getByRole("textbox", { name: "来源引用", exact: true })
+    .fill("source-synthetic-image-limit");
+  for (const label of ["产品名称证据", "产品类型证据", "内部编号证据"]) {
+    await form.getByLabel(label, { exact: true }).click();
+    await page.getByRole("option", { name: /合成产品目录/ }).click();
+  }
+  await form.getByLabel("产品图片（可选）", { exact: true }).setInputFiles(
+    Array.from({ length: 5 }, (_, i) => ({
+      name: `synthetic-${i}.png`,
+      mimeType: "image/png",
+      buffer: Buffer.from("SYNTHETIC image-limit fixture; never uploaded"),
+    })),
+  );
+  await form.getByRole("button", { name: "创建待审核草稿", exact: true }).click();
+  await expect(form.getByText("最多上传 4 张产品图片。", { exact: true })).toBeVisible();
+  expect(mutations).toEqual([]);
 });
 
 test("product evidence feedback follows edits and product type without a batch interaction", async ({

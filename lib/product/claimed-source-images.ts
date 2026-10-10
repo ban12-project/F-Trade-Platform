@@ -7,6 +7,23 @@ import type { DocumentUploadIdentity } from "./document-upload-access";
 import { claimDocumentUpload } from "./document-upload-receipts";
 import { productImageContentType, productImageReceiptIdsSchema } from "./source-image-contracts";
 
+/** Manual entry retains private images without sending them to a model. */
+export async function claimProductImageEvidenceRefs(
+  receiptIds: unknown[],
+  identity: DocumentUploadIdentity,
+) {
+  const ids = productImageReceiptIdsSchema.parse(receiptIds);
+  const refs: string[] = [];
+  for (const receiptId of ids) {
+    const claimed = await claimDocumentUpload(
+      { receiptId, projectId: identity.projectId, purpose: "agent_image" },
+      identity,
+    );
+    refs.push(claimed.evidenceId);
+  }
+  return refs;
+}
+
 export async function attachClaimedProductImages(
   source: ProductAgentSource,
   receiptIds: unknown[],

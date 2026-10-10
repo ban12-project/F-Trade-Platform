@@ -25,6 +25,7 @@ export const productImageFilesSchema = z
       ),
   )
   .max(maximumProductImages, "最多上传 4 张产品图片。");
+export const productImageFormSchema = z.object({ imageFiles: productImageFilesSchema });
 export const productImageReceiptIdsSchema = z
   .array(z.uuid())
   .max(maximumProductImages)
