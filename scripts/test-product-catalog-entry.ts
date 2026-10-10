@@ -53,6 +53,40 @@ assert.throws(() => parseAcceptanceResult(unrecordedCorrection));
 const promotedMissingFacts = acceptanceFixture("blocked-v2.synthetic");
 promotedMissingFacts.ready = true;
 assert.throws(() => parseAcceptanceResult(promotedMissingFacts));
+const unmeasuredReview = acceptanceFixture("reviewed-v2.synthetic");
+unmeasuredReview.metrics.sourced_field_recognition = null;
+unmeasuredReview.metrics.review_elapsed_seconds = null;
+unmeasuredReview.unmeasured_metrics = ["sourced_field_recognition", "review_elapsed_seconds"];
+unmeasuredReview.notes =
+  "SYNTHETIC current fact review; extraction diagnostics and review timing were not measured.";
+assert.deepEqual(parseAcceptanceResult(unmeasuredReview), unmeasuredReview);
+for (const mutate of [
+  (r: typeof unmeasuredReview) => {
+    delete r.policy_version;
+  },
+  (r: typeof unmeasuredReview) => {
+    delete r.unmeasured_metrics;
+  },
+  (r: typeof unmeasuredReview) => {
+    r.unmeasured_metrics = ["review_elapsed_seconds"];
+  },
+  (r: typeof unmeasuredReview) => {
+    r.unmeasured_metrics.push("oe_preservation");
+  },
+  (r: typeof unmeasuredReview) => {
+    r.notes = "";
+  },
+  (r: typeof unmeasuredReview) => {
+    r.final_review.critical_fields_complete = false;
+  },
+]) {
+  const r = structuredClone(unmeasuredReview);
+  mutate(r);
+  assert.throws(() => parseAcceptanceResult(r));
+}
+const oldUnmeasured = acceptanceFixture("failed.synthetic");
+oldUnmeasured.metrics.review_elapsed_seconds = null;
+assert.throws(() => parseAcceptanceResult(oldUnmeasured));
 console.log(
   "PASS strict application contract validates final fact review independently of automatic scores",
 );

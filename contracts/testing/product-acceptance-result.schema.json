@@ -52,27 +52,27 @@
       ],
       "properties": {
         "sourced_field_recognition": {
-          "type": "number",
+          "type": ["number", "null"],
           "minimum": 0,
           "maximum": 1
         },
         "oe_preservation": {
-          "type": "number",
+          "type": ["number", "null"],
           "minimum": 0,
           "maximum": 1
         },
         "vehicle_fidelity": {
-          "type": "number",
+          "type": ["number", "null"],
           "minimum": 0,
           "maximum": 1
         },
         "blocking_missing_detection": {
-          "type": "number",
+          "type": ["number", "null"],
           "minimum": 0,
           "maximum": 1
         },
         "review_elapsed_seconds": {
-          "type": "integer",
+          "type": ["integer", "null"],
           "minimum": 0
         }
       }
@@ -169,6 +169,21 @@
         "minLength": 1
       },
       "uniqueItems": true
+    },
+    "unmeasured_metrics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "sourced_field_recognition",
+          "oe_preservation",
+          "vehicle_fidelity",
+          "blocking_missing_detection",
+          "review_elapsed_seconds"
+        ]
+      },
+      "description": "V2 only. Null metrics must be listed here; notes explain why they were not measured or are not applicable. Numeric observations cannot be listed."
     }
   },
   "allOf": [
@@ -431,6 +446,351 @@
             }
           }
         ]
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["unmeasured_metrics"],
+        "properties": {
+          "unmeasured_metrics": {
+            "type": "array"
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["policy_version"],
+        "properties": {
+          "policy_version": {
+            "const": "2.0.0"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["sourced_field_recognition"],
+            "properties": {
+              "sourced_field_recognition": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["policy_version", "unmeasured_metrics"],
+        "properties": {
+          "policy_version": {
+            "const": "2.0.0"
+          },
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "sourced_field_recognition"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["unmeasured_metrics"],
+        "properties": {
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "sourced_field_recognition"
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["sourced_field_recognition"],
+            "properties": {
+              "sourced_field_recognition": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["oe_preservation"],
+            "properties": {
+              "oe_preservation": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["policy_version", "unmeasured_metrics"],
+        "properties": {
+          "policy_version": {
+            "const": "2.0.0"
+          },
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "oe_preservation"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["unmeasured_metrics"],
+        "properties": {
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "oe_preservation"
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["oe_preservation"],
+            "properties": {
+              "oe_preservation": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["vehicle_fidelity"],
+            "properties": {
+              "vehicle_fidelity": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["policy_version", "unmeasured_metrics"],
+        "properties": {
+          "policy_version": {
+            "const": "2.0.0"
+          },
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "vehicle_fidelity"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["unmeasured_metrics"],
+        "properties": {
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "vehicle_fidelity"
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["vehicle_fidelity"],
+            "properties": {
+              "vehicle_fidelity": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["blocking_missing_detection"],
+            "properties": {
+              "blocking_missing_detection": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["policy_version", "unmeasured_metrics"],
+        "properties": {
+          "policy_version": {
+            "const": "2.0.0"
+          },
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "blocking_missing_detection"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["unmeasured_metrics"],
+        "properties": {
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "blocking_missing_detection"
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["blocking_missing_detection"],
+            "properties": {
+              "blocking_missing_detection": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["review_elapsed_seconds"],
+            "properties": {
+              "review_elapsed_seconds": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["policy_version", "unmeasured_metrics"],
+        "properties": {
+          "policy_version": {
+            "const": "2.0.0"
+          },
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "review_elapsed_seconds"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "required": ["unmeasured_metrics"],
+        "properties": {
+          "unmeasured_metrics": {
+            "type": "array",
+            "contains": {
+              "const": "review_elapsed_seconds"
+            }
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "required": ["metrics"],
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "required": ["review_elapsed_seconds"],
+            "properties": {
+              "review_elapsed_seconds": {
+                "type": "null"
+              }
+            }
+          }
+        }
       }
     }
   ]
