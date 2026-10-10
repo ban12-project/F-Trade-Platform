@@ -6,6 +6,7 @@ import {
   PRODUCT_REVIEW_ACCESS_MESSAGE,
   ProductReviewAccessError,
 } from "../lib/product/review-write-access";
+import { productImageReceiptIdsSchema } from "../lib/product/source-image-contracts";
 
 const secret = "SYNTHETIC private SQL, product value, source URL and credential";
 let authorized = true;
@@ -14,6 +15,10 @@ let boundaryFailure: unknown;
 let attempts = 0;
 let refreshes = 0;
 let revisionFailure: unknown = new Error(secret);
+let imageFailure: unknown;
+let creationFailure: unknown;
+let creations = 0;
+let revisions = 0;
 const moduleUrl = (path: string) => new URL(path, import.meta.url).href;
 mock.module(moduleUrl("../lib/action-boundary.ts"), {
   exports: {
@@ -41,15 +46,59 @@ mock.module(moduleUrl("../lib/workspace/store.ts"), {
 });
 mock.module(moduleUrl("../lib/product/evidence-bound-catalog.ts"), {
   exports: {
-    createEvidenceBoundProductCatalogDraft: async () => {
-      throw new Error("Unexpected write");
+    createEvidenceBoundProductCatalogDraft: async (
+      _input: unknown,
+      actor: string,
+      project: string,
+      refs: string[],
+      identity: unknown,
+    ) => {
+      creations++;
+      assert.equal(actor, "synthetic-reviewer");
+      assert.equal(project, projectId);
+      assert.deepEqual(refs, ["evidence-synthetic-image"]);
+      assert.deepEqual(identity, {
+        actorId: actor,
+        sessionId: "synthetic-session",
+        projectId: project,
+      });
+      if (creationFailure) throw creationFailure;
+      return { id: "22222222-2222-4222-8222-222222222222" };
     },
-    reviseEvidenceBoundProductCatalogDraft: async () => {
-      throw revisionFailure;
+    reviseEvidenceBoundProductCatalogDraft: async (
+      _id: string,
+      _input: unknown,
+      actor: string,
+      project: string,
+      refs: string[],
+      identity: unknown,
+    ) => {
+      revisions++;
+      assert.deepEqual(identity, {
+        actorId: actor,
+        sessionId: "synthetic-session",
+        projectId: project,
+      });
+      assert.ok(refs.length <= 1);
+      if (revisionFailure) throw revisionFailure;
     },
   },
 });
 const projectId = "11111111-1111-4111-8111-111111111111";
+mock.module(moduleUrl("../lib/product/claimed-source-images.ts"), {
+  exports: {
+    claimProductImageEvidenceRefs: async (ids: unknown[], identity: unknown) => {
+      assert.deepEqual(identity, {
+        actorId: "synthetic-reviewer",
+        sessionId: "synthetic-session",
+        projectId,
+      });
+      productImageReceiptIdsSchema.parse(ids);
+      if (imageFailure) throw imageFailure;
+      return ids.length ? ["evidence-synthetic-image"] : [];
+    },
+  },
+});
 mock.module(moduleUrl("../lib/products.ts"), {
   exports: {
     decideProductCatalogReview: async (_input: unknown, identity: unknown) => {
@@ -161,4 +210,34 @@ assert.deepEqual(await revise(), {
 });
 console.log(
   "PASS actual revision Action keeps private correction/database failures out of client results",
+);
+
+const { createProductCatalogDraftAction } = await import("../lib/actions/products");
+const imageReceipt = "44444444-4444-4444-8444-444444444444";
+revisionForm.append("imageReceiptId", imageReceipt);
+const create = () => createProductCatalogDraftAction({ status: "idle", message: "" }, revisionForm);
+creationFailure = new Error(secret);
+assert.deepEqual(await create(), {
+  status: "error",
+  message: "无法保存产品草稿，请确认资料、图片、登录与项目权限后重试。",
+});
+creationFailure = undefined;
+assert.equal((await create()).status, "success");
+imageFailure = new Error(secret);
+const beforeCreate = creations;
+const beforeRevision = revisions;
+assert.equal((await create()).status, "error");
+assert.equal((await revise()).status, "error");
+assert.equal(creations, beforeCreate);
+assert.equal(revisions, beforeRevision);
+imageFailure = undefined;
+revisionForm.append("imageReceiptId", imageReceipt);
+assert.equal((await create()).status, "error");
+assert.equal(creations, beforeCreate);
+revisionForm.delete("imageReceiptId");
+revisionForm.append("imageReceiptId", imageReceipt);
+revisionFailure = undefined;
+assert.equal((await revise()).status, "success");
+console.log(
+  "PASS manual create/revise Actions forward validated image refs and current identity; upload failures and duplicate receipts never save or expose private errors",
 );

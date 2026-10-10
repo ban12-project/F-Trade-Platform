@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
@@ -10,6 +10,7 @@ import {
 } from "../lib/product/catalog-form-schema";
 import {
   buildEvidenceBoundProductCatalogDraft,
+  createEvidenceBoundProductCatalogDraft,
   reviseEvidenceBoundProductCatalogDraft,
 } from "../lib/product/evidence-bound-catalog";
 import { productStreamFields } from "../lib/product/stream-contract";
@@ -158,13 +159,14 @@ void (async () => {
       packaging: "MOCK revised packaging",
       packagingEvidenceRef: supplementRef,
     };
-    const current = async () =>
-      (
-        await db
-          .select()
-          .from(schema.aggregateRecord)
-          .where(eq(schema.aggregateRecord.id, saved.id))
-      )[0]!;
+    const current = async () => {
+      const [record] = await db
+        .select()
+        .from(schema.aggregateRecord)
+        .where(eq(schema.aggregateRecord.id, saved.id));
+      assert.ok(record);
+      return record;
+    };
     const baseline = await current();
     for (const [input, actor, project] of [
       [{ ...revision, productName: "MOCK changed without fresh evidence" }, actors[0], projects[0]],
@@ -318,6 +320,251 @@ void (async () => {
     assert.deepEqual((unchangedAudit.metadata.fact_revision as { changes: unknown[] }).changes, []);
     console.log(
       "PASS locked revision preserves unchanged locations, rejects changed/foreign/rebound facts, serializes competing edits and retains image Gate",
+    );
+
+    const manualForm = { ...form };
+    for (const [, key] of manualProductFactEvidenceFields) manualForm[key] = baseRef;
+    const manual = await createEvidenceBoundProductCatalogDraft(
+      manualForm,
+      actors[0],
+      projects[0],
+      [imageRef],
+      reviewIdentity,
+    );
+    const [manualRecord] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, manual.id));
+    assert.equal(manualRecord?.state, "PRODUCT_REVIEW_REQUIRED");
+    assert.equal(manualRecord?.version, 1);
+    const manualImages = await db
+      .select()
+      .from(schema.productSourceImage)
+      .where(eq(schema.productSourceImage.productId, manual.id));
+    assert.deepEqual(
+      manualImages.map((i) => i.evidenceId),
+      [imageRef],
+    );
+    assert.ok(!manual.draft.evidence_refs.includes(imageRef));
+    const [manualAudit] = await db
+      .select()
+      .from(schema.auditEvent)
+      .where(eq(schema.auditEvent.aggregateId, manual.id));
+    assert.deepEqual(manualAudit?.metadata.source_image_refs, [imageRef]);
+    const manualDecision = {
+      productId: manual.id,
+      approvalId: manual.approvalId,
+      reviewedVersion: "1",
+      decision: "approved" as const,
+      evidenceRef: baseRef,
+      notes: "SYNTHETIC manual image gate",
+    };
+    await assert.rejects(decideProductCatalogReview(manualDecision, reviewIdentity, db), /图片/);
+    await decideProductCatalogReview(
+      { ...manualDecision, imageConsistencyConfirmed: "true" },
+      reviewIdentity,
+      db,
+    );
+
+    const footprint = async () =>
+      JSON.stringify(
+        (
+          await db.execute(
+            sql`SELECT (SELECT count(*) FROM aggregate_record) AS products,(SELECT count(*) FROM product_source_image) AS images,(SELECT count(*) FROM approval) AS approvals,(SELECT count(*) FROM workflow_event) AS transitions,(SELECT count(*) FROM audit_event) AS audit`,
+          )
+        ).rows,
+      );
+    const expectNoPartialCreate = async (
+      input: unknown,
+      refs: string[],
+      identity = reviewIdentity,
+    ) => {
+      const before = await footprint();
+      await assert.rejects(
+        createEvidenceBoundProductCatalogDraft(input, actors[0], projects[0], refs, identity),
+      );
+      assert.equal(await footprint(), before);
+    };
+    await expectNoPartialCreate(manualForm, [foreignRef]);
+    await expectNoPartialCreate(manualForm, [imageRef, imageRef]);
+    await expectNoPartialCreate(manualForm, [
+      imageRef,
+      baseRef,
+      supplementRef,
+      foreignRef,
+      "evidence-synthetic-fifth",
+    ]);
+    await expectNoPartialCreate({ ...manualForm, productNameEvidenceRef: imageRef }, []);
+    await expectNoPartialCreate(manualForm, [imageRef], {
+      ...reviewIdentity,
+      sessionId: sessionIds[1],
+    });
+    await db
+      .update(schema.session)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.session.id, sessionIds[0]));
+    await expectNoPartialCreate(manualForm, [imageRef]);
+    await db
+      .update(schema.session)
+      .set({ expiresAt: new Date(Date.now() + 3_600_000) })
+      .where(eq(schema.session.id, sessionIds[0]));
+
+    const beforeDeadline = await footprint();
+    let unlockImages = () => {};
+    let notifyImageLock = () => {};
+    const imageLockReady = new Promise<void>((resolve) => {
+      notifyImageLock = resolve;
+    });
+    const holdImages = new Promise<void>((resolve) => {
+      unlockImages = resolve;
+    });
+    const blockedImages = db.transaction(async (tx) => {
+      await tx.execute(sql`LOCK TABLE product_source_image IN ACCESS EXCLUSIVE MODE`);
+      notifyImageLock();
+      await holdImages;
+    });
+    await imageLockReady;
+    await db
+      .update(schema.session)
+      .set({ expiresAt: new Date(Date.now() + 1500) })
+      .where(eq(schema.session.id, sessionIds[0]));
+    const waitingCreate = createEvidenceBoundProductCatalogDraft(
+      manualForm,
+      actors[0],
+      projects[0],
+      [imageRef],
+      reviewIdentity,
+    );
+    const rejectedCreate = assert.rejects(waitingCreate);
+    try {
+      let observedWaiting = false;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const waits = await db.execute(
+          sql`SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%product_source_image%' AND query NOT LIKE '%pg_stat_activity%'`,
+        );
+        if (waits.rows.length) {
+          observedWaiting = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      assert.equal(
+        observedWaiting,
+        true,
+        "Observe the actual image insertion transaction waiting before expiry",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1600));
+    } finally {
+      unlockImages();
+      await blockedImages;
+    }
+    await rejectedCreate;
+    assert.equal(await footprint(), beforeDeadline);
+    await db
+      .update(schema.session)
+      .set({ expiresAt: new Date(Date.now() + 3_600_000) })
+      .where(eq(schema.session.id, sessionIds[0]));
+    console.log(
+      "PASS session expiry while the real image-table write waits rolls back draft, images, approval, transition and audit at final commit guard",
+    );
+    await db
+      .update(schema.workspaceProjectMember)
+      .set({ role: "viewer" })
+      .where(
+        and(
+          eq(schema.workspaceProjectMember.projectId, projects[0]),
+          eq(schema.workspaceProjectMember.userId, actors[0]),
+        ),
+      );
+    await expectNoPartialCreate(manualForm, [imageRef]);
+    await db
+      .update(schema.workspaceProjectMember)
+      .set({ role: "owner" })
+      .where(
+        and(
+          eq(schema.workspaceProjectMember.projectId, projects[0]),
+          eq(schema.workspaceProjectMember.userId, actors[0]),
+        ),
+      );
+
+    const imageRevision = await createRejected(false);
+    const imageRevised = await reviseEvidenceBoundProductCatalogDraft(
+      imageRevision.id,
+      form,
+      actors[0],
+      projects[0],
+      [imageRef],
+      reviewIdentity,
+    );
+    const [imageRevisionRecord] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, imageRevision.id));
+    assert.equal(imageRevisionRecord?.version, 3);
+    assert.equal(imageRevisionRecord?.state, "PRODUCT_REVIEW_REQUIRED");
+    const [imageRevisionAudit] = await db
+      .select()
+      .from(schema.auditEvent)
+      .where(
+        and(
+          eq(schema.auditEvent.aggregateId, imageRevision.id),
+          eq(schema.auditEvent.action, "product_draft_revised"),
+        ),
+      );
+    assert.deepEqual(imageRevisionAudit?.metadata.added_source_image_refs, [imageRef]);
+    assert.ok(imageRevisionAudit);
+    assert.deepEqual(
+      (imageRevisionAudit.metadata.fact_revision as { changes: unknown[] }).changes,
+      [],
+    );
+    await assert.rejects(
+      decideProductCatalogReview(
+        {
+          ...manualDecision,
+          productId: imageRevision.id,
+          approvalId: imageRevised.approvalId,
+          reviewedVersion: "3",
+        },
+        reviewIdentity,
+        db,
+      ),
+      /图片/,
+    );
+    await decideProductCatalogReview(
+      {
+        ...manualDecision,
+        decision: "rejected",
+        productId: imageRevision.id,
+        approvalId: imageRevised.approvalId,
+        reviewedVersion: "3",
+      },
+      reviewIdentity,
+      db,
+    );
+    const beforeDuplicate = await footprint();
+    const [beforeDuplicateRecord] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, imageRevision.id));
+    await assert.rejects(
+      reviseEvidenceBoundProductCatalogDraft(
+        imageRevision.id,
+        form,
+        actors[0],
+        projects[0],
+        [imageRef],
+        reviewIdentity,
+      ),
+      /重复/,
+    );
+    assert.equal(await footprint(), beforeDuplicate);
+    const [afterDuplicateRecord] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, imageRevision.id));
+    assert.deepEqual(afterDuplicateRecord, beforeDuplicateRecord);
+    console.log(
+      "PASS manual entry/revision retain private images atomically, reset image review, reject foreign/duplicate images and image-as-fact; expired/foreign sessions and lost project access leave no partial product, image, approval or audit",
     );
   } finally {
     await closeDatabase();

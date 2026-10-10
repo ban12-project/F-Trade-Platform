@@ -7,6 +7,7 @@ import {
   aggregateRecord,
   approval,
   auditEvent,
+  evidence,
   user,
   workflowEvent,
   workspaceProject,
@@ -21,11 +22,13 @@ import {
   type ProductCatalogForm,
   productCatalogFormSchema,
 } from "./catalog-form-schema";
+import type { DocumentUploadIdentity } from "./document-upload-access";
 import {
   ProductFactRevisionError,
   partitionRevisionEvidence,
   productFactRevision,
 } from "./retained-evidence";
+import { insertProductSourceImages } from "./source-image-store";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
 export type EvidenceBoundProductCatalogInput = ProductCatalogForm;
@@ -245,6 +248,8 @@ export async function createEvidenceBoundProductCatalogDraft(
   inputValue: unknown,
   actorId: string,
   projectId?: string,
+  sourceImageRefs: readonly string[] = [],
+  identity?: DocumentUploadIdentity,
 ) {
   const input = productCatalogFormSchema.parse(inputValue);
   const id = randomUUID();
@@ -307,11 +312,19 @@ export async function createEvidenceBoundProductCatalogDraft(
       evidence_mode: "per_field",
       product_type_specific_fields: kitContentCount(draft),
       commercial_field_count: Object.keys(draft.commercial ?? {}).length,
+      source_image_refs: [...sourceImageRefs],
     },
     occurredAt: now,
   };
 
   await getDatabase().transaction(async (tx) => {
+    if (identity && (identity.actorId !== actorId || identity.projectId !== projectId))
+      throw new Error("产品保存身份与项目不一致。");
+    const access = identity ? await import("./document-upload-access") : null;
+    const current =
+      identity && access
+        ? await access.authorizeDocumentUpload(tx, identity, identity.projectId)
+        : null;
     if (projectId) {
       await assertAndLinkProjectEvidence(projectId, draft.evidence_refs, actorId, tx);
       const [project] = await tx
@@ -319,10 +332,16 @@ export async function createEvidenceBoundProductCatalogDraft(
         .from(workspaceProject)
         .where(eq(workspaceProject.id, projectId))
         .for("update");
-      if (!project || project.kind !== "marketing" || project.status !== "active") {
+      if (project?.kind !== "marketing" || project.status !== "active") {
         throw new Error("产品草稿只能关联到进行中的产品营销项目。");
       }
     }
+    const factEvidence = await tx
+      .select({ contentType: evidence.contentType })
+      .from(evidence)
+      .where(inArray(evidence.id, draft.evidence_refs));
+    if (factEvidence.some((row) => row.contentType.startsWith("image/")))
+      throw new Error("图片不能作为产品字段的文字来源证据。");
     await tx.insert(aggregateRecord).values(aggregateValues);
     if (projectId)
       await tx.insert(workspaceProjectItem).values({
@@ -332,9 +351,11 @@ export async function createEvidenceBoundProductCatalogDraft(
         role: "product_source",
         relation: "owned",
       });
+    await insertProductSourceImages(tx, id, projectId, actorId, sourceImageRefs);
     await tx.insert(approval).values(approvalValues);
     await tx.insert(workflowEvent).values(workflowValues);
     await tx.insert(auditEvent).values(auditValues);
+    if (current) access?.assertDocumentUploadDeadline(current.expiresAt);
   });
 
   return { id, draft, approvalId };
@@ -345,12 +366,19 @@ export async function reviseEvidenceBoundProductCatalogDraft(
   inputValue: unknown,
   actorId: string,
   projectId: string,
+  sourceImageRefs: readonly string[] = [],
+  identity?: DocumentUploadIdentity,
 ) {
   const input = productCatalogFormSchema.parse(inputValue);
   const now = new Date();
   const eventId = randomUUID();
   const approvalId = randomUUID();
   return getDatabase().transaction(async (tx) => {
+    if (identity && (identity.actorId !== actorId || identity.projectId !== projectId))
+      throw new Error("产品保存身份与项目不一致。");
+    const access = identity ? await import("./document-upload-access") : null;
+    const current =
+      identity && access ? await access.authorizeDocumentUpload(tx, identity, projectId) : null;
     await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
     const draft = buildEvidenceBoundProductCatalogDraft(input, productId);
     const [aggregate] = await tx
@@ -394,6 +422,15 @@ export async function reviseEvidenceBoundProductCatalogDraft(
     const revisionEvidence = partitionRevisionEvidence(previousDraft, draft);
     if (revisionEvidence.uploaded.length)
       await assertAndLinkProjectEvidence(projectId, revisionEvidence.uploaded, actorId, tx);
+    if (revisionEvidence.uploaded.length) {
+      const factEvidence = await tx
+        .select({ contentType: evidence.contentType })
+        .from(evidence)
+        .where(inArray(evidence.id, revisionEvidence.uploaded));
+      if (factEvidence.some((row) => row.contentType.startsWith("image/")))
+        throw new Error("图片不能作为产品字段的文字来源证据。");
+    }
+    await insertProductSourceImages(tx, productId, projectId, actorId, sourceImageRefs);
 
     assertTransition({
       eventId,
@@ -447,6 +484,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
       subjectId: productId,
       metadata: {
         approval_id: approvalId,
+        added_source_image_refs: [...sourceImageRefs],
         fact_revision: productFactRevision(previousDraft, draft, aggregate.version),
         retained_evidence_location_count: revisionEvidence.retained.length,
         blocking_field_count: draft.blocking_missing_fields.length,
@@ -458,6 +496,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
       },
       occurredAt: now,
     });
+    if (current) access?.assertDocumentUploadDeadline(current.expiresAt);
     return { approvalId, draft };
   });
 }

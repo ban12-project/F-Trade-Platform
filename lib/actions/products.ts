@@ -1,10 +1,11 @@
 "use server";
 
 import { z } from "zod";
-import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
+import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
 import { productReviewFormSchema } from "@/lib/form-schemas";
 import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
+import { claimProductImageEvidenceRefs } from "@/lib/product/claimed-source-images";
 import {
   createEvidenceBoundProductCatalogDraft as createProductCatalogDraft,
   reviseEvidenceBoundProductCatalogDraft as reviseProductCatalogDraft,
@@ -47,16 +48,31 @@ export async function createProductCatalogDraftAction(
 
   try {
     const projectId = projectIdFrom(formData);
-    if (projectId) await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
-    const result = await createProductCatalogDraft(parsed.data, session.user.id, projectId);
+    if (!projectId) throw new Error("产品资料必须绑定项目。");
+    await assertWorkspaceProjectKind(projectId, "marketing", session.user.id);
+    const identity = { actorId: session.user.id, sessionId: session.session.id, projectId };
+    const imageRefs = await claimProductImageEvidenceRefs(
+      formData.getAll("imageReceiptId"),
+      identity,
+    );
+    const result = await createProductCatalogDraft(
+      parsed.data,
+      session.user.id,
+      projectId,
+      imageRefs,
+      identity,
+    );
     revalidateProductPaths(projectId, result.id);
     return {
       status: "success",
       message: `产品草稿已创建（${result.id.slice(0, 8)}）。每个事实均保留独立证据，仍需 Gate 01 人工核验。`,
       productId: result.id,
     };
-  } catch (error) {
-    return actionError(error, "无法保存产品草稿。");
+  } catch {
+    return {
+      status: "error",
+      message: "无法保存产品草稿，请确认资料、图片、登录与项目权限后重试。",
+    };
   }
 }
 
@@ -129,7 +145,19 @@ export async function reviseProductCatalogDraftAction(
         session.user.id,
       );
     if (!projectId) throw new Error("产品修订必须在所属项目中进行。");
-    await reviseProductCatalogDraft(parsedProductId.data, parsed.data, session.user.id, projectId);
+    const identity = { actorId: session.user.id, sessionId: session.session.id, projectId };
+    const imageRefs = await claimProductImageEvidenceRefs(
+      formData.getAll("imageReceiptId"),
+      identity,
+    );
+    await reviseProductCatalogDraft(
+      parsedProductId.data,
+      parsed.data,
+      session.user.id,
+      projectId,
+      imageRefs,
+      identity,
+    );
     revalidateProductPaths(projectId, parsedProductId.data);
     return {
       status: "success",

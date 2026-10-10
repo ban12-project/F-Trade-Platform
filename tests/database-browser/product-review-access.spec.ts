@@ -149,11 +149,11 @@ for (const change of [
       ]);
       const path = `/workspace/${projectId}/records/product/${productId}`;
       await page.goto(path);
-      const form = page.locator("form#product-review").filter({ visible: true });
+      const form = page.locator('form[id$="-product-review"]').filter({ visible: true });
       await expect(form).toBeVisible();
-      await expect(form.locator('#product-review-decision [data-slot="select-value"]')).toHaveText(
-        "请选择审核决定",
-      );
+      await expect(
+        form.locator('[id$="-product-review-decision"] [data-slot="select-value"]'),
+      ).toHaveText("请选择审核决定");
       await expect(
         page.getByRole("button", { name: "请先选择决定", exact: true }).filter({ visible: true }),
       ).toBeDisabled();
@@ -161,7 +161,7 @@ for (const change of [
       await page.getByRole("option", { name: label, exact: true }).click();
       await form.getByRole("combobox", { name: "审核证据", exact: true }).click();
       await page.getByRole("option", { name: /SYNTHETIC browser review source/ }).click();
-      await form.locator("#product-review-notes").fill(notes);
+      await form.locator('[id$="-product-review-notes"]').fill(notes);
       const submit = page
         .getByRole("button", { name: label, exact: true })
         .filter({ visible: true });
@@ -215,7 +215,7 @@ for (const change of [
         await expect(
           page.getByText(PRODUCT_REVIEW_ACCESS_MESSAGE, { exact: true }).filter({ visible: true }),
         ).toBeVisible();
-        await expect(form.locator("#product-review-notes")).toHaveValue(notes);
+        await expect(form.locator('[id$="-product-review-notes"]')).toHaveValue(notes);
         await expect(
           form
             .getByRole("combobox", { name: "决定", exact: true })

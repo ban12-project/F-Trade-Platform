@@ -29,6 +29,12 @@ export async function insertProductSourceImages(
     );
   if (new Set(rows.map((row) => row.evidenceId)).size !== refs.length)
     throw new Error("产品图片未完成当前项目的私有上传核验。");
+  const existing = await listProductSourceImages(productId, tx);
+  if (
+    existing.length + refs.length > maximumProductImages ||
+    existing.some((image) => refs.includes(image.evidenceId))
+  )
+    throw new Error("产品图片最多保留 4 张，不能重复关联。");
   await tx
     .insert(productSourceImage)
     .values(refs.map((evidenceId) => ({ id: randomUUID(), productId, projectId, evidenceId })));

@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2Icon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect, useId } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -73,6 +73,8 @@ export function ProductReview({
   sourceDocuments: ProductEvidencePreview[];
 }) {
   const router = useRouter();
+  const idPrefix = useId();
+  const fieldId = (name: string) => `${idPrefix}-${name}`;
   const [state, action, pending] = useActionState(
     decideProductCatalogReviewAction,
     initialProductActionState,
@@ -87,7 +89,7 @@ export function ProductReview({
       notes: "",
     },
   });
-  useWorkspaceDirty(`product-review-${detail.id}`, form.formState.isDirty);
+  useWorkspaceDirty(`${idPrefix}-product-review-${detail.id}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
       form.reset(form.getValues());
@@ -221,10 +223,10 @@ export function ProductReview({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form id="product-review" onSubmit={form.handleSubmit(submit)}>
+            <form id={fieldId("product-review")} onSubmit={form.handleSubmit(submit)}>
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.decision}>
-                  <FieldLabel htmlFor="product-review-decision">决定</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("product-review-decision")}>决定</FieldLabel>
                   <Controller
                     control={form.control}
                     name="decision"
@@ -235,7 +237,7 @@ export function ProductReview({
                         onValueChange={field.onChange}
                       >
                         <SelectTrigger
-                          id="product-review-decision"
+                          id={fieldId("product-review-decision")}
                           className="min-h-11 w-full"
                           aria-invalid={!!form.formState.errors.decision}
                         >
@@ -254,7 +256,9 @@ export function ProductReview({
                 </Field>
                 {detail.sourceImages.length ? (
                   <Field>
-                    <FieldLabel htmlFor="product-image-confirmation">图片一致性</FieldLabel>
+                    <FieldLabel htmlFor={fieldId("product-image-confirmation")}>
+                      图片一致性
+                    </FieldLabel>
                     <Controller
                       control={form.control}
                       name="imageConsistencyConfirmed"
@@ -267,7 +271,7 @@ export function ProductReview({
                             true: "已核对全部原始图片，与当前产品一致",
                           }}
                         >
-                          <SelectTrigger id="product-image-confirmation">
+                          <SelectTrigger id={fieldId("product-image-confirmation")}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -287,7 +291,7 @@ export function ProductReview({
                   </Field>
                 ) : null}
                 <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                  <FieldLabel htmlFor="product-review-evidence">审核证据</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("product-review-evidence")}>审核证据</FieldLabel>
                   <Controller
                     control={form.control}
                     name="evidenceRef"
@@ -297,7 +301,10 @@ export function ProductReview({
                         onValueChange={(value) => field.onChange(value ?? "")}
                         disabled={!evidenceOptions.length}
                       >
-                        <SelectTrigger id="product-review-evidence" className="min-h-11 w-full">
+                        <SelectTrigger
+                          id={fieldId("product-review-evidence")}
+                          className="min-h-11 w-full"
+                        >
                           <SelectValue>
                             {evidenceOptions.find((option) => option.id === field.value)
                               ?.sourceLabel ?? "选择已上传证据"}
@@ -318,11 +325,11 @@ export function ProductReview({
                   <FieldError errors={[form.formState.errors.evidenceRef]} />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.notes}>
-                  <FieldLabel htmlFor="product-review-notes">
+                  <FieldLabel htmlFor={fieldId("product-review-notes")}>
                     审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
                   </FieldLabel>
                   <Textarea
-                    id="product-review-notes"
+                    id={fieldId("product-review-notes")}
                     aria-invalid={!!form.formState.errors.notes}
                     {...form.register("notes")}
                   />
@@ -333,7 +340,7 @@ export function ProductReview({
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-3">
             <Button
-              form="product-review"
+              form={fieldId("product-review")}
               type="submit"
               variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
               disabled={pending || !form.watch("decision") || !evidenceOptions.length}

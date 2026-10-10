@@ -211,7 +211,7 @@ test("authenticated browser reviews a mock product and its content through real 
   ]);
   await page.goto(path);
   await page.getByRole("tab", { name: "手动录入" }).click();
-  const form = page.locator("form#create-product").filter({ visible: true });
+  const form = page.locator('form[id$="-create-product"]').filter({ visible: true });
   await form.getByLabel("产品名称", { exact: true }).fill(productName);
   await form.getByLabel("内部编号", { exact: true }).fill(sku);
   await form.getByLabel("OE / OEM 编号", { exact: true }).fill("MOCK-OE-BROWSER");
@@ -268,7 +268,9 @@ test("authenticated browser reviews a mock product and its content through real 
   await expect(
     page.getByText("等待审核者核实产品", { exact: true }).filter({ visible: true }),
   ).toBeVisible();
-  await expect(page.locator("form#product-review").filter({ visible: true })).toHaveCount(0);
+  await expect(page.locator('form[id$="-product-review"]').filter({ visible: true })).toHaveCount(
+    0,
+  );
   await db
     .update(schema.workspaceProjectMember)
     .set({ role: "viewer" })
@@ -296,23 +298,23 @@ test("authenticated browser reviews a mock product and its content through real 
     );
   await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, actorId));
   await page.reload();
-  const review = page.locator("form#product-review").filter({ visible: true });
+  const review = page.locator('form[id$="-product-review"]').filter({ visible: true });
   await review.getByRole("combobox").first().click();
   await page.getByRole("option", { name: "退回产品事实", exact: true }).click();
   await review.getByLabel("审核证据", { exact: true }).click();
   await page.getByRole("option", { name: /MOCK evidence/ }).click();
   await review
-    .locator("#product-review-notes")
+    .locator('[id$="-product-review-notes"]')
     .fill("Synthetic source reference revision exercise.");
   await page.getByRole("button", { name: "退回产品事实", exact: true }).click();
-  await expect(page.locator("form#revise-product").filter({ visible: true })).toBeVisible();
+  await expect(page.locator('form[id$="-revise-product"]').filter({ visible: true })).toBeVisible();
   await expect(
     page
       .getByText("Synthetic source reference revision exercise.", { exact: true })
       .filter({ visible: true }),
   ).toBeVisible();
   await page
-    .locator("form#revise-product")
+    .locator('form[id$="-revise-product"]')
     .getByLabel("来源引用", { exact: true })
     .fill("source-mock-browser-revised");
   await page.getByRole("button", { name: "提交修订并送审", exact: true }).click();
@@ -328,7 +330,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await review.getByLabel("审核证据", { exact: true }).click();
   await page.getByRole("option", { name: /MOCK evidence/ }).click();
   await review
-    .locator("#product-review-notes")
+    .locator('[id$="-product-review-notes"]')
     .fill("Synthetic approval only; no real factory or human approval.");
   const reviewResponse = page.waitForResponse(
     (response) =>
@@ -352,7 +354,9 @@ test("authenticated browser reviews a mock product and its content through real 
   await expect(
     page.getByRole("region", { name: "业务记录" }).getByText("已核验", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator("form#product-review").filter({ visible: true })).toHaveCount(0);
+  await expect(page.locator('form[id$="-product-review"]').filter({ visible: true })).toHaveCount(
+    0,
+  );
 
   const [ready] = await db
     .select()

@@ -89,7 +89,8 @@ void (async () => {
     for (const size of sizes) {
       const buffer = Buffer.alloc(size, 65);
       await page
-        .locator("#project-evidence-document")
+        .getByLabel("证据文件", { exact: true })
+        .filter({ visible: true })
         .setInputFiles({ name: "synthetic.csv", mimeType: "text/csv", buffer });
       await page.getByRole("button", { name: "保存到项目证据库" }).click();
       await expect
@@ -116,11 +117,14 @@ void (async () => {
         .from(productDocumentUploadReceipt)
         .where(eq(productDocumentUploadReceipt.projectId, projectId))
     ).length;
-    await page.locator("#project-evidence-document").setInputFiles({
-      name: "synthetic.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.alloc(26214401, 65),
-    });
+    await page
+      .getByLabel("证据文件", { exact: true })
+      .filter({ visible: true })
+      .setInputFiles({
+        name: "synthetic.csv",
+        mimeType: "text/csv",
+        buffer: Buffer.alloc(26214401, 65),
+      });
     await page.getByRole("button", { name: "保存到项目证据库" }).click();
     await expect(page.getByText("文件不能超过 25 MiB。")).toBeVisible();
     assert.equal(
