@@ -68,8 +68,7 @@ export async function createProductCatalogDraftAction(
       message: `产品草稿已创建（${result.id.slice(0, 8)}）。每个事实均保留独立证据，仍需 Gate 01 人工核验。`,
       productId: result.id,
     };
-  } catch (error) {
-    void error;
+  } catch {
     return {
       status: "error",
       message: "无法保存产品草稿，请确认资料、图片、登录与项目权限后重试。",

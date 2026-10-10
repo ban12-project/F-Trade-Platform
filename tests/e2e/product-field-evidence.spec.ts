@@ -13,7 +13,12 @@ test("manual product intake exposes evidence-bound specification and commercial 
   await page.waitForLoadState("networkidle");
   await page.getByRole("tab", { name: "手动录入" }).click();
 
-  const form = page.locator("form#create-product");
+  const form = page.locator('form[id$="-create-product"]:visible');
+  const nameId = await form
+    .getByRole("textbox", { name: "产品名称", exact: true })
+    .getAttribute("id");
+  expect(nameId).toBeTruthy();
+  await expect(page.locator(`label[for="${nameId}"]`)).toHaveCount(1);
   await expect(form.getByText("每个事实必须绑定自己的私有证据", { exact: false })).toBeVisible();
   await expect(form.locator('[data-slot="select-trigger"][id$="-evidence"]')).toHaveCount(20);
 
@@ -78,7 +83,7 @@ test("manual product entry rejects excess images before uploading or saving", as
     if (request.method() === "POST") mutations.push(request.url());
   });
   await page.goto("/testing/product-field-evidence?method=manual");
-  const form = page.locator("form#create-product");
+  const form = page.locator('form[id$="-create-product"]:visible');
   await form
     .getByRole("textbox", { name: "产品名称", exact: true })
     .fill("SYNTHETIC image limit disc");
@@ -107,7 +112,7 @@ test("product evidence feedback follows edits and product type without a batch i
 }) => {
   await page.goto("/testing/product-field-evidence");
   await page.getByRole("tab", { name: "手动录入" }).click();
-  const form = page.locator("form#create-product");
+  const form = page.locator('form[id$="-create-product"]:visible');
   const meter = form.getByRole("progressbar", { name: "事实与证据完成度" });
   const chooseEvidence = async (label: string) => {
     await form.getByLabel(label, { exact: true }).click();

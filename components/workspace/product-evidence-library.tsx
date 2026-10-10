@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileUpIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect, useId } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export function EvidenceLibrary({
   evidenceOptions: EvidenceOption[];
 }) {
   const router = useRouter();
+  const fileId = useId();
   const [state, action, pending] = useActionState(
     async (previous: typeof initialProductEvidenceActionState, file: File) => {
       try {
@@ -66,13 +67,13 @@ export function EvidenceLibrary({
         >
           <FieldGroup>
             <Field data-invalid={Boolean(form.formState.errors.document)}>
-              <FieldLabel htmlFor="project-evidence-document">证据文件</FieldLabel>
+              <FieldLabel htmlFor={fileId}>证据文件</FieldLabel>
               <Controller
                 control={form.control}
                 name="document"
                 render={({ field }) => (
                   <Input
-                    id="project-evidence-document"
+                    id={fileId}
                     name={field.name}
                     ref={field.ref}
                     onBlur={field.onBlur}

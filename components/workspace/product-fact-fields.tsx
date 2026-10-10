@@ -3,6 +3,7 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -268,6 +269,8 @@ export function ProductFields({
   form: UseFormReturn<ProductValues>;
   evidenceOptions: EvidenceOption[];
 }) {
+  const idPrefix = useId();
+  const fieldId = (name: string) => `${idPrefix}-${name}`;
   const rootRef = useRef<HTMLDivElement>(null);
   const { errors, submitCount } = useFormState({ control: form.control });
   const [batchEvidence, setBatchEvidence] = useState("");
@@ -356,13 +359,13 @@ export function ProductFields({
                 {eligibleBatchTargets.map(([, evidenceName, label]) => (
                   <Field key={evidenceName} orientation="horizontal">
                     <Checkbox
-                      id={`batch-${evidenceName}`}
+                      id={fieldId(`batch-${evidenceName}`)}
                       checked={batchTargets.has(evidenceName)}
                       onCheckedChange={(checked) =>
                         toggleBatchTarget(evidenceName, checked === true)
                       }
                     />
-                    <FieldLabel htmlFor={`batch-${evidenceName}`}>{label}</FieldLabel>
+                    <FieldLabel htmlFor={fieldId(`batch-${evidenceName}`)}>{label}</FieldLabel>
                   </Field>
                 ))}
               </FieldGroup>
@@ -387,9 +390,9 @@ export function ProductFields({
             <FieldGroup>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.productName)}>
-                  <FieldLabel htmlFor="product-name">产品名称</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("product-name")}>产品名称</FieldLabel>
                   <Input
-                    id="product-name"
+                    id={fieldId("product-name")}
                     aria-invalid={Boolean(form.formState.errors.productName)}
                     {...form.register("productName")}
                   />
@@ -399,14 +402,14 @@ export function ProductFields({
                   form={form}
                   name="productNameEvidenceRef"
                   label="产品名称证据"
-                  id="product-name-evidence"
+                  id={fieldId("product-name-evidence")}
                   required
                 />
               </FactPair>
 
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.productType)}>
-                  <FieldLabel htmlFor="product-type">产品类型</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("product-type")}>产品类型</FieldLabel>
                   <Controller
                     control={form.control}
                     name="productType"
@@ -430,7 +433,7 @@ export function ProductFields({
                         }}
                       >
                         <SelectTrigger
-                          id="product-type"
+                          id={fieldId("product-type")}
                           className="w-full"
                           aria-invalid={Boolean(form.formState.errors.productType)}
                         >
@@ -454,16 +457,16 @@ export function ProductFields({
                   form={form}
                   name="productTypeEvidenceRef"
                   label="产品类型证据"
-                  id="product-type-evidence"
+                  id={fieldId("product-type-evidence")}
                   required
                 />
               </FactPair>
 
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.internalSku)}>
-                  <FieldLabel htmlFor="internal-sku">内部编号</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("internal-sku")}>内部编号</FieldLabel>
                   <Input
-                    id="internal-sku"
+                    id={fieldId("internal-sku")}
                     aria-invalid={Boolean(form.formState.errors.internalSku)}
                     {...form.register("internalSku")}
                   />
@@ -473,16 +476,16 @@ export function ProductFields({
                   form={form}
                   name="internalSkuEvidenceRef"
                   label="内部编号证据"
-                  id="internal-sku-evidence"
+                  id={fieldId("internal-sku-evidence")}
                   required
                 />
               </FactPair>
 
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.oeNumbers)}>
-                  <FieldLabel htmlFor="oe-numbers">OE / OEM 编号</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("oe-numbers")}>OE / OEM 编号</FieldLabel>
                   <Input
-                    id="oe-numbers"
+                    id={fieldId("oe-numbers")}
                     placeholder="多个编号用逗号分隔"
                     aria-invalid={Boolean(form.formState.errors.oeNumbers)}
                     {...form.register("oeNumbers")}
@@ -493,7 +496,7 @@ export function ProductFields({
                   form={form}
                   name="oeNumbersEvidenceRef"
                   label="OE / OEM 编号证据"
-                  id="oe-numbers-evidence"
+                  id={fieldId("oe-numbers-evidence")}
                 />
               </FactPair>
             </FieldGroup>
@@ -507,9 +510,9 @@ export function ProductFields({
             <FieldGroup>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.application)}>
-                  <FieldLabel htmlFor="application">适配说明</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("application")}>适配说明</FieldLabel>
                   <Input
-                    id="application"
+                    id={fieldId("application")}
                     aria-invalid={Boolean(form.formState.errors.application)}
                     {...form.register("application")}
                   />
@@ -519,14 +522,14 @@ export function ProductFields({
                   form={form}
                   name="applicationEvidenceRef"
                   label="适配说明证据"
-                  id="application-evidence"
+                  id={fieldId("application-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.vehicleBrand)}>
-                  <FieldLabel htmlFor="vehicle-brand">车辆品牌</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("vehicle-brand")}>车辆品牌</FieldLabel>
                   <Input
-                    id="vehicle-brand"
+                    id={fieldId("vehicle-brand")}
                     aria-invalid={Boolean(form.formState.errors.vehicleBrand)}
                     {...form.register("vehicleBrand")}
                   />
@@ -536,14 +539,14 @@ export function ProductFields({
                   form={form}
                   name="vehicleBrandEvidenceRef"
                   label="车辆品牌证据"
-                  id="vehicle-brand-evidence"
+                  id={fieldId("vehicle-brand-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.vehicleModel)}>
-                  <FieldLabel htmlFor="vehicle-model">车型</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("vehicle-model")}>车型</FieldLabel>
                   <Input
-                    id="vehicle-model"
+                    id={fieldId("vehicle-model")}
                     aria-invalid={Boolean(form.formState.errors.vehicleModel)}
                     {...form.register("vehicleModel")}
                   />
@@ -553,7 +556,7 @@ export function ProductFields({
                   form={form}
                   name="vehicleModelEvidenceRef"
                   label="车型证据"
-                  id="vehicle-model-evidence"
+                  id={fieldId("vehicle-model-evidence")}
                 />
               </FactPair>
             </FieldGroup>
@@ -565,9 +568,9 @@ export function ProductFields({
             <FieldGroup>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.clutchDiameterMm)}>
-                  <FieldLabel htmlFor="clutch-diameter">盘径（mm）</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("clutch-diameter")}>盘径（mm）</FieldLabel>
                   <Input
-                    id="clutch-diameter"
+                    id={fieldId("clutch-diameter")}
                     inputMode="decimal"
                     aria-invalid={Boolean(form.formState.errors.clutchDiameterMm)}
                     {...form.register("clutchDiameterMm")}
@@ -578,14 +581,14 @@ export function ProductFields({
                   form={form}
                   name="clutchDiameterMmEvidenceRef"
                   label="盘径证据"
-                  id="clutch-diameter-evidence"
+                  id={fieldId("clutch-diameter-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.splineCount)}>
-                  <FieldLabel htmlFor="spline-count">花键数</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("spline-count")}>花键数</FieldLabel>
                   <Input
-                    id="spline-count"
+                    id={fieldId("spline-count")}
                     inputMode="numeric"
                     aria-invalid={Boolean(form.formState.errors.splineCount)}
                     {...form.register("splineCount")}
@@ -596,14 +599,14 @@ export function ProductFields({
                   form={form}
                   name="splineCountEvidenceRef"
                   label="花键数证据"
-                  id="spline-count-evidence"
+                  id={fieldId("spline-count-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.splineSize)}>
-                  <FieldLabel htmlFor="spline-size">花键尺寸</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("spline-size")}>花键尺寸</FieldLabel>
                   <Input
-                    id="spline-size"
+                    id={fieldId("spline-size")}
                     aria-invalid={Boolean(form.formState.errors.splineSize)}
                     {...form.register("splineSize")}
                   />
@@ -613,14 +616,14 @@ export function ProductFields({
                   form={form}
                   name="splineSizeEvidenceRef"
                   label="花键尺寸证据"
-                  id="spline-size-evidence"
+                  id={fieldId("spline-size-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.frictionMaterial)}>
-                  <FieldLabel htmlFor="friction-material">摩擦材料</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("friction-material")}>摩擦材料</FieldLabel>
                   <Input
-                    id="friction-material"
+                    id={fieldId("friction-material")}
                     aria-invalid={Boolean(form.formState.errors.frictionMaterial)}
                     {...form.register("frictionMaterial")}
                   />
@@ -630,7 +633,7 @@ export function ProductFields({
                   form={form}
                   name="frictionMaterialEvidenceRef"
                   label="摩擦材料证据"
-                  id="friction-material-evidence"
+                  id={fieldId("friction-material-evidence")}
                 />
               </FactPair>
             </FieldGroup>
@@ -673,15 +676,15 @@ export function ProductFields({
                   form={form}
                   name="kitContentsEvidenceRef"
                   label="套件组成证据"
-                  id="kit-contents-evidence"
+                  id={fieldId("kit-contents-evidence")}
                   disabled={kitDisabled}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.grossWeightKg)}>
-                  <FieldLabel htmlFor="gross-weight">毛重（kg）</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("gross-weight")}>毛重（kg）</FieldLabel>
                   <Input
-                    id="gross-weight"
+                    id={fieldId("gross-weight")}
                     inputMode="decimal"
                     aria-invalid={Boolean(form.formState.errors.grossWeightKg)}
                     {...form.register("grossWeightKg")}
@@ -692,14 +695,14 @@ export function ProductFields({
                   form={form}
                   name="grossWeightKgEvidenceRef"
                   label="毛重证据"
-                  id="gross-weight-evidence"
+                  id={fieldId("gross-weight-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.netWeightKg)}>
-                  <FieldLabel htmlFor="net-weight">净重（kg）</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("net-weight")}>净重（kg）</FieldLabel>
                   <Input
-                    id="net-weight"
+                    id={fieldId("net-weight")}
                     inputMode="decimal"
                     aria-invalid={Boolean(form.formState.errors.netWeightKg)}
                     {...form.register("netWeightKg")}
@@ -710,14 +713,14 @@ export function ProductFields({
                   form={form}
                   name="netWeightKgEvidenceRef"
                   label="净重证据"
-                  id="net-weight-evidence"
+                  id={fieldId("net-weight-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.packageSize)}>
-                  <FieldLabel htmlFor="package-size">包装尺寸</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("package-size")}>包装尺寸</FieldLabel>
                   <Input
-                    id="package-size"
+                    id={fieldId("package-size")}
                     placeholder="40 × 40 × 12 cm"
                     aria-invalid={Boolean(form.formState.errors.packageSize)}
                     {...form.register("packageSize")}
@@ -728,7 +731,7 @@ export function ProductFields({
                   form={form}
                   name="packageSizeEvidenceRef"
                   label="包装尺寸证据"
-                  id="package-size-evidence"
+                  id={fieldId("package-size-evidence")}
                 />
               </FactPair>
             </FieldGroup>
@@ -742,9 +745,9 @@ export function ProductFields({
             <FieldGroup>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.moq)}>
-                  <FieldLabel htmlFor="product-moq">最小起订量（MOQ）</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("product-moq")}>最小起订量（MOQ）</FieldLabel>
                   <Input
-                    id="product-moq"
+                    id={fieldId("product-moq")}
                     inputMode="numeric"
                     aria-invalid={Boolean(form.formState.errors.moq)}
                     {...form.register("moq")}
@@ -755,14 +758,14 @@ export function ProductFields({
                   form={form}
                   name="moqEvidenceRef"
                   label="最小起订量证据"
-                  id="moq-evidence"
+                  id={fieldId("moq-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.estimatedLeadTimeDays)}>
-                  <FieldLabel htmlFor="lead-time-days">预计交期（天）</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("lead-time-days")}>预计交期（天）</FieldLabel>
                   <Input
-                    id="lead-time-days"
+                    id={fieldId("lead-time-days")}
                     inputMode="numeric"
                     aria-invalid={Boolean(form.formState.errors.estimatedLeadTimeDays)}
                     {...form.register("estimatedLeadTimeDays")}
@@ -773,14 +776,14 @@ export function ProductFields({
                   form={form}
                   name="estimatedLeadTimeDaysEvidenceRef"
                   label="预计交期证据"
-                  id="lead-time-evidence"
+                  id={fieldId("lead-time-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.packaging)}>
-                  <FieldLabel htmlFor="packaging">包装方式</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("packaging")}>包装方式</FieldLabel>
                   <Input
-                    id="packaging"
+                    id={fieldId("packaging")}
                     aria-invalid={Boolean(form.formState.errors.packaging)}
                     {...form.register("packaging")}
                   />
@@ -790,14 +793,14 @@ export function ProductFields({
                   form={form}
                   name="packagingEvidenceRef"
                   label="包装方式证据"
-                  id="packaging-evidence"
+                  id={fieldId("packaging-evidence")}
                 />
               </FactPair>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.supportedCustomization)}>
-                  <FieldLabel htmlFor="supported-customization">支持定制</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("supported-customization")}>支持定制</FieldLabel>
                   <Input
-                    id="supported-customization"
+                    id={fieldId("supported-customization")}
                     placeholder="Logo, color box"
                     aria-invalid={Boolean(form.formState.errors.supportedCustomization)}
                     {...form.register("supportedCustomization")}
@@ -808,7 +811,7 @@ export function ProductFields({
                   form={form}
                   name="supportedCustomizationEvidenceRef"
                   label="支持定制证据"
-                  id="supported-customization-evidence"
+                  id={fieldId("supported-customization-evidence")}
                 />
               </FactPair>
               <FactPair>
@@ -835,7 +838,7 @@ export function ProductFields({
                   form={form}
                   name="sampleAvailableEvidenceRef"
                   label="样品可用性证据"
-                  id="sample-available-evidence"
+                  id={fieldId("sample-available-evidence")}
                 />
               </FactPair>
             </FieldGroup>
@@ -847,9 +850,9 @@ export function ProductFields({
               来源引用标识整份资料；字段证据仍以上述逐项映射为准。
             </FieldDescription>
             <Field data-invalid={Boolean(form.formState.errors.sourceRef)}>
-              <FieldLabel htmlFor="source-ref">来源引用</FieldLabel>
+              <FieldLabel htmlFor={fieldId("source-ref")}>来源引用</FieldLabel>
               <Input
-                id="source-ref"
+                id={fieldId("source-ref")}
                 placeholder="source-catalog-001"
                 aria-invalid={Boolean(form.formState.errors.sourceRef)}
                 {...form.register("sourceRef")}

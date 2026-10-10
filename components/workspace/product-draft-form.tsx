@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon, RotateCcwIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useId, useRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +49,8 @@ export function ProductDraftForm({
   evidenceOptions: EvidenceOption[];
 }) {
   const router = useRouter();
+  const formId = useId();
+  const imageId = `${formId}-manual-product-images`;
   const revising = detail?.state === "PRODUCT_REVISION_REQUIRED";
   const imageRef = useRef<HTMLInputElement>(null);
   const images = useForm<{ imageFiles: File[] }>({
@@ -84,8 +86,8 @@ export function ProductDraftForm({
     resolver: zodResolver(productCatalogFormSchema),
     defaultValues: detail ? productDraftValues(detail) : emptyProduct,
   });
-  useWorkspaceDirty(`product-draft-${detail?.id ?? "new"}`, form.formState.isDirty);
-  useWorkspaceDirty(`product-images-${detail?.id ?? "new"}`, images.formState.isDirty);
+  useWorkspaceDirty(`${formId}-product-draft-${detail?.id ?? "new"}`, form.formState.isDirty);
+  useWorkspaceDirty(`${formId}-product-images-${detail?.id ?? "new"}`, images.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
       form.reset(revising ? form.getValues() : emptyProduct);
@@ -110,7 +112,7 @@ export function ProductDraftForm({
         </CardDescription>
       </CardHeader>
       <form
-        id={revising ? "revise-product" : "create-product"}
+        id={`${formId}-${revising ? "revise-product" : "create-product"}`}
         onSubmit={form.handleSubmit(submit)}
         noValidate
       >
@@ -118,14 +120,17 @@ export function ProductDraftForm({
           <ProductFields form={form} evidenceOptions={evidenceOptions} />
           <FieldGroup className="mt-4">
             <Field data-invalid={!!images.formState.errors.imageFiles} data-disabled={pending}>
-              <FieldLabel htmlFor="manual-product-images">产品图片（可选）</FieldLabel>
+              <FieldLabel htmlFor={imageId}>产品图片（可选）</FieldLabel>
               <Controller
                 control={images.control}
                 name="imageFiles"
                 render={({ field }) => (
                   <Input
-                    ref={imageRef}
-                    id="manual-product-images"
+                    ref={(input) => {
+                      imageRef.current = input;
+                      field.ref(input);
+                    }}
+                    id={imageId}
                     name={field.name}
                     type="file"
                     accept=".png,.jpg,.jpeg"
