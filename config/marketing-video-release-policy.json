@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "decision_status": "accepted",
-  "decided_on": "2026-10-09",
+  "decided_on": "2026-10-10",
   "decision_issue": 122,
   "decision_record": "docs/decisions/0007-marketing-video-release-policy.md",
   "decision_basis": "user_delegated_review_in_current_session",
@@ -23,7 +23,9 @@
     "external_platform_copies_in_scope": false,
     "audit_after_expiry": "minimal_ids_hashes_decisions_and_policy_version_only",
     "automatic_enforcement_status": "implemented_application_scope",
-    "managed_copy_inventory_status": "provider_logs_and_backups_unverified"
+    "managed_copy_inventory_status": "partially_verified",
+    "excluded_from_acceptance": ["model_gateway_logs"],
+    "gateway_log_retention_state": "not_verified"
   },
   "access": {
     "storage": "private",
