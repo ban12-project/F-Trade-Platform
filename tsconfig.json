@@ -36,6 +36,7 @@
     "scripts/test-content-edit-write-access-postgres.mts",
     "scripts/test-content-edit-action-errors.mts",
     "scripts/test-video-review-evidence-postgres.mts",
+    "scripts/test-browser-publication-inspection-action.mts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]

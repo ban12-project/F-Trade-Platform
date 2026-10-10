@@ -26,7 +26,7 @@ async function readBody(request) {
   }
   return JSON.parse(Buffer.concat(parts).toString("utf8"));
 }
-export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
+export function createGateway({ appOrigin, nodeCall, slots, inspectPublicationPage, port = 9400 }) {
   const views = new Map();
   function allowed(entry) {
     return (
@@ -78,6 +78,26 @@ export function createGateway({ appOrigin, nodeCall, slots, port = 9400 }) {
       if (request.method === "GET" && request.url === "/viewer.js") {
         response.setHeader("Content-Type", "text/javascript; charset=utf-8");
         response.end(source.replace('"__APP_ORIGIN__"', JSON.stringify(appOrigin)));
+        return;
+      }
+      if (request.method === "POST" && request.url === "/publication-inspection") {
+        if (request.headers.origin !== appOrigin || !inspectPublicationPage) return fail();
+        const input = await readBody(request);
+        if (typeof input.ticket !== "string" || Object.keys(input).length !== 1) return fail();
+        const admission = await nodeCall("admit", { ticket: input.ticket });
+        const slot = slots.get(admission.runId);
+        if (
+          !slot?.ready ||
+          slot.stopping ||
+          slot.run.kind !== "interactive" ||
+          slot.expiresAt <= Date.now()
+        )
+          return fail();
+        const result = await inspectPublicationPage(slot);
+        if (slots.get(admission.runId) !== slot || slot.stopping || slot.expiresAt <= Date.now())
+          return fail();
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify(result));
         return;
       }
       if (request.method === "POST" && request.url === "/admit") {

@@ -24,6 +24,7 @@ import {
 import { managedFacebookEnvironment } from "./managed-facebook.mjs";
 import { readPublicationMedia } from "./media.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
+import { createPublicationPageInspector } from "./publication-inspection.mjs";
 import { stagePublicationUpload } from "./upload.mjs";
 
 const idleExit = createIdleExitPolicy();
@@ -158,6 +159,23 @@ const gateway = createGateway({
   appOrigin,
   nodeCall,
   slots,
+  inspectPublicationPage: createPublicationPageInspector({
+    directory: process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR,
+    browserRequest,
+    assertActive(slot) {
+      const age = Date.now() - slot.egressCheckedAt;
+      if (
+        !slot.ready ||
+        slot.stopping ||
+        slot.abort.signal.aborted ||
+        slot.expiresAt <= Date.now() ||
+        !Number.isFinite(age) ||
+        age < 0 ||
+        age > 45000
+      )
+        throw new Error("inspection_lease_inactive");
+    },
+  }),
   port: Number(process.env.GATEWAY_PORT ?? 9400),
 });
 console.log("browser_node_ready");
@@ -247,6 +265,9 @@ async function launch(slot) {
   slot.egressTabId = await openEgressCheckedSession(
     (path, body) => browserRequest(slot, path, body),
     slot.run,
+    (tabId) => {
+      slot.interactiveTabId = tabId;
+    },
   );
   slot.egressCheckedAt = Date.now();
   if (slot.stopping) return;

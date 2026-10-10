@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PublicationPageInspectionPanel } from "@/components/workspace/publication-page-inspection-panel";
 import { SandboxRegistrationCard } from "@/components/workspace/sandbox-registration-card";
 import { SandboxStatus } from "@/components/workspace/sandbox-status";
 import { browserNodeCommandAction, browserNodesAction } from "@/lib/actions/browser-nodes";
@@ -642,6 +643,9 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                       >
                         关闭并释放
                       </Button>
+                    )}
+                    {node.sandbox && run.status === "running" && !run.stopRequested && (
+                      <PublicationPageInspectionPanel nodeId={node.id} runId={run.id} />
                     )}
                   </div>
                 ))}

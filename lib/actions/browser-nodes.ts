@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { ownerCommandSchema } from "@/lib/browser-fleet/contracts";
+import { inspectOwnedPublicationPage } from "@/lib/browser-fleet/publication-page-inspection";
+import { publicationPageInspectionInputSchema } from "@/lib/browser-fleet/publication-page-inspection-contract";
 import { inspectOwnedBrowserSandbox } from "@/lib/browser-fleet/sandbox-inspection";
 import { deliverQueuedBrowserSandboxes } from "@/lib/browser-fleet/sandbox-workflow-delivery";
 import { listBrowserNodes, ownerBrowserCommand } from "@/lib/browser-fleet/store";
@@ -16,6 +18,18 @@ async function actor() {
 }
 export async function browserNodesAction() {
   return listBrowserNodes((await actor()).id);
+}
+export async function inspectPublicationPageAction(input: unknown) {
+  try {
+    const current = await actor();
+    const value = publicationPageInspectionInputSchema.parse(input);
+    return { ok: true as const, inspection: await inspectOwnedPublicationPage(value, current) };
+  } catch {
+    return {
+      ok: false as const,
+      message: "无法核对当前发布页面。请确认当前登录、节点归属、运行中的接管及页面检查服务。",
+    };
+  }
 }
 export async function inspectBrowserSandboxAction(input: unknown) {
   try {
