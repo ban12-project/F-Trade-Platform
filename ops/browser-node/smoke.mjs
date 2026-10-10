@@ -20,6 +20,7 @@ for (const path of [
   "./managed-facebook.mjs",
   "./media.mjs",
   "./publication.mjs",
+  "./publication-inspection.mjs",
   "./upload.mjs",
 ]) {
   await import(path);
@@ -61,6 +62,12 @@ const syntax = spawnSync(
   { encoding: "utf8" },
 );
 assert.equal(syntax.status, 0, "Agent entrypoint syntax must be valid in the image runtime");
+const inspectionSyntax = spawnSync(
+  process.execPath,
+  ["--check", new URL("./publication-inspection-page.js", import.meta.url).pathname],
+  { encoding: "utf8" },
+);
+assert.equal(inspectionSyntax.status, 0, "The read-only inspection page asset must parse offline");
 // No profiles are supplied. The explicit adapter must fail for this exact reason,
 // rather than loading successfully or failing because a packaged dependency is missing.
 delete process.env.FACEBOOK_DOM_PROFILES_FILE;

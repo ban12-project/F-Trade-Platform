@@ -73,29 +73,27 @@ async function currentInspectionAccess(
           throw new Error("inspection_observation_stale");
       };
       alive();
-      await tx
-        .insert(auditEvent)
-        .values({
-          id: randomUUID(),
-          action: "browser_publication_page.inspected",
-          actorType: "human",
-          actorId: actor.id,
-          subjectType: "browser_node",
-          subjectId: value.nodeId,
-          metadata: {
-            candidate_hash: final.observation.candidateHash,
-            observed_at: final.observation.observedAt,
-            candidate_expired: Date.parse(final.observation.candidateExpiresAt) <= Date.now(),
-            identity_matches_candidate: final.observation.identityMatched,
-            controls: final.observation.controls,
-            composer_identity_matches_candidate: final.observation.composerIdentityMatched,
-            composer_empty: final.observation.composerEmpty,
-            audience_matches_candidate: final.observation.audienceMatchesCandidate,
-            video_preview_count: final.observation.videoPreviewCount,
-            video_receipt_visible: final.observation.videoReceiptVisible,
-          },
-          occurredAt: new Date(),
-        });
+      await tx.insert(auditEvent).values({
+        id: randomUUID(),
+        action: "browser_publication_page.inspected",
+        actorType: "human",
+        actorId: actor.id,
+        subjectType: "browser_node",
+        subjectId: value.nodeId,
+        metadata: {
+          candidate_hash: final.observation.candidateHash,
+          observed_at: final.observation.observedAt,
+          candidate_expired: Date.parse(final.observation.candidateExpiresAt) <= Date.now(),
+          identity_matches_candidate: final.observation.identityMatched,
+          controls: final.observation.controls,
+          composer_identity_matches_candidate: final.observation.composerIdentityMatched,
+          composer_empty: final.observation.composerEmpty,
+          audience_matches_candidate: final.observation.audienceMatchesCandidate,
+          video_preview_count: final.observation.videoPreviewCount,
+          video_receipt_visible: final.observation.videoReceiptVisible,
+        },
+        occurredAt: new Date(),
+      });
       alive();
     }
     return access;
