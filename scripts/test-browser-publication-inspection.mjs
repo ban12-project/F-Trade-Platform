@@ -135,8 +135,8 @@ test("fixed failure stages discard private errors and preserve late lease failur
   );
 });
 test("fixed page envelope classifies source and selector errors without returning page exception text", async () => {
-  for (const failure of ["tab", "candidate", "response", "null"]) {
-    const stage = failure === "null" ? "response" : failure;
+  for (const failure of ["tab", "candidate", "page", "null"]) {
+    const stage = failure === "null" ? "page" : failure;
     let queries = 0;
     const inspect = createPublicationPageInspector({
       directory: "synthetic",
@@ -196,7 +196,7 @@ test("fixed page envelope classifies source and selector errors without returnin
   );
 });
 test("gateway failure stages require valid one-use admission and a still-live task", async () => {
-  const tickets = new Set(["candidate", "forged", "late"]);
+  const tickets = new Set(["candidate", "page", "forged", "late"]);
   const active = { ...slot, run: { ...run }, expiresAt: Date.now() + 30000 };
   const slots = new Map([[run.id, active]]);
   let fault = "candidate",
@@ -217,7 +217,7 @@ test("gateway failure stages require valid one-use admission and a still-live ta
         });
       if (fault === "forged")
         throw Object.assign(Error("SYNTHETIC private error"), { stage: "candidate" });
-      throw new PublicationInspectionFailure("candidate");
+      throw new PublicationInspectionFailure(fault === "page" ? "page" : "candidate");
     },
   });
   await new Promise((resolve) => gateway.server.once("listening", resolve));
@@ -242,6 +242,14 @@ test("gateway failure stages require valid one-use admission and a still-live ta
     const replay = await post("candidate");
     assert.equal(replay.status, 403);
     assert.equal(await replay.text(), "");
+    fault = "page";
+    const pageFailure = await post("page");
+    assert.equal(pageFailure.status, 422);
+    assert.deepEqual(await pageFailure.json(), {
+      version: 1,
+      kind: "publication_inspection_failure",
+      stage: "page",
+    });
     fault = "forged";
     const forged = await post("forged");
     assert.equal(forged.status, 403);

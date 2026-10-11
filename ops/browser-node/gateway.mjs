@@ -108,7 +108,7 @@ export function createGateway({
           // Never relay raw errors from candidate files, browser pages or transport.
           const stage = inspectionFailureStage?.(error);
           if (
-            !["active", "tab", "candidate", "browser", "response"].includes(stage) ||
+            !["active", "tab", "candidate", "browser", "page", "response"].includes(stage) ||
             slots.get(admission.runId) !== slot ||
             slot.stopping ||
             slot.expiresAt <= Date.now()

@@ -42,8 +42,15 @@ docker run --rm --network none --read-only --init \
 
 # No Facebook/proxy/account is used. Test server startup and independent lease expiry.
 name="ftrade-image-smoke-${ARCH}-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
-trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
-deadline=$(( $(date +%s) * 1000 + 70000 ))
+inspection_config=$(mktemp)
+trap 'rm -f "$inspection_config"; docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+node --input-type=module -e '
+  import { readFileSync, writeFileSync } from "node:fs";
+  const config = JSON.parse(readFileSync("ops/browser-node/camofox.config.json", "utf8"));
+  config.plugins["ftrade-inspection-fixture"] = { enabled: true };
+  writeFileSync(process.argv[1], JSON.stringify(config));
+' "$inspection_config"
+deadline=$(( $(date +%s) * 1000 + 90000 ))
 docker run -d --name "$name" --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
   --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
@@ -51,6 +58,8 @@ docker run -d --name "$name" --network none --read-only \
   --tmpfs /data:rw,nosuid,nodev,size=64m,mode=700 \
   -v "$PWD/ops/browser-node/publication-inspection-page.js:/fixture/publication-inspection-page.js:ro" \
   -v "$PWD/ops/browser-node/publication-inspection.mjs:/fixture/publication-inspection.mjs:ro" \
+  -v "$inspection_config:/app/camofox.config.json:ro" \
+  -v "$PWD/scripts/fixtures/browser-inspection:/app/plugins/ftrade-inspection-fixture:ro" \
   -e "FTRADE_LEASE_DEADLINE=$deadline" \
   -e CAMOFOX_ACCESS_KEY=SYNTHETIC-image-smoke-key \
   -e BROWSER_IDLE_TIMEOUT_MS=900000 \
@@ -114,13 +123,14 @@ docker exec "$name" node --input-type=module -e '
   assert.match(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
   assert.match(prefs, /user_pref\("media\.peerconnection\.enabled", false\);/);
 '
+docker exec "$name" node /app/plugins/ftrade-inspection-fixture/verify.mjs
 docker exec "$name" node -e 'require("node:fs").writeFileSync("/tmp/ftrade-lease",String(Date.now()+2000),{mode:0o600})'
 timeout 35 docker wait "$name" >/dev/null
 test "$(docker inspect --format '{{.State.Running}}' "$name")" = false
 
 # The runtime image is not a persistent Compose browser: the loader only pre-pulls it.
 config=$(mktemp)
-trap 'rm -f "$config"; docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+trap 'rm -f "$config" "$inspection_config"; docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
 FTRADE_URL=https://synthetic.example BROWSER_NODE_ACCESS_KEY=synthetic-key \
   BROWSER_DOMAIN=browser.synthetic.example BROWSER_NODE_IMAGE="$agent" BROWSER_IMAGE="$browser" \
   docker compose -f ops/browser-node/compose.ghcr.yaml config --format json > "$config"

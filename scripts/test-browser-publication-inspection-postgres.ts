@@ -167,7 +167,12 @@ function dependencies(
           {
             version: 1,
             kind: "publication_inspection_failure",
-            stage: badResponse === "classified_unknown" ? "SYNTHETIC-private" : "browser",
+            stage:
+              badResponse === "classified_unknown"
+                ? "SYNTHETIC-private"
+                : badResponse === "classified_page"
+                  ? "page"
+                  : "browser",
             ...(badResponse === "classified_extra" ? { privateCaption: "SYNTHETIC private" } : {}),
           },
           { status: 422 },
@@ -311,6 +316,7 @@ async function main() {
     }
     for (const fault of [
       "classified",
+      "classified_page",
       "classified_unknown",
       "classified_extra",
       "classified_revoked",
@@ -331,6 +337,8 @@ async function main() {
         (error) => {
           assert(error instanceof Error);
           if (fault === "classified") assert.equal(error.message, "inspection_browser_unavailable");
+          if (fault === "classified_page")
+            assert.equal(error.message, "inspection_page_unavailable");
           if (fault === "classified_revoked")
             assert.equal(error.message, "inspection_access_invalid");
           if (fault === "classified_unknown" || fault === "classified_extra")
