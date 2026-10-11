@@ -55,7 +55,13 @@ function inspectPublicationCandidate(profile) {
     videoReceiptVisible: null,
   };
   if (!identityMatched) return result;
-  controls.openComposer = Math.min(25, all(document, "openComposer").length);
+  controls.openComposer = Math.min(
+    25,
+    all(document, "openComposer").filter(
+      (element) =>
+        !profile.openComposerText || element.innerText.trim() === profile.openComposerText,
+    ).length,
+  );
   const composers = all(document, "composer");
   controls.composer = Math.min(25, composers.length);
   if (composers.length !== 1) return result;

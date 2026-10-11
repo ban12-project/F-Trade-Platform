@@ -21,6 +21,10 @@ export function register(_app, ctx, config = {}) {
           "tracked",
           "query-mismatch",
           "tracking-lookalike",
+          "open-filtered",
+          "open-missing",
+          "open-duplicate",
+          "closed",
         ].includes(kind)
       )
         return route.abort();

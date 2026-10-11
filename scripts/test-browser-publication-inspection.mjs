@@ -64,6 +64,7 @@ test("private expired candidates remain byte-identical and cannot confer publica
       channelRef: run.channelRef,
       identityHref: "https://www.facebook.com/synthetic-own-profile",
       audienceText: "Only me",
+      openComposerText: "SYNTHETIC exact composer label",
       expiresAt: "2000-01-01T00:00:00Z",
       selectors: Object.fromEntries(Object.keys(controls).map((k) => [k, `#${k}`])),
     };
@@ -73,9 +74,15 @@ test("private expired candidates remain byte-identical and cannot confer publica
     const stat = await lstat(file);
     const observed = await readPublicationInspectionCandidate(dir, run);
     assert.equal(observed.candidateExpired, true);
+    assert.equal(observed.profile.openComposerText, value.openComposerText);
     assert.equal(await readFile(file, "utf8"), text);
     assert.equal((await lstat(file)).mtimeMs, stat.mtimeMs);
     assert(!("capabilities" in observed));
+    for (const invalid of [null, 7, [], "", " ", "x".repeat(201)]) {
+      await writeFile(file, JSON.stringify([{ ...value, openComposerText: invalid }]));
+      await assert.rejects(readPublicationInspectionCandidate(dir, run));
+    }
+    await writeFile(file, text);
     await assert.rejects(
       readPublicationInspectionCandidate(dir, { ...run, accountRef: "other-account" }),
     );

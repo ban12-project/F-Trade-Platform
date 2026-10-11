@@ -58,6 +58,7 @@ docker run -d --name "$name" --network none --read-only \
   --tmpfs /data:rw,nosuid,nodev,size=64m,mode=700 \
   -v "$PWD/ops/browser-node/publication-inspection-page.js:/fixture/publication-inspection-page.js:ro" \
   -v "$PWD/ops/browser-node/publication-inspection.mjs:/fixture/publication-inspection.mjs:ro" \
+  -v "$PWD/ops/browser-node/facebook-publication-page.js:/fixture/facebook-publication-page.js:ro" \
   -v "$inspection_config:/app/camofox.config.json:ro" \
   -v "$PWD/scripts/fixtures/browser-inspection:/app/plugins/ftrade-inspection-fixture:ro" \
   -e "FTRADE_LEASE_DEADLINE=$deadline" \

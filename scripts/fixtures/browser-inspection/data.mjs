@@ -30,6 +30,7 @@ export function syntheticPage(kind) {
     kind === "page-error"
       ? '<svg width="100" height="100"><g role="textbox" contenteditable="true"><rect width="90" height="90"/></g></svg>'
       : `<div role="textbox" contenteditable="true">${kind === "nonempty" ? "SYNTHETIC unsent text" : ""}</div>`;
-  const composer = `<div role="dialog"><a aria-label="SYNTHETIC Timeline" href="${href}">SYNTHETIC actor</a>${textbox}<div role="button" aria-label="Post">Post</div><button aria-label="Edit privacy. audience">${kind === "friends" ? "Friends" : "Only me"}</button><input type="file" hidden></div>`;
-  return `<!doctype html><title>SYNTHETIC inspection fixture</title><nav role="navigation" aria-label="Shortcuts"><a href="${href}">SYNTHETIC identity</a></nav><div role="button" data-synthetic-open>Open</div>${composer}${kind === "ambiguous" ? composer : ""}`;
+  const composer = `<div id="synthetic-composer" role="dialog" ${kind === "closed" ? "hidden" : ""}><a aria-label="SYNTHETIC Timeline" href="${href}">SYNTHETIC actor</a>${textbox}<div role="button" aria-label="Post">Post</div><button aria-label="Edit privacy. audience">${kind === "friends" ? "Friends" : "Only me"}</button><input type="file" hidden></div>`;
+  const extraButtons = `<div role="button" data-synthetic-open>Other</div><div role="button" data-synthetic-open>${kind === "open-duplicate" ? "Open" : "Other again"}</div>`;
+  return `<!doctype html><title>SYNTHETIC inspection fixture</title><nav role="navigation" aria-label="Shortcuts"><a href="${href}">SYNTHETIC identity</a></nav><div role="button" data-synthetic-open onclick="document.getElementById('synthetic-composer').hidden=false">${kind === "open-missing" ? "Changed label" : "Open"}</div>${kind.startsWith("open-") ? extraButtons : ""}${composer}${kind === "ambiguous" ? composer : ""}`;
 }
