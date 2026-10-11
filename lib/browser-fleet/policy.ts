@@ -58,6 +58,8 @@ export type Run = {
     automatic?: boolean;
     outcome?: "filled" | "ready" | "refused" | "unknown";
     challenge?: "checkpoint" | "rejected" | "unsupported_factor";
+    factorPrompts?: Array<"password" | "totp" | "pin">;
+    historyEvidence?: "threads" | "empty_inbox" | "unverified";
   };
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
@@ -433,6 +435,8 @@ export function publicState(state: FleetState, now = Date.now()) {
         ...r,
         savedLoginOutcome: savedLoginOutcome(run, now),
         savedLoginChallenge: savedLogin?.challenge ?? null,
+        savedLoginFactorPrompts: savedLogin?.factorPrompts ?? null,
+        savedLoginHistoryEvidence: savedLogin?.historyEvidence ?? "unverified",
         savedLoginState: savedLogin
           ? savedLogin.claimedAt === null
             ? "requested"

@@ -1,7 +1,23 @@
 import { generateTotp } from "./totp.mjs";
 
 /** Credential submissions are one-shot. Observation may repeat, submission never does. */
-export async function runFacebookLoginFlow({
+export async function runFacebookLoginFlow(input) {
+  const factorPrompts = [];
+  const result = await executeFacebookLoginFlow({
+    ...input,
+    onFactorPrompt: (phase) => {
+      if (!factorPrompts.includes(phase)) factorPrompts.push(phase);
+    },
+  });
+  return {
+    ...result,
+    factorPrompts: factorPrompts.sort(
+      (a, b) => ({ password: 1, totp: 2, pin: 3 })[a] - { password: 1, totp: 2, pin: 3 }[b],
+    ),
+  };
+}
+
+async function executeFacebookLoginFlow({
   credentials,
   acquireCredentials,
   observeOnly = false,
@@ -9,6 +25,7 @@ export async function runFacebookLoginFlow({
   submit,
   assertActive,
   onAttention,
+  onFactorPrompt = () => {},
   deadline,
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -37,7 +54,14 @@ export async function runFacebookLoginFlow({
       if (observed.state === "ready") {
         if (observed.identityVerified !== true || observed.messengerRestored !== true)
           return { outcome: "refused", reason: "ready_unverified" };
-        return { outcome: "ready" };
+        return {
+          outcome: "ready",
+          historyEvidence: observed.historyObserved
+            ? "threads"
+            : observed.emptyInboxObserved
+              ? "empty_inbox"
+              : "unverified",
+        };
       }
       if (observed.state === "checkpoint" && onAttention) {
         if (!attentionReported) {
@@ -50,6 +74,7 @@ export async function runFacebookLoginFlow({
       if (["checkpoint", "rejected", "unsupported_factor"].includes(observed.state))
         return { outcome: "attention", reason: observed.state };
       const phase = observed.state;
+      if (["password", "totp", "pin"].includes(phase)) onFactorPrompt(phase);
       // Navigation can expose a new document before its form/identity hydrates.
       // Allow bounded reads only; wrong origins/accounts above still stop immediately.
       if (phase === "invalid" && unsettledReads++ < 20) {

@@ -82,7 +82,13 @@ async function save(tx: DatabaseTransaction, row: NodeRow) {
   await tx.execute(sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(row.document)}::jsonb,
     key_hash = ${row.key_hash}, status = ${row.status}, updated_at = now() WHERE id = ${row.id}`);
 }
-async function audit(tx: DatabaseTransaction, actorId: string, action: string, subjectId: string) {
+async function audit(
+  tx: DatabaseTransaction,
+  actorId: string,
+  action: string,
+  subjectId: string,
+  metadata: Record<string, unknown> = {},
+) {
   await tx.insert(auditEvent).values({
     id: randomUUID(),
     actorType: "system",
@@ -90,7 +96,7 @@ async function audit(tx: DatabaseTransaction, actorId: string, action: string, s
     action,
     subjectType: "browser_node",
     subjectId,
-    metadata: {},
+    metadata,
     occurredAt: new Date(),
   });
 }
@@ -605,6 +611,10 @@ async function nodeOperation(
   }
   if (request.operation === "login-result") {
     const authorization = run.savedLogin;
+    const factorPrompts = request.factorPrompts?.slice().sort();
+    const historyEvidence = request.historyEvidence ?? "unverified";
+    if (historyEvidence !== "unverified" && request.outcome !== "ready")
+      throw new Error("saved_login_evidence_invalid");
     if (
       run.kind !== "interactive" ||
       !authorization ||
@@ -618,7 +628,11 @@ async function nodeOperation(
       throw new Error("saved_login_challenge_not_authorized");
     if (
       authorization.outcome &&
-      (authorization.outcome !== request.outcome || authorization.challenge !== request.challenge)
+      (authorization.outcome !== request.outcome ||
+        authorization.challenge !== request.challenge ||
+        JSON.stringify(authorization.factorPrompts?.slice().sort() ?? null) !==
+          JSON.stringify(factorPrompts ?? null) ||
+        (authorization.historyEvidence ?? "unverified") !== historyEvidence)
     )
       throw new Error("saved_login_result_conflict");
     const replayed = !!authorization.outcome;
@@ -631,7 +645,12 @@ async function nodeOperation(
       }
       authorization.outcome = request.outcome;
       authorization.challenge = request.challenge;
-      await audit(tx, row.owner_id, `browser_credentials.login_${request.outcome}`, run.id);
+      authorization.factorPrompts = factorPrompts;
+      authorization.historyEvidence = historyEvidence;
+      await audit(tx, row.owner_id, `browser_credentials.login_${request.outcome}`, run.id, {
+        factor_prompts: factorPrompts ?? null,
+        history_evidence: historyEvidence,
+      });
     }
     return { recorded: true, replayed };
   }

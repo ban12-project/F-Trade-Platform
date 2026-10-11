@@ -328,6 +328,8 @@ The optional `selectors.postsReady` marks the reviewed profile feed readiness be
 
 ## 自动登录配置 version 2（#423，生产待验收）
 
+`login-result` 可携带去重后的 `factorPrompts`（仅 `password`、`totp`、`pin`）和 `historyEvidence`（`threads`、`empty_inbox`、`unverified`）。它们只记录页面观察，不含凭据或聊天正文；看到会话条目不证明完整历史恢复，空收件箱也不算 DM 采集验收。未携带字段的旧回执保留“未记录／未核验”，不推断本次沿用了会话。平台拒绝改变已保存观察的重放以及非 ready 回执声称已观察历史。升级先部署接受可选字段的应用，再部署发送字段的节点；旧节点继续兼容，不能给历史回执补造观察。
+
 节点在首次导航前必须等待 `/health` 同时返回 Camoufox 引擎、浏览器运行和连接就绪；HTTP 监听成功不代表 Firefox 预启动完成。检查受当前租约和取消信号约束，最多进行 60 次，不重发创建标签页请求。固定版本上游创建标签页请求超时后仍可能在后台完成，因此不得仅凭超时断言没有创建页面。
 
 

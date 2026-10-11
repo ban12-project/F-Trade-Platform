@@ -4,6 +4,8 @@ test("unknown publication requires reviewed evidence and rejects an unauthentica
   page,
 }) => {
   await page.goto("/testing/project-workflow?kind=marketing&record=publication&state=unknown");
+  await expect(page.getByText("回执阶段：发布步骤未取得可验证回执", { exact: true })).toBeVisible();
+  await expect(page.getByText("发布点击完成", { exact: false })).toHaveCount(0);
   await page.getByRole("button", { name: "确认已发布结果" }).click();
   await expect(
     page.getByText("请先核对账号、完整文案、受众和帖子链接。", { exact: true }),

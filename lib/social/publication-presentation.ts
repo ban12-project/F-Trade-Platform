@@ -43,3 +43,19 @@ export function publicationProgress(status: string, humanConfirmed = false) {
       };
   }
 }
+
+const publicationFailureLabels: Record<string, string> = {
+  publication_publish_unknown: "发布步骤未取得可验证回执",
+  publication_observe_unknown: "新帖子观察未完成",
+  publication_validate_unknown: "帖子链接或内容校验未完成",
+  publication_observation_unknown: "帖子观察结果不确定",
+  external_result_unknown: "未收到可验证的平台结果",
+  fleet_publication_result_unknown: "节点停止时仍未收到平台结果",
+};
+
+/** Fixed codes only. Unknown legacy strings stay internal instead of being
+ * rendered as if they were trusted diagnostics. */
+export function publicationFailureLabel(failureCode?: string | null) {
+  if (!failureCode || !Object.hasOwn(publicationFailureLabels, failureCode)) return null;
+  return publicationFailureLabels[failureCode];
+}

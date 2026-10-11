@@ -438,6 +438,10 @@ export async function submitFacebookMediaPublication(
       metadata: { format: value.format, digest: media.sha256 },
       occurredAt: new Date(),
     });
+    const { enqueuePublicationSandboxDemand } = await import(
+      "@/lib/browser-fleet/sandbox-publication-wakeup"
+    );
+    await enqueuePublicationSandboxDemand(tx, publicationId);
     await assertCurrentCommit();
     return { publicationId };
   });

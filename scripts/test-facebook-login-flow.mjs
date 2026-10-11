@@ -37,6 +37,8 @@ const happy = await run([
   ready,
 ]);
 assert.equal(happy.result.outcome, "ready");
+assert.deepEqual(happy.result.factorPrompts, ["password", "totp", "pin"]);
+assert.equal(happy.result.historyEvidence, "unverified");
 assert.deepEqual(
   happy.submissions.map((s) => s.phase),
   ["password", "totp", "pin"],
@@ -44,7 +46,18 @@ assert.deepEqual(
 assert.match(happy.submissions[1].code, /^\d{6}$/);
 assert.equal(happy.credentials.totpSecret, undefined);
 assert.equal(happy.credentials.password, undefined);
-assert.equal((await run([ready])).submissions.length, 0);
+const sessionReuse = await run([ready]);
+assert.equal(sessionReuse.submissions.length, 0);
+assert.deepEqual(sessionReuse.result.factorPrompts, []);
+const emptyInbox = await run([
+  { state: "ready", identityVerified: true, messengerRestored: true, emptyInboxObserved: true },
+]);
+assert.equal(emptyInbox.result.outcome, "ready");
+assert.equal(emptyInbox.result.historyEvidence, "empty_inbox");
+const observedHistory = await run([
+  { state: "ready", identityVerified: true, messengerRestored: true, historyObserved: true },
+]);
+assert.equal(observedHistory.result.historyEvidence, "threads");
 assert.equal((await run([{ state: "ready" }])).result.reason, "ready_unverified");
 assert.equal((await run([{ state: "password", accountMismatch: true }])).submissions.length, 0);
 assert.equal((await run([{ state: "checkpoint" }])).result.outcome, "attention");
