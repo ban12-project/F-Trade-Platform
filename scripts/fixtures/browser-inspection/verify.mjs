@@ -45,7 +45,17 @@ const inspector = createPublicationPageInspector({
   },
 });
 const slot = { run: { kind: "interactive", accountId: userId }, interactiveTabId: tabId };
-for (const kind of ["empty", "nonempty", "friends", "ambiguous", "wrong-identity", "page-error"]) {
+for (const kind of [
+  "empty",
+  "nonempty",
+  "friends",
+  "ambiguous",
+  "wrong-identity",
+  "page-error",
+  "tracked",
+  "query-mismatch",
+  "tracking-lookalike",
+]) {
   console.log({ syntheticCase: kind });
   await api(`/tabs/${encodeURIComponent(tabId)}/navigate`, {
     userId,
@@ -77,8 +87,9 @@ for (const kind of ["empty", "nonempty", "friends", "ambiguous", "wrong-identity
   assert.equal(observed.candidateExpired, true);
   assert.equal(observed.videoPreviewCount, 0);
   assert.equal(observed.videoReceiptVisible, null);
-  assert.equal(observed.identityMatched, kind !== "wrong-identity");
-  if (kind === "wrong-identity" || kind === "ambiguous") {
+  const wrongIdentity = ["wrong-identity", "query-mismatch", "tracking-lookalike"].includes(kind);
+  assert.equal(observed.identityMatched, !wrongIdentity);
+  if (wrongIdentity || kind === "ambiguous") {
     assert.equal(observed.controls.composer, kind === "ambiguous" ? 2 : 0);
     assert.equal(observed.composerEmpty, null);
     assert.equal(observed.audienceMatchesCandidate, null);

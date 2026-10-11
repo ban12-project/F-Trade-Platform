@@ -23,8 +23,13 @@ function inspectPublicationCandidate(profile) {
   const normalized = (href) => {
     const u = new URL(href, location.href);
     u.searchParams.delete("__tn__");
-    for (const key of [...u.searchParams.keys()])
-      if (/^__cft__\[\d+\]$/.test(key)) u.searchParams.delete(key);
+    // Camoufox's isolated scope does not expose the iterator symbol of
+    // URLSearchParams.keys(). Collect before deleting so duplicates are safe.
+    const tracking = [];
+    u.searchParams.forEach((_value, key) => {
+      if (/^__cft__\[\d+\]$/.test(key)) tracking.push(key);
+    });
+    for (const key of tracking) u.searchParams.delete(key);
     return u.href;
   };
   const identities = all(document, "identity");

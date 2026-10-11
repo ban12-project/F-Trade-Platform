@@ -11,9 +11,17 @@ export function register(_app, ctx, config = {}) {
         !route.request().isNavigationRequest() ||
         url.origin !== "https://www.facebook.com" ||
         url.pathname !== "/" ||
-        !["empty", "nonempty", "friends", "ambiguous", "wrong-identity", "page-error"].includes(
-          kind,
-        )
+        ![
+          "empty",
+          "nonempty",
+          "friends",
+          "ambiguous",
+          "wrong-identity",
+          "page-error",
+          "tracked",
+          "query-mismatch",
+          "tracking-lookalike",
+        ].includes(kind)
       )
         return route.abort();
       return route.fulfill({ contentType: "text/html", body: syntheticPage(kind) });
