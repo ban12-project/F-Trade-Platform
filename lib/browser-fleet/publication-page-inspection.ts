@@ -8,6 +8,7 @@ import { auditEvent, session, user } from "../db/schema";
 import type { FleetState } from "./policy";
 import {
   type PublicationPageInspection,
+  publicationPageInspectionFailureSchema,
   publicationPageInspectionInputSchema,
   publicationPageInspectionSchema,
 } from "./publication-page-inspection-contract";
@@ -143,7 +144,9 @@ export async function inspectOwnedPublicationPage(
     body: JSON.stringify({ ticket: ticket.connection.token }),
     signal: AbortSignal.timeout(12000),
   });
-  if (!response.ok || !response.body) {
+  const classifiedFailure =
+    response.status === 422 && response.headers.get("content-type")?.includes("application/json");
+  if ((!response.ok && !classifiedFailure) || !response.body) {
     await response.body?.cancel();
     throw new Error("inspection_unavailable");
   }
@@ -162,9 +165,14 @@ export async function inspectOwnedPublicationPage(
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
-  const observation = publicationPageInspectionSchema.parse(
-    JSON.parse(Buffer.concat(chunks).toString("utf8")),
-  );
+  const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  if (classifiedFailure) {
+    const failure = publicationPageInspectionFailureSchema.parse(body);
+    const access = await currentInspectionAccess(value, actor, database);
+    if (access.origin !== origin) throw new Error("inspection_origin_invalid");
+    throw new Error(`inspection_${failure.stage}_unavailable`);
+  }
+  const observation = publicationPageInspectionSchema.parse(body);
   const after = await currentInspectionAccess(value, actor, database, { origin, observation }),
     now = Date.now();
   if (

@@ -162,6 +162,16 @@ function dependencies(
       assert(body.ticket.startsWith(`${f.runId}.`));
       if (change) await change();
       if (badResponse === "oversized") return new Response("x".repeat(8193));
+      if (badResponse.startsWith("classified"))
+        return Response.json(
+          {
+            version: 1,
+            kind: "publication_inspection_failure",
+            stage: badResponse === "classified_unknown" ? "SYNTHETIC-private" : "browser",
+            ...(badResponse === "classified_extra" ? { privateCaption: "SYNTHETIC private" } : {}),
+          },
+          { status: 422 },
+        );
       return Response.json(
         badResponse === "extra"
           ? { ...observation(), privateCaption: "SYNTHETIC private" }
@@ -297,6 +307,39 @@ async function main() {
       await assert.rejects(
         inspectOwnedPublicationPage({ nodeId: f.nodeId, runId: f.runId }, f.actor, db, d.value),
       );
+      scenarios++;
+    }
+    for (const fault of [
+      "classified",
+      "classified_unknown",
+      "classified_extra",
+      "classified_revoked",
+    ]) {
+      const f = await fixture(),
+        d = dependencies(
+          f,
+          fault === "classified_revoked"
+            ? async () => {
+                await db.update(user).set({ role: "user" }).where(eq(user.id, f.actor.id));
+              }
+            : undefined,
+          "",
+          fault,
+        );
+      await assert.rejects(
+        inspectOwnedPublicationPage({ nodeId: f.nodeId, runId: f.runId }, f.actor, db, d.value),
+        (error) => {
+          assert(error instanceof Error);
+          if (fault === "classified") assert.equal(error.message, "inspection_browser_unavailable");
+          if (fault === "classified_revoked")
+            assert.equal(error.message, "inspection_access_invalid");
+          if (fault === "classified_unknown" || fault === "classified_extra")
+            assert.notEqual(error.message, "inspection_browser_unavailable");
+          return true;
+        },
+      );
+      const audits = await db.select().from(auditEvent).where(eq(auditEvent.subjectId, f.nodeId));
+      assert(!audits.some((a) => a.action === "browser_publication_page.inspected"));
       scenarios++;
     }
     const waiting = await fixture(),

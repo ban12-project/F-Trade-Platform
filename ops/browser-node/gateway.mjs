@@ -26,7 +26,14 @@ async function readBody(request) {
   }
   return JSON.parse(Buffer.concat(parts).toString("utf8"));
 }
-export function createGateway({ appOrigin, nodeCall, slots, inspectPublicationPage, port = 9400 }) {
+export function createGateway({
+  appOrigin,
+  nodeCall,
+  slots,
+  inspectPublicationPage,
+  inspectionFailureStage,
+  port = 9400,
+}) {
   const views = new Map();
   function allowed(entry) {
     return (
@@ -93,7 +100,30 @@ export function createGateway({ appOrigin, nodeCall, slots, inspectPublicationPa
           slot.expiresAt <= Date.now()
         )
           return fail();
-        const result = await inspectPublicationPage(slot);
+        let result;
+        try {
+          result = await inspectPublicationPage(slot);
+        } catch (error) {
+          // Only an admitted owner of a still-live task can observe fixed stages.
+          // Never relay raw errors from candidate files, browser pages or transport.
+          const stage = inspectionFailureStage?.(error);
+          if (
+            !["active", "tab", "candidate", "browser", "response"].includes(stage) ||
+            slots.get(admission.runId) !== slot ||
+            slot.stopping ||
+            slot.expiresAt <= Date.now()
+          )
+            return fail();
+          response.writeHead(422, { "Content-Type": "application/json" });
+          response.end(
+            JSON.stringify({
+              version: 1,
+              kind: "publication_inspection_failure",
+              stage,
+            }),
+          );
+          return;
+        }
         if (slots.get(admission.runId) !== slot || slot.stopping || slot.expiresAt <= Date.now())
           return fail();
         response.setHeader("Content-Type", "application/json");

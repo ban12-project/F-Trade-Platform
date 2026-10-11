@@ -24,7 +24,10 @@ import {
 import { managedFacebookEnvironment } from "./managed-facebook.mjs";
 import { readPublicationMedia } from "./media.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
-import { createPublicationPageInspector } from "./publication-inspection.mjs";
+import {
+  createPublicationPageInspector,
+  publicationInspectionFailureStage,
+} from "./publication-inspection.mjs";
 import { stagePublicationUpload } from "./upload.mjs";
 
 const idleExit = createIdleExitPolicy();
@@ -159,6 +162,7 @@ const gateway = createGateway({
   appOrigin,
   nodeCall,
   slots,
+  inspectionFailureStage: publicationInspectionFailureStage,
   inspectPublicationPage: createPublicationPageInspector({
     directory: process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR,
     browserRequest,

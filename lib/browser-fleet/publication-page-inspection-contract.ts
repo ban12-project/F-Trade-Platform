@@ -32,3 +32,10 @@ export const publicationPageInspectionSchema = z
   })
   .strict();
 export type PublicationPageInspection = z.infer<typeof publicationPageInspectionSchema>;
+export const publicationPageInspectionFailureSchema = z
+  .object({
+    version: z.literal(1),
+    kind: z.literal("publication_inspection_failure"),
+    stage: z.enum(["active", "tab", "candidate", "browser", "response"]),
+  })
+  .strict();
