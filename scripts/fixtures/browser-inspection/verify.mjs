@@ -100,7 +100,7 @@ for (const kind of [
   ].includes(kind);
   assert.equal(observed.identityMatched, !wrongIdentity);
   if (wrongIdentity || kind === "ambiguous") {
-    assert.equal(observed.controls.composer, kind === "ambiguous" ? 2 : 1);
+    assert.equal(observed.controls.composer, 0);
     assert.equal(observed.composerEmpty, null);
     assert.equal(observed.audienceMatchesCandidate, null);
     assert.equal(observed.composerIdentityMatched, null);

@@ -46,7 +46,7 @@ function inspectPublicationCandidate(profile) {
   const controls = {
     identity: Math.min(25, identities.length),
     openComposer: 0,
-    composer: Math.min(25, composers.length),
+    composer: 0,
     textbox: 0,
     submit: 0,
     audience: 0,
@@ -63,6 +63,7 @@ function inspectPublicationCandidate(profile) {
     videoReceiptVisible: null,
   };
   if (!identityMatched) return result;
+  controls.composer = Math.min(25, composers.length);
   controls.openComposer = Math.min(
     25,
     all(document, "openComposer").filter(
