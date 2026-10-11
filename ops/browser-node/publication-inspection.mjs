@@ -138,7 +138,7 @@ export function createPublicationPageInspector({
           userId: slot.run.accountId,
           // Upstream intentionally sanitizes thrown page errors. Catch inside
           // this fixed program boundary and return only a predetermined marker.
-          expression: `(() => { try { return (${program})(${JSON.stringify(value.profile)}); } catch (error) { return { inspectionFailure: error.message === "inspection_page_unavailable" ? "tab" : error.name === "SyntaxError" ? "candidate" : "response" }; } })()`,
+          expression: `(() => { try { return (${program})(${JSON.stringify(value.profile)}); } catch (error) { return { inspectionFailure: error?.message === "inspection_page_unavailable" ? "tab" : error?.name === "SyntaxError" ? "candidate" : "response" }; } })()`,
         },
         5000,
       ),

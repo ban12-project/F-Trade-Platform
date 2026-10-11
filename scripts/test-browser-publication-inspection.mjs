@@ -135,7 +135,8 @@ test("fixed failure stages discard private errors and preserve late lease failur
   );
 });
 test("fixed page envelope classifies source and selector errors without returning page exception text", async () => {
-  for (const stage of ["tab", "candidate", "response"]) {
+  for (const failure of ["tab", "candidate", "response", "null"]) {
+    const stage = failure === "null" ? "response" : failure;
     let queries = 0;
     const inspect = createPublicationPageInspector({
       directory: "synthetic",
@@ -159,6 +160,7 @@ test("fixed page envelope classifies source and selector errors without returnin
             document: {
               querySelectorAll() {
                 queries++;
+                if (failure === "null") throw null;
                 const error = Error("SYNTHETIC private selector and caption");
                 if (stage === "candidate") error.name = "SyntaxError";
                 throw error;
