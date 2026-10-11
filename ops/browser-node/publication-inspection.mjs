@@ -25,6 +25,9 @@ export class PublicationInspectionFailure extends Error {
     this.stage = stage;
   }
 }
+export function publicationInspectionFailureStage(error) {
+  return error instanceof PublicationInspectionFailure ? error.stage : null;
+}
 async function checkedStage(stage, operation) {
   try {
     return await operation();

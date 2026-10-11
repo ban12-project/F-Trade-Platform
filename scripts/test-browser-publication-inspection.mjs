@@ -8,6 +8,7 @@ import { createGateway } from "../ops/browser-node/gateway.mjs";
 import {
   createPublicationPageInspector,
   PublicationInspectionFailure,
+  publicationInspectionFailureStage,
   readPublicationInspectionCandidate,
 } from "../ops/browser-node/publication-inspection.mjs";
 
@@ -142,6 +143,7 @@ test("gateway failure stages require valid one-use admission and a still-live ta
     appOrigin: "https://synthetic-app.example",
     slots,
     port: 0,
+    inspectionFailureStage: publicationInspectionFailureStage,
     async nodeCall(_op, { ticket }) {
       if (!tickets.delete(ticket)) throw Error("SYNTHETIC invalid ticket");
       return { runId: run.id };
