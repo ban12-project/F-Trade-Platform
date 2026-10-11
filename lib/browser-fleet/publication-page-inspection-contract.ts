@@ -36,6 +36,6 @@ export const publicationPageInspectionFailureSchema = z
   .object({
     version: z.literal(1),
     kind: z.literal("publication_inspection_failure"),
-    stage: z.enum(["active", "tab", "candidate", "browser", "response"]),
+    stage: z.enum(["active", "tab", "candidate", "browser", "page", "response"]),
   })
   .strict();

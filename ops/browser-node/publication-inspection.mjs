@@ -17,7 +17,7 @@ const keys = [
   "fileInput",
   "attachmentName",
 ];
-const stages = new Set(["active", "tab", "candidate", "browser", "response"]);
+const stages = new Set(["active", "tab", "candidate", "browser", "page", "response"]);
 export class PublicationInspectionFailure extends Error {
   constructor(stage) {
     super("inspection_unavailable");
@@ -138,7 +138,7 @@ export function createPublicationPageInspector({
           userId: slot.run.accountId,
           // Upstream intentionally sanitizes thrown page errors. Catch inside
           // this fixed program boundary and return only a predetermined marker.
-          expression: `(() => { try { return (${program})(${JSON.stringify(value.profile)}); } catch (error) { return { inspectionFailure: error?.message === "inspection_page_unavailable" ? "tab" : error?.name === "SyntaxError" ? "candidate" : "response" }; } })()`,
+          expression: `(() => { try { return (${program})(${JSON.stringify(value.profile)}); } catch (error) { return { inspectionFailure: error?.message === "inspection_page_unavailable" ? "tab" : error?.name === "SyntaxError" ? "candidate" : "page" }; } })()`,
         },
         5000,
       ),
@@ -166,7 +166,7 @@ export function createPublicationPageInspector({
       if (Object.hasOwn(body.result, "inspectionFailure")) {
         if (
           Object.keys(body.result).length !== 1 ||
-          !["tab", "candidate", "response"].includes(body.result.inspectionFailure)
+          !["tab", "candidate", "page"].includes(body.result.inspectionFailure)
         )
           throw new Error("inspection_response_invalid");
         throw new PublicationInspectionFailure(body.result.inspectionFailure);
