@@ -39,6 +39,7 @@
     "scripts/test-video-retention-postgres.mts",
     "scripts/test-browser-publication-inspection-action.mts",
     "scripts/test-publication-submission-wakeup-postgres.mts",
+    "scripts/test-facebook-video-caption-postgres.mts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules", "tmp", "ops/browser-node/upstream"]

@@ -1,0 +1,1 @@
+ALTER TABLE "facebook_publication_manifest" ADD COLUMN "caption_source" jsonb;

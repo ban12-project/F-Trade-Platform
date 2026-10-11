@@ -9,6 +9,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { FacebookCaptionSource } from "../social/facebook-media-confirmation";
 import type { FacebookMedia } from "../social/facebook-media-contract";
 import { socialPublication, user } from "./schema";
 
@@ -62,6 +63,7 @@ export const facebookPublicationManifest = pgTable("facebook_publication_manifes
   contentVersion: integer("content_version").notNull(),
   format: text("format").notNull(),
   caption: text("caption").notNull(),
+  captionSource: jsonb("caption_source").$type<FacebookCaptionSource>(),
   media: jsonb("media").$type<FacebookMedia>().notNull(),
   mediaId: text("media_id").notNull(),
   confirmedBy: text("confirmed_by")
