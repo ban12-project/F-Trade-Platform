@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
 import { assertPublicationEligible } from "../lib/social/publication-store";
@@ -12,7 +12,10 @@ import {
   beginGuardedMarketingVideoRender,
   decideGuardedVideoReview,
 } from "../lib/video/product-media-guarded-operations";
-import { assertVideoRetentionForId } from "../lib/video/retention-access";
+import {
+  assertVideoRetentionForId,
+  assertVideoWorkingEvidenceRetained,
+} from "../lib/video/retention-access";
 import {
   cleanupExpiredVideoObjects,
   purgeVideoRetentionObject,
@@ -118,6 +121,24 @@ async function observeWait(pid: number) {
     assert(performance.now() < deadline, "Observe actual PostgreSQL lock wait");
     await delay(10);
   }
+}
+
+async function bindHistory(
+  connection: Pool | PoolClient,
+  kind: "workflow" | "audit",
+  aggregateId: string,
+  evidenceId: string,
+) {
+  if (kind === "workflow")
+    await connection.query(
+      "INSERT INTO workflow_event(id,aggregate_id,from_state,to_state,actor_type,actor_id,evidence_refs,occurred_at) VALUES($1,$2,'SYNTHETIC_DRAFT','SYNTHETIC_REVIEWED','human','synthetic-retention',$3::jsonb,now())",
+      [randomUUID(), aggregateId, JSON.stringify([evidenceId])],
+    );
+  else
+    await connection.query(
+      "INSERT INTO audit_event(id,aggregate_id,action,actor_type,actor_id,subject_type,subject_id,metadata,occurred_at) VALUES($1,$2,'synthetic.fact_bound','human','synthetic-retention','aggregate',$2,$3::jsonb,now())",
+      [randomUUID(), aggregateId, JSON.stringify({ evidence_ref: evidenceId })],
+    );
 }
 try {
   await migrate(db as unknown as Parameters<typeof migrate>[0], { migrationsFolder: "./drizzle" });
@@ -399,6 +420,94 @@ try {
     await claim.query("ROLLBACK");
     claim.release();
     if (purge) await purge.catch(() => {});
+  }
+
+  // Historical product facts protect legacy bytes even after the current payload changes.
+  // Video-only history is a control: it must not make working copies permanent.
+  for (const label of [
+    "marketing-upload:image",
+    "marketing-upload:video",
+    "internet-search:wikimedia-commons:private-test-only",
+  ]) {
+    for (const kind of ["workflow", "audit"] as const) {
+      for (const timing of ["initial", "queued", "waiting", "video_only"] as const) {
+        const source = await evidence(label);
+        const sourceBefore = await readEvidence(source.id);
+        const aggregateId = timing === "video_only" ? active.videoId : active.productId;
+        if (timing === "initial" || timing === "video_only") {
+          await bindHistory(pool, kind, aggregateId, source.id);
+          await cleanupExpiredVideoObjects(db, store);
+          if (timing === "video_only") {
+            assert(!bytes.has(source.blobKey));
+            assert.equal((await readEvidence(source.id)).blobKey, `retired/${source.id}`);
+          } else {
+            assert(bytes.has(source.blobKey), `${label}: ${kind} history protects bytes`);
+            assert.deepEqual(await readEvidence(source.id), sourceBefore);
+            const jobs = await db
+              .select()
+              .from(schema.videoRetentionCleanup)
+              .where(
+                and(
+                  eq(schema.videoRetentionCleanup.objectKind, "evidence"),
+                  eq(schema.videoRetentionCleanup.objectRef, source.id),
+                ),
+              );
+            assert.equal(jobs.length, 0, "Protected history is never admitted to cleanup");
+          }
+        } else {
+          const jobId = randomUUID();
+          await db.insert(schema.videoRetentionCleanup).values({
+            id: jobId,
+            objectKind: "evidence",
+            objectRef: source.id,
+            blobPath: source.blobKey,
+            policyVersion: "1.0.0",
+            originalCreatedAt: sourceBefore.createdAt,
+          });
+          if (timing === "queued") {
+            await bindHistory(pool, kind, aggregateId, source.id);
+            assert.equal(await purgeVideoRetentionObject(jobId, db, store), "protected");
+          } else {
+            const claim = await pool.connect();
+            let pending: ReturnType<typeof purgeVideoRetentionObject> | undefined;
+            try {
+              await claim.query("BEGIN");
+              await claim.query("SELECT id FROM evidence WHERE id=$1 FOR SHARE", [source.id]);
+              const {
+                rows: [backend],
+              } = await claim.query("SELECT pg_backend_pid() AS pid");
+              pending = purgeVideoRetentionObject(jobId, db, store);
+              await observeWait(backend.pid);
+              await bindHistory(claim, kind, aggregateId, source.id);
+              await claim.query("COMMIT");
+              assert.equal(
+                await pending,
+                "protected",
+                "Recheck history after the actual lock wait",
+              );
+            } finally {
+              await claim.query("ROLLBACK");
+              claim.release();
+              await pending?.catch(() => {});
+            }
+          }
+          assert(bytes.has(source.blobKey));
+          assert.deepEqual(await readEvidence(source.id), sourceBefore);
+          const [job] = await db
+            .select()
+            .from(schema.videoRetentionCleanup)
+            .where(eq(schema.videoRetentionCleanup.id, jobId));
+          assert.equal(job.status, "pending");
+          assert.equal(job.policyVersion, "1.0.0");
+        }
+        // Protecting source bytes never renews their 90-day use in the video workflow.
+        await assert.rejects(
+          assertVideoWorkingEvidenceRetained(db, [source.id]),
+          VideoRetentionError,
+        );
+        scenarios++;
+      }
+    }
   }
 
   const olderSource = await seedVideoReviewFixture(db);

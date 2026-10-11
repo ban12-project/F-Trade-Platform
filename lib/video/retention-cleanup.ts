@@ -56,6 +56,8 @@ export function unprotectedWorkingEvidenceCondition() {
     AND NOT EXISTS (SELECT 1 FROM product_catalog_import p WHERE p.evidence_id = ${evidence.id})
     AND NOT EXISTS (SELECT 1 FROM approval p WHERE p.evidence_ref = ${evidence.id})
     AND NOT EXISTS (SELECT 1 FROM aggregate_record p WHERE p.type <> 'video' AND strpos(p.payload::text, ${evidence.id}) > 0)
+    AND NOT EXISTS (SELECT 1 FROM workflow_event w JOIN aggregate_record a ON a.id = w.aggregate_id WHERE a.type <> 'video' AND w.evidence_refs @> jsonb_build_array(${evidence.id}::text))
+    AND NOT EXISTS (SELECT 1 FROM audit_event w JOIN aggregate_record a ON a.id = w.aggregate_id WHERE a.type <> 'video' AND strpos(w.metadata::text, ${evidence.id}) > 0)
   )`;
   return or(
     legacy,
