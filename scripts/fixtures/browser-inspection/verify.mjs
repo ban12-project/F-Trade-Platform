@@ -55,6 +55,9 @@ for (const kind of [
   "tracked",
   "query-mismatch",
   "tracking-lookalike",
+  "inert-background",
+  "foreign-composer",
+  "missing-composer-actor",
 ]) {
   console.log({ syntheticCase: kind });
   await api(`/tabs/${encodeURIComponent(tabId)}/navigate`, {
@@ -87,10 +90,17 @@ for (const kind of [
   assert.equal(observed.candidateExpired, true);
   assert.equal(observed.videoPreviewCount, 0);
   assert.equal(observed.videoReceiptVisible, null);
-  const wrongIdentity = ["wrong-identity", "query-mismatch", "tracking-lookalike"].includes(kind);
+  const wrongIdentity = [
+    "wrong-identity",
+    "query-mismatch",
+    "tracking-lookalike",
+    "ambiguous",
+    "foreign-composer",
+    "missing-composer-actor",
+  ].includes(kind);
   assert.equal(observed.identityMatched, !wrongIdentity);
   if (wrongIdentity || kind === "ambiguous") {
-    assert.equal(observed.controls.composer, kind === "ambiguous" ? 2 : 0);
+    assert.equal(observed.controls.composer, 0);
     assert.equal(observed.composerEmpty, null);
     assert.equal(observed.audienceMatchesCandidate, null);
     assert.equal(observed.composerIdentityMatched, null);
@@ -105,6 +115,43 @@ for (const kind of [
   }
   assert(!JSON.stringify(observed).includes("SYNTHETIC unsent text"));
 }
+// The exact same broad selector and optional label used by the publication
+// program must report missing/unique/ambiguous controls without exposing text.
+profile.openComposerText = "Open";
+for (const [kind, expected] of [
+  ["open-filtered", 1],
+  ["open-missing", 0],
+  ["open-duplicate", 2],
+]) {
+  await api(`/tabs/${encodeURIComponent(tabId)}/navigate`, {
+    userId,
+    url: `https://www.facebook.com/?synthetic-inspection=${kind}`,
+  });
+  const observed = await inspector(slot);
+  assert.equal(observed.controls.openComposer, expected);
+  assert(!JSON.stringify(observed).includes("Open"));
+}
+// Exercise the actual publisher page program, including a real DOM side effect.
+// The fixture is synthetic and physically has no outbound network.
+const publication = readFileSync("/fixture/facebook-publication-page.js", "utf8");
+const publisherProfile = { ...profile, expiresAt: new Date(Date.now() + 60000).toISOString() };
+await api(`/tabs/${encodeURIComponent(tabId)}/navigate`, {
+  userId,
+  url: "https://www.facebook.com/?synthetic-inspection=closed",
+});
+const publicationAction = async (kind) => {
+  const response = await api(`/tabs/${encodeURIComponent(tabId)}/evaluate`, {
+    userId,
+    expression: `(async () => { try { return { result: await (${publication})(${JSON.stringify(publisherProfile)},{kind:${JSON.stringify(kind)}}) }; } catch (error) { return { syntheticError: String(error?.message).slice(0,500) }; } })()`,
+  });
+  const body = await response.json();
+  assert.equal(body.result.syntheticError, undefined, JSON.stringify(body));
+  return body.result.result;
+};
+assert.equal(await publicationAction("composer-closed"), true);
+assert.equal(await publicationAction("open"), true);
+assert.equal(await publicationAction("composer-ready"), true);
+assert.equal((await inspector(slot)).controls.composer, 1);
 await api(`/tabs/${encodeURIComponent(tabId)}`, { userId }, "DELETE");
 console.log(
   "PASS: native Firefox HTTP full-DOM inspection and negative controls, no external traffic",

@@ -86,6 +86,15 @@ export async function readPublicationInspectionCandidate(directory, run) {
       selectors[k] = v;
     }
     const profile = { identityHref: p.identityHref, audienceText: p.audienceText, selectors };
+    if (p.openComposerText !== undefined) {
+      if (
+        typeof p.openComposerText !== "string" ||
+        !p.openComposerText.trim() ||
+        p.openComposerText.length > 200
+      )
+        throw new Error("inspection_candidate_unavailable");
+      profile.openComposerText = p.openComposerText;
+    }
     if (p.videoReceipt) {
       if (
         typeof p.videoReceipt.container !== "string" ||
