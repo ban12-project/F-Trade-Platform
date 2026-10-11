@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   createPublicationPageInspector,
   PublicationInspectionFailure,
@@ -45,6 +46,7 @@ const inspector = createPublicationPageInspector({
 });
 const slot = { run: { kind: "interactive", accountId: userId }, interactiveTabId: tabId };
 for (const kind of ["empty", "nonempty", "friends", "ambiguous", "wrong-identity", "page-error"]) {
+  console.log({ syntheticCase: kind });
   await api(`/tabs/${encodeURIComponent(tabId)}/navigate`, {
     userId,
     url: `https://www.facebook.com/?synthetic-inspection=${kind}`,
@@ -58,7 +60,20 @@ for (const kind of ["empty", "nonempty", "friends", "ambiguous", "wrong-identity
     });
     continue;
   }
-  const observed = await inspector(slot);
+  let observed;
+  try {
+    observed = await inspector(slot);
+  } catch (error) {
+    // This container only contains the synthetic fixture and has no network.
+    // Exception details are test diagnostics, never a production response.
+    const program = readFileSync("/fixture/publication-inspection-page.js", "utf8");
+    const diagnosed = await api(`/tabs/${encodeURIComponent(tabId)}/evaluate`, {
+      userId,
+      expression: `(() => { try { return (${program})(${JSON.stringify(profile)}); } catch (error) { return { name: String(error?.name), message: String(error?.message).slice(0, 500), stack: String(error?.stack).slice(0, 1500) }; } })()`,
+    });
+    console.log({ syntheticException: await diagnosed.json() });
+    throw error;
+  }
   assert.equal(observed.candidateExpired, true);
   assert.equal(observed.videoPreviewCount, 0);
   assert.equal(observed.videoReceiptVisible, null);
