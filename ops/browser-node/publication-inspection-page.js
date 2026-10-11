@@ -32,13 +32,21 @@ function inspectPublicationCandidate(profile) {
     for (const key of tracking) u.searchParams.delete(key);
     return u.href;
   };
-  const identities = all(document, "identity");
+  // Facebook hides the background navigation while a composer is open.
+  // Match the active composer actor, as the publication program does; never
+  // fall back to the background identity for an ambiguous or foreign actor.
+  const composers = all(document, "composer");
+  const identities = composers.length
+    ? composers.length === 1 && profile.selectors.composerIdentity
+      ? all(composers[0], "composerIdentity")
+      : []
+    : all(document, "identity");
   const identityMatched =
     identities.length === 1 && normalized(identities[0].href) === normalized(profile.identityHref);
   const controls = {
     identity: Math.min(25, identities.length),
     openComposer: 0,
-    composer: 0,
+    composer: Math.min(25, composers.length),
     textbox: 0,
     submit: 0,
     audience: 0,
@@ -62,8 +70,6 @@ function inspectPublicationCandidate(profile) {
         !profile.openComposerText || element.innerText.trim() === profile.openComposerText,
     ).length,
   );
-  const composers = all(document, "composer");
-  controls.composer = Math.min(25, composers.length);
   if (composers.length !== 1) return result;
   const composer = composers[0];
   for (const key of ["textbox", "submit", "audience", "fileInput", "attachmentName"])

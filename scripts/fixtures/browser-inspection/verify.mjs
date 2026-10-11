@@ -55,6 +55,9 @@ for (const kind of [
   "tracked",
   "query-mismatch",
   "tracking-lookalike",
+  "inert-background",
+  "foreign-composer",
+  "missing-composer-actor",
 ]) {
   console.log({ syntheticCase: kind });
   await api(`/tabs/${encodeURIComponent(tabId)}/navigate`, {
@@ -87,10 +90,17 @@ for (const kind of [
   assert.equal(observed.candidateExpired, true);
   assert.equal(observed.videoPreviewCount, 0);
   assert.equal(observed.videoReceiptVisible, null);
-  const wrongIdentity = ["wrong-identity", "query-mismatch", "tracking-lookalike"].includes(kind);
+  const wrongIdentity = [
+    "wrong-identity",
+    "query-mismatch",
+    "tracking-lookalike",
+    "ambiguous",
+    "foreign-composer",
+    "missing-composer-actor",
+  ].includes(kind);
   assert.equal(observed.identityMatched, !wrongIdentity);
   if (wrongIdentity || kind === "ambiguous") {
-    assert.equal(observed.controls.composer, kind === "ambiguous" ? 2 : 0);
+    assert.equal(observed.controls.composer, kind === "ambiguous" ? 2 : 1);
     assert.equal(observed.composerEmpty, null);
     assert.equal(observed.audienceMatchesCandidate, null);
     assert.equal(observed.composerIdentityMatched, null);

@@ -25,6 +25,9 @@ export function register(_app, ctx, config = {}) {
           "open-missing",
           "open-duplicate",
           "closed",
+          "inert-background",
+          "foreign-composer",
+          "missing-composer-actor",
         ].includes(kind)
       )
         return route.abort();
