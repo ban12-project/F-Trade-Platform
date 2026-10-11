@@ -512,6 +512,7 @@ async function ProjectWorkflowFixture({
                   channelRef: "synthetic-channel",
                   accountRef: "synthetic-account",
                   externalPublicationRef: null,
+                  failureLabel: "发布步骤未取得可验证回执",
                   status: "unknown",
                   createdAt: new Date("2026-09-20T00:00:00Z"),
                 },

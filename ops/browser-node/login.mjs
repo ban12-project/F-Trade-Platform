@@ -92,6 +92,8 @@ export function createSavedLoginExecutor({
     let claimAttempted = false;
     let outcome = "refused";
     let challenge;
+    let factorPrompts = [];
+    let historyEvidence = "unverified";
     try {
       if (run.kind !== "interactive" || !notice?.id) throw new Error("login_scope_invalid");
       assertActive();
@@ -207,6 +209,8 @@ export function createSavedLoginExecutor({
             : result.outcome === "unknown"
               ? "unknown"
               : "refused";
+        factorPrompts = result.factorPrompts ?? [];
+        historyEvidence = result.historyEvidence ?? "unverified";
         if (
           result.outcome === "attention" &&
           ["checkpoint", "rejected", "unsupported_factor"].includes(result.reason)
@@ -246,6 +250,8 @@ export function createSavedLoginExecutor({
           leaseId: run.leaseId,
           authorizationId: notice.id,
           outcome,
+          factorPrompts,
+          historyEvidence,
           ...(challenge && outcome === "refused" ? { challenge } : {}),
         });
       } catch {

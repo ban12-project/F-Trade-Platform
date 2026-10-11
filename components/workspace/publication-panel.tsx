@@ -124,6 +124,9 @@ export function PublicationPanel({
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               <p className="text-sm">{progress.detail}</p>
+              {item.failureLabel ? (
+                <p className="text-sm text-muted-foreground">回执阶段：{item.failureLabel}</p>
+              ) : null}
               {item.status === "unknown" && item.format === "text" ? (
                 <PublicationReconciliationForm projectId={projectId} publicationId={item.id} />
               ) : null}

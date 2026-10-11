@@ -193,10 +193,21 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
         unsupported_factor: "当前验证方式无法自动处理。请人工完成验证后重新接入。",
       }[connectedRun.savedLoginChallenge]
     : null;
+  const factorStatus = connectedRun?.savedLoginFactorPrompts?.length
+    ? `本次恢复请求了 ${connectedRun.savedLoginFactorPrompts.join("、")}。`
+    : connectedRun?.savedLoginFactorPrompts
+      ? "本次未请求密码、TOTP 或 PIN。"
+      : "本次未记录登录验证步骤。";
+  const historyStatus =
+    connectedRun?.savedLoginHistoryEvidence === "threads"
+      ? "已观察到聊天条目，但这不代表完整历史已恢复。"
+      : connectedRun?.savedLoginHistoryEvidence === "empty_inbox"
+        ? "当前为空收件箱，不能作为历史恢复或 DM 采集通过。"
+        : "尚未形成历史恢复证据。";
   const loginStatus =
     challengeStatus ??
     (connectedRun?.savedLoginOutcome === "ready"
-      ? "已自动完成账号身份与 Messenger 恢复验证。"
+      ? `已自动完成账号身份与 Messenger 界面验证。${factorStatus}${historyStatus}`
       : connectedRun?.savedLoginOutcome === "filled"
         ? "已填入，请在远程页面完成登录和 2FA。"
         : connectedRun?.savedLoginOutcome === "refused"

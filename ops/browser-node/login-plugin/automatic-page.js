@@ -129,17 +129,20 @@ async function automaticLoginPage({
         states.push(name);
     const readyRoots = location.href === auto.ready.url ? matches(auto.ready.marker) : [];
     let restored = false;
+    let historyObserved = false;
+    let emptyInboxObserved = false;
     if (readyRoots.length === 1 && !matches('[role="dialog"]').length) {
       const root = readyRoots[0];
       const empties = [...root.querySelectorAll(auto.ready.empty)].filter(
         (element) => visible(element) && element.textContent.trim() === auto.ready.emptyText,
       );
       const threads = [...root.querySelectorAll(auto.ready.thread)].filter(visible);
-      restored =
-        (empties.length === 1 &&
-          threads.length === 0 &&
-          empties[0].textContent.trim() === auto.ready.emptyText) ||
-        (empties.length === 0 && threads.length > 0);
+      historyObserved = empties.length === 0 && threads.length > 0;
+      emptyInboxObserved =
+        empties.length === 1 &&
+        threads.length === 0 &&
+        empties[0].textContent.trim() === auto.ready.emptyText;
+      restored = historyObserved || emptyInboxObserved;
     }
     if (restored) states.push("ready");
     const state =
@@ -162,6 +165,8 @@ async function automaticLoginPage({
         identityVerified,
         atReadyUrl: location.href === auto.ready.url,
         messengerRestored: state === "ready" && restored,
+        historyObserved: state === "ready" && historyObserved,
+        emptyInboxObserved: state === "ready" && emptyInboxObserved,
       };
     if (state !== phase || !["password", "totp", "pin"].includes(phase)) return "refused";
     const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;

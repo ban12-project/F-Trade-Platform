@@ -102,6 +102,12 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       authorizationId: id,
       outcome: z.enum(["filled", "ready", "refused", "unknown"]),
       challenge: z.enum(["checkpoint", "rejected", "unsupported_factor"]).optional(),
+      factorPrompts: z
+        .array(z.enum(["password", "totp", "pin"]))
+        .max(3)
+        .refine((values) => new Set(values).size === values.length)
+        .optional(),
+      historyEvidence: z.enum(["threads", "empty_inbox", "unverified"]).optional(),
     })
     .strict(),
   z

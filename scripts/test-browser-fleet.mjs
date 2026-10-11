@@ -469,7 +469,7 @@ test("observe-only waits for Messenger hydration and never submits or claims fac
       time += ms;
     },
   });
-  assert.deepEqual(result, { outcome: "ready" });
+  assert.deepEqual(result, { outcome: "ready", historyEvidence: "unverified", factorPrompts: [] });
   assert.equal(reads, 2);
   assert.equal(claims, 0);
   assert.equal(submissions, 0);
@@ -493,7 +493,11 @@ test("observe-only stops on a confirmed recovery page without claiming factors",
       assertActive() {},
       deadline: Date.now() + 1000,
     });
-    assert.deepEqual(result, { outcome: "refused", reason: "recovery_required" });
+    assert.deepEqual(result, {
+      outcome: "refused",
+      reason: "recovery_required",
+      factorPrompts: [phase],
+    });
     assert.equal(claims, 0);
     assert.equal(submissions, 0);
   }

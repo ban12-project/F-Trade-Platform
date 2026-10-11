@@ -525,10 +525,52 @@ export async function testBrowserLogin(
   await assert.rejects(() => call({ ...challengeReceipt, challenge: "rejected" }));
   await assert.rejects(() => call({ ...challengeReceipt, challenge: "untrusted raw text" }));
   await write(claimedState);
-  const autoReceipt = { operation: "login-result", ...autoRequest, outcome: "ready" };
+  const autoReceipt = {
+    operation: "login-result",
+    ...autoRequest,
+    outcome: "ready",
+    factorPrompts: ["password", "totp", "pin"],
+    historyEvidence: "empty_inbox",
+  };
+  const readyAuditsBefore = (
+    await database.select().from(auditEvent).where(eq(auditEvent.subjectId, autoRun.id))
+  ).filter((event) => event.action === "browser_credentials.login_ready").length;
   await call(challengeNotice);
   assert.equal((await call(autoReceipt)).replayed, false);
   assert.equal((await call(autoReceipt)).replayed, true);
+  assert.equal(
+    (await call({ ...autoReceipt, factorPrompts: ["pin", "password", "totp"] })).replayed,
+    true,
+  );
+  for (const change of [
+    { factorPrompts: [] },
+    { factorPrompts: ["password", "password"] },
+    { factorPrompts: ["SYNTHETIC private raw error"] },
+    { historyEvidence: "threads" },
+    { outcome: "refused", historyEvidence: "threads" },
+  ])
+    await assert.rejects(() => call({ ...autoReceipt, ...change }));
+  const loginEvidence = (await call({ operation: "sync" })).runs as Array<{
+    savedLoginFactorPrompts: string[] | null;
+    savedLoginHistoryEvidence: string;
+  }>;
+  assert.deepEqual(loginEvidence.at(-1)?.savedLoginFactorPrompts, ["password", "pin", "totp"]);
+  assert.equal(loginEvidence.at(-1)?.savedLoginHistoryEvidence, "empty_inbox");
+  const loginAudits = await database
+    .select()
+    .from(auditEvent)
+    .where(eq(auditEvent.subjectId, autoRun.id));
+  const readyAudits = loginAudits.filter(
+    (event) => event.action === "browser_credentials.login_ready",
+  );
+  assert.equal(readyAudits.length, readyAuditsBefore + 1);
+  const observedAudit = readyAudits.find(
+    (event) => event.metadata.history_evidence === "empty_inbox",
+  );
+  assert.deepEqual(observedAudit?.metadata, {
+    factor_prompts: ["password", "pin", "totp"],
+    history_evidence: "empty_inbox",
+  });
   assert.equal((await state()).accounts[0].authState, "ready");
   assert.equal((await state()).runs.at(-1)?.savedLogin?.challenge, undefined);
   await assert.rejects(() => call(challengeNotice));

@@ -283,6 +283,8 @@ for (const mode of [
       expect(await runtime("observe", { ...packet })).toMatchObject({
         state: "ready",
         messengerRestored: true,
+        historyObserved: false,
+        emptyInboxObserved: true,
       });
       await page.evaluate(() => {
         const dialog = document.createElement("div");
@@ -306,6 +308,8 @@ for (const mode of [
       expect(await runtime("observe", { ...packet })).toMatchObject({
         state: "ready",
         messengerRestored: true,
+        historyObserved: true,
+        emptyInboxObserved: false,
       });
       return;
     }

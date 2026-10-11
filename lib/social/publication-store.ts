@@ -34,6 +34,7 @@ import {
   type SocialProjectIdentity,
 } from "./human-write-access";
 import { createControlledPublicationCommand } from "./publication-command";
+import { publicationFailureLabel } from "./publication-presentation";
 import { digestSocialWorkerPayload } from "./worker-protocol";
 
 export type PublicationCandidate = {
@@ -53,6 +54,7 @@ export type PublicationEntry = {
   channelRef: string;
   accountRef: string;
   externalPublicationRef: string | null;
+  failureLabel?: string | null;
   status: string;
   createdAt: Date;
 };
@@ -203,11 +205,13 @@ export async function listProjectPublicationData(
           channelRef: socialPublication.channelRef,
           accountRef: socialPublication.accountRef,
           externalPublicationRef: socialPublication.externalPublicationRef,
+          failureCode: socialBrowserJob.failureCode,
           humanConfirmed: sql<boolean>`EXISTS (SELECT 1 FROM audit_event e WHERE e.subject_id = social_publication.id AND e.action = 'social_publication.reconciled')`,
           status: socialPublication.status,
           createdAt: socialPublication.createdAt,
         })
         .from(socialPublication)
+        .leftJoin(socialBrowserJob, eq(socialBrowserJob.id, socialPublication.browserJobId))
         .where(
           and(
             eq(socialPublication.projectId, projectId),
@@ -267,7 +271,16 @@ export async function listProjectPublicationData(
       return [];
     },
   );
-  return { candidates, channels, publications: publications as PublicationEntry[] };
+  return {
+    candidates,
+    channels,
+    publications: publications.map(
+      ({ failureCode, ...publication }): PublicationEntry => ({
+        ...publication,
+        failureLabel: publicationFailureLabel(failureCode),
+      }),
+    ),
+  };
 }
 
 export async function submitControlledPublication(
@@ -385,6 +398,12 @@ export async function submitControlledPublication(
       },
       occurredAt: now,
     });
+    // Reserve an idle node before returning; a contended node is recovered
+    // from this durable job. Provider dispatch stays outside the transaction.
+    const { enqueuePublicationSandboxDemand } = await import(
+      "@/lib/browser-fleet/sandbox-publication-wakeup"
+    );
+    await enqueuePublicationSandboxDemand(tx, id);
     assertSocialAuthorizationAlive(expiresAt);
     return saved;
   });
