@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import http from "node:http";
+import { PublicationInspectionFailure } from "./publication-inspection.mjs";
 
 export function safeAssetPath(value) {
   let path;
@@ -93,7 +94,29 @@ export function createGateway({ appOrigin, nodeCall, slots, inspectPublicationPa
           slot.expiresAt <= Date.now()
         )
           return fail();
-        const result = await inspectPublicationPage(slot);
+        let result;
+        try {
+          result = await inspectPublicationPage(slot);
+        } catch (error) {
+          // Only an admitted owner of a still-live task can observe fixed stages.
+          // Never relay raw errors from candidate files, browser pages or transport.
+          if (
+            !(error instanceof PublicationInspectionFailure) ||
+            slots.get(admission.runId) !== slot ||
+            slot.stopping ||
+            slot.expiresAt <= Date.now()
+          )
+            return fail();
+          response.writeHead(422, { "Content-Type": "application/json" });
+          response.end(
+            JSON.stringify({
+              version: 1,
+              kind: "publication_inspection_failure",
+              stage: error.stage,
+            }),
+          );
+          return;
+        }
         if (slots.get(admission.runId) !== slot || slot.stopping || slot.expiresAt <= Date.now())
           return fail();
         response.setHeader("Content-Type", "application/json");

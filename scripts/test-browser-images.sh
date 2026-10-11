@@ -49,7 +49,9 @@ docker run -d --name "$name" --network none --read-only \
   --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
   --tmpfs /root/camoufox:rw,nosuid,nodev,size=16m,mode=700 \
   --tmpfs /data:rw,nosuid,nodev,size=64m,mode=700 \
+  -v "$PWD/ops/browser-node/publication-inspection-page.js:/fixture/publication-inspection-page.js:ro" \
   -e "FTRADE_LEASE_DEADLINE=$deadline" \
+  -e CAMOFOX_ACCESS_KEY=SYNTHETIC-image-smoke-key \
   -e BROWSER_IDLE_TIMEOUT_MS=900000 \
   -e CAMOFOX_CRASH_REPORT_ENABLED=false -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true \
   -e CAMOFOX_PROFILE_DIR=/data/profiles -e CAMOFOX_UPLOADS_DIR=/data/uploads \
@@ -70,12 +72,29 @@ docker exec "$name" node --input-type=module -e '
   import assert from "node:assert/strict";
   import { readdirSync, readFileSync } from "node:fs";
   const response = await fetch("http://127.0.0.1:9377/tabs", {
-    method: "POST", headers: { "content-type": "application/json" },
+    method: "POST", headers: { "content-type": "application/json", authorization: "Bearer SYNTHETIC-image-smoke-key" },
     body: JSON.stringify({ userId: "synthetic-image-smoke", sessionKey: "startup", trace: false }),
     signal: AbortSignal.timeout(30000),
   });
   assert.equal(response.status, 200);
-  assert.ok((await response.json()).tabId);
+  const { tabId } = await response.json();
+  assert.ok(tabId);
+  const program = readFileSync("/fixture/publication-inspection-page.js", "utf8");
+  const evaluate = (authorized, expression) => fetch(`http://127.0.0.1:9377/tabs/${encodeURIComponent(tabId)}/evaluate`, {
+    method: "POST", headers: { "content-type": "application/json", ...(authorized ? { authorization: "Bearer SYNTHETIC-image-smoke-key" } : {}) },
+    body: JSON.stringify({ userId: "synthetic-image-smoke", expression }),
+    signal: AbortSignal.timeout(5000),
+  });
+  const unauthorized = await evaluate(false, `typeof (${program})`);
+  assert.equal(unauthorized.status, 401);
+  await unauthorized.body?.cancel();
+  const compiled = await evaluate(true, `typeof (${program})`);
+  assert.equal(compiled.status, 200);
+  assert.deepEqual(await compiled.json(), { ok: true, result: "function" });
+  // The unchanged program must reject a blank page, without external navigation.
+  const guarded = await evaluate(true, `(${program})({})`);
+  assert.equal(guarded.ok, false);
+  assert.match((await guarded.json()).error, /inspection_page_unavailable/);
   const health = await (await fetch("http://127.0.0.1:9377/health")).json();
   assert.equal(health.browserConnected, true);
   assert.equal(health.activeTabs, 1);

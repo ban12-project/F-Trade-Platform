@@ -17,6 +17,22 @@ const keys = [
   "fileInput",
   "attachmentName",
 ];
+const stages = new Set(["active", "tab", "candidate", "browser", "response"]);
+export class PublicationInspectionFailure extends Error {
+  constructor(stage) {
+    super("inspection_unavailable");
+    if (!stages.has(stage)) throw new Error("inspection_stage_invalid");
+    this.stage = stage;
+  }
+}
+async function checkedStage(stage, operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof PublicationInspectionFailure) throw error;
+    throw new PublicationInspectionFailure(stage);
+  }
+}
 export async function readPublicationInspectionCandidate(directory, run) {
   if (!directory) throw new Error("inspection_candidate_unavailable");
   const stat = await lstat(directory);
@@ -101,75 +117,83 @@ export function createPublicationPageInspector({
   candidate = readPublicationInspectionCandidate,
 }) {
   return async (slot) => {
-    assertActive(slot);
+    const active = () => checkedStage("active", () => assertActive(slot));
+    await active();
     if (
       typeof slot.interactiveTabId !== "string" ||
       !slot.interactiveTabId ||
       slot.run.kind !== "interactive"
     )
-      throw new Error("inspection_page_unavailable");
-    const value = await candidate(directory, slot.run);
-    assertActive(slot);
-    const response = await browserRequest(
-      slot,
-      `/tabs/${encodeURIComponent(slot.interactiveTabId)}/evaluate`,
-      { userId: slot.run.accountId, expression: `(${program})(${JSON.stringify(value.profile)})` },
-      5000,
+      throw new PublicationInspectionFailure("tab");
+    const value = await checkedStage("candidate", () => candidate(directory, slot.run));
+    await active();
+    const response = await checkedStage("browser", () =>
+      browserRequest(
+        slot,
+        `/tabs/${encodeURIComponent(slot.interactiveTabId)}/evaluate`,
+        {
+          userId: slot.run.accountId,
+          expression: `(${program})(${JSON.stringify(value.profile)})`,
+        },
+        5000,
+      ),
     );
-    if (!response.body) throw new Error("inspection_response_invalid");
-    const reader = response.body.getReader(),
-      chunks = [];
-    let length = 0;
-    try {
-      for (;;) {
-        const { done, value: chunk } = await reader.read();
-        if (done) break;
-        length += chunk.length;
-        if (length > 8192) throw new Error("inspection_response_invalid");
-        chunks.push(chunk);
+    return checkedStage("response", async () => {
+      if (!response.body) throw new Error("inspection_response_invalid");
+      const reader = response.body.getReader(),
+        chunks = [];
+      let length = 0;
+      try {
+        for (;;) {
+          const { done, value: chunk } = await reader.read();
+          if (done) break;
+          length += chunk.length;
+          if (length > 8192) throw new Error("inspection_response_invalid");
+          chunks.push(chunk);
+        }
+      } finally {
+        await reader.cancel().catch(() => {});
+        reader.releaseLock();
       }
-    } finally {
-      await reader.cancel().catch(() => {});
-      reader.releaseLock();
-    }
-    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    if (body.ok !== true || !body.result) throw new Error("inspection_response_invalid");
-    assertActive(slot);
-    const observation = body.result,
-      controls = {};
-    for (const key of keys) {
-      const count = observation.controls?.[key];
-      if (!Number.isInteger(count) || count < 0 || count > 25)
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      if (body.ok !== true || !body.result) throw new Error("inspection_response_invalid");
+      await active();
+      const observation = body.result,
+        controls = {};
+      for (const key of keys) {
+        const count = observation.controls?.[key];
+        if (!Number.isInteger(count) || count < 0 || count > 25)
+          throw new Error("inspection_response_invalid");
+        controls[key] = count;
+      }
+      if (
+        typeof observation.identityMatched !== "boolean" ||
+        !Number.isInteger(observation.videoPreviewCount) ||
+        observation.videoPreviewCount < 0 ||
+        observation.videoPreviewCount > 25
+      )
         throw new Error("inspection_response_invalid");
-      controls[key] = count;
-    }
-    if (
-      typeof observation.identityMatched !== "boolean" ||
-      !Number.isInteger(observation.videoPreviewCount) ||
-      observation.videoPreviewCount < 0 ||
-      observation.videoPreviewCount > 25
-    )
-      throw new Error("inspection_response_invalid");
-    const result = {
-      version: 1,
-      observedAt: new Date().toISOString(),
-      candidateHash: value.candidateHash,
-      candidateExpiresAt: value.candidateExpiresAt,
-      candidateExpired: Date.parse(value.candidateExpiresAt) <= Date.now(),
-      identityMatched: observation.identityMatched,
-      controls,
-      videoPreviewCount: observation.videoPreviewCount,
-    };
-    for (const key of [
-      "composerIdentityMatched",
-      "composerEmpty",
-      "audienceMatchesCandidate",
-      "videoReceiptVisible",
-    ]) {
-      if (observation[key] !== null && typeof observation[key] !== "boolean")
-        throw new Error("inspection_response_invalid");
-      result[key] = observation[key];
-    }
-    return result;
+      const result = {
+        version: 1,
+        observedAt: new Date().toISOString(),
+        candidateHash: value.candidateHash,
+        candidateExpiresAt: value.candidateExpiresAt,
+        candidateExpired: Date.parse(value.candidateExpiresAt) <= Date.now(),
+        identityMatched: observation.identityMatched,
+        controls,
+        videoPreviewCount: observation.videoPreviewCount,
+      };
+      for (const key of [
+        "composerIdentityMatched",
+        "composerEmpty",
+        "audienceMatchesCandidate",
+        "videoReceiptVisible",
+      ]) {
+        if (observation[key] !== null && typeof observation[key] !== "boolean")
+          throw new Error("inspection_response_invalid");
+        result[key] = observation[key];
+      }
+      return result;
+    });
   };
 }
