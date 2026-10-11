@@ -2,13 +2,14 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { get } from "@vercel/blob";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { type FleetState, publicationScopeActive } from "@/lib/browser-fleet/policy";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { facebookPublicationManifest } from "@/lib/db/facebook-runtime-schema";
 import { productMediaAsset } from "@/lib/db/product-media-schema";
 import {
   aggregateRecord,
+  approval,
   auditEvent,
   evidence,
   socialBrowserJob,
@@ -29,6 +30,7 @@ import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { facebookMediaSubmitFormSchema } from "./facebook-account-forms";
 import {
   assertFacebookMediaPreview,
+  facebookCaptionSourceSchema,
   facebookMediaPreviewDigest,
 } from "./facebook-media-confirmation";
 import {
@@ -65,7 +67,58 @@ type Selection = {
   contentRef: string;
   format: "image" | "video";
   mediaId: string;
+  captionContentRef?: string;
 };
+function captionIdentity(value: unknown) {
+  return value == null ? "" : JSON.stringify(facebookCaptionSourceSchema.parse(value));
+}
+
+async function videoCaption(
+  selection: Pick<Selection, "projectId" | "captionContentRef">,
+  productId: string,
+  database: ReadDb,
+  lock = false,
+) {
+  if (!selection.captionContentRef) return { text: "", captionSource: undefined };
+  const query = database
+    .select({ record: aggregateRecord })
+    .from(aggregateRecord)
+    .innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
+    .where(
+      and(
+        eq(aggregateRecord.id, selection.captionContentRef),
+        eq(workspaceProjectItem.projectId, selection.projectId),
+        eq(workspaceProjectItem.role, "marketing_content"),
+        eq(workspaceProjectItem.relation, "owned"),
+      ),
+    );
+  const [row] = await (lock ? query.for("share") : query);
+  const record = row?.record;
+  if (
+    record?.type !== "content" ||
+    record.state !== "CONTENT_APPROVED" ||
+    record.payload.status !== "approved" ||
+    record.payload.product_id !== productId ||
+    !facebookTextPayloadSchema.shape.text.safeParse(record.payload.body).success
+  )
+    throw new Error("video_caption_not_approved");
+  const gateQuery = database
+    .select({ id: approval.id, status: approval.status })
+    .from(approval)
+    .where(and(eq(approval.aggregateId, record.id), eq(approval.gate, "gate_01_truth")))
+    .orderBy(desc(approval.requestedAt), desc(approval.createdAt), desc(approval.id))
+    .limit(1);
+  const [gate] = await (lock ? gateQuery.for("share") : gateQuery);
+  if (gate?.status !== "approved") throw new Error("video_caption_not_approved");
+  return {
+    text: record.payload.body as string,
+    captionSource: {
+      contentRef: record.id,
+      contentVersion: record.version,
+      approvalRef: gate.id,
+    },
+  };
+}
 
 async function sourceFor(selection: Selection, database: ReadDb, now: Date, lock = false) {
   const [record] = await database
@@ -116,9 +169,10 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date, lock
       sizeBytes: asset.sizeBytes,
       assetRef: asset.assetRef,
       sha256: null as string | null,
-      text: "",
+      ...(await videoCaption(selection, video.productId, database, lock)),
     };
   }
+  if (selection.captionContentRef) throw new Error("image_caption_source_invalid");
   if (
     content.type !== "content" ||
     content.state !== "CONTENT_APPROVED" ||
@@ -159,12 +213,14 @@ async function sourceFor(selection: Selection, database: ReadDb, now: Date, lock
   }
   return {
     blobKey: asset.evidence.blobKey,
+    retention: undefined,
     content,
     contentType: asset.evidence.contentType as "image/jpeg" | "image/png",
     sizeBytes: asset.evidence.sizeBytes,
     assetRef: asset.evidence.id,
     sha256: asset.evidence.sha256,
     text: content.payload.body,
+    captionSource: undefined,
   };
 }
 
@@ -313,6 +369,7 @@ export async function submitFacebookMediaPublication(
     mediaId: value.mediaId,
     contentVersion: selected.content.version,
     caption: selected.text,
+    ...(selected.captionSource ? { captionSource: selected.captionSource } : {}),
   });
   if (value.format === "video") {
     await assertCurrentProductFactsForVideo(
@@ -369,7 +426,15 @@ export async function submitFacebookMediaPublication(
         tx,
         () => new Date(),
       );
-      await sourceFor(value, tx, new Date(), true);
+      const latest = await sourceFor(value, tx, new Date(), true);
+      assertFacebookMediaPreview(value, {
+        contentRef: value.contentRef,
+        format: value.format,
+        mediaId: value.mediaId,
+        contentVersion: latest.content.version,
+        caption: latest.text,
+        ...(latest.captionSource ? { captionSource: latest.captionSource } : {}),
+      });
       assertSocialAuthorizationAlive(expiresAt);
     };
     if (
@@ -383,6 +448,17 @@ export async function submitFacebookMediaPublication(
       throw new Error("media_changed_during_confirmation");
     }
     if (existing) {
+      const [manifest] = await tx
+        .select()
+        .from(facebookPublicationManifest)
+        .where(eq(facebookPublicationManifest.publicationId, existing.id))
+        .for("share");
+      if (
+        !manifest ||
+        manifest.caption !== current.text ||
+        captionIdentity(manifest.captionSource) !== captionIdentity(current.captionSource)
+      )
+        throw new Error("facebook_media_existing_caption_changed");
       if (
         existing.status === "paused" &&
         existing.failureCode !== "fleet_publication_not_authorized"
@@ -424,6 +500,7 @@ export async function submitFacebookMediaPublication(
       contentVersion: current.content.version,
       format: value.format,
       caption: current.text,
+      captionSource: current.captionSource ?? null,
       media,
       mediaId: value.mediaId,
       confirmedBy: actorId,
@@ -513,6 +590,9 @@ export async function buildFacebookMediaPayload(
       ...publication,
       format: manifest.format as "image" | "video",
       mediaId: manifest.mediaId,
+      captionContentRef: manifest.captionSource
+        ? facebookCaptionSourceSchema.parse(manifest.captionSource).contentRef
+        : undefined,
     },
     tx,
     now,
@@ -524,6 +604,7 @@ export async function buildFacebookMediaPayload(
     source.contentType !== manifest.media.contentType ||
     source.sizeBytes !== manifest.media.sizeBytes ||
     source.text !== manifest.caption ||
+    captionIdentity(source.captionSource) !== captionIdentity(manifest.captionSource) ||
     (source.sha256 && source.sha256 !== manifest.media.sha256)
   ) {
     throw new Error("media_manifest_stale");
@@ -609,6 +690,9 @@ export async function readFacebookPublicationMedia(
         ...publication,
         format: mediaPayload.format,
         mediaId: manifest.mediaId,
+        captionContentRef: manifest.captionSource
+          ? facebookCaptionSourceSchema.parse(manifest.captionSource).contentRef
+          : undefined,
       },
       tx,
       new Date(),
@@ -660,26 +744,69 @@ export async function listFacebookMediaOptions(
     preview: string;
     contentVersion: number;
     previewDigest: string;
+    captionContentRef?: string;
   }> = [];
+  const captionRecords = records.some(({ record }) => record.type === "video")
+    ? await database
+        .select({ record: aggregateRecord })
+        .from(workspaceProjectItem)
+        .innerJoin(aggregateRecord, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
+        .where(
+          and(
+            eq(workspaceProjectItem.projectId, projectId),
+            eq(workspaceProjectItem.role, "marketing_content"),
+            eq(workspaceProjectItem.relation, "owned"),
+            eq(aggregateRecord.type, "content"),
+            eq(aggregateRecord.state, "CONTENT_APPROVED"),
+          ),
+        )
+    : [];
   for (const { record } of records) {
     if (record.type === "video" && record.state === "VIDEO_APPROVED") {
       const video = videoProjectSchema.parse(record.payload);
       if (video.renderedAssetRef) {
-        result.push({
-          contentRef: record.id,
-          mediaId: video.renderedAssetRef,
-          format: "video",
-          label: `视频 · ${video.objective}`,
-          preview: "已批准 MP4 成片；无附加文案。",
-          contentVersion: record.version,
-          previewDigest: facebookMediaPreviewDigest({
+        const reviewedCaptions = await Promise.all(
+          captionRecords
+            .filter(({ record: caption }) => caption.payload.product_id === video.productId)
+            .map(async ({ record: caption }) => {
+              try {
+                return await videoCaption(
+                  { projectId, captionContentRef: caption.id },
+                  video.productId,
+                  database,
+                );
+              } catch (error) {
+                if (error instanceof Error && error.message === "video_caption_not_approved")
+                  return null;
+                throw error;
+              }
+            }),
+        );
+        const variants = [
+          { text: "", captionSource: undefined },
+          ...reviewedCaptions.filter((caption) => caption !== null),
+        ];
+        for (const caption of variants) {
+          result.push({
             contentRef: record.id,
+            mediaId: video.renderedAssetRef,
             format: "video",
-            mediaId: record.payload.renderedAssetRef as string,
+            label: `视频 · ${video.objective} · ${caption.captionSource ? `配文：${caption.text.slice(0, 60)}` : "无配文"}`,
+            preview: caption.captionSource ? caption.text : "已批准 MP4 成片；无附加文案。",
+            ...(caption.captionSource
+              ? { captionContentRef: caption.captionSource.contentRef }
+              : {}),
             contentVersion: record.version,
-            caption: "",
-          }),
-        });
+            previewDigest: facebookMediaPreviewDigest({
+              contentRef: record.id,
+              format: "video",
+              mediaId: record.payload.renderedAssetRef as string,
+              contentVersion: record.version,
+              caption: caption.text,
+              ...(caption.captionSource ? { captionSource: caption.captionSource } : {}),
+            }),
+          });
+        }
       }
     } else if (
       record.type === "content" &&
@@ -794,7 +921,14 @@ export async function resolveFacebookMediaSource(
     .where(eq(facebookPublicationManifest.publicationId, publication.id));
   if (!manifest) throw new Error("media_manifest_missing");
   const source = await sourceFor(
-    { ...publication, format: mediaPayload.format, mediaId: manifest.mediaId },
+    {
+      ...publication,
+      format: mediaPayload.format,
+      mediaId: manifest.mediaId,
+      captionContentRef: manifest.captionSource
+        ? facebookCaptionSourceSchema.parse(manifest.captionSource).contentRef
+        : undefined,
+    },
     tx,
     now,
   );

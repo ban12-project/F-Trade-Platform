@@ -54,7 +54,14 @@ export function FacebookMediaPanel({
       accountRef,
     },
   });
-  const selected = options.find((option) => option.mediaId === form.watch("mediaId"));
+  const mediaId = form.watch("mediaId");
+  const captionContentRef = form.watch("captionContentRef");
+  const selected = options.find(
+    (option) => option.mediaId === mediaId && option.captionContentRef === captionContentRef,
+  );
+  const optionKey = (option: (typeof options)[number]) =>
+    option.captionContentRef ? `${option.mediaId}:${option.captionContentRef}` : option.mediaId;
+  const disabled = !form.formState.isReady || busy || !!publicationId || uncertain;
   useWorkspaceDirty(`media-publication:${contentRef}`, form.formState.isDirty && !publicationId);
   return (
     <Card>
@@ -92,27 +99,38 @@ export function FacebookMediaPanel({
         >
           <Field>
             <FieldLabel htmlFor={`media-${contentRef}`}>当前内容的已审核素材</FieldLabel>
-            <NativeSelect
-              id={`media-${contentRef}`}
-              disabled={busy || !!publicationId || uncertain}
-              {...form.register("mediaId", {
-                onChange: (event) => {
-                  form.setValue("confirm", false);
-                  const option = options.find((item) => item.mediaId === event.target.value);
-                  if (option) {
-                    form.setValue("contentVersion", option.contentVersion);
-                    form.setValue("previewDigest", option.previewDigest);
-                  }
-                },
-              })}
-            >
-              <NativeSelectOption value="">请选择素材</NativeSelectOption>
-              {options.map((option) => (
-                <NativeSelectOption key={option.mediaId} value={option.mediaId}>
-                  {option.label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <Controller
+              control={form.control}
+              name="mediaId"
+              render={({ field }) => (
+                <NativeSelect
+                  id={`media-${contentRef}`}
+                  ref={field.ref}
+                  onBlur={field.onBlur}
+                  value={selected ? optionKey(selected) : ""}
+                  disabled={disabled}
+                  onChange={(event) => {
+                    const option = options.find((item) => optionKey(item) === event.target.value);
+                    field.onChange(option?.mediaId ?? "");
+                    form.setValue("captionContentRef", option?.captionContentRef, {
+                      shouldDirty: true,
+                    });
+                    form.setValue("confirm", false, { shouldDirty: true });
+                    if (option) {
+                      form.setValue("contentVersion", option.contentVersion);
+                      form.setValue("previewDigest", option.previewDigest);
+                    }
+                  }}
+                >
+                  <NativeSelectOption value="">请选择素材</NativeSelectOption>
+                  {options.map((option) => (
+                    <NativeSelectOption key={optionKey(option)} value={optionKey(option)}>
+                      {option.label}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )}
+            />
             <FieldError errors={[form.formState.errors.mediaId]} />
           </Field>
           {selected ? (
@@ -133,7 +151,7 @@ export function FacebookMediaPanel({
                   id={`confirm-${contentRef}`}
                   checked={field.value}
                   onCheckedChange={field.onChange}
-                  disabled={busy || !!publicationId || uncertain}
+                  disabled={disabled}
                 />
               )}
             />
@@ -142,7 +160,7 @@ export function FacebookMediaPanel({
             </FieldLabel>
             <FieldError errors={[form.formState.errors.confirm]} />
           </Field>
-          <Button type="submit" disabled={busy || !options.length || !!publicationId || uncertain}>
+          <Button type="submit" disabled={disabled || !options.length}>
             {busy ? "提交中…" : "确认并提交素材发布"}
           </Button>
           <p role="status" className="text-sm text-muted-foreground">

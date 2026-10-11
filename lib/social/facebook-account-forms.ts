@@ -104,6 +104,7 @@ export const facebookMediaSubmitFormSchema = z
     contentRef: z.uuid(),
     format: z.enum(["image", "video"]),
     mediaId: z.string().max(200),
+    captionContentRef: z.uuid().optional(),
     contentVersion: z.number().int().positive(),
     previewDigest: z.string().regex(/^[a-f0-9]{64}$/),
     channelRef: z.string().min(1).max(200),
