@@ -92,9 +92,9 @@ docker exec "$name" node --input-type=module -e '
   assert.equal(compiled.status, 200);
   assert.deepEqual(await compiled.json(), { ok: true, result: "function" });
   // The unchanged program must reject a blank page, without external navigation.
-  const guarded = await evaluate(true, `(${program})({})`);
-  assert.equal(guarded.ok, false);
-  assert.match((await guarded.json()).error, /inspection_page_unavailable/);
+  const guarded = await evaluate(true, `(() => { try { (${program})({}); return false; } catch (error) { return error.message === "inspection_page_unavailable"; } })()`);
+  assert.equal(guarded.status, 200);
+  assert.deepEqual(await guarded.json(), { ok: true, result: true });
   const health = await (await fetch("http://127.0.0.1:9377/health")).json();
   assert.equal(health.browserConnected, true);
   assert.equal(health.activeTabs, 1);
