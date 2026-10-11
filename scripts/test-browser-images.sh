@@ -50,6 +50,7 @@ docker run -d --name "$name" --network none --read-only \
   --tmpfs /root/camoufox:rw,nosuid,nodev,size=16m,mode=700 \
   --tmpfs /data:rw,nosuid,nodev,size=64m,mode=700 \
   -v "$PWD/ops/browser-node/publication-inspection-page.js:/fixture/publication-inspection-page.js:ro" \
+  -v "$PWD/ops/browser-node/publication-inspection.mjs:/fixture/publication-inspection.mjs:ro" \
   -e "FTRADE_LEASE_DEADLINE=$deadline" \
   -e CAMOFOX_ACCESS_KEY=SYNTHETIC-image-smoke-key \
   -e BROWSER_IDLE_TIMEOUT_MS=900000 \
@@ -71,6 +72,7 @@ test "$ready" = true
 docker exec "$name" node --input-type=module -e '
   import assert from "node:assert/strict";
   import { readdirSync, readFileSync } from "node:fs";
+  import { createPublicationPageInspector, PublicationInspectionFailure } from "/fixture/publication-inspection.mjs";
   const response = await fetch("http://127.0.0.1:9377/tabs", {
     method: "POST", headers: { "content-type": "application/json", authorization: "Bearer SYNTHETIC-image-smoke-key" },
     body: JSON.stringify({ userId: "synthetic-image-smoke", sessionKey: "startup", trace: false }),
@@ -92,9 +94,16 @@ docker exec "$name" node --input-type=module -e '
   assert.equal(compiled.status, 200);
   assert.deepEqual(await compiled.json(), { ok: true, result: "function" });
   // The unchanged program must reject a blank page, without external navigation.
-  const guarded = await evaluate(true, `(() => { try { (${program})({}); return false; } catch (error) { return error.message === "inspection_page_unavailable"; } })()`);
-  assert.equal(guarded.status, 200);
-  assert.deepEqual(await guarded.json(), { ok: true, result: true });
+  const inspector = createPublicationPageInspector({
+    directory: "SYNTHETIC-unused", assertActive() {},
+    candidate: async () => ({ profile: {}, candidateHash: "a".repeat(64), candidateExpiresAt: "2000-01-01T00:00:00Z" }),
+    browserRequest: async (_slot, path, body) => {
+      assert.equal(path, `/tabs/${encodeURIComponent(tabId)}/evaluate`);
+      assert.equal(body.userId, "synthetic-image-smoke");
+      return evaluate(true, body.expression);
+    },
+  });
+  await assert.rejects(inspector({ run: { kind: "interactive", accountId: "synthetic-image-smoke" }, interactiveTabId: tabId }), error => error instanceof PublicationInspectionFailure && error.stage === "tab");
   const health = await (await fetch("http://127.0.0.1:9377/health")).json();
   assert.equal(health.browserConnected, true);
   assert.equal(health.activeTabs, 1);

@@ -136,7 +136,9 @@ export function createPublicationPageInspector({
         `/tabs/${encodeURIComponent(slot.interactiveTabId)}/evaluate`,
         {
           userId: slot.run.accountId,
-          expression: `(${program})(${JSON.stringify(value.profile)})`,
+          // Upstream intentionally sanitizes thrown page errors. Catch inside
+          // this fixed program boundary and return only a predetermined marker.
+          expression: `(() => { try { return (${program})(${JSON.stringify(value.profile)}); } catch (error) { return { inspectionFailure: error.message === "inspection_page_unavailable" ? "tab" : error.name === "SyntaxError" ? "candidate" : "response" }; } })()`,
         },
         5000,
       ),
@@ -161,6 +163,14 @@ export function createPublicationPageInspector({
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       if (body.ok !== true || !body.result) throw new Error("inspection_response_invalid");
       await active();
+      if (Object.hasOwn(body.result, "inspectionFailure")) {
+        if (
+          Object.keys(body.result).length !== 1 ||
+          !["tab", "candidate", "response"].includes(body.result.inspectionFailure)
+        )
+          throw new Error("inspection_response_invalid");
+        throw new PublicationInspectionFailure(body.result.inspectionFailure);
+      }
       const observation = body.result,
         controls = {};
       for (const key of keys) {

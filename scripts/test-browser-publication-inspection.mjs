@@ -4,6 +4,7 @@ import { chmod, lstat, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import { createGateway } from "../ops/browser-node/gateway.mjs";
 import {
   createPublicationPageInspector,
@@ -131,6 +132,65 @@ test("fixed failure stages discard private errors and preserve late lease failur
   await assert.rejects(
     late(slot),
     (error) => error instanceof PublicationInspectionFailure && error.stage === "active",
+  );
+});
+test("fixed page envelope classifies source and selector errors without returning page exception text", async () => {
+  for (const stage of ["tab", "candidate", "response"]) {
+    let queries = 0;
+    const inspect = createPublicationPageInspector({
+      directory: "synthetic",
+      assertActive() {},
+      candidate: async () => ({
+        ...candidate,
+        profile: {
+          identityHref: "https://www.facebook.com/synthetic-profile",
+          selectors: { identity: "#synthetic-identity" },
+        },
+      }),
+      browserRequest: async (_slot, _path, body) => {
+        const result = runInNewContext(
+          body.expression,
+          {
+            URL,
+            location:
+              stage === "tab"
+                ? { origin: "null", pathname: "blank" }
+                : { origin: "https://www.facebook.com", pathname: "/" },
+            document: {
+              querySelectorAll() {
+                queries++;
+                const error = Error("SYNTHETIC private selector and caption");
+                if (stage === "candidate") error.name = "SyntaxError";
+                throw error;
+              },
+            },
+          },
+          { timeout: 1000 },
+        );
+        assert.equal(result.inspectionFailure, stage);
+        assert(!JSON.stringify(result).includes("SYNTHETIC private"));
+        return Response.json({ ok: true, result });
+      },
+    });
+    await assert.rejects(
+      inspect(slot),
+      (error) => error instanceof PublicationInspectionFailure && error.stage === stage,
+    );
+    assert.equal(queries, stage === "tab" ? 0 : 1);
+  }
+  const inspect = createPublicationPageInspector({
+    directory: "synthetic",
+    assertActive() {},
+    candidate: async () => candidate,
+    browserRequest: async () =>
+      Response.json({
+        ok: true,
+        result: { inspectionFailure: "tab", privateCaption: "SYNTHETIC private" },
+      }),
+  });
+  await assert.rejects(
+    inspect(slot),
+    (error) => error instanceof PublicationInspectionFailure && error.stage === "response",
   );
 });
 test("gateway failure stages require valid one-use admission and a still-live task", async () => {
