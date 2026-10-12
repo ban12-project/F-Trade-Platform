@@ -104,6 +104,14 @@ export function validateFacebookProfile(value, now = Date.now()) {
     throw new Error("facebook_profile_selector_invalid");
   if (value.textOnly !== undefined && typeof value.textOnly !== "boolean")
     throw new Error("facebook_profile_format_invalid");
+  if (
+    value.receiptScrollBack !== undefined &&
+    (value.videoReceipt?.mode !== "captioned_post" ||
+      !Number.isInteger(value.receiptScrollBack) ||
+      value.receiptScrollBack < 1 ||
+      value.receiptScrollBack > 2000)
+  )
+    throw new Error("facebook_video_receipt_unreviewed");
   if (value.videoReceipt !== undefined) {
     const mode = value.videoReceipt?.mode === undefined ? "notice" : value.videoReceipt.mode;
     if (
@@ -248,7 +256,7 @@ export function createFacebookDriver(input, browserRequest) {
     if (profile.receiptUrl && !session.readingReceipts) {
       await navigate(session, profile.receiptUrl);
       session.readingReceipts = true;
-      if (session.captionedVideo)
+      if (session.captionedVideo) {
         await json(
           await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/scroll`, {
             userId: session.accountId,
@@ -256,6 +264,15 @@ export function createFacebookDriver(input, browserRequest) {
             amount: profile.receiptScroll,
           }),
         );
+        if (profile.receiptScrollBack !== undefined)
+          await json(
+            await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/scroll`, {
+              userId: session.accountId,
+              direction: "up",
+              amount: profile.receiptScrollBack,
+            }),
+          );
+      }
     }
     if (profile.selectors.postsReady) await waitFor(session, "posts-ready");
     if (session.captionedVideo) await waitFor(session, "posts-loaded");

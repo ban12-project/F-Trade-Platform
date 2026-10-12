@@ -51,6 +51,9 @@ for (const mode of [
   "video",
   "video_empty_caption",
   "video_post",
+  "video_post_return_scroll",
+  "video_post_return_missing",
+  "video_post_return_failed",
   "video_post_empty",
   "video_post_stale",
   "video_post_unloaded",
@@ -109,6 +112,8 @@ for (const mode of [
       format === "video" ? createHash("sha256").update(mediaBytes).digest("hex") : "a".repeat(64);
     const path = `/tmp/ftrade-uploads/${sha256}.${format === "video" ? "mp4" : "png"}`;
     const requests: string[] = [];
+    const scrolls: Array<{ direction: unknown; amount: unknown }> = [];
+    let feedLoaded = false;
     let postReadFailures = 0;
     const browserRequest = async (endpoint: string, body: Record<string, unknown> = {}) => {
       requests.push(endpoint);
@@ -261,11 +266,29 @@ for (const mode of [
       if (endpoint.endsWith("/navigate")) {
         expect([profile.url, profile.identityHref]).toContain(body.url);
         await page.evaluate((url) => history.replaceState(null, "", url), String(body.url));
+        if (mode.startsWith("video_post_return") && body.url === profile.identityHref) {
+          feedLoaded = false;
+          await page.locator("article").evaluateAll((posts) => {
+            for (const post of posts) (post as HTMLElement).hidden = true;
+          });
+        }
         return Response.json({ ok: true });
       }
       if (endpoint.endsWith("/scroll")) {
-        expect(body.direction).toBe("down");
-        expect(body.amount).toBe(850);
+        scrolls.push({ direction: body.direction, amount: body.amount });
+        if (body.direction === "down") {
+          expect(body.amount).toBe(850);
+          feedLoaded = true;
+        } else {
+          expect(body.direction).toBe("up");
+          expect(body.amount).toBe(450);
+          expect(feedLoaded).toBe(true);
+          if (mode === "video_post_return_failed")
+            return Response.json({ ok: false }, { status: 500 });
+          await page.locator("article").evaluateAll((posts) => {
+            for (const post of posts) (post as HTMLElement).hidden = false;
+          });
+        }
         return Response.json({ ok: true });
       }
       if (endpoint === "/act") {
@@ -395,6 +418,9 @@ for (const mode of [
         ? { receiptUrl: profile.identityHref }
         : {}),
       ...(mode.startsWith("video_post") ? { receiptScroll: 850 } : {}),
+      ...(["video_post_return_scroll", "video_post_return_failed"].includes(mode)
+        ? { receiptScrollBack: 450 }
+        : {}),
       selectors: {
         ...profile.selectors,
         ...(mode === "post_link_hover_receipt" || mode.startsWith("video_post")
@@ -480,6 +506,7 @@ for (const mode of [
       "image",
       "video",
       "video_post",
+      "video_post_return_scroll",
       "video_empty_caption",
       "video_existing_blank",
       "extra_file_input",
@@ -524,8 +551,25 @@ for (const mode of [
     if (uncertain) expect(receipts[0].outcome).toBe("unknown");
     if (mode === "post_link_hover")
       expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/synthetic/posts/1");
-    if (["video", "video_post", "video_empty_caption", "video_existing_blank"].includes(mode))
+    if (
+      [
+        "video",
+        "video_post",
+        "video_post_return_scroll",
+        "video_empty_caption",
+        "video_existing_blank",
+      ].includes(mode)
+    )
       expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/reel/1");
+    if (mode === "video_post_return_scroll")
+      expect(scrolls).toEqual([
+        { direction: "down", amount: 850 },
+        { direction: "up", amount: 450 },
+        { direction: "down", amount: 850 },
+        { direction: "up", amount: 450 },
+      ]);
+    if (["video_post_return_missing", "video_post_return_failed"].includes(mode))
+      expect(authorized).toBe(0);
     expect(requests.some((url) => url.endsWith("/click"))).toBe(false);
     if (
       [
@@ -708,6 +752,24 @@ test("captioned video receipt mode is explicit and rejects mixed or unknown rule
         videoReceipt: { mode: "captioned_post" },
       }),
     ).toThrow("facebook_video_receipt_unreviewed");
+  expect(
+    validateFacebookProfile({
+      ...reviewed,
+      receiptScrollBack: 450,
+      videoReceipt: { mode: "captioned_post" },
+    }),
+  ).toMatchObject({ receiptScrollBack: 450 });
+  for (const receiptScrollBack of [null, 0, -1, 2001, 450.5, "450"])
+    expect(() =>
+      validateFacebookProfile({
+        ...reviewed,
+        receiptScrollBack,
+        videoReceipt: { mode: "captioned_post" },
+      }),
+    ).toThrow("facebook_video_receipt_unreviewed");
+  expect(() => validateFacebookProfile({ ...reviewed, receiptScrollBack: 450 })).toThrow(
+    "facebook_video_receipt_unreviewed",
+  );
   expect(() =>
     validateFacebookProfile({
       ...reviewed,

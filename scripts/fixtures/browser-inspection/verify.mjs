@@ -179,6 +179,20 @@ assert.equal(captionedPosts[0].accountRef, publisherProfile.accountRef);
 assert.equal(captionedPosts[1].accountRef, null);
 assert.equal(captionedPosts[0].externalPublicationRef, "https://www.facebook.com/reel/1001");
 assert.equal(Object.hasOwn((await publicationAction("posts"))[0], "videoCount"), false);
+// The reviewed return path uses the same native HTTP scroll contract in both
+// directions. Lazy-feed behavior and publication attribution are exercised by
+// the driver DOM regression; these calls prove native transport compatibility.
+for (const [direction, amount] of [
+  ["down", 850],
+  ["up", 450],
+]) {
+  const scrolled = await api(`/tabs/${encodeURIComponent(tabId)}/scroll`, {
+    userId,
+    direction,
+    amount,
+  });
+  assert.equal((await scrolled.json()).ok, true);
+}
 await api(`/tabs/${encodeURIComponent(tabId)}`, { userId }, "DELETE");
 console.log(
   "PASS: native Firefox HTTP full-DOM inspection and negative controls, no external traffic",
