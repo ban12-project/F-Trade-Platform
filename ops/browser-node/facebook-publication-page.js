@@ -99,7 +99,8 @@ async function inspectPage(profile, action) {
   if (action.kind === "identity")
     return { accountRef: profile.accountRef, channelRef: profile.channelRef };
   if (action.kind === "video-receipt") {
-    if (!profile.videoReceipt) throw new Error("facebook_video_receipt_unreviewed");
+    if (!profile.videoReceipt || profile.videoReceipt.mode === "captioned_post")
+      throw new Error("facebook_video_receipt_unreviewed");
     const containers = all(document, profile.videoReceipt.container);
     if (!containers.length) return null;
     if (containers.length !== 1) throw new Error("facebook_video_receipt_ambiguous");
@@ -136,6 +137,7 @@ async function inspectPage(profile, action) {
         const author = one(post, profile.selectors.postAuthor);
         const link = one(post, profile.selectors.postLink);
         return {
+          ...(action.captionedVideo ? { videoCount: all(post, "video").length } : {}),
           accountRef:
             identityHref(author.href) === identityHref(profile.identityHref)
               ? profile.accountRef
@@ -226,6 +228,12 @@ async function inspectPage(profile, action) {
       throw new Error("facebook_file_input_ambiguous");
   }
   if (action.kind === "publish") {
+    if (
+      profile.videoReceipt?.mode === "captioned_post" &&
+      action.attachmentFormat === "video" &&
+      !text.trim()
+    )
+      throw new Error("facebook_video_caption_required");
     if (!Number.isFinite(action.localExpiresAt) || Date.now() >= action.localExpiresAt)
       throw new Error("facebook_authorization_expired");
     if (

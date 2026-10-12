@@ -91,7 +91,7 @@ function inspectPublicationCandidate(profile) {
       (e) => visible(e) && e.getAttribute("src")?.startsWith("blob:"),
     ).length,
   );
-  if (profile.videoReceipt) {
+  if (profile.videoReceipt && profile.videoReceipt.mode !== "captioned_post") {
     const notices = Array.from(document.querySelectorAll(profile.videoReceipt.container)).filter(
       visible,
     );

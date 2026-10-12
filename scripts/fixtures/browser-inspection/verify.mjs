@@ -139,10 +139,10 @@ await api(`/tabs/${encodeURIComponent(tabId)}/navigate`, {
   userId,
   url: "https://www.facebook.com/?synthetic-inspection=closed",
 });
-const publicationAction = async (kind) => {
+const publicationAction = async (kind, extra = {}) => {
   const response = await api(`/tabs/${encodeURIComponent(tabId)}/evaluate`, {
     userId,
-    expression: `(async () => { try { return { result: await (${publication})(${JSON.stringify(publisherProfile)},{kind:${JSON.stringify(kind)}}) }; } catch (error) { return { syntheticError: String(error?.message).slice(0,500) }; } })()`,
+    expression: `(async () => { try { return { result: await (${publication})(${JSON.stringify(publisherProfile)},${JSON.stringify({ kind, ...extra })}) }; } catch (error) { return { syntheticError: String(error?.message).slice(0,500) }; } })()`,
   });
   const body = await response.json();
   assert.equal(body.result.syntheticError, undefined, JSON.stringify(body));
@@ -152,6 +152,33 @@ assert.equal(await publicationAction("composer-closed"), true);
 assert.equal(await publicationAction("open"), true);
 assert.equal(await publicationAction("composer-ready"), true);
 assert.equal((await inspector(slot)).controls.composer, 1);
+// Caption attribution uses the same post boundary for body, author, media and link.
+Object.assign(publisherProfile.selectors, {
+  post: "article",
+  postAuthor: ".author",
+  postText: ".copy",
+  postLink: ".permalink",
+});
+publisherProfile.accountRef = "synthetic-account";
+publisherProfile.channelRef = "synthetic-channel";
+publisherProfile.videoReceipt = { mode: "captioned_post" };
+await api(`/tabs/${encodeURIComponent(tabId)}/navigate`, {
+  userId,
+  url: "https://www.facebook.com/?synthetic-inspection=captioned-receipt",
+});
+const captionedPosts = await publicationAction("posts", {
+  text: "SYNTHETIC approved caption",
+  captionedVideo: true,
+});
+assert.equal(captionedPosts.length, 3);
+assert.deepEqual(
+  captionedPosts.map((post) => post.videoCount),
+  [1, 1, 2],
+);
+assert.equal(captionedPosts[0].accountRef, publisherProfile.accountRef);
+assert.equal(captionedPosts[1].accountRef, null);
+assert.equal(captionedPosts[0].externalPublicationRef, "https://www.facebook.com/reel/1001");
+assert.equal(Object.hasOwn((await publicationAction("posts"))[0], "videoCount"), false);
 await api(`/tabs/${encodeURIComponent(tabId)}`, { userId }, "DELETE");
 console.log(
   "PASS: native Firefox HTTP full-DOM inspection and negative controls, no external traffic",

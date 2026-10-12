@@ -50,6 +50,17 @@ for (const mode of [
   "image",
   "video",
   "video_empty_caption",
+  "video_post",
+  "video_post_empty",
+  "video_post_stale",
+  "video_post_duplicate",
+  "video_post_wrong_author",
+  "video_post_wrong_caption",
+  "video_post_wrong_link",
+  "video_post_foreign",
+  "video_post_missing_media",
+  "video_post_multiple_media",
+  "video_post_blob_changed",
   "video_existing_blank",
   "video_receipt_stale",
   "video_receipt_wrong_link",
@@ -165,7 +176,7 @@ for (const mode of [
             input.type = "file";
             document.querySelector("#composer")?.append(input);
           });
-        if (mode === "baseline_duplicate" || mode === "video_existing_blank")
+        if (["baseline_duplicate", "video_existing_blank", "video_post_stale"].includes(mode))
           await page.evaluate(
             ({ owner, blank }) => {
               const post = document.createElement("article");
@@ -175,6 +186,45 @@ for (const mode of [
             },
             { owner: profile.identityHref, blank: mode === "video_existing_blank" },
           );
+        if (mode.startsWith("video_post"))
+          await page.evaluate((scenario) => {
+            const composer = document.querySelector<HTMLElement>("#composer");
+            const submit = composer?.querySelector("button");
+            if (!composer || !submit) throw new Error("fixture missing");
+            submit.addEventListener("click", () => {
+              document.querySelector("#video-receipt")?.remove();
+              const post = document.querySelector<HTMLElement>("article");
+              const link = post?.querySelector<HTMLAnchorElement>(".permalink");
+              const author = post?.querySelector<HTMLAnchorElement>(".author");
+              const video = composer.querySelector("video");
+              if (!post || !link || !author || !video) throw new Error("fixture missing");
+              if (scenario !== "video_post_missing_media") post.append(video.cloneNode(true));
+              if (scenario === "video_post_multiple_media") post.append(video.cloneNode(true));
+              if (scenario === "video_post_wrong_author")
+                author.href = "https://www.facebook.com/another-owner";
+              link.href = "https://www.facebook.com/profile.php#placeholder";
+              link.onmouseenter = () => {
+                link.href =
+                  scenario === "video_post_wrong_link"
+                    ? "https://www.facebook.com/synthetic/posts/1"
+                    : scenario === "video_post_foreign"
+                      ? "https://example.invalid/reel/1"
+                      : "https://www.facebook.com/reel/1/?__tn__=tracking&__cft__[0]=tracking";
+              };
+              if (scenario === "video_post_wrong_caption") {
+                const copy = post.querySelector(".copy");
+                if (copy) copy.textContent = "Different body";
+              }
+              if (scenario === "video_post_duplicate") {
+                const duplicate = post.cloneNode(true) as HTMLElement;
+                duplicate
+                  .querySelector(".permalink")
+                  ?.setAttribute("href", "https://www.facebook.com/reel/2");
+                post.after(duplicate);
+              }
+              composer.hidden = true;
+            });
+          }, mode);
         if (mode.startsWith("post_"))
           await page.evaluate((scenario) => {
             const composer = document.querySelector<HTMLElement>("#composer");
@@ -315,14 +365,16 @@ for (const mode of [
     let authorized = 0;
     const scopedProfile = {
       ...profile,
-      resolvePostLinks: mode.startsWith("post_"),
+      resolvePostLinks: mode.startsWith("post_") || mode.startsWith("video_post"),
       ...(format === "video"
         ? {
-            videoReceipt: {
-              container: "#video-receipt",
-              link: "a",
-              successText: "Published Reel",
-            },
+            videoReceipt: mode.startsWith("video_post")
+              ? { mode: "captioned_post" }
+              : {
+                  container: "#video-receipt",
+                  link: "a",
+                  successText: "Published Reel",
+                },
           }
         : {}),
       ...(mode === "post_link_hover_receipt" ? { receiptUrl: profile.identityHref } : {}),
@@ -357,7 +409,7 @@ for (const mode of [
         publication: {
           accountRef: profile.accountRef,
           channelRef: profile.channelRef,
-          text: ["video_empty_caption", "video_existing_blank"].includes(mode)
+          text: ["video_empty_caption", "video_existing_blank", "video_post_empty"].includes(mode)
             ? ""
             : "SYNTHETIC approved copy",
           format,
@@ -391,7 +443,7 @@ for (const mode of [
           await page.locator("#composer").evaluate((element) => {
             element.after(element.cloneNode(true));
           });
-        if (mode === "video_blob_changed")
+        if (["video_blob_changed", "video_post_blob_changed"].includes(mode))
           await page.locator("#composer video").evaluate((element) => {
             (element as HTMLVideoElement).src = URL.createObjectURL(new Blob(["CHANGED media"]));
           });
@@ -408,6 +460,7 @@ for (const mode of [
       "post_link_hover_detached",
       "image",
       "video",
+      "video_post",
       "video_empty_caption",
       "video_existing_blank",
       "extra_file_input",
@@ -423,19 +476,46 @@ for (const mode of [
       "post_link_unresolved",
       "post_author_changed",
       "video_receipt_wrong_link",
+      "video_post_duplicate",
+      "video_post_wrong_author",
+      "video_post_wrong_caption",
+      "video_post_wrong_link",
+      "video_post_foreign",
+      "video_post_missing_media",
+      "video_post_multiple_media",
     ].includes(mode);
     expect(result).toBe(success ? "completed" : uncertain ? "unknown" : "failed");
     expect(await page.locator("#clicks").textContent()).toBe(
-      success || mode.startsWith("post_") || mode === "video_receipt_wrong_link" ? "1" : "0",
+      success ||
+        mode.startsWith("post_") ||
+        mode === "video_receipt_wrong_link" ||
+        [
+          "video_post_duplicate",
+          "video_post_wrong_author",
+          "video_post_wrong_caption",
+          "video_post_wrong_link",
+          "video_post_foreign",
+          "video_post_missing_media",
+          "video_post_multiple_media",
+        ].includes(mode)
+        ? "1"
+        : "0",
     );
     expect(receipts).toHaveLength(success || uncertain ? 1 : 0);
     if (uncertain) expect(receipts[0].outcome).toBe("unknown");
     if (mode === "post_link_hover")
       expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/synthetic/posts/1");
-    if (["video", "video_empty_caption", "video_existing_blank"].includes(mode))
+    if (["video", "video_post", "video_empty_caption", "video_existing_blank"].includes(mode))
       expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/reel/1");
     expect(requests.some((url) => url.endsWith("/click"))).toBe(false);
-    if (["wrong_attachment", "duplicate_scoped_file_input"].includes(mode))
+    if (
+      [
+        "wrong_attachment",
+        "duplicate_scoped_file_input",
+        "video_post_empty",
+        "video_post_stale",
+      ].includes(mode)
+    )
       expect(authorized).toBe(0);
   });
 }
@@ -580,4 +660,18 @@ test("baseline resolves existing post permalinks before publication", async ({ p
   });
   expect(await driver.existingPublicationRefs(session)).toEqual([oldRef]);
   expect(calls.filter((item) => item === "/act").length).toBeGreaterThanOrEqual(3);
+});
+
+test("captioned video receipt mode is explicit and rejects mixed or unknown rules", () => {
+  expect(
+    validateFacebookProfile({ ...profile, videoReceipt: { mode: "captioned_post" } }),
+  ).toMatchObject({ videoReceipt: { mode: "captioned_post" } });
+  for (const videoReceipt of [
+    { mode: "unreviewed" },
+    { mode: "captioned_post", successText: "ignored" },
+    { mode: "notice" },
+  ])
+    expect(() => validateFacebookProfile({ ...profile, videoReceipt })).toThrow(
+      "facebook_video_receipt_unreviewed",
+    );
 });
