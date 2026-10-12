@@ -78,6 +78,19 @@ test("private expired candidates remain byte-identical and cannot confer publica
     assert.equal(await readFile(file, "utf8"), text);
     assert.equal((await lstat(file)).mtimeMs, stat.mtimeMs);
     assert(!("capabilities" in observed));
+    const captionedText = JSON.stringify([{ ...value, videoReceipt: { mode: "captioned_post" } }]);
+    await writeFile(file, captionedText);
+    const captioned = await readPublicationInspectionCandidate(dir, run);
+    assert.deepEqual(captioned.profile.videoReceipt, { mode: "captioned_post" });
+    assert.equal(captioned.candidateExpired, true);
+    assert.equal(await readFile(file, "utf8"), captionedText);
+    for (const videoReceipt of [
+      { mode: "unknown" },
+      { mode: "captioned_post", successText: "ignored" },
+    ]) {
+      await writeFile(file, JSON.stringify([{ ...value, videoReceipt }]));
+      await assert.rejects(readPublicationInspectionCandidate(dir, run));
+    }
     for (const invalid of [null, 7, [], "", " ", "x".repeat(201)]) {
       await writeFile(file, JSON.stringify([{ ...value, openComposerText: invalid }]));
       await assert.rejects(readPublicationInspectionCandidate(dir, run));

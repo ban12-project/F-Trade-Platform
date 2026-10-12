@@ -28,6 +28,7 @@ export function register(_app, ctx, config = {}) {
           "inert-background",
           "foreign-composer",
           "missing-composer-actor",
+          "captioned-receipt",
         ].includes(kind)
       )
         return route.abort();

@@ -105,16 +105,25 @@ export function validateFacebookProfile(value, now = Date.now()) {
   if (value.textOnly !== undefined && typeof value.textOnly !== "boolean")
     throw new Error("facebook_profile_format_invalid");
   if (value.videoReceipt !== undefined) {
+    const mode = value.videoReceipt?.mode === undefined ? "notice" : value.videoReceipt.mode;
     if (
       !value.videoReceipt ||
-      ["container", "link", "successText"].some(
-        (key) =>
-          typeof value.videoReceipt[key] !== "string" ||
-          !value.videoReceipt[key].trim() ||
-          value.videoReceipt[key].length > 500,
-      ) ||
-      value.videoReceipt.container.includes(",") ||
-      value.videoReceipt.link.includes(",")
+      !["notice", "captioned_post"].includes(mode) ||
+      (mode === "captioned_post" &&
+        (Object.keys(value.videoReceipt).some((key) => key !== "mode") ||
+          typeof value.receiptUrl !== "string" ||
+          !Number.isInteger(value.receiptScroll) ||
+          value.receiptScroll < 1 ||
+          value.receiptScroll > 2000)) ||
+      (mode === "notice" &&
+        (["container", "link", "successText"].some(
+          (key) =>
+            typeof value.videoReceipt[key] !== "string" ||
+            !value.videoReceipt[key].trim() ||
+            value.videoReceipt[key].length > 500,
+        ) ||
+          value.videoReceipt.container.includes(",") ||
+          value.videoReceipt.link.includes(",")))
     )
       throw new Error("facebook_video_receipt_unreviewed");
   }
@@ -239,8 +248,17 @@ export function createFacebookDriver(input, browserRequest) {
     if (profile.receiptUrl && !session.readingReceipts) {
       await navigate(session, profile.receiptUrl);
       session.readingReceipts = true;
+      if (session.captionedVideo)
+        await json(
+          await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/scroll`, {
+            userId: session.accountId,
+            direction: "down",
+            amount: profile.receiptScroll,
+          }),
+        );
     }
     if (profile.selectors.postsReady) await waitFor(session, "posts-ready");
+    if (session.captionedVideo) await waitFor(session, "posts-loaded");
     const resolveLinks = async () => {
       if (!profile.resolvePostLinks) return;
       const count = await evaluate(session, { kind: "post-count" });
@@ -263,12 +281,17 @@ export function createFacebookDriver(input, browserRequest) {
         }
       }
     };
-    if (text === undefined && !resolveExisting) return evaluate(session, { kind: "posts" });
+    if (text === undefined && !resolveExisting)
+      return evaluate(session, { kind: "posts", captionedVideo: session.captionedVideo });
     await resolveLinks();
     for (let attempt = 0; attempt < 20; attempt++) {
       if (attempt === 5) await resolveLinks();
       try {
-        const posts = await evaluate(session, { kind: "posts", text });
+        const posts = await evaluate(session, {
+          kind: "posts",
+          text,
+          captionedVideo: session.captionedVideo,
+        });
         if (posts.every((post) => post.externalPublicationRef !== null)) return posts;
         // An unrelated old placeholder may never expose a permalink. Keep its
         // author/text in the duplicate guard and only baseline verified links.
@@ -321,6 +344,8 @@ export function createFacebookDriver(input, browserRequest) {
         signal,
         baseline: new Set(),
         expected: null,
+        captionedVideo:
+          run.publication?.format === "video" && profile.videoReceipt?.mode === "captioned_post",
       };
     },
     async identity(session) {
@@ -349,6 +374,8 @@ export function createFacebookDriver(input, browserRequest) {
       return [...session.baseline];
     },
     async prepare(session, payload, upload) {
+      if (session.captionedVideo && !payload.text?.trim())
+        throw new Error("facebook_video_caption_required");
       if (payload.text && session.existingTexts?.has(payload.text))
         throw new Error("facebook_matching_post_already_exists");
       if (session.readingReceipts) {
@@ -422,6 +449,7 @@ export function createFacebookDriver(input, browserRequest) {
       const inspect = async () => {
         if (
           session.expected?.attachmentFormat === "video" &&
+          !session.captionedVideo &&
           (await evaluate(session, { kind: "video-receipt" }))
         )
           throw new Error("facebook_video_receipt_stale");
@@ -444,7 +472,7 @@ export function createFacebookDriver(input, browserRequest) {
       });
     },
     async observe(session, payload, signal) {
-      if (payload.format === "video") {
+      if (payload.format === "video" && !session.captionedVideo) {
         for (let attempt = 0; attempt < 20; attempt++) {
           const ref = await evaluate(session, { kind: "video-receipt" });
           if (ref)
@@ -467,11 +495,26 @@ export function createFacebookDriver(input, browserRequest) {
             post.text === payload.text &&
             !session.baseline.has(post.externalPublicationRef),
         );
-        if (matches.length === 1) return matches[0];
         if (matches.length > 1) throw new Error("facebook_post_ambiguous");
+        if (matches.length === 1) {
+          const post = matches[0];
+          if (!session.captionedVideo) return post;
+          if (post.videoCount > 1) throw new Error("facebook_video_receipt_ambiguous");
+          if (
+            post.videoCount === 1 &&
+            /^https:\/\/www\.facebook\.com\/reel\/\d+$/.test(post.externalPublicationRef)
+          ) {
+            const { videoCount: _videoCount, ...receipt } = post;
+            return receipt;
+          }
+        }
         await delay(500, undefined, { signal });
       }
-      throw new Error("facebook_post_not_observed");
+      throw new Error(
+        session.captionedVideo
+          ? "facebook_video_receipt_not_observed"
+          : "facebook_post_not_observed",
+      );
     },
     async close() {
       /* The lease owner stops the whole isolated runtime. */

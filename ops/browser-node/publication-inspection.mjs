@@ -95,8 +95,13 @@ export async function readPublicationInspectionCandidate(directory, run) {
         throw new Error("inspection_candidate_unavailable");
       profile.openComposerText = p.openComposerText;
     }
-    if (p.videoReceipt) {
+    if (p.videoReceipt?.mode === "captioned_post") {
+      if (Object.keys(p.videoReceipt).some((key) => key !== "mode"))
+        throw new Error("inspection_candidate_unavailable");
+      profile.videoReceipt = { mode: "captioned_post" };
+    } else if (p.videoReceipt) {
       if (
+        (p.videoReceipt.mode !== undefined && p.videoReceipt.mode !== "notice") ||
         typeof p.videoReceipt.container !== "string" ||
         !p.videoReceipt.container.trim() ||
         p.videoReceipt.container.length > 500 ||

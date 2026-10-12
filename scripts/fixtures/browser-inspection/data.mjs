@@ -16,6 +16,11 @@ export const profile = {
   },
 };
 export function syntheticPage(kind) {
+  if (kind === "captioned-receipt") {
+    const post = (author, id, count) =>
+      `<article><a class="author" href="${author}">SYNTHETIC author</a><p class="copy">SYNTHETIC approved caption</p><a class="permalink" href="https://www.facebook.com/reel/${id}/?__tn__=tracking&__cft__%5B0%5D=tracking">SYNTHETIC timestamp</a>${"<video></video>".repeat(count)}</article>`;
+    return `<!doctype html><nav role="navigation" aria-label="Shortcuts"><a href="${identityHref}">SYNTHETIC identity</a></nav>${post(identityHref, 1001, 1)}${post("https://www.facebook.com/SYNTHETIC-foreign", 1002, 1)}${post(identityHref, 1003, 2)}`;
+  }
   const href =
     kind === "wrong-identity"
       ? "https://www.facebook.com/SYNTHETIC-other"
