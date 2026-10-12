@@ -105,12 +105,16 @@ export function validateFacebookProfile(value, now = Date.now()) {
   if (value.textOnly !== undefined && typeof value.textOnly !== "boolean")
     throw new Error("facebook_profile_format_invalid");
   if (value.videoReceipt !== undefined) {
-    const mode = value.videoReceipt?.mode ?? "notice";
+    const mode = value.videoReceipt?.mode === undefined ? "notice" : value.videoReceipt.mode;
     if (
       !value.videoReceipt ||
       !["notice", "captioned_post"].includes(mode) ||
       (mode === "captioned_post" &&
-        Object.keys(value.videoReceipt).some((key) => key !== "mode")) ||
+        (Object.keys(value.videoReceipt).some((key) => key !== "mode") ||
+          typeof value.receiptUrl !== "string" ||
+          !Number.isInteger(value.receiptScroll) ||
+          value.receiptScroll < 1 ||
+          value.receiptScroll > 2000)) ||
       (mode === "notice" &&
         (["container", "link", "successText"].some(
           (key) =>
@@ -244,8 +248,17 @@ export function createFacebookDriver(input, browserRequest) {
     if (profile.receiptUrl && !session.readingReceipts) {
       await navigate(session, profile.receiptUrl);
       session.readingReceipts = true;
+      if (session.captionedVideo)
+        await json(
+          await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/scroll`, {
+            userId: session.accountId,
+            direction: "down",
+            amount: profile.receiptScroll,
+          }),
+        );
     }
     if (profile.selectors.postsReady) await waitFor(session, "posts-ready");
+    if (session.captionedVideo) await waitFor(session, "posts-loaded");
     const resolveLinks = async () => {
       if (!profile.resolvePostLinks) return;
       const count = await evaluate(session, { kind: "post-count" });

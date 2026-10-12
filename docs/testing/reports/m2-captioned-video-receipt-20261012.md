@@ -2,7 +2,7 @@
 
 Issue #596 adds an explicit `captioned_post` video receipt mode for a separately approved, nonempty exact caption. It uses the same post boundary for the acting author, caption, one visible video and a canonical Reel permalink absent from the pre-click baseline. It does not accept an unrelated Reel found elsewhere on the profile.
 
-The default notice mode remains compatible with its reviewed success container, unique link and success text, including captionless videos. Captioned mode rejects mixed/unknown rule objects and empty captions before preparation. Existing same-caption posts, duplicate new matches, wrong authors/bodies, foreign or non-Reel links, missing or multiple videos and changed approved preview bytes cannot yield a published receipt. The receipt projection preserves the original fields. Authorization, audience, blob digest checks, single-click behavior and unknown/no-retry boundaries remain enforced.
+Captioned mode also requires a reviewed owner receipt page, receipt identity and bounded scroll position. After receipt-page navigation it scrolls and waits for loaded post containers, so lazy loading cannot silently produce an empty baseline. The default notice mode remains compatible with its reviewed success container, unique link and success text, including captionless videos. Captioned mode rejects mixed/unknown rule objects and empty captions before preparation. Existing same-caption posts, duplicate new matches, wrong authors/bodies, foreign or non-Reel links, missing or multiple videos and changed approved preview bytes cannot yield a published receipt. The receipt projection preserves the original fields. Authorization, audience, blob digest checks, single-click behavior and unknown/no-retry boundaries remain enforced.
 
 ## Production observation boundary
 
@@ -14,7 +14,7 @@ The current production candidate's bytes and expiry remain unchanged, and its pu
 
 ## Verification
 
-- 48 Chromium driver tests passed against fully intercepted synthetic HTML. Eleven captioned-mode scenarios cover positive delivery, empty/stale captions, duplicate matches, wrong author/body/link, foreign links, missing/multiple media and post-authorization blob substitution. Explicit-mode validation also passes.
+- 49 Chromium driver tests passed against fully intercepted synthetic HTML. Twelve captioned-mode scenarios cover positive delivery, empty/stale captions, unloaded feed rejection, duplicate matches, wrong author/body/link, foreign links, missing/multiple media and post-authorization blob substitution. Explicit-mode validation also passes.
 - 39 node and page-inspection tests passed with the TypeScript loader. Expired candidate files remain unchanged and confer no capability; mixed/unknown video receipt rules reject.
 - Video publication policy regression and project TypeScript CLI check passed.
 - Complete repository validation passed with the declared local Python dependency path.

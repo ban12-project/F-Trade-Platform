@@ -123,6 +123,7 @@ async function inspectPage(profile, action) {
     return url.href;
   }
   if (action.kind === "posts-ready") return all(document, profile.selectors.postsReady).length > 0;
+  if (action.kind === "posts-loaded") return all(document, profile.selectors.post).length > 0;
   if (["posts", "post-count"].includes(action.kind)) {
     const posts = all(document, profile.selectors.post);
     if (posts.length > 100) throw new Error("facebook_post_scan_limit");

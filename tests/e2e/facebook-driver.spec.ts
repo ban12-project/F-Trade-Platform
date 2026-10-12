@@ -53,6 +53,7 @@ for (const mode of [
   "video_post",
   "video_post_empty",
   "video_post_stale",
+  "video_post_unloaded",
   "video_post_duplicate",
   "video_post_wrong_author",
   "video_post_wrong_caption",
@@ -186,6 +187,14 @@ for (const mode of [
             },
             { owner: profile.identityHref, blank: mode === "video_existing_blank" },
           );
+        if (mode.startsWith("video_post") && mode !== "video_post_unloaded")
+          await page.evaluate((owner) => {
+            const baseline = document.createElement("article");
+            baseline.innerHTML =
+              '<a class="author">Author</a><p class="copy">SYNTHETIC baseline only</p><a class="permalink" href="https://www.facebook.com/reel/99">Older link</a>';
+            baseline.querySelector(".author")?.setAttribute("href", owner);
+            document.body.append(baseline);
+          }, profile.identityHref);
         if (mode.startsWith("video_post"))
           await page.evaluate((scenario) => {
             const composer = document.querySelector<HTMLElement>("#composer");
@@ -193,7 +202,7 @@ for (const mode of [
             if (!composer || !submit) throw new Error("fixture missing");
             submit.addEventListener("click", () => {
               document.querySelector("#video-receipt")?.remove();
-              const post = document.querySelector<HTMLElement>("article");
+              const post = Array.from(document.querySelectorAll<HTMLElement>("article")).at(-1);
               const link = post?.querySelector<HTMLAnchorElement>(".permalink");
               const author = post?.querySelector<HTMLAnchorElement>(".author");
               const video = composer.querySelector("video");
@@ -252,6 +261,11 @@ for (const mode of [
       if (endpoint.endsWith("/navigate")) {
         expect([profile.url, profile.identityHref]).toContain(body.url);
         await page.evaluate((url) => history.replaceState(null, "", url), String(body.url));
+        return Response.json({ ok: true });
+      }
+      if (endpoint.endsWith("/scroll")) {
+        expect(body.direction).toBe("down");
+        expect(body.amount).toBe(850);
         return Response.json({ ok: true });
       }
       if (endpoint === "/act") {
@@ -377,10 +391,15 @@ for (const mode of [
                 },
           }
         : {}),
-      ...(mode === "post_link_hover_receipt" ? { receiptUrl: profile.identityHref } : {}),
+      ...(mode === "post_link_hover_receipt" || mode.startsWith("video_post")
+        ? { receiptUrl: profile.identityHref }
+        : {}),
+      ...(mode.startsWith("video_post") ? { receiptScroll: 850 } : {}),
       selectors: {
         ...profile.selectors,
-        ...(mode === "post_link_hover_receipt" ? { receiptIdentity: "#identity" } : {}),
+        ...(mode === "post_link_hover_receipt" || mode.startsWith("video_post")
+          ? { receiptIdentity: "#identity" }
+          : {}),
         ...(mode.startsWith("composer_identity") ? { composerIdentity: "#composer-identity" } : {}),
       },
       ...(mode.startsWith("audience_selection") ||
@@ -663,15 +682,37 @@ test("baseline resolves existing post permalinks before publication", async ({ p
 });
 
 test("captioned video receipt mode is explicit and rejects mixed or unknown rules", () => {
+  const reviewed = {
+    ...profile,
+    receiptUrl: profile.identityHref,
+    receiptScroll: 850,
+    selectors: { ...profile.selectors, receiptIdentity: "#identity" },
+  };
   expect(
-    validateFacebookProfile({ ...profile, videoReceipt: { mode: "captioned_post" } }),
+    validateFacebookProfile({ ...reviewed, videoReceipt: { mode: "captioned_post" } }),
   ).toMatchObject({ videoReceipt: { mode: "captioned_post" } });
   for (const videoReceipt of [
     { mode: "unreviewed" },
+    { mode: null },
     { mode: "captioned_post", successText: "ignored" },
     { mode: "notice" },
   ])
-    expect(() => validateFacebookProfile({ ...profile, videoReceipt })).toThrow(
+    expect(() => validateFacebookProfile({ ...reviewed, videoReceipt })).toThrow(
       "facebook_video_receipt_unreviewed",
     );
+  for (const receiptScroll of [undefined, null, 0, -1, 2001, 850.5, "850"])
+    expect(() =>
+      validateFacebookProfile({
+        ...reviewed,
+        receiptScroll,
+        videoReceipt: { mode: "captioned_post" },
+      }),
+    ).toThrow("facebook_video_receipt_unreviewed");
+  expect(() =>
+    validateFacebookProfile({
+      ...reviewed,
+      receiptUrl: undefined,
+      videoReceipt: { mode: "captioned_post" },
+    }),
+  ).toThrow("facebook_video_receipt_unreviewed");
 });
