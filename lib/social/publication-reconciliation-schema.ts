@@ -42,9 +42,10 @@ export const videoPublicationReconciliationSchema = z
       .url("请填写有效的 Reel 链接。")
       .max(160)
       .refine(
-        (value) => /^https:\/\/www\.facebook\.com\/reel\/[0-9]+\/$/.test(value),
+        (value) => /^https:\/\/www\.facebook\.com\/reel\/[0-9]+\/?$/.test(value),
         "请填写不含跟踪参数的 Facebook Reel 正式链接。",
-      ),
+      )
+      .transform((value) => `${value.replace(/\/$/, "")}/`),
     evidenceRef: z
       .string()
       .trim()

@@ -1,4 +1,37 @@
 import { expect, test } from "@playwright/test";
+import { videoPublicationReconciliationSchema } from "../../lib/social/publication-reconciliation-schema";
+
+test("Reel reconciliation accepts either canonical slash form and rejects noncanonical URLs", () => {
+  const input = {
+    projectId: "11111111-1111-4111-8111-111111111111",
+    publicationId: "22222222-2222-4222-8222-222222222222",
+    externalPublicationRef: "https://www.facebook.com/reel/123456789/",
+    evidenceRef: "evidence-synthetic-reel",
+    confirmed: true,
+  };
+  for (const suffix of ["", "/"]) {
+    expect(
+      videoPublicationReconciliationSchema.parse({
+        ...input,
+        externalPublicationRef: `https://www.facebook.com/reel/123456789${suffix}`,
+      }).externalPublicationRef,
+    ).toBe(input.externalPublicationRef);
+  }
+  for (const url of [
+    "https://www.facebook.com/reel/123456789?tracking=1",
+    "https://www.facebook.com/reel/123456789/#fragment",
+    "https://www.facebook.com/reel/123456789//",
+    "https://www.facebook.com/reel/not-a-number",
+    "https://www.facebook.com.evil.invalid/reel/123456789",
+    "https://user@www.facebook.com/reel/123456789",
+    "http://www.facebook.com/reel/123456789",
+  ]) {
+    expect(
+      videoPublicationReconciliationSchema.safeParse({ ...input, externalPublicationRef: url })
+        .success,
+    ).toBe(false);
+  }
+});
 
 test("unknown publication requires reviewed evidence and rejects an unauthenticated confirmation", async ({
   page,
