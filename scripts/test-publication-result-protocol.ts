@@ -53,7 +53,7 @@ const classified = {
   ...result,
   outcome: "unknown" as const,
   externalPublicationRef: undefined,
-  failureCode: "publication_observe_link_unresolved",
+  failureCode: "publication_observe_http_409__evaluate__composer_closed__navigation_race",
 };
 const classifiedSigned = signPublicationWorkerResult(classified);
 assert.equal(

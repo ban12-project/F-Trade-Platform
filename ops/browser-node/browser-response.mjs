@@ -43,10 +43,16 @@ export async function checkedBrowserResponse(response, path, body) {
         ? "open-tab"
         : path.endsWith("/navigate")
           ? "navigate"
-          : path.includes("/snapshot?")
-            ? "snapshot"
-            : path === "/vnc/status"
-              ? "vnc-status"
-              : "other",
+          : path.endsWith("/evaluate")
+            ? "evaluate"
+            : path.endsWith("/scroll")
+              ? "scroll"
+              : path === "/act" && body?.kind === "hover"
+                ? "hover"
+                : path.includes("/snapshot?")
+                  ? "snapshot"
+                  : path === "/vnc/status"
+                    ? "vnc-status"
+                    : "other",
   });
 }
