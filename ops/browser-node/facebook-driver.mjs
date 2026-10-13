@@ -1,6 +1,16 @@
 import pagePrograms from "./page-programs.cjs";
 
 const pageProgram = pagePrograms.publication;
+const observationReads = new Set([
+  "composer-closed",
+  "identity-ready",
+  "identity",
+  "posts-ready",
+  "posts-loaded",
+  "post-count",
+  "posts",
+  "video-receipt",
+]);
 
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -223,23 +233,42 @@ export async function awaitVideoPreview(inspect, expected, signal) {
 export function createFacebookDriver(input, browserRequest) {
   const profile = validateFacebookProfile(input);
   const evaluate = async (session, action) => {
-    validateFacebookProfile(profile);
-    if (session.signal.aborted) throw new Error("facebook_cancelled");
-    let result;
-    try {
-      result = await json(
-        await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/evaluate`, {
-          userId: session.accountId,
-          expression: `(${pageProgram})(${JSON.stringify(profile)},${JSON.stringify(action)})`,
-        }),
-      );
-    } catch (error) {
-      if (error?.message === "browser_request_failed") error.browserObservationStage = action.kind;
-      throw error;
+    for (;;) {
+      validateFacebookProfile(profile);
+      if (session.signal.aborted) throw new Error("facebook_cancelled");
+      let result;
+      try {
+        result = await json(
+          await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/evaluate`, {
+            userId: session.accountId,
+            expression: `(${pageProgram})(${JSON.stringify(profile)},${JSON.stringify(action)})`,
+          }),
+        );
+      } catch (error) {
+        if (error?.message === "browser_request_failed")
+          error.browserObservationStage = action.kind;
+        // The pinned server defines 409/navigation_race as a lost page context.
+        // Only fixed reads after the external click may repeat; a shared budget
+        // bounds recovery across all observation stages, not per polling loop.
+        if (
+          session.observationRetriesLeft > 0 &&
+          observationReads.has(action.kind) &&
+          error?.message === "browser_request_failed" &&
+          error.browserHttpStatus === 409 &&
+          error.browserFailureCode === "navigation_race" &&
+          !session.signal.aborted
+        ) {
+          session.observationRetriesLeft--;
+          await delay(250, undefined, { signal: session.signal });
+          continue;
+        }
+        throw error;
+      }
+      if (!result.ok) throw new Error("facebook_evaluation_failed");
+      return result.result;
     }
-    if (!result.ok) throw new Error("facebook_evaluation_failed");
-    return result.result;
   };
+
   const waitFor = async (session, kind) => {
     for (let attempt = 0; attempt < 40; attempt++) {
       if (await evaluate(session, { kind })) return;
@@ -327,9 +356,11 @@ export function createFacebookDriver(input, browserRequest) {
         // A new post observed by exact text still requires its own permalink.
         if (resolveExisting && attempt === 19) return posts;
       } catch (error) {
-        // Reading can race the timestamp replacement. Retry observations only;
-        // every successful observation still validates identity and exact DOM.
-        if (attempt === 19 || session.signal.aborted) throw error;
+        // DOM reads can race timestamp replacement. Structured HTTP failures
+        // have already used the bounded recovery above and must leave this loop.
+        // Every successful read still validates identity and exact DOM.
+        if (attempt === 19 || session.signal.aborted || error?.message === "browser_request_failed")
+          throw error;
       }
       await delay(250, undefined, { signal: session.signal });
     }
@@ -504,49 +535,54 @@ export function createFacebookDriver(input, browserRequest) {
       });
     },
     async observe(session, payload, signal) {
-      if (payload.format === "video" && !session.captionedVideo) {
+      session.observationRetriesLeft = 3;
+      try {
+        if (payload.format === "video" && !session.captionedVideo) {
+          for (let attempt = 0; attempt < 20; attempt++) {
+            const ref = await evaluate(session, { kind: "video-receipt" });
+            if (ref)
+              return {
+                accountRef: profile.accountRef,
+                channelRef: profile.channelRef,
+                text: payload.text,
+                externalPublicationRef: ref,
+              };
+            await delay(500, undefined, { signal });
+          }
+          throw new Error("facebook_video_receipt_not_observed");
+        }
+        if (profile.receiptUrl) await waitFor(session, "composer-closed");
         for (let attempt = 0; attempt < 20; attempt++) {
-          const ref = await evaluate(session, { kind: "video-receipt" });
-          if (ref)
-            return {
-              accountRef: profile.accountRef,
-              channelRef: profile.channelRef,
-              text: payload.text,
-              externalPublicationRef: ref,
-            };
+          const posts = await readPosts(session, payload.text);
+          const matches = posts.filter(
+            (post) =>
+              post.accountRef === profile.accountRef &&
+              post.text === payload.text &&
+              !session.baseline.has(post.externalPublicationRef),
+          );
+          if (matches.length > 1) throw new Error("facebook_post_ambiguous");
+          if (matches.length === 1) {
+            const post = matches[0];
+            if (!session.captionedVideo) return post;
+            if (post.videoCount > 1) throw new Error("facebook_video_receipt_ambiguous");
+            if (
+              post.videoCount === 1 &&
+              /^https:\/\/www\.facebook\.com\/reel\/\d+$/.test(post.externalPublicationRef)
+            ) {
+              const { videoCount: _videoCount, ...receipt } = post;
+              return receipt;
+            }
+          }
           await delay(500, undefined, { signal });
         }
-        throw new Error("facebook_video_receipt_not_observed");
-      }
-      if (profile.receiptUrl) await waitFor(session, "composer-closed");
-      for (let attempt = 0; attempt < 20; attempt++) {
-        const posts = await readPosts(session, payload.text);
-        const matches = posts.filter(
-          (post) =>
-            post.accountRef === profile.accountRef &&
-            post.text === payload.text &&
-            !session.baseline.has(post.externalPublicationRef),
+        throw new Error(
+          session.captionedVideo
+            ? "facebook_video_receipt_not_observed"
+            : "facebook_post_not_observed",
         );
-        if (matches.length > 1) throw new Error("facebook_post_ambiguous");
-        if (matches.length === 1) {
-          const post = matches[0];
-          if (!session.captionedVideo) return post;
-          if (post.videoCount > 1) throw new Error("facebook_video_receipt_ambiguous");
-          if (
-            post.videoCount === 1 &&
-            /^https:\/\/www\.facebook\.com\/reel\/\d+$/.test(post.externalPublicationRef)
-          ) {
-            const { videoCount: _videoCount, ...receipt } = post;
-            return receipt;
-          }
-        }
-        await delay(500, undefined, { signal });
+      } finally {
+        delete session.observationRetriesLeft;
       }
-      throw new Error(
-        session.captionedVideo
-          ? "facebook_video_receipt_not_observed"
-          : "facebook_post_not_observed",
-      );
     },
     async close() {
       /* The lease owner stops the whole isolated runtime. */
