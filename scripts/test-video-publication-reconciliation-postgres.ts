@@ -47,7 +47,19 @@ export async function testVideoPublicationReconciliation(
   await db.execute(sql`UPDATE aggregate_record SET version = version - 1 WHERE id = ${contentRef}`);
   await db.execute(sql`UPDATE workspace_project SET status = 'archived' WHERE id = ${projectId}`);
   const results = await Promise.all(
-    Array.from({ length: 3 }, () => reconcileUnknownVideoPublication(value, identity, db)),
+    Array.from({ length: 3 }, (_, index) =>
+      reconcileUnknownVideoPublication(
+        {
+          ...value,
+          externalPublicationRef:
+            index % 2
+              ? value.externalPublicationRef.replace(/\/$/, "")
+              : value.externalPublicationRef,
+        },
+        identity,
+        db,
+      ),
+    ),
   );
   assert.equal(results.filter((r) => !r.replayed).length, 1);
   assert.equal(results.filter((r) => r.replayed).length, 2);
