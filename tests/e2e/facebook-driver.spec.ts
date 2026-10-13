@@ -66,6 +66,15 @@ for (const mode of [
   "video_post_multiple_media",
   "video_post_http_evaluate",
   "video_post_http_navigate",
+  "video_post_http_recovered",
+  "video_post_http_recovered_posts",
+  "video_post_http_wrong_status",
+  "video_post_http_dead_tab",
+  "video_post_http_wrong_code",
+  "video_post_http_dead_posts",
+  "video_post_http_cancelled",
+  "video_post_http_publish",
+  "video_post_http_budget",
   "video_post_blob_changed",
   "video_existing_blank",
   "video_receipt_stale",
@@ -117,6 +126,9 @@ for (const mode of [
     const scrolls: Array<{ direction: unknown; amount: unknown }> = [];
     let feedLoaded = false;
     let postReadFailures = 0;
+    let httpFailures = 0;
+    const observationEvaluations: Record<string, number> = {};
+    const controller = new AbortController();
     const browserRequest = async (endpoint: string, body: Record<string, unknown> = {}) => {
       requests.push(endpoint);
       if (endpoint === "/tabs") {
@@ -315,6 +327,72 @@ for (const mode of [
       }
       if (endpoint.endsWith("/evaluate")) {
         const expression = String(body.expression);
+        const action = expression.match(/"kind":"([a-z-]+)"/)?.[1];
+        if (
+          mode.startsWith("video_post_http_") &&
+          (await page.locator("#clicks").textContent()) === "1" &&
+          action
+        ) {
+          observationEvaluations[action] = (observationEvaluations[action] ?? 0) + 1;
+          const recover =
+            mode === "video_post_http_recovered" &&
+            action === "composer-closed" &&
+            httpFailures === 0;
+          const recoverPosts =
+            mode === "video_post_http_recovered_posts" && action === "posts" && httpFailures === 0;
+          const budget =
+            mode === "video_post_http_budget" &&
+            ["composer-closed", "identity-ready"].includes(action) &&
+            observationEvaluations[action] <= 2;
+          const terminal =
+            [
+              "video_post_http_wrong_status",
+              "video_post_http_dead_tab",
+              "video_post_http_wrong_code",
+              "video_post_http_dead_posts",
+              "video_post_http_cancelled",
+            ].includes(mode) &&
+            action === (mode === "video_post_http_dead_posts" ? "posts" : "composer-closed");
+          if (recover || recoverPosts || budget || terminal) {
+            httpFailures++;
+            if (mode === "video_post_http_cancelled") setTimeout(() => controller.abort(), 25);
+            return checkedBrowserResponse(
+              Response.json(
+                {
+                  code: ["video_post_http_dead_tab", "video_post_http_dead_posts"].includes(mode)
+                    ? "tab_timeout"
+                    : mode === "video_post_http_wrong_code"
+                      ? "session_expired"
+                      : "navigation_race",
+                  retryable: true,
+                  error: "private-canary",
+                },
+                {
+                  status:
+                    mode === "video_post_http_wrong_status"
+                      ? 503
+                      : ["video_post_http_dead_tab", "video_post_http_dead_posts"].includes(mode)
+                        ? 410
+                        : 409,
+                },
+              ),
+              endpoint,
+              body,
+            );
+          }
+        }
+        if (mode === "video_post_http_publish" && action === "publish") {
+          await page.evaluate(expression);
+          httpFailures++;
+          return checkedBrowserResponse(
+            Response.json(
+              { code: "navigation_race", retryable: true, error: "private-canary" },
+              { status: 409 },
+            ),
+            endpoint,
+            body,
+          );
+        }
         if (
           mode === "video_post_http_evaluate" &&
           expression.includes('"kind":"composer-closed"') &&
@@ -482,7 +560,7 @@ for (const mode of [
           ...(format === "text" ? {} : { media: { sha256 } }),
         },
       },
-      signal: new AbortController().signal,
+      signal: controller.signal,
       async preparePublicationMedia() {
         return { path, media: { sha256 } };
       },
@@ -536,6 +614,8 @@ for (const mode of [
       "hidden_duplicate_composer",
       "audience_selection",
       "composer_identity_tracking",
+      "video_post_http_recovered",
+      "video_post_http_recovered_posts",
     ].includes(mode);
     const uncertain = [
       "transit_expiry",
@@ -552,12 +632,20 @@ for (const mode of [
       "video_post_multiple_media",
       "video_post_http_evaluate",
       "video_post_http_navigate",
+      "video_post_http_wrong_status",
+      "video_post_http_dead_tab",
+      "video_post_http_wrong_code",
+      "video_post_http_dead_posts",
+      "video_post_http_cancelled",
+      "video_post_http_publish",
+      "video_post_http_budget",
     ].includes(mode);
     expect(result).toBe(success ? "completed" : uncertain ? "unknown" : "failed");
     expect(await page.locator("#clicks").textContent()).toBe(
       success ||
         mode.startsWith("post_") ||
         mode === "video_receipt_wrong_link" ||
+        mode.startsWith("video_post_http_") ||
         [
           "video_post_duplicate",
           "video_post_wrong_author",
@@ -576,11 +664,43 @@ for (const mode of [
     if (uncertain) expect(receipts[0].outcome).toBe("unknown");
     if (mode.startsWith("video_post_http_")) {
       expect(authorized).toBe(1);
-      expect(receipts[0].failureCode).toBe(
-        mode === "video_post_http_evaluate"
-          ? "publication_observe_http_409__evaluate__composer_closed__navigation_race"
-          : "publication_observe_http_503__navigate__unknown__tab_timeout",
-      );
+      const expected: Record<string, string> = {
+        video_post_http_evaluate:
+          "publication_observe_http_409__evaluate__composer_closed__navigation_race",
+        video_post_http_navigate: "publication_observe_http_503__navigate__unknown__tab_timeout",
+        video_post_http_wrong_status:
+          "publication_observe_http_503__evaluate__composer_closed__navigation_race",
+        video_post_http_dead_tab:
+          "publication_observe_http_410__evaluate__composer_closed__tab_timeout",
+        video_post_http_wrong_code:
+          "publication_observe_http_409__evaluate__composer_closed__session_expired",
+        video_post_http_dead_posts: "publication_observe_http_410__evaluate__posts__tab_timeout",
+        video_post_http_cancelled: "publication_observe_cancelled",
+        video_post_http_publish: "publication_publish_unknown",
+        video_post_http_budget:
+          "publication_observe_http_409__evaluate__identity_ready__navigation_race",
+      };
+      if (success) {
+        expect(receipts[0].outcome).toBe("published");
+        expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/reel/1");
+        expect(httpFailures).toBe(1);
+      } else expect(receipts[0].failureCode).toBe(expected[mode]);
+      if (mode === "video_post_http_evaluate")
+        expect(observationEvaluations["composer-closed"]).toBe(4);
+      if (mode === "video_post_http_budget") expect(httpFailures).toBe(4);
+      if (
+        [
+          "video_post_http_wrong_status",
+          "video_post_http_dead_tab",
+          "video_post_http_wrong_code",
+          "video_post_http_dead_posts",
+          "video_post_http_cancelled",
+          "video_post_http_publish",
+        ].includes(mode)
+      )
+        expect(httpFailures).toBe(1);
+      if (mode === "video_post_http_cancelled")
+        expect(observationEvaluations["composer-closed"]).toBe(1);
       expect(JSON.stringify(receipts)).not.toContain("private-canary");
     }
     if (mode === "post_link_hover")
