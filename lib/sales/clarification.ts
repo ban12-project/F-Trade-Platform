@@ -10,10 +10,21 @@ export function applyInquiryMessage(rfq: Rfq, message: string) {
     return matches.length === 1 ? matches[0] : undefined;
   };
   const quantity = unique(/(?<![\w.,+-])([1-9]\d*)\s*(?:pcs?|pieces?)\b/gi);
-  if (quantity && Number.isSafeInteger(Number(quantity[1])))
+  // A single unit suffix can apply to a range/list, not just its final number.
+  const beforeQuantity = quantity ? message.slice(0, quantity.index) : "";
+  const afterQuantity = quantity ? message.slice((quantity.index ?? 0) + quantity[0].length) : "";
+  const alternativeBefore = /\d\s*(?:to|or|and|[/&–—-])\s*$/i.test(beforeQuantity);
+  const alternativeAfter = /^\s*(?:to|or|and|[/&–—-])\s*\d/i.test(afterQuantity);
+  if (
+    quantity &&
+    !alternativeBefore &&
+    !alternativeAfter &&
+    Number.isSafeInteger(Number(quantity[1]))
+  )
     patch.commercial.quantity = Number(quantity[1]);
-  const oe = unique(/\b(?:oe|oem)\s*[:#-]\s*([A-Za-z0-9-]{3,240})\b/gi);
-  if (oe) patch.product.oe_number = oe[1];
+  // Capture the whole token before validating; never silently shorten an OE.
+  const oe = unique(/\b(?:oe|oem)\s*[:#-]\s*([^\s,;]+)/gi);
+  if (oe && /^[A-Za-z0-9-]{3,240}$/.test(oe[1])) patch.product.oe_number = oe[1];
   const destination = unique(/\bdestination\s*[:=]\s*([A-Za-z][A-Za-z -]{2,239})(?=[,;.\n]|$)/gi);
   if (destination) patch.commercial.destination = destination[1].trim();
   const vehicle = unique(/\b(Toyota|Honda|Ford|Volkswagen)\s+([A-Za-z0-9 -]{2,100}?)\s+clutch\b/gi);
