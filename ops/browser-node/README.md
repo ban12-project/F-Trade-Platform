@@ -309,7 +309,7 @@ A separately reviewed `videoReceipt: { "mode": "captioned_post" }` can attribute
 
 已确认发布提交后，应用在响应结束后尝试唤醒其绑定的受管节点。每五分钟的认证调度入口也会扫描持久化发布队列，恢复提交后进程中断的情况；扫描只预留原任务、保存启动 outbox，不创建人工交互任务。启动前、取得唯一 dispatch claim 后和释放节点密钥前，分别重新验证节点所有者、明确的未过期发布 scope、账号授权与登录状态、原确认人的当前项目编辑权限、启用的渠道、有效内容确认及 Gate 01。项目归档、未知结果和已披露任务不授权新的冷启动。外部效果仍由原发布授权与租约规则控制。
 
-执行器在成功观察后最多传输同一份回执三次，不重新授权或重复点击。无法确认回执仍为 unknown；已保存的 unknown 不被此次改动覆盖。失败代码仅包含固定阶段 `publication_publish_unknown`、`publication_observe_unknown` 或 `publication_validate_unknown`，不保存异常正文、账号或页面内容。这些阶段诊断与合成回归不能证明既有生产 unknown 已确认，也不等同于真实视频和 DM 验收。
+执行器在成功观察后最多传输同一份回执三次，不重新授权或重复点击。无法确认回执仍为 unknown；已保存的 unknown 不被此次改动覆盖。发布和校验失败继续使用固定阶段代码；观察失败可细分为编辑器关闭、身份／帖子就绪、链接解析、页面契约、视频匹配、到期、取消和超时等白名单分类。分类沿既有签名回执保存，无法识别的异常保留 `publication_observe_unknown`，不保存异常正文、账号或页面内容。这些阶段诊断与合成回归不能证明既有生产 unknown 已确认，也不等同于真实视频和 DM 验收。
 
 发布点击前失败时，Agent 只记录 `browser_publication_preclick_failed:<stage>:<code>`，其中 stage 与 code 都来自执行器固定枚举；无法识别的异常统一记为 `unclassified`。不记录异常正文、页面内容或凭据；诊断回调失败也不能改变“未点击”的执行结果。读取旧帖子基线时，仅对已知的临时页面／传输错误重试一次完整只读读取，失败后停止，不点击或重排原发布任务。2026-09-24 的生产尝试及其证据边界见 [验收记录](../../docs/testing/reports/mvp1-production-publication-attempt-20260924.md)。
 

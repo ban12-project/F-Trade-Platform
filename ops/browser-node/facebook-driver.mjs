@@ -239,7 +239,13 @@ export function createFacebookDriver(input, browserRequest) {
       if (await evaluate(session, { kind })) return;
       await delay(250, undefined, { signal: session.signal });
     }
-    throw new Error("facebook_composer_transition_timeout");
+    const observationTimeouts = {
+      "composer-closed": "facebook_composer_closed_timeout",
+      "identity-ready": "facebook_identity_ready_timeout",
+      "posts-ready": "facebook_posts_ready_timeout",
+      "posts-loaded": "facebook_posts_loaded_timeout",
+    };
+    throw new Error(observationTimeouts[kind] ?? "facebook_composer_transition_timeout");
   };
   const navigate = async (session, url) => {
     const response = await json(
@@ -324,6 +330,9 @@ export function createFacebookDriver(input, browserRequest) {
     throw new Error("facebook_permalink_unresolved");
   };
   const retryableBaselineErrors = new Set([
+    "facebook_identity_ready_timeout",
+    "facebook_posts_ready_timeout",
+    "facebook_posts_loaded_timeout",
     "browser_request_failed",
     "facebook_browser_response_invalid",
     "facebook_composer_transition_timeout",

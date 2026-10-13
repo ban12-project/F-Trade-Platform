@@ -35,6 +35,9 @@ const diagnosticErrors = new Set([
   "browser_request_failed",
   "facebook_browser_response_invalid",
   "facebook_composer_transition_timeout",
+  "facebook_identity_ready_timeout",
+  "facebook_posts_ready_timeout",
+  "facebook_posts_loaded_timeout",
   "facebook_evaluation_failed",
   "facebook_navigation_invalid",
   "facebook_permalink_hover_failed",
@@ -60,6 +63,34 @@ const diagnosticErrors = new Set([
 ]);
 function diagnosticError(error) {
   return diagnosticErrors.has(error?.message) ? error.message : "unclassified";
+}
+
+// These values, never exception text, cross the signed receipt boundary.
+const observationFailures = new Map([
+  ["browser_request_failed", "transport_failed"],
+  ["facebook_composer_closed_timeout", "composer_pending"],
+  ["facebook_identity_ready_timeout", "identity_unavailable"],
+  ["facebook_posts_ready_timeout", "feed_unavailable"],
+  ["facebook_posts_loaded_timeout", "feed_empty"],
+  ["facebook_permalink_hover_failed", "link_resolution_failed"],
+  ["facebook_permalink_unresolved", "link_unresolved"],
+  ["facebook_navigation_invalid", "navigation_failed"],
+  ["facebook_evaluation_failed", "page_contract_failed"],
+  ["facebook_browser_response_invalid", "response_invalid"],
+  ["facebook_post_ambiguous", "post_ambiguous"],
+  ["facebook_video_receipt_ambiguous", "video_ambiguous"],
+  ["facebook_video_receipt_not_observed", "video_unverified"],
+  ["facebook_post_not_observed", "post_unverified"],
+  ["facebook_profile_expired", "review_expired"],
+]);
+function failureCode(phase, error, signal) {
+  if (phase !== "observe") return `publication_${phase}_unknown`;
+  const category = signal.aborted
+    ? "cancelled"
+    : error?.name === "TimeoutError"
+      ? "request_timeout"
+      : observationFailures.get(error?.message);
+  return category ? `publication_observe_${category}` : "publication_observe_unknown";
 }
 
 /** Execution order shared by reviewed DOM drivers. This module supplies no
@@ -173,7 +204,7 @@ export function createPublicationExecutor(driver) {
             outcome: "unknown",
             // Only fixed phase codes leave the executor; exception messages may
             // contain private page text, URLs, or transport credentials.
-            failureCode: `publication_${phase}_unknown`,
+            failureCode: failureCode(phase, error, signal),
           });
         } catch {
           /* broker retains unknown until reconciled */

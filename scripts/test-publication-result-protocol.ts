@@ -48,3 +48,28 @@ assert.throws(
   /failure code/,
 );
 console.log("PASS signed publication result protocol");
+
+const classified = {
+  ...result,
+  outcome: "unknown" as const,
+  externalPublicationRef: undefined,
+  failureCode: "publication_observe_link_unresolved",
+};
+const classifiedSigned = signPublicationWorkerResult(classified);
+assert.equal(
+  verifyPublicationWorkerResult(classifiedSigned, result.workerId, now).failureCode,
+  classified.failureCode,
+);
+assert.throws(
+  () =>
+    verifyPublicationWorkerResult(
+      {
+        ...classifiedSigned,
+        result: { ...classifiedSigned.result, failureCode: "publication_observe_feed_empty" },
+      },
+      result.workerId,
+      now,
+    ),
+  /signature/,
+);
+console.log("PASS observation category is bound to the signed receipt");

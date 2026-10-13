@@ -1110,7 +1110,7 @@ async function main() {
         outcome: outcome === "published" ? "published" : "unknown",
         ...(outcome === "published"
           ? { externalPublicationRef: `synthetic-post-${randomUUID()}` }
-          : { failureCode: "synthetic_observation_unknown" }),
+          : { failureCode: "publication_observe_link_unresolved" }),
       };
       await assert.rejects(
         handleBrowserNodeRequest(node.accessKey, {
@@ -1155,6 +1155,16 @@ async function main() {
         );
         const accepted = await handleBrowserNodeRequest(node.accessKey, resultRequest);
         assert.deepEqual(accepted.receipt, { outcome: expectedOutcome, replayed: false });
+        if (outcome === "unknown" || outcome === "unknown_video") {
+          const diagnostic = await db.execute(sql`SELECT p.receipt, j.failure_code
+            FROM browser_fleet_publication p JOIN social_browser_job j ON j.id = p.job_id
+            WHERE p.authorization_id = ${resultRequest.authorizationId}`);
+          assert.equal(diagnostic.rows[0].failure_code, "publication_observe_link_unresolved");
+          assert.equal(
+            (diagnostic.rows[0].receipt as { failureCode: string }).failureCode,
+            "publication_observe_link_unresolved",
+          );
+        }
         const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);
         assert.deepEqual(repeated.receipt, { outcome: expectedOutcome, replayed: true });
         await assert.rejects(
