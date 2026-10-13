@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
+import { publicationFailureLabel } from "../../lib/social/publication-presentation";
 import { createPublicationExecutor } from "../../ops/browser-node/publication-executor.mjs";
 
 const accountRef = "synthetic-account";
@@ -18,7 +19,12 @@ type Mode =
   | "observe_lost"
   | "old_post"
   | "aborted";
-async function scenario(page: Page, mode: Mode, format: "text" | "image" | "video" = "text") {
+async function scenario(
+  page: Page,
+  mode: Mode,
+  format: "text" | "image" | "video" = "text",
+  observationError = new Error("private page text must not escape"),
+) {
   const events: string[] = [];
   const controller = new AbortController();
   const receipts: Array<Record<string, unknown>> = [];
@@ -75,7 +81,10 @@ async function scenario(page: Page, mode: Mode, format: "text" | "image" | "vide
       if (mode === "click_lost") throw new Error("response_lost_after_click");
     },
     async observe() {
-      if (mode === "observe_lost") throw new Error("private page text must not escape");
+      if (mode === "observe_lost") {
+        if (observationError.name === "AbortError") controller.abort();
+        throw observationError;
+      }
       return {
         accountRef,
         channelRef,
@@ -118,6 +127,56 @@ async function scenario(page: Page, mode: Mode, format: "text" | "image" | "vide
   });
   return { result, events, receipts, clicks: Number(await page.locator("#count").textContent()) };
 }
+
+for (const [message, category] of [
+  ["browser_request_failed", "transport_failed"],
+  ["facebook_composer_closed_timeout", "composer_pending"],
+  ["facebook_identity_ready_timeout", "identity_unavailable"],
+  ["facebook_posts_ready_timeout", "feed_unavailable"],
+  ["facebook_posts_loaded_timeout", "feed_empty"],
+  ["facebook_permalink_hover_failed", "link_resolution_failed"],
+  ["facebook_permalink_unresolved", "link_unresolved"],
+  ["facebook_navigation_invalid", "navigation_failed"],
+  ["facebook_evaluation_failed", "page_contract_failed"],
+  ["facebook_browser_response_invalid", "response_invalid"],
+  ["facebook_post_ambiguous", "post_ambiguous"],
+  ["facebook_video_receipt_ambiguous", "video_ambiguous"],
+  ["facebook_video_receipt_not_observed", "video_unverified"],
+  ["facebook_post_not_observed", "post_unverified"],
+  ["facebook_profile_expired", "review_expired"],
+] as const) {
+  test(`observation failure preserves the fixed ${category} classification without retrying`, async ({
+    page,
+  }) => {
+    const run = await scenario(page, "observe_lost", "video", new Error(message));
+    expect(run.result).toBe("unknown");
+    expect(run.clicks).toBe(1);
+    expect(run.receipts).toHaveLength(1);
+    expect(run.receipts[0].failureCode).toBe(`publication_observe_${category}`);
+    expect(publicationFailureLabel(String(run.receipts[0].failureCode))).toBeTruthy();
+    expect(JSON.stringify(run.receipts)).not.toContain(message);
+  });
+}
+
+test("observation diagnostics redact unknown errors and distinguish request timeouts", async ({
+  page,
+}) => {
+  const privateMessage = "facebook_permalink_unresolved private-account private-caption";
+  const unknown = await scenario(page, "observe_lost", "video", new Error(privateMessage));
+  expect(unknown.receipts[0].failureCode).toBe("publication_observe_unknown");
+  expect(JSON.stringify(unknown.receipts)).not.toContain(privateMessage);
+  const timeout = new Error(privateMessage);
+  timeout.name = "TimeoutError";
+  const timedOut = await scenario(page, "observe_lost", "video", timeout);
+  expect(timedOut.receipts[0].failureCode).toBe("publication_observe_request_timeout");
+  expect(timedOut.clicks).toBe(1);
+  const aborted = new Error(privateMessage);
+  aborted.name = "AbortError";
+  const cancelled = await scenario(page, "observe_lost", "video", aborted);
+  expect(cancelled.receipts[0].failureCode).toBe("publication_observe_cancelled");
+  expect(cancelled.clicks).toBe(1);
+  expect(publicationFailureLabel(privateMessage)).toBeNull();
+});
 
 for (const format of ["text", "image", "video"] as const) {
   test(`publication executor prepares and publishes ${format} once on a synthetic page`, async ({
