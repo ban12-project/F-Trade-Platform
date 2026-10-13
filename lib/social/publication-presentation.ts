@@ -1,3 +1,5 @@
+import { parseObservationHttpFailure } from "../../ops/browser-node/observation-diagnostics.mjs";
+
 /** Presentation only: publishing and retries remain governed by the domain service. */
 export function publicationProgress(status: string, humanConfirmed = false) {
   switch (status) {
@@ -73,6 +75,9 @@ const publicationFailureLabels: Record<string, string> = {
 /** Fixed codes only. Unknown legacy strings stay internal instead of being
  * rendered as if they were trusted diagnostics. */
 export function publicationFailureLabel(failureCode?: string | null) {
+  const http = parseObservationHttpFailure(failureCode);
+  if (http)
+    return `浏览器观察 HTTP ${http.httpStatus}（${http.request} / ${http.step} / ${http.code}）`;
   if (!failureCode || !Object.hasOwn(publicationFailureLabels, failureCode)) return null;
   return publicationFailureLabels[failureCode];
 }

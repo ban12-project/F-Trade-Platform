@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { publicationFailureLabel } from "../../lib/social/publication-presentation";
 import { checkedBrowserResponse } from "../../ops/browser-node/browser-response.mjs";
 import { describeBrowserLaunchFailure } from "../../ops/browser-node/launch-diagnostics.mjs";
+import {
+  observationHttpFailure,
+  parseObservationHttpFailure,
+} from "../../ops/browser-node/observation-diagnostics.mjs";
 
 test("only a read-only hover forwards its 422 response for exact code validation", async () => {
   const hover = new Response(JSON.stringify({ code: "element_not_actionable" }), { status: 422 });
@@ -120,4 +125,59 @@ test("structured production failure codes do not expose error messages or grant 
     expect(error).not.toHaveProperty("retryable");
     expect(JSON.stringify(error)).not.toContain("canary");
   }
+});
+
+test("observation HTTP diagnostics preserve bounded tokens through presentation", async () => {
+  for (const request of ["navigate", "evaluate", "scroll", "hover"]) {
+    const error = await checkedBrowserResponse(
+      Response.json({ code: "navigation_race", error: "private-canary" }, { status: 409 }),
+      request === "hover" ? "/act" : `/tabs/private-canary/${request}`,
+      { kind: "hover" },
+    ).catch((failure) => failure);
+    error.browserObservationStage = "composer-closed";
+    const code = observationHttpFailure(error);
+    expect(code).toBe(`publication_observe_http_409__${request}__composer_closed__navigation_race`);
+    expect(parseObservationHttpFailure(code)).toEqual({
+      httpStatus: 409,
+      request,
+      step: "composer-closed",
+      code: "navigation_race",
+    });
+    expect(publicationFailureLabel(code)).toBe(
+      `浏览器观察 HTTP 409（${request} / composer-closed / navigation_race）`,
+    );
+    expect(JSON.stringify(error)).not.toContain("private-canary");
+  }
+});
+
+test("untrusted observation metadata cannot reach receipts or presentation", () => {
+  const error = {
+    message: "browser_request_failed",
+    browserHttpStatus: 503,
+    browserFailureCode: "private-canary",
+    browserRequestStage: "private-canary",
+    browserObservationStage: "private-canary",
+  };
+  expect(observationHttpFailure(error)).toBe(
+    "publication_observe_http_503__other__unknown__unclassified",
+  );
+  for (const status of [0, 200, 299, 600, NaN, 409.5, "409"]) {
+    expect(observationHttpFailure({ ...error, browserHttpStatus: status })).toBeNull();
+  }
+  expect(observationHttpFailure(new Error("private-canary"))).toBeNull();
+  for (const code of [
+    "publication_observe_http_409__evaluate__composer_closed__private_canary",
+    "publication_observe_http_409__private_canary__unknown__unclassified",
+    "publication_observe_http_409__evaluate__private_canary__unclassified",
+    "publication_observe_http_409__evaluate__composer-closed__navigation_race",
+    "publication_observe_http_200__evaluate__composer_closed__navigation_race",
+    "publication_observe_http_409__evaluate__composer_closed__navigation_race__extra",
+    `publication_observe_http_${"a".repeat(121)}`,
+  ]) {
+    expect(parseObservationHttpFailure(code)).toBeNull();
+    expect(publicationFailureLabel(code)).toBeNull();
+  }
+  expect(publicationFailureLabel("publication_observe_transport_failed")).toBe(
+    "浏览器观察传输失败",
+  );
 });

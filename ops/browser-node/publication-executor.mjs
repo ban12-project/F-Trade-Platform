@@ -1,3 +1,5 @@
+import { observationHttpFailure } from "./observation-diagnostics.mjs";
+
 function checkedPreview(preview, run, upload) {
   const payload = run.publication;
   if (!preview || preview.accountRef !== run.accountRef || preview.channelRef !== run.channelRef)
@@ -85,6 +87,10 @@ const observationFailures = new Map([
 ]);
 function failureCode(phase, error, signal) {
   if (phase !== "observe") return `publication_${phase}_unknown`;
+  if (!signal.aborted) {
+    const httpFailure = observationHttpFailure(error);
+    if (httpFailure) return httpFailure;
+  }
   const category = signal.aborted
     ? "cancelled"
     : error?.name === "TimeoutError"

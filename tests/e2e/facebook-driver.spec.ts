@@ -64,6 +64,8 @@ for (const mode of [
   "video_post_foreign",
   "video_post_missing_media",
   "video_post_multiple_media",
+  "video_post_http_evaluate",
+  "video_post_http_navigate",
   "video_post_blob_changed",
   "video_existing_blank",
   "video_receipt_stale",
@@ -265,6 +267,15 @@ for (const mode of [
       }
       if (endpoint.endsWith("/navigate")) {
         expect([profile.url, profile.identityHref]).toContain(body.url);
+        if (
+          mode === "video_post_http_navigate" &&
+          (await page.locator("#clicks").textContent()) === "1"
+        )
+          return checkedBrowserResponse(
+            Response.json({ code: "tab_timeout", error: "private-canary" }, { status: 503 }),
+            endpoint,
+            body,
+          );
         await page.evaluate((url) => history.replaceState(null, "", url), String(body.url));
         if (mode.startsWith("video_post_return") && body.url === profile.identityHref) {
           feedLoaded = false;
@@ -304,6 +315,16 @@ for (const mode of [
       }
       if (endpoint.endsWith("/evaluate")) {
         const expression = String(body.expression);
+        if (
+          mode === "video_post_http_evaluate" &&
+          expression.includes('"kind":"composer-closed"') &&
+          (await page.locator("#clicks").textContent()) === "1"
+        )
+          return checkedBrowserResponse(
+            Response.json({ code: "navigation_race", error: "private-canary" }, { status: 409 }),
+            endpoint,
+            body,
+          );
         if (
           mode === "video_receipt_wrong_link" &&
           expression.includes('"kind":"video-receipt"') &&
@@ -529,6 +550,8 @@ for (const mode of [
       "video_post_foreign",
       "video_post_missing_media",
       "video_post_multiple_media",
+      "video_post_http_evaluate",
+      "video_post_http_navigate",
     ].includes(mode);
     expect(result).toBe(success ? "completed" : uncertain ? "unknown" : "failed");
     expect(await page.locator("#clicks").textContent()).toBe(
@@ -543,12 +566,23 @@ for (const mode of [
           "video_post_foreign",
           "video_post_missing_media",
           "video_post_multiple_media",
+          "video_post_http_evaluate",
+          "video_post_http_navigate",
         ].includes(mode)
         ? "1"
         : "0",
     );
     expect(receipts).toHaveLength(success || uncertain ? 1 : 0);
     if (uncertain) expect(receipts[0].outcome).toBe("unknown");
+    if (mode.startsWith("video_post_http_")) {
+      expect(authorized).toBe(1);
+      expect(receipts[0].failureCode).toBe(
+        mode === "video_post_http_evaluate"
+          ? "publication_observe_http_409__evaluate__composer_closed__navigation_race"
+          : "publication_observe_http_503__navigate__unknown__tab_timeout",
+      );
+      expect(JSON.stringify(receipts)).not.toContain("private-canary");
+    }
     if (mode === "post_link_hover")
       expect(receipts[0].externalPublicationRef).toBe("https://www.facebook.com/synthetic/posts/1");
     if (

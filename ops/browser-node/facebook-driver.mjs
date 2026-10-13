@@ -225,12 +225,18 @@ export function createFacebookDriver(input, browserRequest) {
   const evaluate = async (session, action) => {
     validateFacebookProfile(profile);
     if (session.signal.aborted) throw new Error("facebook_cancelled");
-    const result = await json(
-      await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/evaluate`, {
-        userId: session.accountId,
-        expression: `(${pageProgram})(${JSON.stringify(profile)},${JSON.stringify(action)})`,
-      }),
-    );
+    let result;
+    try {
+      result = await json(
+        await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/evaluate`, {
+          userId: session.accountId,
+          expression: `(${pageProgram})(${JSON.stringify(profile)},${JSON.stringify(action)})`,
+        }),
+      );
+    } catch (error) {
+      if (error?.message === "browser_request_failed") error.browserObservationStage = action.kind;
+      throw error;
+    }
     if (!result.ok) throw new Error("facebook_evaluation_failed");
     return result.result;
   };

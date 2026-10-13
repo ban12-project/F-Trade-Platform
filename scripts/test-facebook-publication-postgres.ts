@@ -1110,7 +1110,10 @@ async function main() {
         outcome: outcome === "published" ? "published" : "unknown",
         ...(outcome === "published"
           ? { externalPublicationRef: `synthetic-post-${randomUUID()}` }
-          : { failureCode: "publication_observe_link_unresolved" }),
+          : {
+              failureCode:
+                "publication_observe_http_409__evaluate__composer_closed__navigation_race",
+            }),
       };
       await assert.rejects(
         handleBrowserNodeRequest(node.accessKey, {
@@ -1159,10 +1162,13 @@ async function main() {
           const diagnostic = await db.execute(sql`SELECT p.receipt, j.failure_code
             FROM browser_fleet_publication p JOIN social_browser_job j ON j.id = p.job_id
             WHERE p.authorization_id = ${resultRequest.authorizationId}`);
-          assert.equal(diagnostic.rows[0].failure_code, "publication_observe_link_unresolved");
+          assert.equal(
+            diagnostic.rows[0].failure_code,
+            "publication_observe_http_409__evaluate__composer_closed__navigation_race",
+          );
           assert.equal(
             (diagnostic.rows[0].receipt as { failureCode: string }).failureCode,
-            "publication_observe_link_unresolved",
+            "publication_observe_http_409__evaluate__composer_closed__navigation_race",
           );
         }
         const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);
