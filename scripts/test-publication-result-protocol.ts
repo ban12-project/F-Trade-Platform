@@ -73,3 +73,31 @@ assert.throws(
   /signature/,
 );
 console.log("PASS observation category is bound to the signed receipt");
+
+for (const category of [
+  "matching_post_missing",
+  "baseline_only",
+  "receipt_identity_mismatch",
+  "video_missing",
+  "reel_link_unverified",
+]) {
+  const diagnostic = { ...classified, failureCode: `publication_observe_${category}` };
+  const signedDiagnostic = signPublicationWorkerResult(diagnostic);
+  assert.equal(
+    verifyPublicationWorkerResult(signedDiagnostic, result.workerId, now).failureCode,
+    diagnostic.failureCode,
+  );
+  assert.throws(
+    () =>
+      verifyPublicationWorkerResult(
+        {
+          ...signedDiagnostic,
+          result: { ...diagnostic, failureCode: "publication_observe_unknown" },
+        },
+        result.workerId,
+        now,
+      ),
+    /signature/,
+  );
+}
+console.log("PASS condition-specific diagnostics remain bound to the signed receipt");

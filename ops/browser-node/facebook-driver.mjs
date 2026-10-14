@@ -283,6 +283,8 @@ export function createFacebookDriver(input, browserRequest) {
     throw new Error(observationTimeouts[kind] ?? "facebook_composer_transition_timeout");
   };
   const navigate = async (session, url) => {
+    validateFacebookProfile(profile);
+    if (session.signal.aborted) throw new Error("facebook_cancelled");
     const response = await json(
       await browserRequest(`/tabs/${encodeURIComponent(session.tabId)}/navigate`, {
         userId: session.accountId,
@@ -552,8 +554,21 @@ export function createFacebookDriver(input, browserRequest) {
           throw new Error("facebook_video_receipt_not_observed");
         }
         if (profile.receiptUrl) await waitFor(session, "composer-closed");
+        let missingReceipt = "facebook_receipt_post_missing";
         for (let attempt = 0; attempt < 20; attempt++) {
+          // A loaded feed can remain a stale snapshot after the external effect.
+          // Refresh only the reviewed receipt page, twice within the existing
+          // bound. Keep the original baseline and never repeat preparation,
+          // upload, authorization or the publication click.
+          if (session.captionedVideo && profile.receiptUrl && [5, 12].includes(attempt)) {
+            validateFacebookProfile(profile);
+            if (session.signal.aborted) throw new Error("facebook_cancelled");
+            session.readingReceipts = false;
+          }
           const posts = await readPosts(session, payload.text);
+          const ownPosts = posts.filter(
+            (post) => post.accountRef === profile.accountRef && post.text === payload.text,
+          );
           const matches = posts.filter(
             (post) =>
               post.accountRef === profile.accountRef &&
@@ -565,6 +580,10 @@ export function createFacebookDriver(input, browserRequest) {
             const post = matches[0];
             if (!session.captionedVideo) return post;
             if (post.videoCount > 1) throw new Error("facebook_video_receipt_ambiguous");
+            missingReceipt =
+              post.videoCount !== 1
+                ? "facebook_receipt_video_missing"
+                : "facebook_receipt_reel_link_unverified";
             if (
               post.videoCount === 1 &&
               /^https:\/\/www\.facebook\.com\/reel\/\d+$/.test(post.externalPublicationRef)
@@ -572,14 +591,16 @@ export function createFacebookDriver(input, browserRequest) {
               const { videoCount: _videoCount, ...receipt } = post;
               return receipt;
             }
+          } else {
+            missingReceipt = ownPosts.length
+              ? "facebook_receipt_baseline_only"
+              : posts.length
+                ? "facebook_receipt_identity_mismatch"
+                : "facebook_receipt_post_missing";
           }
           await delay(500, undefined, { signal });
         }
-        throw new Error(
-          session.captionedVideo
-            ? "facebook_video_receipt_not_observed"
-            : "facebook_post_not_observed",
-        );
+        throw new Error(session.captionedVideo ? missingReceipt : "facebook_post_not_observed");
       } finally {
         delete session.observationRetriesLeft;
       }
