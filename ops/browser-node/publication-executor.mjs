@@ -82,6 +82,11 @@ const observationFailures = new Map([
   ["facebook_post_ambiguous", "post_ambiguous"],
   ["facebook_video_receipt_ambiguous", "video_ambiguous"],
   ["facebook_video_receipt_not_observed", "video_unverified"],
+  ["facebook_receipt_post_missing", "matching_post_missing"],
+  ["facebook_receipt_baseline_only", "baseline_only"],
+  ["facebook_receipt_identity_mismatch", "receipt_identity_mismatch"],
+  ["facebook_receipt_video_missing", "video_missing"],
+  ["facebook_receipt_reel_link_unverified", "reel_link_unverified"],
   ["facebook_post_not_observed", "post_unverified"],
   ["facebook_profile_expired", "review_expired"],
 ]);

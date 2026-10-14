@@ -189,3 +189,4 @@ rmdir "$mode_dir"
 printf 'PASS: %s image pair, runtime startup, watchdog expiry and pull-only Compose\n' "$ARCH"
 
 NATIVE_PROFILE_IMAGE="$browser" bash scripts/test-native-profile-runtime.sh
+bash scripts/test-browser-observation-images.sh "$agent" "$browser"

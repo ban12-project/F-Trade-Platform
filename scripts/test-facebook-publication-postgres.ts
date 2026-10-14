@@ -1112,7 +1112,9 @@ async function main() {
           ? { externalPublicationRef: `synthetic-post-${randomUUID()}` }
           : {
               failureCode:
-                "publication_observe_http_409__evaluate__composer_closed__navigation_race",
+                outcome === "unknown_video"
+                  ? "publication_observe_video_missing"
+                  : "publication_observe_http_409__evaluate__composer_closed__navigation_race",
             }),
       };
       await assert.rejects(
@@ -1159,16 +1161,14 @@ async function main() {
         const accepted = await handleBrowserNodeRequest(node.accessKey, resultRequest);
         assert.deepEqual(accepted.receipt, { outcome: expectedOutcome, replayed: false });
         if (outcome === "unknown" || outcome === "unknown_video") {
+          assert.ok("failureCode" in resultRequest);
           const diagnostic = await db.execute(sql`SELECT p.receipt, j.failure_code
             FROM browser_fleet_publication p JOIN social_browser_job j ON j.id = p.job_id
             WHERE p.authorization_id = ${resultRequest.authorizationId}`);
-          assert.equal(
-            diagnostic.rows[0].failure_code,
-            "publication_observe_http_409__evaluate__composer_closed__navigation_race",
-          );
+          assert.equal(diagnostic.rows[0].failure_code, resultRequest.failureCode);
           assert.equal(
             (diagnostic.rows[0].receipt as { failureCode: string }).failureCode,
-            "publication_observe_http_409__evaluate__composer_closed__navigation_race",
+            resultRequest.failureCode,
           );
         }
         const repeated = await handleBrowserNodeRequest(node.accessKey, resultRequest);

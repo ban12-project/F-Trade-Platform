@@ -54,6 +54,9 @@ for (const mode of [
   "video_post_return_scroll",
   "video_post_return_missing",
   "video_post_return_failed",
+  "video_post_stale_feed",
+  "video_post_delayed_video",
+  "video_post_refresh_cancelled",
   "video_post_empty",
   "video_post_stale",
   "video_post_unloaded",
@@ -127,6 +130,8 @@ for (const mode of [
     let feedLoaded = false;
     let postReadFailures = 0;
     let httpFailures = 0;
+    let receiptNavigations = 0;
+    let receiptPostReads = 0;
     const observationEvaluations: Record<string, number> = {};
     const controller = new AbortController();
     const browserRequest = async (endpoint: string, body: Record<string, unknown> = {}) => {
@@ -289,6 +294,30 @@ for (const mode of [
             body,
           );
         await page.evaluate((url) => history.replaceState(null, "", url), String(body.url));
+        if (
+          [
+            "video_post_stale_feed",
+            "video_post_delayed_video",
+            "video_post_refresh_cancelled",
+          ].includes(mode) &&
+          body.url === profile.identityHref &&
+          (await page.locator("#clicks").textContent()) === "1"
+        ) {
+          receiptNavigations++;
+          await page
+            .locator("article")
+            .last()
+            .evaluate(
+              (post, { navigation, scenario }) => {
+                const element = post as HTMLElement;
+                if (scenario === "video_post_delayed_video") {
+                  const video = element.querySelector("video");
+                  if (video) video.hidden = navigation === 1;
+                } else element.hidden = navigation === 1;
+              },
+              { navigation: receiptNavigations, scenario: mode },
+            );
+        }
         if (mode.startsWith("video_post_return") && body.url === profile.identityHref) {
           feedLoaded = false;
           await page.locator("article").evaluateAll((posts) => {
@@ -328,6 +357,10 @@ for (const mode of [
       if (endpoint.endsWith("/evaluate")) {
         const expression = String(body.expression);
         const action = expression.match(/"kind":"([a-z-]+)"/)?.[1];
+        if (action === "posts" && (await page.locator("#clicks").textContent()) === "1") {
+          receiptPostReads++;
+          if (mode === "video_post_refresh_cancelled" && receiptPostReads === 5) controller.abort();
+        }
         if (
           mode.startsWith("video_post_http_") &&
           (await page.locator("#clicks").textContent()) === "1" &&
@@ -616,6 +649,8 @@ for (const mode of [
       "composer_identity_tracking",
       "video_post_http_recovered",
       "video_post_http_recovered_posts",
+      "video_post_stale_feed",
+      "video_post_delayed_video",
     ].includes(mode);
     const uncertain = [
       "transit_expiry",
@@ -639,6 +674,7 @@ for (const mode of [
       "video_post_http_cancelled",
       "video_post_http_publish",
       "video_post_http_budget",
+      "video_post_refresh_cancelled",
     ].includes(mode);
     expect(result).toBe(success ? "completed" : uncertain ? "unknown" : "failed");
     expect(await page.locator("#clicks").textContent()).toBe(
@@ -656,12 +692,28 @@ for (const mode of [
           "video_post_multiple_media",
           "video_post_http_evaluate",
           "video_post_http_navigate",
+          "video_post_stale_feed",
+          "video_post_delayed_video",
+          "video_post_refresh_cancelled",
         ].includes(mode)
         ? "1"
         : "0",
     );
     expect(receipts).toHaveLength(success || uncertain ? 1 : 0);
     if (uncertain) expect(receipts[0].outcome).toBe("unknown");
+    if (
+      [
+        "video_post_stale_feed",
+        "video_post_delayed_video",
+        "video_post_refresh_cancelled",
+      ].includes(mode)
+    ) {
+      expect(authorized).toBe(1);
+      expect(requests.filter((path) => path.endsWith("/upload"))).toHaveLength(1);
+      expect(receiptNavigations).toBe(mode === "video_post_refresh_cancelled" ? 1 : 2);
+      if (mode === "video_post_refresh_cancelled")
+        expect(receipts[0].failureCode).toBe("publication_observe_cancelled");
+    }
     if (mode.startsWith("video_post_http_")) {
       expect(authorized).toBe(1);
       const expected: Record<string, string> = {
