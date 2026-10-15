@@ -2,6 +2,8 @@
 
 This runbook applies to the existing, persistent single-account Vercel Sandbox. It does not authorize a new Facebook post, DM, production credential submission, or a change to the account's approved audience. Keep those actions inside their separate reviewed acceptance scopes.
 
+The [current acceptance status](mvp1-acceptance-status.md) maps each gate to its evidence. As of the 2026-10-15 checkpoint, local Podman, the credential-free template, whole-VM synthetic restoration and original-instance staging passed; the live account encountered human verification. The owner deferred that verification and real-account acceptance. Keep that scope paused until resumed, then recheck current snapshots, configuration and review validity before following the sequence below.
+
 ## Credential-free template replacement
 
 Replacing an expired new-node template can preserve the current account runtime when the template contains the exact image IDs already selected in production. A source rebuild usually produces different IDs. Do not change the global image settings just to make a new template pass: existing-account resume consumes those settings too.
