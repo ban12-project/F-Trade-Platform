@@ -220,6 +220,8 @@ jobs:
         run: node --conditions=react-server --import tsx scripts/test-video-retention-postgres.mts
         env:
           VIDEO_RETENTION_TEST_DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/f_trade_stream_test
+      - name: Restore synthetic PostgreSQL backups and verify retention cannot be renewed
+        run: node --conditions=react-server --import tsx scripts/test-video-retention-restore.mts
       - name: Verify private video upload retention and immutable retries
         run: node --experimental-test-module-mocks --conditions=react-server --import tsx scripts/test-video-retention-assets.mts
         env:
