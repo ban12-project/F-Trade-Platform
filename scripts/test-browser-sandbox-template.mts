@@ -57,25 +57,39 @@ async function docker() {
 }
 async function browserProfile(mode: "write" | "read") {
   assert.ok(session);
-  await session.writeFiles([
-    {
-      path: "/tmp/ftrade-profile-fixture.mjs",
-      content: await readFile("scripts/browser-sandbox-profile-fixture.mjs"),
-    },
-  ]);
   await run(
     `browser-profile-${mode}`,
     `
-    docker run -d --name ftrade-profile-proof --read-only --shm-size=256m
-      --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777
+    fixture=/vercel/sandbox/source/scripts/fixtures/native-profile
+    ${
+      mode === "write"
+        ? `
+    test -z "$(docker volume ls -q --filter name=^ftrade-browser-profile-proof$)"
+    docker volume create ftrade-browser-profile-proof >/dev/null
+    docker run --rm --network none -v ftrade-browser-profile-proof:/data
+      -v "$fixture:/app/plugins/synthetic-profile:ro" --entrypoint node
+      ${template.browserImage} /app/plugins/synthetic-profile/initialize.mjs
+    `
+        : "docker volume inspect ftrade-browser-profile-proof >/dev/null"
+    }
+    docker run -d --name ftrade-profile-proof --network none --read-only --init
+      --cap-drop ALL --security-opt no-new-privileges:true
+      --memory 2g --memory-swap 2g --cpus 2 --pids-limit 512 --shm-size=256m
+      --tmpfs /tmp:rw,nosuid,nodev,size=512m,mode=1777
       --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700
+      --tmpfs /root/camoufox:rw,nosuid,nodev,size=16m,mode=700
       -v ftrade-browser-profile-proof:/data
-      -v /tmp/ftrade-profile-fixture.mjs:/fixture.mjs:ro
+      -v "$fixture:/app/plugins/synthetic-profile:ro"
+      -v "$fixture/camofox.config.json:/app/camofox.config.json:ro"
       -e FTRADE_LEASE_DEADLINE=$(( $(date +%s) * 1000 + 90000 ))
-      -e CAMOFOX_PROFILE_DIR=/data/profiles -e CAMOFOX_CRASH_REPORT_ENABLED=false
+      -e FTRADE_NATIVE_PROFILE=1
+      -e FTRADE_PROFILE_ACCOUNT_ID=22222222-2222-4222-8222-222222222222
+      -e FTRADE_PROFILE_NODE_ID=11111111-1111-4111-8111-111111111111
+      -e CAMOFOX_ACCESS_KEY=synthetic-only-api-probe-414
+      -e CAMOFOX_CRASH_REPORT_ENABLED=false -e MAX_SESSIONS=1
       -e CAMOFOX_DISABLE_DEFAULT_ADDONS=true
       ${template.browserImage} >/dev/null
-    timeout --kill-after=5s 120s docker exec ftrade-profile-proof node /fixture.mjs ${mode}
+    timeout --kill-after=5s 120s docker exec ftrade-profile-proof node /app/plugins/synthetic-profile/client.mjs ${mode}
     docker stop -t 20 ftrade-profile-proof >/dev/null
     docker rm ftrade-profile-proof >/dev/null
   `.replace(/\n {6}/g, " "),
@@ -108,7 +122,7 @@ try {
   await run(
     "image-smoke",
     `cd /vercel/sandbox/source; IMAGE_PREFIX=ftrade-sandbox BUILD_TAG=test ARCH=amd64 REVISION=${template.revision} bash scripts/test-browser-images.sh`,
-    120000,
+    360000,
   );
   await browserProfile("write");
   await run(
@@ -157,7 +171,8 @@ await writeFile(
       passed: true,
       syntheticVolumeRestored: true,
       actualBrowserProfileVerified: true,
-      profileScope: "synthetic cookie and localStorage only; no IndexedDB or real login",
+      nativeProfileVerified: true,
+      profileScope: "synthetic native IndexedDB non-extractable key roundtrip; no real login",
       cleanedUp: true,
     },
     null,

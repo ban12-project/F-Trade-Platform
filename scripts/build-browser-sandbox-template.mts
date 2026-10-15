@@ -27,8 +27,9 @@ const payload = execFileSync(
     "ops/browser-node",
     "lib/browser-fleet",
     "scripts/test-browser-images.sh",
+    "scripts/test-browser-observation-images.sh",
     "scripts/test-native-profile-runtime.sh",
-    "scripts/fixtures/native-profile",
+    "scripts/fixtures",
   ],
   { maxBuffer: 20_000_000 },
 );
@@ -115,7 +116,7 @@ try {
   await run(
     "image-smoke",
     `cd /vercel/sandbox/source; IMAGE_PREFIX=ftrade-sandbox BUILD_TAG=test ARCH=amd64 REVISION=${revision} bash scripts/test-browser-images.sh`,
-    120_000,
+    360_000,
   );
   const imageOutput = await run(
     "template-check",
