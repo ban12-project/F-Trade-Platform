@@ -124,10 +124,15 @@ try {
     }),
   );
 } finally {
-  if (session)
-    await fetch(`http://127.0.0.1:9377/tabs/${session.tabId}`, {
+  if (session) {
+    // Each scenario uses a different synthetic user. Release the whole session
+    // so the next one runs under the production MAX_SESSIONS=1 limit.
+    const response = await fetch(`http://127.0.0.1:9377/sessions/${encodeURIComponent(userId)}`, {
       method: "DELETE",
       headers,
-      body: JSON.stringify({ userId }),
+      signal: AbortSignal.timeout(5000),
     });
+    assert.equal(response.status, 200);
+    await response.body?.cancel();
+  }
 }

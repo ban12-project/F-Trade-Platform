@@ -19,8 +19,24 @@ Run against exact image references from the repository root:
 
 ```sh
 CONTAINER_ENGINE=podman FTRADE_PODMAN_CONNECTION=podman-machine-default-root \
+  OBSERVATION_SECCOMP=/absolute/shared/path/restricted.json \
   bash scripts/test-browser-observation-images.sh AGENT_IMAGE BROWSER_IMAGE
 ```
+
+Generate and review the optional local policy using
+[`podman-browser-preflight.md`](../../../docs/testing/podman-browser-preflight.md).
+Its absolute path must be visible inside the Podman VM. Omitting
+`OBSERVATION_SECCOMP` retains the engine policy, including in Docker CI and the
+final Vercel Sandbox check. Do not apply the Podman diagnostic policy to production.
+
+The runner uses the production browser's dropped capabilities, no-new-privileges,
+read-only root, init, 2 GiB memory with no swap, two CPUs, 512 PIDs, 256 MiB shared
+memory and 512 MiB temporary directory. Each case releases its whole synthetic
+session before the next case so `MAX_SESSIONS=1` and the four-tab ceiling remain
+enforced. After the workload it checks effective kernel capabilities,
+no-new-privileges and cgroup v2 limits/events, and emits memory/PID peaks. A limit
+hit or OOM fails the check. The synthetic ephemeral `/data` and network-none setup
+remain different from an account volume and approved production proxy.
 
 The optional third argument `legacy` verifies the pre-fix stale-feed failure
 against an unmodified agent image. CI tests the fixed image pair on both native

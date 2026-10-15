@@ -27,6 +27,16 @@ Use the generated absolute path as `--security-opt seccomp=PATH` for the local d
 
 The existing synthetic continuity fixture accepts `NATIVE_PROFILE_SECCOMP=/absolute/path/restricted.json`. Its `docker` command must address the intended local engine. By default it retains the Docker engine policy used by CI. Run with `NATIVE_PROFILE_IMAGE` set to the reviewed image; the fixture creates and deletes its own synthetic volume and must never target an account volume. It verifies task reuse, container replacement, and lease shutdown independently from real Messenger.
 
+The [native receipt observation fixture](../../scripts/fixtures/browser-observation/README.md)
+also accepts an explicit local restriction through `OBSERVATION_SECCOMP`. Select
+the intended engine and connection with `CONTAINER_ENGINE=podman` and
+`FTRADE_PODMAN_CONNECTION`; do not reset a broken rootless store merely to run the
+fixture if a reviewed separate connection is available. It uses production browser
+isolation and verifies effective cgroup v2 limits and resource events after six
+synthetic receipt cases. Release the entire synthetic session between cases to
+retain the production single-session limit. A passing local diagnostic remains
+separate from the same-image Sandbox check using its actual Docker policy.
+
 ## Live observation and final gate
 
 The reviewed Debian 13 browser base also lacked H.264 decoding: a self-generated MP4 returned an empty `canPlayType` result and media error 4. Installing Debian's `libavcodec61` made the same sample decode with the correct dimensions; a pixel assertion independently verified its blue frame. The browser Dockerfile now includes that runtime library, and both architecture image checks run the generated fixture with network disabled and production resource/isolation settings. See [Mozilla's system codec explanation](https://support.mozilla.org/en-US/kb/open-h264-plugin-firefox) and the [Debian runtime package](https://packages.debian.org/trixie/libavcodec61). This does not prove Facebook playback or automatic publication receipt recognition.
