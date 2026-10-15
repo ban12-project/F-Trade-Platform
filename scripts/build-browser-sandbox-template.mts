@@ -132,7 +132,9 @@ try {
     snapshotExpiration: 86_400_000,
     keepLastSnapshots: { count: 1, deleteEvicted: true },
     resources: { vcpus: 4 },
-    timeout: 1_200_000,
+    // Local SDK uploads can take longer than the actual build. This temporary
+    // builder limit is independent of the provider's 20-minute account limit.
+    timeout: bundle ? 2_400_000 : 1_200_000,
   });
   await writeFile(resolve(output, "sandbox-name"), sandbox.name, { mode: 0o600 });
   await run(
