@@ -2,6 +2,14 @@
 
 This runbook applies to the existing, persistent single-account Vercel Sandbox. It does not authorize a new Facebook post, DM, production credential submission, or a change to the account's approved audience. Keep those actions inside their separate reviewed acceptance scopes.
 
+## Credential-free template replacement
+
+Replacing an expired new-node template can preserve the current account runtime when the template contains the exact image IDs already selected in production. A source rebuild usually produces different IDs. Do not change the global image settings just to make a new template pass: existing-account resume consumes those settings too.
+
+`scripts/build-browser-sandbox-template.mts` accepts an optional local image-bundle directory. It uses the `manifest.json`, `checksums.sha256` and `tested-images.tar.gz` contract emitted by `scripts/export-browser-image-pair.sh`. Review the bundle's origin and source commit first; adjacent checksums establish transfer integrity, not provenance. Both images must be amd64, share the declared commit and retain the expected IDs after Docker import. The builder packages committed runtime files and smoke fixtures from that image commit, reports its own builder commit separately, and refuses an archive with additional images. It imports in bounded chunks, removes the archive before snapshotting, runs smoke under deny-all, and verifies that no account volumes or node credentials exist. It always starts from a fresh provider base image; an account-bearing snapshot is never a template source.
+
+Run local Podman verification first. Then run `BROWSER_TEMPLATE_EXPIRATION_DAYS=30 pnpm exec tsx scripts/build-browser-sandbox-template.mts <reviewed-bundle-directory>` with the existing deployment authentication. Retention is explicitly bounded to 1–30 days (default 7). Run `scripts/test-browser-sandbox-template.mts <builder-result.json>` to verify actual provider creation and whole-VM native-profile restoration. Select a template only after its two local image IDs match production configuration and its expiry is recorded. Update the template ID, deploy, and read back the production selection. Plan replacement before expiry. Existing-account image upgrades still require the staged rollout below; template acceptance does not establish the newer runtime, real publication or inbox acceptance.
+
 ## Release preflight
 
 1. Confirm #424, #426 and #427 are reviewed and their required checks pass at their final commits. Merge in that order and wait for the final `main` application deployment and both GHCR images to finish. A green pull-request build does not publish images.
