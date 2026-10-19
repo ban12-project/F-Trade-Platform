@@ -8,7 +8,7 @@ fi
 agent=${1:?exact agent image required}
 browser=${2:?exact browser image required}
 mode=${3:-fixed}
-[[ "$mode" == fixed || "$mode" == legacy ]]
+[[ "$mode" == fixed || "$mode" == legacy || "$mode" == inbox ]]
 security_options=()
 if [[ -n ${OBSERVATION_SECCOMP:-} ]]; then
   security_options+=(--security-opt "seccomp=$OBSERVATION_SECCOMP")
@@ -60,10 +60,18 @@ cases=(synthetic-stale)
 if [[ "$mode" == fixed ]]; then
   cases+=(synthetic-missing synthetic-baseline synthetic-wrong-author synthetic-no-video synthetic-wrong-link)
 fi
-for scenario in "${cases[@]}"; do
-  "${engine[@]}" exec "$name" node --input-type=module -e 'import { writeFileSync } from "node:fs"; writeFileSync("/tmp/ftrade-lease", String(Date.now()+90000));'
-  "${engine[@]}" exec "$name" node /fixture/test/verify.mjs "$scenario" "$mode"
-done
+if [[ "$mode" != inbox ]]; then
+  for scenario in "${cases[@]}"; do
+    "${engine[@]}" exec "$name" node --input-type=module -e 'import { writeFileSync } from "node:fs"; writeFileSync("/tmp/ftrade-lease", String(Date.now()+90000));'
+    "${engine[@]}" exec "$name" node /fixture/test/verify.mjs "$scenario" "$mode"
+  done
+fi
+if [[ "$mode" != legacy ]]; then
+  for scenario in normal missing-id ambiguous-direction wrong-identity; do
+    "${engine[@]}" exec "$name" node --input-type=module -e 'import { writeFileSync } from "node:fs"; writeFileSync("/tmp/ftrade-lease", String(Date.now()+90000));'
+    "${engine[@]}" exec "$name" node /fixture/test/verify-inbox.mjs "$scenario"
+  done
+fi
 # Check effective kernel isolation and resource events after the real workload.
 "${engine[@]}" exec "$name" node --input-type=module -e '
   import assert from "node:assert/strict";
