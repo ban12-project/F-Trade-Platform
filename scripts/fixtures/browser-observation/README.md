@@ -42,3 +42,16 @@ The optional third argument `legacy` verifies the pre-fix stale-feed failure
 against an unmodified agent image. CI tests the fixed image pair on both native
 architectures. Browser heartbeat renewal and cleanup are limited to these local
 synthetic test containers.
+
+The default `fixed` run also executes the inbox collector through the native
+Firefox/Camofox HTTP boundary. It captures one inbound message, excludes an
+outbound message, and repeats the scan in a new synthetic session to verify the
+same stable message ID. Missing message IDs, ambiguous direction and wrong
+account identity must return `page_contract_failed` without delivering messages
+or a completion marker. Pass `inbox` as the third argument to run only these
+four scenarios with the same isolation and resource checks during local iteration.
+
+These native checks do not persist messages. Stable IDs across two scans are
+not database deduplication evidence; the separate PostgreSQL roundtrip covers
+encrypted storage, lost-response deduplication and human routing. Neither test
+establishes real Facebook selectors, account readiness or two-account delivery.

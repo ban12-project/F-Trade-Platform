@@ -7,6 +7,18 @@ export function register(_app, ctx, config = {}) {
       const url = new URL(route.request().url());
       if (!route.request().isNavigationRequest() || url.origin !== "https://www.facebook.com")
         return route.abort();
+      if (userId.startsWith("synthetic-inbox-")) {
+        const mode = userId.slice("synthetic-inbox-".length);
+        const owner = mode === "wrong-identity" ? "another-owner" : "synthetic-owner";
+        const identity = `<a id="identity" href="https://www.facebook.com/${owner}">Synthetic identity</a>`;
+        const time = new Date(Date.now() - 10000).toISOString();
+        const message = (id, direction) =>
+          `<div class="message ${direction}" ${mode === "missing-id" ? "" : `data-message-id="${id}"`}><p class="body">SYNTHETIC inquiry</p><time datetime="${time}">Synthetic time</time></div>`;
+        return route.fulfill({
+          contentType: "text/html",
+          body: `<!doctype html>${identity}${url.pathname === "/messages" ? '<main id="inbox"><a class="thread" data-thread-id="thread-1" href="https://www.facebook.com/messages/t/thread-1">Synthetic thread</a></main>' : `<main id="thread"><h1 data-thread-id="thread-1">Synthetic thread</h1>${message("message-1", mode === "ambiguous-direction" ? "incoming outgoing" : "incoming")}${message("message-2", "outgoing")}</main>`}`,
+        });
+      }
       const feed = url.pathname === "/synthetic-owner";
       if (feed) feedLoads++;
       const fresh = userId !== "synthetic-stale" || feedLoads > 1;
