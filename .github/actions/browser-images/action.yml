@@ -55,6 +55,12 @@ runs:
     - name: Test image contents, startup, watchdog and pull-only Compose
       shell: bash
       run: bash scripts/test-browser-images.sh
+    - name: Verify explicit new-profile initialization and refusal controls
+      shell: bash
+      run: |
+        image=$(docker image inspect --format '{{.Id}}' "${IMAGE_PREFIX}-browser:${BUILD_TAG}-${ARCH}")
+        sudo install -d -m 700 /var/lib/ftrade-sandbox
+        sudo bash scripts/test-empty-native-profile.sh "$image"
     - name: Export the tested pair for restricted Sandbox deployment
       shell: bash
       run: bash scripts/export-browser-image-pair.sh "$RUNNER_TEMP/tested-browser-images-$ARCH"

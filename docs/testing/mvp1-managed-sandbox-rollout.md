@@ -38,6 +38,38 @@ Keep the node's dispatch exclusion active throughout maintenance. If an operator
 5. Set the root-owned `0600` `/var/lib/ftrade-sandbox/facebook/native-profile.enabled` marker to exactly `1`. Stage only current, account-scoped private profile files and atomically update `manifest.json` last. Leave `inbox:false`; set `login:true` with `mode: "observe-only"` only when the ready-path review is current and verify factor routes refuse submissions. Do not place private profiles or factors in Git, a generic template, command output, or logs.
 6. Freeze Docker, request stop on the captured provider session, and read back that same session until it is stopped with a created snapshot. A returned stop request can still be snapshotting; do not restart staging to resolve that observation. Update the production application's `BROWSER_SANDBOX_AGENT_IMAGE_ID` and `BROWSER_SANDBOX_BROWSER_IMAGE_ID` to the inspected **local IDs** and select the matching verified credential-free template, then redeploy the final `main` build so the controller uses those values. Before queuing a task, verify the deployment, template and staged image IDs agree. A mismatch must fail closed; do not let the controller wake the old Agent.
 
+## First native profile for a new account
+
+Native-profile mode is enabled per node, but storage is initialized per account.
+Saving account authorization does not initialize Firefox storage. A new account
+without an owner manifest cannot pass browser health; queuing it repeatedly will
+not repair that condition. Runtime startup deliberately refuses to create a
+replacement for a missing historical profile.
+
+For an explicitly new account only, verify ownership, zero prior connected runs,
+no live/queued leases, and an existing, empty account volume with matching node
+and account labels. A missing volume or any existing contents require separate
+investigation or the existing-profile migration procedure. Never infer that an
+account is new merely because its profile is absent.
+
+During a bounded maintenance resume of the same owned Sandbox, with Agent and
+browser containers stopped, run the reviewed helper as root:
+
+```bash
+bash ops/browser-node/initialize-empty-native-profile.sh \
+  --new-empty-profile "$NODE_ID" "$ACCOUNT_ID" "$REVIEWED_BROWSER_IMAGE_ID"
+```
+
+The helper requires an immutable local native-profile image and an already
+existing volume with exact ownership labels. It refuses attached containers and
+nonempty storage, uses network-none maintenance with volume copying disabled,
+and calls only the image's explicit initializer. It neither starts Firefox nor
+changes existing account profiles. Verify the new private owner manifest, retain
+before/after fingerprints for existing profiles, then freeze Docker and stop the
+captured session. Confirm its completed recovery snapshot before queuing the
+account through the normal application UI. Subsequent starts reuse this profile;
+do not rerun initialization after any partial or completed result.
+
 ## Acceptance order
 
 1. Start only one interactive session for the bound account. The Agent must first check the existing profile, fixed HTTP-proxy egress and account identity. A current reviewed session-first profile should produce a durable `ready` result with **zero broker credential claims** and no password/TOTP/PIN submission. A loading page, network error or CAPTCHA is not evidence of logout; CAPTCHA requires human attention and cannot cause a login loop.
