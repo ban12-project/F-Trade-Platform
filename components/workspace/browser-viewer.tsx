@@ -34,7 +34,9 @@ export function BrowserViewer({ origin, token }: { origin: string; token: string
       }
     };
     window.addEventListener("message", listener);
-    // Covers a cached iframe whose initial notification preceded this effect.
+    // A prerendered frame can finish loading before React hydrates onLoad.
+    // Re-deliver the same ticket after subscribing; the viewer admits it once.
+    frame.current?.contentWindow?.postMessage({ type: "ftrade-browser-ticket", token }, origin);
     frame.current?.contentWindow?.postMessage({ type: "ftrade-browser-probe" }, origin);
     const timer = setTimeout(() => {
       if (!settled.current) setPhase("timeout");
