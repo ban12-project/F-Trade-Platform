@@ -705,12 +705,14 @@ try {
       );
       await observeWait(pid);
       const interactiveExpiry = new Date(Date.now() + 100);
-      if (kind === "interactive-expiry")
+      if (kind === "interactive-expiry") {
+        // Exercise a clock tick without changing the fixture's chosen deadline.
+        await delay(5);
         await held.query("UPDATE facebook_interactive_session SET expires_at=$1 WHERE id=$2", [
-          new Date(Date.now() + 100),
+          interactiveExpiry,
           f.interactiveId,
         ]);
-      else if (kind !== "unchanged") await change(f, kind, "connect");
+      } else if (kind !== "unchanged") await change(f, kind, "connect");
       if (kind === "natural-expiry" || kind === "interactive-expiry") await delay(130);
       const before = await snapshot(f);
       if (kind === "interactive-expiry") {
