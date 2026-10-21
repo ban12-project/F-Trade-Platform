@@ -9,7 +9,7 @@ import { z } from "zod";
 
 // Opt-in deployment artifact builder. Never run against an existing account VM.
 // Optional argv[2]: reviewed image bundle from export-browser-image-pair.sh.
-// Reuses exact local image IDs instead of rebuilding a different pair.
+// Reuses exact archive content; records destination-local IDs after verification.
 const image = z
   .object({
     id: z.string().regex(/^sha256:[a-f0-9]{64}$/),
@@ -68,6 +68,23 @@ await mkdir(output, { recursive: true, mode: 0o700 });
 const upstream = resolve(process.env.CAMOFOX_SOURCE_DIR ?? "ops/browser-node/upstream");
 const builderRevision = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const revision = bundle?.revision ?? builderRevision;
+const verifier = bundle
+  ? execFileSync("git", ["show", `${builderRevision}:scripts/verify-browser-image-bundle.py`])
+  : undefined;
+const bundleIdentity =
+  bundleDirectory && verifier
+    ? execFileSync(
+        "python3",
+        [
+          "-c",
+          verifier.toString("utf8"),
+          "archive",
+          resolve(bundleDirectory, "tested-images.tar.gz"),
+          resolve(bundleDirectory, "manifest.json"),
+        ],
+        { maxBuffer: 2_000_000 },
+      )
+    : undefined;
 const pin = execFileSync("git", ["show", `${revision}:ops/browser-node/camofox.ref`], {
   encoding: "utf8",
 }).trim();
@@ -106,6 +123,7 @@ const source = bundle
 let sandbox: Sandbox | undefined;
 let retainedSnapshotId: string | undefined;
 let images: { agent: string; browser: string } | undefined;
+let imageIdentityMapping: unknown;
 console.log(`Template build evidence: ${output}`);
 async function run(stage: string, script: string, timeoutMs: number) {
   assert.ok(sandbox);
@@ -171,16 +189,40 @@ try {
   );
   if (bundle && bundleDirectory) {
     await sandbox.currentSession().mkDir("/tmp/ftrade-image-chunks");
+    assert.ok(verifier && bundleIdentity);
+    await sandbox.currentSession().writeFiles([
+      { path: "/tmp/ftrade-image-verifier.py", content: verifier },
+      { path: "/tmp/ftrade-image-identity.json", content: bundleIdentity },
+    ]);
     let index = 0;
-    for await (const chunk of createReadStream(resolve(bundleDirectory, "tested-images.tar.gz"), {
-      highWaterMark: 16 * 1024 * 1024,
-    })) {
-      await sandbox
-        .currentSession()
-        .writeFiles([
-          { path: `/tmp/ftrade-image-chunks/${String(index++).padStart(6, "0")}`, content: chunk },
-        ]);
-      if (index % 16 === 0) console.log(`Uploaded ${index} image chunks`);
+    let pending: Promise<void>[] = [];
+    async function flushUploads() {
+      const results = await Promise.allSettled(pending);
+      pending = [];
+      assert.ok(
+        results.every((result) => result.status === "fulfilled"),
+        "image chunk upload failed",
+      );
+    }
+    try {
+      for await (const chunk of createReadStream(resolve(bundleDirectory, "tested-images.tar.gz"), {
+        highWaterMark: 16 * 1024 * 1024,
+      })) {
+        const upload = sandbox
+          .currentSession()
+          .writeFiles([
+            {
+              path: `/tmp/ftrade-image-chunks/${String(index++).padStart(6, "0")}`,
+              content: chunk,
+            },
+          ]);
+        void upload.catch(() => {});
+        pending.push(upload);
+        if (pending.length === 4) await flushUploads();
+        if (index % 16 === 0) console.log(`Uploaded ${index} image chunks`);
+      }
+    } finally {
+      if (pending.length) await flushUploads();
     }
     await run(
       "import-images",
@@ -189,14 +231,17 @@ try {
       echo '${archiveSha256}  /tmp/ftrade-images.tar.gz' | sha256sum -c -
       docker image load -i /tmp/ftrade-images.tar.gz
       test "$(docker image ls --all --no-trunc --format '{{.ID}}' | sort -u | wc -l)" -eq 2
-      for id in ${bundle.images.agent.id} ${bundle.images.browser.id}; do
-        test "$(docker image inspect --format '{{.Id}}' "$id")" = "$id"
-      done
-      docker tag ${bundle.images.agent.id} ftrade-sandbox-browser-node:test-amd64
-      docker tag ${bundle.images.browser.id} ftrade-sandbox-browser:test-amd64
-      rm -rf /tmp/ftrade-image-chunks /tmp/ftrade-images.tar.gz
+      python3 /tmp/ftrade-image-verifier.py destination /tmp/ftrade-image-identity.json > /tmp/ftrade-image-mapping.json
+      rm -rf /tmp/ftrade-image-chunks /tmp/ftrade-images.tar.gz /tmp/ftrade-image-verifier.py /tmp/ftrade-image-identity.json
     `,
       240000,
+    );
+    imageIdentityMapping = JSON.parse(
+      await run(
+        "image-identity",
+        "cat /tmp/ftrade-image-mapping.json; rm /tmp/ftrade-image-mapping.json",
+        30000,
+      ),
     );
   } else {
     await run(
@@ -274,6 +319,7 @@ await writeFile(
       expirationDays,
       imageSource: bundle ? "verified-bundle" : "source-build",
       archiveSha256,
+      imageIdentityMapping,
       agentImage: images.agent,
       browserImage: images.browser,
       imageSmoke: true,

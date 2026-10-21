@@ -16,6 +16,9 @@ on:
       - "scripts/test-browser-*.mjs"
       - "scripts/test-browser-*.mts"
       - "scripts/test-native-profile.mjs"
+      - "scripts/build-browser-sandbox-template.mts"
+      - "scripts/verify-browser-image-bundle.py"
+      - "scripts/test-browser-image-bundle.py"
       - "drizzle/**"
       - ".github/workflows/browser-node.yml"
 permissions:
@@ -51,6 +54,8 @@ jobs:
         with:
           cache: true
       - run: pnpm install --frozen-lockfile
+      - name: Cross-store image archive identity and refusal checks
+        run: python3 scripts/test-browser-image-bundle.py
       - name: Lease, capacity, gateway and isolation regression tests
         run: node --import tsx --test scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-viewer.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-native-profile.mjs scripts/test-browser-publication-inspection.mjs
       - name: On-demand Agent idle exit and session shutdown
