@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BrowserViewer } from "@/components/workspace/browser-viewer";
 import { PublicationPageInspectionPanel } from "@/components/workspace/publication-page-inspection-panel";
 import { SandboxRegistrationCard } from "@/components/workspace/sandbox-registration-card";
 import { SandboxStatus } from "@/components/workspace/sandbox-status";
@@ -77,7 +78,6 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection | null>(null);
-  const frame = useRef<HTMLIFrameElement>(null);
   const nodeForm = useForm<z.infer<typeof nodeFormSchema>>({
     resolver: zodResolver(nodeFormSchema),
     defaultValues: {
@@ -128,23 +128,6 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
     const timer = setTimeout(() => setKey(null), 120_000);
     return () => clearTimeout(timer);
   }, [key]);
-  useEffect(() => {
-    if (!connection) return;
-    const listener = (event: MessageEvent) => {
-      if (
-        event.source !== frame.current?.contentWindow ||
-        event.origin !== connection.origin ||
-        event.data?.type !== "ftrade-browser-ready"
-      )
-        return;
-      frame.current?.contentWindow?.postMessage(
-        { type: "ftrade-browser-ticket", token: connection.token },
-        connection.origin,
-      );
-    };
-    window.addEventListener("message", listener);
-    return () => window.removeEventListener("message", listener);
-  }, [connection]);
   async function send(input: unknown) {
     setBusy(true);
     setMessage("");
@@ -674,14 +657,10 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <iframe
+            <BrowserViewer
               key={connection.token}
-              ref={frame}
-              src={`${connection.origin}/viewer`}
-              title="账号登录与两步验证"
-              referrerPolicy="no-referrer"
-              sandbox="allow-scripts allow-same-origin"
-              className="h-[640px] w-full rounded border"
+              origin={connection.origin}
+              token={connection.token}
             />
             <div className="flex flex-col items-start gap-2">
               <Button

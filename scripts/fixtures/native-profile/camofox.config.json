@@ -2,7 +2,7 @@
   "plugins": {
     "persistence": { "enabled": true },
     "youtube": { "enabled": false },
-    "vnc": { "enabled": false },
+    "vnc": { "enabled": true, "resolution": "1440x900" },
     "ftrade-login": { "enabled": false },
     "ftrade-diagnostics": { "enabled": false },
     "ftrade-compatibility": { "enabled": false },
