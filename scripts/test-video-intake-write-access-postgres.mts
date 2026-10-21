@@ -160,18 +160,33 @@ async function snapshot(f: Fixture) {
     db
       .select()
       .from(schema.aggregateRecord)
-      .where(eq(schema.aggregateRecord.createdById, f.actorId)),
-    db.select().from(schema.auditEvent).where(eq(schema.auditEvent.actorId, f.actorId)),
+      .where(eq(schema.aggregateRecord.createdById, f.actorId))
+      .orderBy(schema.aggregateRecord.id),
+    db
+      .select()
+      .from(schema.auditEvent)
+      .where(eq(schema.auditEvent.actorId, f.actorId))
+      .orderBy(schema.auditEvent.id),
     db
       .select()
       .from(schema.workspaceProjectItem)
-      .where(eq(schema.workspaceProjectItem.projectId, f.projectId)),
-    db.select().from(schema.workspaceProject).where(eq(schema.workspaceProject.id, f.projectId)),
-    db.select().from(schema.evidence).where(eq(schema.evidence.uploadedById, f.actorId)),
+      .where(eq(schema.workspaceProjectItem.projectId, f.projectId))
+      .orderBy(schema.workspaceProjectItem.id),
+    db
+      .select()
+      .from(schema.workspaceProject)
+      .where(eq(schema.workspaceProject.id, f.projectId))
+      .orderBy(schema.workspaceProject.id),
+    db
+      .select()
+      .from(schema.evidence)
+      .where(eq(schema.evidence.uploadedById, f.actorId))
+      .orderBy(schema.evidence.id),
     db
       .select()
       .from(schema.videoUploadReceipt)
-      .where(eq(schema.videoUploadReceipt.ownerId, f.actorId)),
+      .where(eq(schema.videoUploadReceipt.ownerId, f.actorId))
+      .orderBy(schema.videoUploadReceipt.id),
   ]);
   const jobs = await db
     .select()
@@ -181,7 +196,8 @@ async function snapshot(f: Fixture) {
         schema.videoProcessingJob.videoProjectId,
         records.map((r) => r.id),
       ),
-    );
+    )
+    .orderBy(schema.videoProcessingJob.id);
   return { records, audits, links, projects, evidences, receipts, jobs };
 }
 async function observe(pid: number) {
@@ -243,6 +259,25 @@ const run = (f: Fixture, op: (typeof operations)[number]) =>
 let scenarios = 0;
 try {
   await migrate(db as unknown as Parameters<typeof migrate>[0], { migrationsFolder: "./drizzle" });
+  {
+    const f = await fixture();
+    const before = await snapshot(f);
+    assert(before.links.length >= 2);
+    // Reinsert the identical rows in reverse physical order, retaining every field.
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(schema.workspaceProjectItem)
+        .where(eq(schema.workspaceProjectItem.projectId, f.projectId));
+      await tx.insert(schema.workspaceProjectItem).values([...before.links].reverse());
+    });
+    assert.deepEqual(
+      await snapshot(f),
+      before,
+      "physical row order must not imply a business write",
+    );
+    assert.equal(workflowStarts, 0);
+    scenarios++;
+  }
   for (const op of operations)
     for (const role of ["admin", "user"] as const) {
       {
