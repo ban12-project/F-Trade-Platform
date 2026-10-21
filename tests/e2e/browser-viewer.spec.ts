@@ -54,3 +54,116 @@ test("messages from a sibling frame cannot report a connected desktop", async ({
   );
   await expect(page.getByRole("status")).not.toHaveText("远程桌面已连接。");
 });
+
+test("an independent viewer admits once in its owning window and closes without a reload", async ({
+  page,
+  context,
+}) => {
+  let loads = 0;
+  await context.route("http://127.0.0.1:9427/viewer", (route) => {
+    loads++;
+    return route.fulfill({
+      contentType: "text/html",
+      body: `<body>Isolated desktop<script>
+      let admitted=false;
+      addEventListener('message',e=>{
+        if(e.source!==parent||e.origin!==location.ancestorOrigins[0]||e.data.type!=='ftrade-browser-ticket'||admitted)return;
+        admitted=true;document.body.dataset.admissions='1';
+        parent.postMessage({type:'ftrade-browser-status',phase:'connected'},e.origin);
+      });
+    </script>`,
+    });
+  });
+  await page.clock.install();
+  await page.goto("/testing/browser-viewer");
+  const opened = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Open independent viewer" }).click();
+  const popup = await opened;
+  await expect(popup.getByRole("status")).toHaveText("远程桌面已连接。");
+  await expect(popup.frameLocator("iframe").locator("body")).toHaveAttribute(
+    "data-admissions",
+    "1",
+  );
+  expect(await popup.evaluate(() => window.opener === null)).toBe(true);
+  expect(popup.url()).not.toContain("isolated-viewer-fixture");
+  expect(
+    await popup.evaluate(() =>
+      Object.values(localStorage).some((value) => value.includes("isolated-viewer-fixture")),
+    ),
+  ).toBe(false);
+  await page.getByRole("button", { name: "Refresh fixture" }).click();
+  await expect(page.getByText("Fixture version: 1")).toBeVisible();
+  await page.clock.fastForward(30_001);
+  expect(popup.isClosed()).toBe(false);
+  await popup.close();
+  await expect(page.getByText("Independent viewer closed")).toBeVisible();
+  expect(loads).toBe(2);
+});
+
+test("a blocked independent window does not create a second viewer", async ({ page, context }) => {
+  let loads = 0;
+  await context.route("http://127.0.0.1:9427/viewer", (route) => {
+    loads++;
+    return route.fulfill({ contentType: "text/html", body: "<body>Isolated desktop</body>" });
+  });
+  await page.addInitScript(() => {
+    window.open = () => null;
+  });
+  await page.goto("/testing/browser-viewer");
+  await expect(page.frameLocator("iframe").locator("body")).toHaveText("Isolated desktop");
+  await page.getByRole("button", { name: "Open independent viewer" }).click();
+  await expect(page.getByText("Independent window blocked; no ticket requested")).toBeVisible();
+  expect(context.pages()).toHaveLength(1);
+  expect(loads).toBe(1);
+});
+
+test("an independent viewer rejects messages from its own host and the opener", async ({
+  page,
+  context,
+}) => {
+  await context.route("http://127.0.0.1:9427/viewer", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<body>Isolated unresponsive desktop</body>" }),
+  );
+  await page.goto("/testing/browser-viewer");
+  const opened = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Open independent viewer" }).click();
+  const popup = await opened;
+  await expect(popup.frameLocator("iframe").locator("body")).toHaveText(
+    "Isolated unresponsive desktop",
+  );
+  await page.evaluate(() =>
+    window.postMessage({ type: "ftrade-browser-status", phase: "connected" }, "*"),
+  );
+  await popup.evaluate(() =>
+    window.postMessage({ type: "ftrade-browser-status", phase: "connected" }, "*"),
+  );
+  await expect(popup.getByRole("status")).not.toHaveText("远程桌面已连接。");
+});
+
+test("the production viewer window requires an authorized platform session", async ({ page }) => {
+  await page.goto("/browser-viewer");
+  await expect(page).toHaveURL(/\/auth(?:[?#]|$)/);
+  await expect(page.locator('iframe[title="账号登录与两步验证"]')).toHaveCount(0);
+});
+
+test("a standalone window cannot authorize itself using its binding nonce", async ({ page }) => {
+  const nonce = "11111111-1111-4111-8111-111111111111";
+  await page.goto(`/testing/browser-viewer/window#${nonce}`);
+  await expect(page.getByRole("status")).toContainText("正在等待工作台");
+  await page.evaluate(async (nonce) => {
+    window.postMessage({ type: "ftrade-viewer-window-bind", nonce }, location.origin);
+    window.postMessage(
+      {
+        type: "ftrade-viewer-window-connection",
+        nonce,
+        connection: { origin: "http://127.0.0.1:9427", token: "isolated-viewer-fixture" },
+      },
+      location.origin,
+    );
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))),
+    );
+  }, nonce);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("正在等待工作台");
+});
