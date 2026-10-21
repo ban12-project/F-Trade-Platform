@@ -208,14 +208,12 @@ try {
       for await (const chunk of createReadStream(resolve(bundleDirectory, "tested-images.tar.gz"), {
         highWaterMark: 16 * 1024 * 1024,
       })) {
-        const upload = sandbox
-          .currentSession()
-          .writeFiles([
-            {
-              path: `/tmp/ftrade-image-chunks/${String(index++).padStart(6, "0")}`,
-              content: chunk,
-            },
-          ]);
+        const upload = sandbox.currentSession().writeFiles([
+          {
+            path: `/tmp/ftrade-image-chunks/${String(index++).padStart(6, "0")}`,
+            content: chunk,
+          },
+        ]);
         void upload.catch(() => {});
         pending.push(upload);
         if (pending.length === 4) await flushUploads();
