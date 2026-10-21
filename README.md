@@ -52,7 +52,7 @@ MVP1 视频从内容列表或已核验产品按需进入独立编辑器，把用
 - [产品目录接收清单模板](docs/testing/product-catalog-intake.template.md)
 - [官方渠道接入清单模板](docs/testing/channel-onboarding.template.md)
 - [Meta 规则与外贸 Facebook 社区流程研究](docs/reports/facebook-community-research-20261021.md)
-- [外贸 Facebook 社区 Playwright 实施规格](docs/architecture/facebook-community-playwright-plan.md)
+- [外贸 Facebook 社区筛选、内容与询盘流程（账号自动化暂缓）](docs/architecture/facebook-community-playwright-plan.md)
 - [Product Agent 验收矩阵](docs/testing/product-agent-acceptance.md)
 - [Product Agent 安全控制消融与 Issue 审计](docs/testing/product-safety-ablation.md)
 - [参考资料说明](docs/reference/README.md)
