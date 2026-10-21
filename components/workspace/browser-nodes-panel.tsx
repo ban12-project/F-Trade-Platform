@@ -26,6 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BrowserViewer } from "@/components/workspace/browser-viewer";
+import {
+  BrowserViewerWindow,
+  openViewerWindow,
+  type ViewerWindow,
+  viewerWindowIsOpen,
+} from "@/components/workspace/browser-viewer-window";
 import { PublicationPageInspectionPanel } from "@/components/workspace/publication-page-inspection-panel";
 import { SandboxRegistrationCard } from "@/components/workspace/sandbox-registration-card";
 import { SandboxStatus } from "@/components/workspace/sandbox-status";
@@ -78,6 +84,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection | null>(null);
+  const [viewerWindow, setViewerWindow] = useState<ViewerWindow | null>(null);
   const nodeForm = useForm<z.infer<typeof nodeFormSchema>>({
     resolver: zodResolver(nodeFormSchema),
     defaultValues: {
@@ -609,6 +616,8 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                           size="sm"
                           disabled={busy}
                           onClick={async () => {
+                            setConnection(null);
+                            setViewerWindow(null);
                             const result = await send({
                               operation: "ticket",
                               nodeId: node.id,
@@ -623,6 +632,44 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                           }}
                         >
                           {run.ticketUsed ? "重新授权连接" : "接入登录 / 2FA"}
+                        </Button>
+                      )}
+                    {run.kind === "interactive" &&
+                      run.status === "running" &&
+                      !run.stopRequested && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={async () => {
+                            const popup = openViewerWindow();
+                            if (!popup) {
+                              setMessage(
+                                "浏览器未能打开独立窗口。请允许本次弹出窗口后再次点击；尚未申请连接票据。",
+                              );
+                              return;
+                            }
+                            setConnection(null);
+                            setViewerWindow(popup);
+                            const result = await send({
+                              operation: "ticket",
+                              nodeId: node.id,
+                              runId: run.id,
+                            });
+                            if (result?.connection && viewerWindowIsOpen(popup)) {
+                              setConnection({
+                                ...result.connection,
+                                nodeId: node.id,
+                                runId: run.id,
+                              });
+                            } else {
+                              popup.window.close();
+                              setViewerWindow(null);
+                            }
+                          }}
+                        >
+                          独立窗口接入
                         </Button>
                       )}
                     {run.kind === "interactive" && (
@@ -657,11 +704,15 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <BrowserViewer
-              key={connection.token}
-              origin={connection.origin}
-              token={connection.token}
-            />
+            {viewerWindow ? (
+              <p role="status">接管画面已在独立窗口打开。</p>
+            ) : (
+              <BrowserViewer
+                key={connection.token}
+                origin={connection.origin}
+                token={connection.token}
+              />
+            )}
             <div className="flex flex-col items-start gap-2">
               <Button
                 type="button"
@@ -691,12 +742,24 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                   runId: connection.runId,
                 });
                 setConnection(null);
+                setViewerWindow(null);
               }}
             >
               结束接管并释放浏览器
             </Button>
           </CardContent>
         </Card>
+      )}
+      {viewerWindow && (
+        <BrowserViewerWindow
+          popup={viewerWindow}
+          onClosed={() => {
+            setConnection(null);
+            setViewerWindow(null);
+            setMessage("独立窗口已关闭。继续操作前请核对当前任务，再重新授权连接。");
+          }}
+          connection={connection ? { origin: connection.origin, token: connection.token } : null}
+        />
       )}
     </div>
   );
