@@ -93,6 +93,26 @@ export async function initializeNativeProfile({ root = "/data", accountId, nodeI
   );
 }
 
+// Persistent Firefox can restore a window larger than the current Xvfb desktop.
+// Fit the headed context at launch instead of editing its saved profile files.
+export function nativeProfileLaunchOptions(options, environment) {
+  if (environment.ENABLE_VNC !== "1") return options;
+  const match = /^(\d{3,4})x(\d{3,4})(?:x(?:16|24|32))?$/.exec(
+    environment.VNC_RESOLUTION ?? "1440x900",
+  );
+  if (!match) throw new Error("native_profile_display_invalid");
+  const width = Number(match[1]),
+    height = Number(match[2]);
+  if (width < 800 || width > 3840 || height < 600 || height > 2160)
+    throw new Error("native_profile_display_invalid");
+  // Reserve space for Firefox chrome and window borders inside the desktop.
+  return {
+    ...options,
+    viewport: { width: width - 80, height: height - 140 },
+    deviceScaleFactor: 1,
+  };
+}
+
 export function createNativeProfileRuntime({
   firefox,
   environment = process.env,
@@ -167,9 +187,11 @@ export function createNativeProfileRuntime({
         throw new Error("native_profile_migration_source_changed");
       // Firefox owns the OS-level exclusive profile lock, including across
       // containers. Never remove its lock files or fall back to a temp profile.
-      const candidate = await firefox.launchPersistentContext(p.profile, options).catch(() => {
-        throw new Error("native_profile_launch_failed");
-      });
+      const candidate = await firefox
+        .launchPersistentContext(p.profile, nativeProfileLaunchOptions(options, environment))
+        .catch(() => {
+          throw new Error("native_profile_launch_failed");
+        });
       try {
         await active();
         if (legacy) {

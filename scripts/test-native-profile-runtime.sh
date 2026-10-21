@@ -31,6 +31,7 @@ start() {
     -v "$volume:/data" \
     -v "$fixture:/app/plugins/synthetic-profile:ro" \
     -v "$fixture/camofox.config.json:/app/camofox.config.json:ro" \
+    -e ENABLE_VNC=1 -e VNC_RESOLUTION=1440x900 -e VNC_BIND=127.0.0.1 -e VNC_PASSWORD=native41 \
     -e FTRADE_NATIVE_PROFILE=1 \
     -e FTRADE_PROFILE_ACCOUNT_ID=22222222-2222-4222-8222-222222222222 \
     -e FTRADE_PROFILE_NODE_ID=11111111-1111-4111-8111-111111111111 \
@@ -60,4 +61,12 @@ docker exec "$name" node /app/plugins/synthetic-profile/client.mjs read keep-ses
 docker stop -t 20 "$name" >/dev/null
 test "$(docker inspect --format '{{.State.Running}}' "$name")" = false
 test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
+# Read only the synthetic window geometry after graceful Firefox shutdown.
+docker run --rm --network none -v "$volume:/data:ro" --entrypoint node "$NATIVE_PROFILE_IMAGE" -e '
+const fs=require("node:fs"),assert=require("node:assert/strict");
+const d=JSON.parse(fs.readFileSync("/data/native-profile-v1/firefox/xulstore.json","utf8"));
+const w=d["chrome://browser/content/browser.xhtml"]["main-window"];
+assert.ok(Number(w.width)>0 && Number(w.width)<=1440, "window exceeds remote desktop width");
+assert.ok(Number(w.height)>0 && Number(w.height)<=900, "window exceeds remote desktop height");
+console.log("PASS oversized persistent window fitted; profile cookie and nonextractable key preserved");'
 printf 'PASS: native profile API task reuse, container replacement and expired lease shutdown\n'

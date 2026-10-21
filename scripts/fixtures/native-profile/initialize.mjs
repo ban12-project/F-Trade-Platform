@@ -32,3 +32,20 @@ await writeFile(
   { mode: 0o600, flag: "wx" },
 );
 await initializeNativeProfile({ accountId, nodeId, source: "legacy-json" });
+
+// Reproduce a profile saved on a larger desktop; startup must fit Xvfb without reset.
+await writeFile(
+  "/data/native-profile-v1/firefox/xulstore.json",
+  JSON.stringify({
+    "chrome://browser/content/browser.xhtml": {
+      "main-window": {
+        screenX: "0",
+        screenY: "0",
+        width: "3840",
+        height: "2160",
+        sizemode: "normal",
+      },
+    },
+  }),
+  { mode: 0o600, flag: "wx" },
+);

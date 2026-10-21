@@ -8,6 +8,7 @@ import { containerSpec } from "../ops/browser-node/docker.mjs";
 import {
   createNativeProfileRuntime,
   initializeNativeProfile,
+  nativeProfileLaunchOptions,
 } from "../ops/browser-node/native-profile.mjs";
 import { patchNativeProfileSource } from "../ops/browser-node/patch-native-profile.mjs";
 
@@ -209,4 +210,28 @@ test("timed-out observation retains one in-flight native launch until it settles
     f.browser,
   );
   assert.equal(attempts, 2);
+});
+
+test("headed native windows fit the configured desktop without changing proxy or profile state", async (t) => {
+  const f = await fixture(t);
+  await f.initialize("empty");
+  const options = {
+    viewport: null,
+    proxy: { server: "http://fixed.invalid:3128" },
+    args: ["-no-remote"],
+  };
+  await f.runtime({ ENABLE_VNC: "1", VNC_RESOLUTION: "1440x900" }).launch(options);
+  assert.deepEqual(f.options().viewport, { width: 1360, height: 760 });
+  assert.equal(f.options().deviceScaleFactor, 1);
+  assert.equal(f.options().proxy, options.proxy);
+  assert.equal(f.options().args, options.args);
+  assert.equal(options.viewport, null);
+  assert.equal(f.counts().imports, 0);
+  assert.equal(nativeProfileLaunchOptions(options, {}), options);
+  for (const resolution of ["640x480", "4000x900", "1440x900junk", "1440x9999", "1440;runx900"]) {
+    assert.throws(
+      () => nativeProfileLaunchOptions(options, { ENABLE_VNC: "1", VNC_RESOLUTION: resolution }),
+      /display_invalid/,
+    );
+  }
 });
