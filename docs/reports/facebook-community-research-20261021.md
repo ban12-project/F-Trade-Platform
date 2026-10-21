@@ -9,7 +9,7 @@ meta:
 
 本文供外贸运营与研发评审 Facebook 社区流程。研究优先采用 Meta 公开说明，再对照外贸交流材料；没有找到足以验证“养若干天即可安全自动化”的证据。保留流程请查看[社区筛选、内容与询盘流程](../architecture/facebook-community-playwright-plan.md)，新增线上动作由 [Decision #623](https://github.com/ban12-project/F-Trade-Platform/issues/623) 跟踪。
 
-2026-10-21 范围调整：保留社区筛选、内容准备和询盘流程；依赖该账号的 Playwright 开发暂缓，#624 保留为待恢复任务。文中的自动化建议仅作设计参考。
+2026-10-21 范围调整：保留社区筛选、内容准备和询盘流程；依赖该账号的 Playwright 开发暂缓，#624 按项目方决定以“没有计划”关闭。文中的自动化建议仅作设计参考。
 
 ## 研究计划与证据分级
 

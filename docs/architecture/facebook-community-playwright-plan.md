@@ -112,6 +112,6 @@ GitHub 只保存合成 fixture、规则与测试结果。真实群名单、帖�
 
 ## 实现交付与线上试点的区分
 
-[任务 #624](https://github.com/ban12-project/F-Trade-Platform/issues/624) 保持开放并标记暂缓；恢复后再评审 schema、拒绝策略、状态机、测试和页面适配的实施顺序。线上启用需要 #623 的明确结论、适用平台权限依据、当前群规、已审核页面配置及单社区验收；任何缺项都保持新增功能关闭。
+[任务 #624](https://github.com/ban12-project/F-Trade-Platform/issues/624) 按项目方决定以“没有计划”关闭，自动化设计仅作参考；如需恢复，另行明确范围并创建研发任务。线上启用需要 #623 的明确结论、适用平台权限依据、当前群规、已审核页面配置及单社区验收；任何缺项都保持新增功能关闭。
 
 本规格不修改现有 Product、Content、RFQ、Quotation 或 Workflow 契约。后续实现若扩展这些契约，须同步 schema、fixture、迁移和人工确认流程。
