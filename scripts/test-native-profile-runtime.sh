@@ -66,6 +66,7 @@ docker run --rm --network none -v "$volume:/data:ro" --entrypoint node "$NATIVE_
 const fs=require("node:fs"),assert=require("node:assert/strict");
 const d=JSON.parse(fs.readFileSync("/data/native-profile-v1/firefox/xulstore.json","utf8"));
 const w=d["chrome://browser/content/browser.xhtml"]["main-window"];
+console.log("Persisted synthetic window geometry:", JSON.stringify(w));
 assert.ok(Number(w.width)>0 && Number(w.width)<=1440, "window exceeds remote desktop width");
 assert.ok(Number(w.height)>0 && Number(w.height)<=900, "window exceeds remote desktop height");
 console.log("PASS oversized persistent window fitted; profile cookie and nonextractable key preserved");'
