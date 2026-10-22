@@ -6,7 +6,7 @@ import deliveryFixture from "../data/fixtures/delivery-confirmation.synthetic.js
 import rfqFixture from "../data/fixtures/rfq-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
-import { listProjectLeads } from "../lib/sales/closing-store";
+import { listProjectLeads, saveFollowUpPlan } from "../lib/sales/closing-store";
 import { suggestFromInquiryHistory } from "../lib/sales/inquiry-suggestions";
 import { salesRelations } from "../lib/sales/journey";
 import { readSalesJourney } from "../lib/sales/journey-store";
@@ -475,6 +475,101 @@ void (async () => {
     "Matching payload references do not authorize an unowned RFQ",
   );
   await assert.rejects(listProjectLeads(project, outsider, db), /不是该项目成员/);
+  // Internal planning must not depend on a channel, inbound window or Gate 03.
+  const planLead = await db.query.aggregateRecord.findFirst({
+    where: eq(schema.aggregateRecord.id, leadA),
+  });
+  assert(planLead);
+  const initialPayload = {
+    ...planLead.payload,
+    status: "follow_up",
+    last_outbound_ref: "synthetic-existing-send",
+  };
+  await db
+    .update(schema.aggregateRecord)
+    .set({ state: "FOLLOW_UP", payload: initialPayload })
+    .where(eq(schema.aggregateRecord.id, leadA));
+  const plan = {
+    projectId: project,
+    leadId: leadA,
+    context: "asks_lead_time",
+    triggeredRules: ["active_inquiry", "asks_lead_time"],
+    nextFollowUpAt: "2026-11-01T10:00:00+08:00",
+  };
+  const beforeJobs = await db.select().from(schema.socialBrowserJob);
+  const beforeMessages = await db.select().from(schema.socialMessage);
+  await saveFollowUpPlan(plan, owner, db);
+  const planned = await db.query.aggregateRecord.findFirst({
+    where: eq(schema.aggregateRecord.id, leadA),
+  });
+  assert(planned);
+  assert.equal(planned.state, "FOLLOW_UP");
+  assert.equal(planned.payload.next_follow_up_at, "2026-11-01T02:00:00.000Z");
+  assert.equal(planned.payload.score, 30);
+  assert.equal(planned.payload.next_action, "request_factory_delivery_confirmation");
+  assert.equal(planned.payload.last_outbound_ref, initialPayload.last_outbound_ref);
+  assert.deepEqual(await db.select().from(schema.socialBrowserJob), beforeJobs);
+  assert.deepEqual(await db.select().from(schema.socialMessage), beforeMessages);
+  await assert.rejects(saveFollowUpPlan(plan, viewer, db));
+  await assert.rejects(saveFollowUpPlan(plan, outsider, db));
+  await assert.rejects(saveFollowUpPlan({ ...plan, leadId: foreignLead }, owner, db));
+  await assert.rejects(
+    saveFollowUpPlan({ ...plan, nextFollowUpAt: "2026-11-01T10:00" }, owner, db),
+  );
+  await db
+    .update(schema.workspaceProject)
+    .set({ status: "archived" })
+    .where(eq(schema.workspaceProject.id, project));
+  await assert.rejects(saveFollowUpPlan(plan, owner, db), /归档/);
+  await db
+    .update(schema.workspaceProject)
+    .set({ status: "active" })
+    .where(eq(schema.workspaceProject.id, project));
+  assert.deepEqual(
+    await db.query.aggregateRecord.findFirst({ where: eq(schema.aggregateRecord.id, leadA) }),
+    planned,
+  );
+  await db.insert(schema.socialChannelControl).values({
+    id: randomUUID(),
+    changedBy: owner,
+    changedAt: new Date(),
+    pauseReason: "synthetic paused channel",
+    channelRef: "synthetic-plan-" + project,
+    accountRef: "synthetic-plan",
+    enabled: false,
+    circuitStatus: "paused",
+  });
+  const pausedConversation = randomUUID();
+  await db.insert(schema.socialConversation).values({
+    id: pausedConversation,
+    lastMessageAt: new Date(),
+    channelRef: "synthetic-plan-" + project,
+    accountRef: "synthetic-plan",
+    externalConversationRef: randomUUID(),
+    leadId: leadA,
+  });
+  await db
+    .update(schema.aggregateRecord)
+    .set({ payload: { ...planned.payload, conversation_ref: pausedConversation } })
+    .where(eq(schema.aggregateRecord.id, leadA));
+  await saveFollowUpPlan({ ...plan, nextFollowUpAt: "" }, owner, db);
+  const cleared = await db.query.aggregateRecord.findFirst({
+    where: eq(schema.aggregateRecord.id, leadA),
+  });
+  assert.equal(cleared?.payload.next_follow_up_at, undefined);
+  const planAudits = await db
+    .select()
+    .from(schema.auditEvent)
+    .where(
+      and(
+        eq(schema.auditEvent.aggregateId, leadA),
+        eq(schema.auditEvent.action, "lead.follow_up_plan_saved"),
+      ),
+    );
+  assert.equal(planAudits.length, 2);
+  console.log(
+    "PASS internal follow-up plan, offset time, clearing, access isolation and zero outbound effects",
+  );
   await db
     .delete(schema.workspaceProjectMember)
     .where(

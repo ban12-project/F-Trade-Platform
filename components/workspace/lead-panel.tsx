@@ -51,10 +51,12 @@ import {
   confirmOpportunityAction,
   recordFollowUpAction,
   requestDeliveryAction,
+  saveFollowUpPlanAction,
 } from "@/lib/actions/closing";
 import {
   deliveryRequestFormSchema,
   followUpFormSchema,
+  followUpPlanFormSchema,
   opportunityDecisionFormSchema,
 } from "@/lib/form-schemas";
 import type { DeliveryConfirmationEntry, LeadEntry } from "@/lib/sales/closing-store";
@@ -67,9 +69,20 @@ import {
 } from "./submission-feedback";
 import { WorkspaceLink } from "./workspace-link";
 
+function localDateTime(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
 function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntry }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(recordFollowUpAction, initialClosingActionState);
+  const [planState, planAction, planPending] = useActionState(
+    saveFollowUpPlanAction,
+    initialClosingActionState,
+  );
   const form = useForm<z.infer<typeof followUpFormSchema>>({
     resolver: zodResolver(followUpFormSchema),
     defaultValues: {
@@ -86,6 +99,12 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       nextFollowUpAt: "",
     },
   });
+  useEffect(() => {
+    if (!form.getFieldState("nextFollowUpAt").isDirty)
+      form.resetField("nextFollowUpAt", {
+        defaultValue: localDateTime(entry.lead.next_follow_up_at),
+      });
+  }, [form, entry.lead.next_follow_up_at]);
   const context = form.watch("context");
   const requiresDeliveryConfirmation = context === "asks_lead_time" || context === "asks_sample";
   const canSend =
@@ -97,10 +116,43 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       router.refresh();
     }
   }, [form, router, state]);
+  useEffect(() => {
+    if (planState.status === "success") {
+      for (const key of ["context", "triggeredRules", "nextFollowUpAt"] as const)
+        form.resetField(key, { defaultValue: form.getValues(key) });
+      router.refresh();
+    }
+  }, [form, router, planState]);
+  function savePlan() {
+    const value = form.getValues();
+    const date = value.nextFollowUpAt ? new Date(value.nextFollowUpAt) : null;
+    if (date && Number.isNaN(date.getTime())) {
+      form.setError("nextFollowUpAt", { message: "下次跟进时间无效。" });
+      return;
+    }
+    const parsed = followUpPlanFormSchema.safeParse({
+      ...value,
+      nextFollowUpAt: date?.toISOString() ?? "",
+    });
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues)
+        form.setError(issue.path[0] as keyof typeof value, { message: issue.message });
+      return;
+    }
+    form.clearErrors(["context", "triggeredRules", "nextFollowUpAt"]);
+    const data = new FormData();
+    for (const [key, item] of Object.entries(parsed.data)) {
+      if (key === "triggeredRules") for (const rule of item as string[]) data.append(key, rule);
+      else data.set(key, String(item));
+    }
+    startTransition(() => planAction(data));
+  }
   function submit(value: z.infer<typeof followUpFormSchema>) {
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) {
       if (key === "triggeredRules") for (const rule of item as string[]) data.append(key, rule);
+      else if (key === "nextFollowUpAt" && item)
+        data.set(key, new Date(String(item)).toISOString());
       else data.set(key, String(item));
     }
     startTransition(() => action(data));
@@ -110,141 +162,162 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       <CardHeader>
         <CardTitle>人工跟进</CardTitle>
         <CardDescription>
-          AI 建议只作为可编辑草稿。提交时系统会重新检查成员权限、渠道状态和 60
-          分钟回复窗口；正文只加密保存在受限消息时间线中。
+          可单独保存场景、评分和跟进时间，留空时间可取消提醒。发送时系统会重新检查成员权限、渠道状态和
+          60 分钟回复窗口；正文只加密保存在受限消息时间线中。
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form id={`follow-up-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
-          <FieldGroup>
-            <Field data-invalid={!!form.formState.errors.context}>
-              <FieldLabel htmlFor={`context-${entry.id}`}>当前场景</FieldLabel>
-              <Controller
-                control={form.control}
-                name="context"
-                render={({ field }) => (
-                  <Select
-                    items={Object.fromEntries(contexts)}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      aria-invalid={!!form.formState.errors.context}
-                      id={`context-${entry.id}`}
-                      className="w-full"
+          <FieldSet disabled={pending || planPending}>
+            <FieldGroup>
+              <Field data-invalid={!!form.formState.errors.context}>
+                <FieldLabel htmlFor={`context-${entry.id}`}>当前场景</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="context"
+                  render={({ field }) => (
+                    <Select
+                      items={Object.fromEntries(contexts)}
+                      value={field.value}
+                      onValueChange={field.onChange}
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {contexts.map(([id, label]) => (
-                          <SelectItem key={id} value={id}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[form.formState.errors.context]} />
-            </Field>
-            {requiresDeliveryConfirmation ? (
-              entry.confirmedDelivery ? (
-                <Alert>
-                  <AlertTitle>
-                    将插入已确认交期：{entry.confirmedDelivery.leadTimeDays} 天
-                  </AlertTitle>
-                  <AlertDescription>
-                    交期确认有效至{" "}
-                    {new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(
-                      new Date(entry.confirmedDelivery.validUntil),
-                    )}
-                    。交期句由服务端插入，请勿写入自由文本。
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Alert
-                  variant="destructive"
-                  className="*:data-[slot=alert-description]:text-destructive"
-                >
-                  <AlertTitle>需要工厂确认交期</AlertTitle>
-                  <AlertDescription>
-                    请先创建交期确认请求并等待管理员批准；未批准或过期的交期不能进入回复。
-                  </AlertDescription>
-                </Alert>
-              )
-            ) : null}
-            <FieldSet>
-              <FieldLegend>评分事实</FieldLegend>
-              <FieldDescription>只勾选本轮消息中有可观察证据的行为。</FieldDescription>
-              <FieldGroup>
-                {scoringRules.map(([id, label]) => (
-                  <Field key={id} orientation="horizontal">
-                    <Controller
-                      control={form.control}
-                      name="triggeredRules"
-                      render={({ field }) => (
-                        <Checkbox
-                          id={`${entry.id}-${id}`}
-                          checked={field.value.includes(id)}
-                          onCheckedChange={(checked) =>
-                            field.onChange(
-                              checked
-                                ? [...field.value, id]
-                                : field.value.filter((item) => item !== id),
-                            )
-                          }
-                        />
+                      <SelectTrigger
+                        aria-invalid={!!form.formState.errors.context}
+                        id={`context-${entry.id}`}
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {contexts.map(([id, label]) => (
+                            <SelectItem key={id} value={id}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError errors={[form.formState.errors.context]} />
+              </Field>
+              {requiresDeliveryConfirmation ? (
+                entry.confirmedDelivery ? (
+                  <Alert>
+                    <AlertTitle>
+                      将插入已确认交期：{entry.confirmedDelivery.leadTimeDays} 天
+                    </AlertTitle>
+                    <AlertDescription>
+                      交期确认有效至{" "}
+                      {new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(
+                        new Date(entry.confirmedDelivery.validUntil),
                       )}
-                    />
-                    <FieldLabel htmlFor={`${entry.id}-${id}`}>{label}</FieldLabel>
-                    <FieldError errors={[form.formState.errors.triggeredRules]} />
-                  </Field>
-                ))}
-              </FieldGroup>
-            </FieldSet>
-            <Field data-invalid={!!form.formState.errors.draft}>
-              <FieldLabel htmlFor={`draft-${entry.id}`}>待人工发送内容</FieldLabel>
-              <Textarea
-                id={`draft-${entry.id}`}
-                rows={5}
-                aria-invalid={!!form.formState.errors.draft}
-                {...form.register("draft")}
-              />
-              <FieldDescription>
-                不要在自由文本中填写交期；选择交期或样品场景后，系统只会插入当前有效的交期确认
-                结果。
-              </FieldDescription>
-              <FieldError errors={[form.formState.errors.draft]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.confirmationRef}>
-              <FieldLabel htmlFor={`confirmation-${entry.id}`}>本次人工确认凭据</FieldLabel>
-              <Input
-                id={`confirmation-${entry.id}`}
-                aria-invalid={!!form.formState.errors.confirmationRef}
-                {...form.register("confirmationRef")}
-              />
-              <FieldDescription>
-                每次发送使用一个脱敏证据引用；重复提交同一引用不会重复发送。
-              </FieldDescription>
-              <FieldError errors={[form.formState.errors.confirmationRef]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.nextFollowUpAt}>
-              <FieldLabel htmlFor={`next-${entry.id}`}>下次跟进时间（可选）</FieldLabel>
-              <Input
-                id={`next-${entry.id}`}
-                type="datetime-local"
-                {...form.register("nextFollowUpAt")}
-                aria-invalid={!!form.formState.errors.nextFollowUpAt}
-              />
-              <FieldError errors={[form.formState.errors.nextFollowUpAt]} />
-            </Field>
-          </FieldGroup>
+                      。交期句由服务端插入，请勿写入自由文本。
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert
+                    variant="destructive"
+                    className="*:data-[slot=alert-description]:text-destructive"
+                  >
+                    <AlertTitle>需要工厂确认交期</AlertTitle>
+                    <AlertDescription>
+                      请先创建交期确认请求并等待管理员批准；未批准或过期的交期不能进入回复。
+                    </AlertDescription>
+                  </Alert>
+                )
+              ) : null}
+              <FieldSet>
+                <FieldLegend>评分事实</FieldLegend>
+                <FieldDescription>只勾选本轮消息中有可观察证据的行为。</FieldDescription>
+                <FieldGroup>
+                  {scoringRules.map(([id, label]) => (
+                    <Field key={id} orientation="horizontal">
+                      <Controller
+                        control={form.control}
+                        name="triggeredRules"
+                        render={({ field }) => (
+                          <Checkbox
+                            disabled={pending || planPending}
+                            id={`${entry.id}-${id}`}
+                            checked={field.value.includes(id)}
+                            onCheckedChange={(checked) =>
+                              field.onChange(
+                                checked
+                                  ? [...field.value, id]
+                                  : field.value.filter((item) => item !== id),
+                              )
+                            }
+                          />
+                        )}
+                      />
+                      <FieldLabel htmlFor={`${entry.id}-${id}`}>{label}</FieldLabel>
+                      <FieldError errors={[form.formState.errors.triggeredRules]} />
+                    </Field>
+                  ))}
+                </FieldGroup>
+              </FieldSet>
+              <Field data-invalid={!!form.formState.errors.draft}>
+                <FieldLabel htmlFor={`draft-${entry.id}`}>待人工发送内容</FieldLabel>
+                <Textarea
+                  id={`draft-${entry.id}`}
+                  rows={5}
+                  aria-invalid={!!form.formState.errors.draft}
+                  {...form.register("draft")}
+                />
+                <FieldDescription>
+                  不要在自由文本中填写交期；选择交期或样品场景后，系统只会插入当前有效的交期确认
+                  结果。
+                </FieldDescription>
+                <FieldError errors={[form.formState.errors.draft]} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.confirmationRef}>
+                <FieldLabel htmlFor={`confirmation-${entry.id}`}>本次人工确认凭据</FieldLabel>
+                <Input
+                  id={`confirmation-${entry.id}`}
+                  aria-invalid={!!form.formState.errors.confirmationRef}
+                  {...form.register("confirmationRef")}
+                />
+                <FieldDescription>
+                  每次发送使用一个脱敏证据引用；重复提交同一引用不会重复发送。
+                </FieldDescription>
+                <FieldError errors={[form.formState.errors.confirmationRef]} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.nextFollowUpAt}>
+                <FieldLabel htmlFor={`next-${entry.id}`}>下次跟进时间（可选）</FieldLabel>
+                <Input
+                  id={`next-${entry.id}`}
+                  type="datetime-local"
+                  {...form.register("nextFollowUpAt")}
+                  aria-invalid={!!form.formState.errors.nextFollowUpAt}
+                />
+                <FieldError errors={[form.formState.errors.nextFollowUpAt]} />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button form={`follow-up-${entry.id}`} type="submit" disabled={pending || !canSend}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={savePlan}
+          disabled={pending || planPending}
+        >
+          {planPending ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <Clock3Icon data-icon="inline-start" />
+          )}
+          保存跟进计划
+        </Button>
+        <Message {...planState} />
+        <Button
+          form={`follow-up-${entry.id}`}
+          type="submit"
+          disabled={pending || planPending || !canSend}
+        >
           {pending ? (
             <Spinner data-icon="inline-start" />
           ) : (

@@ -12,6 +12,7 @@ import {
   deliveryDecisionFormSchema,
   deliveryRequestFormSchema,
   followUpFormSchema,
+  followUpPlanFormSchema,
   inboundRoutingFormSchema,
   opportunityDecisionFormSchema,
   publicationConfirmationFormSchema,
@@ -26,6 +27,7 @@ import {
   decideDelivery,
   decideQuotation,
   recordFollowUp,
+  saveFollowUpPlan,
   sendQuotation,
 } from "@/lib/sales/closing-store";
 import { SocialHumanAccessError, socialHumanFailureMessage } from "@/lib/social/human-write-access";
@@ -92,6 +94,25 @@ export async function sendQuotationAction(
     return resultError(error);
   }
 }
+export async function saveFollowUpPlanAction(
+  _previous: ClosingActionState,
+  formData: FormData,
+): Promise<ClosingActionState> {
+  try {
+    const actorId = await actor("sales:write");
+    const parsed = followUpPlanFormSchema.safeParse({
+      ...values(formData),
+      triggeredRules: formData.getAll("triggeredRules"),
+    });
+    if (!parsed.success) return resultError(parsed.error);
+    const saved = await saveFollowUpPlan(parsed.data, actorId);
+    refresh(parsed.data.projectId);
+    return { status: "success", message: "跟进计划已保存，未发送客户消息。", id: saved.id };
+  } catch (error) {
+    return resultError(error, "无法保存跟进计划。");
+  }
+}
+
 export async function recordFollowUpAction(
   _previous: ClosingActionState,
   formData: FormData,

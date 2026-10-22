@@ -316,6 +316,27 @@ test("expired delivery can be requested again through the authenticated UI witho
   await expect(
     page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
   ).toBeDisabled();
+  const plannedTime = "2030-11-01T10:00";
+  await page.getByLabel("待人工发送内容", { exact: true }).fill("MOCK unsent draft stays editable");
+  await page.getByLabel("下次跟进时间（可选）", { exact: true }).fill(plannedTime);
+  await page.getByRole("button", { name: "保存跟进计划", exact: true }).click();
+  await expect(page.getByText("跟进计划已保存，未发送客户消息。", { exact: true })).toBeVisible();
+  const [planned] = await db
+    .select()
+    .from(schema.aggregateRecord)
+    .where(eq(schema.aggregateRecord.id, leadId));
+  expect(planned.payload.next_follow_up_at).toBeTruthy();
+  expect(planned.payload.delivery_confirmation_ref).toBe(original.id);
+  expect(planned.payload.last_outbound_ref).toBeUndefined();
+  await expect(page.getByLabel("待人工发送内容", { exact: true })).toHaveValue(
+    "MOCK unsent draft stays editable",
+  );
+  await page.getByLabel("待人工发送内容", { exact: true }).fill("");
+  await page.reload();
+  await expect(page.getByLabel("下次跟进时间（可选）", { exact: true })).toHaveValue(plannedTime);
+  await expect(
+    page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
+  ).toBeDisabled();
   await page.getByLabel("请求证据", { exact: true }).filter({ visible: true }).fill(evidenceId);
   await page.getByRole("button", { name: "申请工厂确认交期", exact: true }).click();
   const readLead = async () =>
