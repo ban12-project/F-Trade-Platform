@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import deliveryFixture from "../data/fixtures/delivery-confirmation.synthetic.json";
 import rfqFixture from "../data/fixtures/rfq-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
 import { listProjectLeads } from "../lib/sales/closing-store";
-import { suggestFromLatestInquiry } from "../lib/sales/inquiry-suggestions";
+import { suggestFromInquiryHistory } from "../lib/sales/inquiry-suggestions";
 import { salesRelations } from "../lib/sales/journey";
 import { readSalesJourney } from "../lib/sales/journey-store";
 import { listProjectRfqEntries } from "../lib/sales/store";
@@ -166,7 +166,7 @@ void (async () => {
   ]);
   const beforeSuggestions = await db.select().from(schema.aggregateRecord);
   const input = { projectId: project, leadId: leadB };
-  const suggestion = await suggestFromLatestInquiry(input, owner, db);
+  const suggestion = await suggestFromInquiryHistory(input, owner, db);
   assert.deepEqual(suggestion.source, {
     ...input,
     conversationId: conversationB,
@@ -184,24 +184,72 @@ void (async () => {
     !JSON.stringify(suggestion).includes(structuredBody),
     "No raw message body or DB record is returned",
   );
+  const historyIds: string[] = [];
+  const addReply = async (body: string) => {
+    const id = randomUUID();
+    historyIds.push(id);
+    await db.insert(schema.socialMessage).values(
+      createStoredSocialMessageRecord({
+        id,
+        conversationId: conversationB,
+        externalMessageRef: `synthetic-${id}`,
+        direction: "inbound",
+        identityQuality: "manual",
+        body,
+        receivedAt: new Date(),
+      }),
+    );
+    return id;
+  };
+  // A newer reply must not hide product information supplied earlier.
+  const repeatedQuantity = await addReply("500 pcs");
+  const history = await suggestFromInquiryHistory(input, owner, db);
+  assert.deepEqual(history.fields, suggestion.fields);
+  assert(history.fieldSources.quantity?.includes(repeatedQuantity));
+  assert(history.fieldSources.oeNumber?.includes(suggestionMessageId));
+  const conflictingQuantity = await addReply("600 pcs");
+  const conflict = await suggestFromInquiryHistory(input, owner, db);
+  assert.equal(conflict.fields.quantity, undefined);
+  assert(conflict.conflicts.includes("quantity"));
+  assert.equal(conflict.fields.oeNumber, "SYN-OE-499");
+  await db
+    .update(schema.socialMessage)
+    .set({ receivedAt: new Date(Date.now() - 2000), expiresAt: new Date(Date.now() - 1000) })
+    .where(eq(schema.socialMessage.id, conflictingQuantity));
+  assert.equal((await suggestFromInquiryHistory(input, owner, db)).fields.quantity, "500");
+  await db
+    .update(schema.socialMessage)
+    .set({ expiresAt: new Date(Date.now() + 60_000), deletedAt: new Date() })
+    .where(eq(schema.socialMessage.id, conflictingQuantity));
+  assert.equal((await suggestFromInquiryHistory(input, owner, db)).fields.quantity, "500");
+  await addReply("500 or 600 pcs");
+  assert((await suggestFromInquiryHistory(input, owner, db)).conflicts.includes("quantity"));
+  await db.delete(schema.socialMessage).where(inArray(schema.socialMessage.id, historyIds));
+  historyIds.length = 0;
+  // The response states its bounded window instead of implying the whole history was read.
+  for (let i = 0; i < 31; i++) await addReply("Synthetic greeting");
+  const bounded = await suggestFromInquiryHistory(input, owner, db);
+  assert.equal(bounded.messages.length, 30);
+  assert.equal(bounded.truncated, true);
+  await db.delete(schema.socialMessage).where(inArray(schema.socialMessage.id, historyIds));
   for (const actor of [viewer, outsider])
-    await assert.rejects(suggestFromLatestInquiry(input, actor, db), /编辑权限/);
+    await assert.rejects(suggestFromInquiryHistory(input, actor, db), /编辑权限/);
   for (const leadId of [leadA, leadC, foreignLead, randomUUID()])
-    await assert.rejects(suggestFromLatestInquiry({ ...input, leadId }, owner, db), /没有|会话/);
+    await assert.rejects(suggestFromInquiryHistory({ ...input, leadId }, owner, db), /没有|会话/);
   await assert.rejects(
-    suggestFromLatestInquiry({ ...input, message: "untrusted client text" }, owner, db),
+    suggestFromInquiryHistory({ ...input, message: "untrusted client text" }, owner, db),
   );
   await db
     .update(schema.socialMessage)
     .set({ deletedAt: new Date() })
     .where(eq(schema.socialMessage.id, suggestionMessageId));
-  const fallback = await suggestFromLatestInquiry(input, owner, db);
+  const fallback = await suggestFromInquiryHistory(input, owner, db);
   assert.deepEqual(fallback.fields, {}, "Deleted/outbound messages must not be parsed");
   await db
     .update(schema.socialMessage)
     .set({ deletedAt: new Date() })
     .where(eq(schema.socialMessage.id, fallback.source.messageId));
-  await assert.rejects(suggestFromLatestInquiry(input, owner, db), /保留期/);
+  await assert.rejects(suggestFromInquiryHistory(input, owner, db), /保留期/);
   await db
     .update(schema.socialMessage)
     .set({ deletedAt: null })
@@ -214,12 +262,12 @@ void (async () => {
     .update(schema.workspaceProject)
     .set({ status: "archived" })
     .where(eq(schema.workspaceProject.id, project));
-  await assert.rejects(suggestFromLatestInquiry(input, owner, db), /已归档/);
+  await assert.rejects(suggestFromInquiryHistory(input, owner, db), /已归档/);
   await db
     .update(schema.workspaceProject)
     .set({ status: "active", kind: "marketing" })
     .where(eq(schema.workspaceProject.id, project));
-  await assert.rejects(suggestFromLatestInquiry(input, owner, db), /销售机会/);
+  await assert.rejects(suggestFromInquiryHistory(input, owner, db), /销售机会/);
   await db
     .update(schema.workspaceProject)
     .set({ kind: "sales" })
@@ -231,7 +279,10 @@ void (async () => {
     role: "editor",
     createdById: owner,
   });
-  assert.deepEqual((await suggestFromLatestInquiry(input, outsider, db)).fields, suggestion.fields);
+  assert.deepEqual(
+    (await suggestFromInquiryHistory(input, outsider, db)).fields,
+    suggestion.fields,
+  );
   await db
     .delete(schema.workspaceProjectMember)
     .where(
@@ -240,7 +291,7 @@ void (async () => {
         eq(schema.workspaceProjectMember.userId, outsider),
       ),
     );
-  await assert.rejects(suggestFromLatestInquiry(input, outsider, db), /编辑权限/);
+  await assert.rejects(suggestFromInquiryHistory(input, outsider, db), /编辑权限/);
   assert.deepEqual(
     await db.select().from(schema.aggregateRecord),
     beforeSuggestions,
@@ -434,7 +485,7 @@ void (async () => {
     );
   await assert.rejects(listProjectLeads(project, viewer, db), /不是该项目成员/);
   console.log(
-    "Synthetic sales context: conversation ownership, latest history, RFQ addressability and delivery boundaries passed.",
+    "Synthetic sales context: conversation ownership, bounded inquiry history and provenance, RFQ addressability and delivery boundaries passed.",
   );
 })()
   .finally(closeDatabase)

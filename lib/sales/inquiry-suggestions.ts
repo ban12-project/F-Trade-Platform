@@ -13,7 +13,7 @@ import {
 import { inquirySuggestionFieldsSchema, inquirySuggestionRequestSchema } from "@/lib/form-schemas";
 import { decryptSocialMessageBody } from "@/lib/social/message-crypto";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
-import { applyInquiryMessage } from "./clarification";
+import { INQUIRY_HISTORY_LIMIT, summarizeInquiryMessages } from "./inquiry-history";
 
 export type InquirySuggestion = {
   source: {
@@ -24,11 +24,15 @@ export type InquirySuggestion = {
     receivedAt: string;
   };
   fields: z.infer<typeof inquirySuggestionFieldsSchema>;
+  fieldSources: ReturnType<typeof summarizeInquiryMessages>["fieldSources"];
+  conflicts: ReturnType<typeof summarizeInquiryMessages>["conflicts"];
+  messages: { id: string; receivedAt: string }[];
+  truncated: boolean;
 };
 export class InquiryUnavailableError extends Error {}
 
 /** Customer requirements only. No RFQ write, engineering verification, gate, price or outbound effect. */
-export async function suggestFromLatestInquiry(
+export async function suggestFromInquiryHistory(
   input: unknown,
   actorId: string,
   database: Database = getDatabase(),
@@ -59,7 +63,7 @@ export async function suggestFromLatestInquiry(
     if (typeof conversationId !== "string")
       throw new InquiryUnavailableError("该线索没有可整理的客户会话。");
     const now = new Date();
-    const [message] = await tx
+    const rows = await tx
       .select({
         id: socialMessage.id,
         bodyCiphertext: socialMessage.bodyCiphertext,
@@ -78,20 +82,19 @@ export async function suggestFromLatestInquiry(
         ),
       )
       .orderBy(desc(socialMessage.receivedAt), desc(socialMessage.id))
-      .limit(1);
+      .limit(INQUIRY_HISTORY_LIMIT + 1);
+    const messages = rows.slice(0, INQUIRY_HISTORY_LIMIT).reverse();
+    const message = messages.at(-1);
     if (!message)
       throw new InquiryUnavailableError("没有仍在保留期内的客户入站消息，请手动录入需求。");
-    const draft = applyInquiryMessage(
-      { product: {}, commercial: {} },
-      decryptSocialMessageBody(message.bodyCiphertext),
+    const summary = summarizeInquiryMessages(
+      messages.map((entry) => ({
+        id: entry.id,
+        receivedAt: entry.receivedAt.toISOString(),
+        body: decryptSocialMessageBody(entry.bodyCiphertext),
+      })),
     );
-    const fields = inquirySuggestionFieldsSchema.parse({
-      ...(draft.product.oe_number ? { oeNumber: draft.product.oe_number } : {}),
-      ...(draft.product.vehicle_brand ? { vehicleBrand: draft.product.vehicle_brand } : {}),
-      ...(draft.product.vehicle_model ? { vehicleModel: draft.product.vehicle_model } : {}),
-      ...(draft.commercial.quantity ? { quantity: String(draft.commercial.quantity) } : {}),
-      ...(draft.commercial.destination ? { destination: draft.commercial.destination } : {}),
-    });
+    const fields = inquirySuggestionFieldsSchema.parse(summary.fields);
     return {
       source: {
         ...value,
@@ -100,6 +103,13 @@ export async function suggestFromLatestInquiry(
         receivedAt: message.receivedAt.toISOString(),
       },
       fields,
+      fieldSources: summary.fieldSources,
+      conflicts: summary.conflicts,
+      messages: messages.map((entry) => ({
+        id: entry.id,
+        receivedAt: entry.receivedAt.toISOString(),
+      })),
+      truncated: rows.length > INQUIRY_HISTORY_LIMIT,
     };
   });
 }

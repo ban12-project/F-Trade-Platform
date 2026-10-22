@@ -94,7 +94,7 @@ test.afterAll(async () => {
   await pool.end();
 });
 
-test("latest inbound suggestions preserve manual edits and require a separate RFQ save", async ({
+test("inbound history suggestions preserve manual edits and require a separate RFQ save", async ({
   page,
   context,
   baseURL,
@@ -195,7 +195,7 @@ test("latest inbound suggestions preserve manual edits and require a separate RF
       await route.fulfill({ response });
     } else await route.continue();
   });
-  await page.getByRole("button", { name: "从最新客户消息整理建议", exact: true }).click();
+  await page.getByRole("button", { name: "从客户消息整理建议", exact: true }).click();
   try {
     await expect.poll(() => held).toBe(true);
     await expect(page.getByRole("button", { name: "保存询盘", exact: true })).toBeDisabled();
@@ -203,12 +203,13 @@ test("latest inbound suggestions preserve manual edits and require a separate RF
   } finally {
     releaseResponse();
   }
-  await expect(page.locator('p[role="status"]')).toContainText("已整理 3 项建议到空白字段");
+  await expect(page.locator('p[role="status"]')).toContainText("已整理 2 项建议到空白字段");
   await expect(page.getByLabel("OE / OEM 编号", { exact: true })).toHaveValue("SYN-MANUAL");
   await expect(page.getByLabel("数量", { exact: true })).toHaveValue("750");
   await expect(page.getByLabel("车辆品牌", { exact: true })).toHaveValue("Toyota");
   await expect(page.getByLabel("车型", { exact: true })).toHaveValue("Corolla");
-  await expect(page.getByLabel("目的地国家或港口", { exact: true })).toHaveValue("Synthetic Port");
+  await expect(page.getByLabel("目的地国家或港口", { exact: true })).toHaveValue("");
+  await expect(page.getByText("需要人工核对：数量、目的地。", { exact: false })).toBeVisible();
   await expect(page.getByText(`来源消息 ${newest.id.slice(0, 8)}`, { exact: false })).toBeVisible();
   expect(await readRfqs()).toEqual([]);
   await page.getByLabel("目的地国家或港口", { exact: true }).fill("");
