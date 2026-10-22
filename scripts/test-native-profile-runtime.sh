@@ -58,6 +58,8 @@ test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
 docker rm "$name" >/dev/null
 start
 docker exec "$name" node /app/plugins/synthetic-profile/client.mjs read keep-session
+# Observe actual X11 geometry as well as Firefox persisted geometry.
+docker exec "$name" sh -ec 'for socket in /tmp/.X11-unix/X*; do DISPLAY=":${socket##*X}" xwininfo -root -tree; done'
 docker stop -t 20 "$name" >/dev/null
 test "$(docker inspect --format '{{.State.Running}}' "$name")" = false
 test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
