@@ -284,6 +284,10 @@ test("iframe has exact frame-ancestor policy and unauthorized admission fails", 
       page.headers.get("content-security-policy"),
       /frame-ancestors https:\/\/app.example/,
     );
+    assert.match(
+      page.headers.get("content-security-policy"),
+      /sandbox allow-scripts allow-same-origin/,
+    );
     assert.equal(page.headers.get("cache-control"), "no-store");
     assert.equal(page.headers.get("referrer-policy"), "no-referrer");
     await page.text();

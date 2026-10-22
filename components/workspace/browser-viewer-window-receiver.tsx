@@ -2,13 +2,8 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { BrowserViewer } from "@/components/workspace/browser-viewer";
-import {
-  type ViewerWindowConnection,
-  viewerWindowMessageSchema,
-} from "@/lib/browser-fleet/viewer-window-contract";
+import { viewerWindowMessageSchema } from "@/lib/browser-fleet/viewer-window-contract";
 export function BrowserViewerWindowReceiver() {
-  const [connection, setConnection] = useState<ViewerWindowConnection | null>(null);
   const [message, setMessage] = useState("正在等待工作台的本次连接授权…");
   useEffect(() => {
     document.title = "F-Trade 浏览器接管";
@@ -44,7 +39,10 @@ export function BrowserViewerWindowReceiver() {
       } else if (parsed.data.type === "ftrade-viewer-window-connection" && host === event.source) {
         accepted = true;
         clearTimeout(timer);
-        setConnection(parsed.data.connection);
+        setMessage("正在打开远程桌面…");
+        // Only the binding identifier travels through navigation. The parent
+        // delivers the one-use ticket after this document reaches the gateway.
+        window.location.replace(`${parsed.data.connection.origin}/viewer#${nonce.data}`);
       }
     };
     window.addEventListener("message", listener);
@@ -55,11 +53,7 @@ export function BrowserViewerWindowReceiver() {
   }, []);
   return (
     <div className="flex flex-col gap-4">
-      {connection ? (
-        <BrowserViewer origin={connection.origin} token={connection.token} />
-      ) : (
-        <p role="status">{message}</p>
-      )}
+      <p role="status">{message}</p>
       <Button type="button" variant="outline" onClick={() => window.close()}>
         关闭接管窗口
       </Button>

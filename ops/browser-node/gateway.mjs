@@ -68,7 +68,7 @@ export function createGateway({
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader(
       "Content-Security-Policy",
-      `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors ${appOrigin}`,
+      `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors ${appOrigin}; sandbox allow-scripts allow-same-origin`,
     );
     const fail = () => {
       if (!response.headersSent) response.writeHead(403);
@@ -132,7 +132,7 @@ export function createGateway({
       }
       if (request.method === "POST" && request.url === "/admit") {
         const origin = request.headers.origin;
-        // Admission comes from our own iframe, not arbitrary cross-origin forms.
+        // Admission comes from our own viewer document, never cross-origin forms.
         if (!origin || ![...slots.values()].some((s) => s.gatewayOrigin === origin)) return fail();
         const input = await readBody(request);
         if (typeof input.ticket !== "string" || Object.keys(input).length !== 1) return fail();

@@ -6,7 +6,12 @@ import { runInNewContext } from "node:vm";
 const source = readFileSync(new URL("../ops/browser-node/viewer.js", import.meta.url), "utf8")
   .replace('"__APP_ORIGIN__"', '"https://app.example"')
   .replace("await import(module)", "await loadRfb(module)");
-function fixture({ fetchResult, loadResult } = {}) {
+function fixture({
+  fetchResult,
+  loadResult,
+  standalone = false,
+  hash = "#11111111-1111-4111-8111-111111111111",
+} = {}) {
   const events = new Map(),
     timers = new Map(),
     messages = [],
@@ -32,10 +37,12 @@ function fixture({ fetchResult, loadResult } = {}) {
       this.events.get(name)?.();
     }
   }
+  const window = { parent, addEventListener: (name, listener) => events.set(name, listener) };
+  if (standalone) window.parent = window;
   runInNewContext(source, {
-    window: { parent, addEventListener: (name, listener) => events.set(name, listener) },
+    window,
     document: { getElementById: () => status },
-    location: { host: "gateway.example" },
+    location: { host: "gateway.example", hash },
     AbortSignal,
     setInterval: (fn, ms) => {
       timers.set(++id, { fn, ms, repeat: true });
@@ -62,6 +69,7 @@ function fixture({ fetchResult, loadResult } = {}) {
     loadRfb: loadResult ?? (async () => ({ default: RFB })),
   });
   return {
+    self: window,
     status,
     messages,
     requests,
@@ -168,4 +176,33 @@ test("rejected admission, module errors, security failure and page close stay cl
   g.hide();
   assert.equal(g.instances[0].disconnected, 1);
   assert.equal(g.timers.size, 0);
+});
+
+test("standalone viewer binds the platform probe and rejects unbound, self and foreign sources", async () => {
+  const nonce = "11111111-1111-4111-8111-111111111111";
+  const f = fixture({ standalone: true });
+  const probe = { type: "ftrade-browser-probe", nonce };
+  const boundTicket = { ...ticket, nonce };
+  await f.send(boundTicket);
+  await f.send(probe, { source: f.self });
+  await f.send(probe, { origin: "https://evil.example" });
+  await f.send({ ...probe, nonce: "wrong" });
+  assert.equal(f.requests.length, 0);
+  assert.equal(f.messages.length, 0);
+  await f.send(probe);
+  assert.equal(f.messages.at(-1).data.nonce, nonce);
+  await f.send(boundTicket, { source: {} });
+  await f.send(ticket);
+  assert.equal(f.requests.length, 0);
+  await f.send(boundTicket);
+  await f.send(boundTicket);
+  assert.equal(f.requests.length, 1);
+  assert.equal(f.self.opener, null);
+  assert.ok(f.messages.every((m) => !JSON.stringify(m.data).includes(ticket.token)));
+  for (const hash of ["", "#wrong"]) {
+    const g = fixture({ standalone: true, hash });
+    await g.send(probe);
+    await g.send(boundTicket);
+    assert.equal(g.requests.length, 0);
+  }
 });

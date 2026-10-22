@@ -64,12 +64,17 @@ test("an independent viewer admits once in its owning window and closes without 
     loads++;
     return route.fulfill({
       contentType: "text/html",
+      headers: { "Content-Security-Policy": "sandbox allow-scripts allow-same-origin" },
       body: `<body>Isolated desktop<script>
       let admitted=false;
       addEventListener('message',e=>{
-        if(e.source!==parent||e.origin!==location.ancestorOrigins[0]||e.data.type!=='ftrade-browser-ticket'||admitted)return;
+        if(parent!==window) return;
+        if(e.data.nonce!==location.hash.slice(1))return;
+        if(e.data.type==='ftrade-browser-probe') {
+          e.source.postMessage({type:'ftrade-browser-ready',nonce:e.data.nonce},e.origin);return;
+        }
+        if(e.data.type!=='ftrade-browser-ticket'||admitted)return;
         admitted=true;document.body.dataset.admissions='1';
-        parent.postMessage({type:'ftrade-browser-status',phase:'connected'},e.origin);
       });
     </script>`,
     });
@@ -79,11 +84,9 @@ test("an independent viewer admits once in its owning window and closes without 
   const opened = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Open independent viewer" }).click();
   const popup = await opened;
-  await expect(popup.getByRole("status")).toHaveText("远程桌面已连接。");
-  await expect(popup.frameLocator("iframe").locator("body")).toHaveAttribute(
-    "data-admissions",
-    "1",
-  );
+  await expect(popup.locator("body")).toHaveAttribute("data-admissions", "1");
+  await expect(popup.locator("iframe")).toHaveCount(0);
+  await expect(popup).toHaveURL(/^http:\/\/127\.0\.0\.1:9427\/viewer#/);
   expect(await popup.evaluate(() => window.opener === null)).toBe(true);
   expect(popup.url()).not.toContain("isolated-viewer-fixture");
   expect(
@@ -128,16 +131,15 @@ test("an independent viewer rejects messages from its own host and the opener", 
   const opened = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Open independent viewer" }).click();
   const popup = await opened;
-  await expect(popup.frameLocator("iframe").locator("body")).toHaveText(
-    "Isolated unresponsive desktop",
-  );
+  await expect(popup.locator("body")).toHaveText("Isolated unresponsive desktop");
+  await expect(popup.locator("iframe")).toHaveCount(0);
   await page.evaluate(() =>
     window.postMessage({ type: "ftrade-browser-status", phase: "connected" }, "*"),
   );
   await popup.evaluate(() =>
     window.postMessage({ type: "ftrade-browser-status", phase: "connected" }, "*"),
   );
-  await expect(popup.getByRole("status")).not.toHaveText("远程桌面已连接。");
+  await expect(popup.locator("body")).toHaveText("Isolated unresponsive desktop");
 });
 
 test("the production viewer window requires an authorized platform session", async ({ page }) => {

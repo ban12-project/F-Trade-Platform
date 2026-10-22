@@ -1,5 +1,13 @@
 const appOrigin = "__APP_ORIGIN__";
 const status = document.getElementById("status");
+const standalone = window.parent === window;
+const nonce = standalone ? location.hash.slice(1) : null;
+const validNonce =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(nonce ?? "");
+let host = standalone ? null : window.parent;
+// The gateway never retains an opener. A platform probe binds the exact source
+// window; the nonce alone is not an admission capability.
+if (standalone) window.opener = null;
 let admitted = false;
 let finished = false;
 let rfb;
@@ -14,7 +22,10 @@ const messages = {
   timeout: "连接超时。请在平台核对任务后重新连接；本次不会自动重试。",
 };
 function report() {
-  window.parent.postMessage({ type: "ftrade-browser-status", phase }, appOrigin);
+  host?.postMessage(
+    { type: "ftrade-browser-status", phase, ...(standalone ? { nonce } : {}) },
+    appOrigin,
+  );
 }
 function update(next) {
   phase = next;
@@ -22,7 +33,7 @@ function update(next) {
   report();
 }
 function ready() {
-  window.parent.postMessage({ type: "ftrade-browser-ready" }, appOrigin);
+  host?.postMessage({ type: "ftrade-browser-ready", ...(standalone ? { nonce } : {}) }, appOrigin);
 }
 function finish(next) {
   if (finished) return;
@@ -38,7 +49,13 @@ const readiness = setInterval(() => {
 }, 500);
 const deadline = setTimeout(() => finish("timeout"), 30_000);
 window.addEventListener("message", async (event) => {
-  if (event.source !== window.parent || event.origin !== appOrigin || finished) return;
+  if (event.origin !== appOrigin || finished) return;
+  if (standalone) {
+    if (!validNonce || event.data?.nonce !== nonce || !event.source || event.source === window)
+      return;
+    if (!host && event.data?.type === "ftrade-browser-probe") host = event.source;
+  }
+  if (!host || event.source !== host) return;
   if (event.data?.type === "ftrade-browser-probe") {
     report();
     if (!admitted) ready();
