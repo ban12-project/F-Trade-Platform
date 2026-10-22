@@ -60,6 +60,13 @@ test("an independent viewer admits once in its owning window and closes without 
   context,
 }) => {
   let loads = 0;
+  // The remote document must be the first popup navigation. A slow or blocked
+  // platform receiver cannot delay the one-use ticket handshake.
+  await context.route("**/testing/browser-viewer/window*", (route) => route.abort());
+  const navigations: string[] = [];
+  context.on("request", (request) => {
+    if (request.isNavigationRequest()) navigations.push(request.url());
+  });
   await context.route("http://127.0.0.1:9427/viewer", (route) => {
     loads++;
     return route.fulfill({
@@ -101,6 +108,10 @@ test("an independent viewer admits once in its owning window and closes without 
   await popup.close();
   await expect(page.getByText("Independent viewer closed")).toBeVisible();
   expect(loads).toBe(2);
+  expect(navigations.filter((url) => !url.endsWith("/testing/browser-viewer"))).toEqual([
+    "http://127.0.0.1:9427/viewer",
+    "http://127.0.0.1:9427/viewer",
+  ]);
 });
 
 test("a blocked independent window does not create a second viewer", async ({ page, context }) => {
@@ -168,4 +179,37 @@ test("a standalone window cannot authorize itself using its binding nonce", asyn
   }, nonce);
   await expect(page.locator("iframe")).toHaveCount(0);
   await expect(page.getByRole("status")).toContainText("正在等待工作台");
+});
+
+test("a direct window waits for the server ticket after its initial ready message", async ({
+  page,
+  context,
+}) => {
+  await context.route("http://127.0.0.1:9427/viewer", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      headers: { "Content-Security-Policy": "sandbox allow-scripts allow-same-origin" },
+      body: `<body>Pending desktop<script>
+      let admissions = 0;
+      addEventListener('message', e => {
+        if(parent !== window || e.data.nonce !== location.hash.slice(1)) return;
+        if(e.data.type === 'ftrade-browser-probe') {
+          document.body.dataset.ready='yes';
+          e.source.postMessage({type:'ftrade-browser-ready',nonce:e.data.nonce},e.origin);
+        }
+        if(e.data.type === 'ftrade-browser-ticket') document.body.dataset.admissions=String(++admissions);
+      });
+    </script>`,
+    }),
+  );
+  await page.goto("/testing/browser-viewer");
+  const opened = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Open pending independent viewer" }).click();
+  const popup = await opened;
+  await expect(popup.locator("body")).toHaveAttribute("data-ready", "yes");
+  await expect(popup.locator("body")).not.toHaveAttribute("data-admissions");
+  await page.getByRole("button", { name: "Authorize pending viewer" }).click();
+  await expect(popup.locator("body")).toHaveAttribute("data-admissions", "1");
+  await page.getByRole("button", { name: "Refresh fixture" }).click();
+  await expect(popup.locator("body")).toHaveAttribute("data-admissions", "1");
 });

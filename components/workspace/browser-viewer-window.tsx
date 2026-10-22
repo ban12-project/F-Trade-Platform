@@ -1,32 +1,21 @@
 "use client";
 import { useEffect, useEffectEvent, useRef } from "react";
-import {
-  type ViewerWindowConnection,
-  viewerWindowMessageSchema,
-} from "@/lib/browser-fleet/viewer-window-contract";
-export type ViewerWindow = { window: Window; nonce: string; path: string };
-export function openViewerWindow(
-  path: "/browser-viewer" | "/testing/browser-viewer/window" = "/browser-viewer",
-): ViewerWindow | null {
+import type { ViewerWindowConnection } from "@/lib/browser-fleet/viewer-window-contract";
+export type ViewerWindow = { window: Window; nonce: string; origin: string };
+export function openViewerWindow(origin: string | null): ViewerWindow | null {
+  if (!origin) return null;
+  const gateway = URL.parse(origin);
+  if (!gateway || !["https:", "http:"].includes(gateway.protocol) || gateway.origin !== origin)
+    return null;
   const nonce = crypto.randomUUID();
-  const url = new URL(path, window.location.href);
-  url.hash = nonce;
-  const popup = window.open(url.href, "_blank", "popup,width=1440,height=960");
+  const popup = window.open(`${origin}/viewer#${nonce}`, "_blank", "popup,width=1440,height=960");
   if (!popup) return null;
+  // The gateway stays unauthenticated until the server action returns its ticket.
   popup.opener = null;
-  return { window: popup, nonce, path };
+  return { window: popup, nonce, origin };
 }
 export function viewerWindowIsOpen(popup: ViewerWindow) {
-  try {
-    if (popup.window.closed) return false;
-    const href = popup.window.location.href;
-    return (
-      href === "about:blank" ||
-      (new URL(href).origin === window.location.origin && new URL(href).pathname === popup.path)
-    );
-  } catch {
-    return false;
-  }
+  return !popup.window.closed;
 }
 export function BrowserViewerWindow({
   popup,
@@ -43,44 +32,30 @@ export function BrowserViewerWindow({
     gatewayOrigin = connection?.origin;
   useEffect(() => {
     current.current = popup;
-    let delivered = false;
     let gatewayDelivered = false;
     const started = Date.now();
     const closeOwned = () => {
       if (!popup.window.closed) popup.window.close();
     };
     const listener = (event: MessageEvent) => {
-      if (event.source !== popup.window || !token || !gatewayOrigin) return;
-      if (event.origin === gatewayOrigin && delivered && !gatewayDelivered) {
-        if (event.data?.type !== "ftrade-browser-ready" || event.data?.nonce !== popup.nonce)
-          return;
-        popup.window.postMessage(
-          { type: "ftrade-browser-ticket", nonce: popup.nonce, token },
-          gatewayOrigin,
-        );
-        gatewayDelivered = true;
-        return;
-      }
-      if (event.origin !== window.location.origin || delivered) return;
-      const parsed = viewerWindowMessageSchema.safeParse(event.data);
       if (
-        !parsed.success ||
-        parsed.data.type !== "ftrade-viewer-window-ready" ||
-        parsed.data.nonce !== popup.nonce
+        event.source !== popup.window ||
+        event.origin !== popup.origin ||
+        gatewayOrigin !== popup.origin ||
+        !token ||
+        gatewayDelivered ||
+        event.data?.type !== "ftrade-browser-ready" ||
+        event.data?.nonce !== popup.nonce
       )
         return;
       popup.window.postMessage(
-        {
-          type: "ftrade-viewer-window-connection",
-          nonce: popup.nonce,
-          connection: { origin: gatewayOrigin, token },
-        },
-        window.location.origin,
+        { type: "ftrade-browser-ticket", nonce: popup.nonce, token },
+        popup.origin,
       );
-      delivered = true;
+      gatewayDelivered = true;
     };
     const bind = () => {
-      if (popup.window.closed || (!delivered && !viewerWindowIsOpen(popup))) {
+      if (!viewerWindowIsOpen(popup)) {
         closed();
         return;
       }
@@ -89,15 +64,10 @@ export function BrowserViewerWindow({
         closed();
         return;
       }
-      if (!delivered)
-        popup.window.postMessage(
-          { type: "ftrade-viewer-window-bind", nonce: popup.nonce },
-          window.location.origin,
-        );
-      else if (!gatewayDelivered && gatewayOrigin)
+      if (!gatewayDelivered)
         popup.window.postMessage(
           { type: "ftrade-browser-probe", nonce: popup.nonce },
-          gatewayOrigin,
+          popup.origin,
         );
     };
     window.addEventListener("message", listener);

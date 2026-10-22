@@ -643,7 +643,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                           variant="outline"
                           disabled={busy}
                           onClick={async () => {
-                            const popup = openViewerWindow();
+                            const popup = openViewerWindow(node.gatewayOrigin);
                             if (!popup) {
                               setMessage(
                                 "浏览器未能打开独立窗口。请允许本次弹出窗口后再次点击；尚未申请连接票据。",
