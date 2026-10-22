@@ -112,7 +112,7 @@ export function nativeProfileWindowSize(environment) {
 
 export function nativeProfileLaunchOptions(options, environment) {
   if (!nativeProfileWindowSize(environment)) return options;
-  return { ...options, viewport: null, deviceScaleFactor: 1 };
+  return { ...options, viewport: null, deviceScaleFactor: undefined };
 }
 
 export function createNativeProfileRuntime({

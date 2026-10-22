@@ -228,7 +228,7 @@ test("headed native windows fit the configured desktop without changing proxy or
     [1400, 860],
   );
   assert.equal(nativeProfileWindowSize({}), undefined);
-  assert.equal(f.options().deviceScaleFactor, 1);
+  assert.equal(f.options().deviceScaleFactor, undefined);
   assert.equal(f.options().proxy, options.proxy);
   assert.equal(f.options().args, options.args);
   assert.equal(options.viewport, null);
