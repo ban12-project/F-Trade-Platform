@@ -1,6 +1,6 @@
 # MVP1 当前验收状态
 
-核对日期：2026-10-22。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#332](https://github.com/ban12-project/F-Trade-Platform/issues/332)。**MVP1 总验收未完成；用户当前要求继续 MVP1 功能迭代，暂停 DM 验收。** 本轮新业务资料仅使用 `docs/reference/`，旧合成项目归档并保留原审计；受控消息不计作真实客户询盘。新运行时、模板与生产部署的工程证据见[接管修复与交付报告](reports/sandbox-viewer-rollout-20261022.md)。下文标注的 2026-10-15 状态属于历史检查点，不能代替本轮实测。
+核对日期：2026-10-23。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#332](https://github.com/ban12-project/F-Trade-Platform/issues/332)。**MVP1 总验收未完成；用户当前要求继续 MVP1 功能迭代，暂停 DM 验收。** 本轮新业务资料仅使用 `docs/reference/`，旧合成项目归档并保留原审计；受控消息不计作真实客户询盘。新运行时、模板与生产部署的工程证据见[接管修复与交付报告](reports/sandbox-viewer-rollout-20261022.md)。下文标注的 2026-10-15 状态属于历史检查点，不能代替本轮实测。
 
 ## 范围与证据基线
 
@@ -19,7 +19,8 @@
 - **浏览器升级已交付**：PR #643 的运行时 `bc5c7679247f59946531a2423e60b7cfd77f86fd` 使用 Camoufox `158.0-beta.40`。精确制品、无凭据云模板、合成原生档案停启恢复、原实例离线升级及生产选择已有分别核对的证据，详见[后续升级检查点](reports/sandbox-viewer-rollout-20261022.md#camoufox-beta40-and-paused-dm-checkpoint)。原实例在升级完成检查时为 stopped，五个档案及节点状态摘要不变；本次整理未重新启动账号。
 - **多轮询盘整理已上线**：PR #645 合并为 `30a152cf7826679bc8d7e121476658bd41baab49`。最近 30 条有效客户入站消息按字段汇总、记录来源并保留冲突待人工核对；人工填写不被异步建议覆盖。见[合成验证报告](reports/rfq-inquiry-history-20261022.md)。它不创建 RFQ、不发送消息，也不证明真实 DM 已入站。
 - **独立跟进计划已上线**：PR #647 合并为 `20c209b5548d34a54058d89af9aa0e7fa08d9fe5`。无需发送消息即可保存跟进场景、规则评分和提醒时间，已有草稿保留；渠道、回复窗口和交期门禁继续约束发送。见[验证报告](reports/follow-up-plan-20261022.md)。Vercel 独立读回确认该提交的 production 部署为 READY 且绑定 `ftp.ban12.com`。
-- **待交付，不计入完成**：#649 的品牌独立识别、#651 的产品类型建议及取消默认套件仍在 CI。#649 首轮浏览器任务因 20 分钟上限取消：339 项生产构建测试通过，数据库浏览器阶段未完成；已重跑同一工作流，不把部分通过算作整体验收。
+- **品牌与产品类型建议已上线**：PR #649 合并为 `ccf205f47549c4c869b8d49ce8ee435e20f8fda3`，PR #651 合并为 `c35d690897cfbd3ebba17469ac1704c3c3a6530d`。品牌可独立于具体车型提取；产品类型保留来源和歧义待核对，新 RFQ 不再默认套件。#649 早期浏览器任务因 20 分钟上限取消的记录保留；延长为 30 分钟后，最终提交的完整 CI 通过。#651 最终提交的完整 CI 同样通过，其 production 部署 `dpl_GeYpZmudZ6iBABQGXSqG31fxKEBK` 已独立读回为 READY、对应合并提交并绑定 `ftp.ban12.com`。见[产品类型验证报告](reports/rfq-product-type-20261022.md)。
+- **客户补充需求与报价上下文已上线**：PR #656 合并为 `8b9e69c95b7733a222b1e43c0a3678166b5a791f`。RFQ 可保存年款、发动机、规格、包装、期望交期及定制需求；旧客户端省略字段时保留，明确清空时删除。报价页随所选 RFQ 展示需求摘要，不自动填写价格或工厂交期。最终完整 CI 通过；production 部署 `dpl_Cf2r4kEjrG3JcWPGrENi9VWwoe69` 已独立读回为 READY、对应合并提交并绑定 `ftp.ban12.com`。见[合成验证报告](reports/rfq-optional-requirements-20261023.md)。这些是客户请求，不是已确认的工程事实或交期承诺。
 
 当前应用提交与浏览器运行时提交不同，分别以上述证据为准。真实产品事实、人工报价／交期、真实渠道收发和最终 Go/No-Go 仍按下表各自验收，功能迭代没有解除 DM 暂停。
 
@@ -63,7 +64,7 @@
 | 保留期与受控副本 | 90 天、具名责任与预算已决定；应用执行、来源／历史保护、[实际合成数据库备份恢复](reports/m2-retention-restore-20261015.md)均有证据；Neon 6 小时恢复窗口已盘点 | #122 的真实生产到期对象／Blob 删除、生产 Neon PITR、历史副本物理清除和其他未覆盖副本尚未证明；不改写真实时间制造样本，网关日志不重新作为前置 |
 | Sales／RFQ、报价与跟单商机 | 当前领域实现、数据库授权／事务回归和 reference／合成闭环已有证据，见[实现核对](reports/mvp1-implementation-audit-20261006.md)及[reference 汇总](reports/reference-acceptance-20260917.md) | 真实客户 RFQ、人工报价／交期、发送凭据与商机认定仍待业务验收；合成消息、价格或审批不能倒填为真实业务 |
 | 设备与辅助技术 | 自动化 Chromium／WebKit、响应式与权限回归已有证据 | [#391](https://github.com/ban12-project/F-Trade-Platform/issues/391) 的实机、VoiceOver／NVDA、实际缩放／对比度及所声明性能证据尚未完成；仿真不替代实机 |
-| 依赖与历史故障 | 2026-10-15 依赖审计保留 1 high（braces），已安装副本有深度防护；原 CSV 失败后已有冻结输入成功及诊断关联 | [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 的独立 CLI 未修补副本与上游发布风险、[#348](https://github.com/ban12-project/F-Trade-Platform/issues/348) 的原间歇原因仍未知；后续成功不改写原失败 |
+| 依赖与历史故障 | 2026-10-23 PR #657 将 shadcn 的 MCP SDK 定向升级到 1.32.0，最终完整 CI 通过并合并；同轮审计从 0 critical／3 high／2 moderate 降为 0 critical／1 high／0 moderate（braces），见[验证报告](reports/mcp-sdk-security-20261023.md)。已安装 braces 副本有深度防护；原 CSV 失败后已有冻结输入成功及诊断关联 | [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 的独立 CLI 未修补副本与上游发布风险、[#348](https://github.com/ban12-project/F-Trade-Platform/issues/348) 的原间歇原因仍未知；后续成功不改写原失败 |
 | 集成验收与 Go/No-Go | [#26](https://github.com/ban12-project/F-Trade-Platform/issues/26)／[#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 保持 open；受控技术演示已有记录 | 完整实际渠道／业务样本及独立最终决定未完成，不能判 Go |
 
 ## 继续工作的条件

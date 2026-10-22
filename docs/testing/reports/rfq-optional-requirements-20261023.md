@@ -21,3 +21,7 @@ The existing RFQ Ready contract already allows these fields; no database migrati
 - Existing database-browser sales journeys now exercise these fields through intake, revision, explicit clearing and RFQ Ready. Full CI result belongs to the final PR head.
 
 The local browser used a separate app copy and dedicated synthetic PostgreSQL. Tailwind sources in that copy exclude ignored test database files; production build configuration is unchanged. Ignored screenshot: `tmp/rfq-history-644/optional-requirements-ready.png`. Synthetic records are not real business acceptance evidence.
+
+## Delivery checkpoint
+
+PR #656 final head `92e0a69141764ceaa6ba5f30b74a8b6ab10a9f5a` passed all checks, including authenticated PostgreSQL browser tests (workflow `39816022009`). Squash merge: `8b9e69c95b7733a222b1e43c0a3678166b5a791f`. The independent Vercel readback for `dpl_Cf2r4kEjrG3JcWPGrENi9VWwoe69` reports READY, production, that exact Git SHA and alias `ftp.ban12.com`. This establishes deployment, not real customer or channel acceptance.
