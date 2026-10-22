@@ -184,7 +184,7 @@ for (const { role, context: scenario, change } of cases)
       if (change === "unchanged") {
         await expect(
           page
-            .locator('[aria-live="polite"]')
+            .getByRole("status", { name: "提交结果", exact: true })
             .filter({ visible: true, hasText: "人工确认的回复已安全提交" }),
         ).toBeVisible();
         const after = await snapshot();
@@ -208,7 +208,9 @@ for (const { role, context: scenario, change } of cases)
         else expect(plaintext).toBe(draft);
         await expect(form.getByLabel("待人工发送内容", { exact: true })).toHaveValue("");
       } else {
-        await expect(page.locator('[aria-live="polite"]').filter({ visible: true })).toContainText(
+        await expect(
+          page.getByRole("status", { name: "提交结果", exact: true }).filter({ visible: true }),
+        ).toContainText(
           /无法确认当前登录|编辑权限|项目已归档|销售机会项目|保留期|回复窗口|Gate 03/,
         );
         await expect(form).toBeVisible();

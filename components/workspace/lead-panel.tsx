@@ -53,6 +53,7 @@ import {
   requestDeliveryAction,
   saveFollowUpPlanAction,
 } from "@/lib/actions/closing";
+import { nextFollowUp } from "@/lib/follow-up/cadence";
 import {
   deliveryRequestFormSchema,
   followUpFormSchema,
@@ -105,6 +106,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       });
   }, [form, entry.lead.next_follow_up_at]);
   const context = form.watch("context");
+  const recommendation = nextFollowUp(context);
   const requiresDeliveryConfirmation = context === "asks_lead_time" || context === "asks_sample";
   const canSend =
     entry.replyAvailable && (!requiresDeliveryConfirmation || Boolean(entry.confirmedDelivery));
@@ -201,6 +203,15 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                 />
                 <FieldError errors={[form.formState.errors.context]} />
               </Field>
+              <Alert role="status" aria-live="polite" aria-label="当前场景跟进建议">
+                <AlertTitle>{salesNextActionLabels[recommendation.action]}</AlertTitle>
+                <AlertDescription>
+                  {recommendation.human_escalation
+                    ? "需要人工介入：收集客户要求后交由销售或工厂确认，不自动承诺价格、样品或交期。"
+                    : "依据当前场景和客户实际回应安排联系，避免重复催促。"}
+                  本建议随场景预览；保存计划后才会更新下一动作，不会发送消息。
+                </AlertDescription>
+              </Alert>
               {requiresDeliveryConfirmation ? (
                 entry.confirmedDelivery ? (
                   <Alert>
