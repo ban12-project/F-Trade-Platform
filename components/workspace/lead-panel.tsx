@@ -72,8 +72,7 @@ import { WorkspaceLink } from "./workspace-link";
 function localDateTime(value?: string) {
   if (!value) return "";
   const date = new Date(value);
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 16);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
 function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntry }) {
