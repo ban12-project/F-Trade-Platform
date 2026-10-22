@@ -115,15 +115,13 @@ test("quotation handoff follows the selected customer's requests without filling
         commercial: { ...readyRfq.commercial, expected_delivery: `MOCK timing ${name}` },
       },
     });
-    await db
-      .insert(schema.workspaceProjectItem)
-      .values({
-        id: randomUUID(),
-        projectId,
-        aggregateId: id,
-        role: "sales_rfq",
-        relation: "owned",
-      });
+    await db.insert(schema.workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId,
+      aggregateId: id,
+      role: "sales_rfq",
+      relation: "owned",
+    });
   }
   const signature = createHmac("sha256", authSecret).update(token).digest("base64");
   await context.addCookies([
