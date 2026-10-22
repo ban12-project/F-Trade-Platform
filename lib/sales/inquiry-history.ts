@@ -1,4 +1,4 @@
-import { applyInquiryMessage } from "./clarification";
+import { applyInquiryMessage, inquiryVehicle } from "./clarification";
 
 export const INQUIRY_HISTORY_LIMIT = 30;
 export const inquiryFieldLabels = {
@@ -27,10 +27,11 @@ export function summarizeInquiryMessages(messages: readonly InquiryMessageInput[
     };
     // Do not resurrect an earlier value when a later reply is an unsupported
     // range, alternative, or correction. The customer conversation remains the source.
+    const vehicle = inquiryVehicle(message.body);
     const mentions: Record<InquiryField, boolean> = {
       oeNumber: /\b(?:oe|oem)\s*[:#-]/i.test(message.body),
-      vehicleBrand: /\b(?:Toyota|Honda|Ford|Volkswagen)\b/i.test(message.body),
-      vehicleModel: /\b(?:Toyota|Honda|Ford|Volkswagen)\b/i.test(message.body),
+      vehicleBrand: vehicle.brandMentioned,
+      vehicleModel: vehicle.modelMentioned,
       quantity: /\b(?:pcs?|pieces?)\b/i.test(message.body),
       destination: /\bdestination\s*[:=]/i.test(message.body),
     };
@@ -61,6 +62,11 @@ export function summarizeInquiryMessages(messages: readonly InquiryMessageInput[
       fields[field] = candidate.value;
       fieldSources[field] = candidate.messageIds;
     }
+  }
+  if (conflicts.includes("vehicleBrand") && candidates.has("vehicleModel")) {
+    delete fields.vehicleModel;
+    delete fieldSources.vehicleModel;
+    if (!conflicts.includes("vehicleModel")) conflicts.push("vehicleModel");
   }
   return { fields, fieldSources, conflicts };
 }
