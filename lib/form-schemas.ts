@@ -317,6 +317,15 @@ export const followUpFormSchema = z
       context.addIssue({ code: "custom", path: ["nextFollowUpAt"], message: "下次跟进时间无效。" });
   });
 
+/** Internal planning has no outbound-message or approval fields. Times include an explicit offset. */
+export const followUpPlanFormSchema = z.object({
+  projectId: followUpFormSchema.shape.projectId,
+  leadId: followUpFormSchema.shape.leadId,
+  context: followUpFormSchema.shape.context,
+  triggeredRules: followUpFormSchema.shape.triggeredRules,
+  nextFollowUpAt: z.union([z.iso.datetime({ offset: true }), z.literal("")]),
+});
+
 export const deliveryRequestFormSchema = z.object({
   projectId: z.uuid(),
   leadId: z.uuid(),
