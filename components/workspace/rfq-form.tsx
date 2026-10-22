@@ -49,18 +49,19 @@ import { useCreatedRecord } from "./use-created-record";
 import { WorkspaceLink } from "./workspace-link";
 
 const types = [
+  ["", "待确认"],
   ["clutch_disc", "离合器片"],
   ["clutch_cover", "离合器盖 / 压盘"],
   ["release_bearing", "分离轴承"],
   ["clutch_kit", "离合器套件"],
 ] as const;
-type RfqValues = z.infer<typeof rfqFormSchema>;
+type RfqValues = z.input<typeof rfqFormSchema>;
 const emptyRfq: RfqValues = {
   leadId: "",
   customerName: "",
   customerCompany: "",
   customerCountry: "",
-  productType: "clutch_kit",
+  productType: "",
   oeNumber: "",
   vehicleBrand: "",
   vehicleModel: "",
@@ -86,7 +87,7 @@ export function RfqForm({
     revising ? reviseRfqAction : createRfqAction,
     initialSalesActionState,
   );
-  const form = useForm<RfqValues>({
+  const form = useForm<RfqValues, unknown, z.output<typeof rfqFormSchema>>({
     resolver: zodResolver(rfqFormSchema),
     defaultValues: entry
       ? { ...entry.formValues, evidenceRef: "" }

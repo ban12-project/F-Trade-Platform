@@ -174,6 +174,7 @@ void (async () => {
     receivedAt: receivedAt.toISOString(),
   });
   assert.deepEqual(suggestion.fields, {
+    productType: "clutch_kit",
     quantity: "500",
     oeNumber: "SYN-OE-499",
     vehicleBrand: "Toyota",

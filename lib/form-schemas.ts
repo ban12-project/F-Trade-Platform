@@ -201,7 +201,9 @@ export const rfqFormSchema = z.object({
   customerName: optionalRfqText,
   customerCompany: optionalRfqText,
   customerCountry: optionalRfqText,
-  productType: z.enum(["clutch_disc", "clutch_cover", "release_bearing", "clutch_kit"]),
+  productType: z
+    .enum(["clutch_disc", "clutch_cover", "release_bearing", "clutch_kit", ""])
+    .refine((value) => value !== "", "请确认客户需要的产品类型。"),
   oeNumber: optionalRfqText,
   vehicleBrand: optionalRfqText,
   vehicleModel: optionalRfqText,
@@ -221,6 +223,7 @@ export const inquirySuggestionRequestSchema = z
   .strict();
 export const inquirySuggestionFieldsSchema = rfqFormSchema
   .pick({
+    productType: true,
     oeNumber: true,
     vehicleBrand: true,
     vehicleModel: true,
