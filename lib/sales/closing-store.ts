@@ -31,6 +31,7 @@ import {
   deliveryDecisionFormSchema,
   deliveryRequestFormSchema,
   followUpFormSchema,
+  followUpPlanFormSchema,
   opportunityDecisionFormSchema,
   quotationDecisionFormSchema,
   quotationDraftFormSchema,
@@ -634,6 +635,73 @@ export async function sendQuotation(
       occurredAt: now,
     });
     return { id: value.quotationId, leadId };
+  });
+}
+
+/** Saves internal sales planning only; never authorizes or queues a message. */
+export async function saveFollowUpPlan(
+  input: unknown,
+  actorId: string,
+  database: Database = getDatabase(),
+) {
+  const value = followUpPlanFormSchema.parse(input);
+  return database.transaction(async (tx) => {
+    await assertSalesProject(tx, value.projectId, actorId);
+    const [record] = await tx
+      .select({ payload: aggregateRecord.payload, state: aggregateRecord.state })
+      .from(aggregateRecord)
+      .innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, aggregateRecord.id))
+      .where(
+        and(
+          eq(aggregateRecord.id, value.leadId),
+          eq(aggregateRecord.type, "lead"),
+          eq(workspaceProjectItem.projectId, value.projectId),
+          eq(workspaceProjectItem.role, "sales_lead"),
+          eq(workspaceProjectItem.relation, "owned"),
+        ),
+      )
+      .for("update");
+    if (record?.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以保存跟进计划。");
+    const lead = validateLead(record.payload);
+    const scoring = scoreLead(value.triggeredRules);
+    const { next_follow_up_at: _previousTime, ...retained } = lead;
+    const next = validateLead({
+      ...retained,
+      follow_up_context: value.context,
+      score: scoring.score,
+      score_band: scoring.status,
+      score_reasons: scoring.evidence,
+      next_action: nextFollowUp(value.context).action,
+      ...(value.nextFollowUpAt
+        ? { next_follow_up_at: new Date(value.nextFollowUpAt).toISOString() }
+        : {}),
+    });
+    const now = new Date();
+    await tx
+      .update(aggregateRecord)
+      .set({ payload: next, version: sql`${aggregateRecord.version} + 1` })
+      .where(eq(aggregateRecord.id, value.leadId));
+    await tx
+      .update(workspaceProject)
+      .set({ updatedAt: now })
+      .where(eq(workspaceProject.id, value.projectId));
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "lead.follow_up_plan_saved",
+      actorType: "human",
+      actorId,
+      aggregateId: value.leadId,
+      subjectType: "lead",
+      subjectId: value.leadId,
+      metadata: {
+        context: value.context,
+        score: scoring.score,
+        score_reasons: scoring.evidence,
+        next_follow_up_at: next.next_follow_up_at ?? null,
+      },
+      occurredAt: now,
+    });
+    return { id: value.leadId };
   });
 }
 
