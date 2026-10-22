@@ -11,6 +11,10 @@ import {
 } from "@/lib/db/schema";
 import type { rfqFormSchema } from "@/lib/form-schemas";
 import { assessRfq, promoteRfqReady, updateRfqDraft } from "@/lib/rfq/completeness";
+import {
+  readRfqCustomerRequirements,
+  writeRfqCustomerRequirements,
+} from "@/lib/rfq/customer-requirements";
 import { assertTransition } from "@/lib/workflow/transitions";
 import {
   assertAggregateWorkspaceWrite,
@@ -30,14 +34,17 @@ export type RfqEntry = {
   formValues: Omit<RfqFormInput, "evidenceRef">;
 };
 
-function rfqFromInput(input: RfqFormInput, id: string) {
+function rfqFromInput(input: RfqFormInput, id: string, previous?: unknown) {
+  const requirements = writeRfqCustomerRequirements(input, previous);
   const product = {
+    ...requirements.product,
     product_type: input.productType,
     ...(input.oeNumber ? { oe_number: input.oeNumber } : {}),
     ...(input.vehicleBrand ? { vehicle_brand: input.vehicleBrand } : {}),
     ...(input.vehicleModel ? { vehicle_model: input.vehicleModel } : {}),
   };
   const commercial = {
+    ...requirements.commercial,
     ...(input.quantity ? { quantity: Number(input.quantity) } : {}),
     ...(input.destination ? { destination: input.destination } : {}),
   };
@@ -83,6 +90,7 @@ function entryFromRecord(row: typeof aggregateRecord.$inferSelect): RfqEntry | n
     completenessScore:
       typeof payload.completeness_score === "number" ? payload.completeness_score : 0,
     formValues: {
+      ...readRfqCustomerRequirements(payload),
       leadId: typeof payload.lead_ref === "string" ? payload.lead_ref : "",
       customerName: typeof customer?.name === "string" ? customer.name : "",
       customerCompany: typeof customer?.company === "string" ? customer.company : "",
@@ -228,12 +236,13 @@ export async function reviseRfq(
         id: aggregateRecord.id,
         state: aggregateRecord.state,
         version: aggregateRecord.version,
+        payload: aggregateRecord.payload,
       })
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.type, "rfq")))
       .for("update");
     if (record?.state !== "RFQ_COLLECTING") throw new Error("只有收集中的 RFQ 可以补充资料。");
-    const draft = rfqFromInput(input, rfqId);
+    const draft = rfqFromInput(input, rfqId, record.payload);
     const [updated] = await tx
       .update(aggregateRecord)
       .set({ payload: draft, version: sql`${aggregateRecord.version} + 1` })

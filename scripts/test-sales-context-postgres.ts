@@ -6,11 +6,14 @@ import deliveryFixture from "../data/fixtures/delivery-confirmation.synthetic.js
 import rfqFixture from "../data/fixtures/rfq-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
+import { rfqFormSchema } from "../lib/form-schemas";
+import { promoteRfqReady } from "../lib/rfq/completeness";
+import { rfqCustomerRequirements } from "../lib/rfq/customer-requirements";
 import { listProjectLeads, saveFollowUpPlan } from "../lib/sales/closing-store";
 import { suggestFromInquiryHistory } from "../lib/sales/inquiry-suggestions";
 import { salesRelations } from "../lib/sales/journey";
 import { readSalesJourney } from "../lib/sales/journey-store";
-import { listProjectRfqEntries } from "../lib/sales/store";
+import { createRfq, listProjectRfqEntries, reviseRfq } from "../lib/sales/store";
 import { createStoredSocialMessageRecord } from "../lib/social/message-record";
 import { readWorkspaceRecord } from "../lib/workspace/record-read-model";
 
@@ -570,6 +573,63 @@ void (async () => {
   assert.equal(planAudits.length, 2);
   console.log(
     "PASS internal follow-up plan, offset time, clearing, access isolation and zero outbound effects",
+  );
+  const legacyInput = {
+    leadId: "",
+    customerName: "MOCK requirements",
+    customerCompany: "",
+    customerCountry: "",
+    productType: "clutch_kit" as const,
+    oeNumber: "SYN-654",
+    vehicleBrand: "",
+    vehicleModel: "",
+    quantity: "25",
+    destination: "Synthetic Port",
+    evidenceRef: "evidence-synthetic-654",
+  };
+  const optionalInput = {
+    vehicleYear: "MOCK 2030",
+    engine: "MOCK engine",
+    requiredSpecification: "MOCK specification",
+    packagingRequirement: "MOCK packaging",
+    expectedDelivery: "MOCK requested timing",
+    customization: "MOCK customization",
+  };
+  const createdRfq = await createRfq(
+    rfqFormSchema.parse({ ...legacyInput, ...optionalInput }),
+    owner,
+    project,
+  );
+  const readRequirements = async () => (await listProjectRfqEntries(project, [createdRfq.id]))[0];
+  for (const { field } of rfqCustomerRequirements) {
+    assert.equal((await readRequirements()).formValues[field], optionalInput[field]);
+    assert(!rfqFormSchema.safeParse({ ...legacyInput, [field]: "x".repeat(241) }).success);
+  }
+  await assert.rejects(reviseRfq(createdRfq.id, legacyInput, viewer, project), /权限/);
+  // A form opened in an older version omits all six fields; its revision must retain them.
+  const legacyRevision = await reviseRfq(
+    createdRfq.id,
+    rfqFormSchema.parse(legacyInput),
+    owner,
+    project,
+  );
+  const readyRequirements = promoteRfqReady(legacyRevision.draft);
+  for (const { field, section, key } of rfqCustomerRequirements) {
+    assert.equal((await readRequirements()).formValues[field], optionalInput[field]);
+    assert.equal(readyRequirements[section][key], optionalInput[field]);
+  }
+  await reviseRfq(
+    createdRfq.id,
+    { ...legacyInput, packagingRequirement: "", expectedDelivery: "MOCK revised timing" },
+    owner,
+    project,
+  );
+  const revisedRequirements = await readRequirements();
+  assert.equal(revisedRequirements.formValues.packagingRequirement, "");
+  assert.equal(revisedRequirements.formValues.expectedDelivery, "MOCK revised timing");
+  assert.equal(revisedRequirements.formValues.engine, optionalInput.engine);
+  console.log(
+    "PASS optional RFQ requests, bounded schema, old-client preservation, clearing and Ready contract",
   );
   await db
     .delete(schema.workspaceProjectMember)

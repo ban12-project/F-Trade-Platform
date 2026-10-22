@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
+import { rfqCustomerRequirements } from "@/lib/rfq/customer-requirements";
 import type { LeadEntry } from "@/lib/sales/closing-store";
 import { salesStateLabels } from "@/lib/sales/journey";
 import type { RfqEntry } from "@/lib/sales/store";
@@ -52,6 +53,26 @@ export function RfqDetail({
           </Progress>
         </CardContent>
       </Card>
+      {rfqCustomerRequirements.some(({ field }) => entry.formValues[field]) ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>客户补充需求</CardTitle>
+            <CardDescription>客户提出的要求，尚需核实；期望交付不代表工厂承诺。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-3 text-sm">
+              {rfqCustomerRequirements.map(({ field, label }) =>
+                entry.formValues[field] ? (
+                  <div key={field} className="grid gap-1">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="whitespace-pre-wrap break-words">{entry.formValues[field]}</dd>
+                  </div>
+                ) : null,
+              )}
+            </dl>
+          </CardContent>
+        </Card>
+      ) : null}
       {entry.state === "RFQ_COLLECTING" ? (
         <RfqForm key={entry.id} projectId={projectId} entry={entry} leads={leads} />
       ) : null}

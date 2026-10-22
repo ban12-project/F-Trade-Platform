@@ -38,6 +38,10 @@ import { initialSalesActionState } from "@/lib/action-states";
 import { createRfqAction, reviseRfqAction, suggestInquiryAction } from "@/lib/actions/sales";
 import { inquirySuggestionRequestSchema, rfqFormSchema } from "@/lib/form-schemas";
 import { updateRfqDraft } from "@/lib/rfq/assessment";
+import {
+  readRfqCustomerRequirements,
+  rfqCustomerRequirements,
+} from "@/lib/rfq/customer-requirements";
 import { nextClarification } from "@/lib/sales/clarification";
 import type { LeadEntry } from "@/lib/sales/closing-store";
 import { type InquiryField, inquiryFieldLabels } from "@/lib/sales/inquiry-history";
@@ -57,6 +61,7 @@ const types = [
 ] as const;
 type RfqValues = z.input<typeof rfqFormSchema>;
 const emptyRfq: RfqValues = {
+  ...readRfqCustomerRequirements(undefined),
   leadId: "",
   customerName: "",
   customerCompany: "",
@@ -181,7 +186,9 @@ export function RfqForm({
     const data = new FormData();
     data.set("projectId", projectId);
     if (entry) data.set("rfqId", entry.id);
-    for (const [key, value] of Object.entries(values)) data.set(key, value);
+    for (const [key, value] of Object.entries(values)) {
+      if (value !== undefined) data.set(key, value);
+    }
     startTransition(() => action(data));
   }
   return (
@@ -189,7 +196,7 @@ export function RfqForm({
       <CardHeader>
         <CardTitle>{revising ? "补充询盘" : "录入询盘"}</CardTitle>
         <CardDescription>
-          先收齐产品身份、数量和目的地；本表单不接受价格、MOQ、交期或付款承诺。
+          先收齐产品身份、数量和目的地；本表单不接受价格、MOQ、工厂交期或付款承诺。
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -425,6 +432,25 @@ export function RfqForm({
                   />
                   <FieldError errors={[form.formState.errors.destination]} />
                 </Field>
+              </FieldGroup>
+            </FieldSet>
+            <FieldSet>
+              <FieldLegend>客户补充需求（可选）</FieldLegend>
+              <FieldDescription>
+                按客户原意记录，留待报价人员核对。车型、发动机和规格尚未核验；期望交付不是工厂交期承诺。
+              </FieldDescription>
+              <FieldGroup>
+                {rfqCustomerRequirements.map(({ field, label }) => (
+                  <Field key={field} data-invalid={!!form.formState.errors[field]}>
+                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-${field}`}>{label}</FieldLabel>
+                    <Input
+                      id={`${entry?.id ?? "new"}-${field}`}
+                      {...form.register(field)}
+                      aria-invalid={!!form.formState.errors[field]}
+                    />
+                    <FieldError errors={[form.formState.errors[field]]} />
+                  </Field>
+                ))}
               </FieldGroup>
             </FieldSet>
             <Field data-invalid={!!form.formState.errors.evidenceRef}>

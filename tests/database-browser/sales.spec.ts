@@ -15,7 +15,7 @@ import {
 } from "../../lib/sales/closing-store";
 import { decryptSocialMessageBody } from "../../lib/social/message-crypto";
 import { createStoredSocialMessageRecord } from "../../lib/social/message-record";
-import { workspaceCreateHref } from "../../lib/workspace/navigation";
+import { workspaceCreateHref, workspaceRecordHref } from "../../lib/workspace/navigation";
 import { authSecret, databaseURL, socialMessageKey } from "../../playwright.database.config";
 
 process.env.SOCIAL_MESSAGE_ENCRYPTION_KEY = socialMessageKey;
@@ -92,6 +92,62 @@ test.beforeEach(async () => {
 
 test.afterAll(async () => {
   await pool.end();
+});
+
+test("quotation handoff follows the selected customer's requests without filling commercial terms", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  for (const name of ["A", "B"]) {
+    const id = randomUUID();
+    await db.insert(schema.aggregateRecord).values({
+      id,
+      type: "rfq",
+      state: "RFQ_READY",
+      createdByType: "human",
+      createdById: actorId,
+      payload: {
+        ...readyRfq,
+        rfq_id: id,
+        customer: { name: `MOCK buyer ${name}` },
+        product: { ...readyRfq.product, engine: `MOCK engine ${name}` },
+        commercial: { ...readyRfq.commercial, expected_delivery: `MOCK timing ${name}` },
+      },
+    });
+    await db.insert(schema.workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId,
+      aggregateId: id,
+      role: "sales_rfq",
+      relation: "owned",
+    });
+  }
+  const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+  await context.addCookies([
+    {
+      name: "better-auth.session_token",
+      value: encodeURIComponent(`${token}.${signature}`),
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  await page.goto(workspaceCreateHref(projectId, "quotation"));
+  const form = page.locator("form#quotation-new").filter({ visible: true });
+  const summary = form.getByRole("group", { name: "所选客户需求", exact: true });
+  await expect(summary).toHaveCount(0);
+  for (const name of ["A", "B"]) {
+    await form.getByRole("combobox", { name: "客户需求", exact: true }).click();
+    await page.getByRole("option", { name: new RegExp(`MOCK buyer ${name}`) }).click();
+    await expect(summary.getByText(`MOCK engine ${name}`, { exact: true })).toBeVisible();
+    await expect(summary.getByText(`MOCK timing ${name}`, { exact: true })).toBeVisible();
+    await expect(
+      summary.getByText(`MOCK engine ${name === "A" ? "B" : "A"}`, { exact: true }),
+    ).toHaveCount(0);
+    await expect(form.getByLabel("单价", { exact: true })).toHaveValue("");
+    await expect(form.getByLabel("交期（天）", { exact: true })).toHaveValue("");
+  }
 });
 
 test("inbound history suggestions preserve manual edits and require a separate RFQ save", async ({
@@ -444,6 +500,12 @@ for (const inbound of [false, true]) {
     const form = page.locator("form#create-rfq").filter({ visible: true });
     await form.getByLabel("客户名称", { exact: true }).fill("MOCK buyer — synthetic only");
     await form.getByLabel("OE / OEM 编号", { exact: true }).fill("SYN-OE-001");
+    await form.getByLabel("车型年份", { exact: true }).fill("MOCK 2030");
+    await form.getByLabel("发动机", { exact: true }).fill("MOCK engine");
+    await form.getByLabel("规格要求", { exact: true }).fill("MOCK specification");
+    await form.getByLabel("包装要求", { exact: true }).fill("MOCK packaging");
+    await form.getByLabel("客户期望交付", { exact: true }).fill("MOCK requested timing");
+    await form.getByLabel("定制要求", { exact: true }).fill("MOCK customization");
     await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
     await page.getByRole("button", { name: "保存询盘", exact: true }).click();
     await expect(form.getByText("请确认客户需要的产品类型。", { exact: true })).toBeVisible();
@@ -468,6 +530,9 @@ for (const inbound of [false, true]) {
     await expect(page.getByRole("button", { name: "确认需求完整", exact: true })).toBeDisabled();
     expect(await records("quotation")).toHaveLength(0);
     const revise = page.locator(`form#revise-rfq-${rfq.id}`).filter({ visible: true });
+    await expect(revise.getByLabel("包装要求", { exact: true })).toHaveValue("MOCK packaging");
+    await revise.getByLabel("包装要求", { exact: true }).fill("");
+    await revise.getByLabel("客户期望交付", { exact: true }).fill("MOCK revised timing");
     await revise.getByLabel("数量", { exact: true }).fill("25");
     await revise.getByLabel("目的地国家或港口", { exact: true }).fill("MOCK destination");
     await revise.getByLabel("录入证据", { exact: true }).fill(evidenceId);
@@ -482,8 +547,27 @@ for (const inbound of [false, true]) {
       destination: "MOCK destination",
     });
     expect(readyRfq.payload.missing_fields).toEqual([]);
+    expect(readyRfq.payload.product).toMatchObject({
+      vehicle_year: "MOCK 2030",
+      engine: "MOCK engine",
+      required_specification: "MOCK specification",
+    });
+    expect(readyRfq.payload.commercial).toMatchObject({
+      expected_delivery: "MOCK revised timing",
+      customization: "MOCK customization",
+    });
+    expect(readyRfq.payload.commercial).not.toHaveProperty("packaging_requirement");
+    await expect(page.getByText("MOCK revised timing", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "创建人工报价", exact: true }).click();
     const quote = page.locator("form#quotation-new").filter({ visible: true });
+    const requests = quote.getByRole("group", { name: "所选客户需求", exact: true });
+    await expect(requests.getByText("MOCK specification", { exact: true })).toBeVisible();
+    await expect(requests.getByText("MOCK revised timing", { exact: true })).toBeVisible();
+    await expect(requests.getByText("MOCK packaging", { exact: true })).toHaveCount(0);
+    await expect(requests.getByRole("link", { name: "查看完整询盘" })).toHaveAttribute(
+      "href",
+      workspaceRecordHref(projectId, "rfq", rfq.id),
+    );
     for (const [label, value] of [
       ["单价", "12.50"],
       ["报价依据", evidenceId],
