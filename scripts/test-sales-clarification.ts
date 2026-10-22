@@ -18,6 +18,20 @@ const draft = {
 const partial = applyInquiryMessage(draft, "500 pcs Toyota Corolla clutch kit, please quote");
 assert.equal(partial.commercial.quantity, 500);
 assert.equal(nextClarification(partial).field, "destination");
+for (const body of [
+  "Need clutch kits for Toyota, 500 pcs",
+  "Hi, 500 pcs Toyota clutch kit, please quote.",
+]) {
+  const example = applyInquiryMessage(draft, body);
+  assert.equal(example.product.vehicle_brand, "Toyota");
+  assert.equal(example.product.vehicle_model, undefined);
+  assert.equal(example.commercial.quantity, 500);
+  assert.equal(nextClarification(example).field, "vehicle_model_or_oe_number");
+}
+assert.equal(
+  applyInquiryMessage(draft, "Toyota Corolla or Camry clutch").product.vehicle_model,
+  undefined,
+);
 const complete = applyInquiryMessage(partial, "Destination: Synthetic Port");
 assert.equal(nextClarification(complete).status, "ready");
 assert.throws(() => assertNoAgentQuotation(complete), /cannot send/);

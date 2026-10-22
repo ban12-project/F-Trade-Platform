@@ -2,6 +2,29 @@ import { updateRfqDraft } from "../rfq/assessment";
 
 type Rfq = Record<string, any>;
 
+/** Explicit customer requests only; a brand does not establish an exact model or fitment. */
+export function inquiryVehicle(message: string) {
+  const supported = ["Toyota", "Honda", "Ford", "Volkswagen"];
+  const brands = new Set(
+    [...message.matchAll(/\b(Toyota|Honda|Ford|Volkswagen)\b/gi)].map((match) =>
+      match[1].toLowerCase(),
+    ),
+  );
+  const brand =
+    brands.size === 1 ? supported.find((value) => brands.has(value.toLowerCase())) : undefined;
+  const models = [
+    ...message.matchAll(
+      /\b(Toyota|Honda|Ford|Volkswagen)\s+([A-Za-z0-9 /&-]{2,100}?)\s+clutch\b/gi,
+    ),
+  ];
+  const candidate = models.length === 1 ? models[0][2].trim() : undefined;
+  const model =
+    brand && candidate && !/[/&]|\b(?:or|and|not|instead|unknown|unsure)\b/i.test(candidate)
+      ? candidate
+      : undefined;
+  return { brand, model, brandMentioned: brands.size > 0, modelMentioned: models.length > 0 };
+}
+
 export function applyInquiryMessage(rfq: Rfq, message: string) {
   const patch: Rfq = { product: {}, commercial: {} };
   // Only a single unambiguous explicit value is suggested. Unsupported prose stays manual.
@@ -27,11 +50,9 @@ export function applyInquiryMessage(rfq: Rfq, message: string) {
   if (oe && /^[A-Za-z0-9-]{3,240}$/.test(oe[1])) patch.product.oe_number = oe[1];
   const destination = unique(/\bdestination\s*[:=]\s*([A-Za-z][A-Za-z -]{2,239})(?=[,;.\n]|$)/gi);
   if (destination) patch.commercial.destination = destination[1].trim();
-  const vehicle = unique(/\b(Toyota|Honda|Ford|Volkswagen)\s+([A-Za-z0-9 -]{2,100}?)\s+clutch\b/gi);
-  if (vehicle) {
-    patch.product.vehicle_brand = vehicle[1];
-    patch.product.vehicle_model = vehicle[2].trim();
-  }
+  const vehicle = inquiryVehicle(message);
+  if (vehicle.brand) patch.product.vehicle_brand = vehicle.brand;
+  if (vehicle.model) patch.product.vehicle_model = vehicle.model;
   return updateRfqDraft(rfq, patch);
 }
 
