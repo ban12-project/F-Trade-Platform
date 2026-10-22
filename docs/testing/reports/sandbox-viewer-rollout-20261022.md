@@ -67,3 +67,20 @@ The first original-instance import failed with insufficient disk space. A protec
 Production metadata confirmed application source `589bec1a045ed3b8b3c58579e3f8d59bf5d04ba0`. A real top-level viewer admitted successfully and displayed Firefox; mouse and keyboard input reached its address bar. This proves one actual transport connection, not identity, Messenger readiness or reliable repeated admission. Another two independent-window attempts expired before ticket admission. A human-verification checkpoint prevented further account acceptance in the connected session; the user chose another account. No controlled DM was sent.
 
 PR #638 removes the remaining platform receiver navigation from the independent-window opening path. It retains server authorization and only transfers the ticket to the configured gateway after exact popup and nonce matching. Nine local production-build viewer cases passed, including delayed server authorization and navigation with the old receiver route deliberately blocked. This follow-up still needs CI, deployment and repeated real-browser evidence. Issue #634 remains open; MVP1 is not passed.
+
+## Camoufox beta.40 and paused DM checkpoint
+
+This later checkpoint supersedes the earlier pending delivery and issue statuses, not their observed failures. PR #638 is merged at `c89dc241a5015cc22f34a995f02ca6009ad04d16`; issue #634 is closed. Those development states do not independently establish account or repeated-viewer acceptance.
+
+PR #643 upgraded the browser runtime to Camoufox `158.0-beta.40`, at source `bc5c7679247f59946531a2423e60b7cfd77f86fd`. [Image workflow 39788356595](https://github.com/ban12-project/F-Trade-Platform/actions/runs/39788356595) completed successfully. Its reviewed amd64 artifact `12430267606` has ZIP digest `sha256:cd73e61c9fb4577a5e08d4f75ad2ebbc517ff2b2640f3b9556740cce6de98403`. The actual cloud browser reported `Camoufox Camoufox 158.0-beta.40`.
+
+| Image | Source config ID | Verified destination Docker local ID |
+| --- | --- | --- |
+| Agent | `sha256:7df245316a9a0a865c0db235d025ce68a2d107eec1a5c47f3c320a6b19af3f2e` | `sha256:19366a86ec7a2bcb21211ed00ae696b6c14e00cba052b3dc83dfdf9fd5094b97` |
+| Browser | `sha256:dea783f23199c97178b6e5428ce855ac452ac06994b8cc7af1ce43cf977b276d` | `sha256:25d393f6da8c99796603a08c5481d3f808c064bd460d6fe6295543336ac33005` |
+
+Archive/config/layer identity, credential-free template smoke and separate synthetic profile stop/resume were checked. Native cookie and non-extractable-key continuity passed; the test VM and its test snapshots were removed. The protected original-instance stage records `imagesVerified`, `accountAndNodeStatePreserved`, `protectedBackupCreated` and `startupStaged` as true, with five profiles and no lost dispatch exclusion. Its stop result was `stopped` with a created recovery snapshot. These are observations at upgrade completion, not a promise of future resource availability; snapshots and authorization must be rechecked before any later account operation.
+
+The selected production runtime/template was read back, and initial application deployment `dpl_AytYbDVsobZvsdACiMv1iVC4j5dA` reached READY. Subsequent sales-only deliveries advanced the application: PR #645 added multi-message RFQ suggestions, and PR #647 added independently saved follow-up plans. Current production readback confirms `dpl_6q25TvdabbsqDpNNuAJg3jsfNtyK`, source `20c209b5548d34a54058d89af9aa0e7fa08d9fe5`, READY and aliased to `ftp.ban12.com`. This application revision does not replace the separately verified browser runtime revision above.
+
+Private evidence remains under ignored `tmp/camoufox-beta40/` (artifact mapping, stage result, template restore, selection and deployment records). Account identities, credentials and snapshot identifiers are intentionally absent from this engineering report. The user paused DM acceptance; this checkpoint neither starts account sessions nor claims current identity, Messenger, publication, inbound capture or business Go/No-Go success.

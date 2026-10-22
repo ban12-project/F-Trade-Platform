@@ -39,7 +39,7 @@ export function RfqDetail({
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm">
-            {types.find(([type]) => type === entry.productType)?.[1]} ·{" "}
+            {types.find(([type]) => type === entry.productType)?.[1] ?? "产品类型待确认"} ·{" "}
             {entry.formValues.oeNumber ||
               `${entry.formValues.vehicleBrand} ${entry.formValues.vehicleModel}`.trim() ||
               "产品身份待补充"}

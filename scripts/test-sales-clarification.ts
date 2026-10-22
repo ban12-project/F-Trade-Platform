@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { inquirySuggestionFieldsSchema, inquirySuggestionRequestSchema } from "../lib/form-schemas";
+import {
+  inquirySuggestionFieldsSchema,
+  inquirySuggestionRequestSchema,
+  rfqFormSchema,
+} from "../lib/form-schemas";
+import { promoteRfqReady } from "../lib/rfq/completeness";
 import {
   applyInquiryMessage,
   assertNoAgentQuotation,
@@ -18,6 +23,21 @@ const draft = {
 const partial = applyInquiryMessage(draft, "500 pcs Toyota Corolla clutch kit, please quote");
 assert.equal(partial.commercial.quantity, 500);
 assert.equal(nextClarification(partial).field, "destination");
+for (const body of [
+  "Need clutch kits for Toyota, 500 pcs",
+  "Hi, 500 pcs Toyota clutch kit, please quote.",
+]) {
+  const example = applyInquiryMessage({ ...draft, product: {} }, body);
+  assert.equal(example.product.product_type, "clutch_kit");
+  assert.equal(example.product.vehicle_brand, "Toyota");
+  assert.equal(example.product.vehicle_model, undefined);
+  assert.equal(example.commercial.quantity, 500);
+  assert.equal(nextClarification(example).field, "vehicle_model_or_oe_number");
+}
+assert.equal(
+  applyInquiryMessage(draft, "Toyota Corolla or Camry clutch").product.vehicle_model,
+  undefined,
+);
 const complete = applyInquiryMessage(partial, "Destination: Synthetic Port");
 assert.equal(nextClarification(complete).status, "ready");
 assert.throws(() => assertNoAgentQuotation(complete), /cannot send/);
@@ -82,6 +102,41 @@ const incomplete = applyInquiryMessage(
 assert(incomplete.missing_fields.includes("vehicle_model_or_oe_number"));
 assert(incomplete.missing_fields.includes("quantity"));
 assert.equal(nextClarification(incomplete).status, "clarification_required");
+for (const [body, type] of [
+  ["500 pcs clutch discs", "clutch_disc"],
+  ["clutch disk", "clutch_disc"],
+  ["pressure plates", "clutch_cover"],
+  ["clutch covers", "clutch_cover"],
+  ["release bearing", "release_bearing"],
+  ["throw-out bearings", "release_bearing"],
+  ["离合器套件", "clutch_kit"],
+  ["离合器片", "clutch_disc"],
+]) {
+  assert.equal(
+    applyInquiryMessage({ product: {}, commercial: {} }, body).product.product_type,
+    type,
+  );
+}
+for (const body of [
+  "clutch",
+  "not clutch kits",
+  "clutch discs or covers",
+  "clutch kit with release bearing",
+  "clutch discs/covers",
+]) {
+  assert.equal(
+    applyInquiryMessage({ product: {}, commercial: {} }, body).product.product_type,
+    undefined,
+  );
+}
+const unknownType = applyInquiryMessage(
+  { product: {}, commercial: {} },
+  "OE: SYN-001; 500 pcs; Destination: Synthetic Port",
+);
+assert.equal(nextClarification(unknownType).field, "product_type");
+assert.throws(() => promoteRfqReady(unknownType), /product_type/);
+assert(!rfqFormSchema.shape.productType.safeParse("").success);
+assert(!rfqFormSchema.shape.productType.safeParse("invented_component").success);
 assert(!inquirySuggestionFieldsSchema.safeParse({ unitPrice: "5", leadTimeDays: "10" }).success);
 assert(
   !inquirySuggestionRequestSchema.safeParse({
