@@ -17,6 +17,18 @@ const brandOnly = summarizeInquiryMessages(messages("Need clutch kits for Toyota
 assert.equal(brandOnly.fields.vehicleBrand, "Toyota");
 assert.equal(brandOnly.fields.vehicleModel, undefined);
 assert.deepEqual(brandOnly.conflicts, []);
+assert.equal(brandOnly.fields.productType, "clutch_kit");
+assert.deepEqual(brandOnly.fieldSources.productType, ["synthetic-0"]);
+for (const body of [
+  "clutch discs",
+  "not clutch kits",
+  "clutch discs or covers",
+  "clutch kit and release bearing",
+]) {
+  const result = summarizeInquiryMessages(messages("clutch kits", body));
+  assert.equal(result.fields.productType, undefined);
+  assert(result.conflicts.includes("productType"));
+}
 const laterModel = summarizeInquiryMessages(
   messages("500 pcs Toyota clutch kit", "Toyota Corolla clutch kit"),
 );

@@ -2,6 +2,27 @@ import { updateRfqDraft } from "../rfq/assessment";
 
 type Rfq = Record<string, any>;
 
+/** Supported request vocabulary only; alternatives and corrections need human confirmation. */
+export function inquiryProductType(message: string) {
+  const patterns = {
+    clutch_disc: /\bclutch\s+dis[ck]s?\b|离合器片/gi,
+    clutch_cover: /\b(?:clutch\s+covers?|pressure\s+plates?)\b|离合器盖|压盘/gi,
+    release_bearing: /\b(?:release|throw[- ]out)\s+bearings?\b|分离轴承/gi,
+    clutch_kit: /\bclutch\s+kits?\b|离合器套件/gi,
+  } as const;
+  const matches = (Object.keys(patterns) as (keyof typeof patterns)[]).filter((type) =>
+    patterns[type].test(message),
+  );
+  const uncertain =
+    /\b(?:not|wrong|incorrect|cancel|ignore|except|instead|no longer|unsure|unknown|or|and)\b|[/&]|不是|不要|不确定|取消|或者|或是/i.test(
+      message,
+    );
+  return {
+    value: matches.length === 1 && !uncertain ? matches[0] : undefined,
+    mentioned: matches.length > 0,
+  };
+}
+
 /** Explicit customer requests only; a brand does not establish an exact model or fitment. */
 export function inquiryVehicle(message: string) {
   const supported = ["Toyota", "Honda", "Ford", "Volkswagen"];
@@ -27,6 +48,8 @@ export function inquiryVehicle(message: string) {
 
 export function applyInquiryMessage(rfq: Rfq, message: string) {
   const patch: Rfq = { product: {}, commercial: {} };
+  const productType = inquiryProductType(message);
+  if (productType.value) patch.product.product_type = productType.value;
   // Only a single unambiguous explicit value is suggested. Unsupported prose stays manual.
   const unique = (pattern: RegExp) => {
     const matches = [...message.matchAll(pattern)];

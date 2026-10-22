@@ -181,6 +181,9 @@ test("inbound history suggestions preserve manual edits and require a separate R
     },
   ]);
   await page.goto(workspaceCreateHref(projectId, "rfq", { kind: "lead", id: leadId }));
+  await expect(page.getByRole("combobox", { name: "产品类型", exact: true })).toContainText(
+    "待确认",
+  );
   await page.getByLabel("OE / OEM 编号", { exact: true }).fill("SYN-MANUAL");
   let releaseResponse: () => void = () => {};
   const responseGate = new Promise<void>((resolve) => {
@@ -200,6 +203,8 @@ test("inbound history suggestions preserve manual edits and require a separate R
     await expect.poll(() => held).toBe(true);
     await expect(page.getByRole("button", { name: "保存询盘", exact: true })).toBeDisabled();
     await page.getByLabel("数量", { exact: true }).fill("750");
+    await page.getByRole("combobox", { name: "产品类型", exact: true }).click();
+    await page.getByRole("option", { name: "离合器片", exact: true }).click();
   } finally {
     releaseResponse();
   }
@@ -223,6 +228,7 @@ test("inbound history suggestions preserve manual edits and require a separate R
   const [rfq] = await readRfqs();
   expect(rfq.state).toBe("RFQ_COLLECTING");
   expect(rfq.payload.product).toMatchObject({ oe_number: "SYN-MANUAL" });
+  expect(rfq.payload.product).toMatchObject({ product_type: "clutch_disc" });
   expect(rfq.payload.commercial).toEqual({ quantity: 750, destination: "Human Confirmed Port" });
 });
 
@@ -418,6 +424,10 @@ for (const inbound of [false, true]) {
     await form.getByLabel("客户名称", { exact: true }).fill("MOCK buyer — synthetic only");
     await form.getByLabel("OE / OEM 编号", { exact: true }).fill("SYN-OE-001");
     await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+    await page.getByRole("button", { name: "保存询盘", exact: true }).click();
+    await expect(form.getByText("请确认客户需要的产品类型。", { exact: true })).toBeVisible();
+    await form.getByRole("combobox", { name: "产品类型", exact: true }).click();
+    await page.getByRole("option", { name: "离合器套件", exact: true }).click();
     await page.getByRole("button", { name: "保存询盘", exact: true }).click();
     const records = (type: typeof schema.aggregateRecord.$inferSelect.type) =>
       db
@@ -821,6 +831,8 @@ test("stale RFQ form rejects after archival and owner can reopen", async ({
   const form = page.locator("form#create-rfq").filter({ visible: true });
   await form.getByLabel("客户名称", { exact: true }).fill("SYNTHETIC stale form");
   await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+  await form.getByRole("combobox", { name: "产品类型", exact: true }).click();
+  await page.getByRole("option", { name: "离合器套件", exact: true }).click();
   // Archive in another request after the browser has already obtained a writable form.
   await db
     .update(schema.workspaceProject)
