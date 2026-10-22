@@ -44,19 +44,24 @@ export function BrowserViewerWindow({
   useEffect(() => {
     current.current = popup;
     let delivered = false;
+    let gatewayDelivered = false;
     const started = Date.now();
     const closeOwned = () => {
-      if (viewerWindowIsOpen(popup)) popup.window.close();
+      if (!popup.window.closed) popup.window.close();
     };
     const listener = (event: MessageEvent) => {
-      if (
-        event.source !== popup.window ||
-        event.origin !== window.location.origin ||
-        delivered ||
-        !token ||
-        !gatewayOrigin
-      )
+      if (event.source !== popup.window || !token || !gatewayOrigin) return;
+      if (event.origin === gatewayOrigin && delivered && !gatewayDelivered) {
+        if (event.data?.type !== "ftrade-browser-ready" || event.data?.nonce !== popup.nonce)
+          return;
+        popup.window.postMessage(
+          { type: "ftrade-browser-ticket", nonce: popup.nonce, token },
+          gatewayOrigin,
+        );
+        gatewayDelivered = true;
         return;
+      }
+      if (event.origin !== window.location.origin || delivered) return;
       const parsed = viewerWindowMessageSchema.safeParse(event.data);
       if (
         !parsed.success ||
@@ -75,11 +80,11 @@ export function BrowserViewerWindow({
       delivered = true;
     };
     const bind = () => {
-      if (!viewerWindowIsOpen(popup)) {
+      if (popup.window.closed || (!delivered && !viewerWindowIsOpen(popup))) {
         closed();
         return;
       }
-      if (!delivered && Date.now() - started >= 30_000) {
+      if (!gatewayDelivered && Date.now() - started >= 30_000) {
         closeOwned();
         closed();
         return;
@@ -88,6 +93,11 @@ export function BrowserViewerWindow({
         popup.window.postMessage(
           { type: "ftrade-viewer-window-bind", nonce: popup.nonce },
           window.location.origin,
+        );
+      else if (!gatewayDelivered && gatewayOrigin)
+        popup.window.postMessage(
+          { type: "ftrade-browser-probe", nonce: popup.nonce },
+          gatewayOrigin,
         );
     };
     window.addEventListener("message", listener);
