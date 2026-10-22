@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -165,6 +166,89 @@ test("matching MCP issuer remains usable and is preserved at the token storage b
   assert.equal(cached.saved.length, 1);
   assert.equal(cached.saved[0].access_token, "SYNTHETIC_access");
   assert.equal(cached.saved[0].issuer, transport.metadata.issuer);
+});
+
+test("MCP token redirects cannot forward client credentials to another origin", async () => {
+  const received = [];
+  const originalRequests = [];
+  const foreign = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    received.push(body);
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ access_token: "SYNTHETIC_redirected", token_type: "Bearer" }));
+  });
+  const listen = (server) =>
+    new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${server.address().port}`));
+    });
+  let trusted;
+  try {
+    const foreignOrigin = await listen(foreign);
+    trusted = createServer(async (request, response) => {
+      let body = "";
+      for await (const chunk of request) body += chunk;
+      originalRequests.push(body);
+      // 307 retains the original POST body if a client follows it.
+      response.writeHead(307, { Location: `${foreignOrigin}/token` });
+      response.end();
+    });
+    const issuer = await listen(trusted);
+    let rejected = false;
+    try {
+      await fetchToken(provider(issuer), issuer, {
+        metadata: tokenTransport(issuer).metadata,
+        fetchFn: (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(5_000) }),
+      });
+    } catch {
+      rejected = true;
+    }
+    assert.equal(originalRequests.length, 1, "The original token endpoint must be exercised");
+    assert.match(originalRequests[0], /client_secret=SYNTHETIC_secret/);
+    assert.equal(
+      received.length,
+      0,
+      "The foreign origin must receive no request or credential body",
+    );
+    assert.equal(rejected, true, "A redirected token response must not be accepted");
+  } finally {
+    for (const server of [trusted, foreign]) {
+      if (!server) continue;
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  }
+});
+
+test("same-origin MCP token redirects retain the legitimate token exchange", async () => {
+  const paths = [];
+  const server = createServer((request, response) => {
+    paths.push(request.url);
+    if (request.url === "/token") {
+      response.writeHead(307, { Location: "/final-token" });
+      response.end();
+    } else {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ access_token: "SYNTHETIC_same_origin", token_type: "Bearer" }));
+    }
+  });
+  try {
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const issuer = `http://127.0.0.1:${server.address().port}`;
+    const tokens = await fetchToken(provider(issuer), issuer, {
+      metadata: tokenTransport(issuer).metadata,
+      fetchFn: (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(5_000) }),
+    });
+    assert.equal(tokens.access_token, "SYNTHETIC_same_origin");
+    assert.deepEqual(paths, ["/token", "/final-token"]);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test("installed shadcn MCP server retains tool negotiation and a read-only call", async () => {
