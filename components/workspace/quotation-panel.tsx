@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { HandCoinsIcon, SendIcon, ShieldCheckIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,7 @@ import {
   quotationDraftFormSchema,
   quotationSendFormSchema,
 } from "@/lib/form-schemas";
+import { rfqCustomerRequirements } from "@/lib/rfq/customer-requirements";
 import type { QuotationEntry } from "@/lib/sales/closing-store";
 import { productTypeLabel } from "@/lib/sales/journey";
 import type { RfqEntry } from "@/lib/sales/store";
@@ -105,6 +106,8 @@ function QuotationForm({
           validityDays: "30",
         },
   });
+  const selectedRfqId = useWatch({ control: form.control, name: "rfqId" });
+  const selectedRfq = rfqs.find((rfq) => rfq.id === selectedRfqId);
   useWorkspaceDirty(`quotation-${entry?.id ?? "new"}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
@@ -168,6 +171,40 @@ function QuotationForm({
               />
               <FieldError errors={[form.formState.errors.rfqId]} />
             </Field>
+            {selectedRfq ? (
+              <FieldSet>
+                <FieldLegend>所选客户需求</FieldLegend>
+                <FieldDescription>
+                  以下是客户要求，不代表已核实产品事实或工厂承诺。请核对后填写报价。
+                </FieldDescription>
+                <dl className="grid gap-3 text-sm">
+                  {[
+                    ["产品类型", productTypeLabel(selectedRfq.productType)],
+                    ["OE / OEM 编号", selectedRfq.formValues.oeNumber],
+                    [
+                      "车辆品牌与车型",
+                      `${selectedRfq.formValues.vehicleBrand} ${selectedRfq.formValues.vehicleModel}`.trim(),
+                    ],
+                    ["数量", selectedRfq.quantity === null ? "" : String(selectedRfq.quantity)],
+                    ["目的地", selectedRfq.destination],
+                    ...rfqCustomerRequirements.map(({ field, label }) => [
+                      label,
+                      selectedRfq.formValues[field],
+                    ]),
+                  ].map(([label, value]) =>
+                    value ? (
+                      <div key={label} className="grid gap-1">
+                        <dt className="text-muted-foreground">{label}</dt>
+                        <dd className="whitespace-pre-wrap break-words">{value}</dd>
+                      </div>
+                    ) : null,
+                  )}
+                </dl>
+                <WorkspaceLink href={workspaceRecordHref(projectId, "rfq", selectedRfq.id)}>
+                  查看完整询盘
+                </WorkspaceLink>
+              </FieldSet>
+            ) : null}
             <Field data-invalid={!!form.formState.errors.productId}>
               <FieldLabel htmlFor={`quotation-product-${entry?.id ?? "new"}`}>报价产品</FieldLabel>
               <Controller

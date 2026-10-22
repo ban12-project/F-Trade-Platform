@@ -15,7 +15,7 @@ import {
 } from "../../lib/sales/closing-store";
 import { decryptSocialMessageBody } from "../../lib/social/message-crypto";
 import { createStoredSocialMessageRecord } from "../../lib/social/message-record";
-import { workspaceCreateHref } from "../../lib/workspace/navigation";
+import { workspaceCreateHref, workspaceRecordHref } from "../../lib/workspace/navigation";
 import { authSecret, databaseURL, socialMessageKey } from "../../playwright.database.config";
 
 process.env.SOCIAL_MESSAGE_ENCRYPTION_KEY = socialMessageKey;
@@ -92,6 +92,64 @@ test.beforeEach(async () => {
 
 test.afterAll(async () => {
   await pool.end();
+});
+
+test("quotation handoff follows the selected customer's requests without filling commercial terms", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  for (const name of ["A", "B"]) {
+    const id = randomUUID();
+    await db.insert(schema.aggregateRecord).values({
+      id,
+      type: "rfq",
+      state: "RFQ_READY",
+      createdByType: "human",
+      createdById: actorId,
+      payload: {
+        ...readyRfq,
+        rfq_id: id,
+        customer: { name: `MOCK buyer ${name}` },
+        product: { ...readyRfq.product, engine: `MOCK engine ${name}` },
+        commercial: { ...readyRfq.commercial, expected_delivery: `MOCK timing ${name}` },
+      },
+    });
+    await db
+      .insert(schema.workspaceProjectItem)
+      .values({
+        id: randomUUID(),
+        projectId,
+        aggregateId: id,
+        role: "sales_rfq",
+        relation: "owned",
+      });
+  }
+  const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+  await context.addCookies([
+    {
+      name: "better-auth.session_token",
+      value: encodeURIComponent(`${token}.${signature}`),
+      url: baseURL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  await page.goto(workspaceCreateHref(projectId, "quotation"));
+  const form = page.locator("form#quotation-new").filter({ visible: true });
+  const summary = form.getByRole("group", { name: "所选客户需求", exact: true });
+  await expect(summary).toHaveCount(0);
+  for (const name of ["A", "B"]) {
+    await form.getByRole("combobox", { name: "客户需求", exact: true }).click();
+    await page.getByRole("option", { name: new RegExp(`MOCK buyer ${name}`) }).click();
+    await expect(summary.getByText(`MOCK engine ${name}`, { exact: true })).toBeVisible();
+    await expect(summary.getByText(`MOCK timing ${name}`, { exact: true })).toBeVisible();
+    await expect(
+      summary.getByText(`MOCK engine ${name === "A" ? "B" : "A"}`, { exact: true }),
+    ).toHaveCount(0);
+    await expect(form.getByLabel("单价", { exact: true })).toHaveValue("");
+    await expect(form.getByLabel("交期（天）", { exact: true })).toHaveValue("");
+  }
 });
 
 test("inbound history suggestions preserve manual edits and require a separate RFQ save", async ({
@@ -504,6 +562,14 @@ for (const inbound of [false, true]) {
     await expect(page.getByText("MOCK revised timing", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "创建人工报价", exact: true }).click();
     const quote = page.locator("form#quotation-new").filter({ visible: true });
+    const requests = quote.getByRole("group", { name: "所选客户需求", exact: true });
+    await expect(requests.getByText("MOCK specification", { exact: true })).toBeVisible();
+    await expect(requests.getByText("MOCK revised timing", { exact: true })).toBeVisible();
+    await expect(requests.getByText("MOCK packaging", { exact: true })).toHaveCount(0);
+    await expect(requests.getByRole("link", { name: "查看完整询盘" })).toHaveAttribute(
+      "href",
+      workspaceRecordHref(projectId, "rfq", rfq.id),
+    );
     for (const [label, value] of [
       ["单价", "12.50"],
       ["报价依据", evidenceId],
