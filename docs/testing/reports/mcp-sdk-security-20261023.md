@@ -24,3 +24,7 @@ Node 24.21.0 / pnpm 12.3.4. Two local HTTP listeners used only marked synthetic 
 All eight tooling compatibility tests pass: CJS/ESM loader and maps, restricted esbuild origin response, issuer isolation, cached-discovery isolation, legitimate token storage, both redirect controls and actual installed shadcn MCP negotiation/read-only call. Biome CI and TypeScript checks pass. Final production/build/browser compatibility remains subject to the PR's final-head CI.
 
 Same-round `pnpm audit --prod --json`: **0 critical / 3 high / 2 moderate → 0 critical / 1 high / 0 moderate**. These are advisory/version matches, not exploit counts. The remaining braces advisory is still matched; its installed depth guard and the separate unpatched standalone CLI risk remain as documented. **Keep #498 open.** No production credentials, customer data, business writes or account sessions were used.
+
+## CI delivery checkpoint
+
+PR #657 final head `c5b6df5eca3ff9864c9f84758f700bc83c85f7a1` passed every check, including production build and full browser workflow `39817574017`. Squash merge: `365d4c68022b1bb32c983413c4d4a6e7a5fa9055`. This is tooling compatibility evidence, not a new channel or business acceptance result. Risk #498 remains open.

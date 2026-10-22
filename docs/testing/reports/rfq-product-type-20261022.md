@@ -22,3 +22,7 @@ Persisting blank product types would make those records unreadable to existing a
 - Extended database-browser CI tests to cover a manual type selected while suggestions are pending, missing-type validation and explicit selection in existing sales/archive flows. Full CI result is tracked on the PR.
 
 The browser used an isolated application copy and local synthetic PostgreSQL. Its Tailwind sources were restricted to that copy to exclude ignored test database files; repository build configuration is unchanged. No RFQ was saved during the local browser check. Local screenshot: `tmp/rfq-history-644/product-type.png` (ignored).
+
+## Delivery checkpoint — 2026-10-23
+
+PR #651 final head `5b823c6` passed all checks, including browser workflow `39815775213`. Squash merge: `c35d690897cfbd3ebba17469ac1704c3c3a6530d`. Independent Vercel readback for `dpl_GeYpZmudZ6iBABQGXSqG31fxKEBK` reports READY, production, that exact Git SHA and alias `ftp.ban12.com`. This establishes deployment; DM and real business acceptance remain separate and incomplete.
