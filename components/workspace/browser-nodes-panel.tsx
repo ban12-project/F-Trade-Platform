@@ -160,6 +160,12 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
   const connectedAccount = connectedNode?.accounts.find(
     (account) => account.id === connectedRun?.accountId,
   );
+  const loginScope = connectedNode?.loginFillScopes.find(
+    (scope) =>
+      scope.channelRef === connectedAccount?.channelRef &&
+      scope.accountRef === connectedAccount?.accountRef,
+  );
+  const automaticLogin = connectedRun?.savedLoginAutomatic ?? loginScope?.automatic ?? false;
   const canFillLogin =
     connectedNode?.status === "active" &&
     connectedRun?.kind === "interactive" &&
@@ -169,11 +175,21 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
     !connectedRun.savedLoginState &&
     connectedAccount?.enabled &&
     connectedAccount.loginSaved &&
-    connectedNode.loginFillScopes.some(
-      (scope) =>
-        scope.channelRef === connectedAccount.channelRef &&
-        scope.accountRef === connectedAccount.accountRef,
-    );
+    !!loginScope;
+  const loginUnavailable =
+    connectedNode?.status !== "active" ||
+    connectedRun?.status !== "running" ||
+    connectedRun.stopRequested
+      ? "当前浏览器任务不可用，请核对任务状态后重新接入。"
+      : !connectedAccount?.enabled
+        ? "该账号授权已停用，请先核对账号授权。"
+        : !connectedAccount.loginSaved
+          ? "该账号尚未保存登录凭据，请在账号配置中保存。"
+          : !loginScope
+            ? "该账号没有有效的登录页面规则（尚未启用或已过期），请先核对节点配置。"
+            : !connectedRun.ticketUsed
+              ? "正在等待远程桌面接入，连接建立后即可使用已保存凭据。"
+              : null;
   const challengeStatus = connectedRun?.savedLoginChallenge
     ? {
         checkpoint: connectedRun.savedLoginOutcome
@@ -205,8 +221,13 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
           : connectedRun?.savedLoginOutcome === "unknown"
             ? "登录结果未知，本次不再重试。请重新接入后核对。"
             : connectedRun?.savedLoginState
-              ? "填充请求已记录，正在等待节点结果。"
-              : "仅填入已保存的账号和密码；请自行检查并提交登录。需要已接入浏览器及有效的登录页面规则。");
+              ? automaticLogin
+                ? "自动登录请求已记录，正在等待账号身份与 Messenger 验证结果。"
+                : "填充请求已记录，正在等待节点结果。"
+              : (loginUnavailable ??
+                (automaticLogin
+                  ? "将先核对现有会话；需要恢复时会提交已保存密码及受支持的 2FA/PIN。遇到真人验证会暂停等待处理。"
+                  : "仅填入已保存的账号和密码；请在远程页面检查并提交登录。")));
   return (
     <div className="space-y-6">
       <p role="status" className="text-sm text-muted-foreground">
@@ -727,7 +748,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                   });
                 }}
               >
-                填入已保存账号和密码
+                {automaticLogin ? "使用已保存凭据自动登录" : "填入已保存账号和密码"}
               </Button>
               <p role="status" className="text-sm text-muted-foreground">
                 {loginStatus}
