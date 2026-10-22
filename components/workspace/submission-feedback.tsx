@@ -3,6 +3,8 @@ export function SubmissionFeedback({ status, message }: { status: string; messag
   return message ? (
     <p
       className={status === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}
+      role="status"
+      aria-label="提交结果"
       aria-live="polite"
     >
       {message}

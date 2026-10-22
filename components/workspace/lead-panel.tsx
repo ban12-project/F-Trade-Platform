@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2Icon, Clock3Icon, MessageSquareTextIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -105,7 +105,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
         defaultValue: localDateTime(entry.lead.next_follow_up_at),
       });
   }, [form, entry.lead.next_follow_up_at]);
-  const context = useWatch({ control: form.control, name: "context" });
+  const context = form.watch("context");
   const recommendation = nextFollowUp(context);
   const requiresDeliveryConfirmation = context === "asks_lead_time" || context === "asks_sample";
   const canSend =
