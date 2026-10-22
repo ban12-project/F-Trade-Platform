@@ -11,18 +11,29 @@ import {
 export function ViewerWindowFixture() {
   const [popup, setPopup] = useState<ViewerWindow | null>(null);
   const [message, setMessage] = useState("");
+  const [authorized, setAuthorized] = useState(true);
   const [version, setVersion] = useState(0);
   return (
     <>
       <Button
         onClick={() => {
-          const opened = openViewerWindow("/testing/browser-viewer/window");
+          setAuthorized(true);
+          const opened = openViewerWindow("http://127.0.0.1:9427");
           setMessage(opened ? "" : "Independent window blocked; no ticket requested");
           setPopup(opened);
         }}
       >
         Open independent viewer
       </Button>
+      <Button
+        onClick={() => {
+          setAuthorized(false);
+          setPopup(openViewerWindow("http://127.0.0.1:9427"));
+        }}
+      >
+        Open pending independent viewer
+      </Button>
+      <Button onClick={() => setAuthorized(true)}>Authorize pending viewer</Button>
       <Button onClick={() => setVersion((value) => value + 1)}>Refresh fixture</Button>
       <p>Fixture version: {version}</p>
       <p>{message}</p>
@@ -33,7 +44,11 @@ export function ViewerWindowFixture() {
             setPopup(null);
             setMessage("Independent viewer closed");
           }}
-          connection={{ origin: "http://127.0.0.1:9427", token: "isolated-viewer-fixture" }}
+          connection={
+            authorized
+              ? { origin: "http://127.0.0.1:9427", token: "isolated-viewer-fixture" }
+              : null
+          }
         />
       )}
     </>
