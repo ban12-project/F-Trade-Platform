@@ -9,6 +9,7 @@ import {
   createNativeProfileRuntime,
   initializeNativeProfile,
   nativeProfileLaunchOptions,
+  nativeProfileWindowSize,
 } from "../ops/browser-node/native-profile.mjs";
 import { patchNativeProfileSource } from "../ops/browser-node/patch-native-profile.mjs";
 
@@ -221,7 +222,12 @@ test("headed native windows fit the configured desktop without changing proxy or
     args: ["-no-remote"],
   };
   await f.runtime({ ENABLE_VNC: "1", VNC_RESOLUTION: "1440x900" }).launch(options);
-  assert.deepEqual(f.options().viewport, { width: 1360, height: 760 });
+  assert.equal(f.options().viewport, null);
+  assert.deepEqual(
+    nativeProfileWindowSize({ ENABLE_VNC: "1", VNC_RESOLUTION: "1440x900" }),
+    [1400, 860],
+  );
+  assert.equal(nativeProfileWindowSize({}), undefined);
   assert.equal(f.options().deviceScaleFactor, 1);
   assert.equal(f.options().proxy, options.proxy);
   assert.equal(f.options().args, options.args);

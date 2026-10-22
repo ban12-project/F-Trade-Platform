@@ -15,6 +15,10 @@ export function patchNativeProfileSource(file, source) {
     file === "server.js"
       ? [
           [
+            "const options = await buildLaunchOptionsWithGeoipFallback({",
+            "const options = await buildLaunchOptionsWithGeoipFallback({\n        window: nativeProfile ? nativeProfileWindowSize(process.env) : undefined,",
+          ],
+          [
             "async function launchBrowserInstance() {",
             'const nativeProfile = createNativeProfileRuntime({ firefox });\n\nasync function launchBrowserInstance() {\n  if (nativeProfile && (MAX_SESSIONS !== 1 || proxyPool?.canRotateSessions))\n    throw new Error("native_profile_requires_one_fixed_account");',
           ],
@@ -59,7 +63,7 @@ export function patchNativeProfileSource(file, source) {
     result = result.replace(before, after);
   }
   if (file === "server.js")
-    result = `import { createNativeProfileRuntime } from "./ftrade-native-profile.mjs";\n${result}`;
+    result = `import { createNativeProfileRuntime, nativeProfileWindowSize } from "./ftrade-native-profile.mjs";\n${result}`;
   return result;
 }
 export async function patchNativeProfile(root) {
