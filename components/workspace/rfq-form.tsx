@@ -40,6 +40,7 @@ import { inquirySuggestionRequestSchema, rfqFormSchema } from "@/lib/form-schema
 import { updateRfqDraft } from "@/lib/rfq/assessment";
 import { nextClarification } from "@/lib/sales/clarification";
 import type { LeadEntry } from "@/lib/sales/closing-store";
+import { type InquiryField, inquiryFieldLabels } from "@/lib/sales/inquiry-history";
 import type { InquirySuggestion } from "@/lib/sales/inquiry-suggestions";
 import type { RfqEntry } from "@/lib/sales/store";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
@@ -243,7 +244,8 @@ export function RfqForm({
               <FieldSet>
                 <FieldLegend>整理客户消息</FieldLegend>
                 <FieldDescription>
-                  按规则整理最新客户入站消息中的数量、目的地和产品身份，仅填入空白字段。客户提出的适配需求尚未核验，请逐项核对后保存。
+                  按规则汇总最近 30
+                  条有效客户消息中的数量、目的地和产品身份，仅填入没有冲突的空白字段。客户提出的适配需求尚未核验，请逐项核对后保存。
                 </FieldDescription>
                 <Button
                   type="button"
@@ -252,7 +254,7 @@ export function RfqForm({
                   onClick={suggestInquiry}
                 >
                   {suggesting ? <Spinner /> : null}
-                  从最新客户消息整理建议
+                  从客户消息整理建议
                 </Button>
                 <WorkspaceLink
                   href={workspaceRecordHref(projectId, "lead", values.leadId)}
@@ -266,10 +268,37 @@ export function RfqForm({
                   </p>
                 ) : null}
                 {suggestion ? (
-                  <FieldDescription>
-                    来源消息 {suggestion.source.messageId.slice(0, 8)} ·{" "}
-                    {new Date(suggestion.source.receivedAt).toLocaleString("zh-CN")}
-                  </FieldDescription>
+                  <>
+                    <FieldDescription>
+                      已整理 {suggestion.messages.length} 条有效客户消息。最新来源消息{" "}
+                      {suggestion.source.messageId.slice(0, 8)} ·{" "}
+                      {new Date(suggestion.source.receivedAt).toLocaleString("zh-CN")}
+                    </FieldDescription>
+                    {Object.entries(suggestion.fieldSources).map(([field, ids]) => (
+                      <FieldDescription key={field}>
+                        {inquiryFieldLabels[field as InquiryField]}来源：
+                        {suggestion.messages
+                          .filter((message) => ids?.includes(message.id))
+                          .map(
+                            (message) =>
+                              `${message.id.slice(0, 8)} · ${new Date(message.receivedAt).toLocaleString("zh-CN")}`,
+                          )
+                          .join("、")}
+                      </FieldDescription>
+                    ))}
+                    {suggestion.conflicts.length ? (
+                      <FieldDescription>
+                        需要人工核对：
+                        {suggestion.conflicts.map((field) => inquiryFieldLabels[field]).join("、")}
+                        。 消息包含不同值或不明确的表达，这些字段未自动补入。
+                      </FieldDescription>
+                    ) : null}
+                    {suggestion.truncated ? (
+                      <FieldDescription>
+                        仅整理最近 30 条有效客户消息，较早消息未纳入；请结合完整会话核对。
+                      </FieldDescription>
+                    ) : null}
+                  </>
                 ) : null}
                 {clarification.status === "clarification_required" ? (
                   <FieldDescription>可向客户补问：{clarification.message}</FieldDescription>

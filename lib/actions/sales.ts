@@ -12,7 +12,7 @@ import {
 import {
   type InquirySuggestion,
   InquiryUnavailableError,
-  suggestFromLatestInquiry,
+  suggestFromInquiryHistory,
 } from "@/lib/sales/inquiry-suggestions";
 import { rfqMissingLabel } from "@/lib/sales/journey";
 import { createRfq, reviseRfq, submitRfqReady } from "@/lib/sales/store";
@@ -42,7 +42,7 @@ export async function suggestInquiryAction(
   try {
     return {
       status: "success",
-      suggestion: await suggestFromLatestInquiry(parsed.data, session.user.id),
+      suggestion: await suggestFromInquiryHistory(parsed.data, session.user.id),
     };
   } catch (error) {
     return {
