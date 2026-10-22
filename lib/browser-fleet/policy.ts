@@ -433,6 +433,7 @@ export function publicState(state: FleetState, now = Date.now()) {
       const { ticketHash, authSessionId, leaseId, claimId, inboxReceipts, savedLogin, ...r } = run;
       return {
         ...r,
+        savedLoginAutomatic: savedLogin ? savedLogin.automatic === true : null,
         savedLoginOutcome: savedLoginOutcome(run, now),
         savedLoginChallenge: savedLogin?.challenge ?? null,
         savedLoginFactorPrompts: savedLogin?.factorPrompts ?? null,

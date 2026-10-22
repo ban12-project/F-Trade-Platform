@@ -334,7 +334,12 @@ test("saved login waiting ends after interruption or expiry without inventing a 
   const r = enqueue(s, "a", "interactive", now);
   claim(s, now + 1);
   renewRun(s, r.id, r.leaseId, true, now + 2);
+  assert.equal(publicState(s, now + 3).runs[0].savedLoginAutomatic, null);
   r.savedLogin = { id: randomUUID(), requestedAt: now, expiresAt: now + 20000, claimedAt: null };
+  assert.equal(publicState(s, now + 3).runs[0].savedLoginAutomatic, false);
+  r.savedLogin.automatic = true;
+  assert.equal(publicState(s, now + 30000).runs[0].savedLoginAutomatic, true);
+  assert.deepEqual(publicState(s, now + 30000).loginFillScopes, []);
   s.accounts[0].authState = "needs_login";
   const outcome = (at = now + 3) => publicState(s, at).runs[0].savedLoginOutcome;
   assert.equal(outcome(), null);
