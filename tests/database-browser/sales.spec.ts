@@ -438,6 +438,12 @@ for (const inbound of [false, true]) {
     const form = page.locator("form#create-rfq").filter({ visible: true });
     await form.getByLabel("客户名称", { exact: true }).fill("MOCK buyer — synthetic only");
     await form.getByLabel("OE / OEM 编号", { exact: true }).fill("SYN-OE-001");
+    await form.getByLabel("车型年份", { exact: true }).fill("MOCK 2030");
+    await form.getByLabel("发动机", { exact: true }).fill("MOCK engine");
+    await form.getByLabel("规格要求", { exact: true }).fill("MOCK specification");
+    await form.getByLabel("包装要求", { exact: true }).fill("MOCK packaging");
+    await form.getByLabel("客户期望交付", { exact: true }).fill("MOCK requested timing");
+    await form.getByLabel("定制要求", { exact: true }).fill("MOCK customization");
     await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
     await page.getByRole("button", { name: "保存询盘", exact: true }).click();
     const records = (type: typeof schema.aggregateRecord.$inferSelect.type) =>
@@ -458,6 +464,9 @@ for (const inbound of [false, true]) {
     await expect(page.getByRole("button", { name: "确认需求完整", exact: true })).toBeDisabled();
     expect(await records("quotation")).toHaveLength(0);
     const revise = page.locator(`form#revise-rfq-${rfq.id}`).filter({ visible: true });
+    await expect(revise.getByLabel("包装要求", { exact: true })).toHaveValue("MOCK packaging");
+    await revise.getByLabel("包装要求", { exact: true }).fill("");
+    await revise.getByLabel("客户期望交付", { exact: true }).fill("MOCK revised timing");
     await revise.getByLabel("数量", { exact: true }).fill("25");
     await revise.getByLabel("目的地国家或港口", { exact: true }).fill("MOCK destination");
     await revise.getByLabel("录入证据", { exact: true }).fill(evidenceId);
@@ -472,6 +481,17 @@ for (const inbound of [false, true]) {
       destination: "MOCK destination",
     });
     expect(readyRfq.payload.missing_fields).toEqual([]);
+    expect(readyRfq.payload.product).toMatchObject({
+      vehicle_year: "MOCK 2030",
+      engine: "MOCK engine",
+      required_specification: "MOCK specification",
+    });
+    expect(readyRfq.payload.commercial).toMatchObject({
+      expected_delivery: "MOCK revised timing",
+      customization: "MOCK customization",
+    });
+    expect(readyRfq.payload.commercial).not.toHaveProperty("packaging_requirement");
+    await expect(page.getByText("MOCK revised timing", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "创建人工报价", exact: true }).click();
     const quote = page.locator("form#quotation-new").filter({ visible: true });
     for (const [label, value] of [

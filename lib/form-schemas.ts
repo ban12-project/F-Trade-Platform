@@ -205,6 +205,12 @@ export const rfqFormSchema = z.object({
   oeNumber: optionalRfqText,
   vehicleBrand: optionalRfqText,
   vehicleModel: optionalRfqText,
+  vehicleYear: optionalRfqText.optional(),
+  engine: optionalRfqText.optional(),
+  requiredSpecification: optionalRfqText.optional(),
+  packagingRequirement: optionalRfqText.optional(),
+  expectedDelivery: optionalRfqText.optional(),
+  customization: optionalRfqText.optional(),
   quantity: z
     .string()
     .trim()
