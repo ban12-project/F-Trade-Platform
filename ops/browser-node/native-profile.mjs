@@ -94,9 +94,10 @@ export async function initializeNativeProfile({ root = "/data", accountId, nodeI
 }
 
 // Persistent Firefox can restore a window larger than the current Xvfb desktop.
-// Fit the headed context at launch instead of editing its saved profile files.
-export function nativeProfileLaunchOptions(options, environment) {
-  if (environment.ENABLE_VNC !== "1") return options;
+// Size Camoufox before it generates its launch config; beta.40 holds that
+// outer size during startup, so a competing Playwright viewport cannot fit it.
+export function nativeProfileWindowSize(environment) {
+  if (environment.ENABLE_VNC !== "1") return undefined;
   const match = /^(\d{3,4})x(\d{3,4})(?:x(?:16|24|32))?$/.exec(
     environment.VNC_RESOLUTION ?? "1440x900",
   );
@@ -105,12 +106,13 @@ export function nativeProfileLaunchOptions(options, environment) {
     height = Number(match[2]);
   if (width < 800 || width > 3840 || height < 600 || height > 2160)
     throw new Error("native_profile_display_invalid");
-  // Reserve space for Firefox chrome and window borders inside the desktop.
-  return {
-    ...options,
-    viewport: { width: width - 80, height: height - 140 },
-    deviceScaleFactor: 1,
-  };
+  // Leave room for native window decoration inside the remote desktop.
+  return [width - 40, height - 40];
+}
+
+export function nativeProfileLaunchOptions(options, environment) {
+  if (!nativeProfileWindowSize(environment)) return options;
+  return { ...options, viewport: null, deviceScaleFactor: undefined };
 }
 
 export function createNativeProfileRuntime({

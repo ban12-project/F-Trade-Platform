@@ -9,6 +9,8 @@ if [[ -n "${NATIVE_PROFILE_SECCOMP:-}" ]]; then
   security_options+=(--security-opt "seccomp=$NATIVE_PROFILE_SECCOMP")
 fi
 cleanup() {
+  local result=$?
+  if [[ "$result" != 0 ]]; then docker logs --tail 80 "$name" >&2 || true; fi
   docker rm -f "$name" >/dev/null 2>&1 || true
   docker volume rm "$volume" >/dev/null 2>&1 || true
 }
@@ -58,6 +60,8 @@ test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
 docker rm "$name" >/dev/null
 start
 docker exec "$name" node /app/plugins/synthetic-profile/client.mjs read keep-session
+# Observe actual X11 geometry as well as Firefox persisted geometry.
+docker exec "$name" sh -ec 'for socket in /tmp/.X11-unix/X*; do DISPLAY=":${socket##*X}" xwininfo -root -tree; done'
 docker stop -t 20 "$name" >/dev/null
 test "$(docker inspect --format '{{.State.Running}}' "$name")" = false
 test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
@@ -66,6 +70,7 @@ docker run --rm --network none -v "$volume:/data:ro" --entrypoint node "$NATIVE_
 const fs=require("node:fs"),assert=require("node:assert/strict");
 const d=JSON.parse(fs.readFileSync("/data/native-profile-v1/firefox/xulstore.json","utf8"));
 const w=d["chrome://browser/content/browser.xhtml"]["main-window"];
+console.log("Persisted synthetic window geometry:", JSON.stringify(w));
 assert.ok(Number(w.width)>0 && Number(w.width)<=1440, "window exceeds remote desktop width");
 assert.ok(Number(w.height)>0 && Number(w.height)<=900, "window exceeds remote desktop height");
 console.log("PASS oversized persistent window fitted; profile cookie and nonextractable key preserved");'
