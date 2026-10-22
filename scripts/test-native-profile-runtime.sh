@@ -9,6 +9,8 @@ if [[ -n "${NATIVE_PROFILE_SECCOMP:-}" ]]; then
   security_options+=(--security-opt "seccomp=$NATIVE_PROFILE_SECCOMP")
 fi
 cleanup() {
+  local result=$?
+  if [[ "$result" != 0 ]]; then docker logs --tail 80 "$name" >&2 || true; fi
   docker rm -f "$name" >/dev/null 2>&1 || true
   docker volume rm "$volume" >/dev/null 2>&1 || true
 }
