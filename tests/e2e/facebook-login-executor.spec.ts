@@ -23,6 +23,8 @@ for (const mode of [
   "expired_release",
   "lost_claim",
   "lost_fill",
+  "unknown_fill_response",
+  "diagnostic_failure",
   "lost_result",
   "disconnected",
   "concurrent",
@@ -52,6 +54,7 @@ for (const mode of [
       "navigation",
     ].includes(mode);
     const calls: string[] = [];
+    const diagnostics: string[] = [];
     let checks = 0,
       active = true;
     const releases: Array<Record<string, unknown>> = [];
@@ -105,7 +108,13 @@ for (const mode of [
         expect(body).toBeDefined();
         const result = await fill(body ?? {});
         if (mode === "lost_fill") throw new Error("SYNTHETIC secret in upstream error");
+        if (["unknown_fill_response", "diagnostic_failure"].includes(mode))
+          return Response.json({ outcome: "unknown" });
         return Response.json(result);
+      },
+      reportUncertain(stage) {
+        diagnostics.push(stage);
+        if (mode === "diagnostic_failure") throw new Error("SYNTHETIC diagnostic failure");
       },
       async request(operation, fields) {
         calls.push(operation);
@@ -147,6 +156,17 @@ for (const mode of [
       ["normal", "concurrent"].includes(mode) ? "filled" : refusal ? "refused" : "unknown",
     );
     if (mode === "concurrent") expect(outcomes[1]).toBe("refused");
+    const expectedStage: Record<string, string> = {
+      expired_release: "release_deadline",
+      lost_claim: "claim",
+      lost_fill: "fill_request",
+      unknown_fill_response: "fill_response",
+      diagnostic_failure: "fill_response",
+      lost_result: "result_receipt",
+    };
+    if (mode in expectedStage) expect(diagnostics).toEqual([expectedStage[mode]]);
+    if (refusal || ["normal", "concurrent"].includes(mode)) expect(diagnostics).toEqual([]);
+    expect(JSON.stringify(diagnostics)).not.toContain("SYNTHETIC");
     expect(calls.filter((call) => call === "claim-login")).toHaveLength(refusal ? 0 : 1);
     if (mode === "normal")
       expect(calls).toEqual([
