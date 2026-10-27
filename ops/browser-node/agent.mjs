@@ -398,6 +398,9 @@ async function heartbeat(slot) {
       },
       request: nodeCall,
       browserRequest: (path, body) => browserRequest(slot, path, body),
+      reportUncertain(stage) {
+        console.error(`browser_login_fill_uncertain:${stage}`);
+      },
     });
     // Run independently so slow navigation cannot starve other slots' lease heartbeats.
     slot.loginTask = execute(renewed.loginAuthorization)

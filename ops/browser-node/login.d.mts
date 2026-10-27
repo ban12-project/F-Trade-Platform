@@ -20,6 +20,7 @@ export function createSavedLoginExecutor(input: {
   checkEgress(): Promise<void>;
   request(operation: string, fields: Record<string, unknown>): Promise<Record<string, unknown>>;
   browserRequest(path: string, body?: Record<string, unknown>): Promise<Response>;
+  reportUncertain?(stage: string): void;
 }): (notice: { id: string; expiresAt: number }) => Promise<string>;
 
 export function loginStopOutcome(
