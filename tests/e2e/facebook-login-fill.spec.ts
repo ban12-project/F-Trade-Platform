@@ -155,3 +155,91 @@ test("login plugin is disabled by default and rejects missing runtime authority"
     "login_profile_invalid",
   );
 });
+
+for (const mode of [
+  "reviewed_root",
+  "no_opt_in",
+  "explicit_root_action",
+  "foreign_action",
+  "duplicate_password",
+  "different_origin",
+] as const) {
+  test(`reviewed root login form ${mode}`, async ({ page, context }) => {
+    const accountId = randomUUID(),
+      runId = randomUUID();
+    const rootProfile = {
+      ...profile,
+      url: "https://www.facebook.com/",
+      form: "#login_form",
+      username: '#login_form input[name="email"]',
+      password: '#login_form input[name="pass"]',
+      ...(mode === "no_opt_in" ? {} : { formActionMode: "facebook-root-implicit" }),
+    };
+    const action =
+      mode === "explicit_root_action"
+        ? ' action="/"'
+        : mode === "foreign_action"
+          ? ' action="https://evil.invalid/login/"'
+          : "";
+    await context.route("**/*", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: `<form id="login_form" method="post"${action}><input name="email" type="text"><input name="pass" type="password">${mode === "duplicate_password" ? '<input name="pass" type="password">' : ""}<button>Log in</button></form>`,
+      }),
+    );
+    await page.goto(mode === "different_origin" ? "https://evil.invalid/" : rootProfile.url);
+    let submitted = 0;
+    await page.exposeFunction("onSyntheticSubmit", () => submitted++);
+    await page.locator("form").evaluate((form) =>
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        (window as unknown as { onSyntheticSubmit(): void }).onSyntheticSubmit();
+      }),
+    );
+    const sessions = new Map([
+      [accountId, { tabGroups: new Map([[runId, new Map([["tab", { page }]])]]) }],
+    ]);
+    const fill = createLoginFill({
+      sessions,
+      accountId,
+      runId,
+      kind: "interactive",
+      profile: rootProfile,
+      leaseDeadline: () => Date.now() + 60000,
+    });
+    const result = await fill({
+      requestId: randomUUID(),
+      runId,
+      userId: accountId,
+      tabId: "tab",
+      username: "SYNTHETIC-user",
+      password: "SYNTHETIC-secret",
+      expiresAt: Date.now() + 20000,
+    });
+    expect(result.outcome).toBe(mode === "reviewed_root" ? "filled" : "refused");
+    expect(submitted).toBe(0);
+    expect(await page.locator('input[name="email"]').inputValue()).toBe(
+      mode === "reviewed_root" ? "SYNTHETIC-user" : "",
+    );
+  });
+}
+
+test("root form opt-in rejects broader and automatic profiles", () => {
+  const reviewed = {
+    ...profile,
+    url: "https://www.facebook.com/",
+    form: "#login_form",
+    username: '#login_form input[name="email"]',
+    password: '#login_form input[name="pass"]',
+    formActionMode: "facebook-root-implicit",
+  };
+  expect(validateLoginProfile(reviewed)).toEqual(reviewed);
+  for (const invalid of [
+    { ...reviewed, url: "https://www.facebook.com/login/" },
+    { ...reviewed, form: "form" },
+    { ...reviewed, username: "input" },
+    { ...reviewed, formActionMode: "unknown" },
+    { ...reviewed, version: 2, automation: {} },
+  ])
+    expect(() => validateLoginProfile(invalid)).toThrow("login_profile_invalid");
+});

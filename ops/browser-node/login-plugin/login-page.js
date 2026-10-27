@@ -37,11 +37,18 @@ function fillLogin({ profile, username, password, expiresAt }) {
     )
       return "refused";
     const action = new URL(form.action);
+    const reviewedRootForm =
+      profile.formActionMode === "facebook-root-implicit" &&
+      location.href === "https://www.facebook.com/" &&
+      !form.hasAttribute("action") &&
+      action.href === location.href;
     if (
       action.origin !== "https://www.facebook.com" ||
       action.username ||
       action.password ||
-      !(action.pathname === "/login.php" || action.pathname.startsWith("/login/"))
+      !(profile.formActionMode === "facebook-root-implicit"
+        ? reviewedRootForm
+        : action.pathname === "/login.php" || action.pathname.startsWith("/login/"))
     )
       return "refused";
     if (Date.now() >= expiresAt) return "refused";
