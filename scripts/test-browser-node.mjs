@@ -878,6 +878,71 @@ test("saved login profiles remain private, bounded and interactive-account scope
       await writeFile(path, JSON.stringify(invalid));
       await assert.rejects(() => loadLoginProfiles(path));
     }
+    const expired = {
+      ...entry,
+      accountRef: "expired-account",
+      profile: {
+        ...profile,
+        reviewedAt: new Date(Date.now() - 120000).toISOString(),
+        expiresAt: new Date(Date.now() - 60000).toISOString(),
+      },
+    };
+    await writeFile(path, JSON.stringify([expired, entry]));
+    const current = await loadLoginProfiles(path);
+    assert.deepEqual(
+      loginScopes(current).map((scope) => scope.accountRef),
+      [entry.accountRef],
+    );
+    assert.equal(
+      loginProfileForRun(current, { ...scopedRun, accountRef: expired.accountRef }),
+      null,
+    );
+    const expiredAutomatic = {
+      ...expired,
+      accountRef: "123456789",
+      profile: {
+        ...expired.profile,
+        version: 2,
+        automation: {
+          accountRef: "123456789",
+          identity: { selector: "#identity", attribute: "data-account-id" },
+          passwordSubmit: "#submit",
+          totp: {
+            url: "https://www.facebook.com/two_factor/",
+            marker: "#totp",
+            input: "#code",
+            submit: "#verify",
+          },
+          pin: {
+            url: "https://www.facebook.com/messages/",
+            marker: "#pin",
+            input: "#pin-code",
+            submit: null,
+          },
+          ready: {
+            url: "https://www.facebook.com/messages/",
+            marker: "#chats",
+            empty: "#empty",
+            emptyText: "No chats",
+            thread: "#thread",
+          },
+          checkpoint: "#checkpoint",
+          rejected: "#rejected",
+          loading: "#loading",
+        },
+      },
+    };
+    await writeFile(path, JSON.stringify([expiredAutomatic]));
+    assert.equal((await loadLoginProfiles(path)).size, 0);
+    for (const invalid of [
+      [expired, expired],
+      [{ ...expired, profile: { ...expired.profile, url: "https://example.invalid/" } }],
+      [{ ...expired, profile: { ...expired.profile, reviewedAt: new Date(0).toISOString() } }],
+      [{ ...expiredAutomatic, profile: { ...expiredAutomatic.profile, automation: {} } }],
+    ]) {
+      await writeFile(path, JSON.stringify(invalid));
+      await assert.rejects(() => loadLoginProfiles(path));
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
