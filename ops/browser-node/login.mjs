@@ -5,6 +5,7 @@ import { validateLoginProfile } from "./login-plugin/index.js";
 
 export async function loadLoginProfiles(path) {
   const profiles = new Map();
+  const seen = new Set();
   if (!path) return profiles;
   const source = await readFile(path, "utf8");
   if (source.length > 64000) throw new Error("login_profiles_limit");
@@ -22,8 +23,15 @@ export async function loadLoginProfiles(path) {
     )
       throw new Error("login_profile_scope_invalid");
     const key = JSON.stringify([value.channelRef, value.accountRef]);
-    if (profiles.has(key)) throw new Error("login_profile_duplicate");
-    profiles.set(key, { ...value, profile: validateLoginProfile(value.profile) });
+    if (seen.has(key)) throw new Error("login_profile_duplicate");
+    seen.add(key);
+    const now = Date.now();
+    const expires = Date.parse(value.profile?.expiresAt);
+    // Validate the entire original contract even for an expired review. Never
+    // renew it: omit it from advertised scopes and allow interactive access.
+    const validationTime = Number.isFinite(expires) && expires <= now ? expires - 1 : now;
+    const profile = validateLoginProfile(value.profile, validationTime);
+    if (expires > now) profiles.set(key, { ...value, profile });
   }
   return profiles;
 }
