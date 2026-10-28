@@ -143,19 +143,28 @@ test("browser startup waits for Firefox prewarm and rechecks cancellation", asyn
   );
   assert.equal(calls, 60);
 });
-test("browser compatibility hook preserves proxy and unrelated preferences across launches", () => {
+test("browser compatibility hook preserves WebSocket preferences and restricts WebRTC", () => {
   const events = new EventEmitter();
   registerCompatibility({}, { events }, { enabled: true });
-  for (const firefoxUserPrefs of [undefined, { "network.http.http2.enabled": true }]) {
+  for (const firefoxUserPrefs of [
+    undefined,
+    { "network.http.http2.websockets": true },
+    { "network.http.http2.websockets": false },
+  ]) {
     const proxy = { server: "http://proxy.example:3128" };
     const options = { proxy, firefoxUserPrefs };
     events.emit("browser:launching", { options });
     assert.equal(options.proxy, proxy);
-    assert.equal(options.firefoxUserPrefs["network.http.http2.websockets"], false);
+    assert.equal(
+      options.firefoxUserPrefs["network.http.http2.websockets"],
+      firefoxUserPrefs?.["network.http.http2.websockets"],
+    );
     assert.equal(options.firefoxUserPrefs["media.peerconnection.enabled"], false);
     if (firefoxUserPrefs) {
-      assert.equal(options.firefoxUserPrefs["network.http.http2.enabled"], true);
-      assert.deepEqual(firefoxUserPrefs, { "network.http.http2.enabled": true });
+      assert.deepEqual(
+        options.firefoxUserPrefs["network.http.http2.websockets"],
+        firefoxUserPrefs["network.http.http2.websockets"],
+      );
     }
   }
 });

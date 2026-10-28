@@ -249,7 +249,7 @@ try {
     );
     await run(
       "build-base",
-      "cd /vercel/sandbox/source; docker build --build-arg CAMOUFOX_VERSION=152.0.4 --build-arg CAMOUFOX_RELEASE=beta.30 --build-arg TARGETARCH=amd64 -f ops/browser-node/upstream/Dockerfile.ci -t ftrade-camofox-base:152.0.4-beta.30 ops/browser-node/upstream",
+      "cd /vercel/sandbox/source; docker build --build-arg CAMOUFOX_VERSION=158.0 --build-arg CAMOUFOX_RELEASE=beta.40 --build-arg TARGETARCH=amd64 -f ops/browser-node/upstream/Dockerfile.ci -t ftrade-camofox-base:158.0-beta.40 ops/browser-node/upstream",
       420_000,
     );
     await run(
