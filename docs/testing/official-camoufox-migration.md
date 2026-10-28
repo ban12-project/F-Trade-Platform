@@ -86,7 +86,10 @@ into the production image.
 
 An isolated read-only image test failed before browser launch: the official
 package needs its profile directory and pinned fpgen model provisioned before
-the filesystem becomes read-only. Its default add-on also attempts a runtime
-download when absent. The eventual image must provision and verify its required
-assets during the build, and explicitly decide its add-on policy; a writable
-runtime filesystem or silent download failure is not proof of readiness.
+the filesystem becomes read-only. A follow-up probe also found that the GeoIP
+database is downloaded when absent or stale, its default add-on attempts a
+runtime download when absent, and generated font configuration requires a
+writable destination unless provisioned. The eventual image must provision and
+verify its required assets during the build, explicitly decide its add-on
+policy, and account for GeoIP refresh; a writable runtime filesystem or silent
+download failure is not proof of readiness.
