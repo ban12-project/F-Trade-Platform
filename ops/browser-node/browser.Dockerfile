@@ -1,4 +1,4 @@
-ARG BROWSER_BASE_IMAGE=ftrade-camofox-base:152.0.4-beta.30
+ARG BROWSER_BASE_IMAGE=ftrade-camofox-base:158.0-beta.40
 FROM ${BROWSER_BASE_IMAGE}
 # Firefox on the reviewed Debian 13 base uses system FFmpeg for H.264/AAC.
 RUN apt-get update \
@@ -17,5 +17,4 @@ COPY watchdog.mjs /opt/ftrade/watchdog.mjs
 COPY camofox.config.json /app/camofox.config.json
 COPY login-plugin/ /app/plugins/ftrade-login/
 COPY diagnostics-plugin/ /app/plugins/ftrade-diagnostics/
-COPY compatibility-plugin/ /app/plugins/ftrade-compatibility/
 CMD ["node", "/opt/ftrade/watchdog.mjs"]
