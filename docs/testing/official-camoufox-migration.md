@@ -110,9 +110,10 @@ with the existing runtime, rather than tolerating an unprovisioned download.
 The launcher checks GeoIP freshness before generating options and rejects stale
 assets before the official library can attempt a runtime database download.
 Refresh requires an image rebuild; a managed rebuild/deployment cadence still
-needs to be established before cutover. The standalone build, both native
-architectures, full login/publication contracts, real fixed-proxy DNS/IPv6/ICE/UDP
-checks, actual Sandbox viewer and rollback gates remain required. The local
+needs to be established before cutover. The standalone image and actual-browser fixture passed on native amd64 and arm64
+in CI run 40760771707, including reopening the profile after watchdog shutdown.
+Full login/publication contracts, real fixed-proxy DNS/IPv6/ICE/UDP checks, actual
+Sandbox viewer and rollback gates remain required. The local
 development image inherits old packages solely to reuse provisioned assets and
 is not evidence that the final image excludes jo-inc or `camoufox-js`.
 
