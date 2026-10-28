@@ -10,6 +10,8 @@ import { startDisplay } from "/app/official-runtime/display.mjs";
 import { Camoufox, launchOptions } from "/app/official-runtime/node_modules/camoufox/dist/index.js";
 import { createRuntimeService } from "/app/official-runtime/service.mjs";
 import { createGateway } from "/project/browser-node/gateway.mjs";
+import { configureLoginFixture, verifyLoginContracts } from "./login.mjs";
+import { verifyPublicationContracts } from "./publication.mjs";
 import { verifySocialContracts } from "./social.mjs";
 
 const mode = process.env.FIXTURE_MODE;
@@ -100,6 +102,7 @@ try {
       return context;
     },
   };
+  if (mode === "write") configureLoginFixture(accountId, runId);
   runtime = createRuntimeService({
     launcher,
     accountId,
@@ -107,7 +110,7 @@ try {
     accessKey: key,
     leaseDeadline,
     viewer: display,
-    registerIntegrations: false,
+    registerIntegrations: mode === "write",
     validateUrl: (value) => {
       const u = new URL(value);
       assert.ok([origin, "https://www.facebook.com"].includes(u.origin));
@@ -175,7 +178,17 @@ try {
   if (process.env.EXPECT_SHUTDOWN === "1")
     assert.equal(await evaluate("localStorage.getItem('shutdownMarker')"), "lease-expiry");
   const identity = await evaluate(
-    "({ua:navigator.userAgent,language:navigator.language,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,width:innerWidth,height:innerHeight})",
+    `(() => {
+      const gl=document.createElement('canvas').getContext('webgl');
+      const debug=gl?.getExtension('WEBGL_debug_renderer_info');
+      return {ua:navigator.userAgent,language:navigator.language,languages:[...navigator.languages],
+        timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,width:innerWidth,height:innerHeight,
+        screen:{width:screen.width,height:screen.height,colorDepth:screen.colorDepth,pixelRatio:devicePixelRatio},
+        webgl:gl?{vendor:gl.getParameter(gl.VENDOR),renderer:gl.getParameter(gl.RENDERER),version:gl.getParameter(gl.VERSION),
+          unmaskedVendor:debug?gl.getParameter(debug.UNMASKED_VENDOR_WEBGL):null,
+          unmaskedRenderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):null}:null,
+        rtc:{peerConnection:typeof RTCPeerConnection,mediaDevices:typeof navigator.mediaDevices}}
+    })()`,
   );
   assert.ok(identity.width <= 1440 && identity.height <= 900);
   if (mode === "write")
@@ -184,7 +197,9 @@ try {
     const previous = JSON.parse(readFileSync("/data/synthetic-identity.json", "utf8"));
     console.log(
       JSON.stringify({
-        identityChangedFields: Object.keys(identity).filter((k) => identity[k] !== previous[k]),
+        identityChangedFields: Object.keys(identity).filter(
+          (k) => JSON.stringify(identity[k]) !== JSON.stringify(previous[k]),
+        ),
       }),
     );
   }
@@ -222,6 +237,8 @@ try {
       selector: "#click-proof",
     });
     await verifySocialContracts({ context, accountId, runId, accessKey: key });
+    await verifyLoginContracts({ context, accountId, runId, accessKey: key });
+    await verifyPublicationContracts({ context, accountId, runId, accessKey: key });
   }
   if (mode === "lease") {
     await evaluate("localStorage.setItem('shutdownMarker', 'lease-expiry')");

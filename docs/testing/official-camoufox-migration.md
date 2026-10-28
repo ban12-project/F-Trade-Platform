@@ -85,17 +85,28 @@ browser hashes. It preserves the existing login/diagnostics integration and
 Agent-side task controls. Production still selects the existing image.
 
 The launcher, service, native-profile and Agent unit suites pass (48 tests).
-A local amd64 development image ran the actual official browser through the new
-HTTP service with isolated synthetic data. Two successive containers verified
-cookies, local storage, IndexedDB and a non-extractable WebCrypto key. The sampled
-UA, language, timezone and window dimensions did not change; this is not a full
-fingerprint or WebGL/ICE comparison. Actual noVNC canvas keyboard input, one-use
-ticket rejection and expired-tunnel closure passed. Existing passive inbox and
-publication observation drivers passed against synthetic DOM fixtures through
-the HTTP service, including fail-closed identity/direction/receipt cases. No real
-message or publication was submitted. Lease-expiry watchdog shutdown also passes after disabling competing
-Playwright signal handlers: the service owns context flush and display teardown.
-These passes do not establish deployment readiness.
+Actual native amd64 and arm64 CI images pass isolated synthetic native-profile
+restart (cookies, local storage, IndexedDB and a non-extractable WebCrypto key),
+noVNC keyboard input, single-use ticket rejection, expired-tunnel closure and
+watchdog expiry followed by another profile restart. The service owns shutdown
+ordering instead of competing with Playwright signal handlers.
+
+Additional local standalone-image fixtures exercise the production login flow
+through the actual service: password, generated TOTP and stored synthetic PIN
+are each submitted once; checkpoint observation, scope rejection, empty inbox
+history evidence and wrong identity are checked. The existing publication driver
+also prepares text, verifies preview, submits once, rejects replay and observes
+its synthetic receipt. Existing inbox/receipt rejection fixtures remain in use.
+All pages and credentials here are synthetic, with container networking disabled;
+these are not real authentication, publication or DM acceptance.
+
+The initial sampled UA, locale/timezone and window dimensions happened to match
+across restarts. A later repeat changed UA and window dimensions. The fixture now
+also compares screen geometry, WebGL and WebRTC API availability. The official
+launcher generates identity data independently of native storage persistence;
+no stable-fingerprint guarantee is inferred and no custom fingerprint is added.
+Actual ICE candidates and packet-level behavior still require the authorized
+proxy gate.
 
 Correction to the earlier local launch-timeout report: the manual test omitted
 the existing production tmpfs mount at `/root/camoufox` (and initially
@@ -110,12 +121,11 @@ with the existing runtime, rather than tolerating an unprovisioned download.
 The launcher checks GeoIP freshness before generating options and rejects stale
 assets before the official library can attempt a runtime database download.
 Refresh requires an image rebuild; a managed rebuild/deployment cadence still
-needs to be established before cutover. The standalone image and actual-browser fixture passed on native amd64 and arm64
-in CI run 40760771707, including reopening the profile after watchdog shutdown.
-Full login/publication contracts, real fixed-proxy DNS/IPv6/ICE/UDP checks, actual
-Sandbox viewer and rollback gates remain required. The local
-development image inherits old packages solely to reuse provisioned assets and
-is not evidence that the final image excludes jo-inc or `camoufox-js`.
+needs to be established before cutover. CI runs 40760771707 and 40761434934 passed
+both native architectures. Real fixed-proxy DNS/IPv6/ICE/UDP checks, actual Sandbox
+viewer and rollback gates, and separate live account/Messenger/DM acceptance
+remain required. CI retains checksummed image pairs for isolated Sandbox tests
+without publishing a registry tag or selecting the new runtime in production.
 
 After the validated cutover and acceptance, inventory Vercel snapshots again,
 replace old template/recovery references, then delete obsolete snapshots. Do not
