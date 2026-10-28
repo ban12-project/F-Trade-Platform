@@ -17,5 +17,4 @@ COPY watchdog.mjs /opt/ftrade/watchdog.mjs
 COPY camofox.config.json /app/camofox.config.json
 COPY login-plugin/ /app/plugins/ftrade-login/
 COPY diagnostics-plugin/ /app/plugins/ftrade-diagnostics/
-COPY compatibility-plugin/ /app/plugins/ftrade-compatibility/
 CMD ["node", "/opt/ftrade/watchdog.mjs"]
