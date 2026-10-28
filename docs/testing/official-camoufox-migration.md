@@ -77,26 +77,46 @@ Until these gates have evidence, the existing runtime remains the selected
 production implementation. The scope does not include bypassing Facebook
 verification, restoring seller-supplied cookies or promising fewer challenges.
 
-## Initial adapter evidence
+## Implementation and current evidence
 
-The official launcher adapter and its synthetic tests cover fixed-proxy GeoIP,
-native-profile ownership and lease checks. They do not implement the HTTP
-service, VNC, or any end-to-end acceptance gate above. The adapter is not wired
-into the production image.
+The draft implements a per-run HTTP service, mandatory fixed-proxy official
+launcher, Xvfb/x11vnc/noVNC lifecycle and a standalone image with pinned official
+browser hashes. It preserves the existing login/diagnostics integration and
+Agent-side task controls. Production still selects the existing image.
 
-An isolated read-only image test failed before browser launch: the official
-package needs its profile directory and pinned fpgen model provisioned before
-the filesystem becomes read-only. A follow-up probe also found that the GeoIP
-database is downloaded when absent or stale, its default add-on attempts a
-runtime download when absent, and generated font configuration requires a
-writable destination unless provisioned. The eventual image must provision and
-verify its required assets during the build, explicitly decide its add-on
-policy, and account for GeoIP refresh; a writable runtime filesystem or silent
-download failure is not proof of readiness.
+The launcher, service, native-profile and Agent unit suites pass (48 tests).
+A local amd64 development image ran the actual official browser through the new
+HTTP service with isolated synthetic data. Two successive containers verified
+cookies, local storage, IndexedDB and a non-extractable WebCrypto key. The sampled
+UA, language, timezone and window dimensions did not change; this is not a full
+fingerprint or WebGL/ICE comparison. Actual noVNC canvas keyboard input, one-use
+ticket rejection and expired-tunnel closure passed. Existing passive inbox and
+publication observation drivers passed against synthetic DOM fixtures through
+the HTTP service, including fail-closed identity/direction/receipt cases. No real
+message or publication was submitted. Lease-expiry watchdog shutdown also passes after disabling competing
+Playwright signal handlers: the service owns context flush and display teardown.
+These passes do not establish deployment readiness.
 
-In a local isolated amd64 container with pre-provisioned model, GeoIP data and
-font configuration, the official launch options were generated, but the
-persistent browser launch timed out. This is not evidence about the production
-Sandbox, and it does not establish profile persistence or a working proxy. The
-container lacked the default add-on and the upstream launcher logged and
-skipped it; that behavior must be addressed before acceptance.
+Correction to the earlier local launch-timeout report: the manual test omitted
+the existing production tmpfs mount at `/root/camoufox` (and initially
+`/root/.camoufox`). With both mounts restored, the official persistent launcher
+works. The image acceptance driver now derives mounts from `containerSpec`
+instead of maintaining a drifting manual copy. That earlier timeout is not
+reproducible evidence of a production browser defect.
+
+The read-only image must pre-provision the fpgen model, GeoIP database and font
+configuration. The implementation excludes the default UBO add-on consistently
+with the existing runtime, rather than tolerating an unprovisioned download.
+The launcher checks GeoIP freshness before generating options and rejects stale
+assets before the official library can attempt a runtime database download.
+Refresh requires an image rebuild; a managed rebuild/deployment cadence still
+needs to be established before cutover. The standalone build, both native
+architectures, full login/publication contracts, real fixed-proxy DNS/IPv6/ICE/UDP
+checks, actual Sandbox viewer and rollback gates remain required. The local
+development image inherits old packages solely to reuse provisioned assets and
+is not evidence that the final image excludes jo-inc or `camoufox-js`.
+
+After the validated cutover and acceptance, inventory Vercel snapshots again,
+replace old template/recovery references, then delete obsolete snapshots. Do not
+infer that a snapshot is obsolete from age alone. Record deleted and retained
+storage without exposing private snapshot identifiers in public Issues.

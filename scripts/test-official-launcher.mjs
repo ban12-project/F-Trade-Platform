@@ -28,6 +28,7 @@ async function fixture(t, official, extra = {}) {
     display: ":99",
     executablePath: "/opt/camoufox/camoufox-bin",
     official,
+    checkAssets: async () => {},
     ...extra,
   });
 }
@@ -51,6 +52,8 @@ test("uses official persistent launcher, fixed proxy and mandatory GeoIP", async
   assert.equal(calls[0].proxy.server, "http://proxy.invalid:1234");
   assert.deepEqual(calls[0].window, [1400, 860]);
   assert.equal(calls[1].persistent_context, true);
+  for (const signal of ["handleSIGTERM", "handleSIGINT", "handleSIGHUP"])
+    assert.equal(calls[1].from_options[signal], false);
   assert.match(calls[1].from_options.user_data_dir, /native-profile-v1\/firefox$/);
   assert.equal(await runtime.contextFor(accountId), context);
   await assert.rejects(runtime.contextFor(nodeId), /native_profile_account_mismatch/);
@@ -81,4 +84,20 @@ test("expired lease prevents generating launch options", async (t) => {
     { leaseDeadline: async () => Date.now() - 1 },
   );
   await assert.rejects(runtime.ensureBrowser(5000), /native_profile_lease_expired/);
+});
+
+test("stale assets prevent launch options and any GeoIP download", async (t) => {
+  const runtime = await fixture(
+    t,
+    {
+      launchOptions: async () => assert.fail("must not generate options"),
+      Camoufox: async () => assert.fail("must not launch"),
+    },
+    {
+      checkAssets: async () => {
+        throw new Error("official_runtime_assets_stale");
+      },
+    },
+  );
+  await assert.rejects(runtime.ensureBrowser(5000), /official_runtime_assets_stale/);
 });

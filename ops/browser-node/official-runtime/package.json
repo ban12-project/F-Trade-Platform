@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "camoufox": "0.5.9-beta.5",
+    "express": "5.2.1",
     "playwright-core": "1.62.0"
   }
 }
