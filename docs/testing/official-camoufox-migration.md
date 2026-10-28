@@ -93,3 +93,10 @@ writable destination unless provisioned. The eventual image must provision and
 verify its required assets during the build, explicitly decide its add-on
 policy, and account for GeoIP refresh; a writable runtime filesystem or silent
 download failure is not proof of readiness.
+
+In a local isolated amd64 container with pre-provisioned model, GeoIP data and
+font configuration, the official launch options were generated, but the
+persistent browser launch timed out. This is not evidence about the production
+Sandbox, and it does not establish profile persistence or a working proxy. The
+container lacked the default add-on and the upstream launcher logged and
+skipped it; that behavior must be addressed before acceptance.
