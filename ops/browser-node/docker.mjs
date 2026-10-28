@@ -180,6 +180,7 @@ export function containerSpec(nodeId, run, imageId, deadline, nativeProfile = fa
       Labels: labels,
       Env: [
         "NODE_ENV=production",
+        `FTRADE_RUNTIME_RUN_ID=${run.id}`,
         ...(nativeProfile
           ? [
               "FTRADE_NATIVE_PROFILE=1",

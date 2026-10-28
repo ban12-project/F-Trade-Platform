@@ -1,0 +1,70 @@
+name: Official browser runtime acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "ops/browser-node/official-runtime/**"
+      - "ops/browser-node/official.browser.Dockerfile*"
+      - "ops/browser-node/native-profile.mjs"
+      - "ops/browser-node/docker.mjs"
+      - "ops/browser-node/gateway.mjs"
+      - "scripts/test-official-*.mjs"
+      - "scripts/fixtures/official-runtime/**"
+      - ".github/workflows/official-browser-runtime.yml"
+
+permissions:
+  contents: read
+concurrency:
+  group: official-browser-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    name: Official runtime (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install pinned official launcher
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix ops/browser-node/official-runtime
+      - name: Check authorization, leases and unknown operation results
+        run: node --test scripts/test-official-launcher.mjs scripts/test-official-service.mjs
+      - name: Build standalone image without jo-inc or camoufox-js
+        run: docker build --label org.opencontainers.image.revision=${{ github.sha }} --build-arg TARGETARCH=${{ matrix.arch }} -t ftrade-official:test -f ops/browser-node/official.browser.Dockerfile ops/browser-node
+      - name: Verify actual browser, native profile, noVNC and watchdog
+        env:
+          OFFICIAL_RUNTIME_IMAGE: ftrade-official:test
+        run: node scripts/test-official-runtime-image.mjs
+      - name: Export exact tested image and matching Agent for isolated Sandbox acceptance
+        env:
+          ARCH: ${{ matrix.arch }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          export IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
+          export BUILD_TAG="official-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker tag ftrade-official:test "${IMAGE_PREFIX}-browser:${BUILD_TAG}-${ARCH}"
+          docker build --label "org.opencontainers.image.revision=$REVISION" -t "${IMAGE_PREFIX}-browser-node:${BUILD_TAG}-${ARCH}" -f ops/browser-node/Dockerfile .
+          docker run --rm --network none "${IMAGE_PREFIX}-browser-node:${BUILD_TAG}-${ARCH}" node --check ops/browser-node/agent.mjs
+          bash scripts/export-browser-image-pair.sh "$RUNNER_TEMP/official-image-pair-$ARCH"
+      - name: Retain isolated acceptance artifacts (no registry publication)
+        uses: actions/upload-artifact@v7
+        with:
+          name: official-browser-image-pair-${{ matrix.arch }}
+          path: ${{ runner.temp }}/official-image-pair-${{ matrix.arch }}/
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0

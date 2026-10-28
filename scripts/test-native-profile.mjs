@@ -172,6 +172,7 @@ test("opt-in binds every task to the existing account volume, not task payload p
   assert.equal(a.volume, b.volume);
   assert.ok(a.body.Env.includes(`FTRADE_PROFILE_ACCOUNT_ID=${accountId}`));
   assert.ok(a.body.Env.includes(`FTRADE_PROFILE_NODE_ID=${nodeId}`));
+  assert.ok(a.body.Env.includes(`FTRADE_RUNTIME_RUN_ID=${run.id}`));
   assert.ok(!JSON.stringify(a).includes("/arbitrary"));
   assert.ok(
     !containerSpec(nodeId, run, "reviewed", Date.now() + 90000).body.Env.includes(
