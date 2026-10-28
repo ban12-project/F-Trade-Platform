@@ -121,7 +121,7 @@ docker exec "$name" node --input-type=module -e '
   const profile = readdirSync("/tmp").find(name => name.startsWith("playwright_firefoxdev_profile-"));
   assert.ok(profile, "pinned Playwright Firefox profile must exist");
   const prefs = readFileSync(`/tmp/${profile}/prefs.js`, "utf8");
-  assert.match(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
+  assert.doesNotMatch(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
   assert.match(prefs, /user_pref\("media\.peerconnection\.enabled", false\);/);
 '
 docker exec "$name" node /app/plugins/ftrade-inspection-fixture/verify.mjs
