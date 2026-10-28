@@ -148,10 +148,11 @@ test("browser compatibility hook preserves WebSocket preferences and restricts W
   registerCompatibility({}, { events }, { enabled: true });
   for (const firefoxUserPrefs of [
     undefined,
-    { "network.http.http2.websockets": true },
-    { "network.http.http2.websockets": false },
+    { "network.http.http2.websockets": true, "network.http.http2.enabled": true },
+    { "network.http.http2.websockets": false, "network.http.http2.enabled": true },
   ]) {
     const proxy = { server: "http://proxy.example:3128" };
+    const originalPrefs = firefoxUserPrefs && { ...firefoxUserPrefs };
     const options = { proxy, firefoxUserPrefs };
     events.emit("browser:launching", { options });
     assert.equal(options.proxy, proxy);
@@ -161,10 +162,8 @@ test("browser compatibility hook preserves WebSocket preferences and restricts W
     );
     assert.equal(options.firefoxUserPrefs["media.peerconnection.enabled"], false);
     if (firefoxUserPrefs) {
-      assert.deepEqual(
-        options.firefoxUserPrefs["network.http.http2.websockets"],
-        firefoxUserPrefs["network.http.http2.websockets"],
-      );
+      assert.equal(options.firefoxUserPrefs["network.http.http2.enabled"], true);
+      assert.deepEqual(firefoxUserPrefs, originalPrefs);
     }
   }
 });
