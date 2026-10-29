@@ -63,8 +63,8 @@ try {
         join(dir, "login.mjs"),
         replaceOnce(
           sources["login.mjs"],
-          'return outcome === "ready" ? null : "page_contract_failed";',
-          'return outcome === "ready" ? "completed" : "page_contract_failed";',
+          "if (version === 2) return null;",
+          'if (version === 2) return outcome === "ready" ? "completed" : null;',
         ),
       );
     if (variant.noObservation)
@@ -88,6 +88,7 @@ try {
         agent,
         `.finally(() => {
         slot.loginTask = null;
+        if (profile.version === 2) slot.loginCompletedAt = Date.now();
       })`,
         "",
       );
@@ -301,12 +302,9 @@ try {
                 : 2,
           );
           assert.equal(claims + submissions, 0);
-          assert.equal(
-            row.immediateStop,
-            ready ? (variant.noReady ? "completed" : null) : "page_contract_failed",
-          );
-          assert.equal(row.connectedPreserved, ready && !variant.noReady);
-          assert.equal(row.pendingPreserved, ready && !variant.noReady);
+          assert.equal(row.immediateStop, ready && variant.noReady ? "completed" : null);
+          assert.equal(row.connectedPreserved, !(ready && variant.noReady));
+          assert.equal(row.pendingPreserved, !(ready && variant.noReady));
           assert.equal(row.taskCleared, !variant.noCleanup);
           assert.equal(row.idleRetires, !variant.noCleanup);
           assert.equal(row.disconnectRetires, !variant.noCleanup);
