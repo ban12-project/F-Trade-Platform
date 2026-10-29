@@ -103,6 +103,21 @@ class ImageBundleIdentity(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "config mismatch"):
             self.exported()
 
+    def test_legacy_empty_container_fields_are_compatible(self):
+        self.actual["example/agent:release"]["Config"].update({"Hostname": "", "Domainname": "", "Image": "",
+            "AttachStdin": False, "AttachStdout": False, "AttachStderr": False,
+            "OpenStdin": False, "StdinOnce": False, "Tty": False})
+        self.verify()
+        self.exported()
+
+    def test_nondefault_legacy_fields_are_not_ignored(self):
+        for field, value in [("Hostname", "changed"), ("OpenStdin", True), ("Tty", 0)]:
+            with self.subTest(field=field):
+                self.actual["example/agent:release"]["Config"][field] = value
+                with self.assertRaisesRegex(ValueError, "config mismatch"):
+                    self.exported()
+                del self.actual["example/agent:release"]["Config"][field]
+
     def test_changed_local_ids_are_verified_and_recorded(self):
         result = self.verify()
         self.assertEqual(result["agent"]["sourceId"], self.bundle["images"]["agent"]["id"])

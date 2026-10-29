@@ -49,9 +49,15 @@ def normalized_config(config):
     # https://docs.docker.com/engine/deprecated/#emptynil-fields-in-image-config-from-inspect-api
     empty_values = {"Cmd": (None, []), "Entrypoint": (None, []), "Env": (None, []),
                     "Labels": (None, {}), "OnBuild": (None, []), "User": (None, ""),
-                    "Volumes": (None, {}), "WorkingDir": (None, "")}
+                    "Volumes": (None, {}), "WorkingDir": (None, ""),
+                    # Non-image container defaults removed from inspect in API v1.50.
+                    # https://docs.docker.com/engine/deprecated/#non-standard-fields-in-image-inspect
+                    "Hostname": ("",), "Domainname": ("",), "Image": ("",),
+                    "AttachStdin": (False,), "AttachStdout": (False,), "AttachStderr": (False,),
+                    "OpenStdin": (False,), "StdinOnce": (False,), "Tty": (False,)}
     return {key: value for key, value in config.items()
-            if key not in empty_values or value not in empty_values[key]}
+            if key not in empty_values or not any(type(value) is type(empty) and value == empty
+                                                  for empty in empty_values[key])}
 
 
 def verify_image(expected, actual):
