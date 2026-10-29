@@ -35,6 +35,9 @@ runs:
           echo "REVISION=$GITHUB_SHA"
           echo "SOURCE=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
         } >> "$GITHUB_ENV"
+    - name: Verify image export against the runner Docker store
+      shell: bash
+      run: bash scripts/test-browser-image-export.sh
     - name: Fetch pinned Camofox source (no deployment credentials)
       shell: bash
       run: sh ops/browser-node/prepare-upstream.sh

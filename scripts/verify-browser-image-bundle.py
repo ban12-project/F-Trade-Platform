@@ -50,7 +50,10 @@ def verify_image(expected, actual):
     require(actual["Architecture"] == config["architecture"] and actual["Os"] == config["os"], "destination platform mismatch")
     require(actual["RootFS"]["Type"] == config["rootfs"]["type"] and actual["RootFS"]["Layers"] == config["rootfs"]["diff_ids"], "destination layers mismatch")
     # Labels alone cannot establish identity. Reject any changed or added setting.
-    require(actual["Config"] == config["config"], "destination config mismatch")
+    different = sorted(key for key in set(actual["Config"]) | set(config["config"])
+                       if key not in actual["Config"] or key not in config["config"]
+                       or actual["Config"][key] != config["config"][key])
+    require(not different, "destination config mismatch (fields: " + ", ".join(different) + ")")
     return actual["Id"]
 
 
