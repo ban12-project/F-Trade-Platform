@@ -342,6 +342,7 @@ async function heartbeat(slot) {
         connected: slot.connected,
         disconnectedAt: slot.disconnectedAt,
         readyAt: slot.readyAt,
+        loginCompletedAt: slot.loginCompletedAt,
         loginTask: Boolean(slot.loginTask),
         pendingConnection,
         automatic: loginProfileForRun(loginProfiles, slot.run)?.version === 2,
@@ -408,9 +409,13 @@ async function heartbeat(slot) {
         const reason = loginStopOutcome(profile.version, outcome);
         if (reason) await stop(slot, reason);
       })
-      .catch(() => stop(slot, loginStopOutcome(profile.version, "unknown")))
+      .catch(async () => {
+        const reason = loginStopOutcome(profile.version, "unknown");
+        if (reason) await stop(slot, reason);
+      })
       .finally(() => {
         slot.loginTask = null;
+        if (profile.version === 2) slot.loginCompletedAt = Date.now();
       });
   }
 }
