@@ -26,6 +26,13 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
   /root/.cache/camoufox/camoufox-bin --version
 '
+timeout 180 docker run --rm --network none --read-only --init --cap-drop ALL \
+  --security-opt no-new-privileges:true --memory 2g --cpus 2 --pids-limit 512 --shm-size 256m \
+  --tmpfs /tmp:rw,nosuid,nodev,size=512m,mode=1777 \
+  --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
+  --tmpfs /root/camoufox:rw,nosuid,nodev,size=16m,mode=700 \
+  -v "$PWD/scripts/fixtures/login-fill/native.mjs:/app/ftrade-native-fill-test.mjs:ro" \
+  --entrypoint node "$browser" /app/ftrade-native-fill-test.mjs
 docker run --rm --network none --add-host target.browser.test:127.0.0.1 \
   -v "$PWD/scripts/fixtures/native-profile/proxy-fail-closed.mjs:/app/proxy-fail-closed.mjs:ro" \
   --entrypoint node "$browser" /app/proxy-fail-closed.mjs

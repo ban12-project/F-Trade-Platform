@@ -657,6 +657,10 @@ async function nodeOperation(
         const { account } = await savedLoginAccount(tx, row, run, now);
         account.authState = "ready";
       }
+      if (!authorization.automatic && request.outcome === "unknown" && isLive(run)) {
+        const account = state.accounts.find((value) => value.id === run.accountId);
+        if (account) account.authState = "needs_login";
+      }
       authorization.outcome = request.outcome;
       authorization.challenge = request.challenge;
       authorization.factorPrompts = factorPrompts;

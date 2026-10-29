@@ -1,6 +1,5 @@
 // biome-ignore lint/correctness/noUnusedVariables: Loaded as a fixed page source asset.
-function fillLogin({ profile, username, password, expiresAt }) {
-  let attempted = false;
+function inspectLogin({ profile, username, password, phase, expiresAt }) {
   try {
     const visible = (element) =>
       element.getClientRects().length && getComputedStyle(element).visibility !== "hidden";
@@ -14,7 +13,7 @@ function fillLogin({ profile, username, password, expiresAt }) {
       Date.now() >= Date.parse(profile.expiresAt) ||
       location.href !== profile.url
     )
-      return "refused";
+      return null;
     const form = one(profile.form),
       user = one(profile.username),
       secret = one(profile.password);
@@ -32,10 +31,10 @@ function fillLogin({ profile, username, password, expiresAt }) {
       secret.disabled ||
       user.readOnly ||
       secret.readOnly ||
-      (user.value && user.value !== username) ||
-      secret.value
+      (phase === "initial" ? user.value && user.value !== username : user.value !== username) ||
+      (phase === "filled" ? secret.value !== password : secret.value)
     )
-      return "refused";
+      return null;
     const action = new URL(form.action);
     const reviewedRootForm =
       profile.formActionMode === "facebook-root-implicit" &&
@@ -50,19 +49,11 @@ function fillLogin({ profile, username, password, expiresAt }) {
         ? reviewedRootForm
         : action.pathname === "/login.php" || action.pathname.startsWith("/login/"))
     )
-      return "refused";
-    if (Date.now() >= expiresAt) return "refused";
-    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-    attempted = true;
-    set.call(user, username);
-    set.call(secret, password);
-    for (const element of [user, secret]) {
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-      element.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    // No submit/click/Enter, no returned credential values or DOM diagnostics.
-    return user.value === username && secret.value === password ? "filled" : "unknown";
+      return null;
+    if (Date.now() >= expiresAt) return null;
+    // Return only node handles to the trusted runtime, never credential values.
+    return { form, user, secret };
   } catch {
-    return attempted ? "unknown" : "refused";
+    return null;
   }
 }

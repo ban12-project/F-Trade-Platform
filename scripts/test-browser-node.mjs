@@ -86,6 +86,18 @@ test("automatic ready preserves admission and connected viewer until normal reti
   assert.equal(loginStopOutcome(2, "unknown"), "page_contract_failed");
   assert.equal(loginStopOutcome(2, "refused"), "page_contract_failed");
 });
+test("uncertain fill-only result preserves bounded inspection without retry", () => {
+  assert.equal(loginStopOutcome(1, "unknown"), null);
+  const state = {
+    automatic: false,
+    connected: true,
+    pendingConnection: false,
+    readyAt: 1,
+    loginTask: false,
+  };
+  assert.equal(viewerGraceExpired(state, 100000), false);
+  assert.equal(viewerGraceExpired({ ...state, disconnectedAt: 80000 }, 100000), true);
+});
 test("browser startup waits for Firefox prewarm and rechecks cancellation", async () => {
   const ready = { ok: true, engine: "camoufox", browserConnected: true, browserRunning: true };
   const states = [
