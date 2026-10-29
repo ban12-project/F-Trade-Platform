@@ -225,7 +225,7 @@ for (const mode of [
   });
 }
 
-test("root form opt-in rejects broader and automatic profiles", () => {
+test("root form opt-in rejects broader profiles", () => {
   const reviewed = {
     ...profile,
     url: "https://www.facebook.com/",
@@ -240,7 +240,6 @@ test("root form opt-in rejects broader and automatic profiles", () => {
     { ...reviewed, form: "form" },
     { ...reviewed, username: "input" },
     { ...reviewed, formActionMode: "unknown" },
-    { ...reviewed, version: 2, automation: {} },
   ])
     expect(() => validateLoginProfile(invalid)).toThrow("login_profile_invalid");
 });

@@ -7,6 +7,7 @@ async function automaticLoginPage({
   expiresAt,
   sessionIdentity,
   captchaVisible,
+  nativeFilled = false,
 }) {
   let attempted = false;
   try {
@@ -204,7 +205,10 @@ async function automaticLoginPage({
         overridesForm(submit) ||
         !(user instanceof HTMLInputElement) ||
         !["email", "text"].includes(user.type) ||
-        !editable(password) ||
+        !(password instanceof HTMLInputElement) ||
+        password.disabled ||
+        password.readOnly ||
+        (nativeFilled ? password.value !== values.password : Boolean(password.value)) ||
         password.type !== "password" ||
         user === password ||
         user.disabled ||
@@ -216,11 +220,18 @@ async function automaticLoginPage({
       )
         return "refused";
       const target = new URL(form.action);
+      const reviewedRootForm =
+        profile.formActionMode === "facebook-root-implicit" &&
+        location.href === "https://www.facebook.com/" &&
+        !form.hasAttribute("action") &&
+        target.href === location.href;
       if (
         target.origin !== location.origin ||
         target.username ||
         target.password ||
-        !(target.pathname === "/login.php" || target.pathname.startsWith("/login/"))
+        !(profile.formActionMode === "facebook-root-implicit"
+          ? reviewedRootForm
+          : target.pathname === "/login.php" || target.pathname.startsWith("/login/"))
       )
         return "refused";
       if (
@@ -230,9 +241,9 @@ async function automaticLoginPage({
           submit.type !== "submit")
       )
         return "refused";
+      if (operation === "inspect-password") return "fillable";
+      if (!nativeFilled || user.value !== values.username) return "refused";
       attempted = true;
-      fill(user, values.username);
-      fill(password, values.password);
     } else {
       if (phase === "pin" && !identityVerified) return "refused";
       const authenticator = phase === "totp" && auto.totp.mode === "facebook-authenticator";
