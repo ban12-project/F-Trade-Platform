@@ -431,13 +431,17 @@ test("loading and unknown session observations pause work without declaring logo
       },
     });
     const state = fixture();
+    state.accounts[0].authState = "needs_login";
     enqueue(state);
     const run = claim(state);
-    finishRun(state, run.id, loginStopOutcome(2, result.outcome), true, 1100);
+    renewRun(state, run.id, run.leaseId, true, 1100);
+    const stopReason = loginStopOutcome(2, result.outcome);
+    assert.equal(stopReason, null);
+    if (stopReason) finishRun(state, run.id, stopReason, true, 1100);
     assert.equal(claims, 0);
     assert.equal(submissions, 0);
-    assert.equal(state.accounts[0].authState, "page_contract_failed");
-    assert.equal(run.status, "failed");
+    assert.equal(state.accounts[0].authState, "needs_login");
+    assert.equal(run.status, "running");
     scheduleInbox(state, 2000, randomUUID);
     assert.equal(state.runs.filter((r) => r.accountId === "a").length, 1);
   }

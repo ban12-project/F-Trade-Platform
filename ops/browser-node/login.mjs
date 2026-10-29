@@ -293,7 +293,8 @@ export function createSavedLoginExecutor({
 export function loginStopOutcome(version, outcome) {
   // Readiness is an observation, not a request to end the owner's viewer.
   // Idle grace, explicit stop and the lease still bound this interactive run.
-  if (version === 2) return outcome === "ready" ? null : "page_contract_failed";
+  // A consumed automatic attempt pauses credential work but leaves human inspection bounded.
+  if (version === 2) return null;
   if (outcome === "ready") return "completed";
   // A consumed v1 authorization cannot retry. Keep its bounded viewer available
   // to inspect an uncertain partial fill; never promote the account to ready.

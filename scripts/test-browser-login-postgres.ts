@@ -508,6 +508,19 @@ export async function testBrowserLogin(
     } else assert.deepEqual(body, { error: "node_request_denied" });
   }
   const claimedState = await state();
+  for (const outcome of ["unknown", "refused"] as const) {
+    const paused = structuredClone(claimedState);
+    paused.accounts[0].authState = "ready";
+    await write(paused);
+    await call({ operation: "login-result", ...autoRequest, outcome });
+    const observed = await state();
+    assert.equal(observed.runs.at(-1)?.status, "running", "paused flow retains inspection");
+    assert.equal(observed.accounts[0].authState, "needs_login");
+    assert.equal((await autoHeartbeat()).loginAuthorization, undefined);
+    await assert.rejects(() => call({ operation: "claim-login", ...autoRequest }), /saved_login_/);
+  }
+  await write(claimedState);
+
   const challengeNotice = { operation: "login-challenge", ...autoRequest, challenge: "checkpoint" };
   assert.equal((await call(challengeNotice)).replayed, false);
   assert.equal((await call(challengeNotice)).replayed, true);

@@ -83,8 +83,25 @@ test("automatic ready preserves admission and connected viewer until normal reti
     viewerGraceExpired({ ...state, connected: true, disconnectedAt: 80000 }, 100000),
     true,
   );
-  assert.equal(loginStopOutcome(2, "unknown"), "page_contract_failed");
-  assert.equal(loginStopOutcome(2, "refused"), "page_contract_failed");
+  assert.equal(loginStopOutcome(2, "unknown"), null);
+  assert.equal(loginStopOutcome(2, "refused"), null);
+});
+test("paused automatic flow grants bounded inspection after a long factor wait", () => {
+  const state = {
+    automatic: true,
+    connected: false,
+    pendingConnection: false,
+    readyAt: 1,
+    loginTask: false,
+    loginCompletedAt: 180000,
+  };
+  assert.equal(viewerGraceExpired(state, 180001), false);
+  assert.equal(viewerGraceExpired(state, 240001), true);
+  assert.equal(viewerGraceExpired({ ...state, connected: true }, 240001), false);
+  assert.equal(
+    viewerGraceExpired({ ...state, connected: true, disconnectedAt: 180000 }, 196000),
+    true,
+  );
 });
 test("uncertain fill-only result preserves bounded inspection without retry", () => {
   assert.equal(loginStopOutcome(1, "unknown"), null);
