@@ -86,9 +86,10 @@ try {
     const path = new URL(route.request().url()).pathname;
     const body =
       path === "/"
-        ? `<form id="login_form" method="post"><input name="email"><input name="pass" type="password"><button>Log in</button></form><script>
+        ? `<form id="login_form" method="post"><input name="email"><input name="pass" type="password"><div role="button" tabindex="0" aria-label="Log In">Log in</div></form><script>
       for(const input of document.querySelectorAll('input'))input.oninput=event=>{if(!event.isTrusted)input.value='';};
-      document.querySelector('form').onsubmit=event=>{event.preventDefault();location.href='/two_step_verification/two_factor/?encrypted_context=synthetic&flow=two_factor_login&next';};</script>`
+      document.querySelector('[name=pass]').addEventListener('input',()=>{if(!document.querySelector('[aria-label="Show password"]'))document.querySelector('form').insertAdjacentHTML('beforeend','<div role="button" tabindex="0" aria-label="Show password"></div>');});
+      document.querySelector('[aria-label="Log In"]').onclick=()=>{location.href='/two_step_verification/two_factor/?encrypted_context=synthetic&flow=two_factor_login&next';};</script>`
         : path === "/two_step_verification/two_factor/"
           ? `<h2>Go to your authentication app</h2><form><input type="text" autocomplete="off"><input type="submit" hidden></form><div role="button" tabindex="-1" aria-disabled="true">Continue</div><script>
         document.querySelector('input').oninput=()=>{const b=document.querySelector('[role=button]');b.setAttribute('tabindex','0');b.setAttribute('aria-disabled','false');};
@@ -111,7 +112,7 @@ try {
     automation: {
       accountRef: "123456789",
       identity: { selector: "#identity", attribute: "data-account-id" },
-      passwordSubmit: "#login_form button",
+      passwordSubmit: '#login_form [role="button"][tabindex="0"][aria-label="Log In"]',
       totp: {
         mode: "facebook-authenticator",
         url: base + "/two_step_verification/two_factor/",
