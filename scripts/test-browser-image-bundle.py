@@ -93,6 +93,16 @@ class ImageBundleIdentity(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ambiguous source tags"):
             verifier.export_manifest(self.path, self.revision, "amd64", sources)
 
+    def test_empty_inspect_defaults_match_absent_archive_fields(self):
+        self.actual["example/agent:release"]["Config"].update({"User": "", "WorkingDir": "", "OnBuild": None, "Volumes": None})
+        self.verify()
+        self.exported()
+
+    def test_unknown_empty_config_field_is_still_rejected(self):
+        self.actual["example/agent:release"]["Config"]["Unexpected"] = None
+        with self.assertRaisesRegex(ValueError, "config mismatch"):
+            self.exported()
+
     def test_changed_local_ids_are_verified_and_recorded(self):
         result = self.verify()
         self.assertEqual(result["agent"]["sourceId"], self.bundle["images"]["agent"]["id"])

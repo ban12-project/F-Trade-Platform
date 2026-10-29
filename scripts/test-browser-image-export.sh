@@ -8,10 +8,12 @@ cleanup() {
   rm -rf "$export_fixture_dir"
 }
 trap cleanup EXIT
+printf synthetic > "$export_fixture_dir/marker"
 for kind in browser-node browser; do
   docker build --label "org.opencontainers.image.revision=$REVISION" --label io.ftrade.native-profile=1 \
     -t "$export_fixture_prefix-$kind:test-$ARCH" -f - "$export_fixture_dir" <<EOF
 FROM scratch
+COPY marker /marker
 ENV SYNTHETIC_KIND=$kind
 CMD ["synthetic-only"]
 EOF

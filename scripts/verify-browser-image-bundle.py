@@ -44,15 +44,25 @@ def archive_identity(archive, bundle):
         return result
 
 
+def normalized_config(config):
+    # Docker 29 omits these empty/default fields; older inspect APIs add them.
+    # https://docs.docker.com/engine/deprecated/#emptynil-fields-in-image-config-from-inspect-api
+    empty_values = {"Cmd": (None, []), "Entrypoint": (None, []), "Env": (None, []),
+                    "Labels": (None, {}), "OnBuild": (None, []), "User": (None, ""),
+                    "Volumes": (None, {}), "WorkingDir": (None, "")}
+    return {key: value for key, value in config.items()
+            if key not in empty_values or value not in empty_values[key]}
+
+
 def verify_image(expected, actual):
     config = expected["config"]
     require(re.fullmatch(r"sha256:[a-f0-9]{64}", actual["Id"]), "invalid destination ID")
     require(actual["Architecture"] == config["architecture"] and actual["Os"] == config["os"], "destination platform mismatch")
     require(actual["RootFS"]["Type"] == config["rootfs"]["type"] and actual["RootFS"]["Layers"] == config["rootfs"]["diff_ids"], "destination layers mismatch")
-    # Labels alone cannot establish identity. Reject any changed or added setting.
-    different = sorted(key for key in set(actual["Config"]) | set(config["config"])
-                       if key not in actual["Config"] or key not in config["config"]
-                       or actual["Config"][key] != config["config"][key])
+    # Labels alone cannot establish identity. Reject changed non-default settings.
+    observed, archived = normalized_config(actual["Config"]), normalized_config(config["config"])
+    different = sorted(key for key in set(observed) | set(archived)
+                       if key not in observed or key not in archived or observed[key] != archived[key])
     require(not different, "destination config mismatch (fields: " + ", ".join(different) + ")")
     return actual["Id"]
 
