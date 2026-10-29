@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
+import { isIP } from "node:net";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { hasPermission } from "@/lib/authz";
 import { type DatabaseTransaction, getDatabase } from "@/lib/db/client";
@@ -55,6 +56,10 @@ import {
 import { sealBrowserSandboxKey } from "./sandbox-credentials";
 import { cancelInvalidManualSandboxStart } from "./sandbox-dispatch";
 import { registerBrowserSandbox, type SandboxLifecycle } from "./sandbox-lifecycle";
+import {
+  assertBrowserSandboxProxyIpAllowed,
+  configuredBrowserSandboxNetworkPolicy,
+} from "./sandbox-network-policy";
 import { enqueueManualBrowserSandboxStart } from "./sandbox-outbox";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
 
@@ -406,6 +411,15 @@ async function grant(
       lastCheckedAt: null,
     };
     row.document.accounts.push(account);
+  }
+  // Check the actual endpoint, never the expected exit IP: they may differ.
+  // VPS nodes have their own networking and must not inherit Sandbox policy.
+  if (c.proxyHost && isIP(c.proxyHost) && !c.clearProxy) {
+    const managed = await tx.execute(
+      sql`SELECT node_id FROM browser_sandbox WHERE node_id = ${row.id}`,
+    );
+    if (managed.rows.length)
+      assertBrowserSandboxProxyIpAllowed(c.proxyHost, configuredBrowserSandboxNetworkPolicy());
   }
   const ring = configuredFacebookKeyring();
   account.loginCiphertext = updateFacebookLoginCiphertext(

@@ -53,7 +53,13 @@ export async function browserNodeCommandAction(input: unknown) {
       }
     }
     return { ok: true as const, result };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "sandbox_proxy_ip_not_allowed")
+      return {
+        ok: false as const,
+        message:
+          "代理 IP 尚未被托管节点的网络策略放行。请先由管理员核对并更新策略，再保存代理配置。",
+      };
     return {
       ok: false as const,
       message:
