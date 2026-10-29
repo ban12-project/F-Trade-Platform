@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
+import { isIP } from "node:net";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { hasPermission } from "@/lib/authz";
 import { type DatabaseTransaction, getDatabase } from "@/lib/db/client";
@@ -413,7 +414,7 @@ async function grant(
   }
   // Check the actual endpoint, never the expected exit IP: they may differ.
   // VPS nodes have their own networking and must not inherit Sandbox policy.
-  if (c.proxyHost && !c.clearProxy) {
+  if (c.proxyHost && isIP(c.proxyHost) && !c.clearProxy) {
     const managed = await tx.execute(
       sql`SELECT node_id FROM browser_sandbox WHERE node_id = ${row.id}`,
     );
