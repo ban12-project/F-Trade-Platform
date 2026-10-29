@@ -6,7 +6,6 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { register as registerCompatibility } from "../ops/browser-node/compatibility-plugin/index.js";
 import {
   createConnectionDiagnostics,
   register as registerDiagnostics,
@@ -142,31 +141,26 @@ test("browser startup waits for Firefox prewarm and rechecks cancellation", asyn
     /browser_start_timeout/,
   );
   assert.equal(calls, 60);
-});
-test("browser compatibility hook preserves proxy and unrelated preferences across launches", () => {
-  const events = new EventEmitter();
-  registerCompatibility({}, { events }, { enabled: true });
-  for (const firefoxUserPrefs of [undefined, { "network.http.http2.enabled": true }]) {
-    const proxy = { server: "http://proxy.example:3128" };
-    const options = { proxy, firefoxUserPrefs };
-    events.emit("browser:launching", { options });
-    assert.equal(options.proxy, proxy);
-    assert.equal(options.firefoxUserPrefs["network.http.http2.websockets"], false);
-    assert.equal(options.firefoxUserPrefs["media.peerconnection.enabled"], false);
-    if (firefoxUserPrefs) {
-      assert.equal(options.firefoxUserPrefs["network.http.http2.enabled"], true);
-      assert.deepEqual(firefoxUserPrefs, { "network.http.http2.enabled": true });
-    }
+  for (const [response, code] of [
+    [
+      () => {
+        throw new Error("private proxy password");
+      },
+      "unreachable",
+    ],
+    [() => Response.json({ private: "secret" }), "invalid_health"],
+    [() => new Response("private error", { status: 503 }), "unhealthy_response"],
+    [() => Response.json({ ...ready, browserConnected: false }), "browser_disconnected"],
+  ]) {
+    await assert.rejects(
+      waitForBrowserReady(response, { assertActive() {}, sleep: async () => {} }),
+      (error) =>
+        error.message === "browser_start_timeout" &&
+        error.browserFailureCode === `browser_health_${code}` &&
+        !JSON.stringify(error).includes("private"),
+    );
   }
 });
-
-test("browser compatibility plugin is inactive unless enabled", () => {
-  const events = new EventEmitter();
-  registerCompatibility({}, { events });
-  registerCompatibility({}, { events }, { enabled: false });
-  assert.equal(events.listenerCount("browser:launching"), 0);
-});
-
 const accountId = randomUUID();
 const run = {
   id: randomUUID(),

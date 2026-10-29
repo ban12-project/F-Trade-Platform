@@ -1,3 +1,4 @@
+import { BlockList, isIP } from "node:net";
 import { z } from "zod";
 
 const matcher = z.union([
@@ -87,4 +88,35 @@ export function browserSandboxNetworkPolicyMatches(
   // Ignore object key ordering only. Preserve rule/transform order and all
   // explicit fields; uncertain semantic equivalence must require reconciliation.
   return parsed.success && canonical(parsed.data) === canonical(expected);
+}
+
+/** Detect literal proxy IPs blocked by a managed Sandbox before saving a
+ * replacement proxy. Hostname routing remains the provider's responsibility;
+ * an HTTP domain allow rule does not authorize an arbitrary TCP proxy port.
+ */
+export function assertBrowserSandboxProxyIpAllowed(
+  host: string,
+  policy: BrowserSandboxNetworkPolicy,
+) {
+  const family = isIP(host);
+  if (!family) return;
+  const type = family === 4 ? "ipv4" : "ipv6";
+  const matchesSubnet = (cidr: string) => {
+    const [address, prefix, extra] = cidr.split("/");
+    const version = isIP(address);
+    if (!version || extra !== undefined || (prefix !== undefined && !/^\d+$/.test(prefix)))
+      throw new Error("sandbox_network_policy_configuration_invalid");
+    const bits = prefix === undefined ? (version === 4 ? 32 : 128) : Number(prefix);
+    if (bits > (version === 4 ? 32 : 128))
+      throw new Error("sandbox_network_policy_configuration_invalid");
+    const list = new BlockList();
+    list.addSubnet(address, bits, version === 4 ? "ipv4" : "ipv6");
+    return list.check(host, type);
+  };
+  if (
+    policy === "deny-all" ||
+    (policy.subnets?.deny ?? []).some(matchesSubnet) ||
+    !(policy.subnets?.allow ?? []).some(matchesSubnet)
+  )
+    throw new Error("sandbox_proxy_ip_not_allowed");
 }

@@ -12,6 +12,10 @@ const stages = new Set([
 ]);
 const requests = new Set(["open-tab", "navigate", "snapshot", "vnc-status", "other"]);
 const codes = new Set([
+  "browser_health_unreachable",
+  "browser_health_invalid_health",
+  "browser_health_unhealthy_response",
+  "browser_health_browser_disconnected",
   // Reviewed from the pinned Camofox server's structured error contract.
   "ssl_error",
   "page_crashed",

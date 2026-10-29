@@ -22,13 +22,16 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   node --check /opt/ftrade/watchdog.mjs
   node --check /app/server.js
   node --check /app/plugins/ftrade-diagnostics/index.js
-  node --check /app/plugins/ftrade-compatibility/index.js
+  test ! -e /app/plugins/ftrade-compatibility/index.js
   node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
   /root/.cache/camoufox/camoufox-bin --version
 '
 docker run --rm --network none --add-host target.browser.test:127.0.0.1 \
   -v "$PWD/scripts/fixtures/native-profile/proxy-fail-closed.mjs:/app/proxy-fail-closed.mjs:ro" \
   --entrypoint node "$browser" /app/proxy-fail-closed.mjs
+docker run --rm --network none \
+  -v "$PWD/scripts/fixtures/native-profile/geoip-fallback.mjs:/app/geoip-fallback.mjs:ro" \
+  --entrypoint node "$browser" /app/geoip-fallback.mjs
 
 # Decode a generated H.264 frame, not merely a canPlayType/metadata claim.
 docker run --rm --network none --read-only --init \
@@ -121,8 +124,8 @@ docker exec "$name" node --input-type=module -e '
   const profile = readdirSync("/tmp").find(name => name.startsWith("playwright_firefoxdev_profile-"));
   assert.ok(profile, "pinned Playwright Firefox profile must exist");
   const prefs = readFileSync(`/tmp/${profile}/prefs.js`, "utf8");
-  assert.match(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
-  assert.match(prefs, /user_pref\("media\.peerconnection\.enabled", false\);/);
+  assert.doesNotMatch(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
+  assert.doesNotMatch(prefs, /user_pref\("media\.peerconnection\.enabled", false\);/);
 '
 docker exec "$name" node /app/plugins/ftrade-inspection-fixture/verify.mjs
 docker exec "$name" node -e 'require("node:fs").writeFileSync("/tmp/ftrade-lease",String(Date.now()+2000),{mode:0o600})'

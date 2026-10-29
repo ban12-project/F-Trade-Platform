@@ -90,6 +90,7 @@ export function createSavedLoginExecutor({
   checkEgress,
   request,
   browserRequest,
+  reportUncertain = () => {},
 }) {
   const profile = validateLoginProfile(input);
   let used = false;
@@ -102,6 +103,8 @@ export function createSavedLoginExecutor({
     let challenge;
     let factorPrompts = [];
     let historyEvidence = "unverified";
+    let stage = "preclaim";
+    let uncertainStage;
     try {
       if (run.kind !== "interactive" || !notice?.id) throw new Error("login_scope_invalid");
       assertActive();
@@ -145,11 +148,13 @@ export function createSavedLoginExecutor({
         if (profile.version === 2) await checkEgress();
         assertActive();
         claimAttempted = true;
+        stage = "claim";
         release = await request("claim-login", {
           runId: run.id,
           leaseId: run.leaseId,
           authorizationId: notice.id,
         });
+        stage = "claim_response";
         const credential = release.credential;
         if (
           release.authorizationId !== notice.id ||
@@ -226,7 +231,9 @@ export function createSavedLoginExecutor({
           challenge = result.reason;
       } else {
         const credential = await acquireCredentials();
+        stage = "release_deadline";
         expiresAt = localDeadline(release, release.expiresAt);
+        stage = "fill_request";
         const result = await json(
           await browserRequest("/ftrade/login-fill", {
             userId: run.accountId,
@@ -238,10 +245,13 @@ export function createSavedLoginExecutor({
             expiresAt,
           }),
         );
+        stage = "fill_response";
         outcome = ["filled", "refused"].includes(result.outcome) ? result.outcome : "unknown";
+        if (outcome === "unknown") uncertainStage = stage;
       }
     } catch {
       outcome = claimAttempted ? "unknown" : "refused";
+      if (outcome === "unknown") uncertainStage = stage;
     } finally {
       if (release?.credential) {
         delete release.credential.username;
@@ -263,7 +273,16 @@ export function createSavedLoginExecutor({
           ...(challenge && outcome === "refused" ? { challenge } : {}),
         });
       } catch {
+        if (outcome !== "unknown") uncertainStage = "result_receipt";
         outcome = "unknown";
+      }
+    }
+    if (profile.version === 1 && outcome === "unknown") {
+      // Fixed stage names only; exception text and credential values never enter diagnostics.
+      try {
+        reportUncertain(uncertainStage ?? "result_receipt");
+      } catch {
+        // Diagnostics must not alter the existing fail-closed outcome.
       }
     }
     return outcome;

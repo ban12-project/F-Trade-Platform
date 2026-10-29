@@ -15,6 +15,10 @@ export function patchNativeProfileSource(file, source) {
     file === "server.js"
       ? [
           [
+            "if (!baseOptions.geoip || !isCamoufoxGeoipError(err)) {",
+            "if (baseOptions.proxy || !baseOptions.geoip || !isCamoufoxGeoipError(err)) {",
+          ],
+          [
             "const options = await buildLaunchOptionsWithGeoipFallback({",
             "const options = await buildLaunchOptionsWithGeoipFallback({\n        window: nativeProfile ? nativeProfileWindowSize(process.env) : undefined,",
           ],

@@ -254,6 +254,8 @@ Agent 仅向匹配的 interactive 运行注入非凭据页面配置。人工接�
 
 `login-result` 只记录 filled/refused/unknown，重复同值幂等、冲突拒绝；领取前拒绝也可结束授权，阻止后续领取。界面显示结果，但 filled 仅证明填字段成功；提交登录、2FA 和确认就绪仍由人工完成。
 
+version 1 填充结果为 unknown 时，Agent 仅输出固定的阶段名称，区分凭据领取、领取响应、期限换算、填充请求、填充响应或结果回执；不输出异常文本、账号标识、页面内容或凭据。这只能用于诊断新运行，不能推断此前 unknown 的原因，也不能作为重试许可。
+
 当前验证分为两段：拦截网络的 Chromium 执行器测试覆盖插件与一次性执行顺序；本地 Next.js／PostgreSQL 页面测试通过实际 Server Action、接入票、heartbeat、claim-login 和 login-result 验证 UI 状态及凭据不返回页面。后者使用模拟远程查看器及节点结果，不能据此声称真实 Agent／Docker／noVNC／Camofox 全链路已通过。
 
 
