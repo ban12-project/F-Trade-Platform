@@ -54,6 +54,45 @@ class ImageBundleIdentity(unittest.TestCase):
         return verifier.verify_destination(self.archive(), lambda ref: self.actual[ref],
             lambda ref, target: self.actual.__setitem__(target, copy.deepcopy(self.actual[ref])))
 
+    def exported(self):
+        self.archive()
+        sources = {kind: {**self.actual["example/" + kind + ":release"],
+                         "RepoTags": ["example/" + kind + ":release"]}
+                   for kind in ["agent", "browser"]}
+        return verifier.export_manifest(self.path, self.revision, "amd64", sources)
+
+    def test_export_uses_config_digest_not_store_id(self):
+        result = self.exported()
+        for kind in ["agent", "browser"]:
+            self.assertEqual(result["images"][kind]["id"], self.bundle["images"][kind]["id"])
+            self.assertNotEqual(result["images"][kind]["id"], self.actual["example/" + kind + ":release"]["Id"])
+
+    def test_export_refuses_source_layer_drift(self):
+        self.actual["example/agent:release"]["RootFS"]["Layers"] = ["sha256:" + "f" * 64]
+        with self.assertRaisesRegex(ValueError, "layers mismatch"):
+            self.exported()
+
+    def test_export_refuses_source_config_drift(self):
+        self.actual["example/browser:release"]["Config"]["Env"] = ["SAFE=0"]
+        with self.assertRaisesRegex(ValueError, "config mismatch"):
+            self.exported()
+
+    def test_export_refuses_wrong_revision(self):
+        self.archive()
+        sources = {kind: {**self.actual["example/" + kind + ":release"],
+                         "RepoTags": ["example/" + kind + ":release"]}
+                   for kind in ["agent", "browser"]}
+        with self.assertRaisesRegex(ValueError, "wrong revision"):
+            verifier.export_manifest(self.path, "b" * 40, "amd64", sources)
+
+    def test_export_refuses_ambiguous_source_tags(self):
+        self.archive()
+        sources = {kind: {**self.actual["example/" + kind + ":release"],
+                         "RepoTags": ["example/agent:release", "example/browser:release"]}
+                   for kind in ["agent", "browser"]}
+        with self.assertRaisesRegex(ValueError, "ambiguous source tags"):
+            verifier.export_manifest(self.path, self.revision, "amd64", sources)
+
     def test_changed_local_ids_are_verified_and_recorded(self):
         result = self.verify()
         self.assertEqual(result["agent"]["sourceId"], self.bundle["images"]["agent"]["id"])

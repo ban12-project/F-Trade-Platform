@@ -29,7 +29,7 @@ def archive_identity(archive, bundle):
             require(len(kinds) == 1 and kinds[0] not in result, "archive config identity mismatch")
             kind = kinds[0]
             config = json.loads(raw)
-            require(config["architecture"] == "amd64" and config["os"] == "linux", "wrong platform")
+            require(config["architecture"] == bundle.get("architecture", "amd64") and config["os"] == "linux", "wrong platform")
             require(config["config"]["Labels"]["org.opencontainers.image.revision"] == bundle["revision"], "wrong revision")
             if kind == "browser":
                 require(config["config"]["Labels"].get("io.ftrade.native-profile") == "1", "native profile label missing")
@@ -52,6 +52,33 @@ def verify_image(expected, actual):
     # Labels alone cannot establish identity. Reject any changed or added setting.
     require(actual["Config"] == config["config"], "destination config mismatch")
     return actual["Id"]
+
+
+def export_manifest(archive, revision, architecture, sources):
+    """Bind archive config digests to the fully inspected source images."""
+    require(re.fullmatch(r"[a-f0-9]{40}", revision), "invalid revision")
+    require(architecture in ("amd64", "arm64"), "invalid architecture")
+    require(set(sources) == {"agent", "browser"}, "incomplete source images")
+    bundle = {"version": 1, "revision": revision, "architecture": architecture, "images": {}}
+    with tarfile.open(archive, "r:gz") as source:
+        entries = source.getmembers()
+        require(len({e.name for e in entries}) == len(entries), "duplicate archive member")
+        rows = json.load(source.extractfile("manifest.json"))
+        require(len(rows) == 2, "expected exactly two archive images")
+        for row in rows:
+            tags = row.get("RepoTags") or []
+            kinds = [kind for kind, inspected in sources.items()
+                     if set(tags) & set(inspected.get("RepoTags") or [])]
+            require(len(kinds) == 1 and kinds[0] not in bundle["images"], "ambiguous source tags")
+            kind = kinds[0]
+            member = source.getmember(row["Config"])
+            require(member.isfile() and member.size < 5_000_000, "invalid image config")
+            raw = source.extractfile(member).read()
+            verify_image({"config": json.loads(raw)}, sources[kind])
+            bundle["images"][kind] = {"id": "sha256:" + hashlib.sha256(raw).hexdigest(),
+                                      "architecture": architecture, "revision": revision}
+    archive_identity(archive, bundle)
+    return bundle
 
 
 def verify_destination(identity, inspect=None, tag=None):
@@ -80,6 +107,11 @@ if __name__ == "__main__":
     if sys.argv[1] == "archive":
         with open(sys.argv[3]) as stream:
             output = archive_identity(sys.argv[2], json.load(stream))
+    elif sys.argv[1] == "export":
+        with open(sys.argv[5]) as stream:
+            sources = json.load(stream)
+        require(len(sources) == 2, "expected exactly two inspected images")
+        output = export_manifest(sys.argv[2], sys.argv[3], sys.argv[4], dict(zip(["agent", "browser"], sources)))
     elif sys.argv[1] == "destination":
         with open(sys.argv[2]) as stream:
             output = verify_destination(json.load(stream))
