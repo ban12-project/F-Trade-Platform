@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createSavedLoginExecutor } from "../../ops/browser-node/login.mjs";
+import { runFacebookLoginFlow } from "../../ops/browser-node/login-flow.mjs";
 import { createAutomaticLoginRuntime } from "../../ops/browser-node/login-plugin/automatic-runtime.js";
 import { validateLoginProfile } from "../../ops/browser-node/login-plugin/index.js";
 
@@ -645,5 +646,122 @@ for (const mode of [
       .locator("#identity")
       .evaluate((el) => el.setAttribute("data-account-id", "999999999"));
     expect(await runtime("observe", { ...packet })).toMatchObject({ accountMismatch: true });
+  });
+}
+
+for (const mode of [
+  "continue-totp",
+  "action-override",
+  "target-override",
+  "replace-password",
+] as const) {
+  test(`reviewed automatic root flow: ${mode}`, async ({ page }) => {
+    const base = "https://www.facebook.com";
+    await page.route(`${base}/**`, async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      const body =
+        path === "/"
+          ? `<form id="login_form" method="post" ${mode === "action-override" ? 'action="/login.php"' : ""} ${mode === "target-override" ? 'target="_blank"' : ""}><input name="email"><input name="pass" type="password"><button>Log in</button></form><script>
+        for(const input of document.querySelectorAll('input')) input.addEventListener('input',event=>{if(!event.isTrusted)input.value='';});
+        ${mode === "replace-password" ? `document.querySelector('[name="email"]').oninput=()=>document.querySelector('[name="pass"]').outerHTML='<input name="pass" type="password">';` : ""}
+        document.querySelector('form').onsubmit=e=>{e.preventDefault();location.href='/challenge/';};</script>`
+          : path === "/challenge/"
+            ? '<div id="checkpoint">Synthetic human verification</div>'
+            : path === "/two_factor/"
+              ? `<div id="totp"><input id="code"><button id="verify">Verify</button></div><script>document.querySelector('button').onclick=()=>{if(/^[0-9]{6}$/.test(document.querySelector('input').value)) location.href='/messages/';};</script>`
+              : '<a id="identity" data-account-id="123456789">Account</a><div id="chats"><span id="empty">No chats</span></div>';
+      await route.fulfill({ contentType: "text/html", body });
+    });
+    const profile = {
+      version: 2,
+      reviewRef: "evidence-native-root-automatic",
+      reviewedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString(),
+      url: base + "/",
+      form: "#login_form",
+      username: '#login_form input[name="email"]',
+      password: '#login_form input[name="pass"]',
+      formActionMode: "facebook-root-implicit",
+      automation: {
+        accountRef: "123456789",
+        identity: { selector: "#identity", attribute: "data-account-id" },
+        passwordSubmit: "#login_form button",
+        totp: { url: base + "/two_factor/", marker: "#totp", input: "#code", submit: "#verify" },
+        pin: { url: base + "/messages/", marker: "#pin", input: "#pin-code", submit: null },
+        ready: {
+          url: base + "/messages/",
+          marker: "#chats",
+          empty: "#empty",
+          emptyText: "No chats",
+          thread: "#thread",
+        },
+        checkpoint: "#checkpoint",
+        rejected: "#rejected",
+        loading: "#loading",
+      },
+    };
+    validateLoginProfile(profile);
+    const accountId = "00000000-0000-4000-8000-000000000011",
+      runId = "00000000-0000-4000-8000-000000000012";
+    const runtime = createAutomaticLoginRuntime({
+      sessions: new Map([
+        [accountId, { tabGroups: new Map([[runId, new Map([["tab", { page }]])]]) }],
+      ]),
+      accountId,
+      runId,
+      profile,
+      leaseDeadline: () => Date.now() + 60000,
+    });
+    const packet = {
+      userId: accountId,
+      runId,
+      tabId: "tab",
+      requestId: "00000000-0000-4000-8000-000000000013",
+      expiresAt: Date.now() + 30000,
+    };
+    await page.goto(base + "/");
+    if (mode !== "continue-totp") {
+      const result = await runtime("submit", {
+        ...packet,
+        phase: "password",
+        values: { username: "123456789", password: "synthetic-secret" },
+      });
+      expect(result.outcome).toBe(mode === "replace-password" ? "unknown" : "refused");
+      await expect(page.locator('[name="pass"]')).toHaveValue("");
+      await expect(page).toHaveURL(base + "/");
+      return;
+    }
+    let attention = 0;
+    const phases: string[] = [];
+    const result = await runFacebookLoginFlow({
+      credentials: {
+        username: "123456789",
+        password: "synthetic-secret",
+        totpSecret: "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+      },
+      deadline: packet.expiresAt,
+      assertActive() {},
+      observe: () => runtime("observe", { ...packet }),
+      onAttention: async () => {
+        attention++;
+        await page.goto(base + "/two_factor/");
+      },
+      submit: async (phase, values) => {
+        phases.push(phase);
+        return (await runtime("submit", { ...packet, phase, values })).outcome;
+      },
+    });
+    expect(result).toMatchObject({ outcome: "ready", factorPrompts: ["password", "totp"] });
+    expect(attention).toBe(1);
+    expect(phases).toEqual(["password", "totp"]);
+    expect(
+      (
+        await runtime("submit", {
+          ...packet,
+          phase: "totp",
+          values: { code: "123456", expiresAt: packet.expiresAt },
+        })
+      ).outcome,
+    ).toBe("refused");
   });
 }

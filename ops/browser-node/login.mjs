@@ -46,7 +46,7 @@ export function loginScopes(profiles) {
 export function loginProfileForRun(profiles, run) {
   if (run.kind !== "interactive") return null;
   const profile = profiles.get(JSON.stringify([run.channelRef, run.accountRef]))?.profile;
-  if (profile?.version === 2 && profile.automation.accountRef !== run.accountRef) return null;
+  // The reviewed map binds the opaque workbench reference; automation.accountRef is the Facebook identity.
   return profile && Date.parse(profile.expiresAt) > Date.now()
     ? validateLoginProfile(profile)
     : null;
@@ -56,7 +56,7 @@ export function configureLoginRuntime(spec, run, profile) {
   spec.body.Env.push(
     `FTRADE_ACCOUNT_ID=${run.accountId}`,
     `FTRADE_RUN_ID=${run.id}`,
-    ...(profile.version === 2 ? [`FTRADE_ACCOUNT_REF=${run.accountRef}`] : []),
+    ...(profile.version === 2 ? [`FTRADE_ACCOUNT_REF=${profile.automation.accountRef}`] : []),
     "FTRADE_RUN_KIND=interactive",
     `FTRADE_LOGIN_PROFILE_JSON=${JSON.stringify(validateLoginProfile(profile))}`,
   );

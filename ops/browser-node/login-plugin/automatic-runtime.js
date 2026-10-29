@@ -1,4 +1,5 @@
 import pageProgram from "./automatic-program.cjs";
+import { createLoginFill } from "./native-fill.js";
 
 const program = new Function(`return (${pageProgram});`)();
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -37,6 +38,15 @@ export function createAutomaticLoginRuntime({
   profile,
   leaseDeadline,
 }) {
+  const { automation: _automation, ...formProfile } = profile;
+  const fillPassword = createLoginFill({
+    sessions,
+    accountId,
+    runId,
+    kind: "interactive",
+    profile: { ...formProfile, version: 1 },
+    leaseDeadline,
+  });
   const submitted = new Set();
   let requestId;
   return async (operation, packet) => {
@@ -140,9 +150,30 @@ export function createAutomaticLoginRuntime({
         });
         return { outcome: "submitted" };
       }
+      if (phase === "password") {
+        const checked = await evaluate({
+          profile,
+          operation: "inspect-password",
+          phase,
+          values: packet.values,
+          expiresAt,
+        });
+        if (checked !== "fillable") return { outcome: "refused" };
+        const filled = await fillPassword({
+          userId: accountId,
+          runId,
+          requestId: packet.requestId,
+          tabId: packet.tabId,
+          expiresAt: Math.min(expiresAt, Date.now() + 30000),
+          username: packet.values.username,
+          password: packet.values.password,
+        });
+        if (filled.outcome !== "filled") return { outcome: filled.outcome };
+      }
       const outcome = await evaluate({
         profile,
         operation: "submit",
+        nativeFilled: phase === "password",
         phase,
         values: packet.values,
         expiresAt,

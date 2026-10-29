@@ -938,6 +938,25 @@ test("saved login profiles remain private, bounded and interactive-account scope
         },
       },
     };
+    const namedAutomatic = {
+      ...expiredAutomatic,
+      accountRef: "synthetic-account Europe",
+      profile: {
+        ...expiredAutomatic.profile,
+        reviewedAt: new Date(Date.now() - 1000).toISOString(),
+        expiresAt: new Date(Date.now() + 60000).toISOString(),
+      },
+    };
+    await writeFile(path, JSON.stringify([namedAutomatic]));
+    const namedProfiles = await loadLoginProfiles(path);
+    const namedRun = { ...scopedRun, accountRef: namedAutomatic.accountRef };
+    assert.deepEqual(loginProfileForRun(namedProfiles, namedRun), namedAutomatic.profile);
+    assert.equal(loginProfileForRun(namedProfiles, { ...namedRun, accountRef: "other" }), null);
+    assert.equal(loginProfileForRun(namedProfiles, { ...namedRun, channelRef: "other" }), null);
+    const namedSpec = { body: { Env: [] } };
+    configureLoginRuntime(namedSpec, namedRun, namedAutomatic.profile);
+    assert.ok(namedSpec.body.Env.includes("FTRADE_ACCOUNT_REF=123456789"));
+    assert.ok(!namedSpec.body.Env.includes("FTRADE_ACCOUNT_REF=" + namedAutomatic.accountRef));
     await writeFile(path, JSON.stringify([expiredAutomatic]));
     assert.equal((await loadLoginProfiles(path)).size, 0);
     for (const invalid of [
