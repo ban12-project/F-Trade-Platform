@@ -351,6 +351,36 @@ export async function testBrowserLogin(
   const recovered = (await call({ operation: "sync" })).runs as typeof interrupted;
   assert.equal(recovered.find((run) => run.id === lost.run.id)?.savedLoginOutcome, "filled");
   assert.equal((await state()).accounts[0].authState, "needs_login");
+  const readyState = await state();
+  readyState.accounts[0].authState = "ready";
+  await write(readyState);
+  const uncertain = await start();
+  await uncertain.authorize();
+  const uncertainNotice = (await uncertain.heartbeat()).loginAuthorization as { id: string };
+  const uncertainRequest = {
+    runId: uncertain.run.id,
+    leaseId: uncertain.run.leaseId,
+    authorizationId: uncertainNotice.id,
+  };
+  await call({ ...uncertainRequest, operation: "claim-login" });
+  await call({ ...uncertainRequest, operation: "login-result", outcome: "unknown" });
+  assert.equal(
+    (await state()).runs.at(-1)?.status,
+    "running",
+    "uncertain fill preserves manual inspection",
+  );
+  assert.equal(
+    (await state()).accounts[0].authState,
+    "needs_login",
+    "uncertain fill cannot retain publication readiness",
+  );
+  assert.equal((await uncertain.heartbeat()).loginAuthorization, undefined);
+  await assert.rejects(uncertain.authorize, /already_requested/);
+  await assert.rejects(
+    () => call({ ...uncertainRequest, operation: "claim-login" }),
+    /saved_login_/,
+  );
+  await uncertain.finish();
   // Public RFC test seed and synthetic PIN: never real account material.
   const totpSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
   const messengerPin = "123456";

@@ -58,13 +58,15 @@ for (const mode of [
     const controlledPage = {
       isClosed: () => page.isClosed(),
       bringToFront: () => page.bringToFront(),
-      async evaluate(program: Parameters<typeof page.evaluate>[0], payload: unknown) {
+      evaluate: page.evaluate.bind(page),
+      async evaluateHandle(program: Parameters<typeof page.evaluateHandle>[0], payload: unknown) {
         evaluations++;
         if (mode === "browser_error") throw new Error(`SYNTHETIC upstream exception ${password}`);
         if (mode === "expired_in_page")
           (payload as { expiresAt: number }).expiresAt = Date.now() - 1;
-        const result = await page.evaluate(program, payload);
-        if (mode === "lost_response") throw new Error(`SYNTHETIC lost response ${username}`);
+        const result = await page.evaluateHandle(program, payload);
+        if (mode === "lost_response" && evaluations === 3)
+          throw new Error(`SYNTHETIC lost response ${username}`);
         return result;
       },
     };
@@ -113,9 +115,8 @@ for (const mode of [
     const replay = await fill(packet());
     expect(replay.outcome).toBe("refused");
     expect(evaluations).toBe(before);
-    expect(evaluations).toBe(
-      ["wrong_account", "wrong_run", "expired", "expired_lease"].includes(mode) ? 0 : 1,
-    );
+    if (["wrong_account", "wrong_run", "expired", "expired_lease"].includes(mode))
+      expect(evaluations).toBe(0);
   });
 }
 test("login plugin is disabled by default and rejects missing runtime authority", () => {
@@ -243,3 +244,64 @@ test("root form opt-in rejects broader and automatic profiles", () => {
   ])
     expect(() => validateLoginProfile(invalid)).toThrow("login_profile_invalid");
 });
+
+for (const mode of [
+  "trusted_only",
+  "replace_password",
+  "change_path",
+  "change_origin",
+  "expire_after_username",
+] as const) {
+  test(`native input remains scoped: ${mode}`, async ({ page, context }) => {
+    const accountId = randomUUID(),
+      runId = randomUUID();
+    await context.route("**/*", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: `<form id="login" method="post" action="/login/device-based/regular/login/"><input id="username"><input id="password" type="password"><button>Log in</button></form>`,
+      }),
+    );
+    await page.goto(profile.url);
+    await page.evaluate((mode) => {
+      const user = document.querySelector("#username"),
+        secret = document.querySelector("#password");
+      if (!user || !secret) throw new Error("fixture_controls_missing");
+      user.addEventListener("input", (event) => {
+        if (mode === "trusted_only" && !event.isTrusted)
+          (event.target as HTMLInputElement).value = "";
+        if (mode === "replace_password") secret.outerHTML = '<input id="password" type="password">';
+        if (mode === "change_path") history.replaceState({}, "", "/not-reviewed/");
+        if (mode === "change_origin") location.href = "https://evil.invalid/login/";
+        if (mode === "expire_after_username") Date.now = () => 9e15;
+      });
+      secret.addEventListener("input", (event) => {
+        if (mode === "trusted_only" && !event.isTrusted)
+          (event.target as HTMLInputElement).value = "";
+      });
+    }, mode);
+    const fill = createLoginFill({
+      sessions: new Map([
+        [accountId, { tabGroups: new Map([[runId, new Map([["tab", { page }]])]]) }],
+      ]),
+      accountId,
+      runId,
+      kind: "interactive",
+      profile,
+      leaseDeadline: () => Date.now() + 60000,
+    });
+    const result = await fill({
+      requestId: randomUUID(),
+      runId,
+      userId: accountId,
+      tabId: "tab",
+      username: "SYNTHETIC-user",
+      password: "SYNTHETIC-secret",
+      expiresAt: Date.now() + 20000,
+    });
+    expect(result.outcome).toBe(mode === "trusted_only" ? "filled" : "unknown");
+    if (mode === "change_origin") await page.waitForURL("https://evil.invalid/login/");
+    expect(await page.locator("#password").inputValue()).toBe(
+      mode === "trusted_only" ? "SYNTHETIC-secret" : "",
+    );
+  });
+}

@@ -295,6 +295,8 @@ export function loginStopOutcome(version, outcome) {
   // Idle grace, explicit stop and the lease still bound this interactive run.
   if (version === 2) return outcome === "ready" ? null : "page_contract_failed";
   if (outcome === "ready") return "completed";
-  if (outcome === "unknown") return "unknown";
+  // A consumed v1 authorization cannot retry. Keep its bounded viewer available
+  // to inspect an uncertain partial fill; never promote the account to ready.
+  if (outcome === "unknown") return null;
   return null;
 }
