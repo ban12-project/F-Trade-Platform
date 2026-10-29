@@ -7,6 +7,7 @@ const fillPage = new Function(`return (${pageProgram});`)();
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 export function validateLoginProfile(profile, now = Date.now()) {
   if (profile?.version === 2) {
+    if (Object.hasOwn(profile, "formActionMode")) throw new Error("login_profile_invalid");
     const { automation, ...legacy } = profile;
     validateLoginProfile({ ...legacy, version: 1 }, now);
     return { ...structuredClone(profile), automation: validateAutomaticProfile(automation) };
@@ -14,7 +15,9 @@ export function validateLoginProfile(profile, now = Date.now()) {
   if (
     !profile ||
     Object.keys(profile).sort().join(",") !==
-      "expiresAt,form,password,reviewRef,reviewedAt,url,username,version" ||
+      (profile.formActionMode === "facebook-root-implicit"
+        ? "expiresAt,form,formActionMode,password,reviewRef,reviewedAt,url,username,version"
+        : "expiresAt,form,password,reviewRef,reviewedAt,url,username,version") ||
     profile.version !== 1 ||
     !/^evidence-[a-z0-9_-]{3,120}$/i.test(profile.reviewRef ?? "")
   )
@@ -49,6 +52,14 @@ export function validateLoginProfile(profile, now = Date.now()) {
       profile[key].includes(",")
     )
       throw new Error("login_profile_invalid");
+  if (
+    profile.formActionMode === "facebook-root-implicit" &&
+    (profile.url !== "https://www.facebook.com/" ||
+      profile.form !== "#login_form" ||
+      profile.username !== '#login_form input[name="email"]' ||
+      profile.password !== '#login_form input[name="pass"]')
+  )
+    throw new Error("login_profile_invalid");
   return structuredClone(profile);
 }
 

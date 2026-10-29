@@ -248,6 +248,8 @@ CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose �
 
 可选 `FACEBOOK_LOGIN_PROFILES_FILE` 指向 Agent 容器中的私有 JSON 文件，例如已有 node-state 挂载内的 `/var/lib/browser-node/login-profiles.json`（实际路径以 compose 挂载为准）。文件为 1–16 个 `{channelRef, accountRef, profile}` 条目的数组；profile 使用插件校验的 version、reviewRef、reviewedAt、expiresAt、url、form、username、password 字段，其中 username/password 是选择器，不是凭据。必须由页面审核提供真实规则，配置有效期最多 30 天。修改文件后重启 Agent；配置时要求浏览器镜像标记 `io.ftrade.login-fill=1`。不提交私有配置或真实账号。
 
+仅对已重新审核的 Facebook 根页面隐式 action 表单，version 1 可显式设置 `formActionMode: "facebook-root-implicit"`；此时 URL 必须是 `https://www.facebook.com/`，表单和字段选择器分别固定为 `#login_form`、`#login_form input[name="email"]` 和 `#login_form input[name="pass"]`。运行时仍要求表单没有 action 属性、为唯一可见的 POST 表单，两个唯一可见字段属于该表单；它只填充、不提交。此选项不能用于 version 2 自动恢复，未经过审核不得启用。
+
 Agent 仅向匹配的 interactive 运行注入非凭据页面配置。人工接入后点击“填入已保存账号和密码”，平台记录一次授权；Agent 检查插件运行身份、当前接管连接和出口，打开精确登录页，再次检查后领取一次短期凭据并调用专用填充接口。任务异步执行以保持其他租约心跳。密码不写入运行日志、检查点或容器环境变量。结果未知时停止运行，永不自动重发密码。
 
 `login-result` 只记录 filled/refused/unknown，重复同值幂等、冲突拒绝；领取前拒绝也可结束授权，阻止后续领取。界面显示结果，但 filled 仅证明填字段成功；提交登录、2FA 和确认就绪仍由人工完成。
