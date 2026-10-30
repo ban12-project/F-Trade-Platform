@@ -207,7 +207,25 @@ export function createSavedLoginExecutor({
             if (receipt.recorded !== true) throw new Error("challenge_not_recorded");
             challenge = reason;
           },
-          observe: async () => json(await browserRequest("/ftrade/login-observe", packet)),
+          observe: async () => {
+            const observed = await json(await browserRequest("/ftrade/login-observe", packet));
+            if (
+              observed?.outcome !== "unknown" &&
+              observed?.originVerified === true &&
+              observed.accountMismatch !== true
+            ) {
+              // Keep a current checkpoint, including one revisited after recovery.
+              // Only positive progress clears the historical human-attention notice.
+              if (observed.state === "checkpoint") challenge = "checkpoint";
+              else if (
+                observed.state === "totp" ||
+                (["pin", "messenger", "ready"].includes(observed.state) &&
+                  observed.identityVerified === true)
+              )
+                challenge = undefined;
+            }
+            return observed;
+          },
           submit: async (phase, values) => {
             await checkEgress();
             assertActive();
