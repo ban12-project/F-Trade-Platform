@@ -156,7 +156,9 @@ try {
                 const payload = document.createElement("script");
                 payload.id = "overflow";
                 payload.type = "application/json";
-                payload.textContent = JSON.stringify({ unrelated: "x".repeat(4_000_000) });
+                // Exceed the total scan budget, rather than the smaller budget
+                // reserved for identity-bearing scripts.
+                payload.textContent = JSON.stringify({ unrelated: "x".repeat(16_000_000) });
                 document.head.append(payload);
               }
             },

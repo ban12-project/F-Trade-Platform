@@ -34,7 +34,8 @@ async function automaticLoginPage({
           ? { state: "invalid", originVerified: true, accountMismatch: true }
           : "refused";
       let visited = 0,
-        bytes = 0;
+        scannedCharacters = 0,
+        identityCharacters = 0;
       const records = [];
       const walk = (value, depth = 0) => {
         if (++visited > 200000 || depth > 80) throw new Error("identity_limit");
@@ -52,10 +53,16 @@ async function automaticLoginPage({
       const scripts = document.querySelectorAll(auto.identity.selector);
       if (scripts.length > 256) throw new Error("identity_limit");
       for (const script of scripts) {
-        bytes += script.textContent.length;
-        if (bytes > 4000000) throw new Error("identity_limit");
-        if (script.textContent.includes("CurrentUserInitialData"))
-          walk(JSON.parse(script.textContent));
+        const content = script.textContent;
+        // Hydrated Messenger can contain over 9 MB of unrelated JSON. Bound
+        // scanning separately while retaining the smaller parsed-identity cap.
+        scannedCharacters += content.length;
+        if (scannedCharacters > 16000000) throw new Error("identity_limit");
+        if (content.includes("CurrentUserInitialData")) {
+          identityCharacters += content.length;
+          if (identityCharacters > 4000000) throw new Error("identity_limit");
+          walk(JSON.parse(content));
+        }
       }
       if (
         records.some(
