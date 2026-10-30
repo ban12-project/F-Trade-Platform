@@ -1,3 +1,5 @@
+> Historical report. The environment-driven network restriction described below was removed in #710; managed Sandboxes now use allow-all networking with browser-session egress verification.
+
 # #459 策略校验候选修复
 
 基线 `main@37c068363aea3e746119b56a01f7757dfca63fbd`。本候选必须先完成已审核策略配置与真实 SDK 返回值核对，再合并部署；不代表生产网络或在线账号验收通过。

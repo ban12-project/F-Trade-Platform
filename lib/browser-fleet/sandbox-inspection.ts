@@ -4,7 +4,6 @@ import { Sandbox, Snapshot } from "@vercel/sandbox";
 import { sql } from "drizzle-orm";
 import { type DatabaseExecutor, getDatabase } from "../db/client";
 import { type SandboxInspection, sandboxInspectionSchema } from "./sandbox-inspection-contract";
-import { configuredBrowserSandboxNetworkPolicy } from "./sandbox-network-policy";
 import { type BrowserSandboxProvider, browserSandboxPreflightChecks } from "./sandbox-provider";
 
 /** Read-only: no resume, stop, credential release, lifecycle reset or raw provider data. */
@@ -13,7 +12,6 @@ export async function inspectOwnedBrowserSandbox(
   ownerId: string,
   database: DatabaseExecutor = getDatabase(),
   provider: Pick<BrowserSandboxProvider, "get"> = Sandbox,
-  configuredPolicy = configuredBrowserSandboxNetworkPolicy,
   snapshots: {
     get: (input: { snapshotId: string }) => Promise<Pick<Snapshot, "status" | "expiresAt">>;
   } = Snapshot,
@@ -23,12 +21,6 @@ export async function inspectOwnedBrowserSandbox(
     JOIN browser_sandbox s ON s.node_id = n.id
     WHERE n.id = ${nodeId} AND n.owner_id = ${ownerId} AND n.status = 'active'`);
   if (!owned.rows.length) throw new Error("browser_node_unavailable");
-  let policy: ReturnType<typeof configuredPolicy>;
-  try {
-    policy = configuredPolicy();
-  } catch {
-    return { kind: "unavailable", reason: "configuration" };
-  }
   try {
     const sandbox = await provider.get({ name: `ftrade-browser-${nodeId}`, resume: false });
     let snapshot: Extract<SandboxInspection, { kind: "observed" }>["snapshot"] = "missing";
@@ -52,7 +44,7 @@ export async function inspectOwnedBrowserSandbox(
         sandbox.status === "stopped" || sandbox.status === "running"
           ? sandbox.status
           : "transitioning",
-      checks: browserSandboxPreflightChecks(sandbox, nodeId, policy),
+      checks: browserSandboxPreflightChecks(sandbox, nodeId),
       snapshot,
     };
   } catch (error) {

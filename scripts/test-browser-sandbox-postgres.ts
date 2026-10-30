@@ -80,17 +80,9 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
       } as unknown as BrowserSandboxProviderHandle;
     },
   };
+  await assert.rejects(inspectOwnedBrowserSandbox({ nodeId }, "foreign-owner", database, provider));
   await assert.rejects(
-    inspectOwnedBrowserSandbox({ nodeId }, "foreign-owner", database, provider, () => "deny-all"),
-  );
-  await assert.rejects(
-    inspectOwnedBrowserSandbox(
-      { nodeId: randomUUID() },
-      "synthetic-owner",
-      database,
-      provider,
-      () => "deny-all",
-    ),
+    inspectOwnedBrowserSandbox({ nodeId: randomUUID() }, "synthetic-owner", database, provider),
   );
   await assert.rejects(
     inspectOwnedBrowserSandbox(
@@ -98,7 +90,6 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
       "synthetic-owner",
       database,
       provider,
-      () => "deny-all",
     ),
   );
   assert.equal(inspected, 0, "invalid or foreign requests never inspect the provider");
@@ -107,7 +98,6 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
     "synthetic-owner",
     database,
     provider,
-    () => "deny-all",
   );
   assert.equal(inspection.kind, "observed");
   if (inspection.kind === "observed") {
@@ -116,7 +106,6 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
       ownership: true,
       resources: true,
       timeout: true,
-      networkPolicy: true,
     });
   }
   assert.ok(!JSON.stringify(inspection).includes(privateMarker));
@@ -134,7 +123,6 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
           };
         },
       },
-      () => "deny-all",
       {
         async get(input) {
           assert.deepEqual(input, { snapshotId: "synthetic-snapshot" });
@@ -150,45 +138,21 @@ export async function testBrowserSandboxLifecycle(pool: Pool) {
     assert.equal(checked.snapshot, variant === "deleted" ? "missing" : variant);
     assert.ok(!JSON.stringify(checked).includes(privateMarker));
   }
-  const mismatch = await inspectOwnedBrowserSandbox(
-    { nodeId },
-    "synthetic-owner",
-    database,
-    provider,
-    () => ({ allow: ["example.invalid"] }),
-  );
-  assert.ok(mismatch.kind === "observed" && !mismatch.checks.networkPolicy);
   for (const status of [401, 403, 500]) {
-    const failed = await inspectOwnedBrowserSandbox(
-      { nodeId },
-      "synthetic-owner",
-      database,
-      {
-        async get() {
-          throw Object.assign(new Error(privateMarker), {
-            response: new Response(privateMarker, { status }),
-          });
-        },
+    const failed = await inspectOwnedBrowserSandbox({ nodeId }, "synthetic-owner", database, {
+      async get() {
+        throw Object.assign(new Error(privateMarker), {
+          response: new Response(privateMarker, { status }),
+        });
       },
-      () => "deny-all",
-    );
+    });
     assert.deepEqual(failed, {
       kind: "unavailable",
       reason: status === 500 ? "provider_unavailable" : "provider_authorization",
     });
     assert.ok(!JSON.stringify(failed).includes(privateMarker));
   }
-  const configured = await inspectOwnedBrowserSandbox(
-    { nodeId },
-    "synthetic-owner",
-    database,
-    provider,
-    () => {
-      throw new Error(privateMarker);
-    },
-  );
-  assert.deepEqual(configured, { kind: "unavailable", reason: "configuration" });
-  assert.equal(inspected, 6);
+  assert.equal(inspected, 5);
   assert.deepEqual(
     (await pool.query("SELECT * FROM browser_sandbox WHERE node_id=$1", [nodeId])).rows,
     beforeInspection,

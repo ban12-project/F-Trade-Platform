@@ -72,11 +72,7 @@ try {
       actor,
     );
     assert(nodeId);
-    // Saving configuration does not authorize network access. A proxy outside
-    // the runtime allowlist must still persist; startup enforces that policy.
-    process.env.BROWSER_SANDBOX_NETWORK_POLICY_JSON = JSON.stringify({
-      subnets: { allow: ["198.51.100.0/24"] },
-    });
+    // Literal proxy IPs persist without a deployment network allowlist.
     await ownerBrowserCommand(
       {
         operation: "grant",

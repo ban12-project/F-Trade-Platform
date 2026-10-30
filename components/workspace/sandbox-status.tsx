@@ -22,10 +22,8 @@ const checkLabels = {
   ownership: "实例归属",
   resources: "计算资源",
   timeout: "运行时限",
-  networkPolicy: "网络策略",
 };
 const failureLabels = {
-  configuration: "应用的连接配置无效，需要管理员核对。",
   provider_authorization: "云端拒绝访问，请核对项目授权。",
   provider_unavailable: "暂时无法读取云端状态，请稍后检查。",
 };
