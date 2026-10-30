@@ -48,14 +48,20 @@ async function boundedJson(response) {
   }
 }
 export async function waitForBrowserReady(browserRequest, { assertActive, sleep }) {
+  let lastObservation = "unreachable";
   for (let attempt = 0; attempt < 60; attempt++) {
     assertActive();
     let status;
     try {
       const response = await browserRequest("/health", undefined, 2000);
-      if (response.ok) status = await boundedJson(response);
-      else await response.body?.cancel();
+      lastObservation = response.ok ? "invalid-health" : "unhealthy-response";
+      if (response.ok) {
+        status = await boundedJson(response);
+        if (status?.ok === true && status.engine === "camoufox")
+          lastObservation = "browser-disconnected";
+      } else await response.body?.cancel();
     } catch {
+      lastObservation = "unreachable";
       // The HTTP listener may start before Firefox's prewarm finishes.
     }
     assertActive();
@@ -68,7 +74,9 @@ export async function waitForBrowserReady(browserRequest, { assertActive, sleep 
       return;
     if (attempt < 59) await sleep(1000);
   }
-  throw new Error("browser_start_timeout");
+  throw Object.assign(new Error("browser_start_timeout"), {
+    browserFailureCode: `browser_health_${lastObservation.replaceAll("-", "_")}`,
+  });
 }
 // Heartbeat and task authorization share a probe tab and the same run object.
 // Queue the entire observation, not just navigation. Each caller needs a fresh

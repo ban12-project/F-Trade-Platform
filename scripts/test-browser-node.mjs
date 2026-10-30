@@ -170,6 +170,25 @@ test("browser startup waits for Firefox prewarm and rechecks cancellation", asyn
     /browser_start_timeout/,
   );
   assert.equal(calls, 60);
+  for (const [response, code] of [
+    [
+      () => {
+        throw new Error("private proxy password");
+      },
+      "unreachable",
+    ],
+    [() => Response.json({ private: "secret" }), "invalid_health"],
+    [() => new Response("private error", { status: 503 }), "unhealthy_response"],
+    [() => Response.json({ ...ready, browserConnected: false }), "browser_disconnected"],
+  ]) {
+    await assert.rejects(
+      waitForBrowserReady(response, { assertActive() {}, sleep: async () => {} }),
+      (error) =>
+        error.message === "browser_start_timeout" &&
+        error.browserFailureCode === `browser_health_${code}` &&
+        !JSON.stringify(error).includes("private"),
+    );
+  }
 });
 const accountId = randomUUID();
 const run = {
