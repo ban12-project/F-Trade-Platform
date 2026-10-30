@@ -187,3 +187,98 @@ for (const mode of [
       expect(await page.locator("#password").inputValue()).toBe("  SYNTHETIC exact password  ");
   });
 }
+
+for (const mode of [
+  "totp",
+  "messenger",
+  "pin",
+  "invalid",
+  "wrong-origin",
+  "wrong-account",
+  "unverified",
+  "revisited",
+] as const) {
+  test(`resolved checkpoint final result: ${mode}`, async () => {
+    const automatic = {
+      ...profile,
+      version: 2,
+      automation: {
+        mode: "observe-only",
+        accountRef: "123456789",
+        identity: { selector: "#identity", attribute: "data-account-id" },
+        passwordSubmit: "#submit",
+        totp: {
+          url: "https://www.facebook.com/two_factor/",
+          marker: "#totp",
+          input: "#code",
+          submit: "#verify",
+        },
+        pin: {
+          url: "https://www.facebook.com/messages/",
+          marker: "#pin",
+          input: "#pin-code",
+          submit: "#restore",
+        },
+        ready: {
+          url: "https://www.facebook.com/messages/",
+          marker: "#chats",
+          empty: "span",
+          emptyText: "No chats",
+          thread: "a[data-thread-id]",
+        },
+        checkpoint: "#checkpoint",
+        rejected: "#rejected",
+        loading: "#loading",
+      },
+    };
+    const run = {
+      kind: "interactive",
+      id: randomUUID(),
+      leaseId: randomUUID(),
+      accountId: randomUUID(),
+    };
+    const observations = [
+      { state: "checkpoint", originVerified: true },
+      {
+        state: ["totp", "pin"].includes(mode) ? mode : mode === "invalid" ? "invalid" : "messenger",
+        originVerified: mode !== "wrong-origin",
+        accountMismatch: mode === "wrong-account",
+        identityVerified: mode !== "unverified",
+        atReadyUrl: true,
+      },
+      ...(mode === "revisited" ? [{ state: "checkpoint", originVerified: true }] : []),
+      { state: "invalid", originVerified: false },
+    ];
+    let result: Record<string, unknown> | undefined;
+    const execute = createSavedLoginExecutor({
+      run,
+      profile: automatic,
+      assertActive() {},
+      async checkEgress() {},
+      async request(operation, body) {
+        if (operation === "login-challenge") return { recorded: true };
+        expect(operation).toBe("login-result");
+        result = body;
+        return {};
+      },
+      async browserRequest(path) {
+        if (path === "/ftrade/login-status")
+          return Response.json({
+            version: 2,
+            runId: run.id,
+            accountId: run.accountId,
+            reviewRef: automatic.reviewRef,
+            expiresAt: Date.parse(automatic.expiresAt),
+          });
+        if (path === "/tabs")
+          return Response.json({ tabId: "tab", url: automatic.automation.ready.url });
+        expect(path).toBe("/ftrade/login-observe");
+        return Response.json(observations.shift());
+      },
+    });
+    expect(await execute({ id: randomUUID(), expiresAt: Date.now() + 60000 })).toBe("refused");
+    expect(result?.challenge).toBe(
+      ["totp", "messenger", "pin"].includes(mode) ? undefined : "checkpoint",
+    );
+  });
+}
