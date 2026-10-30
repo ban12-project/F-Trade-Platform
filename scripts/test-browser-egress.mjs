@@ -204,18 +204,20 @@ test("concurrent checks serialize the full navigation and snapshot without shari
   const entered = deferred();
   const release = deferred();
   const calls = [];
-  let navigating = false;
+  let readingSnapshot = false;
   const request = async (path) => {
     if (path.endsWith("/navigate")) {
       calls.push("navigate");
-      assert.equal(navigating, false, "overlapping probe navigation");
-      navigating = true;
-      entered.resolve();
-      await release.promise;
+      // The pinned server locks navigate, but its snapshot route is unlocked.
+      // Even serial navigations must not overlap the preceding snapshot read.
+      assert.equal(readingSnapshot, false, "navigation interrupted probe snapshot");
       return Response.json({ url: EGRESS_URL });
     }
     calls.push("snapshot");
-    navigating = false;
+    readingSnapshot = true;
+    entered.resolve();
+    await release.promise;
+    readingSnapshot = false;
     return Response.json(snapshot());
   };
   const first = verifyBrowserEgress(request, current, "probe");
