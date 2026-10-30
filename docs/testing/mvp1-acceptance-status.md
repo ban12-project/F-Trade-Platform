@@ -1,6 +1,21 @@
 # MVP1 当前验收状态
 
-核对日期：2026-10-23。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#332](https://github.com/ban12-project/F-Trade-Platform/issues/332)。**MVP1 总验收未完成；用户当前要求继续 MVP1 功能迭代，暂停 DM 验收。** 本轮新业务资料仅使用 `docs/reference/`，旧合成项目归档并保留原审计；受控消息不计作真实客户询盘。新运行时、模板与生产部署的工程证据见[接管修复与交付报告](reports/sandbox-viewer-rollout-20261022.md)。下文标注的 2026-10-15 状态属于历史检查点，不能代替本轮实测。
+核对日期：2026-10-31。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#332](https://github.com/ban12-project/F-Trade-Platform/issues/332)。**MVP1 总验收未完成；用户当前要求继续 MVP1 功能迭代，暂停 DM 验收。** 本轮新业务资料仅使用 `docs/reference/`，旧合成项目归档并保留原审计；受控消息不计作真实客户询盘。新运行时、模板与生产部署的工程证据见[接管修复与交付报告](reports/sandbox-viewer-rollout-20261022.md)。下文标注的 2026-10-15 状态属于历史检查点，不能代替本轮实测。
+
+## 2026-10-31 工程交付与验收边界
+
+本次只核对研发、部署和既有验收记录，没有执行真实客户、发布、DM、生产删除或设备验收。工程补缺不改变总验收仍未完成的结论。
+
+- **CI 暂停已生效**：用户明确要求最终验收前暂不运行普通自动 CI，保留自动部署。[PR #712](https://github.com/ban12-project/F-Trade-Platform/pull/712) 合并为 `e02765593267817d62dc12dc85983b20e9d21c8d`；main 的五项必需状态检查已移除，PR、管理员保护、线性历史及禁止强推／删除均保留。普通工作流保留手动触发，镜像发布保留发布前验证；恢复步骤与精确检查配置见[临时 CI 例外](../operations/temporary-ci-pause.md)。本地检查不能标记为远端 CI 已通过，最终验收前须恢复并验证。
+- **工具依赖修复已交付**：[PR #713](https://github.com/ban12-project/F-Trade-Platform/pull/713) 合并为 `c663ed0fc4adc466e4895dc9be8fbf66b769d053`，生产部署 `7445247253` 的提交归属与 success 状态已独立读回。11 项输入边界、8 项工具兼容性、TypeScript 与冻结安装本地通过；#708 已关闭。最新审计为 0 critical／1 high／5 moderate／3 low，#498 继续开放；10 月 23 日计数是历史快照。见[验证报告](reports/systeminformation-security-20261031.md)。
+- **分轮补充品牌／型号已交付**：[PR #715](https://github.com/ban12-project/F-Trade-Platform/pull/715) 合并为 `f70088ce890dc2fa193dc905dc5057e7085c813d`，生产部署 `7445350631` 对应同一提交且状态 success。明确标签可在不同回复中补齐，并保留各字段来源；型号单独出现不会满足车辆完整度，冲突／否定／含糊值仍需人工核对。销售、RFQ、合成闭环与类型检查通过，见[验证报告](reports/inquiry-vehicle-labels-20261031.md)。这不证明新的真实询盘、页面／数据库验收或工厂适配事实。
+
+### 仍缺的完成证据
+
+1. **当前渠道闭环**：#383／#322／#480 的当前账号发布回执、独立入站去重及 RFQ 关联仍未通过。10 月 30 日身份与空收件箱恢复证据不证明消息历史或 DM；暂停未解除。
+2. **真实业务与最终决定**：#26／#32 仍缺同批业务样本、实际人工报价／交期及商机认定、六项验收结果和具名人工 Go/No-Go。历史合成结果不能改成真实客户计数，也不能仅因实现存在而判 Go。
+3. **独立运营验收**：#122 的生产恢复及真实到期删除、#318 的当前目标路径规则与实际平台接受、#391 的实机和辅助技术证据仍未完成。现有本地恢复、导出预设或浏览器仿真不替代这些证据。
+4. **未解释的故障**：#348 的历史 CSV 间歇失败、#664 的会话拒绝后草稿丢失、#674 的启动／出口观察仍保持原有不确定性；后续成功不抹去失败。按现有 Issue 的复现条件继续调查，不将反复通过相同测试计作根因修复。
 
 ## 2026-10-30 自动登录与会话恢复补充
 
@@ -68,7 +83,7 @@
 | 保留期与受控副本 | 90 天、具名责任与预算已决定；应用执行、来源／历史保护、[实际合成数据库备份恢复](reports/m2-retention-restore-20261015.md)均有证据；Neon 6 小时恢复窗口已盘点 | #122 的真实生产到期对象／Blob 删除、生产 Neon PITR、历史副本物理清除和其他未覆盖副本尚未证明；不改写真实时间制造样本，网关日志不重新作为前置 |
 | Sales／RFQ、报价与跟单商机 | 当前领域实现、数据库授权／事务回归和 reference／合成闭环已有证据，见[实现核对](reports/mvp1-implementation-audit-20261006.md)及[reference 汇总](reports/reference-acceptance-20260917.md) | 真实客户 RFQ、人工报价／交期、发送凭据与商机认定仍待业务验收；合成消息、价格或审批不能倒填为真实业务 |
 | 设备与辅助技术 | 自动化 Chromium／WebKit、响应式与权限回归已有证据 | [#391](https://github.com/ban12-project/F-Trade-Platform/issues/391) 的实机、VoiceOver／NVDA、实际缩放／对比度及所声明性能证据尚未完成；仿真不替代实机 |
-| 依赖与历史故障 | 2026-10-23 PR #657 将 shadcn 的 MCP SDK 定向升级到 1.32.0，最终完整 CI 通过并合并；同轮审计从 0 critical／3 high／2 moderate 降为 0 critical／1 high／0 moderate（braces），见[验证报告](reports/mcp-sdk-security-20261023.md)。已安装 braces 副本有深度防护；原 CSV 失败后已有冻结输入成功及诊断关联 | [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 的独立 CLI 未修补副本与上游发布风险、[#348](https://github.com/ban12-project/F-Trade-Platform/issues/348) 的原间歇原因仍未知；后续成功不改写原失败 |
+| 依赖与历史故障 | 最新状态见本页 2026-10-31 检查点；以下为历史证据。2026-10-23 PR #657 将 shadcn 的 MCP SDK 定向升级到 1.32.0，最终完整 CI 通过并合并；同轮审计从 0 critical／3 high／2 moderate 降为 0 critical／1 high／0 moderate（braces），见[验证报告](reports/mcp-sdk-security-20261023.md)。已安装 braces 副本有深度防护；原 CSV 失败后已有冻结输入成功及诊断关联 | [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 的独立 CLI 未修补副本与上游发布风险、[#348](https://github.com/ban12-project/F-Trade-Platform/issues/348) 的原间歇原因仍未知；后续成功不改写原失败 |
 | 集成验收与 Go/No-Go | [#26](https://github.com/ban12-project/F-Trade-Platform/issues/26)／[#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 保持 open；受控技术演示已有记录 | 完整实际渠道／业务样本及独立最终决定未完成，不能判 Go |
 
 ## 继续工作的条件
