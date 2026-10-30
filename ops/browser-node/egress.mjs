@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { describeBrowserLaunchFailure } from "./launch-diagnostics.mjs";
 
 // This is a browser navigation in the account's own session, never a host fetch.
 export const EGRESS_URL = "https://api.ipify.org/";
@@ -120,4 +121,25 @@ export async function openEgressCheckedSession(browserRequest, run, onInteractiv
     } else await login.body?.cancel();
   }
   return probe.tabId;
+}
+
+/** Diagnostics distinguish failed observation from an actual observed IP mismatch. */
+export function describeEgressFailure(error) {
+  const reasons = new Set([
+    "egress_ip_invalid",
+    "egress_tab_invalid",
+    "egress_response_missing",
+    "egress_response_limit",
+    "egress_navigation_invalid",
+    "egress_observation_invalid",
+    "egress_ip_mismatch",
+  ]);
+  const detail = describeBrowserLaunchFailure("egress", error);
+  return {
+    event: "browser_egress_failed",
+    reason: reasons.has(error?.message) ? error.message : "egress_observation_unavailable",
+    request: detail.request,
+    code: detail.code,
+    httpStatus: detail.httpStatus,
+  };
 }

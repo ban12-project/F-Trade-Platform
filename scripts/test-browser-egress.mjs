@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { claimRun, enqueueRun, finishRun, initialState } from "../lib/browser-fleet/policy.ts";
 import {
+  describeEgressFailure,
   EGRESS_URL,
   openEgressCheckedSession,
   readEgressSnapshot,
@@ -132,4 +133,60 @@ test("egress failure pauses background work and is not a successful inbox check"
   assert.equal(state.accounts[0].lastCheckedAt, null);
   assert.equal(queued.status, "failed");
   assert.throws(() => enqueueRun(state, { ...queued, id: "new" }, 1002), /account_needs_attention/);
+});
+
+test("egress diagnostics distinguish observed mismatch from failed observation without secrets", async () => {
+  for (const [request, expected] of [
+    [transport(snapshot("203.0.113.11")).request, "egress_ip_mismatch"],
+    [
+      transport({ ...snapshot(), snapshot: "- generic: challenge" }).request,
+      "egress_observation_invalid",
+    ],
+    [async () => new Response("not json: SECRET"), "egress_observation_unavailable"],
+    [
+      async () => {
+        throw Object.assign(new Error("SECRET proxy credentials and URL"), {
+          browserFailureCode: "ssl_error",
+          browserRequestStage: "navigate",
+          browserHttpStatus: 502,
+        });
+      },
+      "egress_observation_unavailable",
+    ],
+  ]) {
+    let caught;
+    try {
+      await verifyBrowserEgress(request, run, "probe");
+    } catch (error) {
+      caught = error;
+    }
+    assert.ok(caught);
+    const detail = describeEgressFailure(caught);
+    assert.equal(detail.reason, expected);
+    assert.equal(JSON.stringify(detail).includes("SECRET"), false);
+    assert.equal(JSON.stringify(detail).includes(run.expectedEgressIp), false);
+    if (caught.browserFailureCode)
+      assert.deepEqual(detail, {
+        event: "browser_egress_failed",
+        reason: expected,
+        request: "navigate",
+        code: "ssl_error",
+        httpStatus: 502,
+      });
+  }
+  assert.deepEqual(
+    describeEgressFailure({
+      message: "SECRET",
+      browserFailureCode: "SECRET",
+      browserRequestStage: "SECRET",
+      browserHttpStatus: "SECRET",
+    }),
+    {
+      event: "browser_egress_failed",
+      reason: "egress_observation_unavailable",
+      request: "unknown",
+      code: "unclassified",
+      httpStatus: null,
+    },
+  );
 });
