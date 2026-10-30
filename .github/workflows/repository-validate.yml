@@ -74,6 +74,9 @@ jobs:
       - name: Verify patched Undici TLS identity checks on actual SDK dependencies
         run: node --test scripts/test-undici-tls-compatibility.mjs
 
+      - name: Verify compressed request cleanup through actual tooling dependencies
+        run: node --test scripts/test-body-parser-cleanup.mjs
+
       - name: Resume frozen old-nanoid SDK state and check security boundaries
         run: node --test --test-reporter=tap scripts/test-workflow-nanoid-replay.mjs
 
