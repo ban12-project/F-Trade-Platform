@@ -1,10 +1,5 @@
 import { Sandbox } from "@vercel/sandbox";
 import { z } from "zod";
-import {
-  type BrowserSandboxNetworkPolicy,
-  browserSandboxNetworkPolicyMatches,
-  browserSandboxNetworkPolicySchema,
-} from "./sandbox-network-policy";
 
 const uuid = z
   .string()
@@ -14,7 +9,6 @@ const requestSchema = z.discriminatedUnion("mode", [
     .object({
       mode: z.literal("create"),
       nodeId: uuid,
-      networkPolicy: browserSandboxNetworkPolicySchema,
       operationId: uuid,
       templateSnapshotId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/),
     })
@@ -24,7 +18,6 @@ const requestSchema = z.discriminatedUnion("mode", [
       mode: z.literal("resume"),
       nodeId: uuid,
       operationId: uuid,
-      networkPolicy: browserSandboxNetworkPolicySchema,
     })
     .strict(),
 ]);
@@ -38,7 +31,7 @@ export type BrowserSandboxProviderHandle = Pick<
   | "timeout"
   | "vcpus"
   | "tags"
-  | "networkPolicy"
+  | "update"
   | "currentSnapshotId"
   | "currentSession"
   | "domain"
@@ -52,7 +45,6 @@ export type BrowserSandboxProvider = {
 export function browserSandboxPreflightChecks(
   sandbox: BrowserSandboxProviderHandle,
   nodeId: string,
-  policy: BrowserSandboxNetworkPolicy,
 ) {
   return {
     ownership:
@@ -65,7 +57,6 @@ export function browserSandboxPreflightChecks(
       Number.isFinite(sandbox.timeout) &&
       sandbox.timeout > 0 &&
       sandbox.timeout <= 20 * 60 * 1000,
-    networkPolicy: browserSandboxNetworkPolicyMatches(sandbox.networkPolicy, policy),
   };
 }
 
@@ -85,7 +76,7 @@ export async function provisionBrowserSandbox(
     if (request.mode === "create") {
       sandbox = await provider.create({
         name,
-        networkPolicy: request.networkPolicy,
+        networkPolicy: "allow-all",
         source: { type: "snapshot", snapshotId: request.templateSnapshotId },
         ports: [9400],
         persistent: true,
@@ -100,7 +91,7 @@ export async function provisionBrowserSandbox(
       // Inspect first. Never use getOrCreate: a lost snapshot must not turn an
       // established account profile into a fresh, empty runtime.
       const existing = await provider.get({ name, resume: false });
-      const checks = browserSandboxPreflightChecks(existing, request.nodeId, request.networkPolicy);
+      const checks = browserSandboxPreflightChecks(existing, request.nodeId);
       if (!checks.ownership || existing.status !== "stopped")
         throw new Error("sandbox_requires_reconciliation");
       // A stopped sandbox retains externally edited resource configuration. Do
@@ -110,13 +101,12 @@ export async function provisionBrowserSandbox(
       // to resume if its stored deadline no longer satisfies our compute bound.
       // Do not repair it by extending an already running session's timeout.
       if (!checks.timeout) throw new Error("sandbox_timeout_requires_reconciliation");
-      if (!checks.networkPolicy) throw new Error("sandbox_network_policy_requires_reconciliation");
+      // Persistent Sandboxes retain old allowlists. Clear them before resuming.
+      await existing.update({ networkPolicy: "allow-all" });
       sandbox = await provider.get({ name, resume: true });
     }
     if (sandbox.name !== name || !sandbox.persistent || sandbox.status !== "running")
       throw new Error("sandbox_requires_reconciliation");
-    if (!browserSandboxNetworkPolicyMatches(sandbox.networkPolicy, request.networkPolicy))
-      throw new Error("sandbox_network_policy_requires_reconciliation");
     const session = sandbox.currentSession();
     if (session.status !== "running") throw new Error("sandbox_requires_reconciliation");
     return { sandboxName: name, session, gatewayOrigin: sandbox.domain(9400) };

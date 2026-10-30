@@ -72,52 +72,41 @@ try {
       actor,
     );
     assert(nodeId);
-    const grant = {
-      operation: "grant",
-      value: {
-        nodeId,
-        channelRef: f.channelRef,
-        accountRef: f.accountRef,
-        expectedEgressIp: "203.0.113.10",
-        pollSeconds: 0,
-        credentials: {
-          loginUsername: "",
-          loginPassword: "",
-          proxyHost: "192.0.2.42",
-          proxyPort: "3128",
-          proxyUsername: "",
-          proxyPassword: "",
-          clearLogin: false,
-          clearProxy: false,
+    // Literal proxy IPs persist without a deployment network allowlist.
+    await ownerBrowserCommand(
+      {
+        operation: "grant",
+        value: {
+          nodeId,
+          channelRef: f.channelRef,
+          accountRef: f.accountRef,
+          expectedEgressIp: "203.0.113.10",
+          pollSeconds: 0,
+          credentials: {
+            loginUsername: "",
+            loginPassword: "",
+            proxyHost: "192.0.2.42",
+            proxyPort: "3128",
+            proxyUsername: "",
+            proxyPassword: "",
+            clearLogin: false,
+            clearProxy: false,
+          },
         },
       },
-    };
-    process.env.BROWSER_SANDBOX_NETWORK_POLICY_JSON = JSON.stringify({
-      subnets: { allow: ["198.51.100.0/24"] },
-    });
-    const beforeGrant = (
-      await db.execute(sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`)
-    ).rows;
-    await assert.rejects(ownerBrowserCommand(grant, actor), {
-      message: "sandbox_proxy_ip_not_allowed",
-    });
-    assert.deepEqual(
-      (await db.execute(sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`)).rows,
-      beforeGrant,
+      actor,
     );
-    assert.equal(
-      (await db.execute(sql`SELECT id FROM browser_fleet_binding WHERE node_id = ${nodeId}`)).rows
-        .length,
-      0,
-    );
-    process.env.BROWSER_SANDBOX_NETWORK_POLICY_JSON = JSON.stringify({
-      subnets: { allow: ["192.0.2.0/24"] },
-    });
-    await ownerBrowserCommand(grant, actor);
     const nodes = await db.execute(
       sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`,
     );
     const state = nodes.rows[0].document as FleetState;
+    assert.equal(state.accounts.length, 1);
+    assert.ok(state.accounts[0].proxyCiphertext);
+    assert.equal(
+      (await db.execute(sql`SELECT id FROM browser_fleet_binding WHERE node_id = ${nodeId}`)).rows
+        .length,
+      1,
+    );
     state.capabilities = ["publish"];
     state.accounts[0].authState = "ready";
     state.publicationScopes = [
