@@ -17,7 +17,22 @@ overrides:
   '@esbuild-kit/core-utils@3.3.2>esbuild': 0.25.12
   'shadcn@4.19.1>@modelcontextprotocol/sdk': 1.32.0
 
+  # Reviewed Zod 4 size-check patches; keep Zod 3 consumers on their own major (#702).
+  '@remotion/media@4.0.520>zod': 4.6.7
+  '@remotion/studio-protocol@4.0.520>zod': 4.6.7
+  '@remotion/studio-server@4.0.520>zod': 4.6.7
+  '@remotion/studio@4.0.520>zod': 4.6.7
+  '@vercel/cli-auth@0.0.1>zod': 4.6.7
+  '@vercel/cli-config@0.2.4>zod': 4.6.7
+  '@workflow/cli@4.3.12>zod': 4.6.7
+  '@workflow/core@4.8.8>zod': 4.6.7
+  '@workflow/world-local@4.4.1>zod': 4.6.7
+  '@workflow/world-vercel@4.7.4>zod': 4.6.7
+  '@workflow/world@4.5.0>zod': 4.6.7
+
 patchedDependencies:
+  # Enforce the existing dependency-list limit before the embedded parser (#702).
+  '@remotion/studio-protocol@4.0.520': patches/@remotion__studio-protocol@4.0.520.patch
   # Preserve old implicit-hook tokens and the shared seeded RNG on patched nanoid.
   # Remove only after the upstream migration passes the frozen SDK state fixture.
   '@workflow/core@4.8.8': patches/@workflow__core@4.8.8.patch
