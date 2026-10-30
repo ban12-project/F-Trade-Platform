@@ -31,6 +31,13 @@ const parentPins = [
 const store = resolve("node_modules/.pnpm");
 const entries = readdirSync(store);
 for (const pin of parentPins) {
+  if (pin === "@remotion/studio-protocol@4.0.520") {
+    const cli = createRequire(require.resolve("@remotion/cli"));
+    const server = createRequire(cli.resolve("@remotion/studio-server"));
+    const protocol = createRequire(server.resolve("@remotion/studio-protocol"));
+    libraries.push([pin, protocol("zod").z]);
+    continue;
+  }
   const separator = pin.lastIndexOf("@");
   const name = pin.slice(0, separator);
   const encoded = pin.replace("/", "+");

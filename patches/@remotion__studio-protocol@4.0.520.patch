@@ -1,0 +1,54 @@
+diff --git a/dist/esm/index.mjs b/dist/esm/index.mjs
+index 3e2c3a035f2693c01da2b1ec4cb632879462883b..afdef5d5ac988a7db258ac60e6535775cdff4d72 100644
+--- a/dist/esm/index.mjs
++++ b/dist/esm/index.mjs
+@@ -2015,9 +2015,13 @@ var elementDragDataSchema = object({
+     dimensions: optional(nullable(dimensionsSchema))
+   })
+ });
++// Reject the existing bound before the bundled parser walks dependency elements.
++var hasOversizedElementDependencies = (value) => Array.isArray(value?.element?.dependencies) && value.element.dependencies.length > MAX_DEPENDENCIES;
+ var parseElementDragData = (value) => {
+   try {
+-    const parsed = safeParse(elementDragDataSchema, JSON.parse(value));
++    const data = JSON.parse(value);
++    if (hasOversizedElementDependencies(data)) return null;
++    const parsed = safeParse(elementDragDataSchema, data);
+     if (!parsed.success || makeElementFileNameFromSlug(parsed.data.element.slug) === null) {
+       return null;
+     }
+@@ -2290,6 +2294,7 @@ var createElementPayload = (input) => {
+   return payload;
+ };
+ var parseStudioElementPayload = (value) => {
++  if (hasOversizedElementDependencies(value)) return null;
+   const parsed = safeParse(studioElementPayloadEnvelopeSchema, value);
+   if (!parsed.success) {
+     return null;
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 004450c08cc094e9c28373855d192ee00252767f..e018395761246b63fec11be84aaa9a1531df2e24 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -2055,9 +2055,13 @@ var elementDragDataSchema = object({
+     dimensions: optional(nullable(dimensionsSchema))
+   })
+ });
++// Reject the existing bound before the bundled parser walks dependency elements.
++var hasOversizedElementDependencies = (value) => Array.isArray(value?.element?.dependencies) && value.element.dependencies.length > MAX_DEPENDENCIES;
+ var parseElementDragData = (value) => {
+   try {
+-    const parsed = safeParse(elementDragDataSchema, JSON.parse(value));
++    const data = JSON.parse(value);
++    if (hasOversizedElementDependencies(data)) return null;
++    const parsed = safeParse(elementDragDataSchema, data);
+     if (!parsed.success || makeElementFileNameFromSlug(parsed.data.element.slug) === null) {
+       return null;
+     }
+@@ -2330,6 +2334,7 @@ var createElementPayload = (input) => {
+   return payload;
+ };
+ var parseStudioElementPayload = (value) => {
++  if (hasOversizedElementDependencies(value)) return null;
+   const parsed = safeParse(studioElementPayloadEnvelopeSchema, value);
+   if (!parsed.success) {
+     return null;

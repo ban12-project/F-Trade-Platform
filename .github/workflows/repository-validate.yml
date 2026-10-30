@@ -65,6 +65,9 @@ jobs:
       - name: Verify bounded Zod parsing and exact-parent schema compatibility
         run: node --import tsx --test scripts/test-zod-collection-bounds.ts
 
+      - name: Verify shipped Remotion CJS and ESM payload bounds
+        run: node --test scripts/test-remotion-bundled-bounds.mjs
+
       - name: Verify patched Workflow replay and serialization compatibility
         run: node scripts/test-workflow-security-compatibility.mjs
 
