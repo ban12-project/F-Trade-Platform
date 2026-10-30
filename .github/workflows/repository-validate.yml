@@ -59,6 +59,9 @@ jobs:
       - name: Test Better Auth core and Passkey schema mappings
         run: pnpm exec tsx scripts/test-auth-schema.ts
 
+      - name: Verify actual OTP and cookie session compatibility
+        run: node --test scripts/test-auth-security-compatibility.mjs
+
       - name: Verify patched Workflow replay and serialization compatibility
         run: node scripts/test-workflow-security-compatibility.mjs
 
