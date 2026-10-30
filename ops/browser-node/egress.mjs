@@ -78,7 +78,23 @@ export async function waitForBrowserReady(browserRequest, { assertActive, sleep 
     browserFailureCode: `browser_health_${lastObservation.replaceAll("-", "_")}`,
   });
 }
-export async function verifyBrowserEgress(browserRequest, run, tabId) {
+// Heartbeat and task authorization share a probe tab and the same run object.
+// Queue the entire observation, not just navigation. Each caller needs a fresh
+// result; a shared success could authorize work using an older observation.
+const pendingChecks = new WeakMap();
+export function verifyBrowserEgress(browserRequest, run, tabId) {
+  const previous = pendingChecks.get(run) ?? Promise.resolve();
+  // A failed check also rejects callers already queued behind it. Do not turn
+  // transport errors or IP mismatches into implicit retry attempts.
+  const current = previous.then(() => observeBrowserEgress(browserRequest, run, tabId));
+  pendingChecks.set(run, current);
+  const clear = () => {
+    if (pendingChecks.get(run) === current) pendingChecks.delete(run);
+  };
+  void current.then(clear, clear);
+  return current;
+}
+async function observeBrowserEgress(browserRequest, run, tabId) {
   canonicalIp(run.expectedEgressIp);
   if (typeof tabId !== "string" || !tabId || tabId.length > 200)
     throw new Error("egress_tab_invalid");
