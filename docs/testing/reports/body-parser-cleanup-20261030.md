@@ -1,0 +1,11 @@
+# Compressed request cleanup — 2026-10-30
+
+Issue #706, parent #498. Candidate is based on #705 and updates body-parser 2.3.0 to 2.4.0 within Express 5.2.1's existing range. The new parser brings qs 6.17.1 for its own dependency; Express's separate qs 6.16.0 remains unchanged. No parent upgrades, compression disabling, manual source patch or existing Workflow patch changes are involved.
+
+[Upstream advisory](https://github.com/expressjs/body-parser/security/advisories/GHSA-27r3-jxmh-p828) and [release source comparison](https://github.com/expressjs/body-parser/compare/v2.3.0...v2.4.0) identify decompressor cleanup after successful parsing and charset validation before stream creation. A package match does not establish production reachability. These installed paths are tooling: shadcn → MCP SDK → Express and workflow → CLI → web → Express.
+
+Four tests resolve Express through those actual parent chains and run its JSON/form middleware in isolated child processes, each bounded to ten seconds and bound only to loopback. A small compressed synthetic JSON frame followed by 100 KiB of trailing bytes causes both baseline children to exit with an unhandled Gunzip `Z_DATA_ERROR`; both normal-input control children pass. No uncaught-error listener is installed to conceal that crash. The fixed dependency passes all four tests, including trailing data, unsupported charset, valid compressed JSON/form data, malformed JSON rejection, size-limit rejection and a subsequent healthy request. The test neither replaces the parser nor sends any request to production.
+
+Existing Workflow replay/legacy data/Buffer/HTTP compatibility and eight tooling/MCP compatibility tests pass. Frozen install, TypeScript 7 and Biome checks pass. The targeted tests are added to repository CI. Full final-head CI and production delivery remain required; no production exploit or business acceptance is claimed.
+
+Same-round production audit changes from **0 critical / 3 high / 6 moderate / 4 low** to **0 critical / 2 high / 6 moderate / 4 low**, with no body-parser advisory matches. Other dependency risks remain in #498, including Zod 3 tooling and systeminformation. Do not claim a vulnerability-free graph or standalone CLI remediation.
