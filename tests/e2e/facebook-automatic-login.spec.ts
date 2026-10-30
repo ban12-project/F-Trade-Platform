@@ -24,6 +24,8 @@ for (const mode of [
   "bootstrap-limit-hydration",
   "bootstrap-limit-persistent",
   "bootstrap-limit-conflict",
+  "bootstrap-limit-unrelated",
+  "bootstrap-limit-identity",
   "ready-shell",
   "ready-hydration",
   "aria-submit",
@@ -365,7 +367,7 @@ for (const mode of [
       );
       if (mode.startsWith("bootstrap-limit-")) {
         Object.assign(profile.automation, { mode: "observe-only" });
-        await page.evaluate(() => {
+        await page.evaluate((kind) => {
           document.querySelector("#pin")?.remove();
           const chats = document.createElement("div");
           chats.id = "chats";
@@ -374,9 +376,17 @@ for (const mode of [
           const payload = document.createElement("script");
           payload.id = "hydrating-payload";
           payload.type = "application/json";
-          payload.textContent = JSON.stringify({ unrelated: "x".repeat(4_000_000) });
+          payload.textContent = JSON.stringify(
+            kind === "bootstrap-limit-identity"
+              ? { CurrentUserInitialData: "x".repeat(4_000_000) }
+              : {
+                  unrelated: "x".repeat(
+                    kind === "bootstrap-limit-unrelated" ? 9_200_000 : 16_000_000,
+                  ),
+                },
+          );
           document.head.append(payload);
-        });
+        }, mode);
         let reads = 0;
         const calls: string[] = [];
         const execute = createSavedLoginExecutor({
@@ -404,16 +414,27 @@ for (const mode of [
               if (!body) throw new Error("missing observation packet");
               value = await runtime("observe", body);
               reads++;
-              if (reads === 1 && mode !== "bootstrap-limit-persistent")
+              if (
+                reads === 1 &&
+                ["bootstrap-limit-hydration", "bootstrap-limit-conflict"].includes(mode)
+              )
                 await page.locator("#hydrating-payload").evaluate((element) => element.remove());
             } else throw new Error("unexpected browser submission");
             return new Response(JSON.stringify(value));
           },
         });
         expect(await execute({ id: packet.requestId, expiresAt: Date.now() + 30000 })).toBe(
-          mode === "bootstrap-limit-hydration" ? "ready" : "refused",
+          ["bootstrap-limit-hydration", "bootstrap-limit-unrelated"].includes(mode)
+            ? "ready"
+            : "refused",
         );
-        expect(reads).toBe(mode === "bootstrap-limit-persistent" ? 21 : 2);
+        expect(reads).toBe(
+          mode === "bootstrap-limit-unrelated"
+            ? 1
+            : ["bootstrap-limit-persistent", "bootstrap-limit-identity"].includes(mode)
+              ? 21
+              : 2,
+        );
         expect(calls).toEqual(["login-result"]);
         return;
       }
