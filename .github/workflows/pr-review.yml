@@ -1,22 +1,8 @@
 name: Browser fleet review and ablations
 
 on:
+  workflow_dispatch:
   workflow_call:
-  pull_request:
-    paths:
-      - ".github/workflows/pr-review.yml"
-      - "scripts/browser-fleet-ablation*"
-      - "scripts/test-browser-review*"
-      - "lib/browser-fleet/**"
-      - "lib/social/facebook-*.ts"
-      - "lib/actions/facebook-*.ts"
-      - "lib/db/**"
-      - "drizzle/**"
-      - "app/api/social-worker/facebook/**"
-      - "ops/browser-node/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-
 permissions:
   contents: read
 

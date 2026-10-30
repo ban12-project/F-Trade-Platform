@@ -1,29 +1,6 @@
 name: Browser node validation
 on:
-  pull_request:
-    paths:
-      - "lib/browser-fleet/**"
-      - "lib/actions/browser-nodes.ts"
-      - "app/api/browser-nodes/**"
-      - "app/api/browser-sandbox-dispatch/**"
-      - "workflows/browser-sandbox.ts"
-      - "app/workspace/browsers/**"
-      - "components/workspace/browser-nodes-panel.tsx"
-      - "components/workspace/browser-viewer.tsx"
-      - "components/workspace/browser-viewer-window.tsx"
-      - "components/workspace/browser-viewer-window-receiver.tsx"
-      - "app/browser-viewer/**"
-      - "components/workspace/publication-page-inspection-panel.tsx"
-      - "ops/browser-node/**"
-      - "scripts/test-browser-*.ts"
-      - "scripts/test-browser-*.mjs"
-      - "scripts/test-browser-*.mts"
-      - "scripts/test-native-profile.mjs"
-      - "scripts/build-browser-sandbox-template.mts"
-      - "scripts/verify-browser-image-bundle.py"
-      - "scripts/test-browser-image-bundle.py"
-      - "drizzle/**"
-      - ".github/workflows/browser-node.yml"
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

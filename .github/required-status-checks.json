@@ -1,0 +1,10 @@
+{
+  "strict": true,
+  "checks": [
+    { "context": "repository-validate", "app_id": 15368 },
+    { "context": "production-build", "app_id": 15368 },
+    { "context": "product-stream-postgres", "app_id": 15368 },
+    { "context": "harbor-compatibility", "app_id": 15368 },
+    { "context": "playwright-chromium", "app_id": 15368 }
+  ]
+}

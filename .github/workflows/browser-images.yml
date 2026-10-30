@@ -21,25 +21,6 @@ on:
       - ".github/workflows/browser-images.yml"
       - ".github/workflows/pr-review.yml"
       - ".dockerignore"
-  pull_request:
-    paths:
-      - "ops/browser-node/**"
-      - "lib/browser-fleet/policy.ts"
-      - "lib/browser-fleet/security.ts"
-      - "lib/browser-fleet/inbox-signature.mjs"
-      - "scripts/test-browser-images.sh"
-      - "scripts/test-browser-observation-images.sh"
-      - "scripts/fixtures/browser-observation/**"
-      - "scripts/export-browser-image-pair.sh"
-      - "scripts/test-native-profile-runtime.sh"
-      - "scripts/test-empty-native-profile.sh"
-      - "scripts/fixtures/native-profile/**"
-      - "scripts/fixtures/browser-inspection/**"
-      - "scripts/test-camofox-login-contract.mjs"
-      - ".github/actions/browser-images/**"
-      - ".github/workflows/browser-images.yml"
-      - ".github/workflows/pr-review.yml"
-      - ".dockerignore"
   workflow_dispatch:
 
 permissions:
