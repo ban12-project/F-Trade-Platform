@@ -40,6 +40,32 @@ assert.equal(
 );
 const complete = applyInquiryMessage(partial, "Destination: Synthetic Port");
 assert.equal(nextClarification(complete).status, "ready");
+const modelOnly = applyInquiryMessage({ ...draft, product: {} }, "Vehicle model: D-Max");
+assert.equal(modelOnly.product.vehicle_model, "D-Max");
+assert(modelOnly.missing_fields.includes("vehicle_model_or_oe_number"));
+const explicitVehicle = applyInquiryMessage(modelOnly, "Vehicle brand: Isuzu");
+assert.equal(explicitVehicle.product.vehicle_brand, "Isuzu");
+assert(!explicitVehicle.missing_fields.includes("vehicle_model_or_oe_number"));
+for (const body of [
+  "Model: Corolla/Camry",
+  "Model: Corolla or Camry",
+  "Model: unknown",
+  "Model: unsure",
+  "Not Model: Corolla",
+  "Model: Corolla; Toyota Camry clutch",
+  "Model: Corolla; Model: Camry",
+  `Model: ${"X".repeat(101)}`,
+  "Product model: SYN-CLUTCH-1",
+]) {
+  assert.equal(applyInquiryMessage(draft, body).product.vehicle_model, undefined, body);
+}
+for (const body of ["Brand: Isuzu; Toyota clutch", "Brand: Toyota/Honda", "Brand: unknown"]) {
+  assert.equal(applyInquiryMessage(draft, body).product.vehicle_brand, undefined, body);
+}
+assert.equal(
+  applyInquiryMessage(draft, "Brand: Isuzu\nModel: D-Max").product.vehicle_model,
+  "D-Max",
+);
 assert.throws(() => assertNoAgentQuotation(complete), /cannot send/);
 for (const message of [
   "500 pcs or 600 pcs",

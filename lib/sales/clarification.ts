@@ -25,25 +25,69 @@ export function inquiryProductType(message: string) {
 
 /** Explicit customer requests only; a brand does not establish an exact model or fitment. */
 export function inquiryVehicle(message: string) {
+  // Labels must start a field, not occur in prose such as "product model:".
+  // Keep unsupported values mentioned so history cannot silently reuse an old value.
+  const labeled = (field: "brand" | "model") => {
+    const matches = [
+      ...message.matchAll(
+        new RegExp(
+          `(?:^|[;,\\n])\\s*(?:(?:not|wrong|incorrect|ignore)\\s+)?(?:vehicle\\s+)?${field}\\s*[:=]([^;,\\n]*)`,
+          "gi",
+        ),
+      ),
+    ];
+    const value = matches.length === 1 ? matches[0][1].trim() : undefined;
+    const uncertain =
+      /\b(?:not|wrong|incorrect|cancel|ignore|except|instead|no longer|unknown|unsure|or|and)\b/i.test(
+        message,
+      );
+    return {
+      mentioned: matches.length > 0,
+      value:
+        value && value.length <= 100 && /^[\p{L}\p{N}][\p{L}\p{N} '-]*$/u.test(value) && !uncertain
+          ? value
+          : undefined,
+    };
+  };
+  const labeledBrand = labeled("brand");
+  const labeledModel = labeled("model");
   const supported = ["Toyota", "Honda", "Ford", "Volkswagen"];
   const brands = new Set(
     [...message.matchAll(/\b(Toyota|Honda|Ford|Volkswagen)\b/gi)].map((match) =>
       match[1].toLowerCase(),
     ),
   );
-  const brand =
+  const inferredBrand =
     brands.size === 1 ? supported.find((value) => brands.has(value.toLowerCase())) : undefined;
+  const brand = labeledBrand.mentioned
+    ? labeledBrand.value &&
+      [...brands].every((value) => value === labeledBrand.value?.toLowerCase())
+      ? labeledBrand.value
+      : undefined
+    : inferredBrand;
   const models = [
     ...message.matchAll(
       /\b(Toyota|Honda|Ford|Volkswagen)\s+([A-Za-z0-9 /&-]{2,100}?)\s+clutch\b/gi,
     ),
   ];
   const candidate = models.length === 1 ? models[0][2].trim() : undefined;
-  const model =
+  const proseModel =
     brand && candidate && !/[/&]|\b(?:or|and|not|instead|unknown|unsure)\b/i.test(candidate)
       ? candidate
       : undefined;
-  return { brand, model, brandMentioned: brands.size > 0, modelMentioned: models.length > 0 };
+  const model = labeledModel.mentioned
+    ? labeledModel.value &&
+      (!models.length ||
+        (models.length === 1 && proseModel?.toLowerCase() === labeledModel.value.toLowerCase()))
+      ? labeledModel.value
+      : undefined
+    : proseModel;
+  return {
+    brand,
+    model,
+    brandMentioned: labeledBrand.mentioned || brands.size > 0,
+    modelMentioned: labeledModel.mentioned || models.length > 0,
+  };
 }
 
 export function applyInquiryMessage(rfq: Rfq, message: string) {

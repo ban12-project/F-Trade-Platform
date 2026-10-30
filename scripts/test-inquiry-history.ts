@@ -35,6 +35,33 @@ const laterModel = summarizeInquiryMessages(
 assert.equal(laterModel.fields.vehicleModel, "Corolla");
 assert.deepEqual(laterModel.fieldSources.vehicleBrand, ["synthetic-0", "synthetic-1"]);
 assert.deepEqual(laterModel.conflicts, []);
+const labeledVehicle = summarizeInquiryMessages(
+  messages("Brand: Isuzu", "Vehicle model: D-Max", "clutch kit; 500 pcs"),
+);
+assert.equal(labeledVehicle.fields.vehicleBrand, "Isuzu");
+assert.equal(labeledVehicle.fields.vehicleModel, "D-Max");
+assert.deepEqual(labeledVehicle.fieldSources.vehicleBrand, ["synthetic-0"]);
+assert.deepEqual(labeledVehicle.fieldSources.vehicleModel, ["synthetic-1"]);
+assert.deepEqual(labeledVehicle.conflicts, []);
+for (const reply of [
+  "Model: Camry",
+  "Model: Corolla/Camry",
+  "Model: unknown",
+  "Model:",
+  "Not Model: Corolla",
+  "Model: Corolla; Model: Camry",
+]) {
+  const result = summarizeInquiryMessages(messages("Toyota Corolla clutch kit", reply));
+  assert.equal(result.fields.vehicleModel, undefined, reply);
+  assert(result.conflicts.includes("vehicleModel"), reply);
+}
+const changedLabeledBrand = summarizeInquiryMessages(
+  messages("Toyota Corolla clutch kit", "Brand: Isuzu"),
+);
+assert.equal(changedLabeledBrand.fields.vehicleBrand, undefined);
+assert.equal(changedLabeledBrand.fields.vehicleModel, undefined);
+assert(changedLabeledBrand.conflicts.includes("vehicleBrand"));
+assert(changedLabeledBrand.conflicts.includes("vehicleModel"));
 for (const reply of ["Honda", "Toyota or Honda", "Not Toyota"]) {
   const changedBrand = summarizeInquiryMessages(messages("Toyota Corolla clutch kit", reply));
   assert.equal(changedBrand.fields.vehicleBrand, undefined);
