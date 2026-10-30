@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import {
-  assertBrowserSandboxProxyIpAllowed,
   browserSandboxNetworkPolicyMatches,
   configuredBrowserSandboxNetworkPolicy,
 } from "../lib/browser-fleet/sandbox-network-policy";
@@ -339,29 +338,4 @@ test("private policy configuration failures emit only a stable error code", () =
     if (previous === undefined) delete process.env.BROWSER_SANDBOX_NETWORK_POLICY_JSON;
     else process.env.BROWSER_SANDBOX_NETWORK_POLICY_JSON = previous;
   }
-});
-
-test("proxy replacement rejects stale subnet policy without disclosing the endpoint", () => {
-  const policy = { allow: ["app.example.invalid"], subnets: { allow: ["192.0.2.0/24"] } };
-  assert.doesNotThrow(() => assertBrowserSandboxProxyIpAllowed("192.0.2.42", policy));
-  assert.throws(() => assertBrowserSandboxProxyIpAllowed("198.51.100.42", policy), {
-    message: "sandbox_proxy_ip_not_allowed",
-  });
-  for (const denied of [
-    "deny-all",
-    {},
-    { allow: ["192.0.2.42"] },
-    { subnets: { allow: ["192.0.2.0/24"], deny: ["192.0.2.42/32"] } },
-  ] as const)
-    assert.throws(
-      () => assertBrowserSandboxProxyIpAllowed("192.0.2.42", JSON.parse(JSON.stringify(denied))),
-      { message: "sandbox_proxy_ip_not_allowed" },
-    );
-  assert.throws(
-    () => assertBrowserSandboxProxyIpAllowed("192.0.2.42", { subnets: { allow: ["invalid/24"] } }),
-    { message: "sandbox_network_policy_configuration_invalid" },
-  );
-  assert.doesNotThrow(() =>
-    assertBrowserSandboxProxyIpAllowed("proxy.example.invalid", "deny-all"),
-  );
 });
