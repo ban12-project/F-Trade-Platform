@@ -651,6 +651,8 @@ for (const mode of [
 
 for (const mode of [
   "continue-totp",
+  "revealed-toggle",
+  "ambiguous-toggle",
   "action-override",
   "target-override",
   "replace-password",
@@ -661,10 +663,11 @@ for (const mode of [
       const path = new URL(route.request().url()).pathname;
       const body =
         path === "/"
-          ? `<form id="login_form" method="post" ${mode === "action-override" ? 'action="/login.php"' : ""} ${mode === "target-override" ? 'target="_blank"' : ""}><input name="email"><input name="pass" type="password"><button>Log in</button></form><script>
+          ? `<form id="login_form" method="post" ${mode === "action-override" ? 'action="/login.php"' : ""} ${mode === "target-override" ? 'target="_blank"' : ""}><input name="email"><input name="pass" type="password">${mode.includes("toggle") ? '<div role="button" tabindex="0" aria-label="Log In">Log in</div>' : "<button>Log in</button>"}</form><script>
         for(const input of document.querySelectorAll('input')) input.addEventListener('input',event=>{if(!event.isTrusted)input.value='';});
         ${mode === "replace-password" ? `document.querySelector('[name="email"]').oninput=()=>document.querySelector('[name="pass"]').outerHTML='<input name="pass" type="password">';` : ""}
-        document.querySelector('form').onsubmit=e=>{e.preventDefault();location.href='/challenge/';};</script>`
+        document.querySelector('form').onsubmit=e=>{e.preventDefault();location.href='/challenge/';};
+        ${mode.includes("toggle") ? `document.querySelector('[name=pass]').addEventListener('input',()=>{if(!document.querySelector('[aria-label="Show password"]'))document.querySelector('form').insertAdjacentHTML('beforeend','<div role="button" tabindex="0" aria-label="Show password"></div>');});document.querySelector('[aria-label="Log In"]').onclick=()=>location.href='/challenge/';` : ""}</script>`
           : path === "/challenge/"
             ? '<div id="checkpoint">Synthetic human verification</div>'
             : path === "/two_factor/"
@@ -685,7 +688,12 @@ for (const mode of [
       automation: {
         accountRef: "123456789",
         identity: { selector: "#identity", attribute: "data-account-id" },
-        passwordSubmit: "#login_form button",
+        passwordSubmit:
+          mode === "ambiguous-toggle"
+            ? '#login_form [role="button"][tabindex="0"]'
+            : mode === "revealed-toggle"
+              ? '#login_form [role="button"][tabindex="0"][aria-label="Log In"]'
+              : "#login_form button",
         totp: { url: base + "/two_factor/", marker: "#totp", input: "#code", submit: "#verify" },
         pin: { url: base + "/messages/", marker: "#pin", input: "#pin-code", submit: null },
         ready: {
@@ -720,14 +728,16 @@ for (const mode of [
       expiresAt: Date.now() + 30000,
     };
     await page.goto(base + "/");
-    if (mode !== "continue-totp") {
+    if (!["continue-totp", "revealed-toggle"].includes(mode)) {
       const result = await runtime("submit", {
         ...packet,
         phase: "password",
         values: { username: "123456789", password: "synthetic-secret" },
       });
       expect(result.outcome).toBe(mode === "replace-password" ? "unknown" : "refused");
-      await expect(page.locator('[name="pass"]')).toHaveValue("");
+      await expect(page.locator('[name="pass"]')).toHaveValue(
+        mode === "ambiguous-toggle" ? "synthetic-secret" : "",
+      );
       await expect(page).toHaveURL(base + "/");
       return;
     }

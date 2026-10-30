@@ -390,3 +390,5 @@ session-only Cookie 跨浏览器退出保留。每次任务应先观察账号身
 登录填充通过已核对页面中的固定元素句柄调用 Playwright 原生输入；填写密码前及填写后重新核对页面、表单、元素身份和授权时限。页面跳转、控件替换或输入结果不确定时不继续填充、不提交表单，也不重复领取凭据。v1 的不确定结果保留有租约时限的人工查看窗口，并将账号保持为需核对登录状态；断线、租约撤销和正常空闲回收仍生效。
 
 自动登录配置的外层 `channelRef` / `accountRef` 用于精确绑定工作台账号，允许账号标识带备注；`profile.automation.accountRef` 则是待核对的纯数字 Facebook 身份，两者不能混用。v2 可显式采用同样严格的 `facebook-root-implicit` 页面规则；密码步骤先检查提交控件和表单，再复用原生输入，最后重新检查并提交。现有真人验证等待及一次性 TOTP/PIN 流程保持不变，切换为 v2 前仍须核验当前页面规则。
+
+Reviewed password-submit selectors must remain unique after native input as well as before it. A password-visibility control may only appear once the field is populated; use a currently verified distinguishing attribute (such as the login button’s accessibility label), and test the revealed-control state. Ambiguous selectors must still refuse submission.
