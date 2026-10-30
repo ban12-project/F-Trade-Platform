@@ -7,7 +7,12 @@ import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
 import { checkedBrowserResponse } from "./browser-response.mjs";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
-import { openEgressCheckedSession, verifyBrowserEgress, waitForBrowserReady } from "./egress.mjs";
+import {
+  describeEgressFailure,
+  openEgressCheckedSession,
+  verifyBrowserEgress,
+  waitForBrowserReady,
+} from "./egress.mjs";
 import { createGateway } from "./gateway.mjs";
 import { createIdleExitPolicy, viewerGraceExpired } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
@@ -317,7 +322,8 @@ async function heartbeat(slot) {
         slot.egressTabId,
       );
       slot.egressCheckedAt = Date.now();
-    } catch {
+    } catch (error) {
+      console.error(JSON.stringify(describeEgressFailure(error)));
       slot.outcome = "egress_mismatch";
       await stop(slot, slot.outcome);
       return;
@@ -393,6 +399,7 @@ async function heartbeat(slot) {
           );
           slot.egressCheckedAt = Date.now();
         } catch (error) {
+          console.error(JSON.stringify(describeEgressFailure(error)));
           await stop(slot, "egress_mismatch");
           throw error;
         }
@@ -507,6 +514,7 @@ async function tick() {
                   slot.egressTabId,
                 );
               } catch (error) {
+                console.error(JSON.stringify(describeEgressFailure(error)));
                 await stop(slot, "egress_mismatch");
                 throw error;
               }
@@ -584,6 +592,7 @@ async function tick() {
                     slot.egressTabId,
                   );
                 } catch (error) {
+                  console.error(JSON.stringify(describeEgressFailure(error)));
                   await stop(slot, "egress_mismatch");
                   throw error;
                 }
@@ -619,6 +628,8 @@ async function tick() {
       .catch((error) => {
         if (!slot.ready)
           console.error(JSON.stringify(describeBrowserLaunchFailure(slot.launchStage, error)));
+        if (slot.launchStage === "egress")
+          console.error(JSON.stringify(describeEgressFailure(error)));
         slot.outcome = error.message?.startsWith("egress_") ? "egress_mismatch" : "failed";
         void stop(slot, slot.outcome).catch(() => {});
       });
