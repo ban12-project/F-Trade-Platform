@@ -1,0 +1,11 @@
+# Undici security patches — 2026-10-30
+
+Issue #704, parent #498; candidate follows #703. Blob retains major 6 and resolves 6.29.1. Sandbox, AI SDK provider-utils, shadcn/dotenvx and both Workflow worlds resolve 7.30.1. Only Undici resolutions and the two existing exact Workflow overrides change; other package versions and prior source patches remain intact.
+
+Sources: [7.30.1 release](https://github.com/nodejs/undici/releases/tag/v7.30.1), [TLS callback advisory](https://github.com/nodejs/undici/security/advisories/GHSA-2m5v-pch6-74hx). The callback issue requires function-valued TLS options; version matches alone do not demonstrate the application uses this configuration. Local Node 24.22.1 separately reports built-in Undici 7.30.1; do not confuse Node's embedded client with installed SDK dependencies.
+
+Four tests use the actual Blob, Sandbox and local/Vercel Workflow dependency resolutions. Each first establishes successful TLS using a newly generated loopback certificate explicitly trusted for that Agent; then a custom certificate callback must reject the same trusted peer before any HTTP request. All four fail on old versions because rejection is missing, and all four pass on patched versions. Default certificate verification is never disabled; the endpoint is loopback-only, and certificates/private keys are ephemeral and removed. This is a synthetic library-level regression, not a production exploit or proof of every advisory scenario.
+
+Existing frozen SDK historical-run replay, RNG/ULID/token preservation, serialization/Buffer checks and real loopback HTTP retry behavior pass. In particular, idempotent GET retries remain bounded and failed POST is sent once. Frozen install and TypeScript pass under Node 24.22.1 / pnpm 12.3.4. Full final-head CI and production deployment remain pending.
+
+Same-round production audit: **0 critical / 10 high / 12 moderate / 4 low → 0 critical / 3 high / 6 moderate / 4 low**. No Undici advisory matches remain. Residual packages include Zod 3, body-parser, systeminformation, ip-address, fast-uri, deepmerge, @hono/node-server and qs. Keep #498 open. No real Blob object, Sandbox, message, mail or business record was created by these tests.
