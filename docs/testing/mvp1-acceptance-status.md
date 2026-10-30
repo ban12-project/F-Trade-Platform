@@ -2,6 +2,10 @@
 
 核对日期：2026-10-23。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#332](https://github.com/ban12-project/F-Trade-Platform/issues/332)。**MVP1 总验收未完成；用户当前要求继续 MVP1 功能迭代，暂停 DM 验收。** 本轮新业务资料仅使用 `docs/reference/`，旧合成项目归档并保留原审计；受控消息不计作真实客户询盘。新运行时、模板与生产部署的工程证据见[接管修复与交付报告](reports/sandbox-viewer-rollout-20261022.md)。下文标注的 2026-10-15 状态属于历史检查点，不能代替本轮实测。
 
+## 2026-10-30 自动登录与会话恢复补充
+
+获授权账号已实际自动完成密码与 TOTP，并在随后一次正常停启中不领取任何验证因素直接恢复到身份已验证的 Messenger 空收件箱。对应 #684 已结项；证据与失败记录见[本批次报告](reports/automatic-login-session-recovery-20261030.md)。这更新了登录和会话恢复的工程证据，不表示历史消息或 DM 采集通过，也不解除业务渠道暂停。首次启动／出口观察调查 #674 继续开放，MVP1 总验收仍未完成。
+
 ## 范围与证据基线
 
 目标仍是[第一阶段技术方案](../background/AI外贸工作流平台_第一阶段MVP_离合器.md)中的产品资料至 `OPPORTUNITY` 闭环：一个工厂、约 20 个真实来源槽位、一个渠道、Product／Content／Sales／Follow-up 与 Workflow Orchestrator，以及三类 Human Gate。规则能解决的部分可以使用确定性实现；不能把模块名当作自主模型协作的证明。
