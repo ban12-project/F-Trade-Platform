@@ -108,8 +108,8 @@ settings:
 overrides:
   '@workflow/core@4.8.8>devalue': 5.9.3
   '@workflow/core@4.8.8>nanoid': 5.1.16
-  '@workflow/world-local@4.4.1>undici': 7.29.1
-  '@workflow/world-vercel@4.7.4>undici': 7.29.1
+  '@workflow/world-local@4.4.1>undici': 7.30.1
+  '@workflow/world-vercel@4.7.4>undici': 7.30.1
   '@esbuild-kit/core-utils@3.3.2>esbuild': 0.25.12
   shadcn@4.19.1>@modelcontextprotocol/sdk: 1.32.0
   '@remotion/media@4.0.520>zod': 4.6.7
@@ -5401,16 +5401,12 @@ packages:
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
-  undici@6.29.0:
-    resolution: {integrity: sha512-R+RODBqp6i2pPflGdq+xIOUkl+RNfGgHwoinecKu/JCuf2uO06cOKoDbI2P7Dn6KcswdKwrczbU6IYJ6K8X+wg==}
+  undici@6.29.1:
+    resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
     engines: {node: '>=18.17'}
 
-  undici@7.29.1:
-    resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
-    engines: {node: '>=20.18.1'}
-
-  undici@7.30.0:
-    resolution: {integrity: sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ==}
+  undici@7.30.1:
+    resolution: {integrity: sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==}
     engines: {node: '>=20.18.1'}
 
   unicorn-magic@0.1.0:
@@ -5687,7 +5683,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 7.30.0
+      undici: 7.30.1
       zod: 4.6.7
 
   '@ai-sdk/provider-utils@5.0.34(zod@4.6.7)':
@@ -5696,7 +5692,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 7.30.0
+      undici: 7.30.1
       zod: 4.6.7
 
   '@ai-sdk/provider@4.0.7':
@@ -6127,7 +6123,7 @@ snapshots:
       open: 8.4.2
       picomatch: 4.0.7
       systeminformation: 5.33.6
-      undici: 7.30.0
+      undici: 7.30.1
       which: 4.0.0
       yocto-spinner: 1.2.2
 
@@ -7695,7 +7691,7 @@ snapshots:
       is-buffer: 2.0.5
       is-node-process: 1.2.0
       throttleit: 2.1.0
-      undici: 6.29.0
+      undici: 6.29.1
 
   '@vercel/cli-auth@0.0.1':
     dependencies:
@@ -7746,7 +7742,7 @@ snapshots:
       ms: 2.1.3
       picocolors: 1.1.1
       tar-stream: 3.1.7
-      undici: 7.30.0
+      undici: 7.30.1
       xdg-app-paths: 5.1.0
       zod: 4.6.7
     transitivePeerDependencies:
@@ -8061,7 +8057,7 @@ snapshots:
       '@workflow/world': 4.5.0
       async-sema: 3.1.1
       ulid: 3.0.2
-      undici: 7.29.1
+      undici: 7.30.1
       zod: 4.6.7
 
   '@workflow/world-vercel@4.7.4':
@@ -8071,7 +8067,7 @@ snapshots:
       '@workflow/errors': 4.2.1
       '@workflow/world': 4.5.0
       cbor-x: 1.6.0
-      undici: 7.29.1
+      undici: 7.30.1
       zod: 4.6.7
 
   '@workflow/world@4.5.0':
@@ -10143,7 +10139,7 @@ snapshots:
       tailwind-merge: 3.6.0
       ts-morph: 26.0.0
       tsconfig-paths: 4.2.0
-      undici: 7.30.0
+      undici: 7.30.1
       validate-npm-package-name: 7.0.2
       zod: 3.25.76
       zod-to-json-schema: 3.25.2(zod@3.25.76)
@@ -10519,11 +10515,9 @@ snapshots:
 
   undici-types@8.3.0: {}
 
-  undici@6.29.0: {}
+  undici@6.29.1: {}
 
-  undici@7.29.1: {}
-
-  undici@7.30.0: {}
+  undici@7.30.1: {}
 
   unicorn-magic@0.1.0: {}
 
