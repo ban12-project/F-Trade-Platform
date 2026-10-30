@@ -190,3 +190,131 @@ test("egress diagnostics distinguish observed mismatch from failed observation w
     },
   );
 });
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+test("concurrent checks serialize the full navigation and snapshot without sharing success", async () => {
+  const current = { ...run };
+  const entered = deferred();
+  const release = deferred();
+  const calls = [];
+  let readingSnapshot = false;
+  const request = async (path) => {
+    if (path.endsWith("/navigate")) {
+      calls.push("navigate");
+      // The pinned server locks navigate, but its snapshot route is unlocked.
+      // Even serial navigations must not overlap the preceding snapshot read.
+      assert.equal(readingSnapshot, false, "navigation interrupted probe snapshot");
+      return Response.json({ url: EGRESS_URL });
+    }
+    calls.push("snapshot");
+    readingSnapshot = true;
+    entered.resolve();
+    await release.promise;
+    readingSnapshot = false;
+    return Response.json(snapshot());
+  };
+  const first = verifyBrowserEgress(request, current, "probe");
+  await entered.promise;
+  const second = verifyBrowserEgress(request, current, "probe");
+  const settled = Promise.allSettled([first, second]);
+  release.resolve();
+  assert.deepEqual(
+    (await settled).map((x) => x.status),
+    ["fulfilled", "fulfilled"],
+  );
+  assert.deepEqual(calls, ["navigate", "snapshot", "navigate", "snapshot"]);
+});
+
+test("failure rejects queued checks without another navigation or cached success", async () => {
+  const current = { ...run };
+  const entered = deferred();
+  const release = deferred();
+  let navigations = 0;
+  const failure = new Error("synthetic_transport_failure");
+  const request = async () => {
+    navigations++;
+    entered.resolve();
+    await release.promise;
+    throw failure;
+  };
+  const first = verifyBrowserEgress(request, current, "probe");
+  await entered.promise;
+  const second = verifyBrowserEgress(request, current, "probe");
+  const settled = Promise.allSettled([first, second]);
+  release.resolve();
+  const results = await settled;
+  assert.ok(results.every((x) => x.status === "rejected" && x.reason === failure));
+  assert.equal(navigations, 1);
+  // A later explicit call still runs its own check; there is no cached failure.
+  const later = transport();
+  await verifyBrowserEgress(later.request, current, "probe");
+  assert.equal(later.calls.length, 2);
+});
+
+test("queued check revalidates its transport lease before any navigation", async () => {
+  const current = { ...run };
+  const entered = deferred();
+  const release = deferred();
+  const request = async (path) => {
+    if (path.endsWith("/navigate")) {
+      entered.resolve();
+      await release.promise;
+      return Response.json({ url: EGRESS_URL });
+    }
+    return Response.json(snapshot());
+  };
+  let active = true;
+  let sent = 0;
+  const first = verifyBrowserEgress(request, current, "probe");
+  await entered.promise;
+  const second = verifyBrowserEgress(
+    async () => {
+      if (!active) throw new Error("local_lease_expired");
+      sent++;
+      return Response.json({ url: EGRESS_URL });
+    },
+    current,
+    "probe",
+  );
+  const settled = Promise.allSettled([first, second]);
+  active = false;
+  release.resolve();
+  const results = await settled;
+  assert.equal(results[0].status, "fulfilled");
+  assert.equal(results[1].status, "rejected");
+  assert.equal(results[1].reason.message, "local_lease_expired");
+  assert.equal(sent, 0);
+});
+
+test("a blocked probe does not block another run", async () => {
+  const entered = deferred();
+  const release = deferred();
+  const first = verifyBrowserEgress(
+    async (path) => {
+      if (path.endsWith("/navigate")) {
+        entered.resolve();
+        await release.promise;
+        return Response.json({ url: EGRESS_URL });
+      }
+      return Response.json(snapshot());
+    },
+    { ...run },
+    "probe",
+  );
+  await entered.promise;
+  try {
+    const other = transport();
+    await verifyBrowserEgress(other.request, { ...run, id: "other-run" }, "probe");
+    assert.equal(other.calls.length, 2);
+  } finally {
+    release.resolve();
+    await first;
+  }
+});
