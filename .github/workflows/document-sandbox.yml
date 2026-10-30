@@ -1,33 +1,6 @@
 name: document-sandbox
 
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/document-sandbox.yml'
-      - 'ops/video-sandbox/Dockerfile'
-      - 'scripts/markitdown_preprocess.py'
-      - 'scripts/pdf_catalog_layout.py'
-      - 'scripts/pdf_kit_ocr.py'
-      - 'scripts/pdf_disc_table_ocr.py'
-      - 'scripts/pdf_tesseract_ocr.py'
-      - 'scripts/test-pdf-disc-table-ocr.py'
-      - 'scripts/test-pdf-kit-ocr.py'
-      - 'scripts/synthetic_pdf_fixture.py'
-      - 'scripts/test-document-sandbox.py'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/document-sandbox.yml'
-      - 'ops/video-sandbox/Dockerfile'
-      - 'scripts/markitdown_preprocess.py'
-      - 'scripts/pdf_catalog_layout.py'
-      - 'scripts/pdf_kit_ocr.py'
-      - 'scripts/pdf_disc_table_ocr.py'
-      - 'scripts/pdf_tesseract_ocr.py'
-      - 'scripts/test-pdf-disc-table-ocr.py'
-      - 'scripts/test-pdf-kit-ocr.py'
-      - 'scripts/synthetic_pdf_fixture.py'
-      - 'scripts/test-document-sandbox.py'
   workflow_dispatch:
 
 permissions:

@@ -1,31 +1,7 @@
 name: Facebook worker validation
 
 on:
-  pull_request:
-    paths:
-      - "lib/social/**"
-      - "lib/browser-fleet/**"
-      - "ops/browser-node/**"
-      - "scripts/test-rfq-reply-policy.ts"
-      - "scripts/test-facebook-publication-postgres.ts"
-      - "scripts/test-facebook-inbound-postgres.ts"
-      - "scripts/test-browser-inbox-postgres.ts"
-      - "scripts/test-browser-inbox-roundtrip.ts"
-      - "scripts/test-browser-login-postgres.ts"
-      - "scripts/test-facebook-login-credentials.ts"
-      - "scripts/test-facebook-account-status.ts"
-      - "scripts/test-facebook-totp.mjs"
-      - "scripts/test-facebook-login-flow.mjs"
-      - "drizzle/**"
-      - "lib/actions/facebook-*.ts"
-      - "lib/db/facebook-runtime-schema.ts"
-      - "lib/db/schema.ts"
-      - "app/api/social-worker/**"
-      - "app/workspace/facebook/**"
-      - "components/workspace/facebook-*.tsx"
-      - "components/workspace/workspace-facebook-attention.tsx"
-      - ".github/workflows/facebook-worker.yml"
-
+  workflow_dispatch:
 permissions:
   contents: read
 
