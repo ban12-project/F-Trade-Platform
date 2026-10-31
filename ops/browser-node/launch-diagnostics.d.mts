@@ -8,4 +8,5 @@ export function describeBrowserLaunchFailure(
   request: string;
   code: string;
   httpStatus: number | null;
+  startup?: { stage: string; status: string; code: string };
 };

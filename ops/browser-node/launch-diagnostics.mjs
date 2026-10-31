@@ -1,3 +1,5 @@
+import { sanitizeStartupDiagnostics } from "./startup-diagnostics.mjs";
+
 const stages = new Set([
   "volume",
   "network",
@@ -49,6 +51,9 @@ export function describeBrowserLaunchFailure(stage, error) {
     stage: stages.has(stage) ? stage : "unknown",
     request: requests.has(error?.browserRequestStage) ? error.browserRequestStage : "unknown",
     code: sanitizeBrowserFailureCode(error?.browserFailureCode),
+    ...(sanitizeStartupDiagnostics(error?.browserStartup)
+      ? { startup: sanitizeStartupDiagnostics(error.browserStartup) }
+      : {}),
     httpStatus:
       Number.isInteger(error?.browserHttpStatus) &&
       error.browserHttpStatus >= 400 &&
