@@ -57,5 +57,11 @@ suggestion in the checked files; no formatting errors remain.
 The requested local connection test with the designated disabled account and
 its saved proxy is separate and pending secure availability of that proxy. The
 production account remains disabled. No local result establishes DM acceptance.
-The change is not yet deployed: exact image release, Sandbox rollout, actual
-new-account connection, and production two-account DM remain to be verified.
+An existing pre-release binding, after the reviewed empty-profile maintenance
+initializer, subsequently passed production browser health and viewer admission
+and reached the Facebook login form. This supports the initialization diagnosis;
+it does not exercise this candidate's automatic first-use grant in production.
+
+The change is not yet deployed: exact image release, Sandbox rollout, automated
+new-account initialization in production, and production two-account DM remain
+to be verified.
