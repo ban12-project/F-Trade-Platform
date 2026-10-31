@@ -3,7 +3,8 @@
 Scope: reviewed migration implementation on `codex/722-vps-runtime`, Issue #722.
 Tests used generated documents and synthetic color-bar video; no customer data.
 These are direct application-function and live VPS checks, not proof of a deployed
-Vercel Action/Workflow or production private Blob integration.
+Vercel Action/Workflow. Production private Blob integration was subsequently
+verified with an isolated synthetic object, as described below.
 
 ## Application functions on the VPS
 
@@ -41,6 +42,35 @@ on the host root filesystem. The dedicated workspace is a physically allocated
 12 GiB ext4 loop filesystem, mounted nodev/nosuid/noexec, with systemd ordering
 and admission-time verification.
 
+## Private Blob acceptance and cleanup
+
+Repeated all five application paths against a synthetic MP4 uploaded to the
+production private Blob store using authenticated OIDC, with a short-lived
+signed GET token for that exact pathname. The exact production source hostname
+was independently verified through an authenticated Blob listing before it was
+allowed. All five paths passed with the same output metadata above. The isolated
+`migration-tests/` object was deleted after the run; no business database writes
+or publications were performed. Result artifacts are in
+`tmp/vps-compute-smoke-289ff9f1-10e1-41ed-b1ac-fee595758c26/`.
+
+The public synthetic fixture service and files were removed. The broker now
+allows only the verified production private Blob hostname. The edge owner was
+instructed to remove the temporary exact fixture route. The final broker restart
+completed with `Result=success`; HTTPS health returned `ok`, and no ephemeral
+job containers or workspaces remained. Final deployed broker image:
+`sha256:5b08614a9588ce8ef3d707b7c6839995fa35c0466ee3124d7553574b857a41e0`.
+Its actual configuration includes init, UID 1000, read-only rootfs and 256 MiB
+memory. The worker remains independently capped at 2 GiB.
+
+## Upload capacity
+
+A live job downloaded and wrote three files of 1,073,741,823 bytes each (the
+existing per-video maximum), totalling 3,221,225,469 bytes, in 208.86 seconds.
+A fourth download was rejected by the aggregate budget. Actual file sizes were
+checked inside the offline container. Broker memory was observed at about
+46 MiB of its 256 MiB hard limit during streaming. Stop removed the workspace;
+the synthetic HTTPS fixture was restored to its original 189,054-byte content.
+
 ## Reproduction and evidence
 
 - `python3 scripts/test-vps-compute.py`: 13 tests passed.
@@ -58,9 +88,9 @@ in this report.
 ## Remaining production acceptance
 
 Use a synthetic private Blob uploaded through the deployed application to verify
-its actual Action/Workflow calling path and deadlines. The fixture download used
-a temporary exact hostname allowlist; it does not prove private Blob permissions.
-Retire the temporary fixture and allowlist after testing. VPS is the default
+its actual Action/Workflow calling path and deadlines. The authenticated private
+Blob-to-VPS domain-function test passed, but did not execute within a deployed
+Vercel function. VPS is the default
 provider; missing credentials fail closed. Explicit Vercel provider configuration is rejected. Remove old configuration
 and paid Sandbox resources at final retirement.
 
