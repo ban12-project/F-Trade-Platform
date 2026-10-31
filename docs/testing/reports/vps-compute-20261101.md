@@ -2,9 +2,10 @@
 
 Scope: reviewed migration implementation on `codex/722-vps-runtime`, Issue #722.
 Tests used generated documents and synthetic color-bar video; no customer data.
-These are direct application-function and live VPS checks, not proof of a deployed
-Vercel Action/Workflow. Production private Blob integration was subsequently
-verified with an isolated synthetic object, as described below.
+Initial checks called the domain functions directly. A later isolated Vercel
+production deployment executed the same five paths in a real Workflow step with
+automatic OIDC and a synthetic private Blob, as recorded below. No business
+database records, messages or publications were created.
 
 ## Application functions on the VPS
 
@@ -54,13 +55,28 @@ or publications were performed. Result artifacts are in
 `tmp/vps-compute-smoke-289ff9f1-10e1-41ed-b1ac-fee595758c26/`.
 
 The public synthetic fixture service and files were removed. The broker now
-allows only the verified production private Blob hostname. The edge owner was
-instructed to remove the temporary exact fixture route. The final broker restart
+allows only the verified production private Blob hostname. The temporary exact fixture edge route was also removed and the edge configuration revalidated. The final broker restart
 completed with `Result=success`; HTTPS health returned `ok`, and no ephemeral
 job containers or workspaces remained. Final deployed broker image:
 `sha256:5b08614a9588ce8ef3d707b7c6839995fa35c0466ee3124d7553574b857a41e0`.
 Its actual configuration includes init, UID 1000, read-only rootfs and 256 MiB
 memory. The worker remains independently capped at 2 GiB.
+
+## PDF and OCR image regression
+
+The exact live compute image
+`sha256:58b36fa3d3c778a56895a2db9e1bfa380b44db39c8fbaf4aa9a69c009b0d54ac`
+passed the existing document, kit-PDF and disc-table OCR regression suites in a
+broker-admitted offline, read-only 2 GiB job (33.47 seconds). Coverage included
+native tables, duplicate records, scanned/blank pages, spatial isolation,
+damaged headings/captions, bounded rereads, all eight table columns, true
+Tesseract conversion, row identity/OEM and crash/timeout fallback. Expected
+Tesseract diagnostics for deliberately damaged tiny images did not fail tests.
+
+The production configuration snapshot had `F_TRADE_LOCAL_OCR_ENABLED=1` and no
+language override (English default). No flags were changed for the deployment.
+Test files, runner, container and workspace were removed. Private evidence is
+retained under `tmp/vps-document-regression/` and the VPS compute evidence directory.
 
 ## Upload capacity
 
@@ -85,14 +101,26 @@ Synthetic outputs and machine-readable evidence are retained outside Git under
 `/opt/ftrade-vps/compute/` on the test VPS. Tokens and signed URLs are not recorded
 in this report.
 
-## Remaining production acceptance
+## Deployed Workflow acceptance
 
-Use a synthetic private Blob uploaded through the deployed application to verify
-its actual Action/Workflow calling path and deadlines. The authenticated private
-Blob-to-VPS domain-function test passed, but did not execute within a deployed
-Vercel function. VPS is the default
-provider; missing credentials fail closed. Explicit Vercel provider configuration is rejected. Remove old configuration
-and paid Sandbox resources at final retirement.
+A disposable production-environment deployment, with no production domain alias,
+ran a real Workflow step importing the same five domain functions. All five
+passed with the metadata above; Remotion used that deployment's traced `.remotion`
+bundle. This verifies actual Vercel-to-VPS HTTPS, Workflow execution, private Blob
+OIDC, renderer transport and final probes. It does not re-certify the unchanged
+business authorization UI or product/publication approval gates.
+
+The diagnostic endpoint required the runtime bearer plus a deployment-bound run
+proof, remained behind existing deployment protection, and exposed no arbitrary
+business operations. It was never included in the final production code. The
+successful test deployment and two failed temporary build attempts were deleted;
+the exact fixture Blob was independently confirmed absent. The production origin
+returns 404 for that temporary endpoint. Run evidence is retained privately.
+
+The migrated application was deployed from PR #723. Old cloud creation is
+permanently rejected, old dispatch cron is removed, and the project was verified
+with zero named Sandbox instances, zero active snapshots and zero VCR repositories.
+Deleted snapshot tombstones remain in history and are not active resources.
 
 ## Calling platform duration
 
@@ -101,6 +129,6 @@ step functions. Ordinary media registration is a synchronous Server Action and
 inherits its page's duration. The deployment owner verified the production Vercel
 team is Pro with Fluid compute enabled and changed the project default function
 timeout to 800 seconds via the official API (response confirmed the value).
-That setting applies to the next deployment; inspect the resulting deployment
-metadata before acceptance. This allows the 600-second job lifecycle plus
+The production rollout and disposable acceptance deployment followed that setting.
+The real Workflow completed successfully; the configured budget permits the 600-second job lifecycle plus
 transport/cleanup overhead without relying on the default 300-second budget.
