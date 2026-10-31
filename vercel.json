@@ -4,10 +4,6 @@
     {
       "path": "/api/video-retention",
       "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/browser-sandbox-dispatch",
-      "schedule": "*/5 * * * *"
     }
   ]
 }

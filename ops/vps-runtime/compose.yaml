@@ -1,0 +1,29 @@
+name: ftrade-compute
+services:
+  broker:
+    image: ${FTRADE_BROKER_IMAGE:-ftrade-compute-broker}
+    restart: "no"
+    init: true
+    network_mode: host
+    user: "1000:1000"
+    group_add: ["${FTRADE_DOCKER_GID:?Host docker socket group ID}"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 64
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m
+    environment:
+      FTRADE_RUNTIME_TOKEN: ${FTRADE_RUNTIME_TOKEN:?Required}
+      FTRADE_COMPUTE_IMAGE: ${FTRADE_COMPUTE_IMAGE:?Pinned local compute image ID}
+      FTRADE_COMPUTE_MEMORY_MB: ${FTRADE_COMPUTE_MEMORY_MB:-2048}
+      FTRADE_BLOB_HOSTS: ${FTRADE_BLOB_HOSTS:?Exact approved Blob hostnames}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/ftrade-vps/compute/workspaces:/opt/ftrade-vps/compute/workspaces
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"

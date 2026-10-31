@@ -13,7 +13,6 @@ async function Settings() {
       settings={canManage ? await readWorkspaceModelSettings() : []}
       currentUser={session.user}
       legacyWorker={process.env.SOCIAL_FACEBOOK_WORKER_ENABLED === "1"}
-      sandboxEnabled={process.env.BROWSER_SANDBOX_ENABLED === "1"}
       canManage={canManage}
     />
   );

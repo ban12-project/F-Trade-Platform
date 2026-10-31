@@ -33,7 +33,6 @@ import {
   viewerWindowIsOpen,
 } from "@/components/workspace/browser-viewer-window";
 import { PublicationPageInspectionPanel } from "@/components/workspace/publication-page-inspection-panel";
-import { SandboxRegistrationCard } from "@/components/workspace/sandbox-registration-card";
 import { SandboxStatus } from "@/components/workspace/sandbox-status";
 import { browserNodeCommandAction, browserNodesAction } from "@/lib/actions/browser-nodes";
 import { accountFormSchema, nodeFormSchema } from "@/lib/browser-fleet/contracts";
@@ -78,7 +77,7 @@ const stateLabels: Record<string, string> = {
   egress_mismatch: "固定出口校验失败",
   result_unknown: "需要核对未知结果",
 };
-export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?: boolean }) {
+export function BrowserNodesPanel() {
   const [nodes, setNodes] = useState<Nodes>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -255,10 +254,6 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
           高级：连接节点与容量
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-4 pt-4">
-          <SandboxRegistrationCard
-            enabled={sandboxEnabled}
-            onCreated={async () => setNodes(await browserNodesAction())}
-          />
           <Card>
             <CardHeader>
               <CardTitle>连接自管服务器</CardTitle>
@@ -706,7 +701,7 @@ export function BrowserNodesPanel({ sandboxEnabled = false }: { sandboxEnabled?:
                         关闭并释放
                       </Button>
                     )}
-                    {node.sandbox && run.status === "running" && !run.stopRequested && (
+                    {run.status === "running" && !run.stopRequested && (
                       <PublicationPageInspectionPanel nodeId={node.id} runId={run.id} />
                     )}
                   </div>

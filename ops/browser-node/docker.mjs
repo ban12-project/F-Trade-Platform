@@ -138,12 +138,21 @@ function identifier(value) {
   if (!/^[a-f0-9-]{36}$/.test(value)) throw new Error("invalid_runtime_identifier");
   return value;
 }
-export function containerSpec(nodeId, run, imageId, deadline, nativeProfile = false) {
+export function containerSpec(
+  nodeId,
+  run,
+  imageId,
+  deadline,
+  nativeProfile = false,
+  maximumMemoryMb = 8192,
+) {
   if (typeof nativeProfile !== "boolean") throw new Error("native_profile_mode_invalid");
   identifier(nodeId);
   identifier(run.id);
   identifier(run.accountId);
-  if (!Number.isInteger(run.memoryMb) || run.memoryMb < 1024 || run.memoryMb > 8192)
+  if (!Number.isInteger(maximumMemoryMb) || maximumMemoryMb < 1024 || maximumMemoryMb > 8192)
+    throw new Error("invalid_host_memory_limit");
+  if (!Number.isInteger(run.memoryMb) || run.memoryMb < 1024 || run.memoryMb > maximumMemoryMb)
     throw new Error("invalid_memory_limit");
   const proxy = run.proxy;
   if (

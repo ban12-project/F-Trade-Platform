@@ -1,26 +1,16 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { enqueueRun, type FleetState, initialState } from "../lib/browser-fleet/policy";
+import { initialState } from "../lib/browser-fleet/policy";
 import { authorizeManualSandboxStart } from "../lib/browser-fleet/sandbox-authorization";
-import { openBrowserSandboxKey } from "../lib/browser-fleet/sandbox-credentials";
 import {
-  claimManualSandboxDispatch,
-  recordedBrowserSandboxDispatch,
-} from "../lib/browser-fleet/sandbox-dispatch";
-import {
-  bindBrowserSandboxGateway,
-  settleBrowserSandboxOperation,
-} from "../lib/browser-fleet/sandbox-lifecycle";
-import { monitorBrowserSandboxSession } from "../lib/browser-fleet/sandbox-monitor";
-import {
-  claimBrowserSandboxDelivery,
-  deliverBrowserSandboxOutbox,
-  enqueueManualBrowserSandboxStart,
-  recordBrowserSandboxDelivery,
-} from "../lib/browser-fleet/sandbox-outbox";
-import type { BrowserSandboxProviderHandle } from "../lib/browser-fleet/sandbox-provider";
-import { digest } from "../lib/browser-fleet/security";
+  openBrowserSandboxKey,
+  sealBrowserSandboxKey,
+} from "../lib/browser-fleet/sandbox-credentials";
+import { claimManualSandboxDispatch } from "../lib/browser-fleet/sandbox-dispatch";
+import { registerBrowserSandbox } from "../lib/browser-fleet/sandbox-lifecycle";
+import { enqueueManualBrowserSandboxStart } from "../lib/browser-fleet/sandbox-outbox";
+import { createAccessKey, digest } from "../lib/browser-fleet/security";
 import { listBrowserNodes, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import type { Database } from "../lib/db/client";
 import { user } from "../lib/db/schema";
@@ -28,6 +18,23 @@ import {
   configuredFacebookKeyring,
   decryptFacebookCredential,
 } from "../lib/social/facebook-vault-crypto";
+
+/** Seed historical managed metadata directly; production can no longer create it. */
+async function legacyManagedFixture(database: Database, owner: { id: string }, name: string) {
+  const nodeId = randomUUID();
+  const key = createAccessKey(nodeId);
+  const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
+  const ciphertext = sealBrowserSandboxKey(nodeId, key, configuredFacebookKeyring());
+  await database.transaction(async (tx) => {
+    await tx.execute(sql`INSERT INTO browser_fleet_node (id,owner_id,name,key_hash,document)
+      VALUES (${nodeId},${owner.id},${name},${digest(key)},${JSON.stringify(state)}::jsonb)`);
+    await registerBrowserSandbox(tx, nodeId);
+    await tx.execute(
+      sql`UPDATE browser_sandbox SET access_key_ciphertext=${ciphertext} WHERE node_id=${nodeId}`,
+    );
+  });
+  return { nodeId };
+}
 
 export async function testBrowserSandboxOwner(
   database: Database,
@@ -37,7 +44,7 @@ export async function testBrowserSandboxOwner(
   const command = { operation: "create-sandbox", value: { name: "SYNTHETIC on-demand" } };
   try {
     delete process.env.BROWSER_SANDBOX_ENABLED;
-    await assert.rejects(ownerBrowserCommand(command, owner), /not_enabled/);
+    await assert.rejects(ownerBrowserCommand(command, owner), /vercel_sandbox_retired_use_vps/);
     process.env.BROWSER_SANDBOX_ENABLED = "1";
     await assert.rejects(
       ownerBrowserCommand(command, { ...owner, sessionId: randomUUID() }),
@@ -49,7 +56,14 @@ export async function testBrowserSandboxOwner(
         owner,
       ),
     );
-    const result = await ownerBrowserCommand(command, owner);
+    const before = await listBrowserNodes(owner.id);
+    await assert.rejects(ownerBrowserCommand(command, owner), /vercel_sandbox_retired_use_vps/);
+    assert.deepEqual(
+      await listBrowserNodes(owner.id),
+      before,
+      "retired creation makes no database changes",
+    );
+    const result = await legacyManagedFixture(database, owner, command.value.name);
     assert.ok(result.nodeId);
     assert.deepEqual(Object.keys(result), ["nodeId"], "managed keys never go to the page");
     const nodeId = result.nodeId;
@@ -109,10 +123,9 @@ export async function testBrowserSandboxOwner(
     assert.equal(revoked.status, "revoked");
     assert.equal(revoked.access_key_ciphertext, null);
     assert.equal(revoked.phase, "stopped");
-    await testDispatchAuthorization(database, owner);
-    await testCancelledStarts(database, owner);
+    await testRetiredDispatch(database, owner);
     console.log(
-      "PASS: managed node authorization, encrypted key isolation, metadata-only create/list/rotate/revoke",
+      "PASS: retired creation, historical key isolation and metadata-only list/rotate/revoke",
     );
   } finally {
     if (previous === undefined) delete process.env.BROWSER_SANDBOX_ENABLED;
@@ -120,464 +133,57 @@ export async function testBrowserSandboxOwner(
   }
 }
 
-async function testCancelledStarts(database: Database, owner: { id: string; sessionId: string }) {
-  for (const scenario of [
-    "stop",
-    "account",
-    "revoke",
-    "expired-session",
-    "claimed",
-    "remaining-demand",
-  ] as const) {
-    const created = await ownerBrowserCommand(
-      { operation: "create-sandbox", value: { name: `SYNTHETIC cancellation ${scenario}` } },
-      owner,
+async function testRetiredDispatch(database: Database, owner: { id: string; sessionId: string }) {
+  for (const scenario of ["unclaimed", "claimed", "bound"] as const) {
+    const { nodeId } = await legacyManagedFixture(database, owner, `SYNTHETIC retired ${scenario}`);
+    const operationId = randomUUID();
+    await database.execute(sql`UPDATE browser_sandbox SET phase='starting', operation_kind='start',
+      operation_id=${operationId}::uuid,
+      dispatch_operation_id=${scenario === "unclaimed" ? null : operationId}::uuid,
+      provider_initialized=${scenario !== "unclaimed"},
+      session_id=${scenario === "bound" ? "synthetic-captured-session" : null}
+      WHERE node_id=${nodeId}`);
+    const before = (
+      await database.execute(sql`SELECT * FROM browser_sandbox WHERE node_id=${nodeId}`)
+    ).rows[0];
+    assert.equal(
+      await database.transaction((tx) => authorizeManualSandboxStart(tx, nodeId, operationId)),
+      null,
     );
-    assert.ok(created.nodeId);
-    const nodeId = created.nodeId;
-    const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
-    const accountId = randomUUID();
-    state.accounts.push({
-      id: accountId,
-      channelRef: "synthetic",
-      accountRef: randomUUID(),
-      enabled: true,
-      authState: "needs_login",
-      credentialVersion: 1,
-      loginCiphertext: null,
-      proxyCiphertext: "synthetic-encrypted-proxy",
-      expectedEgressIp: "203.0.113.1",
-      pollSeconds: 0,
-      nextPollAt: 0,
-      lastCheckedAt: null,
-    });
-    const secondAccountId = randomUUID();
-    if (scenario === "remaining-demand")
-      state.accounts.push({ ...state.accounts[0], id: secondAccountId, accountRef: randomUUID() });
-    await database.execute(
-      sql`UPDATE browser_fleet_node SET document=${JSON.stringify(state)}::jsonb WHERE id=${nodeId}`,
+    const claims = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        database.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId)),
+      ),
     );
-    const opened = await ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner);
-    const second =
-      scenario === "remaining-demand"
-        ? await ownerBrowserCommand(
-            { operation: "open", nodeId, accountId: secondAccountId },
-            owner,
-          )
-        : null;
-    const read = async () =>
-      (
-        await database.execute(sql`SELECT phase, operation_id, dispatch_operation_id,
-      provider_initialized FROM browser_sandbox WHERE node_id=${nodeId}`)
-      ).rows[0];
-    const initial = await read();
-    const operationId = initial.operation_id as string;
-    assert.ok(operationId);
-    const claim = () =>
-      database.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId));
-    if (scenario === "claimed") assert.ok(await claim());
-    if (scenario === "stop" || scenario === "claimed" || scenario === "remaining-demand")
-      await ownerBrowserCommand({ operation: "stop", nodeId, runId: opened.runId }, owner);
-    else if (scenario === "account")
-      await ownerBrowserCommand({ operation: "account", nodeId, accountId, enabled: false }, owner);
-    else if (scenario === "revoke")
-      await ownerBrowserCommand({ operation: "revoke", nodeId }, owner);
-    else {
-      const row = (
-        await database.execute(sql`SELECT document FROM browser_fleet_node WHERE id=${nodeId}`)
-      ).rows[0];
-      const document = row.document as FleetState;
-      document.runs[0].authSessionId = randomUUID();
-      await database.execute(
-        sql`UPDATE browser_fleet_node SET document=${JSON.stringify(document)}::jsonb WHERE id=${nodeId}`,
-      );
-    }
-    if (second) {
-      assert.equal(
-        (await read()).operation_id,
-        operationId,
-        "other valid queued demand retains the start",
-      );
-      assert.equal((await read()).phase, "starting");
-      await ownerBrowserCommand({ operation: "stop", nodeId, runId: second.runId }, owner);
-    }
-    assert.equal(await claim(), null);
-    const after = await read();
-    if (scenario === "claimed") {
-      assert.equal(after.phase, "starting", "a provider claim cannot be undone by cancellation");
-      assert.equal(after.operation_id, operationId);
-      assert.equal(after.dispatch_operation_id, operationId);
-      assert.equal(after.provider_initialized, true);
-    } else {
+    assert.ok(
+      claims.every((claim) => claim === null),
+      "no new or resumed provider claim after retirement",
+    );
+    const after = (
+      await database.execute(sql`SELECT * FROM browser_sandbox WHERE node_id=${nodeId}`)
+    ).rows[0];
+    if (scenario === "unclaimed") {
       assert.equal(after.phase, "stopped");
       assert.equal(after.operation_id, null);
-      assert.equal(after.dispatch_operation_id, null);
-      assert.equal(after.provider_initialized, false);
-      assert.equal(await claim(), null, "late delivery cannot revive a cancelled intent");
-      if (scenario === "stop") {
-        await ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner);
-        const restarted = await read();
-        assert.equal(restarted.phase, "starting");
-        assert.notEqual(restarted.operation_id, operationId);
-        assert.equal(await claim(), null, "old delivery cannot cancel a later authorized start");
-        assert.deepEqual(await read(), restarted);
-        const delivery = await claimBrowserSandboxDelivery(database, nodeId);
-        assert.equal(
-          delivery?.operationId,
-          restarted.operation_id,
-          "cancelled outbox entries must not consume the immediate next-start delivery slot",
-        );
-      }
+      assert.equal(
+        await database.transaction((tx) => enqueueManualBrowserSandboxStart(tx, nodeId)),
+        null,
+      );
+      assert.equal(
+        (await database.execute(sql`SELECT * FROM browser_sandbox_outbox WHERE node_id=${nodeId}`))
+          .rows.length,
+        0,
+      );
+    } else {
+      assert.deepEqual(
+        after,
+        before,
+        "retirement never erases a possibly running legacy session or uncertain claim",
+      );
     }
   }
   console.log(
-    "PASS: unclaimed cancelled/disabled/revoked/expired demand releases start intent; claimed provider operations stay fenced",
-  );
-}
-
-async function testDispatchAuthorization(
-  database: Database,
-  owner: { id: string; sessionId: string },
-) {
-  const created = await ownerBrowserCommand(
-    { operation: "create-sandbox", value: { name: "SYNTHETIC dispatch" } },
-    owner,
-  );
-  assert.ok(created.nodeId);
-  const nodeId = created.nodeId;
-  const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
-  const accountId = randomUUID();
-  let now = Date.now();
-  state.accounts.push({
-    id: accountId,
-    channelRef: "synthetic",
-    accountRef: randomUUID(),
-    enabled: true,
-    authState: "needs_login",
-    credentialVersion: 1,
-    loginCiphertext: null,
-    proxyCiphertext: "synthetic-encrypted-proxy",
-    expectedEgressIp: "203.0.113.1",
-    pollSeconds: 0,
-    nextPollAt: 0,
-    lastCheckedAt: null,
-  });
-  const save = () =>
-    database.execute(
-      sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(state)}::jsonb WHERE id = ${nodeId}`,
-    );
-  await save();
-  await assert.rejects(
-    database.transaction(async (tx) => {
-      const temporary = structuredClone(state);
-      enqueueRun(
-        temporary,
-        {
-          id: randomUUID(),
-          accountId,
-          kind: "interactive",
-          jobRef: null,
-          requestedBy: owner.id,
-          authSessionId: owner.sessionId,
-        },
-        Date.now(),
-      );
-      await tx.execute(
-        sql`UPDATE browser_fleet_node SET document=${JSON.stringify(temporary)}::jsonb WHERE id=${nodeId}`,
-      );
-      assert.ok(await enqueueManualBrowserSandboxStart(tx, nodeId));
-      throw new Error("synthetic transaction rollback");
-    }),
-    /synthetic transaction rollback/,
-  );
-  const rolledBack = await database.execute(sql`SELECT n.document, s.phase,
-    (SELECT count(*)::integer FROM browser_sandbox_outbox o WHERE o.node_id=n.id) AS pending
-    FROM browser_fleet_node n JOIN browser_sandbox s ON s.node_id=n.id WHERE n.id=${nodeId}`);
-  assert.equal(rolledBack.rows[0].phase, "stopped");
-  assert.equal(rolledBack.rows[0].pending, 0);
-  assert.deepEqual(rolledBack.rows[0].document, state);
-  const opened = await ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner);
-  assert.deepEqual(Object.keys(opened), ["runId"]);
-  const queued =
-    await database.execute(sql`SELECT n.document, s.operation_id FROM browser_fleet_node n
-    JOIN browser_sandbox s ON s.node_id=n.id WHERE n.id=${nodeId}`);
-  const savedState = queued.rows[0].document as FleetState;
-  state.runs = savedState.runs;
-  const run = state.runs.find((item) => item.id === opened.runId);
-  assert.ok(run);
-  now = Date.now();
-  const operationId = queued.rows[0].operation_id as string;
-  assert.ok(operationId);
-  await testOutboxDelivery(database, nodeId, operationId);
-  const authorize = (id = operationId, time = now) =>
-    database.transaction((tx) => authorizeManualSandboxStart(tx, nodeId, id, time));
-  assert.ok(await authorize());
-  const dispatched = await Promise.all(
-    Array.from({ length: 12 }, () =>
-      database.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId)),
-    ),
-  );
-  const winners = dispatched.filter((value) => value !== null);
-  assert.equal(winners.length, 1);
-  assert.deepEqual(winners[0], { nodeId, operationId, mode: "create" });
-  assert.equal(
-    await database.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operationId)),
-    null,
-  );
-  assert.equal(await authorize(randomUUID()), null);
-  assert.equal(await authorize(operationId, now + 900000), null);
-  run.authSessionId = randomUUID();
-  await save();
-  assert.equal(await authorize(), null);
-  run.authSessionId = owner.sessionId;
-  state.accounts[0].enabled = false;
-  await save();
-  assert.equal(await authorize(), null);
-  state.accounts[0].enabled = true;
-  state.accounts[0].credentialVersion++;
-  await save();
-  assert.equal(await authorize(), null);
-  state.accounts[0].credentialVersion--;
-  run.stopRequested = true;
-  await save();
-  assert.equal(await authorize(), null);
-  run.stopRequested = false;
-  await save();
-  await database.execute(sql`UPDATE "user" SET banned = true WHERE id = ${owner.id}`);
-  try {
-    assert.equal(await authorize(), null);
-  } finally {
-    await database.execute(sql`UPDATE "user" SET banned = false WHERE id = ${owner.id}`);
-  }
-  assert.ok(await authorize());
-  await database.transaction(async (tx) => {
-    assert.equal(
-      await bindBrowserSandboxGateway(
-        tx,
-        nodeId,
-        operationId,
-        "monitor-session",
-        "https://gateway.example.invalid",
-      ),
-      true,
-    );
-    assert.equal(
-      await settleBrowserSandboxOperation(tx, nodeId, operationId, {
-        status: "running",
-        sessionId: "monitor-session",
-      }),
-      true,
-    );
-  });
-  assert.deepEqual(await recordedBrowserSandboxDispatch(database, nodeId, operationId), {
-    status: "running",
-    sessionId: "monitor-session",
-  });
-  assert.equal(await recordedBrowserSandboxDispatch(database, nodeId, randomUUID()), null);
-  let inspections = 0,
-    revocations = 0;
-  await database.execute(sql`UPDATE "user" SET banned = true WHERE id = ${owner.id}`);
-  try {
-    assert.equal(
-      await monitorBrowserSandboxSession(nodeId, "monitor-session", {
-        inspect: async () => {
-          const status = inspections++ === 0 ? "running" : "stopped";
-          return {
-            status,
-            currentSession: () => ({ sessionId: "monitor-session", status }),
-          } as unknown as BrowserSandboxProviderHandle;
-        },
-        revoke: async () => {
-          revocations++;
-          return "stopped";
-        },
-        retire: async () => {
-          throw new Error("revoked owner must not use idle-only retirement");
-        },
-      }),
-      "stopped",
-    );
-    assert.equal(revocations, 1);
-  } finally {
-    await database.execute(sql`UPDATE "user" SET banned = false WHERE id = ${owner.id}`);
-  }
-  // Repeat from a captured running session with a failed Agent inspection.
-  // Use the production authorization and stop-recording database paths.
-  await database.execute(sql`UPDATE browser_sandbox SET phase='running',
-    session_id='monitor-session' WHERE node_id=${nodeId}`);
-  await database.execute(sql`UPDATE browser_fleet_node SET gateway_origin='https://gateway.example.invalid'
-    WHERE id=${nodeId}`);
-  const originalDocument = (
-    await database.execute(sql`SELECT document FROM browser_fleet_node WHERE id=${nodeId}`)
-  ).rows[0].document;
-  let providerStopped = false;
-  let fallbackStops = 0;
-  const failureInspection = async () =>
-    ({
-      status: providerStopped ? "stopped" : "running",
-      currentSession: () => ({
-        sessionId: "monitor-session",
-        status: "running",
-        stop: async () => {
-          fallbackStops++;
-        },
-      }),
-    }) as unknown as BrowserSandboxProviderHandle;
-  await database.execute(sql`UPDATE "user" SET banned=true WHERE id=${owner.id}`);
-  try {
-    assert.equal(
-      await monitorBrowserSandboxSession(nodeId, "monitor-session", {
-        inspect: failureInspection,
-        revoke: async () => {
-          throw new Error("synthetic_agent_inspection_failed");
-        },
-      }),
-      "pending",
-      "successful stop response is insufficient while provider still reports running",
-    );
-    assert.equal(fallbackStops, 1);
-    const pending = (
-      await database.execute(
-        sql`SELECT phase,session_id FROM browser_sandbox WHERE node_id=${nodeId}`,
-      )
-    ).rows[0];
-    assert.deepEqual(pending, { phase: "running", session_id: "monitor-session" });
-    providerStopped = true;
-    assert.equal(
-      await monitorBrowserSandboxSession(nodeId, "monitor-session", {
-        inspect: failureInspection,
-      }),
-      "stopped",
-    );
-    assert.equal(
-      fallbackStops,
-      1,
-      "confirmed stopped metadata must not issue another runtime command",
-    );
-    assert.deepEqual(
-      (await database.execute(sql`SELECT document FROM browser_fleet_node WHERE id=${nodeId}`))
-        .rows[0].document,
-      originalDocument,
-      "fallback shutdown must not settle business leases or results",
-    );
-  } finally {
-    await database.execute(sql`UPDATE "user" SET banned=false WHERE id=${owner.id}`);
-  }
-  const retired =
-    await database.execute(sql`SELECT s.phase, s.session_id, n.gateway_origin, n.document
-    FROM browser_sandbox s JOIN browser_fleet_node n ON n.id = s.node_id WHERE n.id = ${nodeId}`);
-  assert.equal(retired.rows[0].phase, "stopped");
-  assert.equal(await recordedBrowserSandboxDispatch(database, nodeId, operationId), null);
-  assert.equal(retired.rows[0].session_id, null);
-  assert.equal(retired.rows[0].gateway_origin, null);
-  assert.equal((retired.rows[0].document as typeof state).runs[0].status, "queued");
-  assert.equal(
-    await monitorBrowserSandboxSession(nodeId, "monitor-session", {
-      inspect: async () => {
-        throw new Error("must not query stale session");
-      },
-    }),
-    "superseded",
-  );
-  // Provider stop does not release a stale interactive lease. Reopening must
-  // queue fresh demand so Agent recovery can confirm the old browser stopped.
-  const stale = retired.rows[0].document as FleetState;
-  const oldRun = stale.runs[0];
-  oldRun.status = "quarantined";
-  oldRun.stopRequested = true;
-  oldRun.leaseUntil = Date.now() - 1000;
-  oldRun.deadline = Date.now() - 1000;
-  await database.execute(
-    sql`UPDATE browser_fleet_node SET document=${JSON.stringify(stale)}::jsonb WHERE id=${nodeId}`,
-  );
-  const reopened = await Promise.all(
-    Array.from({ length: 12 }, () =>
-      ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner),
-    ),
-  );
-  assert.equal(new Set(reopened.map((value) => value.runId)).size, 1);
-  assert.notEqual(reopened[0].runId, oldRun.id);
-  const recoveredDemand = await database.execute(sql`SELECT n.document, s.operation_id,
-    (SELECT count(*)::integer FROM browser_sandbox_outbox o WHERE o.operation_id=s.operation_id) AS outbox_count
-    FROM browser_fleet_node n JOIN browser_sandbox s ON s.node_id=n.id WHERE n.id=${nodeId}`);
-  const nextState = recoveredDemand.rows[0].document as FleetState;
-  assert.equal(nextState.runs.find((item) => item.id === oldRun.id)?.status, "quarantined");
-  assert.equal(nextState.runs.filter((item) => item.status === "queued").length, 1);
-  assert.equal(recoveredDemand.rows[0].outbox_count, 1);
-  const nextOperation = recoveredDemand.rows[0].operation_id as string;
-  assert.notEqual(nextOperation, operationId);
-  const nextClaim = await database.transaction((tx) =>
-    claimManualSandboxDispatch(tx, nodeId, nextOperation),
-  );
-  assert.deepEqual(nextClaim, { nodeId, operationId: nextOperation, mode: "resume" });
-  assert.equal(
-    await database.transaction((tx) => enqueueManualBrowserSandboxStart(tx, nodeId)),
-    null,
-  );
-  assert.equal(
-    await monitorBrowserSandboxSession(nodeId, "monitor-session", {
-      inspect: async () => {
-        throw new Error("old session must not be inspected after next start");
-      },
-    }),
-    "superseded",
-  );
-  await ownerBrowserCommand({ operation: "revoke", nodeId }, owner);
-  assert.equal(await authorize(), null);
-  console.log(
-    "PASS: manual dispatch rechecks operation, current owner/session, queued demand, expiry, account version and revocation",
-  );
-}
-
-async function testOutboxDelivery(database: Database, nodeId: string, operationId: string) {
-  const entries =
-    await database.execute(sql`SELECT operation_id, node_id FROM browser_sandbox_outbox
-    WHERE node_id=${nodeId}`);
-  assert.deepEqual(entries.rows, [{ operation_id: operationId, node_id: nodeId }]);
-  const claims = await Promise.all(
-    Array.from({ length: 12 }, () => claimBrowserSandboxDelivery(database, nodeId)),
-  );
-  const winners = claims.filter((item) => item !== null);
-  assert.equal(winners.length, 1);
-  const first = winners[0];
-  assert.equal(first.operationId, operationId);
-  assert.equal(await claimBrowserSandboxDelivery(database, randomUUID()), null);
-  await database.execute(sql`UPDATE browser_sandbox_outbox SET claim_until=now()-interval '1 minute'
-    WHERE operation_id=${operationId}::uuid`);
-  const second = await claimBrowserSandboxDelivery(database, nodeId);
-  assert.ok(second);
-  assert.notEqual(second.claimId, first.claimId);
-  assert.equal(
-    await recordBrowserSandboxDelivery(database, operationId, first.claimId, "stale"),
-    false,
-  );
-  await database.execute(sql`UPDATE browser_sandbox_outbox SET claim_until=now()-interval '1 minute'
-    WHERE operation_id=${operationId}::uuid`);
-  let calls = 0;
-  assert.deepEqual(
-    await deliverBrowserSandboxOutbox(
-      database,
-      async (node, operation) => {
-        assert.equal(node, nodeId);
-        assert.equal(operation, operationId);
-        calls++;
-        throw new Error("lost workflow start response");
-      },
-      nodeId,
-    ),
-    { delivered: 0 },
-  );
-  assert.equal(calls, 1, "a lost response is not immediately retried");
-  assert.equal(await claimBrowserSandboxDelivery(database, nodeId), null);
-  await database.execute(sql`UPDATE browser_sandbox_outbox SET claim_until=now()-interval '1 minute'
-    WHERE operation_id=${operationId}::uuid`);
-  assert.deepEqual(
-    await deliverBrowserSandboxOutbox(database, async () => "synthetic-workflow", nodeId),
-    { delivered: 1 },
-  );
-  assert.equal(await claimBrowserSandboxDelivery(database, nodeId), null);
-  console.log(
-    "PASS: owner open atomically creates outbox; concurrent delivery, expired lease, stale receipt and lost response recovery",
+    "PASS: permanent retirement rejects concurrent dispatch while retaining uncertain legacy claims",
   );
 }
 

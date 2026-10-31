@@ -54,6 +54,9 @@ try {
 const bootId = randomUUID();
 const maxSlots = Math.min(16, Math.max(1, Number(process.env.MAX_RUNNING_BROWSERS ?? 2)));
 const reserveMb = Math.max(512, Number(process.env.HOST_RESERVE_MB ?? 1024));
+const maximumMemoryMb = Number(process.env.BROWSER_MAX_MEMORY_MB ?? 8192);
+if (!Number.isInteger(maximumMemoryMb) || maximumMemoryMb < 1024 || maximumMemoryMb > 8192)
+  throw new Error("invalid_host_memory_limit");
 if (!Number.isInteger(maxSlots) || !Number.isFinite(reserveMb))
   throw new Error("node_capacity_invalid");
 const docker = dockerClient(process.env.DOCKER_SOCKET ?? "/var/run/docker.sock");
@@ -145,6 +148,11 @@ async function browserRequest(slot, path, body, timeout = 30_000) {
 }
 const sync = await nodeCall("sync");
 if (sync.nodeId !== nodeId) throw new Error("node_identity_mismatch");
+if (
+  !Number.isInteger(sync.limits?.browserMemoryMb) ||
+  sync.limits.browserMemoryMb > maximumMemoryMb
+)
+  throw new Error("node_memory_exceeds_host_limit");
 gatewayOrigin = secureOrigin(sync.gatewayOrigin);
 const filters = encodeURIComponent(JSON.stringify({ label: [`io.ftrade.node=${nodeId}`] }));
 // The managed Agent also carries the node label so the platform can retire its
@@ -445,7 +453,10 @@ async function tick() {
     pendingClaim ??= randomUUID();
     const result = await nodeCall("claim", {
       requestId: pendingClaim,
-      availableMemoryMb: Math.max(0, Math.floor(freemem() / 1024 / 1024 - reserveMb)),
+      availableMemoryMb: Math.min(
+        maximumMemoryMb,
+        Math.max(0, Math.floor(freemem() / 1024 / 1024 - reserveMb)),
+      ),
       localSlots: maxSlots,
     });
     if (stopping) return;
@@ -462,7 +473,14 @@ async function tick() {
       result,
       (claim) => {
         const expiresAt = localDeadline(claim, claim.run.leaseUntil);
-        const spec = containerSpec(nodeId, claim.run, imageId, expiresAt, nativeProfiles);
+        const spec = containerSpec(
+          nodeId,
+          claim.run,
+          imageId,
+          expiresAt,
+          nativeProfiles,
+          maximumMemoryMb,
+        );
         configureLoginRuntime(spec, claim.run, loginProfileForRun(loginProfiles, claim.run));
         return { expiresAt, spec };
       },

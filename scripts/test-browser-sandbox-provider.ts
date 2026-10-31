@@ -41,92 +41,32 @@ function fixture(status = "stopped", fails = false, timeout: number | undefined 
   };
   return { provider, calls };
 }
-test("first provision uses a named template, bounded compute and only the gateway port", async () => {
-  const f = fixture();
-  const result = await provisionBrowserSandbox(
-    {
-      mode: "create",
-      nodeId,
-      operationId,
-      templateSnapshotId: "snap_reviewed",
-    },
-    f.provider,
-  );
-  assert.equal(result.session.sessionId, "current");
-  const call = (f.calls[0] as { create: Record<string, unknown> }).create;
-  assert.equal(call.name, `ftrade-browser-${nodeId}`);
-  assert.deepEqual(call.ports, [9400]);
-  assert.deepEqual(call.resources, { vcpus: 2 });
-  assert.equal(call.timeout, 1200000);
-  assert.deepEqual(call.env, {});
-  assert.equal(call.networkPolicy, "allow-all");
-  assert.equal(f.calls.length, 1);
-});
-test("resume first inspects stopped metadata then resumes the same name", async () => {
-  const f = fixture();
-  await provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, f.provider);
-  assert.deepEqual(f.calls, [
-    { get: { name: `ftrade-browser-${nodeId}`, resume: false } },
-    { update: { networkPolicy: "allow-all" } },
-    { get: { name: `ftrade-browser-${nodeId}`, resume: true } },
-  ]);
-});
-test("missing snapshots, running and transitional sessions never create replacements", async () => {
-  for (const status of ["running", "stopping", "snapshotting"]) {
-    const f = fixture(status);
-    await assert.rejects(
-      provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, f.provider),
-      { message: "sandbox_provision_unconfirmed" },
-    );
-    assert.equal(f.calls.length, 1);
+test("retired create/resume cannot touch a provider even with the old flag enabled", async () => {
+  const old = process.env.BROWSER_SANDBOX_ENABLED;
+  try {
+    process.env.BROWSER_SANDBOX_ENABLED = "1";
+    for (const mode of ["create", "resume"] as const) {
+      const f = fixture();
+      await assert.rejects(
+        provisionBrowserSandbox(
+          mode === "create"
+            ? { mode, nodeId, operationId, templateSnapshotId: "snap_reviewed" }
+            : { mode, nodeId, operationId },
+          f.provider,
+        ),
+        { message: "vercel_sandbox_retired_use_vps" },
+      );
+      assert.deepEqual(f.calls, []);
+    }
+  } finally {
+    if (old === undefined) delete process.env.BROWSER_SANDBOX_ENABLED;
+    else process.env.BROWSER_SANDBOX_ENABLED = old;
   }
-  const f = fixture("stopped", true);
-  await assert.rejects(
-    provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, f.provider),
-    { message: "sandbox_provision_unconfirmed" },
-  );
-  assert.equal(f.calls.length, 1);
 });
-test("uncertain create is not retried and inspection never enables resume", async () => {
-  const f = fixture("stopped", true);
-  await assert.rejects(
-    provisionBrowserSandbox(
-      {
-        mode: "create",
-        nodeId,
-        operationId,
-        templateSnapshotId: "snap_reviewed",
-      },
-      f.provider,
-    ),
-    { message: "sandbox_provision_unconfirmed" },
-  );
-  assert.equal(f.calls.length, 1);
-  const read = fixture();
-  await inspectBrowserSandbox(nodeId, read.provider);
-  assert.deepEqual(read.calls, [{ get: { name: `ftrade-browser-${nodeId}`, resume: false } }]);
-});
-
-test("resume refuses unbounded or changed timeout configuration before waking compute", async () => {
-  for (const timeout of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1200001]) {
-    const f = fixture("stopped", false, timeout);
-    await assert.rejects(
-      provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, f.provider),
-      { message: "sandbox_provision_unconfirmed" },
-    );
-    assert.deepEqual(f.calls, [{ get: { name: `ftrade-browser-${nodeId}`, resume: false } }]);
-  }
-  const shorter = fixture("stopped", false, 60000);
-  await provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, shorter.provider);
-  assert.equal(shorter.calls.length, 3);
-  const missing = fixture();
-  const get = missing.provider.get;
-  missing.provider.get = async (input) => ({ ...(await get(input)), timeout: undefined });
-  await assert.rejects(
-    provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, missing.provider),
-    { message: "sandbox_provision_unconfirmed" },
-  );
-  assert.equal(missing.calls.length, 1);
+test("retirement preserves read-only inspection and never resumes", async () => {
+  const f = fixture();
+  await inspectBrowserSandbox(nodeId, f.provider);
+  assert.deepEqual(f.calls, [{ get: { name: `ftrade-browser-${nodeId}`, resume: false } }]);
 });
 
 test("lost initial create requires exact tags and a single matching provider session", async () => {
@@ -166,42 +106,4 @@ test("lost initial create requires exact tags and a single matching provider ses
     );
     if (variant.endsWith("tag")) assert.equal(lists, 0);
   }
-});
-
-test("resume refuses changed resources or foreign ownership without waking compute", async () => {
-  const overrides: Partial<BrowserSandboxProviderHandle>[] = [
-    { vcpus: 4 },
-    { vcpus: 1 },
-    { vcpus: undefined },
-    { vcpus: Number.NaN },
-    { tags: undefined },
-    { tags: {} },
-    { tags: { "ftrade-node": randomUUID() } },
-  ];
-  for (const override of overrides) {
-    const f = fixture();
-    const get = f.provider.get;
-    f.provider.get = async (input) => ({ ...(await get(input)), ...override });
-    await assert.rejects(
-      provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, f.provider),
-      { message: "sandbox_provision_unconfirmed" },
-    );
-    assert.deepEqual(f.calls, [{ get: { name: `ftrade-browser-${nodeId}`, resume: false } }]);
-  }
-});
-
-test("failed policy reset never resumes an existing Sandbox", async () => {
-  const f = fixture();
-  const get = f.provider.get;
-  f.provider.get = async (input) => ({
-    ...(await get(input)),
-    async update() {
-      throw new Error("private-provider-detail");
-    },
-  });
-  await assert.rejects(
-    provisionBrowserSandbox({ mode: "resume", nodeId, operationId }, f.provider),
-    { message: "sandbox_provision_unconfirmed" },
-  );
-  assert.deepEqual(f.calls, [{ get: { name: `ftrade-browser-${nodeId}`, resume: false } }]);
 });

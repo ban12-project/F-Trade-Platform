@@ -2,9 +2,9 @@ import { execFile } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { promisify } from "node:util";
-
-import { Sandbox } from "@vercel/sandbox";
 import { z } from "zod";
+import { createComputeRuntime } from "../compute/runtime";
+import { vpsComputeEnabled } from "../compute/vps";
 
 import type { ProductAgentSource } from "./agent";
 
@@ -43,27 +43,12 @@ function markItDownPython() {
   return process.env.MARKITDOWN_PYTHON ?? "python3";
 }
 
-function productDocumentSandboxImage() {
-  const image = (
-    process.env.PRODUCT_DOCUMENT_SANDBOX_IMAGE ?? process.env.VIDEO_SANDBOX_IMAGE
-  )?.trim();
-  if (!image)
-    throw new Error("Product Agent document preprocessing requires a pinned Sandbox image");
-  return image;
-}
-
 function shouldUseProductDocumentSandbox() {
-  return process.env.VERCEL === "1" || Boolean(process.env.PRODUCT_DOCUMENT_SANDBOX_IMAGE?.trim());
+  return vpsComputeEnabled();
 }
 
 async function preprocessInSandbox(documentPath: string, allowEmptySource: boolean) {
-  const sandbox = await Sandbox.create({
-    image: productDocumentSandboxImage(),
-    timeout: 10 * 60 * 1_000,
-    resources: { vcpus: Number(process.env.PRODUCT_DOCUMENT_SANDBOX_VCPUS ?? 2) },
-    networkPolicy: "deny-all",
-    persistent: false,
-  });
+  const sandbox = await createComputeRuntime();
   try {
     await sandbox.fs.mkdir("/vercel/sandbox/work", { recursive: true });
     const input = `/vercel/sandbox/work/input${extname(documentPath).toLowerCase()}`;

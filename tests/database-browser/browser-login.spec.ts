@@ -317,7 +317,7 @@ test("owner page reads managed lifecycle changes while cloud provisioning stays 
     await expect(page.getByText("已停止", { exact: true })).toBeVisible();
     await expect(page.getByText("不是云端实时状态。", { exact: false })).toBeVisible();
     await page.getByRole("button", { name: "高级：连接节点与容量", exact: true }).click();
-    await expect(page.getByRole("button", { name: "创建托管节点", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "创建托管节点", exact: true })).toHaveCount(0);
     const operationId = randomUUID();
     await pool.query(
       "UPDATE browser_sandbox SET phase='unknown', operation_id=$2, operation_kind='start' WHERE node_id=$1",
