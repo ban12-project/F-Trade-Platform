@@ -120,6 +120,7 @@ export function createNativeProfileRuntime({
   environment = process.env,
   root = "/data",
   leaseDeadline = async () => Number(await readFile("/tmp/ftrade-lease", "utf8")),
+  startupDiagnostics,
 }) {
   const mode = environment.FTRADE_NATIVE_PROFILE ?? "0";
   if (mode === "0") return null;
@@ -165,6 +166,7 @@ export function createNativeProfileRuntime({
       }
     },
     async launch(options) {
+      startupDiagnostics?.stage("profile-check");
       await active();
       await directory(root);
       await directory(p.directory, true);
@@ -189,6 +191,7 @@ export function createNativeProfileRuntime({
         throw new Error("native_profile_migration_source_changed");
       // Firefox owns the OS-level exclusive profile lock, including across
       // containers. Never remove its lock files or fall back to a temp profile.
+      startupDiagnostics?.stage("firefox-launch");
       const candidate = await firefox
         .launchPersistentContext(p.profile, nativeProfileLaunchOptions(options, environment))
         .catch(() => {

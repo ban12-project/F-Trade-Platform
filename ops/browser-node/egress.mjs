@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { describeBrowserLaunchFailure } from "./launch-diagnostics.mjs";
+import { sanitizeStartupDiagnostics } from "./startup-diagnostics.mjs";
 
 // This is a browser navigation in the account's own session, never a host fetch.
 export const EGRESS_URL = "https://api.ipify.org/";
@@ -49,14 +50,17 @@ async function boundedJson(response) {
 }
 export async function waitForBrowserReady(browserRequest, { assertActive, sleep }) {
   let lastObservation = "unreachable";
+  let startup = null;
   for (let attempt = 0; attempt < 60; attempt++) {
     assertActive();
     let status;
+    startup = null;
     try {
       const response = await browserRequest("/health", undefined, 2000);
       lastObservation = response.ok ? "invalid-health" : "unhealthy-response";
       if (response.ok) {
         status = await boundedJson(response);
+        startup = sanitizeStartupDiagnostics(status?.startup);
         if (status?.ok === true && status.engine === "camoufox")
           lastObservation = "browser-disconnected";
       } else await response.body?.cancel();
@@ -76,6 +80,7 @@ export async function waitForBrowserReady(browserRequest, { assertActive, sleep 
   }
   throw Object.assign(new Error("browser_start_timeout"), {
     browserFailureCode: `browser_health_${lastObservation.replaceAll("-", "_")}`,
+    browserStartup: startup,
   });
 }
 // Heartbeat and task authorization share a probe tab and the same run object.

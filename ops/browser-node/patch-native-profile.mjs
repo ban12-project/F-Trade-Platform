@@ -20,15 +20,31 @@ export function patchNativeProfileSource(file, source) {
           ],
           [
             "const options = await buildLaunchOptionsWithGeoipFallback({",
-            "const options = await buildLaunchOptionsWithGeoipFallback({\n        window: nativeProfile ? nativeProfileWindowSize(process.env) : undefined,",
+            'browserStartup.stage("launch-options");\n      const options = await buildLaunchOptionsWithGeoipFallback({\n        window: nativeProfile ? nativeProfileWindowSize(process.env) : undefined,',
           ],
           [
             "async function launchBrowserInstance() {",
-            'const nativeProfile = createNativeProfileRuntime({ firefox });\n\nasync function launchBrowserInstance() {\n  if (nativeProfile && (MAX_SESSIONS !== 1 || proxyPool?.canRotateSessions))\n    throw new Error("native_profile_requires_one_fixed_account");',
+            'const browserStartup = createStartupDiagnostics();\nconst nativeProfile = createNativeProfileRuntime({ firefox, startupDiagnostics: browserStartup });\n\nasync function launchBrowserInstance() {\n  if (nativeProfile && (MAX_SESSIONS !== 1 || proxyPool?.canRotateSessions))\n    throw new Error("native_profile_requires_one_fixed_account");',
+          ],
+          [
+            "let candidateBrowser = null;",
+            "let candidateBrowser = null;\n    browserStartup.begin();",
           ],
           [
             "candidateBrowser = await firefox.launch(options);",
-            "candidateBrowser = nativeProfile\n        ? await nativeProfile.launch({ ...options, viewport: null, ...contextIdentityOptions({ hasProxy: !!proxyPool, directIdentity: CONFIG.directIdentity }) })\n        : await firefox.launch(options);",
+            'browserStartup.stage("firefox-launch");\n      candidateBrowser = nativeProfile\n        ? await nativeProfile.launch({ ...options, viewport: null, ...contextIdentityOptions({ hasProxy: !!proxyPool, directIdentity: CONFIG.directIdentity }) })\n        : await firefox.launch(options);\n      browserStartup.stage("publish");',
+          ],
+          [
+            "browser = candidateBrowser; // publish AFTER PID is captured",
+            "browser = candidateBrowser; // publish AFTER PID is captured\n      browserStartup.ready();",
+          ],
+          [
+            "lastError = err;\n      log('warn', 'camoufox launch attempt failed', {",
+            "lastError = err;\n      browserStartup.fail(err);\n      log('warn', 'camoufox launch attempt failed', {",
+          ],
+          [
+            "res.json({ \n    ok: true, \n    engine: 'camoufox',",
+            "res.json({ \n    ok: true, \n    engine: 'camoufox',\n    startup: browserStartup.read(),",
           ],
           [
             "async function getSession(userId, { trace = false } = {}) {",
@@ -67,7 +83,7 @@ export function patchNativeProfileSource(file, source) {
     result = result.replace(before, after);
   }
   if (file === "server.js")
-    result = `import { createNativeProfileRuntime, nativeProfileWindowSize } from "./ftrade-native-profile.mjs";\n${result}`;
+    result = `import { createNativeProfileRuntime, nativeProfileWindowSize } from "./ftrade-native-profile.mjs";\nimport { createStartupDiagnostics } from "./ftrade-startup-diagnostics.mjs";\n${result}`;
   return result;
 }
 export async function patchNativeProfile(root) {

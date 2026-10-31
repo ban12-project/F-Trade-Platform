@@ -35,6 +35,9 @@ try {
     await new Promise((r) => setTimeout(r, 1000));
   }
   await req("/start", {});
+  const startup = (await req("/health")).startup;
+  if (startup?.stage !== "publish" || startup.status !== "ready" || startup.code !== "unclassified")
+    throw Error("startup_diagnostic_not_ready");
   const manifest = JSON.parse(readFileSync("/data/native-profile-v1/owner.json", "utf8"));
   const hash = createHash("sha256").update(manifest.accountId).digest("hex").slice(0, 32);
   const source = readFileSync(`/data/profiles/${hash}/storage-state.json`);

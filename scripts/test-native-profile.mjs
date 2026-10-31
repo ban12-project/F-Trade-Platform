@@ -12,6 +12,7 @@ import {
   nativeProfileWindowSize,
 } from "../ops/browser-node/native-profile.mjs";
 import { patchNativeProfileSource } from "../ops/browser-node/patch-native-profile.mjs";
+import { createStartupDiagnostics } from "../ops/browser-node/startup-diagnostics.mjs";
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "ftrade-native-"));
@@ -33,9 +34,10 @@ async function fixture(t) {
     },
   };
   let lastOptions;
-  const runtime = (environment = {}) =>
+  const runtime = (environment = {}, startupDiagnostics) =>
     createNativeProfileRuntime({
       root,
+      startupDiagnostics,
       environment: {
         FTRADE_NATIVE_PROFILE: "1",
         FTRADE_PROFILE_ACCOUNT_ID: accountId,
@@ -89,6 +91,18 @@ test("startup refuses missing profile; explicit initialization cannot overwrite 
   await r.launch(options);
   assert.equal(await r.contextFor(f.accountId), f.context);
   assert.equal(f.counts().imports, 0);
+});
+test("native startup reports profile validation separately from the Firefox launch", async (t) => {
+  const f = await fixture(t);
+  const diagnostics = createStartupDiagnostics();
+  diagnostics.begin();
+  await assert.rejects(f.runtime({}, diagnostics).launch({}));
+  assert.equal(diagnostics.read().stage, "profile-check");
+  assert.equal(f.counts().launches, 0);
+  await f.initialize("empty");
+  await f.runtime({}, diagnostics).launch({});
+  assert.equal(diagnostics.read().stage, "firefox-launch");
+  assert.equal(f.counts().launches, 1);
 });
 test("profile ownership and live leases are mandatory", async (t) => {
   const f = await fixture(t);
