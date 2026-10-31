@@ -54,8 +54,9 @@ import {
 } from "./publication";
 import { sealBrowserSandboxKey } from "./sandbox-credentials";
 import { cancelInvalidManualSandboxStart } from "./sandbox-dispatch";
-import { registerBrowserSandbox, type SandboxLifecycle } from "./sandbox-lifecycle";
+import type { SandboxLifecycle } from "./sandbox-lifecycle";
 import { enqueueManualBrowserSandboxStart } from "./sandbox-outbox";
+import { rejectRetiredSandboxExecution } from "./sandbox-retired";
 import { accessKeyNodeId, createAccessKey, digest, matches, secureOrigin } from "./security";
 
 type NodeRow = {
@@ -206,10 +207,8 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
   return getDatabase().transaction(async (tx) => {
     if (!(await validSession(tx, actor.id, actor.sessionId, Date.now())))
       throw new Error("owner_session_expired");
-    if (command.operation === "create" || command.operation === "create-sandbox") {
-      const managed = command.operation === "create-sandbox";
-      if (managed && process.env.BROWSER_SANDBOX_ENABLED !== "1")
-        throw new Error("sandbox_deployment_not_enabled");
+    if (command.operation === "create-sandbox") rejectRetiredSandboxExecution();
+    if (command.operation === "create") {
       // Serialize this owner's node quota across concurrent creation requests.
       await tx.execute(sql`SELECT id FROM "user" WHERE id = ${actor.id} FOR UPDATE`);
       const count = await tx.execute(
@@ -219,27 +218,16 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       const id = randomUUID();
       const accessKey = createAccessKey(id);
       const { name } = command.value;
-      const gatewayOrigin =
-        command.operation === "create" ? secureOrigin(command.value.gatewayOrigin) : null;
-      const limits =
-        command.operation === "create"
-          ? {
-              maxBrowsers: command.value.maxBrowsers,
-              memoryBudgetMb: command.value.memoryBudgetMb,
-              browserMemoryMb: command.value.browserMemoryMb,
-            }
-          : { maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 };
+      const gatewayOrigin = secureOrigin(command.value.gatewayOrigin);
+      const limits = {
+        maxBrowsers: command.value.maxBrowsers,
+        memoryBudgetMb: command.value.memoryBudgetMb,
+        browserMemoryMb: command.value.browserMemoryMb,
+      };
       await tx.execute(sql`INSERT INTO browser_fleet_node (id, owner_id, name, gateway_origin, key_hash, document)
         VALUES (${id}, ${actor.id}, ${name}, ${gatewayOrigin}, ${digest(accessKey)}, ${JSON.stringify(initialState(limits))}::jsonb)`);
-      if (managed) {
-        await registerBrowserSandbox(tx, id);
-        const ciphertext = sealBrowserSandboxKey(id, accessKey, configuredFacebookKeyring());
-        await tx.execute(
-          sql`UPDATE browser_sandbox SET access_key_ciphertext = ${ciphertext} WHERE node_id = ${id}`,
-        );
-      }
       await audit(tx, actor.id, "browser_node.created", id);
-      return managed ? { nodeId: id } : { nodeId: id, accessKey };
+      return { nodeId: id, accessKey };
     }
     const nodeId = command.operation === "grant" ? command.value.nodeId : command.nodeId;
     const row = await lockNode(tx, nodeId);

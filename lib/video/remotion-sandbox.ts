@@ -1,9 +1,10 @@
 import "server-only";
 
 import { existsSync } from "node:fs";
+import { lstat, readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { addBundleToSandbox, createSandbox, renderMediaOnVercel } from "@remotion/vercel";
+import { VpsCompute, vpsComputeEnabled } from "../compute/vps";
 import { videoProbeEntries } from "./encoding-contract";
 import { parseFfprobeOutput } from "./media-probe";
 import { createRemotionCompositionProps } from "./remotion-props";
@@ -14,41 +15,7 @@ type SignedSources = ReadonlyMap<string, SandboxVideoSource>;
 
 export const remotionCompositionId = "AbcdIndustrialVertical";
 
-async function sandboxCommand(
-  sandbox: Awaited<ReturnType<typeof createSandbox>>,
-  executable: string,
-  args: string[],
-) {
-  const result = await sandbox.runCommand({ cmd: executable, args, cwd: "/vercel/sandbox" });
-  if (result.exitCode !== 0)
-    throw new Error((await result.stderr()).trim().slice(0, 1_000) || `${executable} 执行失败。`);
-  return result.stdout();
-}
-
-async function findSandboxExecutable(
-  sandbox: Awaited<ReturnType<typeof createSandbox>>,
-  name: "ffprobe",
-) {
-  const matches = (
-    await sandboxCommand(sandbox, "find", [
-      "/vercel/sandbox/node_modules",
-      "-type",
-      "f",
-      "-name",
-      name,
-    ])
-  )
-    .split("\n")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const executable = matches.find((value) =>
-    /^\/vercel\/sandbox\/node_modules\/.+\/ffprobe$/.test(value),
-  );
-  if (!executable) throw new Error("Remotion Sandbox 缺少 ffprobe，无法执行成片验收。");
-  return executable;
-}
-
-/** Renders the governed ABCD composition inside an ephemeral Vercel Sandbox. */
+/** Renders the governed ABCD composition inside an ephemeral offline VPS container. */
 export async function renderMarketingTimelineWithRemotion(
   request: VideoRenderRequest,
   sources: SignedSources,
@@ -58,41 +25,80 @@ export async function renderMarketingTimelineWithRemotion(
   if (!existsSync(bundleDir))
     throw new Error("Remotion 合成包不存在；部署前必须运行 build:remotion。");
   const inputProps = createRemotionCompositionProps(request, sources, productName);
-  const sandbox = await createSandbox({
-    timeoutInMilliseconds: 10 * 60 * 1_000,
-    resources: { vcpus: Number(process.env.VIDEO_SANDBOX_VCPUS ?? 2) },
-  });
-  try {
-    await addBundleToSandbox({ sandbox, bundleDir });
-    const rendered = await renderMediaOnVercel({
-      sandbox,
-      compositionId: remotionCompositionId,
-      inputProps: inputProps as unknown as Record<string, unknown>,
-      codec: "h264",
-      audioCodec: "aac",
-      pixelFormat: "yuv420p",
-      colorSpace: "bt709",
-      crf: 18,
-      enforceAudioTrack: true,
-      outputFile: "/vercel/sandbox/output.mp4",
-      timeoutInMilliseconds: 8 * 60 * 1_000,
+  vpsComputeEnabled();
+  return renderRemotionOnVps(bundleDir, inputProps, sources);
+}
+
+/** Upload this deployment's exact bundle. A renderer image update must not
+ * silently render an old composition from a separately baked bundle. */
+async function uploadBundle(runtime: VpsCompute, localRoot: string) {
+  let total = 0;
+  let files = 0;
+  async function visit(relative: string) {
+    const directory = resolve(localRoot, relative);
+    await runtime.fs.mkdir(`/vercel/sandbox/work/bundle${relative ? `/${relative}` : ""}`, {
+      recursive: true,
     });
-    const ffprobe = await findSandboxExecutable(sandbox, "ffprobe");
-    const probe = parseFfprobeOutput(
-      JSON.parse(
-        await sandboxCommand(sandbox, ffprobe, [
-          "-v",
-          "error",
-          "-show_entries",
-          videoProbeEntries,
-          "-of",
-          "json",
-          rendered.sandboxFilePath,
-        ]),
-      ),
-    );
-    return { data: new Uint8Array(await sandbox.fs.readFile(rendered.sandboxFilePath)), probe };
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (!/^[a-zA-Z0-9_.-]+$/.test(entry.name)) throw new Error("remotion_bundle_path_invalid");
+      const path = relative ? `${relative}/${entry.name}` : entry.name;
+      if (entry.isSymbolicLink()) throw new Error("remotion_bundle_symlink_rejected");
+      if (entry.isDirectory()) await visit(path);
+      else if (entry.isFile()) {
+        const absolute = resolve(localRoot, path);
+        const info = await lstat(absolute);
+        total += info.size;
+        if (++files > 2000 || total > 128 * 1024 * 1024) throw new Error("remotion_bundle_limit");
+        await runtime.fs.writeFile(`/vercel/sandbox/work/bundle/${path}`, await readFile(absolute));
+      } else throw new Error("remotion_bundle_file_invalid");
+    }
+  }
+  await visit("");
+}
+
+async function renderRemotionOnVps(
+  bundleDir: string,
+  inputProps: ReturnType<typeof createRemotionCompositionProps>,
+  sources: SignedSources,
+) {
+  const runtime = await VpsCompute.create();
+  try {
+    await uploadBundle(runtime, bundleDir);
+    const localSources = new Map<string, string>();
+    for (const [index, source] of [...sources.values()].entries()) {
+      if (!/^\.(?:jpg|png|webp|mp4|mov)$/.test(source.extension))
+        throw new Error("remotion_source_extension_invalid");
+      const filename = `media-${index}${source.extension}`;
+      await runtime.download(
+        source.signedGetUrl,
+        source.hostname,
+        `/vercel/sandbox/work/${filename}`,
+      );
+      localSources.set(source.signedGetUrl, `http://127.0.0.1:8765/${filename}`);
+    }
+    const offlineProps = {
+      ...inputProps,
+      clips: inputProps.clips.map((clip) => {
+        const src = localSources.get(clip.src);
+        if (!src) throw new Error("remotion_source_missing");
+        return { ...clip, src };
+      }),
+    };
+    await runtime.fs.writeFile("/vercel/sandbox/work/props.json", JSON.stringify(offlineProps));
+    const rendered = await runtime.runCommand({
+      cmd: "node",
+      args: ["/opt/ftrade-remotion/render.mjs"],
+    });
+    if (rendered.exitCode !== 0) throw new Error("VPS Remotion 渲染失败。");
+    const output = "/vercel/sandbox/work/output.mp4";
+    const inspected = await runtime.runCommand({
+      cmd: "ffprobe",
+      args: ["-v", "error", "-show_entries", videoProbeEntries, "-of", "json", output],
+    });
+    if (inspected.exitCode !== 0) throw new Error("VPS Remotion 成片验收失败。");
+    const probe = parseFfprobeOutput(JSON.parse(await inspected.stdout()));
+    return { data: new Uint8Array(await runtime.fs.readFile(output)), probe };
   } finally {
-    await sandbox.stop().catch(() => undefined);
+    await runtime.stop();
   }
 }

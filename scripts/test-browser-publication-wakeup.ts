@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import {
   authorizeBrowserSandboxStart,
@@ -41,13 +42,13 @@ export async function testPublicationWakeup(
     );
     const read = async () =>
       (await db.execute(sql`SELECT * FROM browser_sandbox WHERE node_id = ${nodeId}`)).rows[0];
-    const operation = (await read()).operation_id as string;
-    assert.ok(operation);
-    assert.equal((await read()).phase, "starting");
+    assert.equal((await read()).operation_id, null);
+    const operation = randomUUID();
+    assert.equal((await read()).phase, "stopped");
     assert.equal(
       (await db.execute(sql`SELECT * FROM browser_sandbox_outbox WHERE node_id = ${nodeId}`)).rows
         .length,
-      1,
+      0,
     );
     assert.equal(
       (await db.execute(sql`SELECT * FROM browser_fleet_publication WHERE job_id = ${jobId}`)).rows
@@ -56,7 +57,7 @@ export async function testPublicationWakeup(
     );
     const authorize = () =>
       db.transaction((tx) => authorizeBrowserSandboxStart(tx, nodeId, operation));
-    assert.ok(await authorize(), "confirmed queued publication authorizes cold start");
+    assert.equal(await authorize(), null, "confirmed publication cannot revive retired provider");
     assert.equal(
       await db.transaction((tx) => authorizeManualSandboxStart(tx, nodeId, operation)),
       null,
@@ -94,19 +95,19 @@ export async function testPublicationWakeup(
     await db.execute(
       sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{publicationScopes}', ${JSON.stringify(scopes)}::jsonb) WHERE id = ${nodeId}`,
     );
-    assert.ok(await authorize());
+    assert.equal(await authorize(), null);
     const claims = await Promise.all(
       Array.from({ length: 4 }, () =>
         db.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operation)),
       ),
     );
-    assert.equal(claims.filter(Boolean).length, 1, "only one provider dispatch claim");
+    assert.equal(claims.filter(Boolean).length, 0, "no retired provider dispatch claim");
     assert.equal(
       await db.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operation)),
       null,
     );
     console.log(
-      "PASS publication cold-start demand: concurrent recovery, current confirmation, grant, scope and at-most-once dispatch",
+      "PASS publication demand: queued publication retained, retired provider restart and credential release refused",
     );
   } finally {
     await db.execute(sql`DELETE FROM browser_fleet_publication WHERE job_id = ${jobId}`);

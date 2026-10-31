@@ -125,6 +125,7 @@ function dependencies(
   change?: () => Promise<void>,
   badProvider = "",
   badResponse = "",
+  gatewayOrigin = "https://synthetic-node.vercel.run",
 ) {
   const calls = { provider: 0, ticket: 0, request: 0 };
   const value = {
@@ -154,7 +155,7 @@ function dependencies(
     async request(input: string | URL | Request, init?: RequestInit) {
       calls.request++;
       assert(init);
-      assert.equal(String(input), "https://synthetic-node.vercel.run/publication-inspection");
+      assert.equal(String(input), `${gatewayOrigin}/publication-inspection`);
       assert.equal(init.redirect, "error");
       assert.equal(new Headers(init.headers).get("Origin"), "https://synthetic-app.example");
       const body = JSON.parse(String(init.body));
@@ -413,6 +414,42 @@ async function main() {
       await pool.query("DROP TRIGGER synthetic_page_inspection_audit_wait ON audit_event");
       await pool.query("DROP FUNCTION synthetic_page_inspection_audit_wait()");
       await pool.end();
+    }
+    const vps = await fixture();
+    const vpsOrigin = "https://synthetic-vps.example";
+    const originalVpsOrigin = process.env.BROWSER_VPS_GATEWAY_ORIGIN;
+    try {
+      await db.execute(sql`DELETE FROM browser_sandbox WHERE node_id=${vps.nodeId}`);
+      await db.execute(
+        sql`UPDATE browser_fleet_node SET gateway_origin=${vpsOrigin} WHERE id=${vps.nodeId}`,
+      );
+      process.env.BROWSER_VPS_GATEWAY_ORIGIN = vpsOrigin;
+      const vpsDeps = dependencies(vps, undefined, "", "", vpsOrigin);
+      const inspected = await inspectOwnedPublicationPage(
+        { nodeId: vps.nodeId, runId: vps.runId },
+        vps.actor,
+        db,
+        vpsDeps.value,
+      );
+      assert(inspected.identityMatched);
+      assert.equal(vpsDeps.calls.provider, 0);
+      assert.equal(vpsDeps.calls.request, 1);
+      scenarios++;
+      process.env.BROWSER_VPS_GATEWAY_ORIGIN = "https://different-vps.example";
+      await assert.rejects(
+        inspectOwnedPublicationPage(
+          { nodeId: vps.nodeId, runId: vps.runId },
+          vps.actor,
+          db,
+          vpsDeps.value,
+        ),
+        /inspection_origin_invalid/,
+      );
+      assert.equal(vpsDeps.calls.request, 1);
+      scenarios++;
+    } finally {
+      if (originalVpsOrigin === undefined) delete process.env.BROWSER_VPS_GATEWAY_ORIGIN;
+      else process.env.BROWSER_VPS_GATEWAY_ORIGIN = originalVpsOrigin;
     }
     console.log(
       `PASS ${scenarios} PostgreSQL page-inspection authorization, origin, late revocation and response-privacy scenarios; no external I/O`,

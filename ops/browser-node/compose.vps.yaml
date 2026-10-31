@@ -1,0 +1,59 @@
+# Dedicated VPS Agent. OpenShip owns public TLS and routes the configured
+# browser origin to host loopback :9400. Do not run the legacy Caddy service.
+name: ftrade-browser-vps
+services:
+  agent:
+    image: ${BROWSER_AGENT_IMAGE:?Set the reviewed immutable local Agent image ID}
+    pull_policy: never
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      io.ftrade.node: ${BROWSER_NODE_ID:?Set the existing platform node ID}
+      io.ftrade.role: agent
+    environment:
+      FTRADE_URL: ${FTRADE_URL:?Set the HTTPS platform origin}
+      BROWSER_NODE_ACCESS_KEY_FILE: /run/secrets/node-key
+      BROWSER_IMAGE: ${BROWSER_IMAGE:?Set the reviewed immutable local browser image ID}
+      BROWSER_NATIVE_PROFILES: ${BROWSER_NATIVE_PROFILES:?Explicitly preserve native profile mode}
+      BROWSER_MANAGED_FACEBOOK_CONFIG_DIR: /run/facebook-config
+      MAX_RUNNING_BROWSERS: "1"
+      BROWSER_MAX_MEMORY_MB: "2048"
+      HOST_RESERVE_MB: ${HOST_RESERVE_MB:-3072}
+      GATEWAY_PORT: "9400"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - type: bind
+        source: ${BROWSER_PRIVATE_DIR:?Set the operator-owned private configuration directory}/node-key
+        target: /run/secrets/node-key
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${BROWSER_PRIVATE_DIR}/facebook
+        target: /run/facebook-config
+        read_only: true
+        bind:
+          create_host_path: false
+      - node-state:/var/lib/browser-node
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
+volumes:
+  # Must be imported and verified before startup; never silently create a fresh
+  # installation identity when moving an established node.
+  node-state:
+    external: true
+    name: ${BROWSER_NODE_STATE_VOLUME:?Set the restored node-state volume name}
