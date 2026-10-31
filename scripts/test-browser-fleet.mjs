@@ -82,6 +82,19 @@ test("a node key cannot register a second independent installation", () => {
   assert.throws(() => bindInstallation(state, "host-b"));
 });
 test("no queued work means no browser allocation", () => assert.equal(claim(fixture()), null));
+test("first-use grant survives pre-ready failures but is consumed before account access", () => {
+  const state = fixture();
+  state.accounts[0].nativeProfileFirstUse = true;
+  enqueue(state);
+  const run = claim(state);
+  assert.ok(renewRun(state, run.id, run.leaseId, false, 1001));
+  assert.equal(state.accounts[0].nativeProfileFirstUse, true);
+  assert.equal(renewRun(state, run.id, "wrong", true, 1002), null);
+  assert.equal(state.accounts[0].nativeProfileFirstUse, true);
+  assert.ok(renewRun(state, run.id, run.leaseId, true, 1003));
+  assert.equal(state.accounts[0].nativeProfileFirstUse, undefined);
+  assert.equal(state.accounts[1].nativeProfileFirstUse, undefined);
+});
 test("slot and memory budgets both constrain allocation", () => {
   const s = fixture(3);
   assert.equal(availableSlots(s, 8192, 3), 2);

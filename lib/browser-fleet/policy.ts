@@ -24,6 +24,9 @@ export type Account = {
   // Older version-1 documents must be reconfigured before their next lease.
   expectedEgressIp?: string;
   enabled: boolean;
+  // Issued only when a new binding is saved; consumed before viewer/login access.
+  // Absence on historical accounts must never imply permission to recreate storage.
+  nativeProfileFirstUse?: true;
   authState: AuthState;
   credentialVersion: number;
   loginCiphertext: string | null;
@@ -327,7 +330,10 @@ export function renewRun(
   )
     return null;
   run.leaseUntil = Math.min(now + LEASE_MS, run.deadline);
-  if (ready) run.status = "running";
+  if (ready) {
+    run.status = "running";
+    delete a.nativeProfileFirstUse;
+  }
   return run;
 }
 export function requestStop(state: FleetState, run: Run) {

@@ -32,29 +32,27 @@ export async function testBrowserLogin(
     accountRef = randomUUID();
   const username = "synthetic-login@example.invalid",
     password = "  SYNTHETIC-vault-secret  ";
-  await ownerBrowserCommand(
-    {
-      operation: "grant",
-      value: {
-        nodeId,
-        channelRef,
-        accountRef,
-        expectedEgressIp: "203.0.113.10",
-        pollSeconds: 0,
-        credentials: {
-          loginUsername: username,
-          loginPassword: password,
-          proxyHost: "synthetic-proxy.example.invalid",
-          proxyPort: "3128",
-          proxyUsername: "",
-          proxyPassword: "",
-          clearLogin: false,
-          clearProxy: false,
-        },
+  const grantCommand = {
+    operation: "grant",
+    value: {
+      nodeId,
+      channelRef,
+      accountRef,
+      expectedEgressIp: "203.0.113.10",
+      pollSeconds: 0,
+      credentials: {
+        loginUsername: username,
+        loginPassword: password,
+        proxyHost: "synthetic-proxy.example.invalid",
+        proxyPort: "3128",
+        proxyUsername: "",
+        proxyPassword: "",
+        clearLogin: false,
+        clearProxy: false,
       },
     },
-    owner,
-  );
+  } as const;
+  await ownerBrowserCommand(grantCommand, owner);
   const state = async () => {
     const value = await database.execute(
       sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`,
@@ -66,6 +64,7 @@ export async function testBrowserLogin(
       sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(value)}::jsonb WHERE id = ${nodeId}`,
     );
   const accountId = (await state()).accounts[0].id;
+  assert.equal((await state()).accounts[0].nativeProfileFirstUse, true);
   const identity = { installationId: randomUUID(), bootId: randomUUID() };
   const call = (value: Record<string, unknown>) =>
     handleBrowserNodeRequest(accessKey, { ...identity, ...value });
@@ -78,6 +77,7 @@ export async function testBrowserLogin(
         ? { loginFillScopes: [{ channelRef, accountRef, expiresAt: Date.now() + 3600000 }] }
         : {}),
     });
+  let firstUse = true;
   const start = async () => {
     const opened = await ownerBrowserCommand({ operation: "open", nodeId, accountId }, owner);
     const claim = await call({
@@ -86,8 +86,9 @@ export async function testBrowserLogin(
       availableMemoryMb: 4096,
       localSlots: 1,
     });
-    const run = claim.run as { id: string; leaseId: string };
+    const run = claim.run as { id: string; leaseId: string; initializeNativeProfile?: true };
     assert.equal(run.id, opened.runId);
+    assert.equal(run.initializeNativeProfile, firstUse ? true : undefined);
     assert.equal(JSON.stringify(claim).includes(password), false);
     const heartbeat = () =>
       call({ operation: "heartbeat", runId: run.id, leaseId: run.leaseId, ready: true });
@@ -98,6 +99,8 @@ export async function testBrowserLogin(
       );
     await assert.rejects(authorize, /saved_login_unavailable/);
     assert.equal((await heartbeat()).loginAuthorization, undefined);
+    assert.equal((await state()).accounts[0].nativeProfileFirstUse, undefined);
+    firstUse = false;
     await assert.rejects(authorize, /saved_login_unavailable/);
     const ticket = await ownerBrowserCommand({ operation: "ticket", nodeId, runId: run.id }, owner);
     assert.ok(ticket.connection);
@@ -120,6 +123,12 @@ export async function testBrowserLogin(
   const unavailable = await start();
   await assert.rejects(unavailable.authorize, /saved_login_unavailable/);
   await unavailable.finish();
+  await ownerBrowserCommand(grantCommand, owner);
+  assert.equal(
+    (await state()).accounts[0].nativeProfileFirstUse,
+    undefined,
+    "editing a saved account must not reauthorize empty-profile initialization",
+  );
   await recover(true);
   const current = await start();
   const otherSession = randomUUID();

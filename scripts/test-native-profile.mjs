@@ -90,6 +90,64 @@ test("startup refuses missing profile; explicit initialization cannot overwrite 
   assert.equal(await r.contextFor(f.accountId), f.context);
   assert.equal(f.counts().imports, 0);
 });
+test("broker-authorized first use initializes empty storage and later starts retain it", async (t) => {
+  const f = await fixture(t);
+  const r = f.runtime({ FTRADE_NATIVE_PROFILE_FIRST_USE: "1" });
+  await r.launch({});
+  const ownerPath = join(f.root, "native-profile-v1", "owner.json");
+  const owner = await readFile(ownerPath, "utf8");
+  assert.deepEqual(JSON.parse(owner), {
+    version: 1,
+    accountId: f.accountId,
+    nodeId: f.nodeId,
+    source: "empty",
+    legacyDigest: null,
+    imported: true,
+  });
+  const retained = join(f.root, "native-profile-v1", "firefox", "synthetic-history");
+  await writeFile(retained, "retained");
+  await f.context.close();
+  await f.runtime().launch({});
+  assert.equal(await readFile(retained, "utf8"), "retained");
+  assert.equal(await readFile(ownerPath, "utf8"), owner);
+  await f.context.close();
+  await rm(join(f.root, "native-profile-v1"), { recursive: true });
+  await assert.rejects(r.launch({}));
+  await assert.rejects(f.runtime().launch({}));
+});
+test("first-use authorization cannot overwrite nonempty or partial storage", async (t) => {
+  const f = await fixture(t);
+  await writeFile(join(f.root, "historical-marker"), "retain");
+  await assert.rejects(f.runtime({ FTRADE_NATIVE_PROFILE_FIRST_USE: "1" }).launch({}));
+  assert.equal(await readFile(join(f.root, "historical-marker"), "utf8"), "retain");
+  assert.equal(f.counts().launches, 0);
+  await mkdir(join(f.root, "native-profile-v1"), { mode: 0o700 });
+  await assert.rejects(f.runtime({ FTRADE_NATIVE_PROFILE_FIRST_USE: "1" }).launch({}));
+  assert.equal(f.counts().launches, 0);
+});
+test("first-use authorization still requires a live lease and matching existing owner", async (t) => {
+  const f = await fixture(t);
+  await f.initialize("empty");
+  await assert.rejects(
+    f
+      .runtime({ FTRADE_NATIVE_PROFILE_FIRST_USE: "1", FTRADE_PROFILE_NODE_ID: randomUUID() })
+      .launch({}),
+    /manifest_invalid/,
+  );
+  const empty = await fixture(t);
+  empty.expire();
+  await assert.rejects(
+    empty.runtime({ FTRADE_NATIVE_PROFILE_FIRST_USE: "1" }).launch({}),
+    /lease_expired/,
+  );
+  await empty.initialize("empty"); // expired startup made no partial directory
+});
+test("concurrent initializers cannot replace each other's owner manifest", async (t) => {
+  const f = await fixture(t);
+  const outcomes = await Promise.allSettled([f.initialize("empty"), f.initialize("empty")]);
+  assert.equal(outcomes.filter((x) => x.status === "fulfilled").length, 1);
+  await f.runtime().launch({});
+});
 test("profile ownership and live leases are mandatory", async (t) => {
   const f = await fixture(t);
   await f.initialize("empty");
