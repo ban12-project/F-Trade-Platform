@@ -397,6 +397,7 @@ async function grant(
       accountRef,
       channelRef,
       enabled: true,
+      nativeProfileFirstUse: true,
       authState: "needs_login",
       credentialVersion: 0,
       loginCiphertext: null,
@@ -560,6 +561,9 @@ async function nodeOperation(
           ? { publication, publicationDigest: digestSocialWorkerPayload(publication) }
           : {}),
         accountId: account.id,
+        ...(run.kind === "interactive" && account.nativeProfileFirstUse === true
+          ? { initializeNativeProfile: true }
+          : {}),
         accountRef: account.accountRef,
         channelRef: account.channelRef,
         expectedEgressIp: account.expectedEgressIp,

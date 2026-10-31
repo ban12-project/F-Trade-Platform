@@ -37,12 +37,17 @@ try {
   await req("/start", {});
   const manifest = JSON.parse(readFileSync("/data/native-profile-v1/owner.json", "utf8"));
   const hash = createHash("sha256").update(manifest.accountId).digest("hex").slice(0, 32);
-  const source = readFileSync(`/data/profiles/${hash}/storage-state.json`);
-  if (
-    !manifest.imported ||
-    createHash("sha256").update(source).digest("hex") !== manifest.legacyDigest
-  )
-    throw Error("migration_manifest_or_original_changed");
+  if (process.env.SYNTHETIC_NEW_PROFILE === "1") {
+    if (manifest.source !== "empty" || manifest.legacyDigest !== null || !manifest.imported)
+      throw Error("first_use_manifest_invalid");
+  } else {
+    const source = readFileSync(`/data/profiles/${hash}/storage-state.json`);
+    if (
+      !manifest.imported ||
+      createHash("sha256").update(source).digest("hex") !== manifest.legacyDigest
+    )
+      throw Error("migration_manifest_or_original_changed");
+  }
   const mode = process.argv[2];
   const userId = "22222222-2222-4222-8222-222222222222";
   const t = await req("/tabs", {

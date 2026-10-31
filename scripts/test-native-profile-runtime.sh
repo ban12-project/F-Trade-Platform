@@ -13,13 +13,17 @@ cleanup() {
   if [[ "$result" != 0 ]]; then docker logs --tail 80 "$name" >&2 || true; fi
   docker rm -f "$name" >/dev/null 2>&1 || true
   docker volume rm "$volume" >/dev/null 2>&1 || true
+  exit "$result"
 }
 trap cleanup EXIT
 # This is synthetic storage only. Never point this fixture at an account volume.
 docker volume create "$volume" >/dev/null
-docker run --rm --network none -v "$volume:/data" \
-  -v "$fixture:/app/plugins/synthetic-profile:ro" --entrypoint node "$NATIVE_PROFILE_IMAGE" \
-  /app/plugins/synthetic-profile/initialize.mjs
+first_use=${NATIVE_PROFILE_FIRST_USE:-0}
+if [[ "$first_use" != 1 ]]; then
+  docker run --rm --network none -v "$volume:/data" \
+    -v "$fixture:/app/plugins/synthetic-profile:ro" --entrypoint node "$NATIVE_PROFILE_IMAGE" \
+    /app/plugins/synthetic-profile/initialize.mjs
+fi
 start() {
   local deadline=$(( $(date +%s) * 1000 + 90000 ))
   docker run -d --name "$name" --network none --read-only --init \
@@ -35,6 +39,8 @@ start() {
     -v "$fixture/camofox.config.json:/app/camofox.config.json:ro" \
     -e ENABLE_VNC=1 -e VNC_RESOLUTION=1440x900 -e VNC_BIND=127.0.0.1 -e VNC_PASSWORD=native41 \
     -e FTRADE_NATIVE_PROFILE=1 \
+    -e "FTRADE_NATIVE_PROFILE_FIRST_USE=$first_use" \
+    -e "SYNTHETIC_NEW_PROFILE=${NATIVE_PROFILE_FIRST_USE:-0}" \
     -e FTRADE_PROFILE_ACCOUNT_ID=22222222-2222-4222-8222-222222222222 \
     -e FTRADE_PROFILE_NODE_ID=11111111-1111-4111-8111-111111111111 \
     -e "FTRADE_LEASE_DEADLINE=$deadline" \
@@ -58,6 +64,7 @@ JS
 test "$(docker inspect --format '{{.State.Running}}' "$name")" = false
 test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
 docker rm "$name" >/dev/null
+first_use=0 # later tasks must retain the profile without initialization authority
 start
 docker exec "$name" node /app/plugins/synthetic-profile/client.mjs read keep-session
 # Observe actual X11 geometry as well as Firefox persisted geometry.
@@ -73,5 +80,5 @@ const w=d["chrome://browser/content/browser.xhtml"]["main-window"];
 console.log("Persisted synthetic window geometry:", JSON.stringify(w));
 assert.ok(Number(w.width)>0 && Number(w.width)<=1440, "window exceeds remote desktop width");
 assert.ok(Number(w.height)>0 && Number(w.height)<=900, "window exceeds remote desktop height");
-console.log("PASS oversized persistent window fitted; profile cookie and nonextractable key preserved");'
+console.log("PASS persistent window within bounds; profile cookie and nonextractable key preserved");'
 printf 'PASS: native profile API task reuse, container replacement and expired lease shutdown\n'

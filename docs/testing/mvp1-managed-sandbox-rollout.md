@@ -40,11 +40,23 @@ Keep the node's dispatch exclusion active throughout maintenance. If an operator
 
 ## First native profile for a new account
 
-Native-profile mode is enabled per node, but storage is initialized per account.
-Saving account authorization does not initialize Firefox storage. A new account
-without an owner manifest cannot pass browser health; queuing it repeatedly will
-not repair that condition. Runtime startup deliberately refuses to create a
-replacement for a missing historical profile.
+Native-profile mode is enabled per node; storage belongs to each account. Newly
+saved bindings receive a server-owned first-use grant. An authorized interactive
+claim carries that grant to the native runtime. The Agent verifies the Docker
+volume's returned node/account labels; the runtime initializes only a completely
+empty volume, with a live lease and exclusive directory creation. It does not
+submit credentials or change login-review scopes. The first ready heartbeat
+consumes the grant before issuing viewer access or login authorization. Updating
+an existing account never reissues it. A pre-ready failure may retain the grant,
+but nonempty or partial storage is never overwritten, and a runtime instance
+checks initialization only once.
+
+Historical bindings without that grant continue to require an existing profile.
+Missing historical storage, mismatched volume labels, partial initialization and
+invalid manifests fail closed. Do not reset them or infer a new account solely
+from a missing directory. Existing newly added accounts from before this rollout
+can use the reviewed maintenance procedure below after independent first-use
+checks; they are not automatically reclassified.
 
 For an explicitly new account only, verify ownership, zero prior connected runs,
 no live/queued leases, and an existing, empty account volume with matching node

@@ -10,11 +10,17 @@ import {
   createConnectionDiagnostics,
   register as registerDiagnostics,
 } from "../ops/browser-node/diagnostics-plugin/index.js";
-import { containerSpec, dockerClient, stopContainer } from "../ops/browser-node/docker.mjs";
+import {
+  containerSpec,
+  dockerClient,
+  ensureAccountVolume,
+  stopContainer,
+} from "../ops/browser-node/docker.mjs";
 import { waitForBrowserReady } from "../ops/browser-node/egress.mjs";
 import { awaitVideoPreview } from "../ops/browser-node/facebook-driver.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
 import { viewerGraceExpired } from "../ops/browser-node/idle.mjs";
+import { describeBrowserLaunchFailure } from "../ops/browser-node/launch-diagnostics.mjs";
 import { localDeadline, localLoginAuthorizationDeadline } from "../ops/browser-node/lease.mjs";
 import {
   configureLoginRuntime,
@@ -216,6 +222,46 @@ test("each account gets a stable distinct volume; runs get fresh containers", ()
   assert.notEqual(a.volume, c.volume);
   assert.notEqual(a.accessKey, b.accessKey);
   assert.notEqual(a.vncPassword, b.vncPassword);
+});
+test("first-use initialization is scoped to explicitly authorized native interactive runs", () => {
+  const env = (extra, native = true) =>
+    containerSpec(nodeId, { ...run, ...extra }, "sha256:reviewed", Date.now() + 60000, native).body
+      .Env;
+  const marker = "FTRADE_NATIVE_PROFILE_FIRST_USE=1";
+  assert.ok(env({ kind: "interactive", initializeNativeProfile: true }).includes(marker));
+  assert.ok(!env({ kind: "interactive" }).includes(marker));
+  assert.ok(!env({ kind: "publish", initializeNativeProfile: true }).includes(marker));
+  assert.ok(!env({ kind: "interactive", initializeNativeProfile: true }, false).includes(marker));
+  assert.throws(
+    () => env({ kind: "interactive", initializeNativeProfile: "true" }),
+    /initialization_invalid/,
+  );
+});
+test("existing account volumes require returned ownership, not requested labels", async () => {
+  const name = `ftbrowser-${nodeId}-${accountId}`;
+  const valid = {
+    Name: name,
+    Labels: { "io.ftrade.node": nodeId, "io.ftrade.account": accountId },
+  };
+  await ensureAccountVolume(async () => valid, nodeId, accountId, name);
+  for (const invalid of [
+    null,
+    { Name: name },
+    { ...valid, Name: "other" },
+    { ...valid, Labels: { ...valid.Labels, "io.ftrade.account": randomUUID() } },
+    { ...valid, Labels: { ...valid.Labels, "io.ftrade.node": randomUUID() } },
+  ]) {
+    await assert.rejects(
+      ensureAccountVolume(async () => invalid, nodeId, accountId, name),
+      (error) => {
+        assert.equal(
+          describeBrowserLaunchFailure("volume", error).code,
+          "native_profile_volume_owner_mismatch",
+        );
+        return /owner_mismatch/.test(error.message);
+      },
+    );
+  }
 });
 test("browser runtime cannot access the host Docker socket or choose a mount", () => {
   const { body } = containerSpec(nodeId, run, "sha256:reviewed", Date.now() + 60_000);

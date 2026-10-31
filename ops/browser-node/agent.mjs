@@ -6,7 +6,13 @@ import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
 import { checkedBrowserResponse } from "./browser-response.mjs";
-import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
+import {
+  containerSpec,
+  dockerClient,
+  ensureAccountVolume,
+  renewWatchdog,
+  stopContainer,
+} from "./docker.mjs";
 import {
   describeEgressFailure,
   openEgressCheckedSession,
@@ -241,10 +247,7 @@ async function stop(slot, outcome = "failed") {
 async function launch(slot) {
   const spec = slot.spec;
   slot.launchStage = "volume";
-  await docker("POST", "/volumes/create", {
-    Name: spec.volume,
-    Labels: { "io.ftrade.node": nodeId, "io.ftrade.account": slot.run.accountId },
-  });
+  await ensureAccountVolume(docker, nodeId, slot.run.accountId, spec.volume);
   slot.launchStage = "network";
   await docker("POST", "/networks/create", {
     Name: spec.name,
