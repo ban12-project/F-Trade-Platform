@@ -1,5 +1,76 @@
 # Current migration decision — 2026-11-01
 
+## Production cutover and online checkpoint
+
+PR #777 is merged. The VPS release for
+`110311cacdf1a9907d3b8ea5ff6beeb7fce1b207` reached `ready`; the
+[deployment workflow](https://github.com/ban12-project/F-Trade-Platform/actions/runs/41299148441)
+succeeded. Agent and runtime broker are healthy, and the migration drain and
+transaction journal were cleared. Selected immutable images:
+
+- Agent: `sha256:75254ede332b5d0422c11836ff34d625e16f5eaab60b61f1a3fad7d727f377a8`.
+- Browser: `sha256:208638ad62ad71827610b3bba521f9902c78d50a3e3799bf93c095b8d1425008`.
+
+An actual account container confirms official launcher `0.5.9-beta.6`, binary
+`158.0.1-beta.41`, native profile mode, read-only root and read-only GeoIP mount,
+and no installed `camoufox-js`. The independent GeoIP service completed against
+the selected production image after cutover; its hourly timer remains active.
+
+The final quiescent cutover snapshot covers all 11 node-owned account volumes,
+using read-only sources. Its private receipt verifies a 1,618,327,284-byte archive.
+Both the prior runtime image and protected snapshots remain available for rollback.
+Three historical migration archives were copied to protected local storage,
+gzip-validated and SHA-256 matched before deleting only their remote archive
+copies; no live profile volumes were deleted.
+
+Both enabled accounts were then queued through the authenticated production UI.
+Each retained its existing signed-in Facebook session and connected through the
+HTTPS independent-window noVNC Viewer. Harmless account-menu clicks produced the
+expected visible changes. One account also completed the existing automatic
+identity/Messenger observation without requesting password, TOTP or PIN; its empty
+inbox is not evidence of restored historical messages or real DM ingestion. The
+other account's automatic-login page contract is absent or expired, so its evidence
+is the existing authenticated session and manual Viewer, not automatic login.
+Closing and reopening the first Viewer with fresh broker authorization reconnected
+the same session. Explicit application release disconnected its old Viewer. No
+profile reset, credential edit, publication reauthorization, post or DM was made;
+the previously disabled account remained disabled.
+
+Embedded Viewer acceptance remains unverified in the controlled Chrome session:
+the frame stayed at `about:blank` and timed out, while the same gateway's standalone
+window connected. The browser tool reported a paused document response when CDP
+diagnostics were attempted. This suggests a tooling interaction but does not prove
+the cause or establish normal-browser iframe success. Keep that observation under
+#480; do not weaken frame/CSP protections or treat an issued ticket as a connection.
+Independent-window Viewer display, input and reconnect are directly observed.
+Both acceptance runs were explicitly released through the application; the final
+node inventory contains zero account browser containers and the UI has no active
+acceptance run. Agent and broker remain healthy.
+
+The first post-merge GHCR publication run failed on stale gateway-ablation counts,
+not a browser build: the suite had nine cases, while the harness expected seven.
+PR #787 also accounts for the two additional slot-revocation failures when the
+expiry sweep is removed. All nine gateway cases and four isolated ablation variants
+pass locally. The failed run remains recorded; the new publication run is separate
+from the already successful VPS deployment. Its
+[release validation](https://github.com/ban12-project/F-Trade-Platform/actions/runs/41300984838)
+passed, including PostgreSQL and gateway ablations; native image publication was
+still running at this documentation checkpoint. No registry completion is claimed
+by the production receipt.
+
+The actual-proxy checks below establish IPv4 behavior with WebRTC disabled.
+Browser voice/video calling is unavailable by that choice; noVNC uses WebSocket
+and is independently verified. IPv6 connectivity, historical Messenger decryption,
+real DM ingestion and credential-factor recovery are not inferred from this
+migration. Temporary proxy-test credential copies were removed after acceptance;
+production credentials, original volumes and rollback archives remain protected.
+
+The sections below retain chronological implementation checkpoints. Statements
+that production had not switched apply to those earlier checkpoints, not the
+current deployed state.
+
+## Selected scope and initial integration
+
 The owner selected #677: remove jo-inc/camofox-browser and camoufox-js,
 use the official launcher, preserve existing account data and Viewer capability.
 This supersedes the earlier unselected-proposal status. Real publishing and DM
