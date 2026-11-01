@@ -63,6 +63,12 @@ first; an administrator can run the reviewed driver on the host under the releas
 lock to recover, then verify both services and fresh telemetry before clearing a
 drain. Never clear a journal or drain merely to make a receipt green.
 
+`state.json`, service configs, candidate configs and rollback journals contain live
+credentials. Never print them wholesale into tool output or attach them to an issue.
+Read only an explicit allowlist such as revision and image IDs. For ordinary
+release status, use the sanitized receipt below. Private logs also require local
+redaction before any excerpt is shared.
+
 Normal inspection (using the existing administrator SSH key):
 
 ```sh
