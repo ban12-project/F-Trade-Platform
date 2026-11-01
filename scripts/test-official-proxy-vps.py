@@ -109,7 +109,9 @@ def run(image, case):
         docker(['exec', name, 'touch', '/tmp/proxy-start-runtime'])
         wait_marker('runtime-done', 140)
         capture.send_signal(signal.SIGTERM); assert capture.wait(timeout=5) == 0; capture = None
-        docker(['cp', name + ':/tmp/proxy-result.json', str(output / 'probe.json')])
+        # Read through the live mount namespace: Docker archive/cp may omit tmpfs.
+        (output / 'probe.json').write_bytes(docker(['exec', name, 'cat', '/tmp/proxy-result.json']))
+        (output / 'probe.json').chmod(0o600)
         docker(['exec', name, 'touch', '/tmp/proxy-capture-stopped'])
         assert docker(['wait', name], timeout=15).decode().strip() == '0'
         state = json.loads(docker(['inspect', name]))[0]['State']
