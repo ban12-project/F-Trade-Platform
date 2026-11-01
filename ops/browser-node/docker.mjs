@@ -234,6 +234,7 @@ export function containerSpec(
         "CAMOFOX_BIND_HOST=0.0.0.0",
         "CAMOFOX_PORT=9377",
         `CAMOFOX_ACCESS_KEY=${accessKey}`,
+        `FTRADE_RUNTIME_RUN_ID=${run.id}`,
         "ENABLE_VNC=1",
         "VNC_BIND=0.0.0.0",
         "VNC_RESOLUTION=1440x900",
