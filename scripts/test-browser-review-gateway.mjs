@@ -37,9 +37,10 @@ async function fixture(upgradeDelay = 0) {
     vncPort: upstream.address().port,
   };
   const consumed = new Set();
+  const slots = new Map([[slot.run.id, slot]]);
   const gateway = createGateway({
     appOrigin: "https://app.example",
-    slots: new Map([[slot.run.id, slot]]),
+    slots,
     port: 0,
     nodeCall: async (_operation, { ticket }) => {
       if (
@@ -113,6 +114,7 @@ async function fixture(upgradeDelay = 0) {
   }
   return {
     slot,
+    slots,
     gateway,
     port,
     admission,
@@ -143,6 +145,31 @@ test("live authorized tunnel connects; the same websocket capability cannot repl
     f.close();
   }
 });
+
+for (const change of ["removed", "replaced"]) {
+  test(`a ${change} slot revokes its established tunnel even when the old lease is live`, async () => {
+    const f = await fixture();
+    const client = f.connect();
+    try {
+      assert.equal(await client.connected, true);
+      assert.ok(f.slot.expiresAt > Date.now());
+      if (change === "removed") f.slots.delete(f.slot.run.id);
+      else f.slots.set(f.slot.run.id, { ...f.slot });
+      await delay(700);
+      assert.equal(client.closed, true, "old slot identity must lose its live tunnel");
+      const asset = await fetch(`http://127.0.0.1:${f.port}${f.admission.module}`);
+      assert.equal(asset.status, 403);
+      await asset.text();
+      const replay = f.connect();
+      assert.equal(await replay.connected, false);
+      replay.destroy();
+      assert.equal(f.upgrades, 1, "revoked capability must not reach upstream again");
+    } finally {
+      client.destroy();
+      f.close();
+    }
+  });
+}
 test("wrong origin cannot upgrade even with a valid websocket capability", async () => {
   const f = await fixture();
   const a = f.connect("https://untrusted.example");
