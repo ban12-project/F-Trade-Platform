@@ -12,6 +12,10 @@
 [ADR 0011](../decisions/0011-remove-pitr-acceptance.md)。该项移出范围，不记为通过，
 不再作为待授权、延期事项或 Go/No-Go 阻塞项；到期删除与副本政策继续有效。
 
+用户于同日明确要求停止并删除浏览器缩放验收。#391 中的 200% 文本缩放与
+400% 浏览器缩放检查移出 MVP1 范围，不再执行、等待或作为验收阻塞项；
+这是删除要求，不是将检查记为通过。历史缩放观察不构成重新开启要求的依据。
+
 | 工作 | 当前证据／下一完成条件 |
 | --- | --- |
 | 新账号首次初始化 #718 | PR #719/#748 已投产，空目录、持久化与隔离专项测试通过；[11 月 1 日正常 UI 验收](reports/native-profile-live-startup-20261101.md)已验证现有新账号进入运行中、实际远程桌面连接及正常释放。该账号配置在本轮前已存在，不把这次恢复写成空目录初始化；登录规则／身份与发布／DM 另行验收 |
@@ -19,7 +23,7 @@
 | 同批业务闭环与 Go/No-Go #26/#32 | 保留既有领域实现和合成测试；真实业务样本、人工报价／交期、商机认定和最终人工决定仍待独立验收 |
 | 到期删除与副本清除 #122 | [11 月 1 日 Neon 只读核对](reports/m2-neon-retention-checkpoint-20261101.md)：查询的三类对象均未满 90 天，最早年龄到期日为 12 月 17 日；当前部署端点重新匹配和真实删除／副本清除证据仍缺失；PITR 验收已按 ADR 0011 移出范围 |
 | 目标路径规则／平台接受 #318 | 保留来源审计；实际平台接受与发布一同延后，导出预设不作为接受证据 |
-| 实机和辅助技术 #391 | 用户 11 月 1 日确认暂无 iOS/Android 实机；实际设备、屏幕阅读器、缩放及对比度证据仍待补齐，不以模拟器替代 |
+| 实机和辅助技术 #391 | 用户 11 月 1 日确认暂无 iOS/Android 实机；实际设备、屏幕阅读器及对比度证据仍待补齐，不以模拟器替代 |
 | 恢复最终 CI | 普通 CI 临时例外继续按 #711 执行；最终 MVP1 验收前恢复触发器、严格状态检查并验证最终提交 |
 | 残余依赖与间歇故障 #498/#348/#664/#674 | 按证据修补或记录明确风险；不把后续通过自动解释为历史故障已解决 |
 
@@ -114,7 +118,7 @@ Production 部署 `7467769214` 与 VPS 部署 `7467763632` 均为同一提交且
 | M2 授权真实素材成片 | [真实目录成片验收](reports/m2-real-catalogue-video-acceptance-20261010.md)已完成生产编辑、合成、本次委托审核、私有播放及 MP4／清单一致性 | 目标 Profile 的当前规则适用性和实际平台接受仍待 #126/#318；项目预设 passed 不等于平台接受 |
 | 保留期与受控副本 | 90 天、具名责任与预算已决定；应用执行、来源／历史保护、[实际合成数据库备份恢复](reports/m2-retention-restore-20261015.md)均有证据；Neon 6 小时恢复窗口已盘点 | #122 的真实生产到期对象／Blob 删除、历史副本物理清除和其他未覆盖副本尚未证明；不改写真实时间制造样本，网关日志不重新作为前置 |
 | Sales／RFQ、报价与跟单商机 | 当前领域实现、数据库授权／事务回归和 reference／合成闭环已有证据，见[实现核对](reports/mvp1-implementation-audit-20261006.md)及[reference 汇总](reports/reference-acceptance-20260917.md) | 真实客户 RFQ、人工报价／交期、发送凭据与商机认定仍待业务验收；合成消息、价格或审批不能倒填为真实业务 |
-| 设备与辅助技术 | 自动化 Chromium／WebKit、响应式与权限回归已有证据 | [#391](https://github.com/ban12-project/F-Trade-Platform/issues/391) 的实机、VoiceOver／NVDA、实际缩放／对比度及所声明性能证据尚未完成；仿真不替代实机 |
+| 设备与辅助技术 | 自动化 Chromium／WebKit、响应式与权限回归已有证据 | [#391](https://github.com/ban12-project/F-Trade-Platform/issues/391) 的实机、VoiceOver／NVDA、对比度及所声明性能证据尚未完成；仿真不替代实机 |
 | 依赖与历史故障 | 最新状态见本页 2026-10-31 检查点；以下为历史证据。2026-10-23 PR #657 将 shadcn 的 MCP SDK 定向升级到 1.32.0，最终完整 CI 通过并合并；同轮审计从 0 critical／3 high／2 moderate 降为 0 critical／1 high／0 moderate（braces），见[验证报告](reports/mcp-sdk-security-20261023.md)。已安装 braces 副本有深度防护；原 CSV 失败后已有冻结输入成功及诊断关联 | [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 的独立 CLI 未修补副本与上游发布风险、[#348](https://github.com/ban12-project/F-Trade-Platform/issues/348) 的原间歇原因仍未知；后续成功不改写原失败 |
 | 集成验收与 Go/No-Go | [#26](https://github.com/ban12-project/F-Trade-Platform/issues/26)／[#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 保持 open；受控技术演示已有记录 | 完整实际渠道／业务样本及独立最终决定未完成，不能判 Go |
 
