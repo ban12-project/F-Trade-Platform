@@ -6,7 +6,8 @@
 
 本节取代历史检查点中“当前恢复 DM 验收”的执行指示，不改写当时观察。
 发布／DM 延后不是通过，也不授权新建或替换真实账号。总目标仍为 MVP1
-完整闭环；真实客户、人工报价／交期和最终决定不能由合成记录替代。
+完整闭环。用户随后明确授权模拟 DM 跑完后续销售流程，本轮销售流程按模拟验收推进；
+真实渠道发布／入站仍延期，测试报价与审批不作为正式业务承诺，最终 Go/No-Go 仍由人决定。
 
 用户已于 2026-11-01 明确删除数据库时间点恢复（PITR）验收要求，见
 [ADR 0011](../decisions/0011-remove-pitr-acceptance.md)。该项移出范围，不记为通过，
@@ -20,7 +21,7 @@
 | --- | --- |
 | 新账号首次初始化 #718 | PR #719/#748 已投产，空目录、持久化与隔离专项测试通过；[11 月 1 日正常 UI 验收](reports/native-profile-live-startup-20261101.md)已验证现有新账号进入运行中、实际远程桌面连接及正常释放。该账号配置在本轮前已存在，不把这次恢复写成空目录初始化；登录规则／身份与发布／DM 另行验收 |
 | 当前账号发布与 DM #383/#322 | 按用户要求延后。待发送账号和具体收发授权具备，再验证回执、入站去重、RFQ 关联和冷启动轮询 |
-| 同批业务闭环与 Go/No-Go #26/#32 | 保留既有领域实现和合成测试；真实业务样本、人工报价／交期、商机认定和最终人工决定仍待独立验收 |
+| 同批业务闭环与 Go/No-Go #26/#32 | 用户授权模拟 DM；[11 月 1 日演示](reports/simulated-dm-sales-20261101.md)复用已有 reference 产品，通过生产构建页面完成 DM 需求整理、RFQ、模拟报价审核／登记、交期、六种跟进及 OPPORTUNITY。该项不再等待真实 DM／客户样本；真实渠道与最终人工决定分开保留 |
 | 到期删除与副本清除 #122 | [11 月 1 日 Neon 只读核对](reports/m2-neon-retention-checkpoint-20261101.md)：查询的三类对象均未满 90 天，最早年龄到期日为 12 月 17 日；当前部署端点重新匹配和真实删除／副本清除证据仍缺失；PITR 验收已按 ADR 0011 移出范围 |
 | 目标路径规则／平台接受 #318 | 保留来源审计；实际平台接受与发布一同延后，导出预设不作为接受证据 |
 | 实机和辅助技术 #391 | 用户 11 月 1 日确认暂无 iOS/Android 实机；实际设备、屏幕阅读器及对比度证据仍待补齐，不以模拟器替代 |
@@ -117,16 +118,16 @@ Production 部署 `7467769214` 与 VPS 部署 `7467763632` 均为同一提交且
 | M1 产品资料与事实审核 | [#268](https://github.com/ban12-project/F-Trade-Platform/issues/268)、[#5](https://github.com/ban12-project/F-Trade-Platform/issues/5) 已按 v2 结项：20 槽位中 10 Ready、10 正确阻断，未执行和错误放行均为 0；当前字段证据、图片、审批与受控原件回读已核对 | 不能宣称 20 条全部 Ready；未测 OCR／审核效率继续未知。GitHub M1 里程碑条目本轮读取仍为 open、零 open Issues，不以管理状态否定已完成的这项验收 |
 | M2 授权真实素材成片 | [真实目录成片验收](reports/m2-real-catalogue-video-acceptance-20261010.md)已完成生产编辑、合成、本次委托审核、私有播放及 MP4／清单一致性 | 目标 Profile 的当前规则适用性和实际平台接受仍待 #126/#318；项目预设 passed 不等于平台接受 |
 | 保留期与受控副本 | 90 天、具名责任与预算已决定；应用执行、来源／历史保护、[实际合成数据库备份恢复](reports/m2-retention-restore-20261015.md)均有证据；Neon 6 小时恢复窗口已盘点 | #122 的真实生产到期对象／Blob 删除、历史副本物理清除和其他未覆盖副本尚未证明；不改写真实时间制造样本，网关日志不重新作为前置 |
-| Sales／RFQ、报价与跟单商机 | 当前领域实现、数据库授权／事务回归和 reference／合成闭环已有证据，见[实现核对](reports/mvp1-implementation-audit-20261006.md)及[reference 汇总](reports/reference-acceptance-20260917.md) | 真实客户 RFQ、人工报价／交期、发送凭据与商机认定仍待业务验收；合成消息、价格或审批不能倒填为真实业务 |
+| Sales／RFQ、报价与跟单商机 | 当前领域实现、数据库授权／事务回归和 reference／合成闭环已有证据，见[实现核对](reports/mvp1-implementation-audit-20261006.md)及[reference 汇总](reports/reference-acceptance-20260917.md) | 11 月 1 日已按用户授权完成现有 reference 产品加模拟 DM 的后续流程验收，见上方当前检查点；模拟值保留测试标记，真实渠道与最终 Go/No-Go 未代替 |
 | 设备与辅助技术 | 自动化 Chromium／WebKit、响应式与权限回归已有证据 | [#391](https://github.com/ban12-project/F-Trade-Platform/issues/391) 的实机、VoiceOver／NVDA、对比度及所声明性能证据尚未完成；仿真不替代实机 |
 | 依赖与历史故障 | 最新状态见本页 2026-10-31 检查点；以下为历史证据。2026-10-23 PR #657 将 shadcn 的 MCP SDK 定向升级到 1.32.0，最终完整 CI 通过并合并；同轮审计从 0 critical／3 high／2 moderate 降为 0 critical／1 high／0 moderate（braces），见[验证报告](reports/mcp-sdk-security-20261023.md)。已安装 braces 副本有深度防护；原 CSV 失败后已有冻结输入成功及诊断关联 | [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 的独立 CLI 未修补副本与上游发布风险、[#348](https://github.com/ban12-project/F-Trade-Platform/issues/348) 的原间歇原因仍未知；后续成功不改写原失败 |
-| 集成验收与 Go/No-Go | [#26](https://github.com/ban12-project/F-Trade-Platform/issues/26)／[#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 保持 open；受控技术演示已有记录 | 完整实际渠道／业务样本及独立最终决定未完成，不能判 Go |
+| 集成验收与 Go/No-Go | [#26](https://github.com/ban12-project/F-Trade-Platform/issues/26)／[#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 保持 open；受控技术演示已有记录 | 本轮模拟销售流程已完成；延期的真实渠道及独立最终决定未完成，不能判 Go |
 
 ## 继续工作的条件
 
 1. 发布与 DM 验收当前按用户要求延后，不启动真实发布、私信或入站验收任务。用户恢复后，再按当时授权与当前 VPS 运行手册核对原 profile、身份、固定出口及 ready 状态。自动验证 unknown 不能由页面可见直接改判成功；发送受控私信前须落实具体发送账号、接收账号和消息授权。必要的真人验证和新增认证凭据由账号本人完成，不以重建 profile 或重复登录替代。
 2. 会话门禁通过后，按文字、视频、入站各自审核范围推进；当时存在的逐帖授权须核对具体账号、内容、受众及有效条件。历史 unknown 不重试，人工结案不充作自动回执；入站按已授权受控消息范围及当前复核契约推进；未审核的执行能力继续关闭。
-3. 保留期后续需要实际生产到期／供应商处理证据；本地恢复演练不能替代生产清除。设备与真实业务验收须取得相应实机／具名业务证据，不反复运行已有合成测试来替代。
+3. 保留期后续需要实际生产到期／供应商处理证据；本地恢复演练不能替代生产清除。设备验收仍须取得实机证据；本轮销售流程按用户授权的模拟范围完成，不再要求另交真实 RFQ，最终 Go/No-Go 仍由人决定。
 4. 总验收按[六项指标与 Go/No-Go 模板](mvp-acceptance-report.template.md)形成新的明确批次。2026-10-06 的六项 `not_run` 摘要是当时批次，不能重写为本轮结果，也不能因 M1 或成片已有后续通过就虚构其余样本、计数或最终人工决定。
 
 本页、GitHub Issue 当前检查点和运行手册共同提供入口；历史报告中的“当前”仅指该报告的检查时间。若将来观察发生变化，应追加新证据并更新本页，不静默修改历史失败或扩大旧授权。
