@@ -84,7 +84,7 @@ jobs:
         run: node --test --test-reporter=tap scripts/test-workflow-queue-deadlines.mjs
 
       - name: Verify patched tooling loaders and MCP credential boundaries
-        run: node --test --test-reporter=tap scripts/test-tooling-security-compatibility.mjs
+        run: node --test --test-reporter=tap scripts/test-tooling-security-compatibility.mjs scripts/test-uri-security-compatibility.mjs
 
       - name: Verify locked braces depth guard and real glob compatibility
         run: node --test --test-reporter=tap scripts/test-braces-depth-guard.mjs

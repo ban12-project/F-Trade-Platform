@@ -7,6 +7,10 @@ allowBuilds:
 # Reviewed same-major patches for Workflow's exact pins; see #498.
 # Remove these when the selected upstream runtime pins equivalent patched versions.
 overrides:
+  # Same-major URI/IP parser fixes, verified at actual parent boundaries (#498).
+  'ajv@8.20.0>fast-uri': 3.1.9
+  'socks@2.8.9>ip-address': 10.7.4
+  'express-rate-limit@8.7.0>ip-address': 10.7.4
   '@dotenvx/dotenvx@1.75.1>systeminformation': 5.33.16
   '@workflow/core@4.8.8>devalue': 5.9.3
   '@workflow/core@4.8.8>nanoid': 5.1.16
