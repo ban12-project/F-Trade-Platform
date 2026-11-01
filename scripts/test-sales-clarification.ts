@@ -113,6 +113,22 @@ for (const message of ["500 pcs", "Please quote 500 pieces", "500 pc; 30 days"])
 for (const message of ["OE: SYN-001;", "OEM # SYN-001, please quote", "OE: SYN-001\n"]) {
   assert.equal(applyInquiryMessage(draft, message).product.oe_number, "SYN-001", message);
 }
+for (const reference of ["123 456 7890", "A123 456 78 90", "A 123 456 78 90"]) {
+  assert.equal(
+    applyInquiryMessage(draft, `MOCK clutch disc; OE: ${reference};`).product.oe_number,
+    reference,
+  );
+}
+for (const message of [
+  "OE: 123 456 7890 extra words",
+  "OE: 123 456 7890/987 654 3210",
+  "OE: 123 456 7890.2",
+  "OE: SYN-001 or SYN-002",
+  "OE: SYN-001 500 pcs",
+  "OE:\n123 456 7890",
+]) {
+  assert.equal(applyInquiryMessage(draft, message).product.oe_number, undefined, message);
+}
 const existing = {
   ...draft,
   product: { ...draft.product, oe_number: "SYN-MANUAL" },
