@@ -380,7 +380,7 @@ try {
         "dispose(key, entry);\n    }\n  }, 250);",
         "void entry;\n    }\n  }, 250);",
       ),
-      2,
+      4, // Lease expiry, stopped run, removed slot and replaced slot.
     ],
   ];
   report.gateway = [];
@@ -402,7 +402,7 @@ try {
     const failed = Number(/# fail (\d+)/.exec(run.stdout)?.[1] ?? -1);
     const passed = Number(/# pass (\d+)/.exec(run.stdout)?.[1] ?? -1);
     assert.equal(failed, expectedFailures, `${name}: ${run.stdout}\n${run.stderr}`);
-    assert.equal(passed + failed, 7);
+    assert.equal(passed + failed, 9);
     assert.equal(run.status, expectedFailures ? 1 : 0);
     report.gateway.push({
       variant: name,
