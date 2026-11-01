@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -40,12 +40,35 @@ Path(sys.argv[1]).write_bytes(build_pdf([commands]))
       env: {
         ...process.env,
         VERCEL: "0",
-        PRODUCT_DOCUMENT_SANDBOX_IMAGE: "",
+        // Preflight must remain local even without any remote compute configuration.
+        VPS_RUNTIME_ORIGIN: "",
+        VPS_RUNTIME_TOKEN: "",
+        COMPUTE_PROVIDER: "vps",
         MARKITDOWN_OCR_ENABLED: "0",
         F_TRADE_LOCAL_OCR_ENABLED: "0",
       },
     },
   );
+  // Normal catalog execution must still reject missing VPS configuration,
+  // rather than silently converting locally or reaching model execution.
+  const remote = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "scripts/run-product-agent-catalog.ts", "--document", path],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        VERCEL: "0",
+        COMPUTE_PROVIDER: "vps",
+        VPS_RUNTIME_ORIGIN: "",
+        VPS_RUNTIME_TOKEN: "",
+        MARKITDOWN_PYTHON: "/nonexistent-local-preprocessor",
+      },
+    },
+  );
+  assert.equal(remote.status, 1);
+  assert.match(remote.stderr, /Invalid URL/);
+  assert.equal(remote.stdout, "");
   const report = JSON.parse(output);
   assert.equal(report.candidate_count, 2);
   assert.deepEqual(report.document.layout_recovered_pages, [1]);

@@ -132,13 +132,16 @@ async function main() {
   );
   const timeoutMs =
     positiveInteger("--model-timeout-seconds", option("--model-timeout-seconds", ""), 75) * 1000;
-  const document = await preprocessProductAgentDocument({
-    documentPath,
-    recordId,
-    imageAvailability: "none",
-    imageRefs: [],
-    allowEmptySource: preflight,
-  });
+  const document = await preprocessProductAgentDocument(
+    {
+      documentPath,
+      recordId,
+      imageAvailability: "none",
+      imageRefs: [],
+      allowEmptySource: preflight,
+    },
+    preflight ? "local-preflight" : "vps",
+  );
   const discoveredCandidates = discoverCatalogCandidates(document.source);
   const candidates = selectCatalogCandidates(discoveredCandidates, onlyIdentifiers, limit);
   if (preflight) {
