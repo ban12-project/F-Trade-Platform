@@ -135,7 +135,8 @@ export function checkAdaptiveBudget(
 
 // Both controllers lock the same host-owned inode. A killed controller releases
 // the kernel lock; Docker's created containers are already counted as reserved.
-export async function acquireHostCapacity(docker, memoryMb, env = process.env) {
+export async function acquireHostCapacity(docker, memoryMb, env = process.env, cpuCores = 2) {
+  if (![1, 2].includes(cpuCores)) throw new Error("host_capacity_cpu_invalid");
   const directory = env.FTRADE_HOST_CAPACITY_DIR;
   if (!directory) {
     if (env.FTRADE_HOST_ADAPTIVE === "1") throw new Error("host_capacity_directory_invalid");
@@ -190,7 +191,7 @@ export async function acquireHostCapacity(docker, memoryMb, env = process.env) {
       checkAdaptiveBudget(
         details,
         memoryMb,
-        2,
+        cpuCores,
         await availableMemoryMb(),
         totalmem() / 1048576,
         cpus().length,
@@ -204,5 +205,22 @@ export async function acquireHostCapacity(docker, memoryMb, env = process.env) {
   } catch (error) {
     await release();
     throw error;
+  }
+}
+
+// A smaller reservation is valid only when the worker enforces the same cap.
+// Never downgrade stale telemetry, drain, lock, or other operational failures.
+export async function acquireBrowserCapacity(
+  docker,
+  memoryMb,
+  env = process.env,
+  acquire = acquireHostCapacity,
+) {
+  try {
+    return { release: await acquire(docker, memoryMb, env, 2), cpuCores: 2 };
+  } catch (error) {
+    if (env.FTRADE_HOST_ADAPTIVE !== "1" || error.message !== "host_capacity_exhausted")
+      throw error;
+    return { release: await acquire(docker, memoryMb, env, 1), cpuCores: 1 };
   }
 }

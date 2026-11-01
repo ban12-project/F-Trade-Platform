@@ -146,7 +146,9 @@ export function containerSpec(
   nativeProfile = false,
   maximumMemoryMb = 8192,
   networkMode = "host",
+  cpuCores = 2,
 ) {
+  if (![1, 2].includes(cpuCores)) throw new Error("browser_cpu_limit_invalid");
   if (!["host", "bridge"].includes(networkMode)) throw new Error("agent_network_mode_invalid");
   if (typeof nativeProfile !== "boolean") throw new Error("native_profile_mode_invalid");
   identifier(nodeId);
@@ -246,7 +248,7 @@ export function containerSpec(
         PidsLimit: 512,
         Memory: run.memoryMb * 1024 * 1024,
         MemorySwap: run.memoryMb * 1024 * 1024,
-        NanoCpus: 2_000_000_000,
+        NanoCpus: cpuCores * 1_000_000_000,
         ShmSize: 256 * 1024 * 1024,
         Tmpfs: {
           "/tmp": "rw,nosuid,nodev,size=512m,mode=1777",
