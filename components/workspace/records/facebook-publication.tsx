@@ -1,9 +1,7 @@
+import { listPublishingAccounts } from "@/lib/social/publishing-account-store";
 import "server-only";
 import { hasPermission } from "@/lib/authz";
-import {
-  listFacebookMediaOptions,
-  resolveFacebookMediaSubmissionScope,
-} from "@/lib/social/facebook-media-store";
+import { listFacebookMediaOptions } from "@/lib/social/facebook-media-store";
 import { FacebookMediaPanel } from "../facebook-media-panel";
 
 export function FacebookPublicationPrerequisitesNotice() {
@@ -34,25 +32,15 @@ export async function FacebookPublication({
     return null;
   const options = await listFacebookMediaOptions(projectId, actorId, undefined, contentRef);
   if (!options.length) return null;
-  try {
-    const scope = await resolveFacebookMediaSubmissionScope(actorId);
-    return (
-      <FacebookMediaPanel
-        key={
-          scope.channelRef +
-          ":" +
-          scope.accountRef +
-          ":" +
-          options.map((option) => option.previewDigest).join(":")
-        }
-        projectId={projectId}
-        contentRef={contentRef}
-        options={options}
-        channelRef={scope.channelRef}
-        accountRef={scope.accountRef}
-      />
-    );
-  } catch {
-    return <FacebookPublicationPrerequisitesNotice />;
-  }
+  const accounts = await listPublishingAccounts(undefined, actorId);
+  return (
+    <FacebookMediaPanel
+      projectId={projectId}
+      contentRef={contentRef}
+      options={options}
+      channelRef={accounts[0]?.channelRef ?? ""}
+      accountRef={accounts[0]?.accountRef ?? ""}
+      accounts={accounts}
+    />
+  );
 }

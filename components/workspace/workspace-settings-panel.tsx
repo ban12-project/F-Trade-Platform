@@ -14,8 +14,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useActionState, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,25 +38,18 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  initialAgentSettingsActionState,
-  initialInvitationActionState,
-  initialSocialControlActionState,
-} from "@/lib/action-states";
+import { initialAgentSettingsActionState, initialInvitationActionState } from "@/lib/action-states";
 import { saveProductAgentModelSettingsAction } from "@/lib/actions/agent-settings";
 import { createInvitationAction } from "@/lib/actions/invitations";
-import { saveSocialChannelControlAction } from "@/lib/actions/social-controls";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { authClient } from "@/lib/auth-client";
 import { invitationFormSchema, productAgentModelSettingsSchema } from "@/lib/form-schemas";
-import { socialControlChangeSchema } from "@/lib/social/control-record";
 import { BrowserNodesPanel } from "./browser-nodes-panel";
 import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
 import { FacebookAccountPanel } from "./facebook-account-panel";
+import { PublishingAccountsPanel } from "./publishing-accounts-panel";
 
 type AgentValues = z.infer<typeof productAgentModelSettingsSchema>;
-const socialSchema = socialControlChangeSchema.omit({ actorType: true, actorId: true });
-type SocialValues = z.infer<typeof socialSchema>;
 const newAgentValues: AgentValues = {
   configId: "",
   name: "",
@@ -495,103 +486,6 @@ function AccountSettings({
   );
 }
 
-function ChannelSettings() {
-  const [state, action, pending] = useActionState(
-    saveSocialChannelControlAction,
-    initialSocialControlActionState,
-  );
-  const form = useForm<SocialValues>({
-    resolver: zodResolver(socialSchema),
-    defaultValues: { channelRef: "", accountRef: "", action: "pause", evidenceRef: "" },
-  });
-  useWorkspaceDirty("channel-settings", form.formState.isDirty);
-  useEffect(() => {
-    if (state.status === "success") form.reset(form.getValues());
-  }, [form, state]);
-  function submit(values: SocialValues) {
-    const data = new FormData();
-    for (const [key, value] of Object.entries(values)) data.set(key, value);
-    startTransition(() => action(data));
-  }
-  return (
-    <div className="flex flex-col gap-4">
-      <Alert variant="destructive">
-        <ShieldAlertIcon />
-        <AlertTitle>异常时暂停操作</AlertTitle>
-        <AlertDescription>
-          验证码、2FA、登录失效或结果不确定时必须暂停，不能自动重试。
-        </AlertDescription>
-      </Alert>
-      <Card>
-        <CardHeader>
-          <CardTitle>社交渠道控制</CardTitle>
-          <CardDescription>启用或恢复不会绕过 内容审核和每次发布前的人工确认。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form id="channel-settings" onSubmit={form.handleSubmit(submit)}>
-            <FieldGroup>
-              <Field data-invalid={!!form.formState.errors.channelRef}>
-                <FieldLabel htmlFor="channel-ref">渠道名称</FieldLabel>
-                <Input id="channel-ref" {...form.register("channelRef")} />
-                <FieldError errors={[form.formState.errors.channelRef]} />
-              </Field>
-              <Field data-invalid={!!form.formState.errors.accountRef}>
-                <FieldLabel htmlFor="account-ref">渠道账号</FieldLabel>
-                <Input id="account-ref" {...form.register("accountRef")} />
-                <FieldError errors={[form.formState.errors.accountRef]} />
-              </Field>
-              <Field>
-                <FieldLabel>操作</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="action"
-                  render={({ field }) => (
-                    <Select
-                      items={{ enable: "启用", pause: "暂停", resume: "人工恢复" }}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="enable">启用</SelectItem>
-                          <SelectItem value="pause">暂停</SelectItem>
-                          <SelectItem value="resume">人工恢复</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-              <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                <FieldLabel htmlFor="channel-evidence">操作原因或处理记录</FieldLabel>
-                <Input
-                  id="channel-evidence"
-                  placeholder="例如：已重新登录并完成人工检查"
-                  {...form.register("evidenceRef")}
-                />
-                <FieldError errors={[form.formState.errors.evidenceRef]} />
-              </Field>
-            </FieldGroup>
-          </form>
-        </CardContent>
-        <CardFooter className="flex-col items-stretch gap-3">
-          <Button form="channel-settings" type="submit" disabled={pending}>
-            保存控制状态
-          </Button>
-          {state.message ? (
-            <p className="text-sm text-muted-foreground" aria-live="polite">
-              {state.message}
-            </p>
-          ) : null}
-        </CardFooter>
-      </Card>
-    </div>
-  );
-}
-
 export function WorkspaceSettingsPanel({
   settings = [],
   canManage,
@@ -617,7 +511,7 @@ export function WorkspaceSettingsPanel({
         requestNavigation(() => {
           const next = new URLSearchParams(query);
           next.set("section", value);
-          router.push(pathname + "?" + next.toString());
+          router.push(`${pathname}?${next.toString()}`);
         })
       }
     >
@@ -657,7 +551,7 @@ export function WorkspaceSettingsPanel({
           </TabsContent>
           <TabsContent value="channels" className="space-y-4">
             {legacyWorker ? <FacebookAccountPanel /> : null}
-            <ChannelSettings />
+            <PublishingAccountsPanel />
             <BrowserNodesPanel />
           </TabsContent>
         </>

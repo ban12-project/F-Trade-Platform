@@ -48,7 +48,7 @@ export function VideoPublicationReconciliationForm({
     <form onSubmit={form.handleSubmit(submit)}>
       <FieldGroup>
         <FieldDescription>
-          仅节点所有者可确认。先在 Facebook 核对原账号、视频画面、受众和 Reel
+          仅账号管理员可确认。先在 Facebook 核对原账号、视频画面、受众和 Reel
           链接。此确认属于人工核对，不会改变原 unknown 回执、恢复渠道或重新发布。
         </FieldDescription>
         <Field data-invalid={!!form.formState.errors.externalPublicationRef}>

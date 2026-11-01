@@ -33,6 +33,7 @@ export const sandboxNodeFormSchema = z.object({ name: nodeFormSchema.shape.name 
 export const accountFormSchema = z
   .object({
     nodeId: id,
+    displayName: z.string().trim().min(1).max(80).optional(),
     channelRef: reference,
     accountRef: reference,
     expectedEgressIp: z.union([z.ipv4(), z.ipv6()], {

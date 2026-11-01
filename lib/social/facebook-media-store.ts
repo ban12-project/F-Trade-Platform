@@ -1,3 +1,4 @@
+import { assertPublishingAccountReady } from "./publishing-account-store";
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
@@ -27,7 +28,7 @@ import {
   assertVideoObjectRetained,
 } from "@/lib/video/retention-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
-import { facebookMediaSubmitFormSchema } from "./facebook-account-forms";
+import { facebookMediaFormSchema, facebookMediaSubmitFormSchema } from "./facebook-account-forms";
 import {
   assertFacebookMediaPreview,
   facebookCaptionSourceSchema,
@@ -258,7 +259,12 @@ export async function resolveFacebookMediaSubmissionScope(
   actorId: string,
   database: ScopeDb = getDatabase(),
   now = Date.now(),
+  selectedScope?: { channelRef: string; accountRef: string },
 ) {
+  if (selectedScope && process.env.SOCIAL_FACEBOOK_WORKER_ENABLED !== "1") {
+    const account = await assertPublishingAccountReady(database, selectedScope, actorId);
+    return { channelRef: account.channelRef, accountRef: account.accountRef };
+  }
   if (process.env.SOCIAL_FACEBOOK_WORKER_ENABLED === "1") {
     const scope = configuredFacebookWorkerScope();
     return { channelRef: scope.channelRef, accountRef: scope.accountRef };
@@ -384,7 +390,7 @@ export async function submitFacebookMediaPublication(
     sha256: selected.sha256 ?? (await digestVideo(selected.blobKey, selected.sizeBytes)),
   });
   return database.transaction(async (tx) => {
-    const scope = await resolveFacebookMediaSubmissionScope(actorId, tx);
+    const scope = await resolveFacebookMediaSubmissionScope(actorId, tx, Date.now(), value);
     if (scope.channelRef !== value.channelRef || scope.accountRef !== value.accountRef)
       throw new Error("media_account_changed_since_preview");
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
@@ -407,7 +413,7 @@ export async function submitFacebookMediaPublication(
       .for("update");
     await authorizeSocialProject(tx, identity, "write", value.contentRef, value.format);
     const expiresAt = await authorizeSocialActor(tx, identity, ["content:review"], true);
-    const currentScope = await resolveFacebookMediaSubmissionScope(actorId, tx);
+    const currentScope = await resolveFacebookMediaSubmissionScope(actorId, tx, Date.now(), value);
     if (
       currentScope.channelRef !== scope.channelRef ||
       currentScope.accountRef !== scope.accountRef
@@ -986,4 +992,36 @@ export async function listFacebookMarketingProjects(
         eq(workspaceProject.status, "active"),
       ),
     );
+}
+
+/** Authenticated native media preview uses the same approved selection as submission. */
+export async function openFacebookPublicationPreview(
+  input: unknown,
+  actorId: string,
+  database: Database = getDatabase(),
+) {
+  const selection = facebookMediaFormSchema
+    .pick({
+      projectId: true,
+      contentRef: true,
+      format: true,
+      mediaId: true,
+      captionContentRef: true,
+    })
+    .parse(input);
+  await assertWorkspaceProjectAccess(selection.projectId, actorId, "view", database);
+  const source = await sourceFor(selection, database, new Date());
+  if (!["image/jpeg", "image/png", "video/mp4"].includes(source.contentType))
+    throw new Error("preview_unavailable");
+  const blob = await get(source.blobKey, { access: "private" });
+  if (
+    blob?.statusCode !== 200 ||
+    !blob.stream ||
+    blob.blob.contentType !== source.contentType ||
+    blob.blob.size !== source.sizeBytes
+  ) {
+    await blob?.stream?.cancel();
+    throw new Error("preview_unavailable");
+  }
+  return { stream: blob.stream, contentType: source.contentType, sizeBytes: source.sizeBytes };
 }

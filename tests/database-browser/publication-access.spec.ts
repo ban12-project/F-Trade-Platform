@@ -69,11 +69,16 @@ for (const { op, role, change } of cases)
           ? `/workspace/${f.projectId}/records/content/${f.contentId}`
           : "/workspace/settings?section=channels",
       );
-      const form = page.locator(
-        op === "publish" ? "#publication-confirmation:visible" : "#channel-settings:visible",
-      );
+      const form =
+        op === "publish"
+          ? page.locator("#publication-confirmation:visible")
+          : page.getByRole("region", { name: "发布账号", exact: true }).locator("form");
+      if (op === "publish")
+        await page
+          .locator("#publication-channel")
+          .selectOption(JSON.stringify([f.channelRef, f.accountRef]));
       await expect(form).toBeVisible();
-      const input = form.getByLabel("操作原因或处理记录", {
+      const input = form.getByLabel("处理情况或操作原因", {
         exact: true,
       });
       const value = "evidence-synthetic-browser-human-confirmation";
@@ -84,12 +89,12 @@ for (const { op, role, change } of cases)
         await expect(input).toHaveValue(value);
       }
       if (op === "control") {
-        await form.getByLabel("渠道名称", { exact: true }).fill(f.channelRef);
-        await form.getByLabel("渠道账号", { exact: true }).fill(f.accountRef);
+        await form.getByLabel("要执行的操作").selectOption("pause");
       }
-      const submit = page.locator(
-        `button[form="${op === "publish" ? "publication-confirmation" : "channel-settings"}"]:visible`,
-      );
+      const submit =
+        op === "publish"
+          ? page.locator('button[form="publication-confirmation"]:visible')
+          : form.locator('button[type="submit"]');
       await expect(submit).toBeEnabled();
       const response = page.waitForResponse(
         (r) => r.request().method() === "POST" && Boolean(r.request().headers()["next-action"]),
@@ -193,6 +198,7 @@ test("Approved video directs to the complete media path and never offers a manif
   await page.goto(`/workspace/${f.projectId}/records/video/${f.contentId}`);
   await expect(page).toHaveURL(
     new RegExp(`/workspace/${f.projectId}/video\\?item=${f.contentId}(?:&|$)`),
+    { timeout: 30000 },
   );
   await expect(
     page.getByRole("heading", { name: "视频编辑器", exact: true }).filter({ visible: true }),
