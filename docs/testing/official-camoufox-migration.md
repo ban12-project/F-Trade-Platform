@@ -104,8 +104,10 @@ The owner selected independent GeoIP updates, keeping browser access read-only.
 The new host helper reserves capacity, downloads and validates public databases
 using the pinned official image, atomically publishes a generation, and retains
 a validated rollback generation. Failed or interrupted updates deny new browser
-launches. Account volumes are never mounted. Installation and initial preparation
-remain pending; see [the updater runbook](../../ops/browser-geoip/README.md).
+launches. Account volumes are never mounted. The VPS timer is installed and its legacy-runtime skip was verified. Initial
+preparation was first refused by host capacity admission while isolated tests
+ran; a later admitted update and independent check both passed. The production
+GeoIP volume is prepared for cutover; see [the updater runbook](../../ops/browser-geoip/README.md).
 The 40-case GeoIP-store, container and launcher tests pass, including repeated
 failure, refusal of expired rollback, preservation of prior data and cleanup.
 The actual built-in MMDB passes the new strict freshness check in a read-only image.
@@ -114,7 +116,8 @@ Manual run 41291728193 exposed a Docker-specific packaging failure on both nativ
 architectures: renaming a lower-overlay-layer browser directory returned EXDEV.
 Extraction now targets the final versioned directory directly. Download, checksum,
 extraction and archive removal share one layer, avoiding retention of the 1.2 GiB
-archive. Native Docker results for this correction remain pending. The manual
+archive. Manual run [41292898134](https://github.com/ban12-project/F-Trade-Platform/actions/runs/41292898134)
+passed validation and both native amd64/arm64 image pairs with publication disabled. The manual
 validation job also exposed an outdated idle-test broker response missing the
 required memory limit; the fixture now supplies it and explicitly runs the Agent
 subprocess only on Linux, where its /proc/meminfo contract is available.
@@ -123,6 +126,30 @@ The current VPS has native-profile mode enabled and still selects the legacy
 runtime. Its host has no Node executable. Release acceptance now temporarily
 extracts Node from the exact Agent image instead of requiring a new host install.
 All ten release/rollback tests pass with that path. No deployment has occurred.
+
+## Current VPS candidate checkpoint
+
+The candidate includes main through `9fdbf16`, preserving the concurrent publishing
+setup delivery. At commit `957ae57728a2799e80197d1feb4d85055a07300a`, 58 related
+unit tests, exact Agent-payload smoke and TypeScript validation pass. The exact VPS
+Agent/browser pair also passes initialized and first-use native suites under the
+existing Docker policy, using only disposable synthetic profiles:
+
+- Agent: `sha256:90b4971d5a59ddf2762ff619664af2bce2283fe9c5c62c070e5888a6bad4d7e0`.
+- Browser: `sha256:0301bd9526b0f3a857fda592147ab20b8434531c7cfc53688d7f4f1bff0dd011`.
+
+A separate operator-run proxy fixture uses the currently approved broker-run
+proxy without exporting its credentials to the client or mounting any real
+account profile. The first case matched independent HTTP exit and browser exit,
+and matched the official GeoIP timezone, but failed its WebRTC observation gate.
+The failure was specifically ICE gathering still incomplete after five seconds.
+The probe now waits for its completion event up to twenty seconds; the next
+execution was refused by host capacity admission, so that revision is not yet
+validated. This is not a passing network acceptance. The fixture uses independent packet
+capture with working DNS and Firefox STUN controls; private packet metadata
+excludes TCP payload and proxy authorization headers. Production cutover and
+actual account continuity remain pending while the other chat completes account
+setup. No real post or DM was sent by these migration tests.
 
 ## Historical beta.40 draft evidence
 
