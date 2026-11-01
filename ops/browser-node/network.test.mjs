@@ -179,3 +179,23 @@ test("cleanup refuses foreign networks and propagates unexpected endpoint confli
     id,
   );
 });
+
+test("the admitted CPU grant is enforced without changing memory or isolation", () => {
+  const run = {
+    id: "22222222-2222-4222-8222-222222222222",
+    accountId: "33333333-3333-4333-8333-333333333333",
+    memoryMb: 2560,
+    proxy: { host: "proxy.example", port: 8080, username: "u", password: "p" },
+  };
+  const make = (cpu) =>
+    containerSpec(nodeId, run, "sha256:test", Date.now() + 60000, true, 2560, "bridge", cpu).body
+      .HostConfig;
+  const reduced = make(1),
+    normal = make(2);
+  assert.equal(reduced.NanoCpus, 1e9);
+  assert.equal(normal.NanoCpus, 2e9);
+  const { NanoCpus: _reduced, ...a } = reduced;
+  const { NanoCpus: _normal, ...b } = normal;
+  assert.deepEqual(a, b);
+  for (const invalid of [0, 0.5, 3, NaN]) assert.throws(() => make(invalid), /cpu_limit_invalid/);
+});

@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
-import { acquireHostCapacity, availableMemoryMb } from "../host-capacity/admission.mjs";
+import { acquireBrowserCapacity, availableMemoryMb } from "../host-capacity/admission.mjs";
 import { checkedBrowserResponse } from "./browser-response.mjs";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import {
@@ -461,7 +461,8 @@ async function tick() {
     );
     if (slots.size) idleExit.observe(false, Date.now());
     if (slots.size >= maxSlots || [...slots.values()].some((s) => s.stopping)) return;
-    releaseAdmission = await acquireHostCapacity(docker, sync.limits.browserMemoryMb);
+    const admission = await acquireBrowserCapacity(docker, sync.limits.browserMemoryMb);
+    releaseAdmission = admission.release;
     pendingClaim ??= randomUUID();
     const result = await nodeCall("claim", {
       requestId: pendingClaim,
@@ -493,6 +494,7 @@ async function tick() {
           nativeProfiles,
           maximumMemoryMb,
           networkMode,
+          admission.cpuCores,
         );
         configureLoginRuntime(spec, claim.run, loginProfileForRun(loginProfiles, claim.run));
         return { expiresAt, spec };
