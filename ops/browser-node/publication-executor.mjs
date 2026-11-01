@@ -1,4 +1,5 @@
 import { observationHttpFailure } from "./observation-diagnostics.mjs";
+import { publicationPreclickCodes } from "./publication-diagnostics.mjs";
 
 function checkedPreview(preview, run, upload) {
   const payload = run.publication;
@@ -33,38 +34,8 @@ function publicationReference(value) {
     throw new Error("publication_observation_invalid");
   return url.href;
 }
-const diagnosticErrors = new Set([
-  "browser_request_failed",
-  "facebook_browser_response_invalid",
-  "facebook_composer_transition_timeout",
-  "facebook_identity_ready_timeout",
-  "facebook_posts_ready_timeout",
-  "facebook_posts_loaded_timeout",
-  "facebook_evaluation_failed",
-  "facebook_navigation_invalid",
-  "facebook_permalink_hover_failed",
-  "facebook_permalink_unresolved",
-  "facebook_profile_expired",
-  "publication_authorization_expired",
-  "publication_lease_inactive",
-  "publication_media_invalid",
-  "publication_media_response_invalid",
-  "publication_media_size_invalid",
-  "publication_media_integrity_invalid",
-  "publication_media_transport_failed",
-  "publication_upload_invalid",
-  "publication_container_invalid",
-  "publication_container_mismatch",
-  "publication_upload_transport_failed",
-  "publication_preview_identity_mismatch",
-  "publication_preview_text_mismatch",
-  "publication_preview_not_ready",
-  "publication_attachment_mismatch",
-  "facebook_video_preview_unready",
-  "facebook_video_preview_mismatch",
-]);
 function diagnosticError(error) {
-  return diagnosticErrors.has(error?.message) ? error.message : "unclassified";
+  return publicationPreclickCodes.includes(error?.message) ? error.message : "unclassified";
 }
 
 // These values, never exception text, cross the signed receipt boundary.

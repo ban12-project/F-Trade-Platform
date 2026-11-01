@@ -293,6 +293,11 @@ export function createFacebookDriver(input, browserRequest) {
     }
     const observationTimeouts = {
       "composer-closed": "facebook_composer_closed_timeout",
+      "composer-ready": "facebook_composer_ready_timeout",
+      "audience-picker-ready": "facebook_audience_picker_timeout",
+      "audience-selection-ready": "facebook_audience_selection_timeout",
+      "audience-option-ready": "facebook_audience_selection_timeout",
+      "audience-applied": "facebook_audience_applied_timeout",
       "identity-ready": "facebook_identity_ready_timeout",
       "posts-ready": "facebook_posts_ready_timeout",
       "posts-loaded": "facebook_posts_loaded_timeout",
@@ -389,6 +394,8 @@ export function createFacebookDriver(input, browserRequest) {
     if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
       await waitFor(session, "audience-picker-ready");
       await evaluate(session, { kind: "audience-select" });
+      await waitFor(session, "audience-option-ready");
+      await evaluate(session, { kind: "audience-clear-default" });
       await waitFor(session, "audience-selection-ready");
       await evaluate(session, { kind: "audience-confirm" });
       await waitFor(session, "audience-applied");

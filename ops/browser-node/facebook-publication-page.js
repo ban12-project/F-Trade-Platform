@@ -37,11 +37,30 @@ async function inspectPage(profile, action) {
     const dialog = one(document, selection.dialog);
     const options = all(dialog, selection.option).filter((element) => {
       if (!selection.optionLabel) return true;
-      const labels = [...(element.labels ?? [])].map((label) => label.innerText.trim());
-      const label =
-        element.getAttribute("aria-label") ??
-        (labels.length === 1 ? labels[0] : element.innerText?.trim());
-      return label === selection.optionLabel;
+      const normalize = (value) => value?.replace(/\s+/g, " ").trim();
+      // Native inputs have no innerText. When ARIA names are present, resolve
+      // only unique references in this dialog before considering HTML labels.
+      const ids = element.getAttribute("aria-labelledby")?.trim().split(/\s+/);
+      let label;
+      if (ids?.length) {
+        const labels = ids.map((id) =>
+          [...dialog.querySelectorAll("[id]")].filter((node) => node.id === id),
+        );
+        if (labels.some((matches) => matches.length !== 1)) return false;
+        label = labels.map(([node]) => node.textContent).join(" ");
+      } else {
+        const labels = [...(element.labels ?? [])].map((node) => node.innerText);
+        label =
+          element.getAttribute("aria-label") ??
+          (labels.length === 1 ? labels[0] : element.innerText);
+      }
+      const name = normalize(label);
+      // Observed Facebook native label includes its explanatory second line.
+      // Accept this exact Public label, never a substring/prefix match.
+      return (
+        name === selection.optionLabel ||
+        (selection.optionLabel === "Public" && name === "Public Anyone on or off Facebook")
+      );
     });
     if (action.kind === "audience-picker-ready" && !options.length) return false;
     if (options.length !== 1) throw new Error("facebook_control_ambiguous");
@@ -53,8 +72,17 @@ async function inspectPage(profile, action) {
     if (action.kind === "audience-select") {
       if (!enabled(option)) throw new Error("facebook_audience_disabled");
       if (!checked(option)) option.click();
-      // Do not change Facebook's global/default audience preference.
-      if (checked(defaultCheckbox)) defaultCheckbox.click();
+      return true;
+    }
+    if (action.kind === "audience-option-ready") return checked(option);
+    if (action.kind === "audience-clear-default") {
+      // Selecting the radio can asynchronously replace/enable this checkbox.
+      // Reacquire it after selection has settled, never click a stale element.
+      if (!checked(option)) throw new Error("facebook_audience_selection_changed");
+      if (checked(defaultCheckbox)) {
+        if (!enabled(defaultCheckbox)) throw new Error("facebook_audience_disabled");
+        defaultCheckbox.click();
+      }
       return true;
     }
     const selected = checked(option) && !checked(defaultCheckbox);

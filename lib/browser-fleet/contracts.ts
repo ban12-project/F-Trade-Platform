@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { facebookCredentialFormSchema } from "@/lib/social/facebook-account-forms";
+import {
+  publicationPreclickCodes,
+  publicationPreclickStages,
+} from "../../ops/browser-node/publication-diagnostics.mjs";
 
 import { inboxEnvelopeSchema } from "./inbox-schema";
 
@@ -90,6 +94,7 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
     })
     .strict(),
 ]);
+
 const common = { installationId: id, bootId: id };
 export const nodeRequestSchema = z.discriminatedUnion("operation", [
   z
@@ -263,6 +268,13 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       runId: id,
       leaseId: id,
       stopped: z.literal(true),
+      publicationFailure: z
+        .object({
+          stage: z.enum(publicationPreclickStages),
+          code: z.enum(publicationPreclickCodes),
+        })
+        .strict()
+        .optional(),
       outcome: z.enum([
         "completed",
         "failed",

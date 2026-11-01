@@ -1,3 +1,4 @@
+import { isPublicationPreauthorizationFailure } from "../../ops/browser-node/publication-diagnostics.mjs";
 import { assertPublishingAccountReady } from "./publishing-account-store";
 import "server-only";
 
@@ -329,7 +330,7 @@ export async function requeueUnsentFacebookMediaPublication(
   if (
     result.rows.length !== 1 ||
     row.job_status !== "paused" ||
-    row.failure_code !== "fleet_publication_not_authorized" ||
+    !isPublicationPreauthorizationFailure(row.failure_code) ||
     row.publication_status !== "failed" ||
     row.external_publication_ref !== null ||
     row.authorization_id !== null ||
@@ -488,12 +489,12 @@ export async function submitFacebookMediaPublication(
         throw new Error("facebook_media_existing_caption_changed");
       if (
         existing.status === "paused" &&
-        existing.failureCode !== "fleet_publication_not_authorized"
+        !isPublicationPreauthorizationFailure(existing.failureCode)
       )
         throw new Error("facebook_media_existing_attempt_requires_review");
       if (
         existing.status === "paused" &&
-        existing.failureCode === "fleet_publication_not_authorized"
+        isPublicationPreauthorizationFailure(existing.failureCode)
       ) {
         await requeueUnsentFacebookMediaPublication(tx, existing.jobId, existing.id, actorId);
       }
