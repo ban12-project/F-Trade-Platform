@@ -75,6 +75,10 @@ the 256 MiB `/tmp` tmpfs: valid larger source videos can exhaust it before the
 first frame renders. Broker stop/deadline cleanup removes the scratch files with
 the rest of the workspace; host pool, per-job quota and memory limits still apply.
 Run `pnpm test:remotion-workspace` to check child-process scratch placement.
+Frame extraction uses one thread and a 128 MiB cache; the media cache is 64 MiB.
+Do not use Remotion's host-memory-derived defaults inside the 2 GiB worker:
+large decoded frames can otherwise trigger the container OOM killer even after
+scratch storage is fixed. These cache budgets are not total process-memory caps.
 
 Run local tests:
 

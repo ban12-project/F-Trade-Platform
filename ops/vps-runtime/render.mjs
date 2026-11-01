@@ -66,6 +66,8 @@ try {
     id: "AbcdIndustrialVertical",
     inputProps,
     browserExecutable,
+    offthreadVideoCacheSizeInBytes: 128 * 1024 * 1024,
+    offthreadVideoThreads: 1,
   });
   await renderMedia({
     composition,
@@ -79,6 +81,10 @@ try {
     crf: 18,
     enforceAudioTrack: true,
     concurrency: 1,
+    // Remotion's system-memory defaults can exceed this worker's 2 GiB cgroup.
+    offthreadVideoCacheSizeInBytes: 128 * 1024 * 1024,
+    mediaCacheSizeInBytes: 64 * 1024 * 1024,
+    offthreadVideoThreads: 1,
     outputLocation: `${root}/output.mp4`,
     timeoutInMilliseconds: 480_000,
     overwrite: true,
