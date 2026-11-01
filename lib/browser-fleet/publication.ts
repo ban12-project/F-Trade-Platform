@@ -1,3 +1,4 @@
+import { isBatchPublication } from "@/lib/social/publication-batch-receipt";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -490,7 +491,7 @@ export async function recordPublicationReceipt(
       .from(aggregateRecord)
       .where(eq(aggregateRecord.id, publication.contentRef))
       .for("update");
-    if (content.type === "content")
+    if (content.type === "content" && !(await isBatchPublication(tx, publication.id)))
       await tx
         .update(aggregateRecord)
         .set({

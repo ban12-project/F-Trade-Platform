@@ -31,6 +31,7 @@ import {
   parseSocialProjectIdentity,
   type SocialProjectIdentity,
 } from "./human-write-access";
+import { isBatchPublication } from "./publication-batch-receipt";
 import { createControlledPublicationCommand } from "./publication-command";
 import { publicationFailureLabel } from "./publication-presentation";
 import type { PublishingAccount } from "./publishing-account-policy";
@@ -173,6 +174,7 @@ export async function listProjectPublicationData(
   projectId: string,
   database: Database = getDatabase(),
   contentId?: string,
+  ownerId?: string,
 ) {
   const [projectRecords, channels] = await Promise.all([
     database
@@ -187,7 +189,7 @@ export async function listProjectPublicationData(
           aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
         ),
       ),
-    listPublishingAccounts(database),
+    listPublishingAccounts(database, ownerId),
   ]);
   const projectRecordIds = projectRecords.map(({ record }) => record.id);
   const publications = projectRecordIds.length
@@ -515,7 +517,7 @@ export async function recordControlledPublicationResult(
         })
         .where(eq(socialPublication.id, publication.id))
         .returning();
-      if (record.type === "content")
+      if (record.type === "content" && !(await isBatchPublication(tx, publication.id)))
         await tx
           .update(aggregateRecord)
           .set({

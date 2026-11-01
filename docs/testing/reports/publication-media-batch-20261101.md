@@ -32,7 +32,7 @@ public audience and post count. Approved video/caption variants remain linked to
 both reviewed versions. Selection survives returning from account recovery. A new
 Server Action reauthenticates and validates the shared Zod schema; one database
 transaction validates and locks all targets before committing per-account jobs.
-The audit stores batch identity, digest and result IDs. Advisory locks and stable
+The audit stores batch identity, digest and result IDs. Batch receipts preserve the approved source version rather than marking it published after the first account; otherwise the next account would fail the original version guard. Legacy single-target transitions retain their existing behavior. Advisory locks and stable
 per-account content identities cover concurrent clicks and lost responses; legacy
 job identities are consulted to avoid resending existing work. Only proven unsent
 failures can be selected for retry; successful/unknown targets are excluded.

@@ -49,7 +49,7 @@ export function PublicationReconciliationForm({
       <FieldGroup>
         <FieldDescription>
           仅账号管理员可确认。先在 Facebook
-          核对原账号、完整文案和受众，再填写已存在帖子的正式链接。核对不会恢复发布或重新发帖。若没有找到对应帖子，请保留暂停状态并联系管理员进一步检查，不能直接重发。
+          核对原账号、完整文案、图片（如有）和公开范围，再填写已存在帖子的正式链接。核对不会恢复发布或重新发帖。若没有找到对应帖子，请保留暂停状态并联系管理员进一步检查，不能直接重发。
         </FieldDescription>
         <Field data-invalid={!!form.formState.errors.externalPublicationRef}>
           <FieldLabel htmlFor={`receipt-url-${publicationId}`}>已发布帖子的链接</FieldLabel>
@@ -89,7 +89,7 @@ export function PublicationReconciliationForm({
                   disabled={pending}
                 />
                 <FieldLabel htmlFor={`receipt-confirm-${publicationId}`}>
-                  我已核对账号、完整文案、受众和帖子链接，确认这是原任务的发布结果。
+                  我已核对账号、完整文案、图片（如有）、公开范围和帖子链接，确认这是原任务的发布结果。
                 </FieldLabel>
               </Field>
               <FieldError errors={[fieldState.error]} />

@@ -541,7 +541,8 @@ export function createFacebookDriver(input, browserRequest) {
           attachmentFormat: session.expected?.attachmentFormat,
         });
       };
-      return session.expected?.attachmentFormat === "video"
+      return session.expected?.attachmentFormat === "video" ||
+        (session.expected?.attachmentFormat === "image" && profile.imagePreview === "blob-sha256")
         ? awaitVideoPreview(inspect, session.expected, session.signal)
         : inspect();
     },

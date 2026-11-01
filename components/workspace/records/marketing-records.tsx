@@ -138,7 +138,12 @@ async function ContentPublication({
   context: RecordContext;
   contentId: string;
 }) {
-  const data = await listProjectPublicationData(context.projectId, undefined, contentId);
+  const data = await listProjectPublicationData(
+    context.projectId,
+    undefined,
+    contentId,
+    context.session.user.id,
+  );
   const mediaOptions =
     context.canWrite &&
     hasPermission(context.session.user.role, "content:review") &&
@@ -205,6 +210,7 @@ export async function PublicationRecord({ context }: { context: RecordContext })
     context.projectId,
     undefined,
     publication.contentRef,
+    context.session.user.id,
   );
   return (
     <PublicationPanel

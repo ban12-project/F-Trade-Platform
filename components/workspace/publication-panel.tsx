@@ -70,7 +70,7 @@ export function PublicationPanel({
                   <p>{item.failureLabel}</p>
                 </details>
               ) : null}
-              {item.status === "unknown" && item.format === "text" ? (
+              {item.status === "unknown" && ["text", "image"].includes(item.format) ? (
                 <PublicationReconciliationForm projectId={projectId} publicationId={item.id} />
               ) : null}
               {item.status === "unknown" && item.format === "video" ? (
