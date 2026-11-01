@@ -69,7 +69,7 @@ async function VideoContent({
   const active = entries[0];
   const publication =
     active && ["VIDEO_APPROVED", "VIDEO_PUBLISHED"].includes(active.state)
-      ? await listProjectPublicationData(projectId, undefined, active.id)
+      ? await listProjectPublicationData(projectId, undefined, active.id, session.user.id)
       : null;
   return (
     <VideoWorkspace

@@ -38,7 +38,10 @@ async function inspectPage(profile, action) {
     const options = all(dialog, selection.option).filter((element) => {
       if (!selection.optionLabel) return true;
       const labels = [...(element.labels ?? [])].map((label) => label.innerText.trim());
-      return labels.length === 1 && labels[0] === selection.optionLabel;
+      const label =
+        element.getAttribute("aria-label") ??
+        (labels.length === 1 ? labels[0] : element.innerText?.trim());
+      return label === selection.optionLabel;
     });
     if (action.kind === "audience-picker-ready" && !options.length) return false;
     if (options.length !== 1) throw new Error("facebook_control_ambiguous");
@@ -50,6 +53,8 @@ async function inspectPage(profile, action) {
     if (action.kind === "audience-select") {
       if (!enabled(option)) throw new Error("facebook_audience_disabled");
       if (!checked(option)) option.click();
+      // Do not change Facebook's global/default audience preference.
+      if (checked(defaultCheckbox)) defaultCheckbox.click();
       return true;
     }
     const selected = checked(option) && !checked(defaultCheckbox);
@@ -196,12 +201,29 @@ async function inspectPage(profile, action) {
   const rawText = "value" in textbox ? textbox.value : textbox.innerText;
   // An empty contenteditable with its editor <br> reports one LF as innerText.
   const text = rawText === "\n" && textbox.textContent?.trim() === "" ? "" : rawText;
+  const blobImages = all(composer, 'img[src^="blob:"]');
+  const previewVideos = all(composer, "video");
+  if (
+    (action.attachmentFormat === "video" && blobImages.length) ||
+    (action.attachmentFormat === "image" && previewVideos.length)
+  )
+    throw new Error("facebook_attachment_combination_mismatch");
   let videoDigest;
-  if (action.attachmentFormat === "video") {
-    const videos = all(composer, "video");
+  let hashedElement;
+  let hashedSource;
+  if (
+    action.attachmentFormat === "video" ||
+    (action.attachmentFormat === "image" && profile.imagePreview === "blob-sha256")
+  ) {
+    const videos = all(
+      composer,
+      action.attachmentFormat === "video" ? "video" : 'img[src^="blob:"]',
+    );
     if (attachments.length || videos.length !== 1 || !videos[0].currentSrc.startsWith("blob:"))
       throw new Error("facebook_video_preview_ambiguous");
-    const source = await fetch(videos[0].currentSrc);
+    hashedElement = videos[0];
+    hashedSource = videos[0].currentSrc;
+    const source = await fetch(hashedSource);
     if (!source.ok) throw new Error("facebook_video_preview_unreadable");
     const blob = await source.blob();
     if (!blob.size || blob.size > 200 * 1024 * 1024)
@@ -216,7 +238,9 @@ async function inspectPage(profile, action) {
     accountRef: profile.accountRef,
     channelRef: profile.channelRef,
     text,
-    attachmentCount: videoDigest ? 1 : attachments.length,
+    attachmentCount: videoDigest
+      ? 1
+      : Math.max(attachments.length, blobImages.length + previewVideos.length),
     attachmentName: attachments[0]?.innerText,
     attachmentSha256: videoDigest,
     readyToPublish: enabled(submit),
@@ -242,11 +266,22 @@ async function inspectPage(profile, action) {
       !preview.readyToPublish ||
       preview.attachmentCount !== action.attachmentCount ||
       (action.attachmentCount === 1 &&
-        (action.attachmentFormat === "video"
+        (action.attachmentFormat === "video" || profile.imagePreview === "blob-sha256"
           ? preview.attachmentSha256 !== action.attachmentSha256
           : preview.attachmentName !== action.attachmentName))
     )
       throw new Error("facebook_preview_changed");
+    if (
+      !composer.isConnected ||
+      one(document, profile.selectors.composer) !== composer ||
+      !submit.isConnected ||
+      (hashedElement &&
+        (!hashedElement.isConnected || hashedElement.currentSrc !== hashedSource)) ||
+      ("value" in textbox ? textbox.value : textbox.innerText) !== rawText ||
+      one(composer, profile.selectors.audience).innerText.trim() !== "Public" ||
+      Date.now() >= action.localExpiresAt
+    )
+      throw new Error("facebook_public_audience_unconfirmed");
     // One DOM click, no generic click endpoint with retry/fallback behavior.
     submit.click();
   }

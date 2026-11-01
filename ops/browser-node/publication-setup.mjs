@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createFacebookDriver, validateFacebookProfile } from "./facebook-driver.mjs";
 import { createPublicationExecutor } from "./publication-executor.mjs";
+import { upgradeGeneratedPublicationProfile } from "./publication-profile-compat.mjs";
 
 const program = await readFile(new URL("./publication-setup-page.js", import.meta.url), "utf8");
 const key = (run) => JSON.stringify([run.channelRef, run.accountRef]);
@@ -42,8 +43,8 @@ export function createPublicationSetup({
         channelRef: p.channelRef,
         accountRef: p.accountRef,
         expiresAt: Date.parse(p.expiresAt),
-        textOnly: true,
-        audience: p.audienceText,
+        textOnly: p.textOnly === true,
+        audience: "Public",
       }));
   async function initialize() {
     await mkdir(directory, { mode: 0o700, recursive: true });
@@ -63,7 +64,8 @@ export function createPublicationSetup({
       throw e;
     }
     if (!Array.isArray(values) || values.length > 16) throw new Error("setup_profiles_invalid");
-    for (const p of values) {
+    for (const previous of values) {
+      const p = upgradeGeneratedPublicationProfile(previous);
       const expires = Date.parse(p.expiresAt);
       validateFacebookProfile(p, expires <= Date.now() ? expires - 1 : Date.now());
       if (profiles.has(key(p))) throw new Error("setup_profiles_duplicate");
@@ -225,28 +227,30 @@ export function createPublicationSetup({
         throw new Error("setup_page_changed");
       writing = true;
       try {
-        const p = validateFacebookProfile({
-          version: 1,
-          channelRef: slot.run.channelRef,
-          accountRef: slot.run.accountRef,
-          reviewRef: `evidence-${randomUUID()}`,
-          reviewedAt: new Date(now).toISOString(),
-          expiresAt: new Date(now + 7 * 86400000).toISOString(),
-          url: "https://www.facebook.com/",
-          identityHref: draft.entry.identityHref,
-          receiptUrl: draft.receipt.identityHref,
-          audienceText: draft.composer.audienceText,
-          openComposerText: draft.entry.openComposerText,
-          textOnly: true,
-          resolvePostLinks: true,
-          selectors: {
-            ...draft.composer.selectors,
-            ...draft.receipt.selectors,
-            ...draft.entry.selectors,
-            composerIdentity: draft.composer.selectors.composerIdentity,
-            postHover: draft.receipt.selectors.postLink,
-          },
-        });
+        const p = validateFacebookProfile(
+          upgradeGeneratedPublicationProfile({
+            version: 1,
+            channelRef: slot.run.channelRef,
+            accountRef: slot.run.accountRef,
+            reviewRef: `evidence-${randomUUID()}`,
+            reviewedAt: new Date(now).toISOString(),
+            expiresAt: new Date(now + 7 * 86400000).toISOString(),
+            url: "https://www.facebook.com/",
+            identityHref: draft.entry.identityHref,
+            receiptUrl: draft.receipt.identityHref,
+            audienceText: draft.composer.audienceText,
+            openComposerText: draft.entry.openComposerText,
+            textOnly: true,
+            resolvePostLinks: true,
+            selectors: {
+              ...draft.composer.selectors,
+              ...draft.receipt.selectors,
+              ...draft.entry.selectors,
+              composerIdentity: draft.composer.selectors.composerIdentity,
+              postHover: draft.receipt.selectors.postLink,
+            },
+          }),
+        );
         if ([draft.composer, draft.receipt].some((v) => v.identityHref !== p.identityHref))
           throw new Error("setup_identity_changed");
         const next = new Map(profiles);
@@ -270,7 +274,11 @@ export function createPublicationSetup({
         }
         // The platform checks the same active owner session and refuses queued publication work.
         profiles.set(key(p), p);
-        const result = summary(draft, "ready", true);
+        const result = {
+          ...summary(draft, "ready", true),
+          textOnly: p.textOnly === true,
+          audience: "Public",
+        };
         activated.set(slot.run.id, { hash: input.candidateHash, result });
         return result;
       } finally {

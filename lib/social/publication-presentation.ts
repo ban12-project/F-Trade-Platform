@@ -37,7 +37,7 @@ export function publicationProgress(
     case "rejected":
       return {
         label: "发布失败",
-        detail: "请由渠道管理员核对失败原因与平台实际结果。当前任务不会自动重试。",
+        detail: "发布未完成。请查看此账号的处理提示；系统仅允许重试已确认未发送的任务。",
       };
     case "paused":
     case "blocked":
@@ -56,6 +56,10 @@ export function publicationProgress(
 }
 
 const publicationFailureLabels: Record<string, string> = {
+  fleet_publication_not_authorized:
+    "系统在提交前停止，尚未取得发帖授权。请处理账号提示后重新预览；系统不会要求您配置页面选择器。",
+  fleet_publication_preflight_rejected:
+    "内容、素材或账号状态已变化，本次未发送。请返回当前内容查看最新状态。",
   publication_publish_unknown: "发布步骤未取得可验证回执",
   publication_observe_unknown: "新帖子观察未完成",
   publication_observe_composer_pending: "发布编辑器未在观察期限内关闭",

@@ -182,6 +182,7 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
     .object({
       ...common,
       operation: z.literal("publication-setup"),
+      textOnly: z.boolean().optional(),
       runId: id,
       leaseId: id,
       audience: z.enum(["Public", "Friends", "Only me"]),

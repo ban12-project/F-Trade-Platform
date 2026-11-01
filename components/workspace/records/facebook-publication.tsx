@@ -7,7 +7,7 @@ import { FacebookMediaPanel } from "../facebook-media-panel";
 export function FacebookPublicationPrerequisitesNotice() {
   return (
     <p role="status" className="text-sm text-muted-foreground">
-      素材发布需要唯一的有效账户绑定、已启用的渠道、就绪的发布执行器和有效的发布页面审核。请在渠道设置逐项核对。
+      请从已审核内容选择正文和素材，再选择发布账号。系统会检查登录、授权和发布条件；需要处理时会显示对应账号的入口。
     </p>
   );
 }

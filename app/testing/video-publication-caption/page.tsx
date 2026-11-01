@@ -54,6 +54,7 @@ export default function VideoPublicationCaptionTestingPage() {
                 channelRef: "synthetic-channel",
                 accountRef: "synthetic-account",
                 name: "合成发布账号",
+                audience: "Public",
                 platform: "Facebook",
                 ready: true,
                 blockers: [],

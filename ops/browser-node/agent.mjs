@@ -41,6 +41,7 @@ import {
   workerEndpoint,
 } from "./network.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
+import { withPublicationSetup } from "./publication-adapter.mjs";
 import {
   createPublicationPageInspector,
   publicationInspectionFailureStage,
@@ -138,7 +139,8 @@ const publicationSetup = process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR
           leaseId: slot.run.leaseId,
           candidateHash,
           expiresAt: Date.parse(profile.expiresAt),
-          audience: profile.audienceText,
+          audience: "Public",
+          textOnly: profile.textOnly === true,
         });
         if (result.active !== true) throw new Error("setup_activation_unconfirmed");
       },
@@ -146,38 +148,7 @@ const publicationSetup = process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR
   : null;
 if (publicationSetup) {
   await publicationSetup.initialize();
-  adapter = {
-    get capabilities() {
-      return [
-        ...new Set([
-          ...baseAdapter.capabilities,
-          ...(publicationSetup.scopes().length ? ["publish"] : []),
-        ]),
-      ];
-    },
-    get publicationScopes() {
-      const reviewed = publicationSetup.scopes();
-      return [
-        ...(baseAdapter.publicationScopes ?? []).filter(
-          (p) =>
-            !reviewed.some((r) => r.channelRef === p.channelRef && r.accountRef === p.accountRef),
-        ),
-        ...reviewed,
-      ];
-    },
-    inboxScopes: baseAdapter.inboxScopes,
-    execute(context) {
-      return context.run.kind === "publish" &&
-        publicationSetup
-          .scopes()
-          .some(
-            (p) =>
-              p.channelRef === context.run.channelRef && p.accountRef === context.run.accountRef,
-          )
-        ? publicationSetup.execute(context)
-        : (baseAdapter.execute?.(context) ?? "failed");
-    },
-  };
+  adapter = withPublicationSetup(baseAdapter, publicationSetup);
 }
 const slots = new Map();
 let gatewayOrigin = "";

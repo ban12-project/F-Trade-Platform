@@ -1,3 +1,4 @@
+import { isBatchPublication } from "./publication-batch-receipt";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -80,9 +81,9 @@ export async function reconcileUnknownTextPublication(
       publication.browserJobId !== job.id ||
       job.payloadRef !== publication.id ||
       job.kind !== "publish" ||
-      publication.format !== "text"
+      !["text", "image"].includes(publication.format)
     )
-      throw new Error("本次核对只支持原节点的文字发布记录。");
+      throw new Error("本次核对只支持原节点的文字或图文发布记录。");
     if (publication.status === "published") {
       await authorizeSocialProject(tx, identity, "receipt", publication.contentRef, "text");
       const expiresAt = await authorizeSocialActor(tx, identity, [
@@ -116,8 +117,28 @@ export async function reconcileUnknownTextPublication(
       job.accountRef !== publication.accountRef
     )
       throw new Error("原任务不是可核对的未知结果。");
-    const payload = facebookTextPayloadSchema.parse(reservation.payload);
-    const confirmation = publication.textConfirmation;
+    const payload =
+      publication.format === "image"
+        ? parseFacebookMediaPayload(reservation.payload)
+        : facebookTextPayloadSchema.parse(reservation.payload);
+    const [imageManifest] =
+      publication.format === "image"
+        ? await tx
+            .select()
+            .from(facebookPublicationManifest)
+            .where(eq(facebookPublicationManifest.publicationId, publication.id))
+            .for("share")
+        : [];
+    const confirmation =
+      publication.format === "image" && imageManifest
+        ? {
+            contentVersion: imageManifest.contentVersion,
+            approvalRef: undefined,
+            payloadDigest: digestSocialWorkerPayload(
+              await buildFacebookMediaPayload(tx, publication, new Date(), true),
+            ),
+          }
+        : publication.textConfirmation;
     const [content] = await tx
       .select()
       .from(aggregateRecord)
@@ -148,7 +169,7 @@ export async function reconcileUnknownTextPublication(
       payload.channelRef !== publication.channelRef ||
       payload.text !== content.payload.body ||
       digestSocialWorkerPayload(payload) !== confirmation.payloadDigest ||
-      gate?.id !== confirmation.approvalRef ||
+      (publication.format === "text" && gate?.id !== confirmation.approvalRef) ||
       gate?.aggregateId !== content.id ||
       gate.gate !== "gate_01_truth" ||
       gate.status !== "approved"
@@ -177,14 +198,15 @@ export async function reconcileUnknownTextPublication(
         updatedAt: now,
       })
       .where(eq(socialPublication.id, publication.id));
-    await tx
-      .update(aggregateRecord)
-      .set({
-        state: "CONTENT_PUBLISHED",
-        payload: publishContent(content.payload, "human", value.externalPublicationRef),
-        version: content.version + 1,
-      })
-      .where(eq(aggregateRecord.id, content.id));
+    if (!(await isBatchPublication(tx, publication.id)))
+      await tx
+        .update(aggregateRecord)
+        .set({
+          state: "CONTENT_PUBLISHED",
+          payload: publishContent(content.payload, "human", value.externalPublicationRef),
+          version: content.version + 1,
+        })
+        .where(eq(aggregateRecord.id, content.id));
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       actorType: "human",

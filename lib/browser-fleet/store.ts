@@ -540,16 +540,23 @@ async function nodeOperation(
       );
     if (!ownerSession) throw new Error("publication_setup_session_expired");
     state.capabilities = [...new Set([...state.capabilities, "publish" as const])];
+    const existingMediaScope = state.publicationScopes?.find(
+      (s) =>
+        s.accountRef === account.accountRef &&
+        s.channelRef === account.channelRef &&
+        s.expiresAt > now &&
+        s.textOnly !== true,
+    );
     state.publicationScopes = [
       ...(state.publicationScopes ?? []).filter(
         (s) => s.accountRef !== account.accountRef || s.channelRef !== account.channelRef,
       ),
-      {
+      existingMediaScope ?? {
         channelRef: account.channelRef,
         accountRef: account.accountRef,
         expiresAt: request.expiresAt,
-        textOnly: true,
-        audience: request.audience,
+        textOnly: request.textOnly ?? true,
+        audience: "Public",
       },
     ];
     await tx.insert(auditEvent).values({
@@ -563,7 +570,7 @@ async function nodeOperation(
         account_id: account.id,
         candidate_hash: request.candidateHash,
         expires_at: request.expiresAt,
-        text_only: true,
+        text_only: existingMediaScope?.textOnly ?? request.textOnly ?? true,
       },
       occurredAt: new Date(now),
     });

@@ -8,6 +8,7 @@ import {
   requireActionActor,
 } from "@/lib/action-boundary";
 import type { ClosingActionState } from "@/lib/action-states";
+import { getDatabase } from "@/lib/db/client";
 import {
   deliveryDecisionFormSchema,
   deliveryRequestFormSchema,
@@ -33,6 +34,7 @@ import {
 import { SocialHumanAccessError, socialHumanFailureMessage } from "@/lib/social/human-write-access";
 import { routeInboundConversation } from "@/lib/social/inbound-routing-store";
 import { submitControlledPublication } from "@/lib/social/publication-store";
+import { assertPublicPublishingAccountReady } from "@/lib/social/publishing-account-store";
 
 const actor = requireActionActor;
 const resultError = actionError;
@@ -209,6 +211,7 @@ export async function confirmPublicationAction(
     if (!current) throw new SocialHumanAccessError();
     const parsed = publicationConfirmationFormSchema.safeParse(values(formData));
     if (!parsed.success) return resultError(parsed.error);
+    await assertPublicPublishingAccountReady(getDatabase(), parsed.data, current.user.id);
     const saved = await submitControlledPublication(parsed.data, {
       actorId: current.user.id,
       sessionId: current.session.id,

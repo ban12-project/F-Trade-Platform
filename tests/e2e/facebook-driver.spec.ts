@@ -16,7 +16,7 @@ const profile = {
   expiresAt: new Date(Date.now() + 3600000).toISOString(),
   url: "https://www.facebook.com/synthetic",
   identityHref: "https://www.facebook.com/synthetic-owner",
-  audienceText: "Only me",
+  audienceText: "Public",
   selectors: {
     identity: "#identity",
     openComposer: "#open",
@@ -32,7 +32,7 @@ const profile = {
     postLink: ".permalink",
   },
 };
-const fixture = `<!doctype html><a id="identity" href="${profile.identityHref}">Synthetic identity</a><button id="open">Open</button><section id="composer" hidden><span class="audience">Only me</span><textarea></textarea><input type="file"><span class="filename" hidden></span><button>Post</button></section><output id="clicks">0</output><script>
+const fixture = `<!doctype html><a id="identity" href="${profile.identityHref}">Synthetic identity</a><button id="open">Open</button><section id="composer" hidden><span class="audience">Public</span><textarea></textarea><input type="file"><span class="filename" hidden></span><button>Post</button></section><output id="clicks">0</output><script>
 const composer=document.querySelector('#composer');
 document.querySelector('#open').onclick=()=>composer.hidden=false;
 composer.querySelector('input').onchange=(e)=>{const name=composer.querySelector('.filename');name.textContent=e.target.files[0].name;name.hidden=false;};
@@ -48,6 +48,9 @@ for (const mode of [
   "post_link_unresolved",
   "post_author_changed",
   "image",
+  "image_blob",
+  "image_blob_changed",
+  "video_upload_resets_audience",
   "video",
   "video_empty_caption",
   "video_post",
@@ -113,6 +116,8 @@ for (const mode of [
       ? "video"
       : [
             "image",
+            "image_blob",
+            "image_blob_changed",
             "wrong_attachment",
             "extra_file_input",
             "duplicate_scoped_file_input",
@@ -121,9 +126,16 @@ for (const mode of [
           ].includes(mode)
         ? "image"
         : "text";
-    const mediaBytes = Buffer.from("SYNTHETIC media");
+    const mediaBytes = mode.startsWith("image_blob")
+      ? Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT1sAAAAASUVORK5CYII=",
+          "base64",
+        )
+      : Buffer.from("SYNTHETIC media");
     const sha256 =
-      format === "video" ? createHash("sha256").update(mediaBytes).digest("hex") : "a".repeat(64);
+      format === "video" || mode.startsWith("image_blob")
+        ? createHash("sha256").update(mediaBytes).digest("hex")
+        : "a".repeat(64);
     const path = `/tmp/ftrade-uploads/${sha256}.${format === "video" ? "mp4" : "png"}`;
     const requests: string[] = [];
     const scrolls: Array<{ direction: unknown; amount: unknown }> = [];
@@ -142,19 +154,20 @@ for (const mode of [
         if (
           mode.startsWith("audience_selection") ||
           mode === "audience_default_changed" ||
-          mode === "upload_resets_audience"
+          ["upload_resets_audience", "video_upload_resets_audience"].includes(mode)
         )
           await page.evaluate((scenario) => {
             const composer = document.querySelector<HTMLElement>("#composer");
             const audience = document.querySelector<HTMLElement>(".audience");
             if (!composer || !audience) throw new Error("fixture missing");
-            if (scenario !== "upload_resets_audience") audience.textContent = "Friends";
+            if (!["upload_resets_audience", "video_upload_resets_audience"].includes(scenario))
+              audience.textContent = "Friends";
             audience.onclick = () => {
               composer.hidden = true;
               const dialog = document.createElement("section");
               dialog.id = "privacy";
               dialog.innerHTML =
-                '<label>Only me<input id="only-me" type="radio"></label><input id="default" type="checkbox" checked><button id="done">Done</button>';
+                '<label>Public<input id="only-me" type="radio"></label><input id="default" type="checkbox" checked><button id="done">Done</button>';
               document.body.append(dialog);
               const option = dialog.querySelector<HTMLInputElement>("#only-me");
               const checkbox = dialog.querySelector<HTMLInputElement>("#default");
@@ -165,7 +178,7 @@ for (const mode of [
               };
               confirm.onclick = () => {
                 audience.textContent =
-                  scenario === "audience_selection_wrong" ? "Public" : "Only me";
+                  scenario === "audience_selection_wrong" ? "Friends" : "Public";
                 dialog.remove();
                 composer.hidden = false;
               };
@@ -457,7 +470,7 @@ for (const mode of [
         }
         if (mode === "audience_transit_change" && expression.includes('"kind":"publish"'))
           await page.locator(".audience").evaluate((element) => {
-            element.textContent = "Public";
+            element.textContent = "Friends";
           });
         return Response.json({ ok: true, result: await page.evaluate(expression) });
       }
@@ -496,6 +509,17 @@ for (const mode of [
             );
             document.querySelector("#composer")?.append(video);
           }, mode);
+        if (mode.startsWith("image_blob"))
+          await input.evaluate((element) => {
+            const file = (element as HTMLInputElement).files?.[0];
+            if (!file) throw Error("synthetic_file_missing");
+            (document.querySelector(".filename") as HTMLElement).hidden = true;
+            const image = document.createElement("img");
+            image.width = 20;
+            image.height = 20;
+            image.src = URL.createObjectURL(file);
+            document.querySelector("#composer")?.append(image);
+          });
         if (mode === "extra_file_input")
           expect(
             await page
@@ -522,7 +546,7 @@ for (const mode of [
           await page.locator(".filename").evaluate((element) => {
             element.textContent = "wrong.png";
           });
-        if (mode === "upload_resets_audience")
+        if (["upload_resets_audience", "video_upload_resets_audience"].includes(mode))
           await page.locator(".audience").evaluate((element) => {
             element.textContent = "Friends";
           });
@@ -534,6 +558,7 @@ for (const mode of [
     let authorized = 0;
     const scopedProfile = {
       ...profile,
+      ...(mode.startsWith("image_blob") ? { imagePreview: "blob-sha256" } : {}),
       resolvePostLinks: mode.startsWith("post_") || mode.startsWith("video_post"),
       ...(format === "video"
         ? {
@@ -562,12 +587,12 @@ for (const mode of [
       },
       ...(mode.startsWith("audience_selection") ||
       mode === "audience_default_changed" ||
-      mode === "upload_resets_audience"
+      ["upload_resets_audience", "video_upload_resets_audience"].includes(mode)
         ? {
             audienceSelection: {
               dialog: "#privacy",
               option: "input[type=radio]",
-              optionLabel: "Only me",
+              optionLabel: "Public",
               defaultCheckbox: "#default",
               confirm: "#done",
             },
@@ -620,6 +645,10 @@ for (const mode of [
           await page.locator("#composer").evaluate((element) => {
             element.after(element.cloneNode(true));
           });
+        if (mode === "image_blob_changed")
+          await page.locator("#composer img").evaluate((element) => {
+            (element as HTMLImageElement).src = URL.createObjectURL(new Blob(["CHANGED media"]));
+          });
         if (["video_blob_changed", "video_post_blob_changed"].includes(mode))
           await page.locator("#composer video").evaluate((element) => {
             (element as HTMLVideoElement).src = URL.createObjectURL(new Blob(["CHANGED media"]));
@@ -636,6 +665,8 @@ for (const mode of [
       "post_link_hover_receipt",
       "post_link_hover_detached",
       "image",
+      "image_blob",
+      "video_upload_resets_audience",
       "video",
       "video_post",
       "video_post_return_scroll",
@@ -646,6 +677,7 @@ for (const mode of [
       "upload_replaces_composer",
       "hidden_duplicate_composer",
       "audience_selection",
+      "audience_default_changed",
       "composer_identity_tracking",
       "video_post_http_recovered",
       "video_post_http_recovered_posts",

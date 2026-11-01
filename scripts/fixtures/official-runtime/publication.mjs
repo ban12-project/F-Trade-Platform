@@ -13,7 +13,7 @@ export async function verifyPublicationContracts({ context, accountId, runId, ac
     r.fulfill({
       contentType: "text/html",
       body:
-        syntheticPage("closed") +
+        syntheticPage("closed").replaceAll("Only me", "Public") +
         `<div id="feed"></div><script>
     document.querySelector('[aria-label="Post"]').onclick=()=>{
       document.documentElement.dataset.submitCount=String(Number(document.documentElement.dataset.submitCount||0)+1);
@@ -41,6 +41,7 @@ export async function verifyPublicationContracts({ context, accountId, runId, ac
   try {
     const profile = {
       ...selectorsProfile,
+      audienceText: "Public",
       version: 1,
       accountRef: "synthetic-account",
       channelRef: "synthetic-channel",

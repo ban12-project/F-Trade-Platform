@@ -35,7 +35,7 @@ export const publicationSetupResultSchema = z
       .nullable(),
     active: z.boolean(),
     observedAt: z.iso.datetime(),
-    textOnly: z.literal(true),
+    textOnly: z.boolean(),
   })
   .strict();
 export type PublicationSetupResult = z.infer<typeof publicationSetupResultSchema>;

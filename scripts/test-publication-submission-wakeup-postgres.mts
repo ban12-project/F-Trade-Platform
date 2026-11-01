@@ -66,6 +66,10 @@ try {
     const format = scenario.split("-")[0] as "text" | "image" | "video";
     const f = await seedPublicationAccessFixture(db, format);
     process.env.SOCIAL_FACEBOOK_OWNER_USER_ID = f.actorId;
+    // The shared authorization fixture now supplies a binding. This scenario
+    // exercises real owner registration instead, so remove only its synthetic node.
+    await db.execute(sql`DELETE FROM browser_fleet_binding WHERE node_id = ${f.nodeId}`);
+    await db.execute(sql`DELETE FROM browser_fleet_node WHERE id = ${f.nodeId}`);
     const actor = { id: f.actorId, sessionId: f.sessionId };
     await assert.rejects(
       ownerBrowserCommand(
@@ -186,12 +190,13 @@ try {
         await blocker.query("BEGIN");
         await blocker.query("SELECT id FROM browser_fleet_node WHERE id = $1 FOR UPDATE", [nodeId]);
         pending = submit();
-        await Promise.race([
-          pending,
-          delay(5000).then(() => {
-            throw Error("Submission must not wait for the node lock while holding business rows");
-          }),
-        ]);
+        // Admission now locks the account snapshot; do not enqueue against a
+        // concurrent login/grant change. Release the short metadata transaction
+        // and verify the durable queue is then accepted normally.
+        await delay(100);
+        assert.equal((await snapshot()).jobs.length, 0);
+        await blocker.query("ROLLBACK");
+        await pending;
         const deferred = await snapshot();
         assert.equal(deferred.publications.length, 1);
         assert.equal(deferred.outbox.length, 0);

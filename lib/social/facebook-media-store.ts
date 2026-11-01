@@ -3,7 +3,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { get } from "@vercel/blob";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { type FleetState, publicationScopeActive } from "@/lib/browser-fleet/policy";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { facebookPublicationManifest } from "@/lib/db/facebook-runtime-schema";
@@ -263,7 +263,10 @@ export async function resolveFacebookMediaSubmissionScope(
 ) {
   if (selectedScope && process.env.SOCIAL_FACEBOOK_WORKER_ENABLED !== "1") {
     const account = await assertPublishingAccountReady(database, selectedScope, actorId);
-    if (account.textOnly) throw new Error("这个账号目前只接通文字发布，图片和视频尚未完成核对。");
+    if (account.textOnly)
+      throw new Error(
+        "该账号的发布适配器缺少媒体附件验证能力，系统尚未完成适配。已保留内容与素材。",
+      );
     return { channelRef: account.channelRef, accountRef: account.accountRef };
   }
   if (process.env.SOCIAL_FACEBOOK_WORKER_ENABLED === "1") {
@@ -405,7 +408,8 @@ export async function submitFacebookMediaPublication(
       () => new Date(),
     );
     await sourceFor(value, tx, new Date(), true);
-    const idempotencyKey = `facebook-media:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}`;
+    const idempotencyKey = `facebook-media:${scope.channelRef}:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}:${value.previewDigest}`;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 0))`);
     const [existing] = await tx
       .select({
         id: socialBrowserJob.payloadRef,
@@ -414,7 +418,19 @@ export async function submitFacebookMediaPublication(
         failureCode: socialBrowserJob.failureCode,
       })
       .from(socialBrowserJob)
-      .where(eq(socialBrowserJob.idempotencyKey, idempotencyKey))
+      .where(
+        and(
+          eq(socialBrowserJob.channelRef, scope.channelRef),
+          eq(socialBrowserJob.accountRef, scope.accountRef),
+          or(
+            eq(socialBrowserJob.idempotencyKey, idempotencyKey),
+            eq(
+              socialBrowserJob.idempotencyKey,
+              `facebook-media:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}`,
+            ),
+          ),
+        ),
+      )
       .for("update");
     await authorizeSocialProject(tx, identity, "write", value.contentRef, value.format);
     const expiresAt = await authorizeSocialActor(tx, identity, ["content:review"], true);

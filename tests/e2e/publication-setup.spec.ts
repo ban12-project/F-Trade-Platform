@@ -34,16 +34,17 @@ test("read-only setup discovers exact account and empty composer without posting
   await page.setContent(composer.replace("Only me</button>", "Custom</button>"));
   expect(await inspect()).toEqual({ stage: "audience" });
 });
-test("setup UI offers automation, requires completed review and handles unauthenticated access without activating", async ({
+test("setup automatically checks service and keeps authentication errors actionable", async ({
   page,
 }) => {
   await page.goto("/testing/publication-page-inspection");
-  await expect(page.getByRole("button", { name: "自动核对发布功能（不发帖）" })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "确认以上范围，让文字发布配置生效" }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: "自动核对发布功能（不发帖）" }).click();
   await expect(page.getByText(/配置未生效。请确认接管页面仍在运行/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "登录完成，重试连接" })).toBeVisible();
+  await expect(
+    page.getByText(
+      "新发布的范围为公开（所有人）。本步骤只检查账号和页面，不上传素材、不发布帖子。",
+    ),
+  ).toBeVisible();
 });
 
 test("an existing profile-photo update can verify result structure without requiring a test text post", async ({
