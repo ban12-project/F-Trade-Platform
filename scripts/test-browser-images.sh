@@ -55,12 +55,15 @@ docker run --rm --network none --read-only --init \
 name="ftrade-image-smoke-${ARCH}-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 inspection_config=$(mktemp)
 trap 'rm -f "$inspection_config"; docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
-node --input-type=module -e '
-  import { readFileSync, writeFileSync } from "node:fs";
+# Use the already-verified Agent image: production hosts need Docker, not Node.
+docker run --rm --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --memory 128m --cpus 1 \
+  --entrypoint node "$agent" --input-type=module -e '
+  import { readFileSync } from "node:fs";
   const config = JSON.parse(readFileSync("ops/browser-node/camofox.config.json", "utf8"));
   config.plugins["ftrade-inspection-fixture"] = { enabled: true };
-  writeFileSync(process.argv[1], JSON.stringify(config));
-' "$inspection_config"
+  process.stdout.write(JSON.stringify(config));
+' > "$inspection_config"
 deadline=$(( $(date +%s) * 1000 + 90000 ))
 docker run -d --name "$name" --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
