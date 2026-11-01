@@ -812,6 +812,8 @@ async function nodeOperation(
   }
   if (request.operation === "finish") {
     finishRun(state, run.id, request.outcome, request.stopped, now);
+    if (run.kind === "publish" && request.outcome === "failed" && request.publicationFailure)
+      run.publicationFailure = request.publicationFailure;
     await audit(tx, row.id, "browser_lease.stopped", run.id);
     return { active: false };
   }

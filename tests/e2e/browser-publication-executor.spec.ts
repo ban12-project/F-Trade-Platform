@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
+import { nodeRequestSchema } from "../../lib/browser-fleet/contracts";
 import { publicationFailureLabel } from "../../lib/social/publication-presentation";
+import {
+  isPublicationPreauthorizationFailure,
+  publicationPreclickFailure,
+} from "../../ops/browser-node/publication-diagnostics.mjs";
 import { createPublicationExecutor } from "../../ops/browser-node/publication-executor.mjs";
 
 const accountRef = "synthetic-account";
@@ -256,3 +261,36 @@ for (const [mode, phase] of [
     expect(run.events.some((event) => event.startsWith("preclick:"))).toBe(false);
   });
 }
+
+test("preauthorization diagnostics are bounded and preserve legacy retry behavior", async () => {
+  const code = publicationPreclickFailure("prepare", "facebook_audience_picker_timeout");
+  expect(isPublicationPreauthorizationFailure(code)).toBe(true);
+  expect(isPublicationPreauthorizationFailure("fleet_publication_not_authorized")).toBe(true);
+  for (const value of [
+    "fleet_publication_not_authorized:prepare:private-data",
+    `${code}:extra`,
+    "fleet_publication_result_unknown",
+  ])
+    expect(isPublicationPreauthorizationFailure(value)).toBe(false);
+  expect(publicationFailureLabel(code)).toContain("无法识别公开发布选项");
+  expect(publicationFailureLabel("fleet_publication_not_authorized")).not.toMatch(
+    /尚未取得发帖授权|选择器/,
+  );
+  const finish = {
+    operation: "finish",
+    installationId: "11111111-1111-4111-8111-111111111111",
+    bootId: "11111111-1111-4111-8111-111111111111",
+    runId: "11111111-1111-4111-8111-111111111111",
+    leaseId: "11111111-1111-4111-8111-111111111111",
+    stopped: true,
+    outcome: "failed",
+    publicationFailure: { stage: "prepare", code: "facebook_audience_picker_timeout" },
+  };
+  expect(nodeRequestSchema.safeParse(finish).success).toBe(true);
+  expect(
+    nodeRequestSchema.safeParse({
+      ...finish,
+      publicationFailure: { stage: "prepare", code: "private-message" },
+    }).success,
+  ).toBe(false);
+});

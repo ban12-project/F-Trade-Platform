@@ -1,4 +1,5 @@
 import { parseObservationHttpFailure } from "../../ops/browser-node/observation-diagnostics.mjs";
+import { parsePublicationPreclickFailure } from "../../ops/browser-node/publication-diagnostics.mjs";
 
 /** Presentation only: publishing and retries remain governed by the domain service. */
 export function publicationProgress(
@@ -57,7 +58,7 @@ export function publicationProgress(
 
 const publicationFailureLabels: Record<string, string> = {
   fleet_publication_not_authorized:
-    "系统在提交前停止，尚未取得发帖授权。请处理账号提示后重新预览；系统不会要求您配置页面选择器。",
+    "发布服务在提交前中止，本次未发送。您的发布确认已收到，无需重复授权；故障处理后可重新预览并重试。",
   fleet_publication_preflight_rejected:
     "内容、素材或账号状态已变化，本次未发送。请返回当前内容查看最新状态。",
   publication_publish_unknown: "发布步骤未取得可验证回执",
@@ -93,6 +94,30 @@ const publicationFailureLabels: Record<string, string> = {
 /** Fixed codes only. Unknown legacy strings stay internal instead of being
  * rendered as if they were trusted diagnostics. */
 export function publicationFailureLabel(failureCode?: string | null) {
+  const preparation = parsePublicationPreclickFailure(failureCode);
+  if (preparation) {
+    const details: Record<string, string> = {
+      facebook_composer_transition_timeout: "发帖编辑器或受众设置未能在规定时间内就绪",
+      facebook_composer_ready_timeout: "发帖编辑器未能在规定时间内就绪",
+      facebook_audience_picker_timeout: "无法识别公开发布选项",
+      facebook_audience_selection_timeout: "公开发布选项未能完成选择",
+      facebook_audience_applied_timeout: "公开发布设置未能生效",
+      publication_preview_text_mismatch: "编辑器中的正文与预览不一致",
+      publication_attachment_mismatch: "编辑器中的附件与预览不一致",
+    };
+    const stages: Record<string, string> = {
+      open: "打开发布页面",
+      identity: "核对账号身份",
+      baseline: "检查已有帖子",
+      media: "准备发布素材",
+      prepare: "准备发帖编辑器",
+      preview: "核对发布内容",
+      authorize: "检查执行条件",
+      recheck: "复核发布内容",
+      authorization_deadline: "检查执行时限",
+    };
+    return `本次未发送：${details[preparation.code] ?? `${stages[preparation.stage]}时中止`}。您的发布确认已收到，无需重复授权。`;
+  }
   const http = parseObservationHttpFailure(failureCode);
   if (http)
     return `浏览器观察 HTTP ${http.httpStatus}（${http.request} / ${http.step} / ${http.code}）`;

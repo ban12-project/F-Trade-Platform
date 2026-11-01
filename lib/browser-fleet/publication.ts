@@ -1,4 +1,5 @@
 import { isBatchPublication } from "@/lib/social/publication-batch-receipt";
+import { publicationPreclickFailure } from "../../ops/browser-node/publication-diagnostics.mjs";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -240,7 +241,7 @@ export async function reconcilePublications(
       .set({
         status: "paused",
         failureCode: preClickFailure
-          ? "fleet_publication_not_authorized"
+          ? publicationPreclickFailure(run.publicationFailure?.stage, run.publicationFailure?.code)
           : unknown
             ? "fleet_publication_result_unknown"
             : "fleet_publication_cancelled",

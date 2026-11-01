@@ -23,6 +23,7 @@ import {
 import { assertVideoRetentionForId } from "@/lib/video/retention-access";
 import { aggregateRetentionCondition } from "@/lib/video/retention-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { isPublicationPreauthorizationFailure } from "../../ops/browser-node/publication-diagnostics.mjs";
 import { facebookTextPayloadSchema } from "./facebook-worker-protocol";
 import {
   assertSocialAuthorizationAlive,
@@ -279,7 +280,7 @@ export async function listProjectPublicationData(
         ...publication,
         failureLabel: publicationFailureLabel(failureCode),
         canRetry:
-          publication.status === "failed" && failureCode === "fleet_publication_not_authorized",
+          publication.status === "failed" && isPublicationPreauthorizationFailure(failureCode),
       }),
     ),
   };
@@ -329,7 +330,7 @@ export async function submitControlledPublication(
       if (!existing) throw new Error("发布任务存在但发布记录缺失，请暂停渠道并人工核对。");
       if (
         existingJob.status === "paused" &&
-        existingJob.failureCode === "fleet_publication_not_authorized"
+        isPublicationPreauthorizationFailure(existingJob.failureCode)
       ) {
         const { requeueUnsentFacebookMediaPublication } = await import("./facebook-media-store");
         await requeueUnsentFacebookMediaPublication(tx, existingJob.id, existing.id, actorId);
