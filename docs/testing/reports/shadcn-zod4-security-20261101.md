@@ -41,3 +41,25 @@ Keep #498 open. This does not establish that untrusted business input previously
 reached the tooling parser, nor does it validate every independently downloaded
 CLI or remove all residual dependency risks. General automatic CI stays paused
 under #711; final MVP acceptance still requires restored CI and its other gates.
+
+## Remaining minimatch advisory: observed call sites
+
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+describes globparts amplification at optimizationLevel >= 2; its version range
+matches installed minimatch 5.1.9, 9.0.9 and 10.2.6. Inspecting the installed
+JavaScript after this upgrade found:
+
+| Parent | Observed call | Boundary |
+| --- | --- | --- |
+| @vercel/queue 0.3.1 | matchesFunctionsPattern uses minimatch(sourceFile, pattern) | No options argument; this is source-file route mapping |
+| @ts-morph/common 0.27.0 | Two minimatch(path, pattern) calls | No options argument |
+| @oclif/core 4.11.4 | Plugin dependency names matched with minimatch(p, w) | No options argument |
+| @swc/cli 0.8.1 | Source include/exclude calls use minimatch(filename, pattern) | No options argument |
+| filelist 1.0.6 | minimatch.match(files, pat, opts or empty object) | Options are forwarded; installed minimatch 5 has no firstPhasePreProcess/optimizationLevel implementation |
+
+The inspected minimatch 9/10 code defaults optimizationLevel to 1 and enters
+first-phase amplification only at >= 2. Thus these observed default-option
+call sites do not enable the documented trigger. This is a scoped reachability
+finding, not proof of safety for arbitrary future consumers/options or other
+denial-of-service patterns. The audit match is not suppressed and #498 remains
+open pending an upstream compatible update or a separately verified migration.
