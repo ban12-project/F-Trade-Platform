@@ -33,9 +33,10 @@ the corresponding 4.23.0 query against the public npm registry.
   channel account is used. CLI `info` also confirms the existing Base UI /
   base-nova project configuration; it does not modify components.
 - Fresh version-based audit reports **0 critical / 0 high / 1 moderate / 1 low**.
-  Remaining matches are minimatch and deepmerge. The separate deepmerge patch
-  in PR #744 is not included in this branch, and a local patch does not remove
-  the advisory's version match anyway.
+  Remaining matches are minimatch and deepmerge. After PR #744 merged, this
+  branch was rebased to retain its deepmerge patch. Frozen installation and
+  14 combined deepmerge/tooling/HTTP cases plus all 18 Zod cases pass together.
+  A local patch does not remove the advisory's version match.
 
 Keep #498 open. This does not establish that untrusted business input previously
 reached the tooling parser, nor does it validate every independently downloaded
