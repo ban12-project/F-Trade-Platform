@@ -1,8 +1,8 @@
 # Main-to-OpenShip releases
 
 `vps-release.yml` validates each main push, then requests that exact SHA through a
-restricted SSH key. The host builds images, drains workers, updates the two
-OpenShip services and checks their health. OpenShip `autoDeploy` stays false:
+restricted SSH key. The host builds images, drains workers, updates the browser
+OpenShip service and checks their health. OpenShip `autoDeploy` stays false:
 its direct deployment path would bypass this transaction. Vercel deployment is
 independent; application/service API changes must remain backward compatible.
 
@@ -20,7 +20,7 @@ changes to bootstrap.py require a deliberate host update.
 - Relevant tracked inputs are hashed. Unrelated main changes get a successful
   `runtime_inputs_unchanged` receipt without restarting services. Worker images
   are rebuilt only when their Dockerfile, copied payload or pinned browser build
-  inputs change. Both controller images are rebuilt for relevant releases.
+  inputs change. The browser controller is rebuilt for relevant releases. Compute is hosted in Vercel Sandbox and is never built or deployed by this driver.
 - Native builds read and validate the Docker daemon architecture (amd64/arm64),
   explicitly pass `TARGETARCH` to the browser base, and use the same architecture
   for image smoke tags. The resource-limited legacy builder does not supply
@@ -38,15 +38,25 @@ changes to bootstrap.py require a deliberate host update.
   its existing fail-closed freshness guard. Later releases use the drain marker
   directly. The monitor resumes even if the first drain times out.
 - Acceptance requires OpenShip's deployment to be ready, the exact immutable
-  image to be running and healthy, fresh host telemetry, and the public runtime
-  health endpoint to return 200. Failed promotion restores both previous service
+  image to be running and healthy, fresh host telemetry, and the public browser
+  gateway to reject an unauthenticated request with 403 (with valid TLS). Failed promotion restores both previous service
   configs/images and monitor files. Failed rollback retains the journal and drain
   marker for investigation; it must not admit jobs into a partially restored pair.
 
-The approved contract fixes the existing 12 GiB mounted workspace pool and both
-quota tiers. A changed contract or independent service configuration drift stops
-the release for reconciliation. This workflow never formats or resizes storage.
-It does not automatically reconcile dashboard edits into its saved baseline.
+The version-2 host contract permits only the browser target. It has no compute
+pool, quota marker, compute image or broker health dependency. The build-capacity
+reservation uses the existing browser Agent image. Old two-service config or
+recovery journals fail closed before any attempt to restart the retired broker.
+
+After owner-authorized cleanup (#803), the VPS compute broker/project, 12 GiB
+workspace image, its mount/service units and compute-only image tags are removed.
+`ops/vps-runtime/retire.py` first performs a dry-run; `--apply` requires the release
+lock, no active workers, matching healthy browser configuration and a verified
+edge. It archives small recovery metadata privately, reconciles the old failed
+compute rollback, and clears its drain only after browser/telemetry verification.
+No Docker volume, browser image, native profile or browser backup is deleted.
+A partial failure retains the drain for operator reconciliation; do not blindly
+restore archived two-service state or clear the drain before health checks.
 
 ## Operations and recovery
 
@@ -78,7 +88,7 @@ cat /opt/ftrade-vps/release/receipts/<SHA>.json
 less /opt/ftrade-vps/release/logs/<SHA>.log
 ```
 
-Only the two dedicated project IDs in private config are mutated. Edge routes
+Only the dedicated browser project ID in private config is mutated. Edge routes
 remain separately managed. Deployment rollback restores code/configuration; it
 cannot undo arbitrary business data writes. Storage/schema migrations need a
 separate reviewed migration and compatibility plan.

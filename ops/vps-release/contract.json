@@ -1,6 +1,4 @@
 {
-  "version": 1,
-  "poolBytes": 12884901888,
-  "quotaMarker": "heavy:20000:20015:5368709120;light:20100:20115:1342177280;inodes:65536",
-  "poolPath": "/opt/ftrade-vps/compute/workspaces"
+  "version": 2,
+  "workloads": ["browser"]
 }

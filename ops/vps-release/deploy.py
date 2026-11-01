@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path('/opt/ftrade-vps/release')
@@ -21,6 +22,18 @@ CAPACITY = pathlib.Path('/opt/ftrade-vps/capacity')
 CLI = ['/root/.openship/bin/openship', '--local', '--json']
 MONITOR = 'ftrade-capacity-monitor.service'
 TERMINAL = {'ready', 'failed', 'rolled_back', 'rollback_failed', 'superseded'}
+
+
+def check_browser_edge(url):
+    # The browser gateway requires a capability, including for /health.
+    # TLS validation plus an explicit unauthorized response proves the edge;
+    # Docker's separate health check proves the Agent process is ready.
+    try:
+        with urllib.request.urlopen(url, timeout=15):
+            raise RuntimeError('browser_gateway_unexpected_public_access')
+    except urllib.error.HTTPError as error:
+        error.close()
+        if error.code != 403: raise
 
 
 def save(path, value):
@@ -105,20 +118,17 @@ def fingerprints(source):
     browser=source/'ops/browser-node'
     browser_paths=copied_inputs(browser/'browser.Dockerfile',browser)
     browser_paths.update(browser/x for x in ['docker-bake.hcl','browser.Dockerfile.dockerignore'])
-    compute_paths=copied_inputs(source/'ops/vps-runtime/compute.Dockerfile',source)
-    compute_paths.update(copied_inputs(source/'ops/video-sandbox/Dockerfile',source))
     release_paths=set()
-    for name in ['ops/browser-node','ops/vps-runtime','ops/host-capacity','ops/vps-release','lib/browser-fleet']:
+    for name in ['ops/browser-node','ops/host-capacity','ops/vps-release','lib/browser-fleet']:
         # Only tracked files: never hash local Python caches, secrets or upstream clones.
         names=run(['git','ls-files','-z',name],cwd=source).split('\0')
         release_paths.update(source/n for n in names if n)
-    release_paths.update(compute_paths)
     if (source/'.dockerignore').exists():release_paths.add(source/'.dockerignore')
     def digest(paths):
         h=hashlib.sha256()
         for p in sorted(paths):h.update(str(p.relative_to(source)).encode()+b'\0'+p.read_bytes()+b'\0')
         return h.hexdigest()
-    return {'browserWorker':digest(browser_paths),'computeWorker':digest(compute_paths),'release':digest(release_paths)}
+    return {'browserWorker':digest(browser_paths),'release':digest(release_paths)}
 
 
 def reserve_build(sha, image, timeout=1200):
@@ -144,7 +154,6 @@ def build(source, sha, previous, fp, configs):
     reported=docker('info','--format','{{.Architecture}}').strip()
     arch={'x86_64':'amd64','amd64':'amd64','aarch64':'arm64','arm64':'arm64'}.get(reported)
     if arch is None:raise RuntimeError('unsupported_build_architecture')
-    gid=str(pathlib.Path('/var/run/docker.sock').stat().st_gid)
     def image(file, tag, context=source, args=()):
         cmd=['docker','build','--memory','2g','--memory-swap','2g','--cpu-period','100000','--cpu-quota','200000','--label','org.opencontainers.image.revision='+sha,'-q','-t',tag,'-f',str(file)]
         for arg in args:cmd+=['--build-arg',arg]
@@ -152,9 +161,7 @@ def build(source, sha, previous, fp, configs):
         return docker('image','inspect','--format','{{.Id}}',tag).strip()
     updated=json.loads(json.dumps(configs))
     updated['browser']['image']=image(source/'ops/browser-node/openship.Dockerfile','ftrade-release-agent:'+sha)
-    updated['runtime']['image']=image(source/'ops/vps-runtime/openship.Dockerfile','ftrade-release-broker:'+sha,args=['DOCKER_GID='+gid])
     docker('run','--rm','--network','none','--memory','512m','--entrypoint','node',updated['browser']['image'],'ops/browser-node/smoke.mjs',timeout=90)
-    docker('run','--rm','--network','none','--memory','256m','-e','FTRADE_RUNTIME_TOKEN='+'a'*64,'-e','FTRADE_COMPUTE_IMAGE=sha256:'+'b'*64,'--entrypoint','python3',updated['runtime']['image'],'-c',"import runpy;m=runpy.run_path('/app/server.py',run_name='smoke');assert m['PROFILES']['light']['memory']==512")
     if previous.get('browserWorker')!=fp['browserWorker']:
         worker=image(source/'ops/browser-node/browser.Dockerfile','ftrade-release-browser:'+sha,source/'ops/browser-node',['TARGETARCH='+arch])
         updated['browser']['environment']['BROWSER_IMAGE']=worker
@@ -171,14 +178,6 @@ def build(source, sha, previous, fp, configs):
             env['PATH']=node_dir+os.pathsep+os.environ.get('PATH','')
             run(['node','--version'],30,env=env)
             run(['bash','scripts/test-browser-images.sh'],600,cwd=source,env=env)
-    if previous.get('computeWorker')!=fp['computeWorker']:
-        base=image(source/'ops/video-sandbox/Dockerfile','ftrade-release-media:'+sha)
-        worker=image(source/'ops/vps-runtime/compute.Dockerfile','ftrade-release-compute:'+sha,args=['MEDIA_BASE='+base])
-        updated['runtime']['environment']['FTRADE_COMPUTE_IMAGE']=worker
-        docker('run','--rm','--network','none','--memory','2g','-v',str(source/'scripts')+':/test:ro',worker,'/opt/markitdown/bin/python3','/test/test-document-sandbox.py',timeout=180)
-        docker('run','--rm','--network','none','--memory','2g',worker,'node','--input-type=module','-e',"import {readFileSync} from 'node:fs';import {execFileSync} from 'node:child_process';execFileSync(readFileSync('/opt/ftrade-remotion/browser-path','utf8'),['--version']);",timeout=60)
-    for script in ['scripts/test-vps-compute.py','ops/vps-runtime/test-openship.py','ops/vps-runtime/test-quota-admission.py']:
-        run(['python3',script],120,cwd=source)
     run(['python3','-m','unittest','discover','-s','ops/host-capacity','-p','test*.py'],60,cwd=source)
     return updated
 
@@ -333,8 +332,7 @@ def promote(cfg, previous, updated, source, sha):
         snapshot=json.loads((CAPACITY/'telemetry.json').read_text())
         if not snapshot['healthy'] or time.time()-snapshot['observedAt']>8:raise RuntimeError('monitor_not_healthy')
         # Public edge is intentionally separate from OpenShip-managed services.
-        with urllib.request.urlopen(cfg['runtimeHealth'],timeout=10) as r:
-            if r.status!=200:raise RuntimeError('edge_health_failed')
+        check_browser_edge(cfg['browserHealth'])
     except BaseException:
         try:
             rollback(cfg,journal);(ROOT/'journal.json').unlink();status(sha,'rolled_back','promotion_failed_previous_version_restored')
@@ -343,8 +341,21 @@ def promote(cfg, previous, updated, source, sha):
         raise
 
 
+def validate_host_contract(source,cfg,state):
+    expected=json.loads((source/'ops/vps-release/contract.json').read_text())
+    if cfg.get('contract')!=expected or expected!={'version':2,'workloads':['browser']}:
+        raise RuntimeError('host_contract_requires_review')
+    if set(cfg['targets'])!={'browser'} or set(state['configs'])!={'browser'}:
+        raise RuntimeError('retired_compute_target_requires_reconciliation')
+    journal=ROOT/'journal.json'
+    if journal.exists() and set(json.loads(journal.read_text())['previous'])!={'browser'}:
+        raise RuntimeError('retired_compute_journal_requires_reconciliation')
+    # Refuse old recovery state before any attempt to revive the retired broker.
+
+
 def main(sha):
     source=pathlib.Path.cwd();cfg=json.loads((ROOT/'config.json').read_text());state=json.loads((ROOT/'state.json').read_text())
+    validate_host_contract(source,cfg,state)
     if (ROOT/'journal.json').exists():
         journal=json.loads((ROOT/'journal.json').read_text())
         rollback(cfg,journal);(ROOT/'journal.json').unlink();clear_drain(journal['revision'])
@@ -356,14 +367,11 @@ def main(sha):
         for name,target in cfg['targets'].items():healthy(target,state['configs'][name]['image'])
         run(['systemctl','start',MONITOR]);clear_drain(orphan['revision'])
         status(orphan['revision'],'ready' if state['revision']==orphan['revision'] else 'failed','interrupted_drain_recovered')
-    if json.loads((source/'ops/vps-release/contract.json').read_text())!=cfg['contract']:raise RuntimeError('host_contract_requires_review')
-    pool=pathlib.Path(cfg['contract']['poolPath'])
-    if not os.path.ismount(pool) or (pool/'.ftrade-quota-v2').read_text().strip()!=cfg['contract']['quotaMarker'] or (pool.parent/'workspace.img').stat().st_size!=cfg['contract']['poolBytes']:raise RuntimeError('host_contract_mismatch')
     fp=fingerprints(source)
     if fp==state['fingerprints']:
         status(sha,'ready','runtime_inputs_unchanged');return
     configs=state['configs']
-    worker_build=any(fp[k]!=state['fingerprints'].get(k) for k in ['browserWorker','computeWorker'])
+    worker_build=fp['browserWorker']!=state['fingerprints'].get('browserWorker')
     disk=shutil.disk_usage(ROOT)
     if disk.free < (12 if worker_build else 4)*1024**3:raise RuntimeError('insufficient_build_disk_headroom')
     # Refuse to overwrite edits made independently in OpenShip/the host.
@@ -386,7 +394,7 @@ def main(sha):
     reservation=None;draining=False;legacy=False
     try:
         status(sha,'waiting_for_build_capacity')
-        reservation=reserve_build(sha,configs['runtime']['environment']['FTRADE_COMPUTE_IMAGE'])
+        reservation=reserve_build(sha,configs['browser']['image'])
         status(sha,'building_and_testing')
         updated=build(source,sha,state['fingerprints'],fp,configs)
         docker('rm','-f',reservation);reservation=None
