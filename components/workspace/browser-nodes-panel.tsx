@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -69,7 +70,7 @@ const stateLabels: Record<string, string> = {
   completed: "已释放",
   failed: "未完成",
   unknown: "结果未知",
-  ready: "登录已就绪",
+  ready: "登录已验证",
   needs_login: "需要登录",
   needs_2fa: "需要 2FA",
   checkpoint: "需要安全验证",
@@ -79,6 +80,7 @@ const stateLabels: Record<string, string> = {
 };
 export function BrowserNodesPanel() {
   const [nodes, setNodes] = useState<Nodes>([]);
+  const [editingAccount, setEditingAccount] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState<string | null>(null);
@@ -99,7 +101,8 @@ export function BrowserNodesPanel() {
     defaultValues: {
       nodeId: "",
       channelRef: "facebook-personal",
-      accountRef: "",
+      accountRef: `account-${crypto.randomUUID()}`,
+      displayName: "",
       expectedEgressIp: "",
       pollSeconds: 900,
       credentials: emptyCredentials,
@@ -117,7 +120,7 @@ export function BrowserNodesPanel() {
         const rows = await browserNodesAction();
         if (!disposed) setNodes(rows);
       } catch {
-        if (!disposed) setMessage("无法读取节点，请检查管理权限与数据库迁移。");
+        if (!disposed) setMessage("无法读取发布服务，请重试或联系管理员检查配置。");
       } finally {
         loading = false;
       }
@@ -145,7 +148,7 @@ export function BrowserNodesPanel() {
       }
       if (result.result.accessKey) setKey(result.result.accessKey);
       setNodes(await browserNodesAction());
-      setMessage("操作已记录，节点将在下一次轮询时同步。");
+      setMessage("操作已记录，正在等待发布服务同步；请以账号实际状态为准。");
       return result.result;
     } catch {
       setMessage("请求未完成，请先查看节点和排队记录，避免重复操作。");
@@ -308,78 +311,165 @@ export function BrowserNodesPanel() {
       </Collapsible>
       <Card>
         <CardHeader>
-          <CardTitle>授权账号与同步配置</CardTitle>
+          <CardTitle>添加或更新发布账号</CardTitle>
           <CardDescription>
-            相同节点、渠道和账号标识再次保存即更新。凭据加密保存，留空保留原值；修改后停止该账号的旧租约。浏览器会话保存在绑定节点的独立存储中。
+            选择已有账号会带出原有绑定；添加账号时系统生成固定标识。名称可以修改，账号不能跨服务重复绑定。保存凭据后需要重新验证登录，发布开关保持原状。
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <Field className="mb-4">
+            <FieldLabel htmlFor="configured-account">选择已有账号或添加账号</FieldLabel>
+            <Select
+              items={Object.fromEntries([
+                ["new", "添加新账号"],
+                ...nodes.flatMap((n) =>
+                  n.accounts.map((a) => [
+                    a.id,
+                    `Facebook · ${a.displayName || a.accountRef}（${n.name}）`,
+                  ]),
+                ),
+              ])}
+              value={editingAccount}
+              onValueChange={(value) => {
+                const selected = nodes
+                  .flatMap((n) => n.accounts.map((a) => ({ node: n, account: a })))
+                  .find(({ account }) => account.id === value);
+                setEditingAccount(value ?? "");
+                accountForm.reset(
+                  selected
+                    ? {
+                        nodeId: selected.node.id,
+                        channelRef: selected.account.channelRef,
+                        accountRef: selected.account.accountRef,
+                        displayName: selected.account.displayName || selected.account.accountRef,
+                        expectedEgressIp: selected.account.expectedEgressIp ?? "",
+                        pollSeconds: selected.account.pollSeconds,
+                        credentials: emptyCredentials,
+                      }
+                    : {
+                        nodeId: nodes.length === 1 ? nodes[0].id : "",
+                        channelRef: "facebook-personal",
+                        accountRef: `account-${crypto.randomUUID()}`,
+                        displayName: "",
+                        expectedEgressIp: "",
+                        pollSeconds: 900,
+                        credentials: emptyCredentials,
+                      },
+                );
+              }}
+            >
+              <SelectTrigger id="configured-account">
+                <SelectValue placeholder="添加新账号" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="new">添加新账号</SelectItem>
+                  {nodes.flatMap((n) =>
+                    n.accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        Facebook · {a.displayName || a.accountRef}（{n.name}）
+                      </SelectItem>
+                    )),
+                  )}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          {!nodes.length && (
+            <p className="mb-4 text-sm">
+              尚未连接发布服务，请先展开上方“高级：连接节点与容量”，由管理员完成连接。
+            </p>
+          )}
           <form
             className="grid gap-4 sm:grid-cols-2"
             onSubmit={accountForm.handleSubmit(async (value) => {
-              const result = await send({ operation: "grant", value });
-              if (result) accountForm.reset({ ...value, credentials: emptyCredentials });
+              const result = await send({
+                operation: "grant",
+                value: {
+                  ...value,
+                  accountRef: value.accountRef || `account-${crypto.randomUUID()}`,
+                },
+              });
+              if (result) {
+                accountForm.reset({ ...value, credentials: emptyCredentials });
+                if (result.accountId) setEditingAccount(result.accountId);
+              }
             })}
           >
             <Field>
-              <FieldLabel>目标节点</FieldLabel>
-              <Controller
-                control={accountForm.control}
-                name="nodeId"
-                render={({ field }) => (
-                  <Select
-                    items={Object.fromEntries(
-                      nodes.filter((n) => n.status === "active").map((n) => [n.id, n.name]),
-                    )}
-                    value={field.value}
-                    onValueChange={(v) => field.onChange(v ?? "")}
-                    disabled={busy}
-                  >
-                    <SelectTrigger aria-label="目标节点">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {nodes
-                        .filter((n) => n.status === "active")
-                        .map((n) => (
-                          <SelectItem key={n.id} value={n.id}>
-                            {n.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[accountForm.formState.errors.nodeId]} />
-            </Field>
-            {(
-              [
-                ["channelRef", "渠道标识"],
-                ["accountRef", "账号标识（固定不变）"],
-                ["expectedEgressIp", "预期固定出口 IP（由代理服务商确认）"],
-              ] as const
-            ).map(([name, label]) => (
-              <Field key={name} data-invalid={!!accountForm.formState.errors[name]}>
-                <FieldLabel htmlFor={`account-${name}`}>{label}</FieldLabel>
-                <Input
-                  id={`account-${name}`}
-                  {...accountForm.register(name)}
-                  aria-invalid={!!accountForm.formState.errors[name]}
-                  disabled={busy}
-                />
-                <FieldError errors={[accountForm.formState.errors[name]]} />
-              </Field>
-            ))}
-            <Field>
-              <FieldLabel htmlFor="account-poll">收件箱检查间隔（秒，0 为停用）</FieldLabel>
+              <FieldLabel htmlFor="account-displayName">账号名称（方便团队识别）</FieldLabel>
               <Input
-                id="account-poll"
-                type="number"
-                {...accountForm.register("pollSeconds", { valueAsNumber: true })}
+                id="account-displayName"
+                {...accountForm.register("displayName")}
                 disabled={busy}
               />
-              <FieldError errors={[accountForm.formState.errors.pollSeconds]} />
+              <FieldError errors={[accountForm.formState.errors.displayName]} />
+              <FieldDescription>
+                平台：Facebook。首次添加需由管理员配置下方发布服务和固定代理。
+              </FieldDescription>
             </Field>
+            <Collapsible className="sm:col-span-2" defaultOpen={!editingAccount}>
+              <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
+                高级：发布服务与网络出口
+              </CollapsibleTrigger>
+              <CollapsibleContent className="grid gap-4 pt-4 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel>目标节点</FieldLabel>
+                  <Controller
+                    control={accountForm.control}
+                    name="nodeId"
+                    render={({ field }) => (
+                      <Select
+                        items={Object.fromEntries(
+                          nodes.filter((n) => n.status === "active").map((n) => [n.id, n.name]),
+                        )}
+                        value={field.value}
+                        onValueChange={(v) => field.onChange(v ?? "")}
+                        disabled={busy || (!!editingAccount && editingAccount !== "new")}
+                      >
+                        <SelectTrigger aria-label="目标节点">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {nodes
+                            .filter((n) => n.status === "active")
+                            .map((n) => (
+                              <SelectItem key={n.id} value={n.id}>
+                                {n.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <FieldError errors={[accountForm.formState.errors.nodeId]} />
+                </Field>
+                {([["expectedEgressIp", "预期固定出口 IP（由代理服务商确认）"]] as const).map(
+                  ([name, label]) => (
+                    <Field key={name} data-invalid={!!accountForm.formState.errors[name]}>
+                      <FieldLabel htmlFor={`account-${name}`}>{label}</FieldLabel>
+                      <Input
+                        id={`account-${name}`}
+                        {...accountForm.register(name)}
+                        aria-invalid={!!accountForm.formState.errors[name]}
+                        disabled={busy}
+                      />
+                      <FieldError errors={[accountForm.formState.errors[name]]} />
+                    </Field>
+                  ),
+                )}
+                <Field>
+                  <FieldLabel htmlFor="account-poll">收件箱检查间隔（秒，0 为停用）</FieldLabel>
+                  <Input
+                    id="account-poll"
+                    type="number"
+                    {...accountForm.register("pollSeconds", { valueAsNumber: true })}
+                    disabled={busy}
+                  />
+                  <FieldError errors={[accountForm.formState.errors.pollSeconds]} />
+                </Field>
+              </CollapsibleContent>
+            </Collapsible>
             {(
               [
                 ["loginUsername", "Facebook 登录名（可选）"],
@@ -471,11 +561,11 @@ export function BrowserNodesPanel() {
               ))}
             </FieldSet>
             <Button type="submit" disabled={busy || !nodes.length}>
-              保存账号授权
+              保存账号凭据
             </Button>
           </form>
           <p className="mt-4 text-sm text-muted-foreground">
-            默认节点仅包含人工接管。保存密码不代表已安装自动登录执行器；收件箱执行器未安装时不会显示虚假的“已同步”。
+            只有人工接管能力时，可以打开远程页面完成登录与核对。自动登录、收件箱同步和发布需要分别配置对应执行能力。保存密码不会完成登录或自动允许发布。
           </p>
         </CardContent>
       </Card>
@@ -483,11 +573,22 @@ export function BrowserNodesPanel() {
         <Card key={node.id}>
           <CardHeader>
             <CardTitle>
-              {node.name} <Badge variant="outline">{node.status}</Badge>
+              {node.name}{" "}
+              <Badge variant="outline">
+                {node.status === "active" ? "服务授权有效" : "服务授权已撤销"}
+              </Badge>
             </CardTitle>
             <CardDescription>
               最近连接 {node.lastSeenAt ? new Date(node.lastSeenAt).toLocaleString() : "尚未连接"} ·
-              执行能力 {node.capabilities.join(", ") || "待节点报告"}
+              执行能力{" "}
+              {node.capabilities
+                .map(
+                  (capability) =>
+                    ({ interactive: "人工接管", inbox: "收件箱同步", publish: "发布执行" })[
+                      capability
+                    ],
+                )
+                .join("、") || "尚未报告"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -525,9 +626,13 @@ export function BrowserNodesPanel() {
               </CollapsibleContent>
             </Collapsible>
             {node.accounts.map((account) => (
-              <div key={account.id} className="space-y-2 rounded-lg border p-3">
+              <div
+                id={`publishing-account-${account.id}`}
+                key={account.id}
+                className="scroll-mt-20 space-y-2 rounded-lg border p-3"
+              >
                 <p className="font-medium">
-                  {account.accountRef}{" "}
+                  {account.displayName || account.accountRef}{" "}
                   <Badge variant="outline">
                     {stateLabels[account.authState] ?? account.authState}
                   </Badge>
@@ -547,7 +652,7 @@ export function BrowserNodesPanel() {
                       void send({ operation: "open", nodeId: node.id, accountId: account.id });
                     }}
                   >
-                    排队打开浏览器
+                    完成登录 / 处理异常
                   </Button>
                   <Button
                     type="button"
@@ -591,7 +696,8 @@ export function BrowserNodesPanel() {
                   .filter((run) => run.kind !== "interactive")
                   .map((run) => (
                     <p key={run.id} className="text-sm">
-                      {run.kind} · {stateLabels[run.status] ?? run.status}
+                      {run.kind === "publish" ? "发布任务" : "收件箱同步"} ·{" "}
+                      {stateLabels[run.status] ?? "等待处理"}
                     </p>
                   ))}
               </CollapsibleContent>
@@ -622,7 +728,7 @@ export function BrowserNodesPanel() {
                       </span>
                     )}
                     <span className="text-sm">
-                      {node.accounts.find((a) => a.id === run.accountId)?.accountRef} · {run.kind}
+                      {node.accounts.find((a) => a.id === run.accountId)?.accountRef} · 登录操作
                     </span>
                     {run.kind === "interactive" &&
                       run.status === "running" &&

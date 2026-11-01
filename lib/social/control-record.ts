@@ -27,6 +27,13 @@ export function applySocialControlChange(
   if (parsed.action === "enable" || parsed.action === "resume") {
     return { enabled: true, circuitStatus: "active", pauseReason: null, pauseEvidenceRef: null };
   }
+  if (
+    !current.enabled &&
+    current.circuitStatus === "paused" &&
+    current.pauseReason &&
+    !["manual_pause", "not_enabled"].includes(current.pauseReason)
+  )
+    return current;
   return {
     enabled: false,
     circuitStatus: "paused",

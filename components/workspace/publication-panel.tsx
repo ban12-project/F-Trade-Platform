@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SendIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -19,14 +19,6 @@ import {
 } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { PublicationReconciliationForm } from "@/components/workspace/publication-reconciliation-form";
 import { VideoPublicationReconciliationForm } from "@/components/workspace/video-publication-reconciliation-form";
@@ -41,6 +33,7 @@ import type {
 } from "@/lib/social/publication-store";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
+import { PublishingAccountSelect, publishingAccountKey } from "./publishing-account-select";
 import { SubmissionFeedback as Message } from "./submission-feedback";
 import { WorkspaceLink } from "./workspace-link";
 export function PublicationPanel({
@@ -79,8 +72,21 @@ export function PublicationPanel({
   );
   const selected = current;
   const [channelKey, setChannelKey] = useState(
-    channels[0] ? `${channels[0].channelRef}\u001f${channels[0].accountRef}` : "",
+    channels[0] ? publishingAccountKey(channels[0]) : "",
   );
+  useEffect(() => {
+    try {
+      const key = sessionStorage.getItem(`publication-account:${projectId}:${current?.id}`);
+      const account = channels.find((a) => publishingAccountKey(a) === key);
+      if (account && key) {
+        setChannelKey(key);
+        form.setValue("channelRef", account.channelRef);
+        form.setValue("accountRef", account.accountRef);
+      }
+    } catch {
+      /* Storage is optional; no server state depends on it. */
+    }
+  }, [channels, projectId, current?.id, form]);
   useEffect(() => {
     if (state.status === "success") {
       form.reset(form.getValues());
@@ -93,8 +99,13 @@ export function PublicationPanel({
     form.setValue("previewDigest", current?.previewDigest ?? "");
     form.setValue("confirmationRef", "");
   }, [form, current?.id, current?.format, current?.previewDigest]);
+  const submitting = useRef(false);
+  useEffect(() => {
+    if (!pending && state.status !== "idle") submitting.current = false;
+  }, [pending, state.status]);
   function submit(value: z.infer<typeof publicationConfirmationFormSchema>) {
-    if (!selected) return;
+    if (!selected || submitting.current || pending || state.status === "success") return;
+    submitting.current = true;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item);
     data.set("previewDigest", selected.previewDigest);
@@ -112,19 +123,30 @@ export function PublicationPanel({
         </p>
       </div>
       {publications.map((item) => {
-        const progress = publicationProgress(item.status, item.humanConfirmed);
+        const progress = publicationProgress(item.status, item.humanConfirmed, item.jobStatus);
         return (
           <Card key={item.id}>
             <CardHeader>
               <CardTitle>{progress.label}</CardTitle>
               <CardDescription>
-                {item.channelRef} · {item.accountRef}
+                {channels.find(
+                  (a) => a.accountRef === item.accountRef && a.channelRef === item.channelRef,
+                )?.name ?? item.accountRef}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               <p className="text-sm">{progress.detail}</p>
+              <p className="text-sm text-muted-foreground">
+                提交时间：{new Date(item.createdAt).toLocaleString()}
+              </p>
+              {item.publishedAt && (
+                <p className="text-sm">发布时间：{new Date(item.publishedAt).toLocaleString()}</p>
+              )}
               {item.failureLabel ? (
-                <p className="text-sm text-muted-foreground">回执阶段：{item.failureLabel}</p>
+                <details className="text-sm text-muted-foreground">
+                  <summary>查看处理详情</summary>
+                  <p>{item.failureLabel}</p>
+                </details>
               ) : null}
               {item.status === "unknown" && item.format === "text" ? (
                 <PublicationReconciliationForm projectId={projectId} publicationId={item.id} />
@@ -133,7 +155,21 @@ export function PublicationPanel({
                 <VideoPublicationReconciliationForm projectId={projectId} publicationId={item.id} />
               ) : null}
               {item.externalPublicationRef ? (
-                <p className="break-all text-sm">发布凭证：{item.externalPublicationRef}</p>
+                <p className="break-all text-sm">
+                  发布凭证：
+                  {/^https:\/\//.test(item.externalPublicationRef) ? (
+                    <a
+                      href={item.externalPublicationRef}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      查看平台帖子
+                    </a>
+                  ) : (
+                    item.externalPublicationRef
+                  )}
+                </p>
               ) : null}
             </CardContent>
             <CardFooter>
@@ -156,15 +192,15 @@ export function PublicationPanel({
           <CardHeader>
             <CardTitle>确认并提交发布</CardTitle>
             <CardDescription>
-              核对发布内容、渠道与账户。本次确认只授权这一条内容，不会授权后续自动发布。
+              核对以下内容和目标账号。本次发布到所选账号的帖子页面；具体可见范围以平台账号设置为准。本次确认只授权这一条内容，不会授权后续自动发布。
             </CardDescription>
           </CardHeader>
           <CardContent>
             {!channels.length ? (
               <Alert className="mb-4">
-                <AlertTitle>等待渠道管理员启用发布</AlertTitle>
+                <AlertTitle>尚未添加发布账号</AlertTitle>
                 <AlertDescription>
-                  当前没有可用渠道，请由管理员在账号与管理中核对授权和渠道状态。
+                  请使用下方“去配置渠道”添加账号。配置完成后可返回当前内容继续发布。
                 </AlertDescription>
               </Alert>
             ) : null}
@@ -186,49 +222,33 @@ export function PublicationPanel({
                 </Field>
                 {selected ? (
                   <Alert>
-                    <AlertTitle>发布内容预览</AlertTitle>
+                    <AlertTitle>
+                      发布内容预览
+                      {selected.contentVersion ? ` · 版本 ${selected.contentVersion}` : ""}
+                    </AlertTitle>
                     <AlertDescription>{selected.preview}</AlertDescription>
                   </Alert>
                 ) : null}
                 <Field>
-                  <FieldLabel htmlFor="publication-channel">已启用渠道</FieldLabel>
-                  <Select
-                    items={Object.fromEntries(
-                      channels.map((item) => [
-                        `${item.channelRef}\u001f${item.accountRef}`,
-                        `${item.channelRef} · ${item.accountRef}`,
-                      ]),
-                    )}
+                  <FieldLabel htmlFor="publication-channel">发布账号</FieldLabel>
+                  <PublishingAccountSelect
+                    id="publication-channel"
+                    accounts={channels}
                     value={channelKey}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      const channel = channels.find(
-                        (item) => `${item.channelRef}\u001f${item.accountRef}` === value,
-                      );
-                      setChannelKey(value);
+                    disabled={pending}
+                    onChange={(channel) => {
+                      setChannelKey(publishingAccountKey(channel));
+                      try {
+                        sessionStorage.setItem(
+                          `publication-account:${projectId}:${current?.id}`,
+                          publishingAccountKey(channel),
+                        );
+                      } catch {}
                       form.setValue("confirmationRef", "");
-                      if (channel) {
-                        form.setValue("channelRef", channel.channelRef);
-                        form.setValue("accountRef", channel.accountRef);
-                      }
+                      form.setValue("channelRef", channel.channelRef);
+                      form.setValue("accountRef", channel.accountRef);
                     }}
-                  >
-                    <SelectTrigger id="publication-channel" className="w-full">
-                      <SelectValue placeholder="没有已启用渠道" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {channels.map((item) => {
-                          const key = `${item.channelRef}\u001f${item.accountRef}`;
-                          return (
-                            <SelectItem key={key} value={key}>
-                              {item.channelRef} · {item.accountRef}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  />
                 </Field>
               </FieldGroup>
             </form>
@@ -237,7 +257,12 @@ export function PublicationPanel({
             <Button
               form="publication-confirmation"
               type="submit"
-              disabled={pending || !candidates.length || !channels.length}
+              disabled={
+                pending ||
+                state.status === "success" ||
+                !candidates.length ||
+                !channels.find((a) => publishingAccountKey(a) === channelKey)?.ready
+              }
             >
               {pending ? (
                 <Spinner data-icon="inline-start" />

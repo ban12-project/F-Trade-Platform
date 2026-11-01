@@ -17,6 +17,9 @@ mock.module(new URL("../lib/auth.ts", import.meta.url).href, {
 });
 mock.module(new URL("../lib/browser-fleet/publication-page-inspection.ts", import.meta.url).href, {
   exports: {
+    currentInspectionAccess: async () => {
+      throw Error("not used");
+    },
     inspectOwnedPublicationPage: async (input: unknown, actor: unknown) => {
       calls.push({ input, actor });
       if (failure) throw Error("SYNTHETIC_PRIVATE_PAGE_DETAILS");

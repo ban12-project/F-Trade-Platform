@@ -74,11 +74,14 @@ test("inspection UI keeps expired candidates explicit and unauthenticated reques
   await page.goto("/testing/publication-page-inspection");
   await expect(page.getByText("候选配置已过期，需要重新审核", { exact: true })).toBeVisible();
   await expect(page.getByText("媒体输入（含隐藏控件）：1", { exact: true })).toBeVisible();
+  await page.getByText("高级：检查原有发布规则", { exact: true }).click();
   await page.getByRole("button", { name: "只读核对当前页面", exact: true }).click();
   await expect(
     page.getByText("无法核对当前发布页面。请确认当前登录、节点归属、运行中的接管及页面检查服务。", {
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: /发布|上传/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "确认以上范围，让文字发布配置生效" }),
+  ).toBeDisabled();
 });

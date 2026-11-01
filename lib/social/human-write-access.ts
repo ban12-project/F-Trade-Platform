@@ -9,6 +9,7 @@ import {
   workspaceProjectItem,
   workspaceProjectMember,
 } from "@/lib/db/schema";
+import { PublishingAccountUnavailableError } from "./publishing-account-policy";
 
 const actorSchema = z
   .object({ actorId: z.string().trim().min(1), sessionId: z.string().trim().min(1) })
@@ -141,6 +142,7 @@ const safeMessages = new Set([
   "Gate 03 交期确认已过期，请重新申请确认。",
 ]);
 export function socialHumanFailureMessage(error: unknown, fallback: string) {
+  if (error instanceof PublishingAccountUnavailableError) return error.message;
   if (error instanceof SocialHumanAccessError) return SOCIAL_HUMAN_ACCESS_MESSAGE;
   return error instanceof Error && safeMessages.has(error.message) ? error.message : fallback;
 }

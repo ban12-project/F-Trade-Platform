@@ -1,7 +1,16 @@
 import { parseObservationHttpFailure } from "../../ops/browser-node/observation-diagnostics.mjs";
 
 /** Presentation only: publishing and retries remain governed by the domain service. */
-export function publicationProgress(status: string, humanConfirmed = false) {
+export function publicationProgress(
+  status: string,
+  humanConfirmed = false,
+  jobStatus?: string | null,
+) {
+  if (["submitted", "pending", "queued"].includes(status)) {
+    if (jobStatus === "running" || jobStatus === "claimed")
+      return { label: "执行中", detail: "发布服务正在处理，尚未取得成功回执。请勿重复提交。" };
+    return { label: "待执行", detail: "发布任务已提交，等待服务执行。提交成功不代表已发布。" };
+  }
   switch (status) {
     case "published":
       if (humanConfirmed)

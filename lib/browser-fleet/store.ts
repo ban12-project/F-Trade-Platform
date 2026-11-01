@@ -76,7 +76,7 @@ async function lockNode(tx: DatabaseTransaction, id: string): Promise<NodeRow> {
     sql`SELECT * FROM browser_fleet_node WHERE id = ${id} FOR UPDATE`,
   );
   const row = result.rows[0] as NodeRow | undefined;
-  if (!row || row.document.version !== 1) throw new Error("browser_node_unavailable");
+  if (row?.document.version !== 1) throw new Error("browser_node_unavailable");
   return row;
 }
 async function save(tx: DatabaseTransaction, row: NodeRow) {
@@ -197,6 +197,7 @@ export async function listBrowserNodes(actorId: string) {
   }));
 }
 export type OwnerResult = {
+  accountId?: string;
   nodeId?: string;
   accessKey?: string;
   runId?: string;
@@ -234,11 +235,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
     if (row.owner_id !== actor.id) throw new Error("browser_node_forbidden");
     const state = row.document;
     const now = Date.now();
-    let result: {
-      accessKey?: string;
-      runId?: string;
-      connection?: { token: string; origin: string; expiresAt: number };
-    } = {};
+    let result: OwnerResult = {};
     if (command.operation === "revoke" || command.operation === "rotate") {
       const key = createAccessKey(row.id);
       row.key_hash = digest(key);
@@ -259,7 +256,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       } else if (command.operation === "rotate") result = { accessKey: key };
     } else if (command.operation === "grant") {
       if (row.status !== "active") throw new Error("node_revoked");
-      await grant(tx, row, command, actor.id, now);
+      result = { accountId: await grant(tx, row, command, actor.id, now) };
     } else if (
       command.operation === "account" ||
       command.operation === "confirm-login" ||
@@ -396,6 +393,7 @@ async function grant(
     };
     row.document.accounts.push(account);
   }
+  if (command.value.displayName) account.displayName = command.value.displayName;
   const ring = configuredFacebookKeyring();
   account.loginCiphertext = updateFacebookLoginCiphertext(
     c,
@@ -425,6 +423,7 @@ async function grant(
     if (run.accountId === account.id && (isLive(run) || run.status === "queued"))
       requestStop(row.document, run);
   await audit(tx, actorId, "browser_account.credentials_updated", account.id);
+  return account.id;
 }
 /** Single node row lock serializes capacity reservations across concurrent HTTP
  * polls. Different nodes lock different rows. No in-process mutex is relied on.
@@ -490,6 +489,68 @@ async function nodeOperation(
   now: number,
 ): Promise<Record<string, unknown>> {
   const state = row.document;
+  if (request.operation === "publication-setup") {
+    const run = state.runs.find((r) => r.id === request.runId);
+    const account = run && state.accounts.find((a) => a.id === run.accountId);
+    if (
+      !run ||
+      run.leaseId !== request.leaseId ||
+      run.kind !== "interactive" ||
+      run.status !== "running" ||
+      run.stopRequested ||
+      run.leaseUntil <= now ||
+      run.deadline <= now ||
+      !account?.enabled ||
+      run.requestedBy !== row.owner_id ||
+      !run.authSessionId ||
+      request.expiresAt <= now ||
+      request.expiresAt > now + 7 * 86400000 ||
+      state.runs.some(
+        (r) => r.kind === "publish" && ["queued", "starting", "running"].includes(r.status),
+      )
+    )
+      throw new Error("publication_setup_inactive");
+    const [ownerSession] = await tx
+      .select({ id: session.id })
+      .from(session)
+      .where(
+        and(
+          eq(session.id, run.authSessionId),
+          eq(session.userId, row.owner_id),
+          gt(session.expiresAt, new Date(now)),
+        ),
+      );
+    if (!ownerSession) throw new Error("publication_setup_session_expired");
+    state.capabilities = [...new Set([...state.capabilities, "publish" as const])];
+    state.publicationScopes = [
+      ...(state.publicationScopes ?? []).filter(
+        (s) => s.accountRef !== account.accountRef || s.channelRef !== account.channelRef,
+      ),
+      {
+        channelRef: account.channelRef,
+        accountRef: account.accountRef,
+        expiresAt: request.expiresAt,
+        textOnly: true,
+        audience: request.audience,
+      },
+    ];
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "browser_publication_setup.activated",
+      actorType: "human",
+      actorId: row.owner_id,
+      subjectType: "browser_node",
+      subjectId: row.id,
+      metadata: {
+        account_id: account.id,
+        candidate_hash: request.candidateHash,
+        expires_at: request.expiresAt,
+        text_only: true,
+      },
+      occurredAt: new Date(now),
+    });
+    return { active: true };
+  }
   if (request.operation === "claim") {
     // Reject stale interactive requests before reserving memory or disclosing a proxy.
     const waiting = state.runs.filter((r) => r.status === "queued" && r.kind === "interactive");
@@ -566,8 +627,7 @@ async function nodeOperation(
   if (request.operation === "admit") {
     const run = state.runs.find((r) => request.ticket.startsWith(`${r.id}.`));
     if (
-      !run ||
-      run.kind !== "interactive" ||
+      run?.kind !== "interactive" ||
       run.status !== "running" ||
       run.stopRequested ||
       !run.ticketHash ||

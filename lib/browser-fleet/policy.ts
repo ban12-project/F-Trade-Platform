@@ -18,6 +18,7 @@ export type AuthState =
   | "result_unknown";
 export type Limits = { maxBrowsers: number; memoryBudgetMb: number; browserMemoryMb: number };
 export type Account = {
+  displayName?: string;
   id: string;
   channelRef: string;
   accountRef: string;
@@ -93,7 +94,13 @@ export type FleetState = {
     automatic?: boolean;
   }>;
   inboxScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
-  publicationScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
+  publicationScopes?: Array<{
+    channelRef: string;
+    accountRef: string;
+    expiresAt: number;
+    textOnly?: boolean;
+    audience?: "Public" | "Friends" | "Only me";
+  }>;
   lastSeenAt: number;
   accounts: Account[];
   runs: Run[];
@@ -336,7 +343,7 @@ export function renewRun(
   }
   return run;
 }
-export function requestStop(state: FleetState, run: Run) {
+export function requestStop(_state: FleetState, run: Run) {
   run.stopRequested = true;
   run.ticketHash = null;
   if (run.status === "queued") {

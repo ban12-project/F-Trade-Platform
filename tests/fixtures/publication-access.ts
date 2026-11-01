@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
+import { initialState } from "../../lib/browser-fleet/policy";
 import type { Database } from "../../lib/db/client";
 import {
   facebookAccountRuntime,
@@ -236,6 +237,37 @@ export async function seedPublicationAccessFixture(
     );
     await db.execute(
       sql`INSERT INTO browser_fleet_publication (job_id,node_id,run_id,payload,authorization_id,authorized_lease_id,authorized_until,receipt,received_at) VALUES (${jobId},${nodeId},${runId},${JSON.stringify(payload)}::jsonb,${authorizationId},${randomUUID()},${Date.now() - 1},${JSON.stringify({ outcome: "unknown", authorizationId, payloadDigest: digestSocialWorkerPayload(payload) })}::jsonb,now())`,
+    );
+  }
+  if (!reconcile) {
+    const fleet = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
+    fleet.installationId = randomUUID();
+    fleet.bootId = randomUUID();
+    fleet.lastSeenAt = Date.now();
+    fleet.capabilities = ["publish"];
+    const accountId = randomUUID();
+    fleet.accounts = [
+      {
+        id: accountId,
+        displayName: "合成权限测试账号",
+        channelRef,
+        accountRef,
+        enabled: true,
+        authState: "ready",
+        expectedEgressIp: "203.0.113.10",
+        credentialVersion: 1,
+        loginCiphertext: null,
+        proxyCiphertext: "SYNTHETIC",
+        pollSeconds: 0,
+        nextPollAt: 0,
+        lastCheckedAt: null,
+      },
+    ];
+    await db.execute(
+      sql`INSERT INTO browser_fleet_node(id,owner_id,name,gateway_origin,key_hash,document) VALUES(${nodeId},${f.actorId},'SYNTHETIC capability fixture','https://synthetic.example.invalid',${randomUUID()},${JSON.stringify(fleet)}::jsonb)`,
+    );
+    await db.execute(
+      sql`INSERT INTO browser_fleet_binding(id,node_id,account_ref,channel_ref) VALUES(${accountId},${nodeId},${accountRef},${channelRef})`,
     );
   }
   const interactiveId = randomUUID();
