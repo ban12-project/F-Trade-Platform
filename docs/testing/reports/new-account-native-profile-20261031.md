@@ -111,3 +111,8 @@ based on cached image `ca832ef326d1` with only the current native-profile module
 replaced. An unnecessary remote base pull was explicitly cancelled and replaced
 by a pull-never build from the verified local image ID; the cancelled build is
 not release evidence. The restricted local policy is not installed in production.
+
+The separate legacy JSON migration fixture also passed on that same overlay and
+restricted policy, retaining its original source and synthetic persisted state
+across container replacement. Current production automatic first-use remains
+unverified and #718 stays open after engineering merge.
