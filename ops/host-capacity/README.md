@@ -26,9 +26,10 @@ and a 10-second host CPU peak. No request, file, URL or credential is sampled.
 Admission holds one kernel flock across both controllers through Docker start.
 It uses measured CPU plus 25% margin (minimum 0.25 core per existing worker),
 current memory plus 25% and recent memory peak plus 10%. A new task starts with
-its full profile budget. Each newly observed worker needs three samples before
-more work is admitted, so several tiny-at-start jobs cannot rush through at
-once. Recent peaks expire gradually; there is no immediate expand/shrink loop.
+its full profile budget. New workers are charged their complete hard envelope until three samples
+exist. A just-started worker may be absent from the snapshot for at most eight
+seconds; older missing workers fail closed. Short tasks can therefore start
+together when their full budgets fit, without treating startup as zero usage. Recent peaks expire gradually; there is no immediate expand/shrink loop.
 
 Additional hard guards remain:
 

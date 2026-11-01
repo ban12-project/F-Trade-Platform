@@ -1,5 +1,6 @@
 """Atomic host admission shared with the browser Agent's Linux flock."""
 import contextlib
+import datetime
 import fcntl
 import json
 import math
@@ -47,12 +48,24 @@ def check_adaptive_budget(containers, memory_mb, cpu_cores, available_mb, total_
             if h.get('Memory', 0) <= 0 or h.get('NanoCpus', 0) <= 0:
                 raise KeyError('unbounded')
             memory += h['Memory'] / 1048576
-            w = snapshot['workers'][c['Id']]
-            if not all(number(w[k]) for k in ['samples', 'memoryMb', 'memoryPeakMb', 'cpuPeakCores', 'oomKills']) or w['samples'] < 3 or w['oomKills']:
-                raise KeyError('worker warming or OOM')
+            w = snapshot['workers'].get(c['Id'])
+            if w is None:
+                state = c.get('State', {})
+                if state.get('Status') != 'created':
+                    started = datetime.datetime.fromisoformat(state['StartedAt'].replace('Z', '+00:00')).timestamp()
+                    if not 0 <= now - started <= 8: raise KeyError('worker missing')
+                demand += h['NanoCpus'] / 1e9
+                footprint += h['Memory'] / 1048576
+                continue
+            if not all(number(w[k]) for k in ['samples', 'memoryMb', 'memoryPeakMb', 'cpuPeakCores', 'oomKills']) or w['oomKills']:
+                raise KeyError('worker invalid or OOM')
+            if w['samples'] < 3:
+                demand += h['NanoCpus'] / 1e9
+                footprint += h['Memory'] / 1048576
+                continue
             demand += max(min(0.25, h['NanoCpus'] / 1e9), w['cpuPeakCores'] * 1.25)
             footprint += max(w['memoryMb'] * 1.25, w['memoryPeakMb'] * 1.1)
-    except (KeyError, TypeError):
+    except (KeyError, TypeError, ValueError, OverflowError):
         raise CapacityUnavailable('host_capacity_telemetry_unavailable') from None
     budget = total_mb - max(2048, total_mb * 0.2)
     reserve = max(1536, total_mb * 0.1)

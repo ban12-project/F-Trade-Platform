@@ -41,7 +41,7 @@ and resource samples; credentials and account data are not in this report.
 
 ## Deterministic validation
 
-- 43 Node browser/network/admission tests, including 17 decision scenarios shared
+- 43 Node browser/network/admission tests, including 20 decision scenarios shared
   verbatim with Python: pressure, peak history, stale/future/malformed snapshots,
   missing workers, warm-up, OOM evidence and non-overcommitted memory limits.
 - 5 Python admission tests, 13 broker tests, 4 namespace/OpenShip tests and 4
@@ -50,6 +50,12 @@ and resource samples; credentials and account data are not in this report.
 - Agent offline payload/missing-asset negative control; compute client default
   and explicit profile propagation, capacity-only retry and no ambiguous retry.
 - TypeScript no-emit, targeted Biome and diff whitespace checks.
+
+A final startup review found that blocking all new work during worker sampling
+could serialize short tasks. Cold workers now reserve their complete profile
+until measured samples are available. Fresh missing samples use the same full
+reservation for at most eight seconds; older missing samples still fail closed.
+This path is covered by the cross-language fixtures and the final canary rerun.
 
 ## Boundaries
 

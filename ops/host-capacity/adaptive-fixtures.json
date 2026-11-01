@@ -170,8 +170,8 @@
       ]
     },
     {
-      "name": "new worker must warm before another admission",
-      "allowed": false,
+      "name": "warming worker reserves full profile without serializing short jobs",
+      "allowed": true,
       "changes": [
         {
           "path": [
@@ -311,6 +311,137 @@
             "cpuCount"
           ],
           "value": 8
+        }
+      ]
+    },
+    {
+      "name": "fresh worker before its first sample",
+      "allowed": true,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "light2"
+          ],
+          "remove": true
+        },
+        {
+          "path": [
+            "containers"
+          ],
+          "value": [
+            {
+              "Id": "heavy",
+              "HostConfig": {
+                "Memory": 2147483648,
+                "NanoCpus": 2000000000.0
+              }
+            },
+            {
+              "Id": "light1",
+              "HostConfig": {
+                "Memory": 536870912,
+                "NanoCpus": 500000000.0
+              }
+            },
+            {
+              "Id": "light2",
+              "HostConfig": {
+                "Memory": 536870912,
+                "NanoCpus": 500000000.0
+              },
+              "State": {
+                "Status": "running",
+                "StartedAt": "1970-01-01T00:01:39Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "old missing worker still fails closed",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "light2"
+          ],
+          "remove": true
+        },
+        {
+          "path": [
+            "containers"
+          ],
+          "value": [
+            {
+              "Id": "heavy",
+              "HostConfig": {
+                "Memory": 2147483648,
+                "NanoCpus": 2000000000.0
+              }
+            },
+            {
+              "Id": "light1",
+              "HostConfig": {
+                "Memory": 536870912,
+                "NanoCpus": 500000000.0
+              }
+            },
+            {
+              "Id": "light2",
+              "HostConfig": {
+                "Memory": 536870912,
+                "NanoCpus": 500000000.0
+              },
+              "State": {
+                "Status": "running",
+                "StartedAt": "1970-01-01T00:01:20Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cold full-envelope CPU charge prevents startup overcommit",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "heavy",
+            "samples"
+          ],
+          "value": 1
+        },
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "light1",
+            "samples"
+          ],
+          "value": 1
+        },
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "light2",
+            "samples"
+          ],
+          "value": 1
+        },
+        {
+          "path": [
+            "cpuCores"
+          ],
+          "value": 1
         }
       ]
     }

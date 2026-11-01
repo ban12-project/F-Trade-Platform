@@ -79,14 +79,29 @@ export function checkAdaptiveBudget(
       if (!(h?.Memory > 0) || !(h.NanoCpus > 0)) throw new Error();
       memory += h.Memory / 1048576;
       const w = snapshot.workers[c.Id];
+      if (!w) {
+        const started = Date.parse(c.State?.StartedAt) / 1000;
+        if (
+          c.State?.Status !== "created" &&
+          !(number(started) && now - started >= 0 && now - started <= 8)
+        )
+          throw new Error();
+        demand += h.NanoCpus / 1e9;
+        footprint += h.Memory / 1048576;
+        continue;
+      }
       if (
         !["samples", "memoryMb", "memoryPeakMb", "cpuPeakCores", "oomKills"].every((k) =>
           number(w[k]),
         ) ||
-        w.samples < 3 ||
         w.oomKills
       )
         throw new Error();
+      if (w.samples < 3) {
+        demand += h.NanoCpus / 1e9;
+        footprint += h.Memory / 1048576;
+        continue;
+      }
       demand += Math.max(Math.min(0.25, h.NanoCpus / 1e9), w.cpuPeakCores * 1.25);
       footprint += Math.max(w.memoryMb * 1.25, w.memoryPeakMb * 1.1);
     }
