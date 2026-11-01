@@ -239,18 +239,16 @@ try {
   const { reconcileUnknownTextPublication } = await import(
     "../lib/social/publication-reconciliation"
   );
-  await db
-    .insert(s.auditEvent)
-    .values({
-      id: randomUUID(),
-      actorType: "human",
-      actorId: image.actorId,
-      action: "social_publication.batch_submitted",
-      subjectType: "publication_batch",
-      subjectId: randomUUID(),
-      metadata: { results: [{ publicationId: image.publicationId }] },
-      occurredAt: new Date(),
-    });
+  await db.insert(s.auditEvent).values({
+    id: randomUUID(),
+    actorType: "human",
+    actorId: image.actorId,
+    action: "social_publication.batch_submitted",
+    subjectType: "publication_batch",
+    subjectId: randomUUID(),
+    metadata: { results: [{ publicationId: image.publicationId }] },
+    occurredAt: new Date(),
+  });
   const originalImage = await db
     .select()
     .from(s.aggregateRecord)
