@@ -29,6 +29,11 @@ merge callbacks are outside the JSON-input threat model.
   input immutability and legitimate own constructor/prototype values pass.
 - Four deepmerge cases plus eight existing actual-tooling checks pass (12/12),
   including installed shadcn MCP negotiation and a read-only tool call.
+- After integrating main's qs/Hono fixes, all fourteen combined cases pass.
+  Frozen installation, TypeScript, targeted Biome and production build pass.
+  The first build lacked the synthetic Better Auth secret and stopped during
+  page collection; the successful run uses the checked-in production-build CI
+  environment with a synthetic, unreachable database, not real credentials.
 
 The version-based audit match remains; no advisory is suppressed. Standalone
 `pnpm dlx shadcn` does not inherit this workspace patch. Keep #498 open for that
