@@ -48,7 +48,9 @@ export function WorkspaceNavigation({
       <Sidebar>
         <SidebarHeader className="gap-4 p-4">
           <span className="text-lg font-semibold tracking-tight">F-Trade</span>
-          <NewWorkButton onOpen={() => setOpenMobile(false)} />
+          <div data-guide="new-work">
+            <NewWorkButton onOpen={() => setOpenMobile(false)} />
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <nav aria-label="主要导航" data-testid="workspace-navigation">
@@ -68,6 +70,7 @@ export function WorkspaceNavigation({
                           render={
                             <WorkspaceLink
                               href={href}
+                              data-guide={item.path.slice(1) || "tasks"}
                               aria-current={active ? "page" : undefined}
                               onFollow={() => setOpenMobile(false)}
                             />

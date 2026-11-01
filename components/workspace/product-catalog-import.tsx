@@ -307,7 +307,7 @@ export function ProductCatalogImport({
         {restoring && <p role="status">正在恢复目录任务…</p>}
         {view && (
           <>
-            <div className="flex flex-wrap items-center gap-2" role="status">
+            <div id="catalog-progress" className="flex flex-wrap items-center gap-2" role="status">
               <Badge variant="secondary">
                 {view.status === "ready"
                   ? `${view.candidates.length} 条候选`
@@ -404,7 +404,7 @@ export function ProductCatalogImport({
                       </CollapsibleContent>
                     </Collapsible>
                     <FieldSet>
-                      <FieldLegend>
+                      <FieldLegend id="catalog-selection-heading">
                         选择目录记录（已选 {selected.length}/{maximumCatalogBatchRecords}）
                       </FieldLegend>
                       <FieldDescription>
