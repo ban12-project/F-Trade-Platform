@@ -2,8 +2,8 @@ import { Camoufox, launchOptions } from "camoufox";
 import { createNativeProfileRuntime, nativeProfileWindowSize } from "../native-profile.mjs";
 import { needsUpdate } from "./node_modules/camoufox/dist/geolocation.js";
 
-// This adapter is not selected by the production image. The surrounding service
-// must supply a fixed proxy and an owned display before admitting any task.
+// The surrounding service must supply a fixed proxy and an owned display
+// before admitting any task.
 export function createOfficialLauncher({
   environment = process.env,
   root,

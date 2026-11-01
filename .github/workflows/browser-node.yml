@@ -1,12 +1,41 @@
 name: Browser node validation
 on:
   workflow_dispatch:
+    inputs:
+      verify_images:
+        description: Build and test the native amd64/arm64 image pairs without publishing
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  images:
+    if: inputs.verify_images
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: ./.github/actions/browser-images
+        with:
+          arch: ${{ matrix.arch }}
+          publish: "false"
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20

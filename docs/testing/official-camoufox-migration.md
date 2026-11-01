@@ -32,9 +32,10 @@ failure. The 82-case launcher/service/profile/Agent/Viewer/egress suite passes.
 
 The initial beta.41 image built successfully after checksum verification and asset
 preparation. It was created from an earlier context snapshot and is not the final
-candidate. The canonical image is rebuilding with the integrated source; actual
-browser acceptance, old-profile upgrade/copy rollback, network checks and production
-cutover remain pending. No passing image or account acceptance is claimed yet.
+candidate. The integrated amd64 candidate has now passed native acceptance, including both
+pre-initialized and broker-authorized first-use profiles. Synthetic beta.40 profile
+copy upgrade and untouched-baseline rollback also pass. Network checks and production
+cutover remain pending; synthetic results do not establish live account acceptance.
 No production cutover or account profile access has occurred in this checkpoint.
 
 ## Integrated candidate failures and limits
@@ -61,8 +62,10 @@ version resolver also requires an active versioned installation. Preparation now
 registers the checksum-verified archive under the official versioned layout,
 records its supported interface, calls the official active-version helper, and
 asserts both resolved directory and full version before provisioning assets.
-The rebuilt candidate's native tests are still pending; no success is inferred
-from these source fixes. Runtime root filesystem protection remains enabled.
+The rebuilt candidate passed actual native tests with the runtime root filesystem
+protection enabled. The initial codec canvas readback failed under official canvas
+randomization; the fixture now checks four pixels from the compositor screenshot
+without disabling that protection, and verifies the decoded 128×72 video dimensions.
 
 Actual image coverage includes H.264 pixels, unchanged DOM inspection assertions,
 login authentication and lease denial, native storage/keys, first use, noVNC input,
@@ -70,6 +73,24 @@ ticket replay/expiry, watchdog shutdown and kernel resource bounds. The dedicate
 upgrade fixture creates two disposable volumes: beta.40 writes the synthetic
 baseline, beta.41 reads a copy across restarts, then beta.40 rereads the untouched
 baseline for rollback evidence. It never accepts an existing account volume.
+
+The tested local amd64 browser image is
+`sha256:6cfab22129d64cc96fab27bf46c8ace6eaefda79484b7304d8b2032b2a5cf51d`.
+Actual binary output confirms beta.41. Both profile initialization paths pass
+H.264 rendering, unchanged full-DOM negative controls, synthetic login/publication/
+inbox contracts, storage and non-extractable-key restart, noVNC keyboard input,
+ticket replay/expiry, and watchdog shutdown followed by restart. Peak observed
+memory was 1,930,506,240 bytes under the 2 GiB limit; no OOM was reported.
+Screen and WebGL properties changed across some restarts: this is storage
+continuity evidence, not a stable identity guarantee.
+
+The upgrade fixture used cached beta.40 image
+`sha256:ca832ef326d118be8ec3f1f46f8d51cd005ed7df89129148b25c772a1d8e046f`.
+Beta.41 read its synthetic data copy twice; beta.40 reread the untouched baseline.
+That cached image is not asserted to be the exact currently selected VPS image.
+Local tests used the reviewed Podman seccomp policy, not Docker's production policy.
+A manual-only workflow option now builds and tests native amd64/arm64 Agent/browser
+pairs with publication disabled. Automatic CI remains paused; results are pending.
 
 Production remains unchanged. A read-only VPS capacity check found no browser or
 compute runs; no production configuration, credentials or profiles were read or
