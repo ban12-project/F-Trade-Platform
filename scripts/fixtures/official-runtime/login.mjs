@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import { runFacebookLoginFlow } from "/project/browser-node/login-flow.mjs";
 
 const origin = "https://www.facebook.com";
@@ -85,6 +86,20 @@ export async function verifyLoginContracts({ context, accountId, runId, accessKe
     return response.json();
   };
   try {
+    for (const [method, path] of [
+      ["GET", "/ftrade/login-status"],
+      ["POST", "/ftrade/login-observe"],
+      ["POST", "/ftrade/login-submit"],
+    ]) {
+      for (const authorization of [undefined, "Bearer SYNTHETIC-invalid"]) {
+        const response = await fetch(`http://127.0.0.1:9377${path}`, {
+          method,
+          headers: authorization ? { authorization } : {},
+        });
+        assert.equal(response.status, 401);
+        await response.arrayBuffer();
+      }
+    }
     const status = await request("/ftrade/login-status");
     assert.equal(status.version, 2);
     assert.equal(status.runId, runId);
@@ -151,6 +166,16 @@ export async function verifyLoginContracts({ context, accountId, runId, accessKe
     variant = "wrong";
     await request(`/tabs/${tab.tabId}/navigate`, { userId: accountId, url: `${origin}/messages/` });
     assert.equal((await observe()).accountMismatch, true);
+    writeFileSync("/tmp/ftrade-lease", "0");
+    try {
+      const denied = await fetch("http://127.0.0.1:9377/ftrade/login-status", {
+        headers: { authorization: `Bearer ${accessKey}` },
+      });
+      assert.equal(denied.status, 403);
+      await denied.arrayBuffer();
+    } finally {
+      writeFileSync("/tmp/ftrade-lease", String(Date.now() + 90000));
+    }
     console.log(
       "PASS official service login integration: synthetic password/TOTP/PIN, checkpoint observation, one submission per factor, empty inbox evidence and identity mismatch; no external authentication",
     );

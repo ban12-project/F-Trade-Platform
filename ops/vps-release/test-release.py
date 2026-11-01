@@ -24,8 +24,9 @@ class ReleaseTest(unittest.TestCase):
                 return ''
             with self.subTest(reported=reported),patch.object(pathlib.Path,'stat',return_value=SimpleNamespace(st_gid=999)),patch.object(r,'run',side_effect=command),patch.object(r,'docker',side_effect=docker):
                 r.build(source,'a'*40,{'computeWorker':'same'},{'browserWorker':'changed','computeWorker':'same'},{'browser':{'environment':{}},'runtime':{'environment':{}}})
-            base=[(args,env) for args,env in calls if args[:2]==['docker','build'] and any(str(x).endswith('upstream/Dockerfile.ci') for x in args)]
+            base=[(args,env) for args,env in calls if args[:2]==['docker','build'] and any(str(x).endswith('ops/browser-node/browser.Dockerfile') for x in args)]
             self.assertEqual(len(base),1)
+            self.assertFalse(any('prepare-upstream.sh' in str(args) or 'upstream/Dockerfile.ci' in str(args) for args,env in calls))
             args,env=base[0]
             self.assertIn('TARGETARCH='+expected,args)
             self.assertEqual(args[args.index('--memory')+1],'2g')

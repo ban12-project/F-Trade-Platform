@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { Camoufox } from "/app/node_modules/camoufox-js/dist/index.js";
+import { Camoufox } from "/app/official-runtime/node_modules/camoufox/dist/index.js";
 
 let browser;
 try {

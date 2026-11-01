@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -25,7 +25,8 @@ const nodeId = "11111111-1111-4111-8111-111111111111";
 const accountId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
 const fixture = resolve("scripts/fixtures/official-runtime");
-const source = resolve("ops/browser-node");
+let source = resolve("ops/browser-node");
+let agentSource, agentContainer;
 let containerExists = false,
   volumeExists = false;
 function runArgs(mode, detached = false, afterShutdown = false) {
@@ -35,6 +36,9 @@ function runArgs(mode, detached = false, afterShutdown = false) {
       id: runId,
       accountId,
       kind: "interactive",
+      ...(mode === "write" && process.env.OFFICIAL_TEST_FIRST_USE === "1"
+        ? { initializeNativeProfile: true }
+        : {}),
       memoryMb: 2048,
       proxy: { host: "proxy.invalid", port: 1234, username: "synthetic", password: "synthetic" },
     },
@@ -70,7 +74,7 @@ function runArgs(mode, detached = false, afterShutdown = false) {
     String(host.ShmSize),
   ];
   if (process.env.OFFICIAL_TEST_SECCOMP)
-    args.push("--security-opt", `seccomp=${resolve(process.env.OFFICIAL_TEST_SECCOMP)}`);
+    args.push("--security-opt", `seccomp=${realpathSync(process.env.OFFICIAL_TEST_SECCOMP)}`);
   // Read the real runtime's temp mounts rather than maintaining a drifting copy.
   for (const [path, settings] of Object.entries(host.Tmpfs))
     args.push("--tmpfs", `${path}:${settings}`);
@@ -97,11 +101,34 @@ function runArgs(mode, detached = false, afterShutdown = false) {
   return args;
 }
 try {
+  const version = call([
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--entrypoint",
+    "/root/.cache/camoufox/browsers/official/158.0.1-beta.41/camoufox-bin",
+    image,
+    "--version",
+  ]).trim();
+  assert.match(version, /158\.0\.1-beta\.41/);
+  console.log(JSON.stringify({ actualBrowserVersion: version }));
+  if (process.env.OFFICIAL_RUNTIME_AGENT_IMAGE) {
+    agentSource = mkdtempSync(resolve(tmpdir(), "official-agent-"));
+    agentContainer = call(["create", process.env.OFFICIAL_RUNTIME_AGENT_IMAGE]).trim();
+    call(["cp", `${agentContainer}:/app/ops/browser-node`, agentSource]);
+    call(["rm", agentContainer]);
+    agentContainer = undefined;
+    source = resolve(agentSource, "browser-node");
+  }
   call(["volume", "create", volume]);
   volumeExists = true;
-  for (const mode of ["write", "read"]) {
+  for (const mode of ["codec", "write", "read"]) {
     containerExists = true;
     console.log(call(runArgs(mode)));
+    const state = JSON.parse(call(["inspect", "--format", "{{json .State}}", name]));
+    assert.equal(state.OOMKilled, false);
+    assert.equal(state.ExitCode, 0);
     call(["rm", name]);
     containerExists = false;
   }
@@ -158,4 +185,6 @@ try {
     } catch {}
   }
   if (volumeExists) call(["volume", "rm", volume]);
+  if (agentContainer) call(["rm", agentContainer]);
+  if (agentSource) rmSync(agentSource, { recursive: true, force: true });
 }

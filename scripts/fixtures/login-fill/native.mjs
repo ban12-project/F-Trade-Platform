@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { launchOptions } from "camoufox-js";
 import { firefox } from "playwright-core";
+import { launchOptions } from "/app/official-runtime/node_modules/camoufox/dist/index.js";
 import { createAutomaticLoginRuntime } from "/app/plugins/ftrade-login/automatic-runtime.js";
 import { createLoginFill } from "/app/plugins/ftrade-login/index.js";
 

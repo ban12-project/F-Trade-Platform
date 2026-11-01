@@ -102,7 +102,7 @@ def copied_inputs(dockerfile, context):
 def fingerprints(source):
     browser=source/'ops/browser-node'
     browser_paths=copied_inputs(browser/'browser.Dockerfile',browser)
-    browser_paths.update(browser/x for x in ['camofox.ref','prepare-upstream.sh','docker-bake.hcl'])
+    browser_paths.update(browser/x for x in ['docker-bake.hcl','browser.Dockerfile.dockerignore'])
     compute_paths=copied_inputs(source/'ops/vps-runtime/compute.Dockerfile',source)
     compute_paths.update(copied_inputs(source/'ops/video-sandbox/Dockerfile',source))
     release_paths=set()
@@ -154,11 +154,7 @@ def build(source, sha, previous, fp, configs):
     docker('run','--rm','--network','none','--memory','512m','--entrypoint','node',updated['browser']['image'],'ops/browser-node/smoke.mjs',timeout=90)
     docker('run','--rm','--network','none','--memory','256m','-e','FTRADE_RUNTIME_TOKEN='+'a'*64,'-e','FTRADE_COMPUTE_IMAGE=sha256:'+'b'*64,'--entrypoint','python3',updated['runtime']['image'],'-c',"import runpy;m=runpy.run_path('/app/server.py',run_name='smoke');assert m['PROFILES']['light']['memory']==512")
     if previous.get('browserWorker')!=fp['browserWorker']:
-        run(['sh','ops/browser-node/prepare-upstream.sh'],180,cwd=source)
-        hcl=(source/'ops/browser-node/docker-bake.hcl').read_text()
-        args=[key+'='+re.search(key+r'\s*=\s*"([\w.-]+)"',hcl)[1] for key in ['CAMOUFOX_VERSION','CAMOUFOX_RELEASE']]
-        base=image(source/'ops/browser-node/upstream/Dockerfile.ci','ftrade-release-camofox:'+sha,source/'ops/browser-node/upstream',args+['TARGETARCH='+arch])
-        worker=image(source/'ops/browser-node/browser.Dockerfile','ftrade-release-browser:'+sha,source/'ops/browser-node',['BROWSER_BASE_IMAGE='+base])
+        worker=image(source/'ops/browser-node/browser.Dockerfile','ftrade-release-browser:'+sha,source/'ops/browser-node',['TARGETARCH='+arch])
         updated['browser']['environment']['BROWSER_IMAGE']=worker
         # Run the existing complete offline browser-image acceptance on this exact pair.
         docker('tag',updated['browser']['image'],'ftrade-release-browser-node:'+sha+'-'+arch)

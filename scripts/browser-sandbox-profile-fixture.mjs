@@ -20,15 +20,19 @@ async function api(path, body) {
   if (response.status !== 200) {
     // This fixture has synthetic data only; retain the error for live diagnosis.
     try {
-      const { launchOptions } = await import("/app/node_modules/camoufox-js/dist/index.js");
+      const { launchOptions } = await import(
+        "/app/official-runtime/node_modules/camoufox/dist/index.js"
+      );
       const options = await launchOptions({
-        executable_path: "/root/.cache/camoufox/camoufox-bin",
+        executable_path: "/root/.cache/camoufox/browsers/official/158.0.1-beta.41/camoufox-bin",
         headless: true,
         exclude_addons: ["UBO"],
         enable_cache: true,
       });
       console.log("Synthetic diagnostic: launch options resolved");
-      const { firefox } = await import("/app/node_modules/playwright-core/index.mjs");
+      const { firefox } = await import(
+        "/app/official-runtime/node_modules/playwright-core/index.mjs"
+      );
       const browser = await firefox.launch({ ...options, timeout: 20000 });
       await browser.close();
       console.log("Synthetic diagnostic: headless browser launched");

@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { ensureModel } from "fpgen-js";
 import {
   downloadMmdb,
   getMmdbPath,
   needsUpdate,
 } from "./node_modules/camoufox/dist/geolocation.js";
+import { COMPAT_FLAG, setActive } from "./node_modules/camoufox/dist/multiversion.js";
+import { camoufoxPath, installedVerStr } from "./node_modules/camoufox/dist/pkgman.js";
 import { getEnvVars } from "./node_modules/camoufox/dist/utils.js";
 
 // Build-time only. The server never fetches a browser or fingerprint model.
@@ -26,6 +28,25 @@ assert.deepEqual(
   },
   "official_browser_pair_mismatch",
 );
+// Register the checksum-verified archive in the official versioned layout.
+// A flat legacy cache is insufficient for the paired package's version resolver.
+const cache = "/root/.cache/camoufox";
+const relative = "browsers/official/158.0.1-beta.41";
+const installed = `${cache}/${relative}`;
+const entries = await readdir(cache);
+await mkdir(installed, { recursive: true });
+for (const entry of entries) await rename(`${cache}/${entry}`, `${installed}/${entry}`);
+const metadata = JSON.parse(await readFile(`${installed}/version.json`, "utf8"));
+assert.equal(metadata.version, "158.0.1");
+assert.equal(metadata.release, "beta.41");
+await writeFile(
+  `${installed}/version.json`,
+  JSON.stringify({ ...metadata, interface: 1, prerelease: true }),
+);
+setActive(relative);
+await writeFile(COMPAT_FLAG, "", { mode: 0o600 });
+assert.equal(camoufoxPath(), installed);
+assert.equal(installedVerStr(), "158.0.1-beta.41");
 const driver = JSON.parse(
   await readFile(new URL("./node_modules/playwright-core/package.json", import.meta.url)),
 );
@@ -35,7 +56,7 @@ await mkdir("/root/camoufox", { recursive: true, mode: 0o700 });
 const model = await ensureModel();
 await downloadMmdb(undefined, () => {});
 assert.equal(await needsUpdate(), false, "geoip_not_current");
-const executable = "/root/.cache/camoufox/camoufox-bin";
+const executable = "/root/.cache/camoufox/browsers/official/158.0.1-beta.41/camoufox-bin";
 for (const os of ["lin", "mac", "win"]) getEnvVars({}, os, executable);
 const geoip = getMmdbPath();
 await writeFile(

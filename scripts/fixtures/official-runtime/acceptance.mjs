@@ -10,12 +10,17 @@ import { startDisplay } from "/app/official-runtime/display.mjs";
 import { Camoufox, launchOptions } from "/app/official-runtime/node_modules/camoufox/dist/index.js";
 import { createRuntimeService } from "/app/official-runtime/service.mjs";
 import { createGateway } from "/project/browser-node/gateway.mjs";
+import { verifyInspection } from "./inspection.mjs";
 import { configureLoginFixture, verifyLoginContracts } from "./login.mjs";
 import { verifyPublicationContracts } from "./publication.mjs";
 import { verifySocialContracts } from "./social.mjs";
 
 const mode = process.env.FIXTURE_MODE;
-assert.ok(["write", "read", "lease"].includes(mode));
+assert.ok(["write", "read", "lease", "codec"].includes(mode));
+if (mode === "codec") {
+  await import("/project-fixtures/browser-media/verify-h264.mjs");
+  process.exit(0);
+}
 const accountId = process.env.FTRADE_PROFILE_ACCOUNT_ID;
 const runId = process.env.FTRADE_RUNTIME_RUN_ID;
 const key = process.env.CAMOFOX_ACCESS_KEY;
@@ -52,7 +57,7 @@ process.once("SIGTERM", () => {
     });
 });
 try {
-  if (mode === "write")
+  if (mode === "write" && process.env.FTRADE_NATIVE_PROFILE_FIRST_USE !== "1")
     await initializeNativeProfile({
       root: "/data",
       accountId,
@@ -81,9 +86,11 @@ try {
   });
   const options = await launchOptions({
     os: "linux",
+    humanize: true,
+    enable_cache: true,
     headless: false,
     virtual_display: display.display,
-    executable_path: "/root/.cache/camoufox/camoufox-bin",
+    executable_path: "/root/.cache/camoufox/browsers/official/158.0.1-beta.41/camoufox-bin",
     window: [1400, 860],
     exclude_addons: ["UBO"],
   });
@@ -239,6 +246,7 @@ try {
     await verifySocialContracts({ context, accountId, runId, accessKey: key });
     await verifyLoginContracts({ context, accountId, runId, accessKey: key });
     await verifyPublicationContracts({ context, accountId, runId, accessKey: key });
+    await verifyInspection({ context, accountId, runId, accessKey: key });
   }
   if (mode === "lease") {
     await evaluate("localStorage.setItem('shutdownMarker', 'lease-expiry')");
@@ -283,7 +291,7 @@ try {
     const viewOptions = await launchOptions({
       os: "linux",
       headless: true,
-      executable_path: "/root/.cache/camoufox/camoufox-bin",
+      executable_path: "/root/.cache/camoufox/browsers/official/158.0.1-beta.41/camoufox-bin",
       exclude_addons: ["UBO"],
     });
     viewerBrowser = await Camoufox({ from_options: viewOptions });
@@ -344,6 +352,36 @@ try {
       );
       throw error;
     }
+    const processStatus = readFileSync("/proc/self/status", "utf8");
+    assert.match(processStatus, /^CapEff:\s+0+$/m);
+    assert.match(processStatus, /^CapBnd:\s+0+$/m);
+    assert.match(processStatus, /^NoNewPrivs:\s+1$/m);
+    const cgroup = (name) => readFileSync(`/sys/fs/cgroup/${name}`, "utf8").trim();
+    assert.equal(cgroup("memory.max"), "2147483648");
+    assert.equal(cgroup("memory.swap.max"), "0");
+    assert.equal(cgroup("pids.max"), "512");
+    const [quota, period] = cgroup("cpu.max").split(/\s+/).map(Number);
+    assert.equal(quota / period, 2);
+    const events = (name) =>
+      Object.fromEntries(
+        cgroup(name)
+          .split("\n")
+          .map((line) => {
+            const [key, value] = line.split(/\s+/);
+            return [key, Number(value)];
+          }),
+      );
+    const memory = events("memory.events"),
+      pids = events("pids.events");
+    for (const key of ["max", "oom", "oom_kill"]) assert.equal(memory[key], 0);
+    assert.equal(pids.max, 0);
+    console.log(
+      JSON.stringify({
+        isolationVerified: true,
+        memoryPeak: cgroup("memory.peak"),
+        pidsPeak: cgroup("pids.peak"),
+      }),
+    );
     slot.expiresAt = Date.now() - 1;
     await viewer.waitForFunction(
       () => document.documentElement.dataset.disconnected === "yes",
@@ -366,6 +404,14 @@ try {
       }),
     );
     await close();
+    const prefs = readFileSync("/data/native-profile-v1/firefox/prefs.js", "utf8");
+    assert.doesNotMatch(prefs, /user_pref\("network\.http\.http2\.websockets", false\);/);
+    assert.doesNotMatch(prefs, /user_pref\("media\.peerconnection\.enabled", false\);/);
+    const geometry = JSON.parse(
+      readFileSync("/data/native-profile-v1/firefox/xulstore.json", "utf8"),
+    )["chrome://browser/content/browser.xhtml"]["main-window"];
+    assert.ok(Number(geometry.width) > 0 && Number(geometry.width) <= 1440);
+    assert.ok(Number(geometry.height) > 0 && Number(geometry.height) <= 900);
   }
 } catch (error) {
   console.error(String(error.stack));

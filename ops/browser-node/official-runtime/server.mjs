@@ -39,7 +39,7 @@ try {
     leaseDeadline,
     startupDiagnostics,
     display: display.display,
-    executablePath: "/root/.cache/camoufox/camoufox-bin",
+    executablePath: "/root/.cache/camoufox/browsers/official/158.0.1-beta.41/camoufox-bin",
     proxy: {
       server: `http://${e.PROXY_HOST}:${e.PROXY_PORT}`,
       username: e.PROXY_USERNAME,

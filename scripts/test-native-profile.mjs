@@ -11,7 +11,6 @@ import {
   nativeProfileLaunchOptions,
   nativeProfileWindowSize,
 } from "../ops/browser-node/native-profile.mjs";
-import { patchNativeProfileSource } from "../ops/browser-node/patch-native-profile.mjs";
 import { createStartupDiagnostics } from "../ops/browser-node/startup-diagnostics.mjs";
 
 async function fixture(t) {
@@ -273,10 +272,6 @@ test("opt-in binds every task to the existing account volume, not task payload p
     ),
   );
   assert.equal(createNativeProfileRuntime({ environment: {} }), null);
-  assert.throws(
-    () => patchNativeProfileSource("server.js", "unreviewed upstream"),
-    /upstream_changed/,
-  );
 });
 
 test("timed-out observation retains one in-flight native launch until it settles", async (t) => {

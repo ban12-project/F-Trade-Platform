@@ -70,9 +70,9 @@ async function fixture(t, options = {}) {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   });
-  const request = async (path, body, authorized = true) => {
+  const request = async (path, body, authorized = true, method) => {
     const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, {
-      method: body === undefined ? "GET" : "POST",
+      method: method ?? (body === undefined ? "GET" : "POST"),
       headers: {
         "content-type": "application/json",
         ...(authorized ? { authorization: `Bearer ${accessKey}` } : {}),
@@ -273,4 +273,31 @@ test("health preserves bounded startup diagnostics through ready and failed laun
   assert.equal(health.startup.code, "unclassified");
   assert.equal(health.browserConnected, false);
   assert.equal(JSON.stringify(health).includes("private-proxy"), false);
+});
+
+test("unconfigured login exposes no credential routes behind service authentication", async (t) => {
+  const previous = process.env.FTRADE_LOGIN_PROFILE_JSON;
+  delete process.env.FTRADE_LOGIN_PROFILE_JSON;
+  t.after(() => {
+    if (previous === undefined) delete process.env.FTRADE_LOGIN_PROFILE_JSON;
+    else process.env.FTRADE_LOGIN_PROFILE_JSON = previous;
+  });
+  const f = await fixture(t, { registerIntegrations: true });
+  for (const path of ["/ftrade/login-status", "/ftrade/login-fill", "/ftrade/login-submit"]) {
+    assert.equal((await f.request(path, undefined, false)).status, 401);
+    assert.equal((await f.request(path)).status, 404);
+  }
+});
+
+test("closing a tab requires account scope and retires the handle", async (t) => {
+  const f = await fixture(t);
+  const id = await f.tab();
+  assert.equal((await f.request(`/tabs/${id}`, { userId: runId }, true, "DELETE")).status, 403);
+  assert.equal(f.pages[0].isClosed(), false);
+  assert.equal((await f.request(`/tabs/${id}`, { userId: accountId }, true, "DELETE")).status, 200);
+  assert.equal(f.pages[0].isClosed(), true);
+  assert.equal(
+    (await f.request(`/tabs/${id}/evaluate`, { userId: accountId, expression: "1" })).status,
+    404,
+  );
 });

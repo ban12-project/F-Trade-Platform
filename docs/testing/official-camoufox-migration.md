@@ -20,8 +20,62 @@ loader resolved that setup failure without application or assertion changes.
 The existing bounded startup-diagnostics health contract is preserved in the new
 service, including sanitized failure states. Frozen root install, targeted Biome,
 repository validation and the candidate runtime npm audit pass (zero advisories).
-The beta.41 native image build and real-browser acceptance are pending.
+The candidate canonical browser build and VPS release build now use the official
+service directly, without an upstream source fetch/base image. The removed source
+patching/cache machinery has no production consumer. Existing receipt/inbox and
+full-DOM inspection tests run against the new HTTP service; legacy test entrypoints
+redirect to that suite. Both pre-initialized and broker-authorized first-use profile
+paths remain covered. Ten release/rollback tests and the offline exact Agent-payload
+smoke pass. Initial Agent-payload invocation before staging deleted source files
+failed on its git-index manifest; staging the intended deletion resolved that setup
+failure. The 82-case launcher/service/profile/Agent/Viewer/egress suite passes.
+
+The initial beta.41 image built successfully after checksum verification and asset
+preparation. It was created from an earlier context snapshot and is not the final
+candidate. The canonical image is rebuilding with the integrated source; actual
+browser acceptance, old-profile upgrade/copy rollback, network checks and production
+cutover remain pending. No passing image or account acceptance is claimed yet.
 No production cutover or account profile access has occurred in this checkpoint.
+
+## Integrated candidate failures and limits
+
+The canonical build reached actual binary output `Camoufox Camoufox 158.0.1-beta.41`.
+Initial image fixture setup supplied `initializeNativeProfile: false`, which the
+existing container contract correctly rejects (only absent or true is valid).
+The fixture now omits the field unless explicitly testing first use. A subsequent
+local seccomp path used macOS `/tmp` rather than its shared `/private/tmp` realpath;
+canonicalizing the path fixed that setup error without disabling the policy.
+
+After a VM restart, Podman reported missing candidate images and invalid overlay
+links. Read-only `podman system check --quick` identified 17 damaged image records,
+all independently matched to this turn's build logs, with no container references.
+Only those exact owned candidates were removed with `--no-prune`; the older image
+store and account volumes were not reset. One unaccounted storage-driver layer
+remains reported. Rebuild succeeded, but this is not a general Podman repair claim.
+An explicit live VM session and `sync` now keep the test environment observable.
+
+Real image testing exposed a packaging defect before browser launch: the prior
+flat cache lacked the official compatibility marker, causing attempted cleanup
+on a read-only filesystem. Adding only the marker was insufficient: the paired
+version resolver also requires an active versioned installation. Preparation now
+registers the checksum-verified archive under the official versioned layout,
+records its supported interface, calls the official active-version helper, and
+asserts both resolved directory and full version before provisioning assets.
+The rebuilt candidate's native tests are still pending; no success is inferred
+from these source fixes. Runtime root filesystem protection remains enabled.
+
+Actual image coverage includes H.264 pixels, unchanged DOM inspection assertions,
+login authentication and lease denial, native storage/keys, first use, noVNC input,
+ticket replay/expiry, watchdog shutdown and kernel resource bounds. The dedicated
+upgrade fixture creates two disposable volumes: beta.40 writes the synthetic
+baseline, beta.41 reads a copy across restarts, then beta.40 rereads the untouched
+baseline for rollback evidence. It never accepts an existing account volume.
+
+Production remains unchanged. A read-only VPS capacity check found no browser or
+compute runs; no production configuration, credentials or profiles were read or
+modified. Actual proxy, current account continuity, exact Agent/browser artifact
+pair, deployed HTTPS Viewer and protected rollback remain required. Historical
+beta.40 native arm64 evidence does not validate beta.41 arm64.
 
 ## Historical beta.40 draft evidence
 

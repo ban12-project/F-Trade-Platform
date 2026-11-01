@@ -226,6 +226,14 @@ export function createRuntimeService({
       return { ok: true, tabId, url: page.url() };
     }),
   );
+  app.delete(
+    "/tabs/:tabId",
+    route(async (req) => {
+      const page = pageFor(req.params.tabId, req.body?.userId);
+      await page.close();
+      return { ok: true };
+    }),
+  );
   app.post(
     "/tabs/:tabId/navigate",
     route(async (req) => {
