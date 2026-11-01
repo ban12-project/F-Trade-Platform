@@ -45,3 +45,25 @@ test("setup UI offers automation, requires completed review and handles unauthen
   await page.getByRole("button", { name: "自动核对发布功能（不发帖）" }).click();
   await expect(page.getByText(/配置未生效。请确认接管页面仍在运行/)).toBeVisible();
 });
+
+test("an existing profile-photo update can verify result structure without requiring a test text post", async ({
+  page,
+}) => {
+  const post = `<a aria-label="Synthetic's Timeline" href="${href}">Synthetic</a><div aria-posinset="1"><h2><a href="${href}">Synthetic</a></h2><div><div><span><span data-ad-rendering-role="profile_name">Synthetic</span></span></div><div><a href="https://www.facebook.com/photo.php?fbid=123">Yesterday</a></div></div><img alt="SYNTHETIC profile photo"></div>`;
+  await page.route("https://www.facebook.com/**", (r) =>
+    r.fulfill({ contentType: "text/html", body: post }),
+  );
+  await page.goto(href);
+  const inspect = () =>
+    page.evaluate(({ program, expected }) => new Function(`return (${program})`)()(expected), {
+      program,
+      expected,
+    });
+  const result = await inspect();
+  expect(result).toMatchObject({ stage: "receipt", verified: true });
+  expect(result.selectors.post).toBe('[aria-posinset]:has([data-ad-preview="message"])');
+  await page
+    .locator("h2 a")
+    .evaluate((a) => a.setAttribute("href", "https://www.facebook.com/profile.php?id=999999999"));
+  expect(await inspect()).toEqual({ stage: "receipt" });
+});
