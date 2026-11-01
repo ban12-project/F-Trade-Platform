@@ -19,6 +19,7 @@ Observed results:
 | Scenario | Result |
 | --- | --- |
 | One real FFmpeg encode + three media-probe loops | All four overlapped; distinct job groups; successful results |
+| Final cold-start regression: one heavy + three light tasks | Four sessions admitted in 3.28 seconds while the heavy worker still had fewer than three samples; real short probes overlapped with an encoder |
 | Small plain-text preprocessing with the actual installed converter | Completed within the 512-MiB profile |
 | Eight real media-probe loops | All eight overlapped and completed; ninth creation rejected; no OOM |
 | Four workers driven into a CPU burst | New light task rejected at measured host peak about 3.66 cores |
