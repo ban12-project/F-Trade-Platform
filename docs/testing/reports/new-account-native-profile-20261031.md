@@ -89,3 +89,25 @@ released-image validation and current production first-use behavior still need
 their own evidence. The user has deferred publication and DM acceptance because
 a sending account is unavailable; this checkpoint sends no messages and cannot
 close those acceptance items.
+
+### Current build and container checks
+
+The integrated production Turbopack build and fixture/anonymous-workspace
+boundaries passed. Fourteen VPS admission/network checks also passed.
+
+The initial local container test used macOS Bash 3.2, whose nounset handling of
+an empty optional seccomp array stopped the script; that invocation is not a
+passing test despite its trap exit status. The optional-array expansion now
+works with Bash 3.2 as well as newer Bash. A diagnostic retry with the default
+Podman policy reached profile validation and stalled at Firefox launch, then
+returned HTTP 500; the fixture now reports only sanitized startup enums.
+
+Using the repository's existing restrictive Podman namespace policy, the actual
+Firefox first-use fixture passed synthetic Cookie/localStorage and nonextractable
+CryptoKey persistence, separate task/container reuse, foreign-account refusal,
+lease expiry and 1400 x 860 window geometry. The test used local overlay image
+`72da9bd27a24b9317d121f4251d7e3be21c60a2b2f6a6e65ea64b51b22935428`,
+based on cached image `ca832ef326d1` with only the current native-profile module
+replaced. An unnecessary remote base pull was explicitly cancelled and replaced
+by a pull-never build from the verified local image ID; the cancelled build is
+not release evidence. The restricted local policy is not installed in production.

@@ -21,6 +21,15 @@ try {
     });
     const d = await r.json();
     if (!r.ok) {
+      // Fixed startup enums only; never forward upstream response/error text.
+      const { sanitizeStartupDiagnostics } = await import("/app/ftrade-startup-diagnostics.mjs");
+      const health = await fetch("http://127.0.0.1:9377/health", {
+        headers,
+        signal: AbortSignal.timeout(3000),
+      })
+        .then((response) => response.json())
+        .catch(() => null);
+      console.error("Synthetic startup:", sanitizeStartupDiagnostics(health?.startup));
       const reason = JSON.stringify(d).match(/native_profile_[a-z_]+|Browser launch timeout/);
       throw Error(`http_${r.status}:${reason?.[0] ?? "runtime_request_failed"}`);
     }
