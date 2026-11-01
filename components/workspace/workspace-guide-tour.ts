@@ -66,10 +66,22 @@ const hints: Hint[] = [
       "对照原件确认名称、编号、类型和 OE 或适配信息。缺少依据时退回补充；批准只覆盖有证据的事实。",
   },
   {
+    selector: 'form[id$="-revise-product"], form[id$="-create-product"]',
+    title: "补充有来源依据的字段",
+    description:
+      "根据审核备注对照原件，填写产品名称、类型和编号，并为每个字段选择对应证据。没有依据的规格和商业条款保持空白；提交修订后重新审核。",
+  },
+  {
     selector: "form#content-review",
     title: "审核当前内容版本",
     description:
       "检查文案是否与已核验产品一致，并记录审核依据。需要修改时先退回；修订后的版本需要重新审核。",
+  },
+  {
+    selector: "#publication-channel",
+    title: "审核通过后安排发布",
+    description:
+      "核对最终文案、已启用渠道和账户，再单独确认本次发布。没有可用渠道时，可以保留已批准内容并继续其他工作；已批准不代表已发布。",
   },
   {
     selector: 'form#create-rfq, form[id^="revise-rfq-"]',
