@@ -23,9 +23,10 @@ class ReleaseTest(unittest.TestCase):
                 if args[:2]==('image','inspect'):return 'sha256:'+'a'*64
                 return ''
             with self.subTest(reported=reported),patch.object(pathlib.Path,'stat',return_value=SimpleNamespace(st_gid=999)),patch.object(r,'run',side_effect=command),patch.object(r,'docker',side_effect=docker):
-                r.build(source,'a'*40,{'computeWorker':'same'},{'browserWorker':'changed','computeWorker':'same'},{'browser':{'environment':{}},'runtime':{'environment':{}}})
+                r.build(source,'a'*40,{},{'browserWorker':'changed'},{'browser':{'environment':{}}})
             base=[(args,env) for args,env in calls if args[:2]==['docker','build'] and any(str(x).endswith('ops/browser-node/browser.Dockerfile') for x in args)]
             self.assertEqual(len(base),1)
+            self.assertFalse(any('ops/vps-runtime' in str(args) or 'ops/video-sandbox' in str(args) for args,env in calls))
             self.assertFalse(any('prepare-upstream.sh' in str(args) or 'upstream/Dockerfile.ci' in str(args) for args,env in calls))
             args,env=base[0]
             self.assertIn('TARGETARCH='+expected,args)
@@ -35,6 +36,20 @@ class ReleaseTest(unittest.TestCase):
             smoke=[env for args,env in calls if args==['bash','scripts/test-browser-images.sh']]
             self.assertEqual(smoke[0]['ARCH'],expected)
             self.assertIn('ftrade-release-node-',smoke[0]['PATH'].split(':')[0])
+
+    def test_browser_only_contract_accepts_no_compute_pool_and_rejects_old_recovery(self):
+        source=pathlib.Path(__file__).resolve().parents[2]
+        cfg={'contract':{'version':2,'workloads':['browser']},'targets':{'browser':{}}}
+        state={'configs':{'browser':{}}}
+        with tempfile.TemporaryDirectory() as t,patch.object(r,'ROOT',pathlib.Path(t)):
+            r.validate_host_contract(source,cfg,state)
+            with self.assertRaisesRegex(RuntimeError,'requires_review'):
+                r.validate_host_contract(source,{**cfg,'contract':{'version':1}},state)
+            with self.assertRaisesRegex(RuntimeError,'target_requires_reconciliation'):
+                r.validate_host_contract(source,{**cfg,'targets':{'browser':{},'runtime':{}}},state)
+            (pathlib.Path(t)/'journal.json').write_text(json.dumps({'previous':{'browser':{},'runtime':{}}}))
+            with self.assertRaisesRegex(RuntimeError,'journal_requires_reconciliation'):
+                r.validate_host_contract(source,cfg,state)
 
     def test_unknown_daemon_architecture_refuses_before_any_build(self):
         with patch.object(r,'docker',return_value='unsupported-machine'),patch.object(r,'run') as run:

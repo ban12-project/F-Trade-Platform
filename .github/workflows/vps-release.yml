@@ -36,6 +36,7 @@ jobs:
           python3 ops/vps-runtime/test-openship.py
           python3 ops/vps-runtime/test-quota-admission.py
           python3 ops/vps-release/test-release.py
+          python3 ops/vps-runtime/test-retire.py
       - name: Request the verified main revision and wait for its receipt
         env:
           VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}

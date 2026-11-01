@@ -13,7 +13,9 @@ or DM tests.
 mutable image references fail before creating a VM. Invalid providers fail;
 provider failures never trigger a cross-provider retry. Explicit `vps` remains
 available for an operator-controlled rollback, using its existing credentials.
-The idle VPS broker and its release contract remain intact for that purpose.
+After owner-requested cleanup #803, the VPS broker, compute pool and compute-only
+images are removed. An operator rollback would require a new provisioning plan;
+the old credential settings are removed from active Vercel environments.
 
 Each task creates a nonpersistent Sandbox with a ten-minute server-enforced
 lifetime: light jobs use one vCPU; heavy jobs use four. All filesystem and
@@ -80,7 +82,7 @@ Workflow deployment with automatic OIDC and the production environment, then
 remove its temporary acceptance route/deployment. After the reviewed PR is
 merged, configure Production and Preview, deploy the final revision, verify the
 production deployment environment and confirm the old broker has no active
-compute containers. Keep browser releases and profiles untouched. Do not treat
+compute containers. Keep browser releases and profiles intact; the VPS release contract is now browser-only (#803). Do not treat
 an empty broker alone as proof that a new application deployment uses Sandbox.
 
 Official references: [Sandbox images](https://vercel.com/docs/sandbox/concepts/images),
