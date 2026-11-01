@@ -112,9 +112,16 @@ export function applyInquiryMessage(rfq: Rfq, message: string) {
     Number.isSafeInteger(Number(quantity[1]))
   )
     patch.commercial.quantity = Number(quantity[1]);
-  // Capture the whole token before validating; never silently shorten an OE.
-  const oe = unique(/\b(?:oe|oem)\s*[:#-]\s*([^\s,;]+)/gi);
-  if (oe && /^[A-Za-z0-9-]{3,240}$/.test(oe[1])) patch.product.oe_number = oe[1];
+  // Capture the complete labeled field before validating. Spaces can separate
+  // numeric OE groups; unsupported prose must not become a shortened reference.
+  const oe = unique(/\b(?:oe|oem)[ \t]*[:#-][ \t]*([^,;\r\n]*)/gi);
+  const oeValue = oe?.[1].trim().replace(/[ \t]+/g, " ");
+  if (
+    oeValue &&
+    oeValue.length <= 240 &&
+    (/^[A-Za-z0-9-]{3,240}$/.test(oeValue) || /^(?:[A-Za-z] ?)?\d+(?: \d+)+$/.test(oeValue))
+  )
+    patch.product.oe_number = oeValue;
   const destination = unique(/\bdestination\s*[:=]\s*([A-Za-z][A-Za-z -]{2,239})(?=[,;.\n]|$)/gi);
   if (destination) patch.commercial.destination = destination[1].trim();
   const vehicle = inquiryVehicle(message);
