@@ -138,6 +138,25 @@ function identifier(value) {
   if (!/^[a-f0-9-]{36}$/.test(value)) throw new Error("invalid_runtime_identifier");
   return value;
 }
+export async function ensureAccountVolume(docker, nodeId, accountId, name) {
+  identifier(nodeId);
+  identifier(accountId);
+  if (name !== `ftbrowser-${nodeId}-${accountId}`) throw new Error("native_profile_volume_invalid");
+  const volume = await docker("POST", "/volumes/create", {
+    Name: name,
+    Labels: { "io.ftrade.node": nodeId, "io.ftrade.account": accountId },
+  });
+  // Docker returns the existing volume unchanged. Never trust request labels as
+  // proof that an already present volume belongs to this account.
+  if (
+    volume?.Name !== name ||
+    volume.Labels?.["io.ftrade.node"] !== nodeId ||
+    volume.Labels?.["io.ftrade.account"] !== accountId
+  )
+    throw Object.assign(new Error("native_profile_volume_owner_mismatch"), {
+      browserFailureCode: "native_profile_volume_owner_mismatch",
+    });
+}
 export function containerSpec(
   nodeId,
   run,
@@ -151,6 +170,8 @@ export function containerSpec(
   if (![1, 2].includes(cpuCores)) throw new Error("browser_cpu_limit_invalid");
   if (!["host", "bridge"].includes(networkMode)) throw new Error("agent_network_mode_invalid");
   if (typeof nativeProfile !== "boolean") throw new Error("native_profile_mode_invalid");
+  if (run.initializeNativeProfile !== undefined && run.initializeNativeProfile !== true)
+    throw new Error("native_profile_initialization_invalid");
   identifier(nodeId);
   identifier(run.id);
   identifier(run.accountId);
@@ -198,6 +219,9 @@ export function containerSpec(
               "FTRADE_NATIVE_PROFILE=1",
               `FTRADE_PROFILE_NODE_ID=${nodeId}`,
               `FTRADE_PROFILE_ACCOUNT_ID=${run.accountId}`,
+              ...(run.kind === "interactive" && run.initializeNativeProfile === true
+                ? ["FTRADE_NATIVE_PROFILE_FIRST_USE=1"]
+                : []),
             ]
           : []),
         ...(run.kind === "interactive"
@@ -260,7 +284,9 @@ export function containerSpec(
           // connection becomes ready. This is not the persisted account profile.
           "/root/camoufox": "rw,nosuid,nodev,size=16m,mode=700",
         },
-        Mounts: [{ Type: "volume", Source: volume, Target: "/data" }],
+        Mounts: [
+          { Type: "volume", Source: volume, Target: "/data", VolumeOptions: { NoCopy: true } },
+        ],
         NetworkMode: name,
         PortBindings:
           networkMode === "bridge"

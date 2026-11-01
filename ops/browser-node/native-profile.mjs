@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
@@ -62,9 +62,9 @@ async function legacyState(root, accountId) {
   return { value, digest: createHash("sha256").update(text).digest("hex") };
 }
 
-/** Explicit local administration, never called by task startup or an HTTP route.
- * The original JSON is retained for rollback. Runtime startup cannot initialize
- * a missing profile, so a missing volume cannot silently become a fresh login.
+/** Explicit migration or broker-authorized first use of a verified empty volume.
+ * The original JSON is retained for rollback. Historical startup never receives
+ * first-use authorization, so missing historical storage cannot become a fresh login.
  */
 export async function initializeNativeProfile({ root = "/data", accountId, nodeId, source }) {
   const identity = scope(accountId, nodeId);
@@ -129,6 +129,7 @@ export function createNativeProfileRuntime({
   const p = paths(root, identity.accountId);
   let context;
   let pendingLaunch;
+  let firstUseChecked = false;
   async function active() {
     const deadline = await leaseDeadline();
     if (!Number.isFinite(deadline) || deadline <= Date.now())
@@ -169,6 +170,16 @@ export function createNativeProfileRuntime({
       startupDiagnostics?.stage("profile-check");
       await active();
       await directory(root);
+      if (!firstUseChecked) {
+        firstUseChecked = true;
+        if (
+          environment.FTRADE_NATIVE_PROFILE_FIRST_USE === "1" &&
+          (await readdir(root)).length === 0
+        ) {
+          await active();
+          await initializeNativeProfile({ root, ...identity, source: "empty" });
+        }
+      }
       await directory(p.directory, true);
       await directory(p.profile, true);
       const { value: manifest } = await privateJson(p.manifest, 4096);

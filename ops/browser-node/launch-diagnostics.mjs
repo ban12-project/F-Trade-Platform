@@ -30,6 +30,7 @@ const codes = new Set([
   "browser_launch_timeout",
   "admission_rejected",
   "native_profile_scope_invalid",
+  "native_profile_volume_owner_mismatch",
   "native_profile_directory_invalid",
   "native_profile_file_invalid",
   "native_profile_migration_required",

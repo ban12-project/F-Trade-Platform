@@ -21,6 +21,15 @@ try {
     });
     const d = await r.json();
     if (!r.ok) {
+      // Fixed startup enums only; never forward upstream response/error text.
+      const { sanitizeStartupDiagnostics } = await import("/app/ftrade-startup-diagnostics.mjs");
+      const health = await fetch("http://127.0.0.1:9377/health", {
+        headers,
+        signal: AbortSignal.timeout(3000),
+      })
+        .then((response) => response.json())
+        .catch(() => null);
+      console.error("Synthetic startup:", sanitizeStartupDiagnostics(health?.startup));
       const reason = JSON.stringify(d).match(/native_profile_[a-z_]+|Browser launch timeout/);
       throw Error(`http_${r.status}:${reason?.[0] ?? "runtime_request_failed"}`);
     }
@@ -40,12 +49,17 @@ try {
     throw Error("startup_diagnostic_not_ready");
   const manifest = JSON.parse(readFileSync("/data/native-profile-v1/owner.json", "utf8"));
   const hash = createHash("sha256").update(manifest.accountId).digest("hex").slice(0, 32);
-  const source = readFileSync(`/data/profiles/${hash}/storage-state.json`);
-  if (
-    !manifest.imported ||
-    createHash("sha256").update(source).digest("hex") !== manifest.legacyDigest
-  )
-    throw Error("migration_manifest_or_original_changed");
+  if (process.env.SYNTHETIC_NEW_PROFILE === "1") {
+    if (manifest.source !== "empty" || manifest.legacyDigest !== null || !manifest.imported)
+      throw Error("first_use_manifest_invalid");
+  } else {
+    const source = readFileSync(`/data/profiles/${hash}/storage-state.json`);
+    if (
+      !manifest.imported ||
+      createHash("sha256").update(source).digest("hex") !== manifest.legacyDigest
+    )
+      throw Error("migration_manifest_or_original_changed");
+  }
   const mode = process.argv[2];
   const userId = "22222222-2222-4222-8222-222222222222";
   const t = await req("/tabs", {
