@@ -10,6 +10,7 @@ COPY ops/browser-node/ ./ops/browser-node/
 COPY ops/host-capacity/admission.mjs ./ops/host-capacity/
 ENV BROWSER_AGENT_NETWORK_MODE=bridge
 LABEL io.ftrade.role="agent"
+LABEL io.ftrade.release-drain="1"
 # UID 0 can read existing root-owned private state and use the Docker socket.
 # Docker authority remains intentional; this is a trusted controller, not a job.
 ENTRYPOINT ["setpriv", "--bounding-set=-all", "--inh-caps=-all", "--ambient-caps=-all", "--no-new-privs", "/usr/bin/tini", "--"]

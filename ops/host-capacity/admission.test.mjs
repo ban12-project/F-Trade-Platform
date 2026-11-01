@@ -60,3 +60,20 @@ test("adaptive mode cannot silently run without a shared lock directory", async 
     /directory_invalid/,
   );
 });
+
+test("release drain refuses new admissions until its marker is removed", async () => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { assertNotDraining } = await import("./admission.mjs");
+  const dir = await mkdtemp(join(tmpdir(), "ftrade-drain-"));
+  try {
+    await assertNotDraining(dir);
+    await writeFile(join(dir, "drain.json"), "{}");
+    await assert.rejects(assertNotDraining(dir), /host_capacity_draining/);
+    await rm(join(dir, "drain.json"));
+    await assertNotDraining(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
