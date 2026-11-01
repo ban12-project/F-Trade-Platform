@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { deriveWorkspaceLibrary } from "../lib/workspace/library-model";
 import { workspaceTaskHref } from "../lib/workspace/navigation";
 import {
   deriveWorkspaceProjectOverview,
@@ -183,4 +184,81 @@ assert.equal(
 );
 console.log(
   "PASS task decision matrix: permissions, revisions, dependencies, timing, publication receipts and shared summaries",
+);
+
+const groupedSnapshot = snapshot([
+  record("CONTENT_APPROVED", "content", "shared", { hook: "SYNTHETIC source content" }),
+  { ...record("CONTENT_APPROVED", "content", "shared"), projectId: "q" },
+  record("PRODUCT_READY", "product", "product"),
+]);
+groupedSnapshot.projects.push({ ...project, id: "q" });
+groupedSnapshot.publications = [
+  {
+    id: "old",
+    projectId: "p",
+    contentRef: "shared",
+    status: "published",
+    accountLabel: "SYNTHETIC account A",
+    createdAt: now,
+  },
+  {
+    id: "new",
+    projectId: "p",
+    contentRef: "shared",
+    status: "failed",
+    accountLabel: "SYNTHETIC account B",
+    createdAt: new Date(now.getTime() + 1000),
+  },
+  {
+    id: "other-project",
+    projectId: "q",
+    contentRef: "shared",
+    status: "submitted",
+    jobStatus: "running",
+    createdAt: now,
+  },
+  {
+    id: "inaccessible",
+    projectId: "private",
+    contentRef: "shared",
+    status: "failed",
+    createdAt: now,
+  },
+  { id: "orphan", projectId: "p", contentRef: "missing", status: "failed", createdAt: now },
+  { id: "not-content", projectId: "p", contentRef: "product", status: "failed", createdAt: now },
+];
+const groupedLibrary = deriveWorkspaceLibrary(groupedSnapshot);
+assert.equal(groupedLibrary.length, 3);
+assert.equal(
+  groupedLibrary.some((row) => row.kind === "publication"),
+  false,
+);
+const source = groupedLibrary.find((row) => row.projectId === "p" && row.id === "shared");
+assert.deepEqual(
+  source?.publications?.map((row) => row.id),
+  ["new", "old"],
+);
+assert.equal(
+  source?.state,
+  "CONTENT_APPROVED",
+  "A failed attempt must not replace content review state",
+);
+assert.equal(source?.publications?.[0].accountLabel, "SYNTHETIC account B");
+assert.equal(source?.publications?.[0].href, "/workspace/p/records/publication/new");
+assert.deepEqual(
+  groupedLibrary.find((row) => row.projectId === "q")?.publications?.map((row) => row.id),
+  ["other-project"],
+);
+assert.equal(
+  groupedLibrary.find((row) => row.projectId === "q")?.publications?.[0].statusLabel,
+  "执行中",
+);
+assert.equal(groupedLibrary[0], source, "Latest publication activity orders its source content");
+assert.equal(
+  groupedSnapshot.records[0].updatedAt,
+  now,
+  "Library projection must not mutate the source snapshot",
+);
+console.log(
+  "PASS content-owned publication grouping, cross-project isolation, source state and receipt links",
 );

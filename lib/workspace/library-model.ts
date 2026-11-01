@@ -1,3 +1,4 @@
+import { publicationProgress } from "../social/publication-presentation";
 import {
   isWorkspaceRecordKind,
   type WorkspaceCollection,
@@ -57,6 +58,13 @@ export const recordStateLabels: Record<string, string> = {
   blocked: "发布受阻",
   cancelled: "已取消",
 };
+export type WorkspaceLibraryPublication = {
+  id: string;
+  accountLabel: string;
+  statusLabel: string;
+  href: string;
+  createdAt: Date;
+};
 export type WorkspaceLibraryRecord = {
   id: string;
   projectId: string;
@@ -69,6 +77,7 @@ export type WorkspaceLibraryRecord = {
   relation: string;
   updatedAt: Date;
   href: string;
+  publications?: WorkspaceLibraryPublication[];
 };
 function object(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -109,26 +118,29 @@ export function deriveWorkspaceLibrary(snapshot: WorkspaceTaskSnapshot): Workspa
       href: workspaceRecordHref(project.id, kind, record.id),
     });
   }
-  for (const publication of snapshot.publications) {
+  const contentByProject = new Map(
+    rows
+      .filter((row) => row.kind === "content" || row.kind === "video")
+      .map((row) => [`${row.projectId}:${row.id}`, row]),
+  );
+  for (const content of contentByProject.values()) content.publications = [];
+  for (const publication of [...snapshot.publications].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id),
+  )) {
     const project = projects.get(publication.projectId);
     if (!project) continue;
-    const content = rows.find(
-      (row) => row.id === publication.contentRef && row.projectId === project.id,
-    );
-    rows.push({
+    const content = contentByProject.get(`${project.id}:${publication.contentRef}`);
+    if (!content?.publications) continue;
+    content.publications.push({
       id: publication.id,
-      projectId: project.id,
-      projectTitle: project.title,
-      kind: "publication",
-      collection: "content",
-      title: content ? `${content.title} · 发布` : `发布记录 · ${publication.id.slice(0, 8)}`,
-      state: publication.status,
-      statusLabel: recordStateLabels[publication.status] ?? "回执待核对",
-      relation: "owned",
-      updatedAt: publication.createdAt,
+      accountLabel: publication.accountLabel || "发布账号",
+      statusLabel: publicationProgress(publication.status, false, publication.jobStatus).label,
+      createdAt: publication.createdAt,
       href: workspaceRecordHref(project.id, "publication", publication.id),
     });
+    if (publication.createdAt > content.updatedAt) content.updatedAt = publication.createdAt;
   }
+
   return rows.sort(
     (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || a.id.localeCompare(b.id),
   );
