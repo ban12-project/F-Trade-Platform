@@ -9,10 +9,16 @@ import { productStreamModelProposalSchema } from "../lib/product/stream-model-sc
 const require = createRequire(import.meta.url);
 const authRequire = createRequire(require.resolve("better-auth"));
 const authZod: typeof z = authRequire("zod").z;
+const shadcnRequire = createRequire(require.resolve("shadcn/mcp"));
+const mcpRequire = createRequire(
+  shadcnRequire.resolve("@modelcontextprotocol/sdk/server/index.js"),
+);
 
 const libraries: [string, typeof z][] = [
   ["application", z],
   ["auth", authZod],
+  ["shadcn", shadcnRequire("zod").z],
+  ["shadcn MCP", mcpRequire("zod").z],
 ];
 // Verify each exact-parent override at its installed resolution, not just root Zod.
 const parentPins = [
