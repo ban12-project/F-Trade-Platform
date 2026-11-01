@@ -16,6 +16,15 @@ import { useWorkspaceDirtyState } from "./dirty-state";
 import { NewWorkButton } from "./new-work";
 import { WorkspaceLink } from "./workspace-link";
 
+const publicationTimeFormat = new Intl.DateTimeFormat("zh-CN", {
+  timeZone: "Asia/Shanghai",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
 export const collectionLabels = {
   products: "产品资料",
   content: "内容与发布",
@@ -107,7 +116,9 @@ export function WorkspaceLibrary({
           </NativeSelect>
         </Field>
         <Field className="w-full sm:w-48">
-          <FieldLabel htmlFor={`${id}-type`}>记录类型</FieldLabel>
+          <FieldLabel htmlFor={`${id}-type`}>
+            {collection === "content" ? "内容类型" : "记录类型"}
+          </FieldLabel>
           <NativeSelect
             id={`${id}-type`}
             value={recordType ?? ""}
@@ -125,7 +136,9 @@ export function WorkspaceLibrary({
           </NativeSelect>
         </Field>
         <Field className="w-full sm:w-48">
-          <FieldLabel htmlFor={`${id}-state`}>状态</FieldLabel>
+          <FieldLabel htmlFor={`${id}-state`}>
+            {collection === "content" ? "内容状态" : "状态"}
+          </FieldLabel>
           <NativeSelect
             id={`${id}-state`}
             value={state ?? ""}
@@ -178,6 +191,43 @@ export function WorkspaceLibrary({
                 </div>
                 <Badge variant="outline">{record.statusLabel}</Badge>
               </WorkspaceLink>
+              {record.publications ? (
+                <div className="mx-4 border-t pb-3 pt-2">
+                  <p className="text-xs text-muted-foreground">
+                    {record.publications.length
+                      ? `发布情况 · ${record.publications.length} 次`
+                      : "尚未发布"}
+                  </p>
+                  {record.publications.length ? (
+                    <ul
+                      aria-label={`${record.title}的发布情况`}
+                      className="mt-1 flex flex-col gap-1"
+                    >
+                      {record.publications.map((publication) => (
+                        <li key={publication.id}>
+                          <WorkspaceLink
+                            href={withWorkspaceReturnTo(publication.href, returnTo)}
+                            className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 rounded-md py-1 text-sm hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+                          >
+                            <span className="min-w-0 flex-1 break-words">
+                              {publication.accountLabel}
+                            </span>
+                            <time
+                              dateTime={publication.createdAt.toISOString()}
+                              title="提交时间（北京时间）"
+                              className="text-xs text-muted-foreground"
+                            >
+                              {publicationTimeFormat.format(publication.createdAt)}
+                            </time>
+                            <Badge variant="outline">{publication.statusLabel}</Badge>
+                            <span className="text-xs text-muted-foreground">查看详情</span>
+                          </WorkspaceLink>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

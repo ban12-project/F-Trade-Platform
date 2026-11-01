@@ -16,6 +16,9 @@ class Query implements PromiseLike<Row[]> {
     this.table = getTableName(table);
     return this;
   }
+  leftJoin(..._args: unknown[]) {
+    return this;
+  }
   innerJoin(..._args: unknown[]) {
     return this;
   }
