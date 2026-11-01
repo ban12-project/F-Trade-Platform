@@ -31,6 +31,7 @@ export function createGateway({
   nodeCall,
   slots,
   inspectPublicationPage,
+  setupPublication,
   inspectionFailureStage,
   port = 9400,
   host = "127.0.0.1",
@@ -86,6 +87,35 @@ export function createGateway({
       if (request.method === "GET" && request.url === "/viewer.js") {
         response.setHeader("Content-Type", "text/javascript; charset=utf-8");
         response.end(source.replace('"__APP_ORIGIN__"', JSON.stringify(appOrigin)));
+        return;
+      }
+      if (request.method === "POST" && request.url === "/publication-setup") {
+        if (request.headers.origin !== appOrigin || !setupPublication) return fail();
+        const input = await readBody(request);
+        if (
+          typeof input.ticket !== "string" ||
+          !["inspect", "prepare", "activate"].includes(input.operation) ||
+          Object.keys(input).sort().join(",") !==
+            (input.operation === "activate"
+              ? "candidateHash,operation,ticket"
+              : "operation,ticket") ||
+          (input.operation === "activate" && !/^[a-f0-9]{64}$/.test(input.candidateHash))
+        )
+          return fail();
+        const admission = await nodeCall("admit", { ticket: input.ticket });
+        const slot = slots.get(admission.runId);
+        if (
+          !slot?.ready ||
+          slot.stopping ||
+          slot.run.kind !== "interactive" ||
+          slot.expiresAt <= Date.now()
+        )
+          return fail();
+        const result = await setupPublication(slot, input);
+        if (slots.get(admission.runId) !== slot || slot.stopping || slot.expiresAt <= Date.now())
+          return fail();
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify(result));
         return;
       }
       if (request.method === "POST" && request.url === "/publication-inspection") {

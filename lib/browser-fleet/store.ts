@@ -489,6 +489,68 @@ async function nodeOperation(
   now: number,
 ): Promise<Record<string, unknown>> {
   const state = row.document;
+  if (request.operation === "publication-setup") {
+    const run = state.runs.find((r) => r.id === request.runId);
+    const account = run && state.accounts.find((a) => a.id === run.accountId);
+    if (
+      !run ||
+      run.leaseId !== request.leaseId ||
+      run.kind !== "interactive" ||
+      run.status !== "running" ||
+      run.stopRequested ||
+      run.leaseUntil <= now ||
+      run.deadline <= now ||
+      !account?.enabled ||
+      run.requestedBy !== row.owner_id ||
+      !run.authSessionId ||
+      request.expiresAt <= now ||
+      request.expiresAt > now + 7 * 86400000 ||
+      state.runs.some(
+        (r) => r.kind === "publish" && ["queued", "starting", "running"].includes(r.status),
+      )
+    )
+      throw new Error("publication_setup_inactive");
+    const [ownerSession] = await tx
+      .select({ id: session.id })
+      .from(session)
+      .where(
+        and(
+          eq(session.id, run.authSessionId),
+          eq(session.userId, row.owner_id),
+          gt(session.expiresAt, new Date(now)),
+        ),
+      );
+    if (!ownerSession) throw new Error("publication_setup_session_expired");
+    state.capabilities = [...new Set([...state.capabilities, "publish" as const])];
+    state.publicationScopes = [
+      ...(state.publicationScopes ?? []).filter(
+        (s) => s.accountRef !== account.accountRef || s.channelRef !== account.channelRef,
+      ),
+      {
+        channelRef: account.channelRef,
+        accountRef: account.accountRef,
+        expiresAt: request.expiresAt,
+        textOnly: true,
+        audience: request.audience,
+      },
+    ];
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "browser_publication_setup.activated",
+      actorType: "human",
+      actorId: row.owner_id,
+      subjectType: "browser_node",
+      subjectId: row.id,
+      metadata: {
+        account_id: account.id,
+        candidate_hash: request.candidateHash,
+        expires_at: request.expiresAt,
+        text_only: true,
+      },
+      occurredAt: new Date(now),
+    });
+    return { active: true };
+  }
   if (request.operation === "claim") {
     // Reject stale interactive requests before reserving memory or disclosing a proxy.
     const waiting = state.runs.filter((r) => r.status === "queued" && r.kind === "interactive");

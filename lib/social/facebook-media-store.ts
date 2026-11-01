@@ -263,6 +263,7 @@ export async function resolveFacebookMediaSubmissionScope(
 ) {
   if (selectedScope && process.env.SOCIAL_FACEBOOK_WORKER_ENABLED !== "1") {
     const account = await assertPublishingAccountReady(database, selectedScope, actorId);
+    if (account.textOnly) throw new Error("这个账号目前只接通文字发布，图片和视频尚未完成核对。");
     return { channelRef: account.channelRef, accountRef: account.accountRef };
   }
   if (process.env.SOCIAL_FACEBOOK_WORKER_ENABLED === "1") {
@@ -291,6 +292,10 @@ export async function resolveFacebookMediaSubmissionScope(
     account.authState !== "ready" ||
     !account.expectedEgressIp ||
     !state.capabilities?.includes("publish") ||
+    state.publicationScopes?.some(
+      (p) =>
+        p.channelRef === account.channelRef && p.accountRef === account.accountRef && p.textOnly,
+    ) ||
     !publicationScopeActive(state, account, now)
   )
     throw new Error("facebook_media_scope_inactive");

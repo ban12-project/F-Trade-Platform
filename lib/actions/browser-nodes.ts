@@ -6,6 +6,8 @@ import { hasPermission } from "@/lib/authz";
 import { ownerCommandSchema } from "@/lib/browser-fleet/contracts";
 import { inspectOwnedPublicationPage } from "@/lib/browser-fleet/publication-page-inspection";
 import { publicationPageInspectionInputSchema } from "@/lib/browser-fleet/publication-page-inspection-contract";
+import { setupOwnedPublication } from "@/lib/browser-fleet/publication-setup";
+import { publicationSetupInputSchema } from "@/lib/browser-fleet/publication-setup-contract";
 import { inspectOwnedBrowserSandbox } from "@/lib/browser-fleet/sandbox-inspection";
 import { deliverQueuedBrowserSandboxes } from "@/lib/browser-fleet/sandbox-workflow-delivery";
 import { listBrowserNodes, ownerBrowserCommand } from "@/lib/browser-fleet/store";
@@ -58,6 +60,20 @@ export async function browserNodeCommandAction(input: unknown) {
       ok: false as const,
       message:
         "操作未完成。请检查节点归属、代理配置、数据库迁移及运行中的任务；账号不可同时绑定多个节点。",
+    };
+  }
+}
+
+export async function setupPublicationAction(input: unknown) {
+  try {
+    const current = await actor();
+    const value = publicationSetupInputSchema.parse(input);
+    return { ok: true as const, result: await setupOwnedPublication(value, current) };
+  } catch {
+    return {
+      ok: false as const,
+      message:
+        "配置未生效。请确认接管页面仍在运行并重新核对；有待执行发布任务时需先处理任务。服务刚更新时请稍后重试。",
     };
   }
 }

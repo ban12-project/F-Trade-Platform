@@ -170,6 +170,17 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
     })
     .strict(),
+  z
+    .object({
+      ...common,
+      operation: z.literal("publication-setup"),
+      runId: id,
+      leaseId: id,
+      audience: z.enum(["Public", "Friends", "Only me"]),
+      candidateHash: z.string().regex(/^[a-f0-9]{64}$/),
+      expiresAt: z.number().int().positive(),
+    })
+    .strict(),
   z.object({ ...common, operation: z.literal("sync") }).strict(),
   z
     .object({
@@ -184,6 +195,8 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
               channelRef: reference,
               accountRef: reference,
               expiresAt: z.number().int().positive(),
+              textOnly: z.boolean().optional(),
+              audience: z.enum(["Public", "Friends", "Only me"]).optional(),
             })
             .strict(),
         )

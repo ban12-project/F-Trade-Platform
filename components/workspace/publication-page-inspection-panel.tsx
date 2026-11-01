@@ -8,6 +8,7 @@ import {
   type PublicationPageInspection,
   publicationPageInspectionInputSchema,
 } from "@/lib/browser-fleet/publication-page-inspection-contract";
+import { PublicationSetupPanel } from "./publication-setup-panel";
 
 const labels = {
   identity: "页面身份",
@@ -90,43 +91,49 @@ export function PublicationPageInspectionPanel({
     [message, setMessage] = useState(""),
     [inspection, setInspection] = useState<PublicationPageInspection>();
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>核对当前发布页面</CardTitle>
-        <CardDescription>
-          在本任务的受控 Facebook
-          页面观察身份和编辑器控件。请先在接管页面打开空编辑器；页面审核与逐帖发布仍需分别确认。
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={async () => {
-            if (pending.current) return;
-            pending.current = true;
-            setBusy(true);
-            setMessage("");
-            setInspection(undefined);
-            try {
-              const value = publicationPageInspectionInputSchema.parse({ nodeId, runId });
-              const result = await inspectPublicationPageAction(value);
-              if (result.ok) setInspection(result.inspection);
-              else setMessage(result.message);
-            } catch {
-              setMessage("页面核对未完成。请检查接管任务与当前登录后重试。");
-            } finally {
-              pending.current = false;
-              setBusy(false);
-            }
-          }}
-        >
-          {busy ? "正在核对…" : "只读核对当前页面"}
-        </Button>
-        {message ? <p role="status">{message}</p> : null}
-        {inspection ? <PublicationPageInspectionView inspection={inspection} /> : null}
-      </CardContent>
-    </Card>
+    <div className="flex w-full flex-col gap-3">
+      <PublicationSetupPanel nodeId={nodeId} runId={runId} />
+      <details>
+        <summary>高级：检查原有发布规则</summary>
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>核对当前发布页面</CardTitle>
+            <CardDescription>
+              在本任务的受控 Facebook
+              页面观察身份和编辑器控件。请先在接管页面打开空编辑器；页面审核与逐帖发布仍需分别确认。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={async () => {
+                if (pending.current) return;
+                pending.current = true;
+                setBusy(true);
+                setMessage("");
+                setInspection(undefined);
+                try {
+                  const value = publicationPageInspectionInputSchema.parse({ nodeId, runId });
+                  const result = await inspectPublicationPageAction(value);
+                  if (result.ok) setInspection(result.inspection);
+                  else setMessage(result.message);
+                } catch {
+                  setMessage("页面核对未完成。请检查接管任务与当前登录后重试。");
+                } finally {
+                  pending.current = false;
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "正在核对…" : "只读核对当前页面"}
+            </Button>
+            {message ? <p role="status">{message}</p> : null}
+            {inspection ? <PublicationPageInspectionView inspection={inspection} /> : null}
+          </CardContent>
+        </Card>
+      </details>
+    </div>
   );
 }

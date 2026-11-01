@@ -45,6 +45,7 @@ import {
   createPublicationPageInspector,
   publicationInspectionFailureStage,
 } from "./publication-inspection.mjs";
+import { createPublicationSetup } from "./publication-setup.mjs";
 import { stagePublicationUpload } from "./upload.mjs";
 
 const idleExit = createIdleExitPolicy();
@@ -109,6 +110,73 @@ if (process.env.BROWSER_TASK_ADAPTER) {
     execute: extra.execute,
     publicationScopes: extra.publicationScopes,
     inboxScopes: extra.inboxScopes,
+  };
+}
+const baseAdapter = adapter;
+function assertSetupActive(slot) {
+  const age = Date.now() - slot.egressCheckedAt;
+  if (
+    !slot.ready ||
+    slot.stopping ||
+    slot.abort.signal.aborted ||
+    slot.expiresAt <= Date.now() ||
+    !Number.isFinite(age) ||
+    age < 0 ||
+    age > 45000
+  )
+    throw new Error("setup_lease_inactive");
+}
+const publicationSetup = process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR
+  ? createPublicationSetup({
+      stateDir,
+      managedDirectory: process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR,
+      browserRequest,
+      assertActive: assertSetupActive,
+      async activate(slot, profile, candidateHash) {
+        const result = await nodeCall("publication-setup", {
+          runId: slot.run.id,
+          leaseId: slot.run.leaseId,
+          candidateHash,
+          expiresAt: Date.parse(profile.expiresAt),
+          audience: profile.audienceText,
+        });
+        if (result.active !== true) throw new Error("setup_activation_unconfirmed");
+      },
+    })
+  : null;
+if (publicationSetup) {
+  await publicationSetup.initialize();
+  adapter = {
+    get capabilities() {
+      return [
+        ...new Set([
+          ...baseAdapter.capabilities,
+          ...(publicationSetup.scopes().length ? ["publish"] : []),
+        ]),
+      ];
+    },
+    get publicationScopes() {
+      const reviewed = publicationSetup.scopes();
+      return [
+        ...(baseAdapter.publicationScopes ?? []).filter(
+          (p) =>
+            !reviewed.some((r) => r.channelRef === p.channelRef && r.accountRef === p.accountRef),
+        ),
+        ...reviewed,
+      ];
+    },
+    inboxScopes: baseAdapter.inboxScopes,
+    execute(context) {
+      return context.run.kind === "publish" &&
+        publicationSetup
+          .scopes()
+          .some(
+            (p) =>
+              p.channelRef === context.run.channelRef && p.accountRef === context.run.accountRef,
+          )
+        ? publicationSetup.execute(context)
+        : (baseAdapter.execute?.(context) ?? "failed");
+    },
   };
 }
 const slots = new Map();
@@ -189,6 +257,7 @@ const gateway = createGateway({
   appOrigin,
   nodeCall,
   slots,
+  setupPublication: publicationSetup?.handle,
   inspectionFailureStage: publicationInspectionFailureStage,
   inspectPublicationPage: createPublicationPageInspector({
     directory: process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR,

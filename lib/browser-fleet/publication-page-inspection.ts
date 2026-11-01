@@ -19,7 +19,7 @@ import { ownerBrowserCommand } from "./store";
 
 type Actor = { id: string; sessionId: string };
 type Request = { nodeId: string; runId: string };
-async function currentInspectionAccess(
+export async function currentInspectionAccess(
   value: Request,
   actor: Actor,
   db: Database,
