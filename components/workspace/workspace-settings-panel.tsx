@@ -195,7 +195,7 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
               <FieldLabel htmlFor="default-agent-model">作为默认模型</FieldLabel>
             </Field>
             <Field>
-              <FieldLabel>Provider</FieldLabel>
+              <FieldLabel htmlFor="agent-provider">Provider</FieldLabel>
               <Controller
                 control={form.control}
                 name="provider"
@@ -210,7 +210,7 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                     value={field.value}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="agent-provider" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
