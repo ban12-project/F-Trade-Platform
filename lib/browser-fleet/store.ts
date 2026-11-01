@@ -32,6 +32,7 @@ import {
   bindInstallation,
   claimRun,
   enqueueRun,
+  extendInteractiveRun,
   type FleetState,
   finishRun,
   initialState,
@@ -201,6 +202,7 @@ export type OwnerResult = {
   nodeId?: string;
   accessKey?: string;
   runId?: string;
+  deadline?: number;
   connection?: { token: string; origin: string; expiresAt: number };
 };
 export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise<OwnerResult> {
@@ -302,7 +304,23 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       const run = state.runs.find((r) => r.id === command.runId);
       if (!run || (run.kind === "interactive" && run.requestedBy !== actor.id))
         throw new Error("run_forbidden");
-      if (command.operation === "stop") requestStop(state, run);
+      if (command.operation === "extend") {
+        if (row.status !== "active") throw new Error("interactive_extension_unavailable");
+        const previousDeadline = run.deadline;
+        result = {
+          deadline: extendInteractiveRun(state, run, command.expectedDeadline, actor, now),
+        };
+        await tx.insert(auditEvent).values({
+          id: randomUUID(),
+          actorType: "human",
+          actorId: actor.id,
+          action: "browser_interactive.extended",
+          subjectType: "browser_node",
+          subjectId: row.id,
+          metadata: { run_id: run.id, previous_deadline: previousDeadline, deadline: run.deadline },
+          occurredAt: new Date(now),
+        });
+      } else if (command.operation === "stop") requestStop(state, run);
       else if (command.operation === "use-saved-login") {
         const { account } = await savedLoginAccount(tx, row, run, now);
         if (run.authSessionId !== actor.sessionId || run.savedLogin)

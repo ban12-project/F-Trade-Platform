@@ -81,6 +81,14 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("open"), nodeId: id, accountId: id }).strict(),
   z.object({ operation: z.literal("stop"), nodeId: id, runId: id }).strict(),
   z.object({ operation: z.literal("ticket"), nodeId: id, runId: id }).strict(),
+  z
+    .object({
+      operation: z.literal("extend"),
+      nodeId: id,
+      runId: id,
+      expectedDeadline: z.number().int().positive(),
+    })
+    .strict(),
 ]);
 const common = { installationId: id, bootId: id };
 export const nodeRequestSchema = z.discriminatedUnion("operation", [

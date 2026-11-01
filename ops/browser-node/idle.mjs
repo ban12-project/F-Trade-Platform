@@ -4,10 +4,11 @@ export function viewerGraceExpired(state, now) {
   if (state.automatic && state.loginTask) return false;
   return (
     (!state.connected &&
+      !state.disconnectedAt &&
       !state.pendingConnection &&
       !state.loginTask &&
       now - Math.max(state.readyAt, state.loginCompletedAt ?? 0) > 60000) ||
-    (Boolean(state.disconnectedAt) && now - state.disconnectedAt > 15000)
+    (Boolean(state.disconnectedAt) && now - state.disconnectedAt > 120000)
   );
 }
 

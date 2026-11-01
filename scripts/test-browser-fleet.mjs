@@ -6,6 +6,7 @@ import {
   bindInstallation,
   claimRun,
   enqueueRun,
+  extendInteractiveRun,
   finishRun,
   initialState,
   publicState,
@@ -523,4 +524,58 @@ test("observe-only stops on a confirmed recovery page without claiming factors",
     assert.equal(claims, 0);
     assert.equal(submissions, 0);
   }
+});
+
+test("30-minute interactive default is separate from short lease and other run deadlines", () => {
+  for (const [kind, duration] of [
+    ["interactive", 1800000],
+    ["inbox", 120000],
+    ["publish", 900000],
+  ]) {
+    const s = fixture();
+    enqueue(s, "a", kind);
+    const r = claim(s);
+    assert.equal(r.deadline, 1001 + duration);
+    assert.equal(r.leaseUntil, 1001 + 90000);
+  }
+});
+test("manual extension is bounded, compare-and-set and cannot revive expired or revoked sessions", () => {
+  const s = fixture();
+  enqueue(s);
+  const r = claim(s);
+  r.status = "running";
+  const actor = { id: "owner", sessionId: "session" },
+    old = r.deadline,
+    now = old - 120000;
+  r.leaseUntil = now + 90000;
+  r.connectBefore = now + 60000;
+  const before = structuredClone(r);
+  for (const patch of [
+    { status: "stopping" },
+    { stopRequested: true },
+    { kind: "publish" },
+    { deadline: now },
+    { leaseUntil: now },
+    { authSessionId: "other" },
+    { credentialVersion: 99 },
+  ]) {
+    Object.assign(r, patch);
+    assert.throws(() => extendInteractiveRun(s, r, r.deadline, actor, now));
+    Object.assign(r, before);
+  }
+  s.accounts[0].enabled = false;
+  assert.throws(() => extendInteractiveRun(s, r, old, actor, now));
+  s.accounts[0].enabled = true;
+  assert.throws(() => extendInteractiveRun(s, r, old, actor, old - 300001));
+  assert.throws(() => extendInteractiveRun(s, r, old, { ...actor, id: "other" }, now));
+  assert.equal(extendInteractiveRun(s, r, old, actor, now), old + 1800000);
+  assert.throws(() => extendInteractiveRun(s, r, old, actor, now), /changed/);
+  assert.deepEqual(
+    { ...r, deadline: old },
+    before,
+    "Only deadline changes, never credentials/ticket/lease/login state",
+  );
+  const renewed = renewRun(s, r.id, r.leaseId, true, now + 1000);
+  assert.equal(renewed.deadline, old + 1800000);
+  assert.equal(renewed.leaseUntil, now + 91000);
 });
