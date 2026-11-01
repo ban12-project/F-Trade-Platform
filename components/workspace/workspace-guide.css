@@ -37,3 +37,19 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+.workspace-guide-popover .driver-popover-arrow-side-left {
+  border-left-color: var(--popover);
+}
+
+.workspace-guide-popover .driver-popover-arrow-side-right {
+  border-right-color: var(--popover);
+}
+
+.workspace-guide-popover .driver-popover-arrow-side-top {
+  border-top-color: var(--popover);
+}
+
+.workspace-guide-popover .driver-popover-arrow-side-bottom {
+  border-bottom-color: var(--popover);
+}
