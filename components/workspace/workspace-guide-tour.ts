@@ -78,10 +78,28 @@ const hints: Hint[] = [
       "检查文案是否与已核验产品一致，并记录审核依据。需要修改时先退回；修订后的版本需要重新审核。",
   },
   {
+    selector: 'a[href*="/new/content?product="]',
+    title: "用已核验产品制作内容",
+    description:
+      "从这里开始第一条图文内容，产品会自动带入。没有实物图片时可以先制作文字内容；视频按需制作。",
+  },
+  {
+    selector: 'form[id^="register-product-media-"]',
+    title: "按需登记视频素材",
+    description:
+      "制作视频前，先登记确实属于当前产品的图片或视频，并说明来源、可见内容和授权范围。素材经独立审核后才能复用；没有匹配素材时可以先继续图文流程。",
+  },
+  {
     selector: "#publication-channel",
     title: "审核通过后安排发布",
     description:
       "核对最终文案、已启用渠道和账户，再单独确认本次发布。没有可用渠道时，可以保留已批准内容并继续其他工作；已批准不代表已发布。",
+  },
+  {
+    selector: 'a[href*="/new/rfq"]',
+    title: "从客户会话整理需求",
+    description:
+      "从这里把当前会话带入 RFQ，先整理消息建议，再核对并保存。演示会话需要标明模拟，已经记录的需求可以直接继续处理。",
   },
   {
     selector: 'form#create-rfq, form[id^="revise-rfq-"]',
@@ -94,6 +112,12 @@ const hints: Hint[] = [
     title: "补齐后确认需求",
     description:
       "先补全缺失字段并保存，再确认需求完整。随后引用已核验产品创建人工报价。已有有效 RFQ 可以直接继续，无需等待新私信。",
+  },
+  {
+    selector: 'a[href*="/new/quotation"]',
+    title: "需求确认后创建报价",
+    description:
+      "带着当前 RFQ 进入报价，选择已核验产品并录入人工确认的商业条款。系统不会根据产品目录自动承诺价格或交期。",
   },
   {
     selector: 'form#quotation-new, form[id^="quotation-"]',
