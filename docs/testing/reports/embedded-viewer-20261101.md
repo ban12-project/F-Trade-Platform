@@ -48,9 +48,33 @@ single-use-ticket checks remain enabled. Fixed diagnostic enums now preserve
   only the desktop transport is synthetic. It does not claim real noVNC pixels.
 - Biome and repository validation passed.
 
-Production rollout and renewed authenticated embedded-session acceptance are
-required before declaring the repair complete. Historical message decryption,
-credential-factor recovery and real DM ingestion remain separate scopes.
+## Production embedded acceptance
+
+PR #789 deployed as `52ccb4084f3b0f4d4a47cc58603db5517789935b`.
+[Deployment run 41303879350](https://github.com/ban12-project/F-Trade-Platform/actions/runs/41303879350)
+completed successfully and the VPS receipt reported READY. The healthy Agent
+image was `sha256:48c6106899894e2f60de1d5b886232ee2217442783ef8063bd4c99cd6e627183`;
+its selected browser image was
+`sha256:208638ad62ad71827610b3bba521f9902c78d50a3e3799bf93c095b8d1425008`.
+
+At approximately 11:57–12:00 UTC, an authenticated ordinary Chrome window,
+operated through native UI, queued a fresh interactive task. Its actual embedded
+HTTPS Viewer displayed the signed-in Messenger desktop and reported connected.
+Opening and closing the account menu proved remote input. The existing automatic
+identity/Messenger observer passed without requesting password, TOTP or PIN.
+The empty inbox is not historical-decryption or DM-ingestion evidence.
+
+The session remained active for more than two minutes across periodic egress
+checks, with no new Agent egress-failure diagnostic. Fresh application-issued
+authorization reconnected the embedded Viewer. Normal application release removed
+the Viewer, and subsequent node inventory contained zero account browser
+containers. Local screenshots remain private; no account identifiers, tickets,
+credentials or profile contents are included here. No post or DM was sent.
+
+This proves the renewed embedded connection, input, readiness, reconnection and
+normal release path. It does not claim the entire production fault/revocation
+matrix, credential-factor recovery or historical-message recovery. Earlier local
+gateway denial/revocation evidence remains distinct from this live happy path.
 
 ## Registry verification
 
@@ -61,3 +85,9 @@ The subsequent #786
 [run 41301349468](https://github.com/ban12-project/F-Trade-Platform/actions/runs/41301349468)
 at `d048b5c27b7cb069a4dd4b582607285c419b7bcf` also completed all those stages.
 These successful runs are distinct from publication of the present repair.
+
+At the 12:01 UTC acceptance checkpoint, the repair's
+[run 41303879356](https://github.com/ban12-project/F-Trade-Platform/actions/runs/41303879356)
+had passed release validation; both native architecture publication jobs were
+still running. The successful VPS rollout above does not imply this registry
+run or its multi-architecture tags have finished.
