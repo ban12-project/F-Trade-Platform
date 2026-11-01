@@ -671,8 +671,7 @@ async function tick() {
       });
   } catch (error) {
     idleExit.observe(false, Date.now());
-    if (!["host_capacity_exhausted", "host_capacity_busy"].includes(error.message))
-      console.error("browser_node_poll_failed");
+    if (!error.message?.startsWith("host_capacity_")) console.error("browser_node_poll_failed");
   } finally {
     await releaseAdmission?.();
     ticking = false;

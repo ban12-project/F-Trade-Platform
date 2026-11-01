@@ -5,12 +5,13 @@ services:
   broker:
     image: ${FTRADE_BROKER_IMAGE:?Pinned OpenShip broker image ID}
     restart: unless-stopped
-    mem_limit: 256m
+    mem_limit: 512m
     cpus: 0.5
     ports:
       - "127.0.0.1:9500:9500"
     environment:
       FTRADE_RUNTIME_BIND: 0.0.0.0
+      FTRADE_HOST_ADAPTIVE: "1"
       FTRADE_HOST_CAPACITY_DIR: /run/ftrade-capacity
       FTRADE_COMPUTE_MAX_RUNNING: "16"
       FTRADE_WORKSPACE_POOL_GIB: "12"

@@ -48,7 +48,9 @@ function shouldUseProductDocumentSandbox() {
 }
 
 async function preprocessInSandbox(documentPath: string, allowEmptySource: boolean) {
-  const sandbox = await createComputeRuntime();
+  const simpleText = [".txt", ".md"].includes(extname(documentPath).toLowerCase());
+  const light = simpleText && (await stat(documentPath)).size <= 1024 * 1024;
+  const sandbox = await createComputeRuntime(light ? "light" : "heavy");
   try {
     await sandbox.fs.mkdir("/vercel/sandbox/work", { recursive: true });
     const input = `/vercel/sandbox/work/input${extname(documentPath).toLowerCase()}`;

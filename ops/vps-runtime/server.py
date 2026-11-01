@@ -37,6 +37,13 @@ POOL_GIB = int(os.environ.get('FTRADE_WORKSPACE_POOL_GIB', '12'))
 QUOTA_ENABLED = os.environ.get('FTRADE_WORKSPACE_QUOTAS', '0') == '1'
 JOB_GROUPS = {}
 QUOTA_BYTES = 5 * 1024**3
+ADAPTIVE = os.environ.get('FTRADE_HOST_ADAPTIVE') == '1'
+# Profiles are server-owned hard envelopes, not arbitrary client limits.
+PROFILES = {
+    'heavy': {'memory': MEMORY_MB, 'cpu': 2, 'disk': QUOTA_BYTES, 'gid': 20000},
+    'light': {'memory': 512, 'cpu': 0.5, 'disk': 1280 * 1024**2, 'gid': 20100},
+}
+QUOTA_V2_MARKER = 'heavy:20000:20015:5368709120;light:20100:20115:1342177280;inodes:65536'
 if not 1 <= MAX_RUNNING <= 16 or not 12 <= POOL_GIB <= 1024:
     raise RuntimeError('invalid capacity configuration')
 WORKSPACE_ROOT = pathlib.Path(os.environ.get('FTRADE_WORKSPACE_ROOT', '/opt/ftrade-vps/compute/workspaces'))
@@ -54,7 +61,7 @@ MAX_DOWNLOAD_BYTES = MAX_FILE_BYTES * 3
 DOWNLOAD_BYTES = {}
 LABEL = 'io.ftrade.compute'
 LOCK = threading.Lock()
-SLOTS = threading.BoundedSemaphore(4)
+SLOTS = threading.BoundedSemaphore(16)
 SESSIONS = {}
 LIMIT = 12 * 1024 * 1024
 
@@ -228,6 +235,8 @@ def workspace_pool_ready():
             raise ValueError('workspace_group_quota_not_mounted')
         if (WORKSPACE_ROOT / '.ftrade-quota-v1').read_text().strip() != '20000:20015:5368709120:65536':
             raise ValueError('workspace_quota_configuration_invalid')
+        if ADAPTIVE and (WORKSPACE_ROOT / '.ftrade-quota-v2').read_text().strip() != QUOTA_V2_MARKER:
+            raise ValueError('workspace_quota_profiles_invalid')
     return capacity
 
 
@@ -303,21 +312,25 @@ def quota_records():
         if not re.fullmatch(r'[a-f0-9-]{36}', data.get('sid', '')) or not re.fullmatch(r'[a-z][a-z0-9-]{0,31}', data.get('namespace', '')):
             raise ValueError('quota_record_invalid')
         gid = int(file.stem)
-        if not 20000 <= gid <= 20015:
+        profile = next((p for p in PROFILES.values() if p['gid'] <= gid <= p['gid'] + 15), None)
+        if profile is None or (not ADAPTIVE and gid > 20015):
             raise ValueError('quota_group_invalid')
+        # Older heavy reservations have no byte field; derive limits from the
+        # host-provisioned group, never trust a client/ledger byte declaration.
+        data['reservedBytes'] = profile['disk']
         records.append((file, data))
     return records
 
 
-def reserve_quota(sid, pool):
+def reserve_quota(sid, pool, profile=None):
     # Kernel group quotas bound each job. The shared pool is not partitioned or
     # preallocated per job; reserve admission headroom for simultaneous peaks.
+    profile = profile or PROFILES['heavy']
     records = quota_records()
-    slots = min(16, (pool.f_blocks * pool.f_frsize - 1024**3) // QUOTA_BYTES)
-    if len(records) >= slots:
+    if len(records) >= 16 or sum(record['reservedBytes'] for _, record in records) + profile['disk'] > pool.f_blocks * pool.f_frsize - 1024**3:
         raise CapacityUnavailable('workspace_quota_capacity_busy')
     used = {int(file.stem) for file, _ in records}
-    gid = next(g for g in range(20000, 20016) if g not in used)
+    gid = next(g for g in range(profile['gid'], profile['gid'] + 16) if g not in used)
     root = WORKSPACE_ROOT / '.quota-allocations'
     temporary = root / ('.tmp-' + sid)
     temporary.write_text(json.dumps({'sid': sid, 'namespace': NAMESPACE}))
@@ -332,7 +345,13 @@ def job_user(name):
 def dispatch(body):
     action = body.get('action')
     if action == 'create':
-        with LOCK, host_capacity(checked, MEMORY_MB):
+        profile_name = body.get('profile', 'heavy')
+        if not isinstance(profile_name, str) or profile_name not in PROFILES:
+            raise ValueError('invalid_compute_profile')
+        if profile_name != 'heavy' and (not ADAPTIVE or not QUOTA_ENABLED):
+            raise ValueError('compute_profiles_not_enabled')
+        profile = PROFILES[profile_name]
+        with LOCK, host_capacity(checked, profile['memory'], profile['cpu']):
             # All capacity checks and creation are serialized. Container deadline
             # also runs independently of this API process. Its UID differs from
             # all tools, so a compromised parser cannot signal/freeze sleep/init.
@@ -353,11 +372,12 @@ def dispatch(body):
             SESSIONS[sid] = (name, time.monotonic() + 600, threading.Lock())
             try:
                 if QUOTA_ENABLED:
-                    JOB_GROUPS[name] = reserve_quota(sid, pool)
+                    JOB_GROUPS[name] = reserve_quota(sid, pool, profile)
                 checked(['run', '-d', '--rm', '--name', name, '--label', f'{LABEL}={LABEL_VALUE}',
+                         '--label', 'io.ftrade.profile=' + profile_name,
                          '--network', 'none', '--read-only', '--cap-drop', 'ALL',
                          '--security-opt', 'no-new-privileges', '--user', '65534:65534',
-                         '--memory', f'{MEMORY_MB}m', '--memory-swap', f'{MEMORY_MB}m', '--cpus', '2', '--pids-limit', '256',
+                         '--memory', str(profile['memory']) + 'm', '--memory-swap', str(profile['memory']) + 'm', '--cpus', str(profile['cpu']), '--pids-limit', '256',
                          '--log-driver', 'none', '--init',
                          '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m,mode=1777',
                          '--mount', f'type=bind,source={directory},target=/vercel/sandbox/work',
