@@ -4,7 +4,6 @@ import { basename, extname, resolve } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 import { createComputeRuntime } from "../compute/runtime";
-import { vpsComputeEnabled } from "../compute/vps";
 
 import type { ProductAgentSource } from "./agent";
 
@@ -43,11 +42,7 @@ function markItDownPython() {
   return process.env.MARKITDOWN_PYTHON ?? "python3";
 }
 
-function shouldUseProductDocumentSandbox() {
-  return vpsComputeEnabled();
-}
-
-async function preprocessInSandbox(documentPath: string, allowEmptySource: boolean) {
+async function preprocessInVps(documentPath: string, allowEmptySource: boolean) {
   const simpleText = [".txt", ".md"].includes(extname(documentPath).toLowerCase());
   const light = simpleText && (await stat(documentPath)).size <= 1024 * 1024;
   const sandbox = await createComputeRuntime(light ? "light" : "heavy");
@@ -67,7 +62,7 @@ async function preprocessInSandbox(documentPath: string, allowEmptySource: boole
     });
     if (result.exitCode !== 0) {
       throw new Error(
-        (await result.stderr()).trim().slice(0, 1_000) || "MarkItDown Sandbox preprocessing failed",
+        (await result.stderr()).trim().slice(0, 1_000) || "MarkItDown VPS preprocessing failed",
       );
     }
     return result.stdout();
@@ -78,6 +73,7 @@ async function preprocessInSandbox(documentPath: string, allowEmptySource: boole
 
 export async function preprocessProductAgentDocument(
   request: ProductAgentDocumentRequest,
+  execution: "vps" | "local-preflight" = "vps",
 ): Promise<ProductAgentDocumentSource> {
   if (request.imageAvailability !== "none" && request.imageAvailability !== "real_product_image") {
     throw new Error("Product Agent document image availability is invalid");
@@ -94,21 +90,24 @@ export async function preprocessProductAgentDocument(
   if (info.size > maximumDocumentBytes)
     throw new Error(`Product Agent document exceeds ${maximumDocumentBytes} byte limit`);
 
-  const stdout = shouldUseProductDocumentSandbox()
-    ? await preprocessInSandbox(documentPath, request.allowEmptySource === true)
-    : (
-        await execFileAsync(
-          markItDownPython(),
-          [resolve("scripts/markitdown_preprocess.py"), documentPath],
-          {
-            maxBuffer: 32 * 1024 * 1024,
-            env: {
-              ...process.env,
-              F_TRADE_METADATA_PREFLIGHT: request.allowEmptySource ? "1" : "0",
+  // Only trusted CLI preflight callers opt in; application requests use VPS.
+  z.enum(["vps", "local-preflight"]).parse(execution);
+  const stdout =
+    execution === "vps"
+      ? await preprocessInVps(documentPath, request.allowEmptySource === true)
+      : (
+          await execFileAsync(
+            markItDownPython(),
+            [resolve("scripts/markitdown_preprocess.py"), documentPath],
+            {
+              maxBuffer: 32 * 1024 * 1024,
+              env: {
+                ...process.env,
+                F_TRADE_METADATA_PREFLIGHT: request.allowEmptySource ? "1" : "0",
+              },
             },
-          },
-        )
-      ).stdout;
+          )
+        ).stdout;
   const converted = JSON.parse(stdout) as MarkItDownResult;
   const layoutPages = z
     .array(z.number().int().positive())
