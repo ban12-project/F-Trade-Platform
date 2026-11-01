@@ -149,6 +149,21 @@ async function main() {
   assert(state.capabilities.includes("publish"));
   assert.equal(state.publicationScopes?.[0].accountRef, "synthetic-account");
   assert.equal(state.publicationScopes?.[0].textOnly, true);
+  const mediaScope = {
+    ...state.publicationScopes![0],
+    textOnly: false,
+    expiresAt: Date.now() + 123456,
+  };
+  state.publicationScopes = [mediaScope];
+  await db.execute(
+    sql`UPDATE browser_fleet_node SET document=${JSON.stringify(state)}::jsonb WHERE id=${f.nodeId}`,
+  );
+  await handleBrowserNodeRequest(accessKey, request);
+  const preserved = (
+    await db.execute(sql`SELECT document FROM browser_fleet_node WHERE id=${f.nodeId}`)
+  ).rows[0].document as typeof f.state;
+  assert.deepEqual(preserved.publicationScopes, [mediaScope]);
+  assert.deepEqual(preserved.accounts, state.accounts);
   const controls = await db.execute(
     sql`SELECT id FROM social_channel_control WHERE channel_ref='synthetic-facebook' AND account_ref='synthetic-account'`,
   );

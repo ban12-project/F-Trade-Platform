@@ -1,3 +1,4 @@
+import { listFacebookMediaOptions } from "@/lib/social/facebook-media-store";
 import "server-only";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -24,7 +25,6 @@ import { ProductReview } from "../product-review";
 import type { RecordContext } from "../record-page";
 import { WorkspaceLink } from "../workspace-link";
 import { WorkspacePanelSkeleton } from "../workspace-loading-skeleton";
-import { FacebookPublication } from "./facebook-publication";
 
 async function ProductMedia({ context }: { context: RecordContext }) {
   const [assets, assessment] = await Promise.all([
@@ -139,6 +139,14 @@ async function ContentPublication({
   contentId: string;
 }) {
   const data = await listProjectPublicationData(context.projectId, undefined, contentId);
+  const mediaOptions =
+    context.canWrite &&
+    hasPermission(context.session.user.role, "content:review") &&
+    context.session.user.id === process.env.SOCIAL_FACEBOOK_OWNER_USER_ID
+      ? (await listFacebookMediaOptions(context.projectId, context.session.user.id)).filter(
+          (option) => option.contentRef === contentId || option.captionContentRef === contentId,
+        )
+      : [];
   return (
     <div className="space-y-5">
       <PublicationPanel
@@ -146,13 +154,7 @@ async function ContentPublication({
         candidates={data.candidates}
         channels={data.channels}
         publications={data.publications}
-      />
-      <FacebookPublication
-        projectId={context.projectId}
-        contentRef={contentId}
-        actorId={context.session.user.id}
-        role={context.session.user.role}
-        canWrite={context.canWrite}
+        mediaOptions={mediaOptions}
       />
     </div>
   );

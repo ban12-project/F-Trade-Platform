@@ -112,6 +112,8 @@ export function validateFacebookProfile(value, now = Date.now()) {
     throw new Error("facebook_profile_audience_selection_invalid");
   if (value.resolvePostLinks !== undefined && typeof value.resolvePostLinks !== "boolean")
     throw new Error("facebook_profile_selector_invalid");
+  if (value.imagePreview !== undefined && value.imagePreview !== "blob-sha256")
+    throw new Error("facebook_profile_image_preview_invalid");
   if (value.textOnly !== undefined && typeof value.textOnly !== "boolean")
     throw new Error("facebook_profile_format_invalid");
   if (
@@ -232,6 +234,21 @@ export async function awaitVideoPreview(inspect, expected, signal) {
 
 export function createFacebookDriver(input, browserRequest) {
   const profile = validateFacebookProfile(input);
+  // Authorization for new publications is Public, independently of the saved
+  // profile's historical audience. Only the current composer is changed.
+  profile.audienceText = "Public";
+  profile.audienceSelection = {
+    dialog: '[role="dialog"]:has(:is(input[type="radio"], [role="radio"]))',
+    option: ':is(input[type="radio"], [role="radio"])',
+    optionLabel: "Public",
+    defaultCheckbox: ':is(input[type="checkbox"], [role="checkbox"])',
+    confirm: '[role="button"][aria-label="Done"]',
+    ...profile.audienceSelection,
+  };
+  if (input.audienceText !== "Public") {
+    profile.audienceSelection.option = ':is(input[type="radio"], [role="radio"])';
+    profile.audienceSelection.optionLabel = "Public";
+  }
   const evaluate = async (session, action) => {
     for (;;) {
       validateFacebookProfile(profile);
@@ -368,6 +385,16 @@ export function createFacebookDriver(input, browserRequest) {
     }
     throw new Error("facebook_permalink_unresolved");
   };
+  const ensureAudience = async (session) => {
+    if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
+      await waitFor(session, "audience-picker-ready");
+      await evaluate(session, { kind: "audience-select" });
+      await waitFor(session, "audience-selection-ready");
+      await evaluate(session, { kind: "audience-confirm" });
+      await waitFor(session, "audience-applied");
+    }
+    await evaluate(session, { kind: "inspect" });
+  };
   const retryableBaselineErrors = new Set([
     "facebook_identity_ready_timeout",
     "facebook_posts_ready_timeout",
@@ -449,17 +476,7 @@ export function createFacebookDriver(input, browserRequest) {
       }
       await evaluate(session, { kind: "open" });
       await waitFor(session, "composer-ready");
-      const ensureAudience = async () => {
-        if (profile.audienceSelection && (await evaluate(session, { kind: "audience-open" }))) {
-          await waitFor(session, "audience-picker-ready");
-          await evaluate(session, { kind: "audience-select" });
-          await waitFor(session, "audience-selection-ready");
-          await evaluate(session, { kind: "audience-confirm" });
-          await waitFor(session, "audience-applied");
-        }
-        await evaluate(session, { kind: "inspect" });
-      };
-      await ensureAudience();
+      await ensureAudience(session);
       if (upload) {
         await evaluate(session, { kind: "upload-check" });
         const attached = await json(
@@ -477,7 +494,7 @@ export function createFacebookDriver(input, browserRequest) {
       if (upload) {
         await waitFor(session, "composer-ready");
         await evaluate(session, { kind: "identity" });
-        await ensureAudience();
+        await ensureAudience(session);
       }
       const active =
         ':not([aria-hidden="true"]):not([aria-hidden="true"] *):not([inert]):not([inert] *)';
@@ -512,6 +529,7 @@ export function createFacebookDriver(input, browserRequest) {
     },
     inspect: (session) => {
       const inspect = async () => {
+        await ensureAudience(session);
         if (
           session.expected?.attachmentFormat === "video" &&
           !session.captionedVideo &&

@@ -45,7 +45,7 @@ export function PublishingAccountSelect({
             {account.platform ?? "Facebook"} · {account.name ?? account.accountRef} ·{" "}
             {account.ready
               ? account.textOnly
-                ? "可发布文字（图片和视频未接通）"
+                ? "可发布文字（媒体适配缺失）"
                 : "可以提交发布"
               : account.blockers?.length
                 ? publishingBlockers[account.blockers[0]]
@@ -53,15 +53,8 @@ export function PublishingAccountSelect({
           </NativeSelectOption>
         ))}
       </NativeSelect>
-      {selected?.audience ? (
-        <p>
-          发布范围：
-          {{ Public: "公开", Friends: "好友", "Only me": "仅自己" }[selected.audience] ??
-            selected.audience}
-          。页面范围不一致时会停止发布。
-        </p>
-      ) : null}
-      {selected?.textOnly ? <p>这个账号目前只接通文字发布，图片和视频尚未完成核对。</p> : null}
+      <p>发布范围：公开（所有人）。系统会自动选择并验证；无法确认时停止提交。</p>
+      {selected?.textOnly ? <p>此账号的媒体发布适配尚未完成；系统目前无法验证附件。</p> : null}
       {selected?.blockers?.length ? (
         <ol className="list-decimal pl-5 text-sm text-muted-foreground">
           {selected.blockers.map((blocker) => (

@@ -33,7 +33,13 @@ export const capabilities = [
   ...(publishing.size ? ["publish"] : []),
   ...(inbox.size ? ["inbox"] : []),
 ];
-export const publicationScopes = scopes(publishing);
+export const publicationScopes = [...publishing.values()].map((p) => ({
+  channelRef: p.channelRef,
+  accountRef: p.accountRef,
+  expiresAt: Date.parse(p.expiresAt),
+  textOnly: p.textOnly === true,
+  audience: "Public",
+}));
 export const inboxScopes = scopes(inbox);
 export async function execute(context) {
   const key = JSON.stringify([context.run.channelRef, context.run.accountRef]);

@@ -7,7 +7,7 @@ const profile = {
   accountRef: "synthetic-account",
   channelRef: "facebook-personal",
   identityHref: "https://www.facebook.com/synthetic-account",
-  audienceText: "Only me",
+  audienceText: "Public",
   selectors: {
     composer: "#composer",
     composerIdentity: "#acting-account",
@@ -23,7 +23,7 @@ test("empty Facebook contenteditable newline is an empty approved caption", asyn
   await page.route("https://www.facebook.com/**", (route) =>
     route.fulfill({
       contentType: "text/html",
-      body: `<div id="composer"><a id="acting-account" href="https://www.facebook.com/synthetic-account">Account</a><button id="audience">Only me</button><div id="caption" contenteditable="true"><br></div><button id="submit">Post</button></div>`,
+      body: `<div id="composer"><a id="acting-account" href="https://www.facebook.com/synthetic-account">Account</a><button id="audience">Public</button><div id="caption" contenteditable="true"><br></div><button id="submit">Post</button></div>`,
     }),
   );
   await page.goto("https://www.facebook.com/synthetic-account");

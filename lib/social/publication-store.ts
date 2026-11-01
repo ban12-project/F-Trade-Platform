@@ -50,6 +50,7 @@ export type PublicationChannel = {
   accountRef: string;
 } & Partial<PublishingAccount>;
 export type PublicationEntry = {
+  canRetry?: boolean;
   publishedAt?: Date | null;
   jobStatus?: string | null;
   humanConfirmed?: boolean;
@@ -275,6 +276,8 @@ export async function listProjectPublicationData(
       ({ failureCode, ...publication }): PublicationEntry => ({
         ...publication,
         failureLabel: publicationFailureLabel(failureCode),
+        canRetry:
+          publication.status === "failed" && failureCode === "fleet_publication_not_authorized",
       }),
     ),
   };
@@ -292,16 +295,27 @@ export async function submitControlledPublication(
   const actorId = identity.actorId;
   return database.transaction(async (tx) => {
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
-    await assertPublishingAccountReady(tx, value);
+    await assertPublishingAccountReady(tx, value, actorId);
     const { control, record, gate } = await assertPublicationEligible(value, tx, () => new Date());
     if (value.previewDigest !== previewDigest({ ...record, id: value.contentRef }, value.format)) {
       throw new Error("内容已更新，请刷新页面、核对新预览后重新确认。");
     }
-    const idempotencyKey = `publish:${value.projectId}:${value.contentRef}:${value.channelRef}:${value.accountRef}:${value.confirmationRef}`;
+    const idempotencyKey = `publish:${value.projectId}:${value.contentRef}:${value.channelRef}:${value.accountRef}:${value.previewDigest}`;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 0))`);
     const [existingJob] = await tx
       .select()
       .from(socialBrowserJob)
-      .where(eq(socialBrowserJob.idempotencyKey, idempotencyKey))
+      .where(
+        and(
+          eq(socialBrowserJob.channelRef, value.channelRef),
+          eq(socialBrowserJob.accountRef, value.accountRef),
+          sql`(${socialBrowserJob.idempotencyKey} = ${idempotencyKey} OR EXISTS (
+          SELECT 1 FROM social_publication p WHERE p.browser_job_id = ${socialBrowserJob.id}
+          AND p.content_ref = ${value.contentRef} AND p.project_id = ${value.projectId}
+          AND p.format = 'text' AND p.text_confirmation->>'contentVersion' = ${String(record.version)}
+        ))`,
+        ),
+      )
       .for("update");
     await authorizeSocialProject(tx, identity, "write", value.contentRef, value.format);
     const expiresAt = await authorizeSocialActor(tx, identity, ["content:write"]);
@@ -311,6 +325,13 @@ export async function submitControlledPublication(
         where: eq(socialPublication.browserJobId, existingJob.id),
       });
       if (!existing) throw new Error("发布任务存在但发布记录缺失，请暂停渠道并人工核对。");
+      if (
+        existingJob.status === "paused" &&
+        existingJob.failureCode === "fleet_publication_not_authorized"
+      ) {
+        const { requeueUnsentFacebookMediaPublication } = await import("./facebook-media-store");
+        await requeueUnsentFacebookMediaPublication(tx, existingJob.id, existing.id, actorId);
+      }
       assertSocialAuthorizationAlive(expiresAt);
       return existing;
     }
@@ -402,7 +423,7 @@ export async function submitControlledPublication(
       "@/lib/browser-fleet/sandbox-publication-wakeup"
     );
     await enqueuePublicationSandboxDemand(tx, id);
-    await assertPublishingAccountReady(tx, value);
+    await assertPublishingAccountReady(tx, value, actorId);
     assertSocialAuthorizationAlive(expiresAt);
     return saved;
   });
