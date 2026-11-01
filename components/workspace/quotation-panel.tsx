@@ -147,7 +147,7 @@ function QuotationForm({
                         `${item.formValues.customerName || productTypeLabel(item.productType)} · ${item.quantity ?? "数量待补"}`,
                       ]),
                     )}
-                    value={field.value}
+                    value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger
@@ -219,7 +219,7 @@ function QuotationForm({
                         `${item.internalSku} · ${item.productName}`,
                       ]),
                     )}
-                    value={field.value}
+                    value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger
@@ -398,7 +398,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                 render={({ field }) => (
                   <Select
                     items={{ approved: "批准人工报价", rejected: "退回人工报价" }}
-                    value={field.value}
+                    value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger

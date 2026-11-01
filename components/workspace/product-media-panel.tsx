@@ -229,7 +229,11 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                 control={form.control}
                 name="origin"
                 render={({ field }) => (
-                  <Select items={originLabels} value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    items={originLabels}
+                    value={field.value ?? null}
+                    onValueChange={field.onChange}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
@@ -252,7 +256,11 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                 control={form.control}
                 name="role"
                 render={({ field }) => (
-                  <Select items={roleLabels} value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    items={roleLabels}
+                    value={field.value ?? null}
+                    onValueChange={field.onChange}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
@@ -530,7 +538,7 @@ function ReviewForm({
               render={({ field }) => (
                 <Select
                   items={{ approved: "批准素材", rejected: "拒绝素材" }}
-                  value={field.value}
+                  value={field.value ?? null}
                   onValueChange={field.onChange}
                 >
                   <SelectTrigger

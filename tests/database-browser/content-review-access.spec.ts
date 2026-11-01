@@ -206,11 +206,11 @@ for (const change of [
         });
       }
       await page.goto(path);
-      const form = page.locator("form#content-review").filter({ visible: true });
+      const form = page.locator("form[data-content-review]").filter({ visible: true });
       await expect(form).toBeVisible();
-      await expect(form.locator('#content-review-decision [data-slot="select-value"]')).toHaveText(
-        "请选择审核决定",
-      );
+      await expect(
+        form.locator('[id^=content-review-][id$=-decision] [data-slot="select-value"]'),
+      ).toHaveText("请选择审核决定");
       await expect(
         page.getByRole("button", { name: "请先选择决定", exact: true }).filter({ visible: true }),
       ).toBeDisabled();
@@ -226,7 +226,8 @@ for (const change of [
             .filter({ visible: true })
             .click();
         }
-        if (change === "notes navigation") await form.locator("#content-review-notes").fill(notes);
+        if (change === "notes navigation")
+          await form.locator("[id^=content-review-][id$=-notes]").fill(notes);
         if (change !== "untouched navigation")
           await page.waitForLoadState("networkidle", { timeout: 5_000 });
         const back = page
@@ -240,14 +241,14 @@ for (const change of [
           await expect(page).toHaveURL(path);
           if (change === "decision navigation")
             await expect(
-              form.locator('#content-review-decision [data-slot="select-value"]'),
+              form.locator('[id^=content-review-][id$=-decision] [data-slot="select-value"]'),
             ).toHaveText("退回营销内容");
           if (change === "evidence navigation")
             await expect(form.getByLabel("审核依据", { exact: true })).toContainText(
               "SYNTHETIC browser review source",
             );
           if (change === "notes navigation")
-            await expect(form.locator("#content-review-notes")).toHaveValue(notes);
+            await expect(form.locator("[id^=content-review-][id$=-notes]")).toHaveValue(notes);
           expect(await snapshot()).toEqual(before);
           await back.click();
           await expect(dialog).toBeVisible();
@@ -266,7 +267,7 @@ for (const change of [
         .locator(`[data-evidence-id="${reviewEvidence}"]`)
         .filter({ visible: true })
         .click();
-      await form.locator("#content-review-notes").fill(notes);
+      await form.locator("[id^=content-review-][id$=-notes]").fill(notes);
       if (missingEvidence)
         await db.delete(schema.evidence).where(eq(schema.evidence.id, reviewEvidence));
       const submit = page
@@ -329,7 +330,7 @@ for (const change of [
             )
             .filter({ visible: true }),
         ).toBeVisible();
-        await expect(form.locator("#content-review-notes")).toHaveValue(notes);
+        await expect(form.locator("[id^=content-review-][id$=-notes]")).toHaveValue(notes);
         await expect(
           form
             .getByRole("combobox", { name: "决定", exact: true })

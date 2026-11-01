@@ -753,7 +753,7 @@ for (const inbound of [false, true]) {
     );
     await page.getByRole("link", { name: "继续客户跟进", exact: true }).click();
     await expect(page.getByRole("button", { name: "确认有效商机", exact: true })).toHaveCount(0);
-    await expect(page.getByText(/商机尚待确认：/)).toBeVisible();
+    await expect(page.getByText(/采购意向尚待确认/)).toBeVisible();
     const follow = page.locator(`form#follow-up-${lead.id}`).filter({ visible: true });
     await follow.getByRole("combobox").click();
     await page.getByRole("option", { name: "询问交期", exact: true }).click();
@@ -823,7 +823,7 @@ for (const inbound of [false, true]) {
     expect(reply).toContain("21");
     expect(outbound.bodyCiphertext).not.toContain("MOCK reply");
     // Exercise every MVP context through the form and verify persisted outcomes.
-    // A fresh synthetic confirmation prevents idempotent replay of the first reply.
+    // Each successful reply gets a fresh automatic confirmation for its next submission.
     const scenarios = [
       ["quote_sent_unread", "报价未读", "wait_then_reference_quote_validity"],
       ["quote_sent_read_no_reply", "已读未回复", "ask_one_decision_blocking_question"],
@@ -833,20 +833,9 @@ for (const inbound of [false, true]) {
       ["asks_lead_time", "询问交期", "request_factory_delivery_confirmation"],
     ] as const;
     const queuedIds = new Set([job.id]);
+    const confirmationRefs = new Set<string>();
     for (const [scenario, label, expectedAction] of scenarios) {
       await test.step(`persist follow-up context: ${scenario}`, async () => {
-        const confirmation = `evidence-mock-${randomUUID()}`;
-        await db.insert(schema.evidence).values({
-          id: confirmation,
-          classification: "internal",
-          blobKey: `synthetic/mock-follow-up-${confirmation}-not-a-real-blob`,
-          contentType: "text/plain",
-          sha256: createHash("sha256").update(confirmation).digest("hex"),
-          sizeBytes: 0,
-          sourceLabel: "MOCK follow-up confirmation — synthetic test only",
-          uploadedByType: "human",
-          uploadedById: actorId,
-        });
         await page.goto(`/workspace/${projectId}/records/lead/${lead.id}`);
         await follow.getByRole("combobox").click();
         await page.getByRole("option", { name: label, exact: true }).click();
@@ -899,9 +888,15 @@ for (const inbound of [false, true]) {
           expect.objectContaining({
             context: scenario,
             browser_job_id: outboundId,
-            confirmation_ref: confirmation,
+            confirmation_ref: expect.stringMatching(/^source-confirmation-[0-9a-f-]{36}$/),
           }),
         );
+        const confirmation = String(
+          audits.find((item) => item.metadata?.browser_job_id === outboundId)?.metadata
+            ?.confirmation_ref,
+        );
+        expect(confirmationRefs.has(confirmation)).toBe(false);
+        confirmationRefs.add(confirmation);
         await page.reload();
         await expect(follow.getByRole("combobox").locator('[data-slot="select-value"]')).toHaveText(
           label,

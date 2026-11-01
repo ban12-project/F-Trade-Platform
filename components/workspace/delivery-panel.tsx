@@ -95,7 +95,7 @@ function DeliveryDecision({
                 render={({ field }) => (
                   <Select
                     items={{ confirmed: "确认交期", rejected: "拒绝确认" }}
-                    value={field.value}
+                    value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger

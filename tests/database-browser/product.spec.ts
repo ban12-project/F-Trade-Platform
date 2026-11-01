@@ -478,23 +478,25 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.approval.aggregateId, contentDraft.id));
   expect(contentApproval.status).toBe("pending");
   await expect(page).toHaveURL(new RegExp(`/records/content/${contentDraft.id}(?:[?].*)?$`));
-  const contentReview = page.locator("form#content-review").filter({ visible: true });
+  const contentReview = page.locator("form[data-content-review]").filter({ visible: true });
   const staleContext = await browser.newContext({ baseURL });
   await staleContext.addCookies(await context.cookies());
   const stalePage = await staleContext.newPage();
   await stalePage.goto(`/workspace/${projectId}/records/content/${contentDraft.id}`);
-  const staleReview = stalePage.locator("form#content-review").filter({ visible: true });
+  const staleReview = stalePage.locator("form[data-content-review]").filter({ visible: true });
   await staleReview.getByRole("combobox", { name: "决定", exact: true }).click();
   await stalePage.getByRole("option", { name: "批准营销内容", exact: true }).click();
   await staleReview.getByLabel("审核依据", { exact: true }).click();
   await stalePage.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
-  await staleReview.locator("#content-review-notes").fill("Synthetic stale review attempt");
+  await staleReview
+    .locator("[id^=content-review-][id$=-notes]")
+    .fill("Synthetic stale review attempt");
   await contentReview.getByRole("combobox", { name: "决定", exact: true }).click();
   await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
   await contentReview.getByLabel("审核依据", { exact: true }).click();
   await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await contentReview
-    .locator("#content-review-notes")
+    .locator("[id^=content-review-][id$=-notes]")
     .fill("Synthetic revision exercise: check the wording.");
   await page.getByRole("button", { name: "退回营销内容", exact: true }).click();
   await expect.poll(async () => (await contentQuery())[0].state).toBe("CONTENT_REVISION_REQUIRED");
@@ -567,7 +569,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await contentReview.getByLabel("审核依据", { exact: true }).click();
   await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await contentReview
-    .locator("#content-review-notes")
+    .locator("[id^=content-review-][id$=-notes]")
     .fill("Synthetic test approval only; no real publication.");
   const contentReviewResponse = page.waitForResponse(
     (response) =>
@@ -581,7 +583,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await expect(
     page.getByRole("region", { name: "业务记录" }).getByText("可安排发布", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator("form#content-review").filter({ visible: true })).toHaveCount(0);
+  await expect(page.locator("form[data-content-review]").filter({ visible: true })).toHaveCount(0);
   const [approvedContent] = await contentQuery();
   expect(approvedContent.version).toBe(4);
   expect(approvedContent.payload).toEqual({
@@ -736,7 +738,7 @@ test("authenticated browser reviews a mock product and its content through real 
     .from(schema.aggregateRecord)
     .where(eq(schema.aggregateRecord.id, targetA.id));
   await page.goto(`/workspace/${projectId}/records/content/${targetA.id}`);
-  await expect(page.locator("form#content-review").filter({ visible: true })).toBeVisible();
+  await expect(page.locator("form[data-content-review]").filter({ visible: true })).toBeVisible();
   await page.getByRole("link", { name: "返回清单", exact: true }).click();
   await expect(page).toHaveURL(`/workspace/content?project=${projectId}`);
   await page
@@ -744,7 +746,7 @@ test("authenticated browser reviews a mock product and its content through real 
     .getByRole("link", { name: /MOCK switching B/ })
     .click();
   await expect(page).toHaveURL(new RegExp(`/records/content/${targetB.id}(?:[?].*)?$`));
-  const switchingReview = page.locator("form#content-review").filter({ visible: true });
+  const switchingReview = page.locator("form[data-content-review]").filter({ visible: true });
   await switchingReview.getByRole("combobox", { name: "决定", exact: true }).click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
   await switchingReview.getByLabel("审核依据", { exact: true }).click();

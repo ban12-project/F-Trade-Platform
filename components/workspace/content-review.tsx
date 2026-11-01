@@ -178,10 +178,14 @@ export function ContentReview({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form id="content-review" onSubmit={form.handleSubmit(submit)}>
+            <form
+              id={`content-review-${detail.id}`}
+              data-content-review=""
+              onSubmit={form.handleSubmit(submit)}
+            >
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.decision}>
-                  <FieldLabel htmlFor="content-review-decision">决定</FieldLabel>
+                  <FieldLabel htmlFor={`content-review-${detail.id}-decision`}>决定</FieldLabel>
                   <Controller
                     control={form.control}
                     name="decision"
@@ -192,7 +196,7 @@ export function ContentReview({
                         onValueChange={field.onChange}
                       >
                         <SelectTrigger
-                          id="content-review-decision"
+                          id={`content-review-${detail.id}-decision`}
                           className="w-full"
                           aria-invalid={!!form.formState.errors.decision}
                         >
@@ -210,21 +214,21 @@ export function ContentReview({
                   <FieldError errors={[form.formState.errors.decision]} />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                  <FieldLabel htmlFor="content-review-evidence">审核依据</FieldLabel>
+                  <FieldLabel htmlFor={`content-review-${detail.id}-evidence`}>审核依据</FieldLabel>
                   <EvidenceSelectField
                     projectId={projectId}
                     control={form.control}
                     name="evidenceRef"
-                    id="content-review-evidence"
+                    id={`content-review-${detail.id}-evidence`}
                   />
                   <FieldError errors={[form.formState.errors.evidenceRef]} />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.notes}>
-                  <FieldLabel htmlFor="content-review-notes">
+                  <FieldLabel htmlFor={`content-review-${detail.id}-notes`}>
                     审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
                   </FieldLabel>
                   <Textarea
-                    id="content-review-notes"
+                    id={`content-review-${detail.id}-notes`}
                     aria-invalid={!!form.formState.errors.notes}
                     {...form.register("notes")}
                   />
@@ -235,7 +239,7 @@ export function ContentReview({
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-3">
             <Button
-              form="content-review"
+              form={`content-review-${detail.id}`}
               type="submit"
               variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
               disabled={pending || !form.watch("decision")}
