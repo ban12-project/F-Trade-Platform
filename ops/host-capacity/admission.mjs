@@ -1,6 +1,15 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import { cpus, totalmem } from "node:os";
+
+export async function assertNotDraining(directory) {
+  try {
+    await lstat(`${directory}/drain.json`);
+    throw new Error("host_capacity_draining");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
 
 export async function availableMemoryMb() {
   const meminfo = await readFile("/proc/meminfo", "utf8");
@@ -161,6 +170,7 @@ export async function acquireHostCapacity(docker, memoryMb, env = process.env) {
           : reject(new Error("host_capacity_lock_invalid")),
       );
     });
+    await assertNotDraining(directory);
     const rows = await docker("GET", "/containers/json?all=true");
     const workers = rows.filter(
       (c) =>

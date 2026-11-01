@@ -12,6 +12,7 @@ WORKDIR /app
 COPY ops/vps-runtime/server.py /app/server.py
 COPY ops/host-capacity/admission.py /host-capacity/admission.py
 ENV PYTHONDONTWRITEBYTECODE=1 FTRADE_RUNTIME_BIND=0.0.0.0
+LABEL io.ftrade.release-drain="1"
 USER 1000:${DOCKER_GID}
 ENTRYPOINT ["setpriv", "--no-new-privs", "--inh-caps=-all", "--ambient-caps=-all", "/usr/bin/tini", "--"]
 CMD ["python3", "/app/server.py"]

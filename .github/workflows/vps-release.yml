@@ -1,0 +1,65 @@
+name: VPS release (OpenShip)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vps-production-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'ban12-project/F-Trade-Platform' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    environment: vps-production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Test release and admission contracts
+        run: |
+          node --test ops/host-capacity/admission.test.mjs ops/browser-node/network.test.mjs
+          node scripts/test-browser-agent-payload.mjs
+          python3 -m unittest discover -s ops/host-capacity -p 'test*.py'
+          python3 scripts/test-vps-compute.py
+          python3 ops/vps-runtime/test-openship.py
+          python3 ops/vps-runtime/test-quota-admission.py
+          python3 ops/vps-release/test-release.py
+      - name: Request the verified main revision and wait for its receipt
+        env:
+          VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          VPS_KNOWN_HOSTS: ${{ vars.VPS_KNOWN_HOSTS }}
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_PORT: ${{ vars.VPS_PORT }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$RUNNER_TEMP/vps-ssh"
+          printf '%s\n' "$VPS_DEPLOY_KEY" > "$RUNNER_TEMP/vps-ssh/key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/vps-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/vps-ssh/key"
+          trap 'rm -rf "$RUNNER_TEMP/vps-ssh"' EXIT
+          ssh_args=(-i "$RUNNER_TEMP/vps-ssh/key" -p "$VPS_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/vps-ssh/known_hosts" -o ConnectTimeout=15)
+          ssh "${ssh_args[@]}" "root@$VPS_HOST" "release $REVISION"
+          for attempt in $(seq 1 570); do
+            receipt=$(ssh "${ssh_args[@]}" "root@$VPS_HOST" "status $REVISION")
+            state=$(printf '%s' "$receipt" | python3 -c 'import sys,json;print(json.load(sys.stdin)["state"])')
+            if [[ "$state" != "${last_state:-}" ]]; then printf '%s\n' "$receipt"; last_state="$state"; fi
+            case "$state" in
+              ready|superseded) printf '%s\n' "$receipt" >> "$GITHUB_STEP_SUMMARY"; exit 0 ;;
+              failed|rolled_back|rollback_failed|rejected) printf '%s\n' "$receipt" >> "$GITHUB_STEP_SUMMARY"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo 'Release receipt timed out; inspect the independent host unit before retrying.' >&2
+          exit 1

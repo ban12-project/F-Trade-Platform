@@ -13,6 +13,14 @@ class CapacityUnavailable(ValueError):
     pass
 
 
+def assert_not_draining(directory):
+    try:
+        pathlib.Path(directory, 'drain.json').lstat()
+    except FileNotFoundError:
+        return
+    raise CapacityUnavailable('host_capacity_draining')
+
+
 def check_budget(containers, memory_mb, available_mb, total_mb, cores):
     memory = cpu = 0
     for container in containers:
@@ -93,6 +101,7 @@ def host_capacity(checked, memory_mb, cpu_cores=2):
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise CapacityUnavailable('host_capacity_busy') from None
+        assert_not_draining(directory)
         ids = set()
         for label in ['io.ftrade.run', 'io.ftrade.compute']:
             ids.update(checked(['ps', '-aq', '--filter', 'label=' + label]).decode().split())

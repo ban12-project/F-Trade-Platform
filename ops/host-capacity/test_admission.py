@@ -1,10 +1,11 @@
 import unittest
 import json
 import copy
+import tempfile
 import os
 from unittest.mock import patch
 from pathlib import Path
-from admission import check_budget, check_adaptive_budget, host_capacity, CapacityUnavailable
+from admission import check_budget, check_adaptive_budget, host_capacity, assert_not_draining, CapacityUnavailable
 
 JOB = {'HostConfig': {'Memory': 2048 * 1048576, 'NanoCpus': 2_000_000_000}}
 
@@ -30,6 +31,13 @@ class AdmissionTest(unittest.TestCase):
         with patch.dict(os.environ, {'FTRADE_HOST_ADAPTIVE': '1'}, clear=True):
             with self.assertRaises(CapacityUnavailable):
                 with host_capacity(lambda _: b'', 512): pass
+
+    def test_deployment_drain_blocks_new_admission(self):
+        with tempfile.TemporaryDirectory() as root:
+            assert_not_draining(root)
+            marker=Path(root)/'drain.json';marker.write_text('{}')
+            with self.assertRaises(CapacityUnavailable):assert_not_draining(root)
+            marker.unlink();assert_not_draining(root)
 
     def test_current_machine(self):
         check_budget([JOB], 2048, 4000, 7424, 4)

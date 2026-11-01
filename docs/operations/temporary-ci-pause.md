@@ -4,7 +4,7 @@ Effective 2026-10-31 at the user's request, tracked by #711. Restore before fina
 
 PRs and squash merge remain required. Run appropriate local checks and record their exact results and limitations in each PR; absence of CI is not evidence of correctness. Do not describe unexecuted checks as passed. Business Human Gates and the paused DM acceptance scope remain unchanged.
 
-Validation workflows retain their jobs and manual `workflow_dispatch` triggers. Automatic PR/push validation triggers are paused. The browser image workflow retains its main push release trigger and reusable release-validation dependency; these release checks still run when publishing images. Vercel configuration and automatic application deployment are unchanged.
+Validation workflows retain their jobs and manual `workflow_dispatch` triggers. Automatic PR/push validation triggers are paused. The browser image workflow retains its main push release trigger and reusable release-validation dependency; these release checks still run when publishing images. The VPS release workflow also retains automatic main releases and its focused admission/release checks (#733); this does not restore the paused general PR checks. Vercel configuration and automatic application deployment are unchanged.
 
 The main branch's required status checks are temporarily removed. Preserve PR protection, enforced administrators, linear history, and the force-push/deletion prohibitions.
 
