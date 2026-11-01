@@ -56,12 +56,16 @@ void (async () => {
   async function fixture(filename: string, contentType: string) {
     const path = join(directory, filename);
     const bytes = await readFile(path);
-    const document = await preprocessProductAgentDocument({
-      documentPath: path,
-      recordId: randomUUID(),
-      imageAvailability: "none",
-      imageRefs: [],
-    });
+    // This fixture intentionally converts local synthetic files without VPS I/O.
+    const document = await preprocessProductAgentDocument(
+      {
+        documentPath: path,
+        recordId: randomUUID(),
+        imageAvailability: "none",
+        imageRefs: [],
+      },
+      "local-preflight",
+    );
     const issued = await issueDocumentUploadReceipt(
       {
         receiptId: randomUUID(),
