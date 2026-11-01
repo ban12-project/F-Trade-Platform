@@ -96,4 +96,94 @@ class ReleaseTest(unittest.TestCase):
             self.assertTrue((root/'journal.json').exists())
             self.assertEqual(json.loads((root/'receipts'/('b'*40+'.json')).read_text())['state'],'rollback_failed')
 
+    def test_profile_backup_reads_file_key_with_agent_precedence_and_refuses_symlinks(self):
+        node='11111111-1111-4111-8111-111111111111'
+        with tempfile.TemporaryDirectory() as t:
+            root=pathlib.Path(t);key=root/'key';key.write_text('fbn_'+node+'.'+'a'*43);key.chmod(0o600)
+            config={'environment':{'BROWSER_NODE_ACCESS_KEY':'invalid-inline','BROWSER_NODE_ACCESS_KEY_FILE':'/secret/key'},'volumes':[t+':/secret:ro']}
+            self.assertEqual(r.profile_backup_node_id(config),node)
+            key.rename(root/'original');key.symlink_to(root/'original')
+            with self.assertRaises(OSError):r.profile_backup_node_id(config)
+            config['environment']['BROWSER_NODE_ACCESS_KEY_FILE']='/secret/../outside'
+            with self.assertRaisesRegex(RuntimeError,'key_path_invalid'):r.profile_backup_node_id(config)
+
+    def test_profile_snapshot_failure_prevents_any_service_change(self):
+        with tempfile.TemporaryDirectory() as t,patch.object(r,'ROOT',pathlib.Path(t)),patch.object(r.shutil,'copy2'),patch.object(r,'backup_profiles_for_official_cutover',side_effect=RuntimeError('injected snapshot failure')),patch.object(r,'cli') as cli,patch.object(r,'apply') as apply,patch.object(r,'rollback') as rollback:
+            with self.assertRaisesRegex(RuntimeError,'snapshot failure'):
+                r.promote({'targets':{}},{},{},pathlib.Path(t),'a'*40)
+            cli.assert_not_called();apply.assert_not_called();rollback.assert_not_called()
+            self.assertFalse((pathlib.Path(t)/'journal.json').exists())
+
+    def test_profile_backup_requires_owned_drain_and_quiescence(self):
+        import contextlib
+        node='11111111-1111-4111-8111-111111111111'
+        previous={'browser':{'environment':{'BROWSER_IMAGE':'old','BROWSER_NODE_ACCESS_KEY':'fbn_'+node+'.'+'a'*43}}}
+        updated={'browser':{'environment':{'BROWSER_IMAGE':'new'}}}
+        def docker(*args,**kwargs):
+            if args[:2]==('image','inspect'):return json.dumps([{'Config':{'Labels':{'io.ftrade.official-camoufox':'1' if args[2]=='new' else '0'}}}])
+            self.fail('must refuse before touching any volume or container')
+        for foreign,active in [(True,False),(False,True)]:
+            with self.subTest(foreign=foreign,active=active),tempfile.TemporaryDirectory() as t,patch.object(r,'CAPACITY',pathlib.Path(t)),patch.object(r,'admission_lock',side_effect=contextlib.nullcontext),patch.object(r,'workers',return_value=[{}] if active else []),patch.object(r,'docker',side_effect=docker):
+                root=pathlib.Path(t);(root/'drain.json').write_text(json.dumps({'revision':('b' if foreign else 'a')*40}))
+                with self.assertRaisesRegex(RuntimeError,'requires_owned_drain'):
+                    r.backup_profiles_for_official_cutover(previous,updated,root,root,'a'*40)
+
+    def test_profile_backup_refuses_foreign_volume_name_before_copy(self):
+        import contextlib
+        node='11111111-1111-4111-8111-111111111111';account='22222222-2222-4222-8222-222222222222'
+        previous={'browser':{'environment':{'BROWSER_IMAGE':'old','BROWSER_NODE_ACCESS_KEY':'fbn_'+node+'.'+'a'*43}}};updated={'browser':{'environment':{'BROWSER_IMAGE':'new'}}}
+        def docker(*args,**kwargs):
+            if args[:2]==('image','inspect'):return json.dumps([{'Config':{'Labels':{'io.ftrade.official-camoufox':'1' if args[2]=='new' else '0'}}}])
+            if args[:2]==('volume','ls'):return 'foreign-volume'
+            if args[:2]==('volume','inspect'):return json.dumps([{'Name':'foreign-volume','Labels':{'io.ftrade.node':node,'io.ftrade.account':account}}])
+            self.fail('must not copy an unowned volume')
+        with tempfile.TemporaryDirectory() as t,patch.object(r,'CAPACITY',pathlib.Path(t)),patch.object(r,'admission_lock',side_effect=contextlib.nullcontext),patch.object(r,'workers',return_value=[]),patch.object(r,'docker',side_effect=docker):
+            root=pathlib.Path(t);(root/'drain.json').write_text(json.dumps({'revision':'a'*40}))
+            with self.assertRaisesRegex(RuntimeError,'volume_owner_mismatch'):
+                r.backup_profiles_for_official_cutover(previous,updated,root,root,'a'*40)
+
+    def test_official_upgrade_does_not_take_another_migration_snapshot(self):
+        with patch.object(r,'docker',return_value=json.dumps([{'Config':{'Labels':{'io.ftrade.official-camoufox':'1'}}}])),patch.object(r,'admission_lock') as lock:
+            result=r.backup_profiles_for_official_cutover({'browser':{'environment':{'BROWSER_IMAGE':'old'}}},{'browser':{'environment':{'BROWSER_IMAGE':'new'}}},pathlib.Path('/unused'),pathlib.Path('/unused'),'a'*40)
+            self.assertIsNone(result);lock.assert_not_called()
+
+    def test_profile_snapshot_is_offline_readonly_private_and_records_archive_digest(self):
+        import contextlib
+        import hashlib
+        import tarfile
+        from unittest.mock import Mock
+        node='11111111-1111-4111-8111-111111111111';account='22222222-2222-4222-8222-222222222222';name='ftbrowser-'+node+'-'+account
+        previous={'browser':{'environment':{'BROWSER_IMAGE':'old','BROWSER_NODE_ACCESS_KEY':'fbn_'+node+'.'+'a'*43}}};updated={'browser':{'environment':{'BROWSER_IMAGE':'new'}}}
+        with tempfile.TemporaryDirectory() as t:
+            root=pathlib.Path(t);(root/'drain.json').write_text(json.dumps({'revision':'a'*40}));(root/'telemetry.json').write_text('{}')
+            calls=[];created=[];original_read=pathlib.Path.read_text;original_run=r.run
+            def read(path,*args,**kwargs):
+                return 'MemTotal: 8388608 kB\nMemAvailable: 6291456 kB\n' if str(path)=='/proc/meminfo' else original_read(path,*args,**kwargs)
+            def docker(*args,**kwargs):
+                calls.append(args)
+                if args[:2]==('image','inspect'):return json.dumps([{'Config':{'Labels':{'io.ftrade.official-camoufox':'1' if args[2]=='new' else '0'}}}])
+                if args[:2]==('volume','ls'):return name
+                if args[:2]==('volume','inspect'):return json.dumps([{'Name':name,'Mountpoint':str(root),'Labels':{'io.ftrade.node':node,'io.ftrade.account':account}}])
+                if args[0]=='ps':return ''
+                if args[0]=='create':created.append(args);return 'container'
+                if args[0]=='start':
+                    destination=next(root.glob('native-profiles-*'))
+                    with tarfile.open(destination/'profiles.tar.gz','w:gz'):pass
+                    return ''
+                if args[0]=='inspect':return json.dumps([{'State':{'ExitCode':0,'OOMKilled':False}}])
+                if args[0]=='rm':return ''
+                self.fail('unexpected docker operation')
+            def run(args,*a,**kw):return '128 synthetic' if args[0]=='du' else original_run(args,*a,**kw)
+            class CapacityError(Exception):pass
+            admission=Mock(side_effect=[CapacityError("recent CPU peak"),None])
+            with patch.object(r,'CAPACITY',root),patch.object(r,'admission_lock',side_effect=contextlib.nullcontext),patch.object(r,'workers',return_value=[]),patch.object(r,'docker',side_effect=docker),patch.object(r,'run',side_effect=run),patch.object(pathlib.Path,'read_text',read),patch('runpy.run_path',return_value={'check_adaptive_budget':admission,'CapacityUnavailable':CapacityError}),patch.object(r.time,'sleep') as sleep:
+                destination=pathlib.Path(r.backup_profiles_for_official_cutover(previous,updated,root,root,'a'*40))
+            self.assertEqual(admission.call_count,2);sleep.assert_called_once_with(5);self.assertEqual(admission.call_args.args[:3],([],256,1))
+            args=created[0];self.assertEqual(args[args.index('--network')+1],'none');self.assertIn('type=volume,source='+name+',target=/profiles/'+account+',readonly,volume-nocopy',args)
+            receipt=json.loads((destination/'receipt.json').read_text())
+            self.assertTrue(receipt['quiescent']);self.assertTrue(receipt['readonlySources']);self.assertEqual(receipt['volumes'],1)
+            self.assertEqual(receipt['sha256'],hashlib.sha256((destination/'profiles.tar.gz').read_bytes()).hexdigest())
+            self.assertEqual(destination.stat().st_mode&0o777,0o700);self.assertEqual((destination/'profiles.tar.gz').stat().st_mode&0o777,0o600)
+            self.assertEqual(calls[-1][0],'rm')
+
 if __name__=='__main__':unittest.main()

@@ -194,6 +194,34 @@ being copied to protected local storage with matching SHA-256 and gzip validatio
 before any server-side removal, to restore required deployment disk headroom.
 Production still selects the legacy runtime.
 
+## Protected restored-copy evidence and final cutover snapshot
+
+Both enabled accounts were restored into disposable volumes from the verified
+three-volume snapshot. The original volumes were never mounted by these probes.
+Each copy passed two offline launches with the official browser, matching source
+cookie identity and unchanged cookie/IndexedDB inventory digests. The probe uses
+synthetic pages under the stored origins in a network-disabled container and an
+explicit GeoIP address already verified by the separate proxy gate. Production
+still uses live `geoip: true`. These checks do not claim authenticated online
+access, message decryption or DM ingestion. The initial identity assertion used
+business `accountRef`; the protected source confirmed that it is an alias, so the
+probe correctly compares a private digest of the source platform cookie instead.
+
+The release now requires another fresh snapshot for the first legacy-to-official
+transition, under its own drain immediately before promotion. It refuses active
+workers, mounted/foreign volumes, resource pressure and invalid archives. The
+helper is offline, with read-only sources, 256 MiB and one CPU. A failure occurs
+before service changes; routine later official-image upgrades skip this migration
+hook. Sixteen release tests pass, including file-key precedence, owned drain,
+quiescence, private archive receipts and refusal to promote after snapshot failure.
+The current production file-key mapping is verified separately without exporting
+its credential. All 11 volumes with this node label have canonical names and valid
+account ownership labels (about 3 GB total). The final hook preserves all of them,
+including historical volumes beyond the three currently configured accounts. The
+new hook also passed an actual Docker integration check with a disposable synthetic
+owned volume, shared admission binding and an owned maintenance drain; archive
+contents were verified and no real account volume was mounted. Final deployment and online account/Viewer acceptance remain.
+
 ## Historical beta.40 draft evidence
 
 # Official Camoufox runtime migration (#677)
