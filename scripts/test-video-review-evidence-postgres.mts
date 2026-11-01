@@ -181,8 +181,16 @@ try {
       (r) => r.id === active.decisionRef,
     ),
   );
-  assert((await listProjectEvidenceOptions(active.projectId, active.actorId, db, active.videoId)).some((r) => r.id === active.decisionRef));
-  assert(!(await listProjectEvidenceOptions(active.projectId, active.actorId, db, randomUUID())).some((r) => r.id === active.decisionRef));
+  assert(
+    (await listProjectEvidenceOptions(active.projectId, active.actorId, db, active.videoId)).some(
+      (r) => r.id === active.decisionRef,
+    ),
+  );
+  assert(
+    !(await listProjectEvidenceOptions(active.projectId, active.actorId, db, randomUUID())).some(
+      (r) => r.id === active.decisionRef,
+    ),
+  );
   await assert.rejects(
     assertAndLinkProjectEvidence(active.projectId, [active.decisionRef], active.actorId, db),
     /只能用于所属视频审核/,

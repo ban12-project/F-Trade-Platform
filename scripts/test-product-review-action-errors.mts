@@ -168,7 +168,10 @@ assert.deepEqual(await run(), { status: "error", message: "无权审核产品资
 assert.equal(attempts, beforeBoundary);
 authorized = true;
 failure = undefined;
-assert.deepEqual(await run(), { status: "success", message: "产品资料审核通过，可以用于制作内容和报价。" });
+assert.deepEqual(await run(), {
+  status: "success",
+  message: "产品资料审核通过，可以用于制作内容和报价。",
+});
 assert.equal(refreshes, 1);
 console.log(
   "PASS actual Gate 01 Action redacts unknown/private errors, preserves controlled guidance and forwards current identity",
