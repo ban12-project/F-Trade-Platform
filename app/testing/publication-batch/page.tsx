@@ -42,7 +42,7 @@ export default function PublicationBatchFixture() {
               name,
               ready: i < 2,
               blockers: i === 2 ? ["login"] : i === 3 ? ["paused"] : [],
-              audience: "Friends",
+              audience: "Public",
             }))}
             publications={[
               {

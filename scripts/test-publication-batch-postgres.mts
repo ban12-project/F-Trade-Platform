@@ -64,6 +64,7 @@ try {
         accountRef: a.accountRef,
         expiresAt: Date.now() + 3600000,
         textOnly: false,
+        audience: "Public",
       }));
       await db.execute(
         sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(original)}::jsonb WHERE id = ${f.nodeId}`,
@@ -99,10 +100,17 @@ try {
             .where(eq(s.socialPublication.projectId, f.projectId))
         ).length;
       // Any invalid target rejects the complete batch and preserves every control.
-      for (const state of ["needs_login", "disabled", "manual_pause", "exception_pause"] as const) {
+      for (const state of [
+        "needs_login",
+        "disabled",
+        "manual_pause",
+        "exception_pause",
+        "private_worker",
+      ] as const) {
         const changed = structuredClone(original);
         if (state === "needs_login") changed.accounts[1].authState = "needs_login";
         if (state === "disabled") changed.accounts[1].enabled = false;
+        if (state === "private_worker") changed.publicationScopes![1].audience = "Friends";
         await db.execute(
           sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(changed)}::jsonb WHERE id = ${f.nodeId}`,
         );

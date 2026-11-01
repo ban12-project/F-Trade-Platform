@@ -124,7 +124,8 @@ export function PublicationComposer({
       ? `/api/publication-preview?${new URLSearchParams({ projectId, contentRef: selected.content.contentRef, format: selected.content.format, mediaId: selected.content.mediaId, ...("captionContentRef" in selected.content && selected.content.captionContentRef ? { captionContentRef: selected.content.captionContentRef } : {}) })}`
       : "";
   const unavailable = targets.some(
-    (a) => !a.ready || (selected?.content.format !== "text" && a.textOnly),
+    (a) =>
+      !a.ready || a.audience !== "Public" || (selected?.content.format !== "text" && a.textOnly),
   );
   return (
     <Card>
@@ -236,7 +237,11 @@ export function PublicationComposer({
                       }}
                     />
                     {a.platform} · {a.name} ·{" "}
-                    {a.ready ? "可以发布" : publishingBlockers[a.blockers?.[0] ?? "binding"]}
+                    {a.ready
+                      ? a.audience === "Public"
+                        ? "可以发布"
+                        : "发布服务正在更新公开范围支持，请稍后重试"
+                      : publishingBlockers[a.blockers?.[0] ?? "binding"]}
                   </label>
                   {keys.includes(key) && selected?.content.format !== "text" && a.textOnly ? (
                     <p role="alert">

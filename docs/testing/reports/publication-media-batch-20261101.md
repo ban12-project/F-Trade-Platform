@@ -17,7 +17,7 @@ Active original media profiles take precedence for both admission and execution.
 Platform setup cannot downgrade a live media scope. No grant, pause, allow-publish,
 credential, stable account ID or historical post is changed.
 
-New publication uses Public regardless of the old profile's audience. The driver
+New publication uses Public regardless of the old profile's audience. New and retained UI actions reject a worker scope that has not reported Public, preventing a rolling deployment from routing a newly confirmed public post to an older private-audience worker. The driver
 selects Public in the current composer, clears the "save as default" checkbox,
 verifies after upload and again around authorization, and checks Public immediately
 before the single click. It does not change account-wide privacy settings. Unknown,

@@ -88,3 +88,18 @@ export async function assertPublishingAccountReady(
     );
   return account;
 }
+
+/** New UI confirmations must not reach an older worker that still publishes to
+ * its saved private audience during a rolling deployment. */
+export async function assertPublicPublishingAccountReady(
+  database: Db,
+  scope: { channelRef: string; accountRef: string },
+  ownerId?: string,
+) {
+  const account = await assertPublishingAccountReady(database, scope, ownerId);
+  if (account.audience !== "Public")
+    throw new PublishingAccountUnavailableError(
+      "该账号的发布服务尚未确认公开范围支持。本批未提交，请待服务更新后重试；内容和账号选择已保留。",
+    );
+  return account;
+}

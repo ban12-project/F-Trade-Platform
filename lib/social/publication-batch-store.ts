@@ -12,7 +12,7 @@ import {
 } from "./human-write-access";
 import { type PublicationBatchResult, publicationBatchSchema } from "./publication-batch-schema";
 import { submitControlledPublication } from "./publication-store";
-import { assertPublishingAccountReady } from "./publishing-account-store";
+import { assertPublicPublishingAccountReady } from "./publishing-account-store";
 
 export async function submitPublicationBatch(
   input: unknown,
@@ -66,7 +66,8 @@ export async function submitPublicationBatch(
       ORDER BY n.id FOR SHARE OF n`);
     // Lock every target before creating any work. A stale target rolls back the
     // whole confirmation; workers cannot observe a silently reduced batch.
-    for (const target of targets) await assertPublishingAccountReady(tx, target, identity.actorId);
+    for (const target of targets)
+      await assertPublicPublishingAccountReady(tx, target, identity.actorId);
     const results: PublicationBatchResult[] = [];
     for (const target of targets) {
       const saved =
@@ -90,7 +91,8 @@ export async function submitPublicationBatch(
         publicationId: "publicationId" in saved ? saved.publicationId : saved.id,
       });
     }
-    for (const target of targets) await assertPublishingAccountReady(tx, target, identity.actorId);
+    for (const target of targets)
+      await assertPublicPublishingAccountReady(tx, target, identity.actorId);
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       actorType: "human",

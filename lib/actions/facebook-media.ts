@@ -2,12 +2,15 @@
 import { after } from "next/server";
 import { z } from "zod";
 import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
+import { getDatabase } from "@/lib/db/client";
+import { facebookMediaSubmitFormSchema } from "@/lib/social/facebook-account-forms";
 import {
   listFacebookMarketingProjects,
   listFacebookMediaOptions,
   submitFacebookMediaPublication,
 } from "@/lib/social/facebook-media-store";
 import { SocialHumanAccessError, socialHumanFailureMessage } from "@/lib/social/human-write-access";
+import { assertPublicPublishingAccountReady } from "@/lib/social/publishing-account-store";
 
 async function actor() {
   const current = await authorizedActionSession("content:review");
@@ -26,9 +29,10 @@ export async function facebookMediaOptionsAction(projectId: unknown, contentRef:
 export async function submitFacebookMediaAction(input: unknown) {
   try {
     const current = await actor();
-    const parsed = z.object({ projectId: z.uuid() }).safeParse(input);
+    const parsed = facebookMediaSubmitFormSchema.safeParse(input);
     if (!parsed.success) return { ok: false as const, message: "请核对发布项目和素材参数。" };
-    const saved = await submitFacebookMediaPublication(input, {
+    await assertPublicPublishingAccountReady(getDatabase(), parsed.data, current.user.id);
+    const saved = await submitFacebookMediaPublication(parsed.data, {
       actorId: current.user.id,
       sessionId: current.session.id,
       projectId: parsed.data.projectId,
