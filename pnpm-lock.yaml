@@ -134,6 +134,7 @@ patchedDependencies:
   '@remotion/studio-protocol@4.0.520': a8028f4b8f606539a140c759f7a14da4f578cf243de6b8dcf14495faabfa834e
   '@workflow/core@4.8.8': 84f7f250d42c93849c9dff73446cbbcaa8031e8c9849ef2de0d97bb3d5035ad5
   braces@3.0.3: 5ac0d932ed4f56afd15036230b7edcecf094a44d071b4c9c48b53a3e9b2082a3
+  deepmerge@4.3.1: c2602592399c77c7dcf4dde55e869c73761a4b022551a235eef4dbb7c888a468
 
 importers:
 
@@ -8626,7 +8627,7 @@ snapshots:
 
   dedent@1.7.2: {}
 
-  deepmerge@4.3.1: {}
+  deepmerge@4.3.1(patch_hash=c2602592399c77c7dcf4dde55e869c73761a4b022551a235eef4dbb7c888a468): {}
 
   default-browser-id@5.0.1: {}
 
@@ -10137,7 +10138,7 @@ snapshots:
       commander: 14.0.3
       cosmiconfig: 9.0.2(typescript@7.0.2)
       dedent: 1.7.2
-      deepmerge: 4.3.1
+      deepmerge: 4.3.1(patch_hash=c2602592399c77c7dcf4dde55e869c73761a4b022551a235eef4dbb7c888a468)
       diff: 8.0.4
       execa: 9.6.1
       fast-glob: 3.3.3

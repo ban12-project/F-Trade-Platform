@@ -85,6 +85,8 @@ jobs:
 
       - name: Verify patched tooling loaders and MCP credential boundaries
         run: node --test --test-reporter=tap scripts/test-tooling-security-compatibility.mjs scripts/test-uri-security-compatibility.mjs scripts/test-http-tooling-security.mjs
+      - name: Test patched deepmerge prototype boundary
+        run: node --test scripts/test-deepmerge-security.mjs
 
       - name: Verify locked braces depth guard and real glob compatibility
         run: node --test --test-reporter=tap scripts/test-braces-depth-guard.mjs

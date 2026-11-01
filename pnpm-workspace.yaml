@@ -46,3 +46,5 @@ patchedDependencies:
   # Bound this installed dependency's parser and AST walks; standalone dlx is separate.
   # Keep #498 open until an upstream fix and the independent CLI are verified.
   braces@3.0.3: patches/braces@3.0.3.patch
+  # Block __proto__ in both merge loops until upstream ships a verified fix (#498).
+  deepmerge@4.3.1: patches/deepmerge@4.3.1.patch
