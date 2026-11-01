@@ -1,5 +1,10 @@
 # M2 retention checkpoint — 2026-11-01
 
+Subsequent scope decision: [ADR 0011](../../decisions/0011-remove-pitr-acceptance.md)
+removes database PITR acceptance from MVP1 at the user's explicit request.
+PITR gaps below describe this earlier checkpoint; they are no longer blockers.
+The retention/deletion requirements and historical observations remain valid.
+
 Related to #122. The existing GitHub sign-in restored the Neon console session.
 Read-only inspection of F-Trade-Platform's default `production` branch found
 one branch, one database and one compute. The current plan is Launch (the old
