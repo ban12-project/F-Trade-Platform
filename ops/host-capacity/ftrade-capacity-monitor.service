@@ -1,0 +1,22 @@
+[Unit]
+Description=F-Trade host resource telemetry
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/ftrade-vps/capacity/monitor.py
+Restart=always
+RestartSec=2
+User=root
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ftrade-vps/capacity
+ProtectHome=true
+PrivateTmp=true
+MemoryMax=128M
+CPUQuota=25%
+
+[Install]
+WantedBy=multi-user.target

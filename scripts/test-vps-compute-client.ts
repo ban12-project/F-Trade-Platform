@@ -51,6 +51,10 @@ async function main() {
     process.env.COMPUTE_PROVIDER = "vps";
     const runtime = await createComputeRuntime();
     assert.ok(runtime instanceof VpsCompute);
+    assert.equal(calls.at(-1)?.profile, "heavy");
+    const light = await createComputeRuntime("light");
+    assert.equal(calls.at(-1)?.profile, "light");
+    await light.stop();
     const input = Buffer.alloc(4 * 1024 * 1024 + 17, 173);
     await runtime.fs.writeFile("/vercel/sandbox/work/input.bin", input);
     assert.deepEqual(await runtime.fs.readFile("/vercel/sandbox/work/input.bin"), input);

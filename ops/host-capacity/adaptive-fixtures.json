@@ -1,0 +1,318 @@
+{
+  "base": {
+    "containers": [
+      {
+        "Id": "heavy",
+        "HostConfig": {
+          "Memory": 2147483648,
+          "NanoCpus": 2000000000.0
+        }
+      },
+      {
+        "Id": "light1",
+        "HostConfig": {
+          "Memory": 536870912,
+          "NanoCpus": 500000000.0
+        }
+      },
+      {
+        "Id": "light2",
+        "HostConfig": {
+          "Memory": 536870912,
+          "NanoCpus": 500000000.0
+        }
+      }
+    ],
+    "memoryMb": 512,
+    "cpuCores": 0.5,
+    "availableMb": 5000,
+    "totalMb": 7424,
+    "cores": 4,
+    "now": 100,
+    "snapshot": {
+      "version": 1,
+      "healthy": true,
+      "observedAt": 99,
+      "host": {
+        "cpuCount": 4,
+        "totalMb": 7424,
+        "availableMb": 5000,
+        "samples": 8,
+        "cpuPeakCores": 1.7,
+        "memorySomeAvg10": 0,
+        "memoryFullAvg10": 0
+      },
+      "workers": {
+        "heavy": {
+          "samples": 5,
+          "memoryMb": 100,
+          "memoryPeakMb": 160,
+          "cpuPeakCores": 1.7,
+          "oomKills": 0
+        },
+        "light1": {
+          "samples": 5,
+          "memoryMb": 100,
+          "memoryPeakMb": 160,
+          "cpuPeakCores": 0.05,
+          "oomKills": 0
+        },
+        "light2": {
+          "samples": 5,
+          "memoryMb": 100,
+          "memoryPeakMb": 160,
+          "cpuPeakCores": 0.05,
+          "oomKills": 0
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "mixed heavy and three light exceeds old two-task limit",
+      "allowed": true,
+      "changes": []
+    },
+    {
+      "name": "rising CPU blocks new work",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "host",
+            "cpuPeakCores"
+          ],
+          "value": 3.2
+        }
+      ]
+    },
+    {
+      "name": "recent worker peak protects burst recovery",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "heavy",
+            "cpuPeakCores"
+          ],
+          "value": 3
+        }
+      ]
+    },
+    {
+      "name": "memory pressure blocks admission",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "host",
+            "memorySomeAvg10"
+          ],
+          "value": 6
+        }
+      ]
+    },
+    {
+      "name": "memory full stalls block admission",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "host",
+            "memoryFullAvg10"
+          ],
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "available memory protects host",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "availableMb"
+          ],
+          "value": 1800
+        }
+      ]
+    },
+    {
+      "name": "memory hard caps cannot be overcommitted",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "memoryMb"
+          ],
+          "value": 3072
+        }
+      ]
+    },
+    {
+      "name": "memory peak above budget blocks admission",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "heavy",
+            "memoryPeakMb"
+          ],
+          "value": 5000
+        }
+      ]
+    },
+    {
+      "name": "new worker must warm before another admission",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "light2",
+            "samples"
+          ],
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "worker absent from snapshot fails closed",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "light2"
+          ],
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "stale snapshot fails closed",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "observedAt"
+          ],
+          "value": 90
+        }
+      ]
+    },
+    {
+      "name": "future snapshot fails closed",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "observedAt"
+          ],
+          "value": 101
+        }
+      ]
+    },
+    {
+      "name": "unhealthy monitor fails closed",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "healthy"
+          ],
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "OOM evidence blocks new work",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "workers",
+            "heavy",
+            "oomKills"
+          ],
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "malformed metric fails closed",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "host",
+            "cpuPeakCores"
+          ],
+          "value": "low"
+        }
+      ]
+    },
+    {
+      "name": "missing container limit fails closed",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "containers"
+          ],
+          "value": [
+            {
+              "Id": "heavy",
+              "HostConfig": {
+                "Memory": 0,
+                "NanoCpus": 2000000000.0
+              }
+            },
+            {
+              "Id": "light1",
+              "HostConfig": {
+                "Memory": 536870912,
+                "NanoCpus": 500000000.0
+              }
+            },
+            {
+              "Id": "light2",
+              "HostConfig": {
+                "Memory": 536870912,
+                "NanoCpus": 500000000.0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hardware change needs fresh samples",
+      "allowed": false,
+      "changes": [
+        {
+          "path": [
+            "snapshot",
+            "host",
+            "cpuCount"
+          ],
+          "value": 8
+        }
+      ]
+    }
+  ]
+}

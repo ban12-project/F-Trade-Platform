@@ -29,7 +29,7 @@ export async function probeProductMediaEvidenceInSandbox(
   const source = sources.get(assetRef);
   if (!source || source.assetRef !== assetRef) throw new Error("产品媒体的私有源文件不可用。");
 
-  const sandbox = await createComputeRuntime();
+  const sandbox = await createComputeRuntime("light");
   try {
     await sandbox.fs.mkdir("/vercel/sandbox/work", { recursive: true });
     const input = `/vercel/sandbox/work/product-media${source.extension}`;

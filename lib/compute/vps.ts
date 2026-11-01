@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const chunkBytes = 4 * 1024 * 1024;
 const maximumFileBytes = 1024 * 1024 * 1024 - 1;
+export type ComputeProfile = "light" | "heavy";
 class CapacityBusy extends Error {}
 const commandResult = z.object({
   exitCode: z.number().int(),
@@ -62,12 +63,15 @@ async function request(body: Record<string, unknown>): Promise<unknown> {
 export class VpsCompute {
   private constructor(private readonly id: string) {}
 
-  static async create() {
+  static async create(profile: ComputeProfile = "heavy") {
+    z.enum(["light", "heavy"]).parse(profile);
     vpsComputeEnabled();
     const deadline = Date.now() + 120_000;
     for (;;) {
       try {
-        const value = z.object({ id: z.uuid() }).parse(await request({ action: "create" }));
+        const value = z
+          .object({ id: z.uuid() })
+          .parse(await request({ action: "create", profile }));
         return new VpsCompute(value.id);
       } catch (error) {
         if (!(error instanceof CapacityBusy)) throw error;

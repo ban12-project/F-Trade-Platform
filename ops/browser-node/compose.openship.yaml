@@ -20,6 +20,7 @@ services:
       BROWSER_IMAGE: ${BROWSER_IMAGE:?Pinned local browser image ID}
       BROWSER_NATIVE_PROFILES: "1"
       BROWSER_MANAGED_FACEBOOK_CONFIG_DIR: /run/facebook-config
+      FTRADE_HOST_ADAPTIVE: "1"
       FTRADE_HOST_CAPACITY_DIR: /run/ftrade-capacity
       MAX_RUNNING_BROWSERS: "16"
       BROWSER_MAX_MEMORY_MB: "2048"
