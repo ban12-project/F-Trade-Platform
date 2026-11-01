@@ -7,6 +7,8 @@ allowBuilds:
 # Reviewed same-major patches for Workflow's exact pins; see #498.
 # Remove these when the selected upstream runtime pins equivalent patched versions.
 overrides:
+  'express@5.2.1>qs': 6.16.1
+  '@modelcontextprotocol/sdk@1.32.0>@hono/node-server': 2.1.3
   # Same-major URI/IP parser fixes, verified at actual parent boundaries (#498).
   'ajv@8.20.0>fast-uri': 3.1.9
   'socks@2.8.9>ip-address': 10.7.4
