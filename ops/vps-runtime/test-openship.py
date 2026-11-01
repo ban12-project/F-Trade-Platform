@@ -54,7 +54,7 @@ class NamespaceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as pool, patch.object(broker, 'WORKSPACE_ROOT', Path(pool)), patch.object(broker, 'workspace_pool_ready', return_value=Pool()), patch.object(broker, 'checked', checked):
             result = broker.dispatch({'action': 'create'})
             args = calls[-1]
-            self.assertEqual(calls[0], ['ps', '-q', '--filter', 'label=io.ftrade.compute'])
+            self.assertEqual(calls[0], ['ps', '-aq', '--filter', 'label=io.ftrade.compute'])
             self.assertEqual(args[args.index('--label') + 1], 'io.ftrade.compute=openship-test')
             self.assertEqual(args[args.index('--name') + 1], 'ftrade-compute-openship-test-' + result['id'])
             self.assertEqual(args[args.index('--mount') + 1], f"type=bind,source={pool}/instance-openship-test/job-{result['id']},target=/vercel/sandbox/work")

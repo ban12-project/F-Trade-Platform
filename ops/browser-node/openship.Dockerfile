@@ -7,6 +7,7 @@ WORKDIR /app
 RUN printf '{"type":"module"}\n' > package.json
 COPY lib/browser-fleet/policy.ts lib/browser-fleet/security.ts lib/browser-fleet/inbox-signature.mjs ./lib/browser-fleet/
 COPY ops/browser-node/ ./ops/browser-node/
+COPY ops/host-capacity/admission.mjs ./ops/host-capacity/
 ENV BROWSER_AGENT_NETWORK_MODE=bridge
 LABEL io.ftrade.role="agent"
 # UID 0 can read existing root-owned private state and use the Docker socket.

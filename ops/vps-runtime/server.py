@@ -13,6 +13,9 @@ import hmac
 import json
 import os
 import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "host-capacity"))
+from admission import host_capacity, CapacityUnavailable
 import shutil
 import re
 import subprocess
@@ -29,6 +32,13 @@ if not re.fullmatch(r'[A-Za-z0-9_-]{48,256}', TOKEN) or not re.fullmatch(r'sha25
 MEMORY_MB = int(os.environ.get('FTRADE_COMPUTE_MEMORY_MB', '2048'))
 if not 1024 <= MEMORY_MB <= 3072:
     raise RuntimeError('invalid compute memory budget')
+MAX_RUNNING = int(os.environ.get('FTRADE_COMPUTE_MAX_RUNNING', '1'))
+POOL_GIB = int(os.environ.get('FTRADE_WORKSPACE_POOL_GIB', '12'))
+QUOTA_ENABLED = os.environ.get('FTRADE_WORKSPACE_QUOTAS', '0') == '1'
+JOB_GROUPS = {}
+QUOTA_BYTES = 5 * 1024**3
+if not 1 <= MAX_RUNNING <= 16 or not 12 <= POOL_GIB <= 1024:
+    raise RuntimeError('invalid capacity configuration')
 WORKSPACE_ROOT = pathlib.Path(os.environ.get('FTRADE_WORKSPACE_ROOT', '/opt/ftrade-vps/compute/workspaces'))
 # These are trusted deployment settings, never values supplied by API clients.
 # The mount must use the identical absolute path on the Docker host and broker.
@@ -184,7 +194,7 @@ def download(url, hostname, destination, name, deadline, budget=MAX_DOWNLOAD_BYT
             if offset + len(chunk) > maximum:
                 raise ValueError('source_too_large')
             spec={'op':'write','path':destination,'offset':offset,'data':base64.b64encode(chunk).decode()}
-            checked(['exec','--user','1000:1000','-i',name,'python3','-c',FS_SCRIPT],json.dumps(spec).encode(),min(30,max(1,deadline-time.monotonic())))
+            checked(['exec','--user',job_user(name),'-i',name,'python3','-c',FS_SCRIPT],json.dumps(spec).encode(),min(30,max(1,deadline-time.monotonic())))
             offset += len(chunk)
         if length is not None and offset != int(length):
             raise ValueError('source_truncated')
@@ -204,7 +214,7 @@ def workspace_pool_ready():
         raise ValueError('workspace_pool_symlink')
     capacity = os.statvfs(WORKSPACE_ROOT)
     size = capacity.f_blocks * capacity.f_frsize
-    if not 11 * 1024**3 < size <= 12 * 1024**3:
+    if not (POOL_GIB - 1) * 1024**3 < size <= POOL_GIB * 1024**3:
         raise ValueError('workspace_pool_capacity_invalid')
     if (WORKSPACE_ROOT / '.ftrade-workspace-pool').read_text().strip() != 'ftrade-compute-v1':
         raise ValueError('workspace_pool_identity_invalid')
@@ -213,6 +223,11 @@ def workspace_pool_ready():
     matching = [line for line in mounts if line.split()[4] == str(WORKSPACE_ROOT)]
     if not matching or not all(' - ext4 ' in line for line in matching):
         raise ValueError('workspace_pool_filesystem_invalid')
+    if QUOTA_ENABLED:
+        if not any('grpquota' in line for line in matching):
+            raise ValueError('workspace_group_quota_not_mounted')
+        if (WORKSPACE_ROOT / '.ftrade-quota-v1').read_text().strip() != '20000:20015:5368709120:65536':
+            raise ValueError('workspace_quota_configuration_invalid')
     return capacity
 
 
@@ -243,6 +258,10 @@ def cleanup_previous_sessions():
         checked(['rm', '-f', cid])
     for directory in instance_workspace().glob('job-*'):
         remove_workspace(directory.name.removeprefix('job-'))
+    if QUOTA_ENABLED:
+        for _, record in quota_records():
+            if record['namespace'] == NAMESPACE:
+                remove_workspace(record['sid'])
 
 
 def remove_workspace(sid):
@@ -264,21 +283,66 @@ def remove_workspace(sid):
                     os.chmod(path, 0o700, follow_symlinks=False)
         shutil.rmtree(directory)
     DOWNLOAD_BYTES.pop(sid, None)
+    if QUOTA_ENABLED:
+        for file, record in quota_records():
+            if record['namespace'] == NAMESPACE and record['sid'] == sid:
+                file.unlink(missing_ok=True)
+        JOB_GROUPS.pop(CONTAINER_PREFIX + sid, None)
+
+
+def quota_records():
+    root = WORKSPACE_ROOT / '.quota-allocations'
+    root.mkdir(mode=0o700, exist_ok=True)
+    records = []
+    for file in root.glob('*.json'):
+        try:
+            data = json.loads(file.read_text())
+        except FileNotFoundError:
+            # A finished worker may release its reservation during this scan.
+            continue
+        if not re.fullmatch(r'[a-f0-9-]{36}', data.get('sid', '')) or not re.fullmatch(r'[a-z][a-z0-9-]{0,31}', data.get('namespace', '')):
+            raise ValueError('quota_record_invalid')
+        gid = int(file.stem)
+        if not 20000 <= gid <= 20015:
+            raise ValueError('quota_group_invalid')
+        records.append((file, data))
+    return records
+
+
+def reserve_quota(sid, pool):
+    # Kernel group quotas bound each job. The shared pool is not partitioned or
+    # preallocated per job; reserve admission headroom for simultaneous peaks.
+    records = quota_records()
+    slots = min(16, (pool.f_blocks * pool.f_frsize - 1024**3) // QUOTA_BYTES)
+    if len(records) >= slots:
+        raise CapacityUnavailable('workspace_quota_capacity_busy')
+    used = {int(file.stem) for file, _ in records}
+    gid = next(g for g in range(20000, 20016) if g not in used)
+    root = WORKSPACE_ROOT / '.quota-allocations'
+    temporary = root / ('.tmp-' + sid)
+    temporary.write_text(json.dumps({'sid': sid, 'namespace': NAMESPACE}))
+    os.replace(temporary, root / (str(gid) + '.json'))
+    return gid
+
+
+def job_user(name):
+    return '1000:' + str(JOB_GROUPS[name] if QUOTA_ENABLED else 1000)
 
 
 def dispatch(body):
     action = body.get('action')
     if action == 'create':
-        with LOCK:
+        with LOCK, host_capacity(checked, MEMORY_MB):
             # All capacity checks and creation are serialized. Container deadline
             # also runs independently of this API process. Its UID differs from
             # all tools, so a compromised parser cannot signal/freeze sleep/init.
             pool = workspace_pool_ready()
-            if pool.f_bavail * pool.f_frsize < 10 * 1024**3:
-                raise ValueError('workspace_pool_capacity_unavailable')
-            active = checked(['ps', '-q', '--filter', f'label={LABEL}']).splitlines()
-            if active:
-                raise ValueError('capacity_exhausted')
+            active = checked(['ps', '-aq', '--filter', f'label={LABEL}']).splitlines()
+            if len(active) >= MAX_RUNNING:
+                raise CapacityUnavailable('capacity_exhausted')
+            required_free = 1024**3 if QUOTA_ENABLED else 10 * 1024**3
+            if pool.f_bavail * pool.f_frsize < required_free:
+                raise CapacityUnavailable('workspace_pool_capacity_unavailable')
             sid = str(uuid.uuid4())
             name = CONTAINER_PREFIX + sid
             directory = instance_workspace() / ('job-' + sid)
@@ -288,6 +352,8 @@ def dispatch(body):
             DOWNLOAD_BYTES[sid] = 0
             SESSIONS[sid] = (name, time.monotonic() + 600, threading.Lock())
             try:
+                if QUOTA_ENABLED:
+                    JOB_GROUPS[name] = reserve_quota(sid, pool)
                 checked(['run', '-d', '--rm', '--name', name, '--label', f'{LABEL}={LABEL_VALUE}',
                          '--network', 'none', '--read-only', '--cap-drop', 'ALL',
                          '--security-opt', 'no-new-privileges', '--user', '65534:65534',
@@ -296,6 +362,9 @@ def dispatch(body):
                          '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m,mode=1777',
                          '--mount', f'type=bind,source={directory},target=/vercel/sandbox/work',
                          '--entrypoint', 'sleep', IMAGE, '600'])
+                if QUOTA_ENABLED:
+                    checked(['exec', '--user', job_user(name), name, 'python3', '-c',
+                             f'import os;assert os.getuid()==1000 and os.getgid()=={JOB_GROUPS[name]};assert all(g=={JOB_GROUPS[name]} for g in os.getgroups())'])
             except Exception:
                 try:
                     remove_container(name)
@@ -339,7 +408,7 @@ def dispatch(body):
                 spec['data'] = value
             if spec['op'] == 'copy':
                 spec['destination'] = path(body.get('destination'))
-            return json.loads(checked(['exec', '--user', '1000:1000', '-i', name, 'python3', '-c', FS_SCRIPT], json.dumps(spec).encode(), min(30, remaining)))
+            return json.loads(checked(['exec', '--user', job_user(name), '-i', name, 'python3', '-c', FS_SCRIPT], json.dumps(spec).encode(), min(30, remaining)))
         if action == 'command':
             cmd, args, env = body.get('cmd'), body.get('args', []), body.get('env', {})
             if cmd not in ('ffmpeg', 'ffprobe', '/opt/markitdown/bin/python3', 'node'):
@@ -350,7 +419,7 @@ def dispatch(body):
             if not isinstance(env, dict) or any(k not in allowed or not isinstance(v,str) or len(v)>100 for k,v in env.items()):
                 raise ValueError('invalid_environment')
             env_args = [a for k,v in env.items() for a in ('-e', k+'='+v)]
-            code, out, err = docker(['exec', '--user', '1000:1000', *env_args, '-w', '/vercel/sandbox', name, 'timeout', str(remaining), cmd, *args], timeout=remaining+5)
+            code, out, err = docker(['exec', '--user', job_user(name), *env_args, '-w', '/vercel/sandbox', name, 'timeout', str(remaining), cmd, *args], timeout=remaining+5)
             return {'exitCode': code, 'stdout': out.decode(errors='replace'), 'stderr': err.decode(errors='replace')}
     raise ValueError('invalid_action')
 
@@ -384,6 +453,10 @@ class Handler(BaseHTTPRequestHandler):
             result = dispatch(body)
             payload = json.dumps({'result': result}).encode()
             self.send_response(200)
+        except CapacityUnavailable:
+            payload = b'{"error":"runtime_capacity_busy"}'
+            self.send_response(429)
+            self.send_header('Retry-After', '2')
         except Exception:
             payload = b'{"error":"runtime_request_failed"}'
             self.send_response(400)

@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { freemem } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { isLive } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, secureOrigin } from "../../lib/browser-fleet/security.ts";
+import { acquireHostCapacity, availableMemoryMb } from "../host-capacity/admission.mjs";
 import { checkedBrowserResponse } from "./browser-response.mjs";
 import { containerSpec, dockerClient, renewWatchdog, stopContainer } from "./docker.mjs";
 import {
@@ -275,6 +275,8 @@ async function launch(slot) {
   if (slot.stopping) return;
   slot.launchStage = "container-start";
   await docker("POST", `/containers/${created.Id}/start`);
+  await slot.releaseAdmission?.();
+  slot.releaseAdmission = null;
   slot.launchStage = "container-inspect";
   const details = await docker("GET", `/containers/${created.Id}/json`);
   Object.assign(slot, workerEndpoint(details, spec.name, networkMode));
@@ -446,6 +448,7 @@ let ticking = false;
 async function tick() {
   if (ticking || stopping) return;
   ticking = true;
+  let releaseAdmission;
   try {
     await Promise.all(
       [...slots.values()].map(async (slot) => {
@@ -458,12 +461,13 @@ async function tick() {
     );
     if (slots.size) idleExit.observe(false, Date.now());
     if (slots.size >= maxSlots || [...slots.values()].some((s) => s.stopping)) return;
+    releaseAdmission = await acquireHostCapacity(docker, sync.limits.browserMemoryMb);
     pendingClaim ??= randomUUID();
     const result = await nodeCall("claim", {
       requestId: pendingClaim,
       availableMemoryMb: Math.min(
         maximumMemoryMb,
-        Math.max(0, Math.floor(freemem() / 1024 / 1024 - reserveMb)),
+        Math.max(0, Math.floor((await availableMemoryMb()) - reserveMb)),
       ),
       localSlots: maxSlots,
     });
@@ -517,7 +521,12 @@ async function tick() {
       await stop(slot, "failed");
       return;
     }
-    slot.startPromise = launch(slot);
+    slot.releaseAdmission = releaseAdmission;
+    releaseAdmission = null;
+    slot.startPromise = launch(slot).finally(async () => {
+      await slot.releaseAdmission?.();
+      slot.releaseAdmission = null;
+    });
     void slot.startPromise
       .then(async () => {
         if (!slot.ready || slot.stopping || slot.run.kind === "interactive") return;
@@ -660,10 +669,12 @@ async function tick() {
         slot.outcome = error.message?.startsWith("egress_") ? "egress_mismatch" : "failed";
         void stop(slot, slot.outcome).catch(() => {});
       });
-  } catch {
+  } catch (error) {
     idleExit.observe(false, Date.now());
-    console.error("browser_node_poll_failed");
+    if (!["host_capacity_exhausted", "host_capacity_busy"].includes(error.message))
+      console.error("browser_node_poll_failed");
   } finally {
+    await releaseAdmission?.();
     ticking = false;
   }
 }

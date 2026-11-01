@@ -137,3 +137,10 @@ Run the additional isolation regressions with
 broker's UID, `NoNewPrivs`, capability sets and worker settings, verify real
 file/command operations, restart cleanup and OpenShip redeploy/rollback, and
 confirm that a missing pool prevents job admission.
+
+## VPS shared task concurrency
+
+Native OpenShip deployments use the shared host CPU/RAM admission guard and
+compute group quotas described in [host capacity](../host-capacity/README.md).
+Enable both controllers together; raising individual limits without the shared
+guard can overcommit the host. The shared compute pool remains 12 GiB.

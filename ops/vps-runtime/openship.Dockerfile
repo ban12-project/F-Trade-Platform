@@ -10,6 +10,7 @@ RUN test -n "$DOCKER_GID" && case "$DOCKER_GID" in *[!0-9]*) exit 1;; esac \
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 WORKDIR /app
 COPY ops/vps-runtime/server.py /app/server.py
+COPY ops/host-capacity/admission.py /host-capacity/admission.py
 ENV PYTHONDONTWRITEBYTECODE=1 FTRADE_RUNTIME_BIND=0.0.0.0
 USER 1000:${DOCKER_GID}
 ENTRYPOINT ["setpriv", "--no-new-privs", "--inh-caps=-all", "--ambient-caps=-all", "/usr/bin/tini", "--"]
