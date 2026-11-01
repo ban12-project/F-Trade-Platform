@@ -65,6 +65,7 @@ export type Run = {
     factorPrompts?: Array<"password" | "totp" | "pin">;
     historyEvidence?: "threads" | "empty_inbox" | "unverified";
   };
+  publicationFailure?: { stage: string; code: string };
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
   authSessionId: string | null;

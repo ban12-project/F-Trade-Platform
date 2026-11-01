@@ -32,8 +32,8 @@ async function Records({
       projects={projects}
       records={records}
       projectId={query.project}
-      recordType={query.type}
-      state={query.state}
+      recordType={collection === "content" && query.type === "publication" ? undefined : query.type}
+      state={collection === "content" && query.type === "publication" ? undefined : query.state}
     />
   );
 }

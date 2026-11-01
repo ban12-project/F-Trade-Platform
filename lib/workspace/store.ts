@@ -1,13 +1,14 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { type Database, getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
   approval,
   auditEvent,
+  socialBrowserJob,
   socialChannelControl,
   socialPublication,
   user,
@@ -132,10 +133,21 @@ export async function readWorkspaceTaskSnapshot(
         id: socialPublication.id,
         projectId: socialPublication.projectId,
         contentRef: socialPublication.contentRef,
+        accountLabel: sql<string>`COALESCE((
+          SELECT NULLIF(a->>'displayName', '')
+          FROM browser_fleet_binding b JOIN browser_fleet_node n ON n.id = b.node_id
+          CROSS JOIN LATERAL jsonb_array_elements(n.document->'accounts') a
+          WHERE b.channel_ref = ${socialPublication.channelRef}
+            AND b.account_ref = ${socialPublication.accountRef}
+            AND a->>'id' = b.id
+          LIMIT 1
+        ), ${socialPublication.accountRef})`,
+        jobStatus: socialBrowserJob.status,
         status: socialPublication.status,
         createdAt: socialPublication.createdAt,
       })
       .from(socialPublication)
+      .leftJoin(socialBrowserJob, eq(socialBrowserJob.id, socialPublication.browserJobId))
       .where(inArray(socialPublication.projectId, ids)),
     database
       .select({ id: socialChannelControl.id })

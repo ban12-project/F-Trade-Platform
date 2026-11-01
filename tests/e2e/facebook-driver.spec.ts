@@ -92,6 +92,9 @@ for (const mode of [
   "audience_missing",
   "audience_transit_change",
   "audience_selection",
+  "audience_selection_labelledby",
+  "audience_selection_description",
+  "audience_selection_async",
   "audience_default_changed",
   "audience_selection_wrong",
   "composer_identity_tracking",
@@ -168,15 +171,35 @@ for (const mode of [
               dialog.id = "privacy";
               dialog.innerHTML =
                 '<label>Public<input id="only-me" type="radio"></label><input id="default" type="checkbox" checked><button id="done">Done</button>';
+              if (scenario === "audience_selection_labelledby") {
+                dialog.innerHTML =
+                  '<span id="public-label">Public</span><span id="description">Anyone on or off Facebook</span><input id="only-me" type="radio" aria-labelledby="public-label" aria-describedby="description"><input id="default" type="checkbox" checked><button id="done">Done</button>';
+              }
+              if (scenario === "audience_selection_description") {
+                dialog.innerHTML =
+                  '<label><span>Public</span><br><span>Anyone on or off Facebook</span><input id="only-me" type="radio"></label><label>Friends<br>Your Facebook friends<input type="radio"></label><input id="default" type="checkbox" checked><button id="done">Done</button>';
+              }
               document.body.append(dialog);
               const option = dialog.querySelector<HTMLInputElement>("#only-me");
               const checkbox = dialog.querySelector<HTMLInputElement>("#default");
               const confirm = dialog.querySelector<HTMLButtonElement>("#done");
               if (!option || !checkbox || !confirm) throw new Error("fixture missing");
               option.onclick = () => {
-                checkbox.checked = scenario === "audience_default_changed";
+                if (scenario === "audience_selection_async") {
+                  option.checked = false;
+                  checkbox.disabled = true;
+                  setTimeout(() => {
+                    option.checked = true;
+                    const fresh = checkbox.cloneNode() as HTMLInputElement;
+                    fresh.disabled = false;
+                    fresh.checked = true;
+                    checkbox.replaceWith(fresh);
+                  }, 20);
+                } else checkbox.checked = scenario === "audience_default_changed";
               };
               confirm.onclick = () => {
+                if (dialog.querySelector<HTMLInputElement>("#default")?.checked)
+                  throw new Error("must not change default privacy");
                 audience.textContent =
                   scenario === "audience_selection_wrong" ? "Friends" : "Public";
                 dialog.remove();
@@ -677,6 +700,9 @@ for (const mode of [
       "upload_replaces_composer",
       "hidden_duplicate_composer",
       "audience_selection",
+      "audience_selection_labelledby",
+      "audience_selection_description",
+      "audience_selection_async",
       "audience_default_changed",
       "composer_identity_tracking",
       "video_post_http_recovered",

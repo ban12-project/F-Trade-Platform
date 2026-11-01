@@ -295,6 +295,7 @@ async function stop(slot, outcome = "failed") {
       leaseId: slot.run.leaseId,
       stopped: true,
       outcome,
+      ...(slot.publicationFailure ? { publicationFailure: slot.publicationFailure } : {}),
     });
     slots.delete(slot.run.id);
     await checkpoint();
@@ -693,6 +694,7 @@ async function tick() {
             onPreclickFailure(stage, code) {
               // Both fields come from fixed executor enums; never log raw page text.
               console.error(`browser_publication_preclick_failed:${stage}:${code}`);
+              slot.publicationFailure = { stage, code };
             },
             readPublicationMedia: readAssignedMedia,
             signal: slot.abort.signal,

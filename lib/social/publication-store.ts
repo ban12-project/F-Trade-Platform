@@ -23,6 +23,7 @@ import {
 import { assertVideoRetentionForId } from "@/lib/video/retention-access";
 import { aggregateRetentionCondition } from "@/lib/video/retention-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { isPublicationPreauthorizationFailure } from "../../ops/browser-node/publication-diagnostics.mjs";
 import { facebookTextPayloadSchema } from "./facebook-worker-protocol";
 import {
   assertSocialAuthorizationAlive,
@@ -219,15 +220,21 @@ export async function listProjectPublicationData(
         )
         .orderBy(desc(socialPublication.createdAt))
     : [];
-  const publishedRefs = new Set(
+  // A confirmed preauthorization failure did not send anything. Keep its
+  // approved source available so the user can reach the retry composer.
+  // Any other attempt still blocks this source, even alongside a safe failure.
+  const blockedRefs = new Set(
     publications
-      .filter((item) => !(item.format === "text" && item.status === "paused"))
+      .filter(
+        (item) =>
+          !(item.format === "text" && item.status === "paused") &&
+          !(item.status === "failed" && isPublicationPreauthorizationFailure(item.failureCode)),
+      )
       .map((item) => item.contentRef),
   );
   const records = projectRecords.filter(
     ({ record }) =>
-      ["CONTENT_APPROVED", "VIDEO_APPROVED"].includes(record.state) &&
-      !publishedRefs.has(record.id),
+      ["CONTENT_APPROVED", "VIDEO_APPROVED"].includes(record.state) && !blockedRefs.has(record.id),
   );
   const ids = records.map(({ record }) => record.id);
   const approvals = ids.length
@@ -279,7 +286,7 @@ export async function listProjectPublicationData(
         ...publication,
         failureLabel: publicationFailureLabel(failureCode),
         canRetry:
-          publication.status === "failed" && failureCode === "fleet_publication_not_authorized",
+          publication.status === "failed" && isPublicationPreauthorizationFailure(failureCode),
       }),
     ),
   };
@@ -329,7 +336,7 @@ export async function submitControlledPublication(
       if (!existing) throw new Error("发布任务存在但发布记录缺失，请暂停渠道并人工核对。");
       if (
         existingJob.status === "paused" &&
-        existingJob.failureCode === "fleet_publication_not_authorized"
+        isPublicationPreauthorizationFailure(existingJob.failureCode)
       ) {
         const { requeueUnsentFacebookMediaPublication } = await import("./facebook-media-store");
         await requeueUnsentFacebookMediaPublication(tx, existingJob.id, existing.id, actorId);

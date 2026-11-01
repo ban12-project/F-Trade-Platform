@@ -245,7 +245,7 @@ export function PublicationComposer({
                   </label>
                   {keys.includes(key) && selected?.content.format !== "text" && a.textOnly ? (
                     <p role="alert">
-                      此账号的媒体发布适配尚未完成，系统不能验证附件。选择已保留；无需您核对页面选择器。
+                      此账号暂不支持所选素材，系统无法核对附件。选择已保留，请更换账号或稍后重试。
                     </p>
                   ) : null}
                   {!a.ready ? (

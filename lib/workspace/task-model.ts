@@ -30,6 +30,8 @@ export type TaskApproval = {
   createdAt: Date;
 };
 export type TaskPublication = {
+  accountLabel?: string;
+  jobStatus?: string | null;
   id: string;
   projectId: string;
   contentRef: string;
