@@ -125,7 +125,7 @@ for (const op of ["register", "review"]) {
     status: "success",
     message:
       op === "register"
-        ? "产品媒体已登记并完成技术探测，等待管理员审核权利与内容。"
+        ? "素材已上传，等待管理员核对使用授权和内容。"
         : "产品媒体已批准，可按其授权范围进入营销视频。",
     productId,
     assetId,
