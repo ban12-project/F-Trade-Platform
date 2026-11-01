@@ -194,9 +194,8 @@ for (const revoke of [false, true]) {
         await page
           .getByRole("option", { name: `${configId} · synthetic-action-model`, exact: true })
           .click();
-        await page.getByRole("button", { name: "改用已有证据中的文本", exact: true }).click();
-        await page.getByLabel("来源引用", { exact: true }).fill("source-synthetic-browser-access");
-        await page.getByRole("combobox", { name: "字段证据", exact: true }).click();
+        await page.getByRole("button", { name: "改用已有资料中的文本", exact: true }).click();
+        await page.getByRole("combobox", { name: "信息来源", exact: true }).click();
         await page.getByRole("option", { name: /SYNTHETIC action source/ }).click();
         await page.getByLabel("已授权资料文本", { exact: true }).fill(sourceText);
         await page.getByRole("button", { name: "生成待审核草稿", exact: true }).click();
@@ -208,8 +207,8 @@ for (const revoke of [false, true]) {
             ),
           ).toBeVisible();
           await expect(page.getByLabel("已授权资料文本", { exact: true })).toHaveValue(sourceText);
-          await expect(page.getByLabel("来源引用", { exact: true })).toHaveValue(
-            "source-synthetic-browser-access",
+          await expect(page.getByRole("combobox", { name: "信息来源", exact: true })).toContainText(
+            "SYNTHETIC action source",
           );
           await expect(
             page.getByRole("button", { name: "生成待审核草稿", exact: true }),

@@ -173,7 +173,7 @@ export function WorkspaceLibrary({
                   <p className="break-words font-medium">{record.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {recordKindLabels[record.kind]} · {record.projectTitle}
-                    {record.relation !== "owned" ? " · 引用资料，只读" : ""}
+                    {record.relation !== "owned" ? " · 来自其他项目，只读" : ""}
                   </p>
                 </div>
                 <Badge variant="outline">{record.statusLabel}</Badge>

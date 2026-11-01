@@ -278,7 +278,8 @@ test("inbound history suggestions preserve manual edits and require a separate R
     page.getByText("可向客户补问：What is the destination country or port?", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("目的地国家或港口", { exact: true }).fill("Human Confirmed Port");
-  await page.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+  await page.getByLabel("客户需求来源", { exact: true }).click();
+  await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await page.getByRole("button", { name: "保存询盘", exact: true }).click();
   await expect.poll(async () => (await readRfqs()).length).toBe(1);
   const [rfq] = await readRfqs();
@@ -399,7 +400,8 @@ test("expired delivery can be requested again through the authenticated UI witho
   await expect(
     page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel("请求证据", { exact: true }).filter({ visible: true }).fill(evidenceId);
+  await page.getByLabel("客户交期要求依据", { exact: true }).filter({ visible: true }).click();
+  await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await page.getByRole("button", { name: "申请工厂确认交期", exact: true }).click();
   const readLead = async () =>
     (
@@ -506,7 +508,8 @@ for (const inbound of [false, true]) {
     await form.getByLabel("包装要求", { exact: true }).fill("MOCK packaging");
     await form.getByLabel("客户期望交付", { exact: true }).fill("MOCK requested timing");
     await form.getByLabel("定制要求", { exact: true }).fill("MOCK customization");
-    await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+    await form.getByLabel("客户需求来源", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "保存询盘", exact: true }).click();
     await expect(form.getByText("请确认客户需要的产品类型。", { exact: true })).toBeVisible();
     await form.getByRole("combobox", { name: "产品类型", exact: true }).click();
@@ -535,10 +538,12 @@ for (const inbound of [false, true]) {
     await revise.getByLabel("客户期望交付", { exact: true }).fill("MOCK revised timing");
     await revise.getByLabel("数量", { exact: true }).fill("25");
     await revise.getByLabel("目的地国家或港口", { exact: true }).fill("MOCK destination");
-    await revise.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+    await revise.getByLabel("客户需求来源", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "保存补充资料", exact: true }).click();
     await expect.poll(async () => (await records("rfq"))[0].version).toBe(2);
-    await page.getByLabel("完整性确认凭据", { exact: true }).fill(evidenceId);
+    await page.getByLabel("需求确认依据", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "确认需求完整", exact: true }).click();
     await expect.poll(async () => (await records("rfq"))[0].state).toBe("RFQ_READY");
     const [readyRfq] = await records("rfq");
@@ -570,13 +575,14 @@ for (const inbound of [false, true]) {
     );
     for (const [label, value] of [
       ["单价", "12.50"],
-      ["报价依据", evidenceId],
-      ["MOQ", "10"],
+      ["最小起订量（MOQ）", "10"],
       ["交期（天）", "30"],
       ["付款条件", "MOCK terms; no real offer"],
     ]) {
       await quote.getByLabel(label, { exact: true }).fill(value);
     }
+    await quote.getByLabel("报价依据", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "创建报价并提交审核", exact: true }).click();
     await expect.poll(async () => (await records("quotation")).length).toBe(1);
     const [draft] = await records("quotation");
@@ -594,13 +600,15 @@ for (const inbound of [false, true]) {
     const staleDecision = stalePage
       .locator(`form#quote-decision-${draft.id}`)
       .filter({ visible: true });
-    await staleDecision.getByRole("combobox").click();
+    await staleDecision.getByRole("combobox", { name: "决定", exact: true }).click();
     await stalePage.getByRole("option", { name: "批准人工报价", exact: true }).click();
-    await staleDecision.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+    await staleDecision.getByLabel("审核依据", { exact: true }).click();
+    await stalePage.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     const decision = page.locator(`form#quote-decision-${draft.id}`).filter({ visible: true });
-    await decision.getByRole("combobox").click();
+    await decision.getByRole("combobox", { name: "决定", exact: true }).click();
     await page.getByRole("option", { name: "退回人工报价", exact: true }).click();
-    await decision.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+    await decision.getByLabel("审核依据", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await decision.locator("textarea").fill("MOCK revision: adjust simulated price");
     await page.getByRole("button", { name: "退回人工报价", exact: true }).click();
     await expect
@@ -608,7 +616,8 @@ for (const inbound of [false, true]) {
       .toBe("QUOTE_REVISION_REQUIRED");
     const revision = page.locator(`form#quotation-${draft.id}`).filter({ visible: true });
     await revision.getByLabel("单价", { exact: true }).fill("13.25");
-    await revision.getByLabel("报价依据", { exact: true }).fill(evidenceId);
+    await revision.getByLabel("报价依据", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "提交修订并再次送审", exact: true }).click();
     await expect
       .poll(async () => (await records("quotation"))[0].state)
@@ -650,9 +659,10 @@ for (const inbound of [false, true]) {
     expect(await auditQuery()).toEqual(beforeAudits);
     expect(await eventQuery()).toEqual(beforeEvents);
     await staleContext.close();
-    await decision.getByRole("combobox").click();
+    await decision.getByRole("combobox", { name: "决定", exact: true }).click();
     await page.getByRole("option", { name: "批准人工报价", exact: true }).click();
-    await decision.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+    await decision.getByLabel("审核依据", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "批准人工报价", exact: true }).click();
     await expect.poll(async () => (await records("quotation"))[0].state).toBe("QUOTE_APPROVED");
     const [approved] = await records("quotation");
@@ -696,7 +706,7 @@ for (const inbound of [false, true]) {
     // Approval alone is not delivery. A simulated receipt is registered below.
     expect((await records("quotation"))[0].state).toBe("QUOTE_APPROVED");
     await send.getByLabel("发送渠道", { exact: true }).fill(channelRef);
-    await send.getByLabel("外部发送凭证", { exact: true }).fill(conversationId);
+    await send.getByLabel("平台消息编号或回执链接", { exact: true }).fill(conversationId);
     await quotationDetails.locator(`button[form="quote-send-${draft.id}"]`).click();
     await expect.poll(async () => (await records("quotation"))[0].state).toBe("QUOTE_SENT");
     await expect.poll(async () => (await records("lead")).length).toBe(1);
@@ -743,7 +753,7 @@ for (const inbound of [false, true]) {
     );
     await page.getByRole("link", { name: "继续客户跟进", exact: true }).click();
     await expect(page.getByRole("button", { name: "确认有效商机", exact: true })).toHaveCount(0);
-    await expect(page.getByText(/商机尚待确认：/)).toBeVisible();
+    await expect(page.getByText(/采购意向尚待确认/)).toBeVisible();
     const follow = page.locator(`form#follow-up-${lead.id}`).filter({ visible: true });
     await follow.getByRole("combobox").click();
     await page.getByRole("option", { name: "询问交期", exact: true }).click();
@@ -751,7 +761,8 @@ for (const inbound of [false, true]) {
       page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
     ).toBeDisabled();
     await page.getByRole("button", { name: "客户询问交期或样品", exact: true }).click();
-    await page.getByLabel("请求证据", { exact: true }).fill(evidenceId);
+    await page.getByLabel("客户交期要求依据", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "申请工厂确认交期", exact: true }).click();
     await expect.poll(async () => (await records("delivery_confirmation")).length).toBe(1);
     const [delivery] = await records("delivery_confirmation");
@@ -765,10 +776,11 @@ for (const inbound of [false, true]) {
     await discard.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/records/delivery/${delivery.id}$`));
     const deliveryForm = page.locator(`form#delivery-${delivery.id}`).filter({ visible: true });
-    await deliveryForm.getByRole("combobox").click();
+    await deliveryForm.getByRole("combobox", { name: "决定", exact: true }).click();
     await page.getByRole("option", { name: "确认交期", exact: true }).click();
     await deliveryForm.getByLabel("确认交期（天）", { exact: true }).fill("21");
-    await deliveryForm.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+    await deliveryForm.getByLabel("审核依据", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "确认人工交期", exact: true }).click();
     await expect
       .poll(async () => (await records("delivery_confirmation"))[0].state)
@@ -792,7 +804,7 @@ for (const inbound of [false, true]) {
     await follow
       .getByLabel("待人工发送内容", { exact: true })
       .fill("MOCK reply: thank you for the inquiry. Synthetic test only.");
-    await follow.getByLabel("本次人工确认凭据", { exact: true }).fill(evidenceId);
+
     await page.getByRole("button", { name: "人工确认并发送此回复", exact: true }).click();
     await expect.poll(async () => (await records("lead"))[0].payload.score_band).toBe("HOT");
     const [job] = await db
@@ -811,7 +823,7 @@ for (const inbound of [false, true]) {
     expect(reply).toContain("21");
     expect(outbound.bodyCiphertext).not.toContain("MOCK reply");
     // Exercise every MVP context through the form and verify persisted outcomes.
-    // A fresh synthetic confirmation prevents idempotent replay of the first reply.
+    // Each successful reply gets a fresh automatic confirmation for its next submission.
     const scenarios = [
       ["quote_sent_unread", "报价未读", "wait_then_reference_quote_validity"],
       ["quote_sent_read_no_reply", "已读未回复", "ask_one_decision_blocking_question"],
@@ -821,26 +833,15 @@ for (const inbound of [false, true]) {
       ["asks_lead_time", "询问交期", "request_factory_delivery_confirmation"],
     ] as const;
     const queuedIds = new Set([job.id]);
+    const confirmationRefs = new Set<string>();
     for (const [scenario, label, expectedAction] of scenarios) {
       await test.step(`persist follow-up context: ${scenario}`, async () => {
-        const confirmation = `evidence-mock-${randomUUID()}`;
-        await db.insert(schema.evidence).values({
-          id: confirmation,
-          classification: "internal",
-          blobKey: `synthetic/mock-follow-up-${confirmation}-not-a-real-blob`,
-          contentType: "text/plain",
-          sha256: createHash("sha256").update(confirmation).digest("hex"),
-          sizeBytes: 0,
-          sourceLabel: "MOCK follow-up confirmation — synthetic test only",
-          uploadedByType: "human",
-          uploadedById: actorId,
-        });
         await page.goto(`/workspace/${projectId}/records/lead/${lead.id}`);
         await follow.getByRole("combobox").click();
         await page.getByRole("option", { name: label, exact: true }).click();
         const draft = `MOCK ${scenario}: synthetic acceptance only.`;
         await follow.getByLabel("待人工发送内容", { exact: true }).fill(draft);
-        await follow.getByLabel("本次人工确认凭据", { exact: true }).fill(confirmation);
+
         await page.getByRole("button", { name: "人工确认并发送此回复", exact: true }).click();
         await expect
           .poll(async () => {
@@ -887,9 +888,15 @@ for (const inbound of [false, true]) {
           expect.objectContaining({
             context: scenario,
             browser_job_id: outboundId,
-            confirmation_ref: confirmation,
+            confirmation_ref: expect.stringMatching(/^source-confirmation-[0-9a-f-]{36}$/),
           }),
         );
+        const confirmation = String(
+          audits.find((item) => item.metadata?.browser_job_id === outboundId)?.metadata
+            ?.confirmation_ref,
+        );
+        expect(confirmationRefs.has(confirmation)).toBe(false);
+        confirmationRefs.add(confirmation);
         await page.reload();
         await expect(follow.getByRole("combobox").locator('[data-slot="select-value"]')).toHaveText(
           label,
@@ -897,7 +904,8 @@ for (const inbound of [false, true]) {
       });
     }
     expect(queuedIds.size).toBe(7);
-    await page.getByLabel("商机确认凭据", { exact: true }).fill(evidenceId);
+    await page.getByLabel("客户采购意向依据", { exact: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "确认有效商机", exact: true }).click();
     await expect.poll(async () => (await records("lead"))[0].state).toBe("OPPORTUNITY");
     const leadAudits = await db
@@ -935,7 +943,8 @@ test("stale RFQ form rejects after archival and owner can reopen", async ({
   await page.goto(`/workspace/${projectId}/new/rfq`);
   const form = page.locator("form#create-rfq").filter({ visible: true });
   await form.getByLabel("客户名称", { exact: true }).fill("SYNTHETIC stale form");
-  await form.getByLabel("录入证据", { exact: true }).fill(evidenceId);
+  await form.getByLabel("客户需求来源", { exact: true }).click();
+  await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await form.getByRole("combobox", { name: "产品类型", exact: true }).click();
   await page.getByRole("option", { name: "离合器套件", exact: true }).click();
   // Archive in another request after the browser has already obtained a writable form.

@@ -97,7 +97,7 @@ for (const { role, context: scenario, change } of cases)
       }
       const draft = "SYNTHETIC browser reply only";
       await form.getByLabel("待人工发送内容", { exact: true }).fill(draft);
-      await form.getByLabel("本次人工确认凭据", { exact: true }).fill(f.confirmationRef);
+
       const submit = page.locator(`button[form="follow-up-${f.leadId}"]`).filter({ visible: true });
       await expect(submit).toBeEnabled();
       const before = await snapshot();
@@ -216,9 +216,7 @@ for (const { role, context: scenario, change } of cases)
         await expect(form).toBeVisible();
         await expect(submit).toBeEnabled();
         await expect(form.getByLabel("待人工发送内容", { exact: true })).toHaveValue(draft);
-        await expect(form.getByLabel("本次人工确认凭据", { exact: true })).toHaveValue(
-          f.confirmationRef,
-        );
+        await expect(form.getByLabel("本次人工确认凭据")).toHaveCount(0);
         expect(await snapshot()).toEqual(before);
       }
     } finally {

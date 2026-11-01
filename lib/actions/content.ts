@@ -44,7 +44,7 @@ export async function createContentDraftAction(
     revalidateContentPaths(projectId, result.id);
     return {
       status: "success",
-      message: `内容草稿已创建（${result.id.slice(0, 8)}），仍需 Gate 01 人工审核。`,
+      message: `内容草稿已创建（${result.id.slice(0, 8)}），请等待人工审核。`,
       contentId: result.id,
     };
   } catch (error) {
@@ -57,7 +57,7 @@ export async function decideContentReviewAction(
   formData: FormData,
 ): Promise<ContentActionState> {
   const session = await authorizedActionSession("content:review");
-  if (!session) return { status: "error", message: "无权执行 Gate 01 内容审核。" };
+  if (!session) return { status: "error", message: "无权审核内容。" };
   const parsed = contentReviewFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success)
     return { status: "error", message: parsed.error.issues[0]?.message ?? "审核资料格式不正确。" };
@@ -80,8 +80,8 @@ export async function decideContentReviewAction(
       status: "success",
       message:
         result.state === "CONTENT_APPROVED"
-          ? "Gate 01 已批准，内容等待官方渠道发布。"
-          : "Gate 01 已退回，内容需要修订。",
+          ? "内容审核通过，可以安排发布。"
+          : "内容已退回，请修改后重新提交。",
     };
   } catch (error) {
     return { status: "error", message: contentReviewFailureMessage(error) };
@@ -121,7 +121,7 @@ export async function reviseContentDraftAction(
     revalidateContentPaths(projectId, parsedContentId.data);
     return {
       status: "success",
-      message: "内容修订已保存，并已重新提交 Gate 01 审核。",
+      message: "内容修改已保存并重新提交审核。",
       contentId: parsedContentId.data,
     };
   } catch (error) {

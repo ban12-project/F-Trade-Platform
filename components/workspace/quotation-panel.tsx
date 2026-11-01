@@ -55,6 +55,7 @@ import type { RfqEntry } from "@/lib/sales/store";
 import { workspaceCreateHref, workspaceRecordHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProductReference } from "@/lib/workspace/types";
 import { useWorkspaceDirty } from "./dirty-state";
+import { EvidenceSelectField } from "./evidence-select";
 import {
   SubmissionFeedback as Message,
   salesRecordStateLabel as stateLabel,
@@ -146,7 +147,7 @@ function QuotationForm({
                         `${item.formValues.customerName || productTypeLabel(item.productType)} · ${item.quantity ?? "数量待补"}`,
                       ]),
                     )}
-                    value={field.value}
+                    value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger
@@ -175,7 +176,7 @@ function QuotationForm({
               <FieldSet>
                 <FieldLegend>所选客户需求</FieldLegend>
                 <FieldDescription>
-                  以下是客户要求，不代表已核实产品事实或工厂承诺。请核对后填写报价。
+                  以下是客户要求，不代表已核实产品信息或工厂承诺。请核对后填写报价。
                 </FieldDescription>
                 <dl className="grid gap-3 text-sm">
                   {[
@@ -218,7 +219,7 @@ function QuotationForm({
                         `${item.internalSku} · ${item.productName}`,
                       ]),
                     )}
-                    value={field.value}
+                    value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger
@@ -266,7 +267,7 @@ function QuotationForm({
                   <FieldError errors={[form.formState.errors.currency]} />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.moq}>
-                  <FieldLabel htmlFor={`moq-${entry?.id ?? "new"}`}>MOQ</FieldLabel>
+                  <FieldLabel htmlFor={`moq-${entry?.id ?? "new"}`}>最小起订量（MOQ）</FieldLabel>
                   <Input
                     id={`moq-${entry?.id ?? "new"}`}
                     inputMode="numeric"
@@ -299,14 +300,14 @@ function QuotationForm({
                   <FieldLabel htmlFor={`quotation-source-${entry?.id ?? "new"}`}>
                     报价依据
                   </FieldLabel>
-                  <Input
+                  <EvidenceSelectField
+                    projectId={projectId}
+                    control={form.control}
+                    name="evidenceRef"
                     id={`quotation-source-${entry?.id ?? "new"}`}
-                    placeholder="evidence-quotation-001"
-                    aria-invalid={!!form.formState.errors.evidenceRef}
-                    {...form.register("evidenceRef")}
                   />
                   <FieldDescription>
-                    填写本次人工商业条款的依据引用；修订时重新填写。
+                    选择支持本次价格和交易条件的资料；修改报价时请重新选择。
                   </FieldDescription>
                   <FieldError errors={[form.formState.errors.evidenceRef]} />
                 </Field>
@@ -397,7 +398,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                 render={({ field }) => (
                   <Select
                     items={{ approved: "批准人工报价", rejected: "退回人工报价" }}
-                    value={field.value}
+                    value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger
@@ -419,11 +420,12 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
               <FieldError errors={[form.formState.errors.decision]} />
             </Field>
             <Field data-invalid={!!form.formState.errors.evidenceRef}>
-              <FieldLabel htmlFor={`quote-evidence-${entry.id}`}>审核证据</FieldLabel>
-              <Input
+              <FieldLabel htmlFor={`quote-evidence-${entry.id}`}>审核依据</FieldLabel>
+              <EvidenceSelectField
+                projectId={projectId}
+                control={form.control}
+                name="evidenceRef"
                 id={`quote-evidence-${entry.id}`}
-                {...form.register("evidenceRef")}
-                aria-invalid={!!form.formState.errors.evidenceRef}
               />
               <FieldError errors={[form.formState.errors.evidenceRef]} />
             </Field>
@@ -489,7 +491,7 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
       <CardHeader>
         <CardTitle>登记报价已发送</CardTitle>
         <CardDescription>
-          先在受控渠道完成发送，再用平台回执或脱敏消息引用登记；缺少凭证时不能进入已发送。
+          请先发送报价，再填写发送渠道和平台消息编号或回执链接，登记发送结果。
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -499,17 +501,17 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
               <FieldLabel htmlFor={`send-channel-${entry.id}`}>发送渠道</FieldLabel>
               <Input
                 id={`send-channel-${entry.id}`}
-                placeholder="sanitized-whatsapp"
+                placeholder="例如 WhatsApp 或电子邮件"
                 {...form.register("channelRef")}
                 aria-invalid={!!form.formState.errors.channelRef}
               />
               <FieldError errors={[form.formState.errors.channelRef]} />
             </Field>
             <Field data-invalid={!!form.formState.errors.externalRef}>
-              <FieldLabel htmlFor={`send-ref-${entry.id}`}>外部发送凭证</FieldLabel>
+              <FieldLabel htmlFor={`send-ref-${entry.id}`}>平台消息编号或回执链接</FieldLabel>
               <Input
                 id={`send-ref-${entry.id}`}
-                placeholder="evidence-message-001"
+                placeholder="填写发送记录中的消息编号或回执链接"
                 {...form.register("externalRef")}
                 aria-invalid={!!form.formState.errors.externalRef}
               />
@@ -598,7 +600,7 @@ export function QuotationPanel({
             <AlertDescription>
               {!ready.length
                 ? "客户需求确认完整后，才能填写正式报价。"
-                : "在下方引用已核实产品后，即可填写人工商业条款。"}
+                : "在下方添加已核实产品后，即可填写价格和交易条件。"}
             </AlertDescription>
             {!ready.length ? (
               <WorkspaceLink

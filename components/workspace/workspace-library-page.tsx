@@ -8,7 +8,7 @@ import { WorkspaceLibrary } from "./workspace-library";
 import { WorkspacePanelSkeleton } from "./workspace-loading-skeleton";
 
 const labels = {
-  products: ["产品资料", "查找、核验和维护有来源的产品事实。"],
+  products: ["产品资料", "查找、核验和维护有来源的产品信息。"],
   content: ["内容与发布", "查看内容版本、审核状态和发布回执。"],
   customers: ["客户与询盘", "从客户线索、需求确认到人工报价与跟进。"],
 };

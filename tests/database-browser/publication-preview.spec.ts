@@ -134,7 +134,7 @@ test("stale displayed preview cannot create a publication; refreshed preview con
     )
     .toBe(true);
   await expect(confirmation.getByText("SYNTHETIC preview one", { exact: true })).toBeVisible();
-  await confirmation.getByLabel("逐帖人工确认凭据").fill("evidence-synthetic-preview");
+
   await db
     .update(schema.aggregateRecord)
     .set({
@@ -155,7 +155,7 @@ test("stale displayed preview cannot create a publication; refreshed preview con
   await page.reload();
   await expect(confirmation).toHaveCount(1);
   await expect(confirmation.getByText("SYNTHETIC preview two", { exact: true })).toBeVisible();
-  await confirmation.getByLabel("逐帖人工确认凭据").fill("evidence-synthetic-preview-current");
+
   await submit.click();
   await expect
     .poll(async () => {

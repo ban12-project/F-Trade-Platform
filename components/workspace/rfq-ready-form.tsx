@@ -17,13 +17,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { initialSalesActionState } from "@/lib/action-states";
 import { submitRfqReadyAction } from "@/lib/actions/sales";
 import { rfqReadyFormSchema } from "@/lib/form-schemas";
 import { rfqMissingLabel } from "@/lib/sales/journey";
 import type { RfqEntry } from "@/lib/sales/store";
 import { useWorkspaceDirty } from "./dirty-state";
+import { EvidenceSelectField } from "./evidence-select";
 
 export function RfqReadyForm({ projectId, entry }: { projectId: string; entry: RfqEntry }) {
   const router = useRouter();
@@ -68,11 +68,12 @@ export function RfqReadyForm({ projectId, entry }: { projectId: string; entry: R
           })}
         >
           <Field data-invalid={!!form.formState.errors.evidenceRef}>
-            <FieldLabel htmlFor={`ready-${entry.id}`}>完整性确认凭据</FieldLabel>
-            <Input
+            <FieldLabel htmlFor={`ready-${entry.id}`}>需求确认依据</FieldLabel>
+            <EvidenceSelectField
+              projectId={projectId}
+              control={form.control}
+              name="evidenceRef"
               id={`ready-${entry.id}`}
-              {...form.register("evidenceRef")}
-              aria-invalid={!!form.formState.errors.evidenceRef}
             />
             <FieldError errors={[form.formState.errors.evidenceRef]} />
           </Field>

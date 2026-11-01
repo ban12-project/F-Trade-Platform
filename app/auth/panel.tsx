@@ -128,7 +128,7 @@ export function AuthPanel() {
             </Badge>
             <div className="flex flex-col gap-3">
               <p className="text-3xl font-semibold tracking-tight text-balance">
-                让证据成为工作流的起点。
+                从工厂资料到客户订单，逐步推进。
               </p>
               <p className="text-sm leading-6 text-primary-foreground/70">
                 产品事实需要来源，内容需要审核，报价与交期需要人工确认。

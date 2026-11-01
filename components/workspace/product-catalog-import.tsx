@@ -562,7 +562,7 @@ export function ProductCatalogImport({
       </CardContent>
       <CardFooter>
         <p className="text-sm text-muted-foreground">
-          目录抽取不会确认工程事实、报价或交期，也不会自动通过 Gate 01。
+          导入结果需要人工核实；正式报价和交期仍需负责人确认。
         </p>
       </CardFooter>
     </Card>

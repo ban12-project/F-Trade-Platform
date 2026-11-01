@@ -122,7 +122,7 @@ assert.equal(writes, 0);
 const upload = () => uploadProductEvidenceAction({ status: "idle", message: "" }, form);
 assert.deepEqual(await upload(), {
   status: "error",
-  message: "无法上传产品证据，请检查项目权限及上传回执。",
+  message: "无法保存资料，请确认项目权限后重新上传。",
 });
 evidenceFailure = new ProductUploadError("upload_unavailable");
 assert.deepEqual(await upload(), {
@@ -131,7 +131,7 @@ assert.deepEqual(await upload(), {
 });
 authorized = false;
 assert.deepEqual(await run(), { status: "error", message: "无权运行 Product Agent。" });
-assert.deepEqual(await upload(), { status: "error", message: "无权上传产品证据。" });
+assert.deepEqual(await upload(), { status: "error", message: "无权上传资料。" });
 console.log(
   "PASS actual product intake Actions redact unknown errors and map verified failures without writes",
 );

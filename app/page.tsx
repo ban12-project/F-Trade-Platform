@@ -73,7 +73,7 @@ export default function HomePage() {
                 {[
                   [BoxesIcon, "产品资料", "为每个字段保留来源", "PRODUCT_REVIEW_REQUIRED"],
                   [ShieldCheckIcon, "人工核验", "逐项确认工程事实", "HUMAN GATE"],
-                  [FileCheck2Icon, "内容草稿", "只引用已核验字段", "REVIEW REQUIRED"],
+                  [FileCheck2Icon, "内容草稿", "使用已核实的产品信息", "REVIEW REQUIRED"],
                 ].map(([Icon, title, description, status]) => {
                   const WorkflowIcon = Icon as typeof BoxesIcon;
                   return (
@@ -114,7 +114,7 @@ export default function HomePage() {
             >
               查看测试页面
             </Link>
-            <span>证据优先 · 人工可控</span>
+            <span>资料有依据 · 报价有人审</span>
           </div>
         </footer>
       </div>

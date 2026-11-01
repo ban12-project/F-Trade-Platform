@@ -64,6 +64,7 @@ import type { DeliveryConfirmationEntry, LeadEntry } from "@/lib/sales/closing-s
 import { salesNextActionLabels } from "@/lib/sales/journey";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
+import { EvidenceSelectField } from "./evidence-select";
 import {
   SubmissionFeedback as Message,
   salesRecordStateLabel as stateLabel,
@@ -168,7 +169,14 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form id={`follow-up-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
+        <form
+          id={`follow-up-${entry.id}`}
+          onSubmit={(event) => {
+            if (!form.getValues("confirmationRef"))
+              form.setValue("confirmationRef", `source-confirmation-${crypto.randomUUID()}`);
+            void form.handleSubmit(submit)(event);
+          }}
+        >
           <FieldSet disabled={pending || planPending}>
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.context}>
@@ -239,8 +247,10 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                 )
               ) : null}
               <FieldSet>
-                <FieldLegend>评分事实</FieldLegend>
-                <FieldDescription>只勾选本轮消息中有可观察证据的行为。</FieldDescription>
+                <FieldLegend>客户意向表现</FieldLegend>
+                <FieldDescription>
+                  只勾选客户在本轮沟通中明确表达或实际发生的行为。
+                </FieldDescription>
                 <FieldGroup>
                   {scoringRules.map(([id, label]) => (
                     <Field key={id} orientation="horizontal">
@@ -281,18 +291,6 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                   结果。
                 </FieldDescription>
                 <FieldError errors={[form.formState.errors.draft]} />
-              </Field>
-              <Field data-invalid={!!form.formState.errors.confirmationRef}>
-                <FieldLabel htmlFor={`confirmation-${entry.id}`}>本次人工确认凭据</FieldLabel>
-                <Input
-                  id={`confirmation-${entry.id}`}
-                  aria-invalid={!!form.formState.errors.confirmationRef}
-                  {...form.register("confirmationRef")}
-                />
-                <FieldDescription>
-                  每次发送使用一个脱敏证据引用；重复提交同一引用不会重复发送。
-                </FieldDescription>
-                <FieldError errors={[form.formState.errors.confirmationRef]} />
               </Field>
               <Field data-invalid={!!form.formState.errors.nextFollowUpAt}>
                 <FieldLabel htmlFor={`next-${entry.id}`}>下次跟进时间（可选）</FieldLabel>
@@ -491,11 +489,12 @@ function LeadActions({
                 <p className="text-sm text-destructive">上次未通过：{delivery.reviewNotes}</p>
               ) : null}
               <Field data-invalid={!!deliveryForm.formState.errors.evidenceRef}>
-                <FieldLabel htmlFor={`delivery-evidence-${entry.id}`}>请求证据</FieldLabel>
-                <Input
+                <FieldLabel htmlFor={`delivery-evidence-${entry.id}`}>客户交期要求依据</FieldLabel>
+                <EvidenceSelectField
+                  projectId={projectId}
+                  control={deliveryForm.control}
+                  name="evidenceRef"
                   id={`delivery-evidence-${entry.id}`}
-                  {...deliveryForm.register("evidenceRef")}
-                  aria-invalid={!!deliveryForm.formState.errors.evidenceRef}
                 />
                 <FieldError errors={[deliveryForm.formState.errors.evidenceRef]} />
               </Field>
@@ -533,11 +532,14 @@ function LeadActions({
               })}
             >
               <Field data-invalid={!!opportunityForm.formState.errors.evidenceRef}>
-                <FieldLabel htmlFor={`opportunity-evidence-${entry.id}`}>商机确认凭据</FieldLabel>
-                <Input
+                <FieldLabel htmlFor={`opportunity-evidence-${entry.id}`}>
+                  客户采购意向依据
+                </FieldLabel>
+                <EvidenceSelectField
+                  projectId={projectId}
+                  control={opportunityForm.control}
+                  name="evidenceRef"
                   id={`opportunity-evidence-${entry.id}`}
-                  {...opportunityForm.register("evidenceRef")}
-                  aria-invalid={!!opportunityForm.formState.errors.evidenceRef}
                 />
                 <FieldError errors={[opportunityForm.formState.errors.evidenceRef]} />
               </Field>
@@ -553,7 +555,7 @@ function LeadActions({
         </Card>
       ) : (
         <p className="text-sm text-muted-foreground">
-          商机尚待确认：继续记录有证据的客户行为，达到高意向条件后再由业务人员确认。
+          采购意向尚待确认。请继续记录客户的询价、样品和采购计划，满足条件后再确认商机。
         </p>
       )}
     </div>

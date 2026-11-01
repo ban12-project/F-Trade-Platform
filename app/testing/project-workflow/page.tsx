@@ -9,6 +9,7 @@ import {
 import { ContentCreatePanel } from "@/components/workspace/content-create-panel";
 import { ContentReview } from "@/components/workspace/content-review";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
+import { EvidenceChoicesProvider } from "@/components/workspace/evidence-select";
 import { ProductIntakePanel } from "@/components/workspace/product-intake-panel";
 import { ProductReview } from "@/components/workspace/product-review";
 import { RecordFrame } from "@/components/workspace/record-frame";
@@ -542,8 +543,12 @@ export default function ProjectWorkflowTestingPage({
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (
-    <Suspense fallback={null}>
-      <ProjectWorkflowFixture searchParams={searchParams} />
-    </Suspense>
+    <EvidenceChoicesProvider
+      options={[{ id: "evidence-synthetic-review", label: "合成审核记录.pdf" }]}
+    >
+      <Suspense fallback={null}>
+        <ProjectWorkflowFixture searchParams={searchParams} />
+      </Suspense>
+    </EvidenceChoicesProvider>
   );
 }

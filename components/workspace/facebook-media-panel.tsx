@@ -135,7 +135,7 @@ export function FacebookMediaPanel({
           </Field>
           {selected ? (
             <Alert>
-              <AlertTitle>最终载荷</AlertTitle>
+              <AlertTitle>发布内容</AlertTitle>
               <AlertDescription className="whitespace-pre-wrap">
                 {selected.preview}
                 <span className="block break-all">素材：{selected.mediaId}</span>

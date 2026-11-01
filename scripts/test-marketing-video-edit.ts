@@ -162,7 +162,7 @@ for (const text of ["OE 99999", "Diameter 300 mm", "Spline 10", "MOQ 1", "Lead t
 }
 const aiJsonSchema = z.toJSONSchema(marketingVideoAiDraftSchema);
 assert.equal(JSON.stringify(aiJsonSchema).includes('"oneOf"'), false);
-assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, ctaText: "MOQ 1" }), /核验事实/);
+assert.throws(() => marketingVideoDraftSchema.parse({ ...exact, ctaText: "MOQ 1" }), /已核实信息/);
 
 const shotCandidates: MarketingShotCandidate[] = [
   {

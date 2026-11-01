@@ -12,7 +12,7 @@ export async function uploadProductEvidenceAction(
 ): Promise<ProductEvidenceActionState> {
   try {
     const session = await authorizedActionSession("product:write");
-    if (!session) return { status: "error", message: "无权上传产品证据。" };
+    if (!session) return { status: "error", message: "无权上传资料。" };
     const projectId = z.uuid("项目标识无效。").parse(formData.get("projectId"));
     await claimDocumentUpload(
       { receiptId: formData.get("receiptId"), projectId, purpose: "evidence" },
@@ -23,11 +23,11 @@ export async function uploadProductEvidenceAction(
     } catch {
       /* The evidence transaction already committed. */
     }
-    return { status: "success", message: "证据已持久化并加入当前项目，可在字段选择器中使用。" };
+    return { status: "success", message: "资料已保存，可在来源资料列表中选择。" };
   } catch (error) {
     return {
       status: "error",
-      message: productIntakeFailureMessage(error, "无法上传产品证据，请检查项目权限及上传回执。"),
+      message: productIntakeFailureMessage(error, "无法保存资料，请确认项目权限后重新上传。"),
     };
   }
 }

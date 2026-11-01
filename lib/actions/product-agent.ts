@@ -95,7 +95,7 @@ export async function runProductAgentAction(
     revalidatePath(`/workspace/${projectId}`);
     return {
       status: "success",
-      message: `已生成待 Gate 01 审核草稿（${saved.id.slice(0, 8)}），每个事实均绑定可核查位置。`,
+      message: `已生成待审核产品草稿（${saved.id.slice(0, 8)}），可逐项查看来源并核实。`,
       productId: saved.id,
     };
   } catch (error) {

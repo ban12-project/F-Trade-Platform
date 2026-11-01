@@ -31,7 +31,7 @@ const creativeMarketingText = (maximum: number, tooLongMessage: string) =>
     .max(maximum, tooLongMessage)
     .refine(
       (value) => !protectedFactLanguage.test(value),
-      "创意文案不能包含工程或商业事实；请改用核验事实字段。",
+      "创意文案不能包含工程或商业事实；请改用已核实信息字段。",
     );
 
 const marketingVideoCreationShape = {

@@ -12,13 +12,13 @@ test("ProductMedia workspace exposes governed rights, review, and VideoReady sta
   await page.goto("/testing/product-media");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText("VideoReady", { exact: true })).toBeVisible();
-  await expect(page.getByText("登记可复用产品媒体", { exact: true })).toBeVisible();
+  await expect(page.getByText("可制作视频", { exact: true })).toBeVisible();
+  await expect(page.getByText("添加产品图片或视频", { exact: true })).toBeVisible();
   await expect(page.getByLabel("图片或视频")).toHaveAttribute("accept", /video\/mp4/);
   await expect(page.getByRole("checkbox", { name: "允许剪辑" })).not.toBeChecked();
   await expect(page.getByRole("checkbox", { name: "允许公开发布" })).not.toBeChecked();
   await expect(page.getByRole("checkbox", { name: "允许图生视频" })).not.toBeChecked();
-  await expect(page.getByRole("button", { name: "上传并登记待审媒体" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "上传素材并提交审核" })).toBeDisabled();
 
   const assetCard = page
     .locator('[data-slot="card"]')

@@ -59,7 +59,7 @@ async function ProjectDetails({ params, searchParams }: ProjectPageProps) {
             ]
           : [
               ["customers", "客户与询盘"],
-              ["products", "引用的产品"],
+              ["products", "关联的产品"],
             ]
         ).map(([path, label]) => (
           <WorkspaceLink

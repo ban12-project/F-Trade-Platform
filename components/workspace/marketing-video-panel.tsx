@@ -65,6 +65,7 @@ import type {
 } from "@/lib/video/store";
 import { workspaceRecordHref, workspaceReturnTo } from "@/lib/workspace/navigation";
 import { useWorkspaceDirtyState } from "./dirty-state";
+import { EvidenceSelect } from "./evidence-select";
 import { MarketingVideoCreateForm } from "./marketing-video-create-form";
 import { VideoReviewEvidenceCopies } from "./video-review-evidence-copies";
 import { WorkspaceLink } from "./workspace-link";
@@ -322,7 +323,7 @@ function ClipEditor({
                   >
                     <NativeSelectOption value="none">无字幕</NativeSelectOption>
                     <NativeSelectOption value="creative">创意文案</NativeSelectOption>
-                    <NativeSelectOption value="verified_fact">核验事实</NativeSelectOption>
+                    <NativeSelectOption value="verified_fact">已核实信息</NativeSelectOption>
                   </NativeSelect>
                   <FieldDescription>
                     事实字幕引用当前已核实的产品资料；修改事实请回到产品资料核实。
@@ -342,13 +343,13 @@ function ClipEditor({
                       }
                     />
                     <FieldDescription>
-                      仅写营销表达；工程和商业事实请使用“核验事实”。
+                      仅写营销表达；工程和商业事实请使用“已核实信息”。
                     </FieldDescription>
                   </Field>
                 ) : null}
                 {clip.caption.kind === "verified_fact" ? (
                   <Field>
-                    <FieldLabel htmlFor={`${clip.clipId}-caption-fact`}>事实字段</FieldLabel>
+                    <FieldLabel htmlFor={`${clip.clipId}-caption-fact`}>产品信息项</FieldLabel>
                     <NativeSelect
                       className="w-full"
                       id={`${clip.clipId}-caption-fact`}
@@ -366,7 +367,7 @@ function ClipEditor({
                       ))}
                     </NativeSelect>
                     <FieldDescription>
-                      成片使用已核实的产品事实，字幕中的事实文字不能直接改写。
+                      成片使用已核实的产品信息，字幕中的事实文字不能直接改写。
                     </FieldDescription>
                   </Field>
                 ) : null}
@@ -507,7 +508,7 @@ function EditVideo({
           />
           <Separator />
           <Field>
-            <FieldLabel htmlFor="video-cta">最后两秒 CTA</FieldLabel>
+            <FieldLabel htmlFor="video-cta">结尾两秒的咨询引导文案</FieldLabel>
             <Input
               id="video-cta"
               maxLength={40}
@@ -572,7 +573,7 @@ function EditVideo({
           <AlertTitle>保持私有测试</AlertTitle>
           <AlertDescription>
             该视频包含互联网检索素材，系统不会提供批准或下载操作。需要正式使用时，请换成已授权
-            ProductMedia。
+            产品素材。
           </AlertDescription>
         </Alert>
       ) : null}
@@ -585,16 +586,19 @@ function EditVideo({
         <Card>
           <CardHeader>
             <CardTitle>成片审核</CardTitle>
-            <CardDescription>核对画面、字幕、CTA 和产品事实后再决定。</CardDescription>
+            <CardDescription>
+              核对画面、字幕、引导客户咨询的文案和产品信息后再决定。
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Field>
-              <FieldLabel htmlFor="video-review-evidence">审核证据</FieldLabel>
-              <Input
+              <FieldLabel htmlFor="video-review-evidence">审核依据</FieldLabel>
+              <EvidenceSelect
+                projectId={projectId}
                 id="video-review-evidence"
-                placeholder="evidence-review-001"
+                videoId={entry.id}
                 value={reviewEvidence}
-                onChange={(event) => setReviewEvidence(event.target.value)}
+                onValueChange={setReviewEvidence}
               />
             </Field>
           </CardContent>

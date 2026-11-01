@@ -1,8 +1,10 @@
 import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
+import { hasPermission } from "@/lib/authz";
 import type { DatabaseTransaction } from "@/lib/db/client";
-import { session, workspaceProjectMember } from "@/lib/db/schema";
+import { session, user, workspaceProject, workspaceProjectMember } from "@/lib/db/schema";
+import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import {
   authorizeLockedProductAgentWrite,
   type ProductAgentWriteIdentity,
@@ -16,9 +18,33 @@ export async function authorizeDocumentUpload(
   tx: DatabaseTransaction,
   input: DocumentUploadIdentity,
   projectId: string,
+  purpose: string = "agent",
 ) {
   try {
-    const identity = await authorizeLockedProductAgentWrite(tx, input);
+    const identity =
+      purpose === "evidence" ? input : await authorizeLockedProductAgentWrite(tx, input);
+    if (purpose === "evidence") {
+      const [actor] = await tx
+        .select({ role: user.role, banned: user.banned, expiresAt: session.expiresAt })
+        .from(user)
+        .innerJoin(session, eq(session.userId, user.id))
+        .where(and(eq(user.id, input.actorId), eq(session.id, input.sessionId)))
+        .for("share");
+      if (
+        !actor ||
+        actor.banned ||
+        !hasPermission(actor.role, "product:write") ||
+        actor.expiresAt <= new Date()
+      )
+        throw new ProductDocumentAccessError();
+      await assertWorkspaceProjectAccess(projectId, input.actorId, "write", tx);
+      const [project] = await tx
+        .select({ kind: workspaceProject.kind })
+        .from(workspaceProject)
+        .where(eq(workspaceProject.id, projectId));
+      if (!project || !["marketing", "sales"].includes(project.kind))
+        throw new ProductDocumentAccessError();
+    }
     if (identity.projectId !== projectId) throw new ProductDocumentAccessError();
     const [membership] = await tx
       .select({ id: workspaceProjectMember.id })

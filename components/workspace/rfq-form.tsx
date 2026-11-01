@@ -49,6 +49,7 @@ import type { InquirySuggestion } from "@/lib/sales/inquiry-suggestions";
 import type { RfqEntry } from "@/lib/sales/store";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
+import { EvidenceSelectField } from "./evidence-select";
 import { useCreatedRecord } from "./use-created-record";
 import { WorkspaceLink } from "./workspace-link";
 
@@ -454,12 +455,12 @@ export function RfqForm({
               </FieldGroup>
             </FieldSet>
             <Field data-invalid={!!form.formState.errors.evidenceRef}>
-              <FieldLabel htmlFor={`${entry?.id ?? "new"}-evidence`}>录入证据</FieldLabel>
-              <Input
+              <FieldLabel htmlFor={`${entry?.id ?? "new"}-evidence`}>客户需求来源</FieldLabel>
+              <EvidenceSelectField
+                projectId={projectId}
+                control={form.control}
+                name="evidenceRef"
                 id={`${entry?.id ?? "new"}-evidence`}
-                placeholder="evidence-rfq-001"
-                {...form.register("evidenceRef")}
-                aria-invalid={!!form.formState.errors.evidenceRef}
               />
               <FieldError errors={[form.formState.errors.evidenceRef]} />
             </Field>

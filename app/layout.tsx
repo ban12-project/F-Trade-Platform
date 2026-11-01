@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     default: "F-Trade 工作台",
     template: "%s · F-Trade",
   },
-  description: "以证据为边界的离合器外贸工作流平台。",
+  description: "管理离合器产品资料、营销内容、客户询盘与报价。",
 };
 
 export const viewport: Viewport = {

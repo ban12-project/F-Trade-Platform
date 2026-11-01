@@ -19,10 +19,7 @@ export const authFormSchema = z.object({
 const privateReference = z
   .string()
   .trim()
-  .regex(
-    /^(?:source|evidence)-[a-z0-9][a-z0-9_-]{2,120}$/i,
-    "请填写脱敏的私有引用，例如 evidence-product-001。",
-  );
+  .regex(/^(?:source|evidence)-[a-z0-9][a-z0-9_-]{2,120}$/i, "请选择来源资料。");
 
 const optionalCatalogText = z.string().trim().max(240, "字段不能超过 240 个字符。");
 
@@ -93,9 +90,13 @@ export const productAgentRunFormSchema = z
   .superRefine((value, context) => {
     if (value.hasUpload) return;
     if (!value.sourceRef)
-      context.addIssue({ code: "custom", path: ["sourceRef"], message: "请填写来源引用。" });
+      context.addIssue({ code: "custom", path: ["sourceRef"], message: "请选择来源资料。" });
     if (!value.evidenceRef)
-      context.addIssue({ code: "custom", path: ["evidenceRef"], message: "请填写字段证据引用。" });
+      context.addIssue({
+        code: "custom",
+        path: ["evidenceRef"],
+        message: "请选择对应的来源文件。",
+      });
     if (value.sourceText.trim().length < 20)
       context.addIssue({
         code: "custom",
@@ -253,8 +254,8 @@ export const quotationDraftFormSchema = z.object({
   evidenceRef: privateReference,
   projectId: z.uuid("项目标识无效。"),
   quotationId: z.uuid("报价标识无效。").optional().or(z.literal("")),
-  rfqId: z.uuid("请选择 RFQ Ready。"),
-  productId: z.uuid("请选择 Product Ready 引用。"),
+  rfqId: z.uuid("请选择已确认完整的客户需求。"),
+  productId: z.uuid("请选择已核实的产品。"),
   unitPrice: positiveMoney,
   currency: z
     .string()
@@ -449,7 +450,7 @@ const videoText = z
 const videoReference = z
   .string()
   .trim()
-  .regex(/^(?:source|evidence|asset)-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写脱敏的私有来源引用。");
+  .regex(/^(?:source|evidence|asset)-[a-z0-9][a-z0-9_-]{2,120}$/i, "请选择主要来源资料。");
 
 export const videoProjectFormSchema = z.object({
   productId: z.uuid("产品记录标识无效。"),

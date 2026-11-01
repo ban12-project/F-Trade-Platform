@@ -38,10 +38,10 @@ test("verified captions remain server controlled", async ({ page }) => {
   await page.getByLabel("创意字幕").fill("OE 99999");
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(
-    page.getByText("创意文案不能包含工程或商业事实；请改用核验事实字段。"),
+    page.getByText("创意文案不能包含工程或商业事实；请改用已核实信息字段。"),
   ).toBeVisible();
   await page.getByLabel("字幕类型").first().selectOption("verified_fact");
-  await expect(page.getByLabel("事实字段")).toContainText("产品名称 · Verified clutch kit");
+  await expect(page.getByLabel("产品信息项")).toContainText("产品名称 · Verified clutch kit");
 });
 
 test("returning to the project protects an unsaved video draft", async ({ page }) => {
@@ -60,7 +60,7 @@ test("video workspace exposes upload and post-render review without generation c
   await page.goto("/testing/video-workspace");
   await page.goto("/testing/video-workspace?new=1");
   await expect(page.getByLabel("素材（1–3 个）")).toHaveAttribute("accept", /video\/mp4/);
-  await expect(page.getByLabel("素材权利证据")).toBeVisible();
+  await expect(page.getByLabel("素材使用授权证明")).toBeVisible();
   await expect(page.getByText("不会调用视频生成模型")).toBeVisible();
   await expect(page.getByRole("button", { name: /生成视频|模型配置|供应商/ })).toHaveCount(0);
 
@@ -96,15 +96,16 @@ test("read-only video keeps private downloads and hides review decisions", async
   await expect(page.getByRole("link", { name: "下载 MP4" })).toBeVisible();
   await page.goto("/testing/video-workspace?viewer=1&state=review");
   await expect(page.getByText("私有预览", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("审核证据")).toHaveCount(0);
+  await expect(page.getByLabel("审核依据")).toHaveCount(0);
 });
 
 test("review evidence is protected when leaving the selected video", async ({ page }) => {
   await page.goto("/testing/video-workspace?state=review");
-  await page.getByLabel("审核证据").fill("evidence-synthetic-unsaved-review");
+  await page.getByLabel("审核依据").click();
+  await page.getByRole("option", { name: "合成审核记录.pdf" }).click();
   await page.getByRole("link", { name: "返回内容与发布" }).click();
   const dialog = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "继续编辑" }).click();
-  await expect(page.getByLabel("审核证据")).toHaveValue("evidence-synthetic-unsaved-review");
+  await expect(page.getByLabel("审核依据")).toContainText("合成审核记录.pdf");
 });

@@ -18,13 +18,13 @@ test("product Gate 01 submits the displayed revision and approval request", asyn
   await page.goto("/testing/project-workflow?record=product&state=product-review");
   await page.waitForLoadState("networkidle");
   const detail = page.getByRole("region", { name: "业务记录", exact: true });
-  await expect(detail.getByText("产品事实与证据")).toBeVisible();
+  await expect(detail.getByText(/逐项核对产品信息与来源资料/)).toBeVisible();
   await expect(detail.getByText("产品核实决定", { exact: true })).toBeVisible();
   await expect(detail.getByText(/审核版本 1/)).toBeVisible();
   await expect(detail.getByRole("button", { name: "请先选择决定" })).toBeDisabled();
   await detail.getByRole("combobox").filter({ hasText: "请选择审核决定" }).press("ArrowDown");
-  await page.getByRole("option", { name: "批准产品事实", exact: true }).click();
-  await detail.getByRole("combobox", { name: "审核证据" }).press("ArrowDown");
+  await page.getByRole("option", { name: "批准产品信息", exact: true }).click();
+  await detail.getByRole("combobox", { name: "审核依据" }).press("ArrowDown");
   await page.getByRole("option", { name: /Synthetic review evidence/ }).click();
   // Capture the actual Action body without executing a business write or requiring a login.
   await page.route("**/testing/project-workflow?**", async (route) => {
@@ -34,7 +34,7 @@ test("product Gate 01 submits the displayed revision and approval request", asyn
   const request = page.waitForRequest(
     (request) => request.method() === "POST" && Boolean(request.headers()["next-action"]),
   );
-  await detail.getByRole("button", { name: "批准产品事实", exact: true }).click();
+  await detail.getByRole("button", { name: "批准产品信息", exact: true }).click();
   const body = (await request).postData() ?? "";
   expect(body).toMatch(/name="[^"\n]*reviewedVersion"\r?\n\r?\n1/);
   expect(body).toMatch(/name="[^"\n]*approvalId"\r?\n\r?\n00000000-0000-4000-8000-000000000302/);
@@ -242,7 +242,7 @@ for (const outcome of [
     if (!zeroAccepted) {
       await expect(progress.getByText("Synthetic streamed clutch", { exact: true })).toBeVisible();
       await expect(progress.getByText("来源校验通过 · 待人工审核", { exact: true })).toBeVisible();
-      await expect(progress.getByText("待补证据", { exact: true })).toBeVisible();
+      await expect(progress.getByText("待补资料", { exact: true })).toBeVisible();
       await expect(progress.getByText("校验失败", { exact: true })).toBeVisible();
     }
     await expect(page.getByRole("link", { name: "打开已保存草稿（新窗口）" })).toHaveAttribute(
@@ -313,5 +313,5 @@ test("customer delivery is optional and an ineligible opportunity is explained",
   await expect(delivery).toBeVisible();
   await expect(panel.getByText(/当前有效交期为 21 天/)).toBeVisible();
   await expect(panel.getByRole("button", { name: "确认有效商机", exact: true })).toHaveCount(0);
-  await expect(panel.getByText(/商机尚待确认：/)).toBeVisible();
+  await expect(panel.getByText(/采购意向尚待确认/)).toBeVisible();
 });

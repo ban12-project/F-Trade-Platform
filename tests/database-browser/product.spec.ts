@@ -215,8 +215,9 @@ test("authenticated browser reviews a mock product and its content through real 
   await form.getByLabel("产品名称", { exact: true }).fill(productName);
   await form.getByLabel("内部编号", { exact: true }).fill(sku);
   await form.getByLabel("OE / OEM 编号", { exact: true }).fill("MOCK-OE-BROWSER");
-  await form.getByLabel("来源引用", { exact: true }).fill("source-mock-browser");
-  for (const label of ["产品名称证据", "产品类型证据", "内部编号证据", "OE / OEM 编号证据"]) {
+  await form.getByLabel("主要来源资料", { exact: true }).click();
+  await page.getByRole("option", { name: /MOCK evidence/ }).click();
+  for (const label of ["产品名称来源", "产品类型来源", "内部编号来源", "OE / OEM 编号来源"]) {
     await form.getByLabel(label, { exact: true }).click();
     await page.getByRole("option", { name: /MOCK evidence/ }).click();
   }
@@ -300,13 +301,13 @@ test("authenticated browser reviews a mock product and its content through real 
   await page.reload();
   const review = page.locator('form[id$="-product-review"]').filter({ visible: true });
   await review.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "退回产品事实", exact: true }).click();
-  await review.getByLabel("审核证据", { exact: true }).click();
+  await page.getByRole("option", { name: "退回产品信息", exact: true }).click();
+  await review.getByLabel("审核依据", { exact: true }).click();
   await page.getByRole("option", { name: /MOCK evidence/ }).click();
   await review
     .locator('[id$="-product-review-notes"]')
     .fill("Synthetic source reference revision exercise.");
-  await page.getByRole("button", { name: "退回产品事实", exact: true }).click();
+  await page.getByRole("button", { name: "退回产品信息", exact: true }).click();
   await expect(page.locator('form[id$="-revise-product"]').filter({ visible: true })).toBeVisible();
   await expect(
     page
@@ -315,8 +316,9 @@ test("authenticated browser reviews a mock product and its content through real 
   ).toBeVisible();
   await page
     .locator('form[id$="-revise-product"]')
-    .getByLabel("来源引用", { exact: true })
-    .fill("source-mock-browser-revised");
+    .getByLabel("主要来源资料", { exact: true })
+    .click();
+  await page.getByRole("option", { name: /MOCK evidence/ }).click();
   await page.getByRole("button", { name: "提交修订并送审", exact: true }).click();
   await expect(review).toBeVisible();
   const rejectedApprovalId = pending.id;
@@ -326,8 +328,8 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(and(eq(schema.approval.aggregateId, created.id), eq(schema.approval.status, "pending")));
   expect(pending.id).not.toBe(rejectedApprovalId);
   await review.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "批准产品事实", exact: true }).click();
-  await review.getByLabel("审核证据", { exact: true }).click();
+  await page.getByRole("option", { name: "批准产品信息", exact: true }).click();
+  await review.getByLabel("审核依据", { exact: true }).click();
   await page.getByRole("option", { name: /MOCK evidence/ }).click();
   await review
     .locator('[id$="-product-review-notes"]')
@@ -337,7 +339,7 @@ test("authenticated browser reviews a mock product and its content through real 
       response.request().method() === "POST" &&
       Boolean(response.request().headers()["next-action"]),
   );
-  await page.getByRole("button", { name: "批准产品事实", exact: true }).click();
+  await page.getByRole("button", { name: "批准产品信息", exact: true }).click();
   expect((await reviewResponse).ok()).toBe(true);
   await expect
     .poll(
@@ -364,7 +366,7 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.aggregateRecord.id, created.id));
   expect(ready.version).toBe(4);
   expect(ready.payload).toMatchObject({
-    source_ref: "source-mock-browser-revised",
+    source_ref: evidenceId,
     verification_status: "verified",
     approval_ref: pending.id,
     product: {
@@ -476,21 +478,25 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.approval.aggregateId, contentDraft.id));
   expect(contentApproval.status).toBe("pending");
   await expect(page).toHaveURL(new RegExp(`/records/content/${contentDraft.id}(?:[?].*)?$`));
-  const contentReview = page.locator("form#content-review").filter({ visible: true });
+  const contentReview = page.locator("form[data-content-review]").filter({ visible: true });
   const staleContext = await browser.newContext({ baseURL });
   await staleContext.addCookies(await context.cookies());
   const stalePage = await staleContext.newPage();
   await stalePage.goto(`/workspace/${projectId}/records/content/${contentDraft.id}`);
-  const staleReview = stalePage.locator("form#content-review").filter({ visible: true });
-  await staleReview.getByRole("combobox").click();
+  const staleReview = stalePage.locator("form[data-content-review]").filter({ visible: true });
+  await staleReview.getByRole("combobox", { name: "决定", exact: true }).click();
   await stalePage.getByRole("option", { name: "批准营销内容", exact: true }).click();
-  await staleReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
-  await staleReview.locator("#content-review-notes").fill("Synthetic stale review attempt");
-  await contentReview.getByRole("combobox").click();
+  await staleReview.getByLabel("审核依据", { exact: true }).click();
+  await stalePage.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
+  await staleReview
+    .locator("[id^=content-review-][id$=-notes]")
+    .fill("Synthetic stale review attempt");
+  await contentReview.getByRole("combobox", { name: "决定", exact: true }).click();
   await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
-  await contentReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+  await contentReview.getByLabel("审核依据", { exact: true }).click();
+  await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await contentReview
-    .locator("#content-review-notes")
+    .locator("[id^=content-review-][id$=-notes]")
     .fill("Synthetic revision exercise: check the wording.");
   await page.getByRole("button", { name: "退回营销内容", exact: true }).click();
   await expect.poll(async () => (await contentQuery())[0].state).toBe("CONTENT_REVISION_REQUIRED");
@@ -558,11 +564,12 @@ test("authenticated browser reviews a mock product and its content through real 
       .where(eq(schema.workflowEvent.aggregateId, contentDraft.id)),
   ).toEqual(eventsBeforeStale);
   await staleContext.close();
-  await contentReview.getByRole("combobox").click();
+  await contentReview.getByRole("combobox", { name: "决定", exact: true }).click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
-  await contentReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+  await contentReview.getByLabel("审核依据", { exact: true }).click();
+  await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await contentReview
-    .locator("#content-review-notes")
+    .locator("[id^=content-review-][id$=-notes]")
     .fill("Synthetic test approval only; no real publication.");
   const contentReviewResponse = page.waitForResponse(
     (response) =>
@@ -576,7 +583,7 @@ test("authenticated browser reviews a mock product and its content through real 
   await expect(
     page.getByRole("region", { name: "业务记录" }).getByText("可安排发布", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator("form#content-review").filter({ visible: true })).toHaveCount(0);
+  await expect(page.locator("form[data-content-review]").filter({ visible: true })).toHaveCount(0);
   const [approvedContent] = await contentQuery();
   expect(approvedContent.version).toBe(4);
   expect(approvedContent.payload).toEqual({
@@ -630,9 +637,7 @@ test("authenticated browser reviews a mock product and its content through real 
   const publicationForm = page.locator("#publication-confirmation").filter({ visible: true });
   await expect(publicationForm).toBeVisible();
   await expect(publicationForm.getByText(revisedBody, { exact: true })).toBeVisible();
-  await publicationForm
-    .getByLabel("逐帖人工确认凭据")
-    .fill("evidence-synthetic-journey-confirmation");
+
   await page.getByRole("button", { name: "确认并提交此条发布", exact: true }).click();
   await expect(
     page.getByText("等待平台回执", { exact: true }).filter({ visible: true }),
@@ -733,7 +738,7 @@ test("authenticated browser reviews a mock product and its content through real 
     .from(schema.aggregateRecord)
     .where(eq(schema.aggregateRecord.id, targetA.id));
   await page.goto(`/workspace/${projectId}/records/content/${targetA.id}`);
-  await expect(page.locator("form#content-review").filter({ visible: true })).toBeVisible();
+  await expect(page.locator("form[data-content-review]").filter({ visible: true })).toBeVisible();
   await page.getByRole("link", { name: "返回清单", exact: true }).click();
   await expect(page).toHaveURL(`/workspace/content?project=${projectId}`);
   await page
@@ -741,10 +746,11 @@ test("authenticated browser reviews a mock product and its content through real 
     .getByRole("link", { name: /MOCK switching B/ })
     .click();
   await expect(page).toHaveURL(new RegExp(`/records/content/${targetB.id}(?:[?].*)?$`));
-  const switchingReview = page.locator("form#content-review").filter({ visible: true });
-  await switchingReview.getByRole("combobox").click();
+  const switchingReview = page.locator("form[data-content-review]").filter({ visible: true });
+  await switchingReview.getByRole("combobox", { name: "决定", exact: true }).click();
   await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
-  await switchingReview.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+  await switchingReview.getByLabel("审核依据", { exact: true }).click();
+  await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await page.getByRole("button", { name: "批准营销内容", exact: true }).click();
   await expect
     .poll(

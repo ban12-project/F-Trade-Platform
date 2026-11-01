@@ -71,6 +71,7 @@ import {
 } from "@/lib/video/upload-contracts";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
+import { EvidenceSelectField } from "./evidence-select";
 import { useCreatedRecord } from "./use-created-record";
 import { WorkspaceLink } from "./workspace-link";
 
@@ -305,7 +306,7 @@ export function MarketingVideoCreateForm({
       <Alert>
         <AlertTitle>需要已核验产品</AlertTitle>
         <AlertDescription>
-          先完成产品事实审核，再创建营销视频。
+          先完成产品信息审核，再创建营销视频。
           <WorkspaceLink
             className="underline underline-offset-4"
             href={`/workspace/products?project=${projectId}`}
@@ -403,7 +404,7 @@ export function MarketingVideoCreateForm({
               </FieldDescription>
             </Field>
             <Field data-invalid={Boolean(form.formState.errors.factPath)}>
-              <FieldLabel>字幕可引用的事实</FieldLabel>
+              <FieldLabel>可用于字幕的产品信息</FieldLabel>
               <Controller
                 control={form.control}
                 name="factPath"
@@ -418,7 +419,7 @@ export function MarketingVideoCreateForm({
                     value={field.value}
                     onValueChange={(value) => value && field.onChange(value)}
                   >
-                    <SelectTrigger aria-label="字幕可引用的事实" className="w-full">
+                    <SelectTrigger aria-label="可用于字幕的产品信息" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -554,12 +555,12 @@ export function MarketingVideoCreateForm({
                   </FieldDescription>
                 </Field>
                 <Field data-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}>
-                  <FieldLabel htmlFor="video-rights">素材权利证据</FieldLabel>
-                  <Input
+                  <FieldLabel htmlFor="video-rights">素材使用授权证明</FieldLabel>
+                  <EvidenceSelectField
+                    projectId={projectId}
+                    control={form.control}
+                    name="rightsEvidenceRef"
                     id="video-rights"
-                    placeholder="evidence-rights-001"
-                    aria-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}
-                    {...form.register("rightsEvidenceRef")}
                   />
                   <FieldError>{form.formState.errors.rightsEvidenceRef?.message}</FieldError>
                 </Field>

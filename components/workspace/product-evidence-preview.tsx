@@ -75,7 +75,7 @@ export function ProductEvidenceSources({ sources }: { sources: ProductEvidencePr
           ))
         ) : (
           <p className="text-sm text-muted-foreground">
-            当前项目中没有可打开的对应原件。请由资料编辑者核对来源归属或补充资料；现有证据引用仍保留在字段中。
+            暂时无法打开原文件，请联系资料上传者确认权限或补充文件。已保存的来源关联会保留。
           </p>
         )}
       </CardContent>

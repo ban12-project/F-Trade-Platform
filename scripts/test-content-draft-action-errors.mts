@@ -116,7 +116,7 @@ authorized = true;
 failure = undefined;
 assert.deepEqual(await run(), {
   status: "success",
-  message: "内容草稿已创建（syntheti），仍需 Gate 01 人工审核。",
+  message: "内容草稿已创建（syntheti），请等待人工审核。",
   contentId: "synthetic-content-id",
 });
 assert.equal(refreshes, 1);

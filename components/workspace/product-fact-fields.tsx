@@ -201,7 +201,7 @@ function EvidenceInput({
   disabled = false,
 }: {
   form: UseFormReturn<ProductValues>;
-  name: EvidenceFieldName;
+  name: EvidenceFieldName | "sourceRef";
   label: string;
   id: string;
   required?: boolean;
@@ -210,7 +210,10 @@ function EvidenceInput({
   const error = form.formState.errors[name];
   const options = useContext(EvidenceOptionsContext);
   const originalRef = form.formState.defaultValues?.[name];
-  const retainedRef = isProductEvidenceLocationRef(originalRef) ? originalRef : undefined;
+  const retainedRef =
+    isProductEvidenceLocationRef(originalRef) || (name === "sourceRef" && originalRef)
+      ? originalRef
+      : undefined;
   return (
     <Field data-invalid={Boolean(error)}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
@@ -233,16 +236,22 @@ function EvidenceInput({
                 {options.find((option) => option.id === field.value)
                   ? `${options.find((option) => option.id === field.value)!.sourceLabel} · ${field.value.slice(-8)}`
                   : field.value === retainedRef && retainedRef
-                    ? "保留原字段证据"
-                    : "选择已上传证据"}
+                    ? "保留原来源资料"
+                    : "选择已上传资料"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {retainedRef ? <SelectItem value={retainedRef}>保留原字段证据</SelectItem> : null}
+                {retainedRef ? <SelectItem value={retainedRef}>保留原来源资料</SelectItem> : null}
                 {options.map((option) => (
                   <SelectItem key={option.id} value={option.id}>
-                    {option.sourceLabel} · {option.classification} · {option.id.slice(-8)}
+                    {option.sourceLabel} ·{" "}
+                    {
+                      { internal: "内部资料", confidential: "保密资料", restricted: "受限资料" }[
+                        option.classification
+                      ]
+                    }{" "}
+                    · {option.id.slice(-8)}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -251,7 +260,9 @@ function EvidenceInput({
         )}
       />
       {!options.length && !retainedRef ? (
-        <FieldDescription>先通过智能导入上传资料，系统持久化后才能选择。</FieldDescription>
+        <FieldDescription>
+          请先通过智能导入或资料库上传文件，再选择对应的来源资料。
+        </FieldDescription>
       ) : null}
       <FieldError errors={[error]} />
     </Field>
@@ -316,31 +327,29 @@ export function ProductFields({
     <EvidenceOptionsContext.Provider value={evidenceOptions}>
       <div ref={rootRef} className="flex flex-col gap-5">
         <Progress value={completion}>
-          <ProgressLabel>事实与证据完成度</ProgressLabel>
+          <ProgressLabel>产品信息与来源填写进度</ProgressLabel>
           <ProgressValue />
         </Progress>
         {submitCount > 0 && errorEntries.length ? (
           <Alert variant="destructive" role="alert">
             <AlertTitle>还有 {errorEntries.length} 项需要处理</AlertTitle>
             <AlertDescription>
-              已定位到第一个错误。请逐项补全字段和对应证据后再次提交。
+              已定位到第一处未完成项。请补充信息和来源资料后再提交。
             </AlertDescription>
           </Alert>
         ) : null}
         <FieldSet>
-          <FieldLegend>批量应用同一证据</FieldLegend>
-          <FieldDescription>
-            先选择证据，再明确勾选目标字段。系统仍逐字段保存绑定，不会覆盖未选择字段。
-          </FieldDescription>
+          <FieldLegend>为多项信息选择同一份资料</FieldLegend>
+          <FieldDescription>选择来源资料，再勾选需要使用这份资料的产品信息。</FieldDescription>
           <FieldGroup>
             <Field>
-              <FieldLabel>证据</FieldLabel>
+              <FieldLabel>来源资料</FieldLabel>
               <Select
                 value={batchEvidence}
                 onValueChange={(value) => setBatchEvidence(value ?? "")}
               >
                 <SelectTrigger className="min-h-11 w-full">
-                  <SelectValue placeholder="选择已上传证据" />
+                  <SelectValue placeholder="选择已上传资料" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -384,8 +393,7 @@ export function ProductFields({
           <FieldSet>
             <FieldLegend>核心产品身份</FieldLegend>
             <FieldDescription>
-              每个事实必须绑定自己的私有证据；相同来源可以重复填写同一 evidence
-              引用，但系统不会自动复制。
+              每项产品信息都要选择来源资料。同一份资料支持多项信息时，可以重复选择。
             </FieldDescription>
             <FieldGroup>
               <FactPair>
@@ -401,7 +409,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="productNameEvidenceRef"
-                  label="产品名称证据"
+                  label="产品名称来源"
                   id={fieldId("product-name-evidence")}
                   required
                 />
@@ -456,7 +464,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="productTypeEvidenceRef"
-                  label="产品类型证据"
+                  label="产品类型来源"
                   id={fieldId("product-type-evidence")}
                   required
                 />
@@ -475,7 +483,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="internalSkuEvidenceRef"
-                  label="内部编号证据"
+                  label="内部编号来源"
                   id={fieldId("internal-sku-evidence")}
                   required
                 />
@@ -495,7 +503,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="oeNumbersEvidenceRef"
-                  label="OE / OEM 编号证据"
+                  label="OE / OEM 编号来源"
                   id={fieldId("oe-numbers-evidence")}
                 />
               </FactPair>
@@ -505,7 +513,7 @@ export function ProductFields({
           <FieldSet>
             <FieldLegend>适配信息</FieldLegend>
             <FieldDescription>
-              OE 缺失时，应用说明、车辆品牌和车型必须全部有值并分别绑定证据，才能通过 Gate 01。
+              没有 OE 编号时，请填写适配说明、车辆品牌和车型，并为每项选择来源资料。
             </FieldDescription>
             <FieldGroup>
               <FactPair>
@@ -521,7 +529,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="applicationEvidenceRef"
-                  label="适配说明证据"
+                  label="适配说明来源"
                   id={fieldId("application-evidence")}
                 />
               </FactPair>
@@ -538,7 +546,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="vehicleBrandEvidenceRef"
-                  label="车辆品牌证据"
+                  label="车辆品牌来源"
                   id={fieldId("vehicle-brand-evidence")}
                 />
               </FactPair>
@@ -555,7 +563,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="vehicleModelEvidenceRef"
-                  label="车型证据"
+                  label="车型来源"
                   id={fieldId("vehicle-model-evidence")}
                 />
               </FactPair>
@@ -564,7 +572,9 @@ export function ProductFields({
 
           <FieldSet>
             <FieldLegend>离合器规格</FieldLegend>
-            <FieldDescription>没有来源依据时，事实和对应证据都留空；AI 不能补齐。</FieldDescription>
+            <FieldDescription>
+              没有来源资料时，请将信息及来源都留空，待工厂确认后补充。
+            </FieldDescription>
             <FieldGroup>
               <FactPair>
                 <Field data-invalid={Boolean(form.formState.errors.clutchDiameterMm)}>
@@ -580,7 +590,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="clutchDiameterMmEvidenceRef"
-                  label="盘径证据"
+                  label="盘径来源"
                   id={fieldId("clutch-diameter-evidence")}
                 />
               </FactPair>
@@ -598,7 +608,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="splineCountEvidenceRef"
-                  label="花键数证据"
+                  label="花键数来源"
                   id={fieldId("spline-count-evidence")}
                 />
               </FactPair>
@@ -615,7 +625,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="splineSizeEvidenceRef"
-                  label="花键尺寸证据"
+                  label="花键尺寸来源"
                   id={fieldId("spline-size-evidence")}
                 />
               </FactPair>
@@ -632,7 +642,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="frictionMaterialEvidenceRef"
-                  label="摩擦材料证据"
+                  label="摩擦材料来源"
                   id={fieldId("friction-material-evidence")}
                 />
               </FactPair>
@@ -675,7 +685,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="kitContentsEvidenceRef"
-                  label="套件组成证据"
+                  label="套件组成来源"
                   id={fieldId("kit-contents-evidence")}
                   disabled={kitDisabled}
                 />
@@ -694,7 +704,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="grossWeightKgEvidenceRef"
-                  label="毛重证据"
+                  label="毛重来源"
                   id={fieldId("gross-weight-evidence")}
                 />
               </FactPair>
@@ -712,7 +722,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="netWeightKgEvidenceRef"
-                  label="净重证据"
+                  label="净重来源"
                   id={fieldId("net-weight-evidence")}
                 />
               </FactPair>
@@ -730,7 +740,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="packageSizeEvidenceRef"
-                  label="包装尺寸证据"
+                  label="包装尺寸来源"
                   id={fieldId("package-size-evidence")}
                 />
               </FactPair>
@@ -740,7 +750,7 @@ export function ProductFields({
           <FieldSet>
             <FieldLegend>商业信息</FieldLegend>
             <FieldDescription>
-              MOQ、交期、包装、定制和样品状态都会进入 ProductReady；不得根据经验或图片推断。
+              起订量、预计交期、包装、定制和样品情况都需要来源资料，不能仅凭经验或图片填写。
             </FieldDescription>
             <FieldGroup>
               <FactPair>
@@ -757,7 +767,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="moqEvidenceRef"
-                  label="最小起订量证据"
+                  label="最小起订量来源"
                   id={fieldId("moq-evidence")}
                 />
               </FactPair>
@@ -775,7 +785,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="estimatedLeadTimeDaysEvidenceRef"
-                  label="预计交期证据"
+                  label="预计交期来源"
                   id={fieldId("lead-time-evidence")}
                 />
               </FactPair>
@@ -792,7 +802,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="packagingEvidenceRef"
-                  label="包装方式证据"
+                  label="包装方式来源"
                   id={fieldId("packaging-evidence")}
                 />
               </FactPair>
@@ -810,7 +820,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="supportedCustomizationEvidenceRef"
-                  label="支持定制证据"
+                  label="支持定制来源"
                   id={fieldId("supported-customization-evidence")}
                 />
               </FactPair>
@@ -837,7 +847,7 @@ export function ProductFields({
                 <EvidenceInput
                   form={form}
                   name="sampleAvailableEvidenceRef"
-                  label="样品可用性证据"
+                  label="样品可用性来源"
                   id={fieldId("sample-available-evidence")}
                 />
               </FactPair>
@@ -847,18 +857,14 @@ export function ProductFields({
           <FieldSet>
             <FieldLegend>来源</FieldLegend>
             <FieldDescription>
-              来源引用标识整份资料；字段证据仍以上述逐项映射为准。
+              选择本产品的主要来源资料；各项参数仍需分别选择对应来源。
             </FieldDescription>
-            <Field data-invalid={Boolean(form.formState.errors.sourceRef)}>
-              <FieldLabel htmlFor={fieldId("source-ref")}>来源引用</FieldLabel>
-              <Input
-                id={fieldId("source-ref")}
-                placeholder="source-catalog-001"
-                aria-invalid={Boolean(form.formState.errors.sourceRef)}
-                {...form.register("sourceRef")}
-              />
-              <FieldError errors={[form.formState.errors.sourceRef]} />
-            </Field>
+            <EvidenceInput
+              form={form}
+              name="sourceRef"
+              label="主要来源资料"
+              id={fieldId("source-ref")}
+            />
           </FieldSet>
         </FieldGroup>
       </div>

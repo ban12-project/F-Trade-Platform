@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { reconcileVideoPublicationAction } from "@/lib/actions/publication-reconciliation";
 import { videoPublicationReconciliationSchema } from "@/lib/social/publication-reconciliation-schema";
+import { EvidenceSelectField } from "./evidence-select";
 
 export function VideoPublicationReconciliationForm({
   projectId,
@@ -64,15 +65,13 @@ export function VideoPublicationReconciliationForm({
         </Field>
         <Field data-invalid={!!form.formState.errors.evidenceRef}>
           <FieldLabel htmlFor={`video-receipt-evidence-${publicationId}`}>
-            私有核对依据编号
+            发布结果核对依据
           </FieldLabel>
-          <Input
+          <EvidenceSelectField
+            projectId={projectId}
+            control={form.control}
+            name="evidenceRef"
             id={`video-receipt-evidence-${publicationId}`}
-            placeholder="evidence-…"
-            autoComplete="off"
-            {...form.register("evidenceRef")}
-            aria-invalid={!!form.formState.errors.evidenceRef}
-            disabled={pending}
           />
           <FieldError errors={[form.formState.errors.evidenceRef]} />
         </Field>

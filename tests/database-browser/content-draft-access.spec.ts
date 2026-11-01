@@ -174,7 +174,7 @@ for (const change of [
       await expect(form.locator("#content-source-product [data-slot='select-value']")).toHaveText(
         `${draft.product.internal_sku} · ${draft.product.product_name}`,
       );
-      await form.getByRole("combobox", { name: "允许引用的产品事实", exact: true }).click();
+      await form.getByRole("combobox", { name: "可用于文案的产品信息", exact: true }).click();
       await page.getByRole("option", { name: /产品名称/ }).click();
       const fields = {
         objective: "#content-objective",

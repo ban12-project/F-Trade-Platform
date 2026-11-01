@@ -72,7 +72,7 @@ const hints: Hint[] = [
       "根据审核备注对照原件，填写产品名称、类型和编号，并为每个字段选择对应证据。没有依据的规格和商业条款保持空白；提交修订后重新审核。",
   },
   {
-    selector: "form#content-review",
+    selector: "form[data-content-review]",
     title: "审核当前内容版本",
     description:
       "检查文案是否与已核验产品一致，并记录审核依据。需要修改时先退回；修订后的版本需要重新审核。",

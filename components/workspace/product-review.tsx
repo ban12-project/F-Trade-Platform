@@ -150,7 +150,9 @@ export function ProductReview({
         <Card>
           <CardHeader>
             <CardTitle>{detail.productName}</CardTitle>
-            <CardDescription>产品事实与证据 · 逐项核对，缺少来源的事实保持待补充。</CardDescription>
+            <CardDescription>
+              逐项核对产品信息与来源资料；没有依据的信息请先补充资料。
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -210,7 +212,7 @@ export function ProductReview({
               ))}
             </div>
           ) : (
-            <p>未提供实物图片。后续内容可使用文字排版，不能以生成图补充产品事实。</p>
+            <p>未提供实物图片。后续内容可使用文字排版，不能以生成图补充产品信息。</p>
           )}
         </CardContent>
       </Card>
@@ -232,7 +234,7 @@ export function ProductReview({
                     name="decision"
                     render={({ field }) => (
                       <Select
-                        items={{ approved: "批准产品事实", rejected: "退回产品事实" }}
+                        items={{ approved: "批准产品信息", rejected: "退回产品信息" }}
                         value={field.value ?? null}
                         onValueChange={field.onChange}
                       >
@@ -245,8 +247,8 @@ export function ProductReview({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
-                            <SelectItem value="approved">批准产品事实</SelectItem>
-                            <SelectItem value="rejected">退回产品事实</SelectItem>
+                            <SelectItem value="approved">批准产品信息</SelectItem>
+                            <SelectItem value="rejected">退回产品信息</SelectItem>
                           </SelectGroup>
                         </SelectContent>
                       </Select>
@@ -291,7 +293,7 @@ export function ProductReview({
                   </Field>
                 ) : null}
                 <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                  <FieldLabel htmlFor={fieldId("product-review-evidence")}>审核证据</FieldLabel>
+                  <FieldLabel htmlFor={fieldId("product-review-evidence")}>审核依据</FieldLabel>
                   <Controller
                     control={form.control}
                     name="evidenceRef"
@@ -307,7 +309,7 @@ export function ProductReview({
                         >
                           <SelectValue>
                             {evidenceOptions.find((option) => option.id === field.value)
-                              ?.sourceLabel ?? "选择已上传证据"}
+                              ?.sourceLabel ?? "选择已上传资料"}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
@@ -353,9 +355,9 @@ export function ProductReview({
                 <XCircleIcon data-icon="inline-start" />
               )}
               {form.watch("decision") === "approved"
-                ? "批准产品事实"
+                ? "批准产品信息"
                 : form.watch("decision") === "rejected"
-                  ? "退回产品事实"
+                  ? "退回产品信息"
                   : "请先选择决定"}
             </Button>
             {state.message ? (

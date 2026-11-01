@@ -121,7 +121,9 @@ for (const { op, role, change } of cases)
           ? `/workspace/${f.projectId}/records/video/${f.videoId}`
           : `/workspace/${f.targetProjectId}/new/video`,
       );
-      const cta = page.getByLabel("最后两秒 CTA", { exact: true }).filter({ visible: true });
+      const cta = page
+        .getByLabel("结尾两秒的咨询引导文案", { exact: true })
+        .filter({ visible: true });
       if (op === "save") {
         await expect(cta).toBeVisible();
         await cta.click();
@@ -301,7 +303,9 @@ for (const op of ["create", "generate", "render"] as const) {
             ? `/workspace/${f.projectId}/new/video`
             : `/workspace/${f.projectId}/records/video/${f.videoId}`,
         );
-        const cta = page.getByLabel("最后两秒 CTA", { exact: true }).filter({ visible: true });
+        const cta = page
+          .getByLabel("结尾两秒的咨询引导文案", { exact: true })
+          .filter({ visible: true });
         if (op === "create") {
           const objective = page.getByLabel("视频目标", { exact: true });
           await objective.click();
@@ -432,16 +436,17 @@ for (const change of ["unchanged", "revoked", "demoted", "banned"] as const)
       await page.goto(`/workspace/${f.projectId}/records/product/${f.productId}`);
       const reviewForm = page
         .locator("form")
-        .filter({ has: page.getByLabel("审核证据", { exact: true }) });
-      const select = reviewForm.getByRole("combobox");
+        .filter({ has: page.getByLabel("审核依据", { exact: true }) });
+      const select = reviewForm.getByRole("combobox").first();
       await expect(select).toHaveCount(1);
       await select.click();
       await page.getByRole("option", { name: "批准素材", exact: true }).click();
-      const evidence = page.getByLabel("审核证据", { exact: true }).filter({ visible: true }),
+      const evidence = page.getByLabel("审核依据", { exact: true }).filter({ visible: true }),
         notes = page.getByLabel("审核备注", { exact: true }).filter({ visible: true });
-      await evidence.fill(f.decisionRef);
+      await evidence.click();
+      await page.locator(`[data-evidence-id="${f.decisionRef}"]`).filter({ visible: true }).click();
       await notes.fill("SYNTHETIC browser media approval");
-      await expect(evidence).toHaveValue(f.decisionRef);
+      await expect(evidence).toContainText("SYNTHETIC video review source");
       const button = page
         .getByRole("button", { name: "批准产品素材", exact: true })
         .filter({ visible: true });
@@ -495,7 +500,7 @@ for (const change of ["unchanged", "revoked", "demoted", "banned"] as const)
             { exact: true },
           ),
         ).toBeVisible();
-        await expect(evidence).toHaveValue(f.decisionRef);
+        await expect(evidence).toContainText("SYNTHETIC video review source");
         await expect(notes).toHaveValue("SYNTHETIC browser media approval");
         expect(await snapshot()).toEqual(before);
       }
