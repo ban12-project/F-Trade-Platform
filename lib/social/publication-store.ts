@@ -220,15 +220,21 @@ export async function listProjectPublicationData(
         )
         .orderBy(desc(socialPublication.createdAt))
     : [];
-  const publishedRefs = new Set(
+  // A confirmed preauthorization failure did not send anything. Keep its
+  // approved source available so the user can reach the retry composer.
+  // Any other attempt still blocks this source, even alongside a safe failure.
+  const blockedRefs = new Set(
     publications
-      .filter((item) => !(item.format === "text" && item.status === "paused"))
+      .filter(
+        (item) =>
+          !(item.format === "text" && item.status === "paused") &&
+          !(item.status === "failed" && isPublicationPreauthorizationFailure(item.failureCode)),
+      )
       .map((item) => item.contentRef),
   );
   const records = projectRecords.filter(
     ({ record }) =>
-      ["CONTENT_APPROVED", "VIDEO_APPROVED"].includes(record.state) &&
-      !publishedRefs.has(record.id),
+      ["CONTENT_APPROVED", "VIDEO_APPROVED"].includes(record.state) && !blockedRefs.has(record.id),
   );
   const ids = records.map(({ record }) => record.id);
   const approvals = ids.length

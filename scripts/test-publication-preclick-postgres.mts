@@ -8,6 +8,7 @@ import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as s from "../lib/db/schema";
 import { requeueUnsentFacebookMediaPublication } from "../lib/social/facebook-media-store";
 import { publicationFailureLabel } from "../lib/social/publication-presentation";
+import { listProjectPublicationData } from "../lib/social/publication-store";
 import { seedPublicationAccessFixture } from "../tests/fixtures/publication-access";
 
 const connection = process.env.FACEBOOK_PUBLICATION_TEST_DATABASE_URL;
@@ -108,6 +109,40 @@ try {
     );
     if (scenario === "diagnostic")
       assert.match(publicationFailureLabel(job.failureCode) ?? "", /无法识别公开发布选项/);
+    const preview = await listProjectPublicationData(f.projectId, db, f.contentId, f.actorId);
+    assert.equal(
+      preview.candidates.some((item) => item.id === f.contentId),
+      !uncertain,
+      `${scenario}: confirmed unsent content must retain its retry preview`,
+    );
+    if (scenario === "diagnostic") {
+      for (const status of ["submitted", "published", "unknown", "failed"]) {
+        const otherId = randomUUID();
+        await db.insert(s.socialPublication).values({
+          ...publication,
+          id: otherId,
+          browserJobId: null,
+          status,
+        });
+        const blocked = await listProjectPublicationData(f.projectId, db, f.contentId, f.actorId);
+        assert.equal(blocked.candidates.length, 0, `${status} history must still block retry`);
+        await db.delete(s.socialPublication).where(eq(s.socialPublication.id, otherId));
+      }
+      await db
+        .update(s.approval)
+        .set({ status: "rejected" })
+        .where(eq(s.approval.aggregateId, f.contentId));
+      assert.equal(
+        (await listProjectPublicationData(f.projectId, db, f.contentId, f.actorId)).candidates
+          .length,
+        0,
+        "retry must not bypass content approval",
+      );
+      await db
+        .update(s.approval)
+        .set({ status: "approved" })
+        .where(eq(s.approval.aggregateId, f.contentId));
+    }
     if (uncertain)
       await assert.rejects(
         db.transaction((tx) =>
