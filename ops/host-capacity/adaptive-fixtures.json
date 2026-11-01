@@ -78,11 +78,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "host",
-            "cpuPeakCores"
-          ],
+          "path": ["snapshot", "host", "cpuPeakCores"],
           "value": 3.2
         }
       ]
@@ -92,12 +88,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "heavy",
-            "cpuPeakCores"
-          ],
+          "path": ["snapshot", "workers", "heavy", "cpuPeakCores"],
           "value": 3
         }
       ]
@@ -107,11 +98,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "host",
-            "memorySomeAvg10"
-          ],
+          "path": ["snapshot", "host", "memorySomeAvg10"],
           "value": 6
         }
       ]
@@ -121,11 +108,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "host",
-            "memoryFullAvg10"
-          ],
+          "path": ["snapshot", "host", "memoryFullAvg10"],
           "value": 2
         }
       ]
@@ -135,9 +118,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "availableMb"
-          ],
+          "path": ["availableMb"],
           "value": 1800
         }
       ]
@@ -147,9 +128,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "memoryMb"
-          ],
+          "path": ["memoryMb"],
           "value": 3072
         }
       ]
@@ -159,12 +138,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "heavy",
-            "memoryPeakMb"
-          ],
+          "path": ["snapshot", "workers", "heavy", "memoryPeakMb"],
           "value": 5000
         }
       ]
@@ -174,12 +148,7 @@
       "allowed": true,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "light2",
-            "samples"
-          ],
+          "path": ["snapshot", "workers", "light2", "samples"],
           "value": 1
         }
       ]
@@ -189,11 +158,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "light2"
-          ],
+          "path": ["snapshot", "workers", "light2"],
           "remove": true
         }
       ]
@@ -203,10 +168,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "observedAt"
-          ],
+          "path": ["snapshot", "observedAt"],
           "value": 90
         }
       ]
@@ -216,10 +178,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "observedAt"
-          ],
+          "path": ["snapshot", "observedAt"],
           "value": 101
         }
       ]
@@ -229,10 +188,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "healthy"
-          ],
+          "path": ["snapshot", "healthy"],
           "value": false
         }
       ]
@@ -242,12 +198,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "heavy",
-            "oomKills"
-          ],
+          "path": ["snapshot", "workers", "heavy", "oomKills"],
           "value": 1
         }
       ]
@@ -257,11 +208,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "host",
-            "cpuPeakCores"
-          ],
+          "path": ["snapshot", "host", "cpuPeakCores"],
           "value": "low"
         }
       ]
@@ -271,9 +218,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "containers"
-          ],
+          "path": ["containers"],
           "value": [
             {
               "Id": "heavy",
@@ -305,11 +250,7 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "host",
-            "cpuCount"
-          ],
+          "path": ["snapshot", "host", "cpuCount"],
           "value": 8
         }
       ]
@@ -319,17 +260,11 @@
       "allowed": true,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "light2"
-          ],
+          "path": ["snapshot", "workers", "light2"],
           "remove": true
         },
         {
-          "path": [
-            "containers"
-          ],
+          "path": ["containers"],
           "value": [
             {
               "Id": "heavy",
@@ -365,17 +300,11 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "light2"
-          ],
+          "path": ["snapshot", "workers", "light2"],
           "remove": true
         },
         {
-          "path": [
-            "containers"
-          ],
+          "path": ["containers"],
           "value": [
             {
               "Id": "heavy",
@@ -411,36 +340,19 @@
       "allowed": false,
       "changes": [
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "heavy",
-            "samples"
-          ],
+          "path": ["snapshot", "workers", "heavy", "samples"],
           "value": 1
         },
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "light1",
-            "samples"
-          ],
+          "path": ["snapshot", "workers", "light1", "samples"],
           "value": 1
         },
         {
-          "path": [
-            "snapshot",
-            "workers",
-            "light2",
-            "samples"
-          ],
+          "path": ["snapshot", "workers", "light2", "samples"],
           "value": 1
         },
         {
-          "path": [
-            "cpuCores"
-          ],
+          "path": ["cpuCores"],
           "value": 1
         }
       ]
