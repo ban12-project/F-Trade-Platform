@@ -10,12 +10,14 @@ export const publishingBlockers = {
   disabled: "尚未允许发布，请在账号设置中允许发布。",
   offline: "发布服务未连接，请由管理员检查服务器连接。",
   configuration: "账号的固定网络出口尚未配置，请补全高级设置。",
-  capability: "当前服务没有发布执行能力；可人工接管核对页面，请由管理员配置发布执行器。",
-  scope: "发布页面审核未生效或已过期，请人工核对页面并更新发布执行授权。",
+  capability: "这个账号尚未接通发布。请打开“完成登录 / 处理异常”，连接页面后完成发布功能核对。",
+  scope: "这个账号的发布配置尚未生效或已过期。请打开接管页面，重新核对并让配置生效。",
 } as const;
 export type PublishingBlocker = keyof typeof publishingBlockers;
 export type PublishingAccount = {
   recoveryHref?: string;
+  textOnly?: boolean;
+  audience?: string;
   id: string;
   nodeId: string | null;
   name: string;
@@ -83,6 +85,16 @@ export function publishingAccountReadiness(
     loginState: account?.authState ?? "needs_login",
     credentialsSaved: !!account?.loginCiphertext,
     publicationEnabled: !!control?.enabled && control.circuitStatus === "active",
+    audience: state?.publicationScopes?.find(
+      (p) => p.channelRef === input.channelRef && p.accountRef === input.accountRef,
+    )?.audience,
+    textOnly:
+      state?.publicationScopes?.some(
+        (p) =>
+          p.channelRef === input.channelRef &&
+          p.accountRef === input.accountRef &&
+          p.textOnly === true,
+      ) ?? false,
     publicationPaused,
     blockers,
     ready: blockers.length === 0,

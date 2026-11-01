@@ -107,6 +107,9 @@ export function FacebookMediaPanel({
     ? `/api/publication-preview?${new URLSearchParams({ projectId, contentRef, format: selected.format, mediaId: selected.mediaId, ...(selected.captionContentRef ? { captionContentRef: selected.captionContentRef } : {}) })}`
     : "";
   const [previewFailed, setPreviewFailed] = useState(false);
+  const textOnlyTarget = accounts.some(
+    (a) => a.channelRef === targetChannel && a.accountRef === targetAccount && a.textOnly,
+  );
   const disabled = !form.formState.isReady || busy || !!publicationId || uncertain;
   useWorkspaceDirty(`media-publication:${contentRef}`, form.formState.isDirty && !publicationId);
   return (
@@ -121,7 +124,8 @@ export function FacebookMediaPanel({
         <form
           className="space-y-4"
           onSubmit={form.handleSubmit(async (values) => {
-            if (submitting.current || uncertain || publicationId || !selected) return;
+            if (submitting.current || uncertain || publicationId || !selected || textOnlyTarget)
+              return;
             submitting.current = true;
             setBusy(true);
             try {
@@ -249,7 +253,9 @@ export function FacebookMediaPanel({
           </Field>
           <Button
             type="submit"
-            disabled={disabled || previewFailed || !options.length || !target?.ready}
+            disabled={
+              textOnlyTarget || disabled || previewFailed || !options.length || !target?.ready
+            }
           >
             {busy ? "提交中…" : "确认并提交素材发布"}
           </Button>

@@ -94,7 +94,13 @@ export type FleetState = {
     automatic?: boolean;
   }>;
   inboxScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
-  publicationScopes?: Array<{ channelRef: string; accountRef: string; expiresAt: number }>;
+  publicationScopes?: Array<{
+    channelRef: string;
+    accountRef: string;
+    expiresAt: number;
+    textOnly?: boolean;
+    audience?: "Public" | "Friends" | "Only me";
+  }>;
   lastSeenAt: number;
   accounts: Account[];
   runs: Run[];
