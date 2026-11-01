@@ -437,15 +437,16 @@ for (const change of ["unchanged", "revoked", "demoted", "banned"] as const)
       const reviewForm = page
         .locator("form")
         .filter({ has: page.getByLabel("审核依据", { exact: true }) });
-      const select = reviewForm.getByRole("combobox");
+      const select = reviewForm.getByRole("combobox").first();
       await expect(select).toHaveCount(1);
       await select.click();
       await page.getByRole("option", { name: "批准素材", exact: true }).click();
       const evidence = page.getByLabel("审核依据", { exact: true }).filter({ visible: true }),
         notes = page.getByLabel("审核备注", { exact: true }).filter({ visible: true });
-      await evidence.fill(f.decisionRef);
+      await evidence.click();
+      await page.locator(`[data-evidence-id="${f.decisionRef}"]`).filter({ visible: true }).click();
       await notes.fill("SYNTHETIC browser media approval");
-      await expect(evidence).toHaveValue(f.decisionRef);
+      await expect(evidence).toContainText("SYNTHETIC video review source");
       const button = page
         .getByRole("button", { name: "批准产品素材", exact: true })
         .filter({ visible: true });
@@ -499,7 +500,7 @@ for (const change of ["unchanged", "revoked", "demoted", "banned"] as const)
             { exact: true },
           ),
         ).toBeVisible();
-        await expect(evidence).toHaveValue(f.decisionRef);
+        await expect(evidence).toContainText("SYNTHETIC video review source");
         await expect(notes).toHaveValue("SYNTHETIC browser media approval");
         expect(await snapshot()).toEqual(before);
       }

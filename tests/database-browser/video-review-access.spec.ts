@@ -51,13 +51,7 @@ for (const change of [
       "product wait expired",
     ].includes(change);
     const decision = change === "reject" ? "rejected" : "approved";
-    const evidenceRef =
-      change === "missing evidence" ? `evidence-synthetic-missing-${randomUUID()}` : f.decisionRef;
-    if (change === "foreign evidence")
-      await db
-        .update(schema.evidence)
-        .set({ uploadedById: f.ownerId })
-        .where(eq(schema.evidence.id, f.decisionRef));
+    const evidenceRef = f.decisionRef;
     const snapshot = async () => {
       const [videos, gates, workflows, audits, links, projects] = await Promise.all([
         db.select().from(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, f.videoId)),
@@ -98,12 +92,19 @@ for (const change of [
       const evidence = page.locator("#video-review-evidence").filter({ visible: true });
       await expect(evidence).toBeVisible();
       await evidence.click();
-      await evidence.fill(evidenceRef);
+      await page.locator(`[data-evidence-id="${evidenceRef}"]`).filter({ visible: true }).click();
+      if (change === "missing evidence")
+        await db.delete(schema.evidence).where(eq(schema.evidence.id, evidenceRef));
+      if (change === "foreign evidence")
+        await db
+          .update(schema.evidence)
+          .set({ uploadedById: f.ownerId })
+          .where(eq(schema.evidence.id, evidenceRef));
       const label = decision === "approved" ? "通过成片" : "退回修改";
       const submit = page
         .getByRole("button", { name: label, exact: true })
         .filter({ visible: true });
-      await expect(evidence).toHaveValue(evidenceRef);
+      await expect(evidence).toContainText("SYNTHETIC video review source");
       await expect(submit).toBeEnabled();
       const response = page.waitForResponse(
         (r) => r.request().method() === "POST" && Boolean(r.request().headers()["next-action"]),
@@ -158,7 +159,7 @@ for (const change of [
         await expect(
           page.getByText(message, { exact: true }).filter({ visible: true }),
         ).toBeVisible();
-        await expect(evidence).toHaveValue(evidenceRef);
+        await expect(evidence).toContainText("SYNTHETIC video review source");
         expect(await snapshot()).toEqual(before);
       } else {
         const message =

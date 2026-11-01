@@ -488,7 +488,7 @@ test("processing locks CTA and a failed job restores editing through a real pend
       }
       if (failureCode === "AI_DRAFT_SOURCE_INVALID") {
         await expect(
-          page.getByText("无法确认产品信息或素材授权，AI 初稿未保存。请核对来源后重试。", {
+          page.getByText("无法确认产品事实或素材授权，AI 初稿未保存。请核对来源后重试。", {
             exact: true,
           }),
         ).toBeVisible();

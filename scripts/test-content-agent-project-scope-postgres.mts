@@ -160,11 +160,11 @@ try {
   await deny(request({ projectId: undefined, productId: foreignProduct }), /项目/);
   await deny(request({ projectId: "", productId: foreignProduct }), /项目/);
   await deny(request({ projectId: "not-a-project", productId: foreignProduct }), /项目/);
-  await deny(request({ productId: foreignProduct }), /已核验/);
-  await deny(request({ productId: unlinkedProduct }), /已核验/);
+  await deny(request({ productId: foreignProduct }), /已审核通过/);
+  await deny(request({ productId: unlinkedProduct }), /已审核通过/);
   await deny(request({ projectId: foreignProject, productId: foreignProduct }), /权限/);
   await deny(request({ projectId: salesProject }), /营销项目/);
-  await deny(request({ factPath: "specifications.missing_fact" }), /已核验/);
+  await deny(request({ factPath: "specifications.missing_fact" }), /已审核通过/);
   actor = viewer;
   await deny(request(), /权限/);
   actor = outsider;
@@ -191,7 +191,7 @@ try {
     .update(schema.aggregateRecord)
     .set({ state: "PRODUCT_REVIEW_REQUIRED" })
     .where(eq(schema.aggregateRecord.id, product));
-  await deny(request(), /已核验/);
+  await deny(request(), /已审核通过/);
   await db
     .update(schema.aggregateRecord)
     .set({ state: "PRODUCT_READY" })
@@ -298,7 +298,7 @@ try {
       .update(schema.aggregateRecord)
       .set({ state: "PRODUCT_REVIEW_REQUIRED" })
       .where(eq(schema.aggregateRecord.id, product));
-  }, /已核验/);
+  }, /已审核通过/);
   await db
     .update(schema.aggregateRecord)
     .set({ state: "PRODUCT_READY" })
