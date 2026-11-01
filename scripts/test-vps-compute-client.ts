@@ -85,9 +85,10 @@ async function main() {
     await assert.rejects(createComputeRuntime(), /^Error: vps_runtime_request_failed$/);
     assert.equal(calls.length, before + 1, "Ambiguous create is not retried");
     process.env.COMPUTE_PROVIDER = "vercel";
-    await assert.rejects(createComputeRuntime(), /compute_provider_invalid/);
+    delete process.env.COMPUTE_SANDBOX_IMAGE;
+    await assert.rejects(createComputeRuntime(), /compute_sandbox_image_invalid/);
     await assert.rejects(VpsCompute.create(), /compute_provider_invalid/);
-    assert.equal(calls.length, before + 1, "Retired provider never creates compute");
+    assert.equal(calls.length, before + 1, "Invalid cloud configuration never falls back to VPS");
     process.env.COMPUTE_PROVIDER = "typo";
     assert.throws(vpsComputeEnabled, /compute_provider_invalid/);
     process.env.COMPUTE_PROVIDER = "vps";
@@ -98,7 +99,12 @@ async function main() {
     );
   } finally {
     globalThis.fetch = oldFetch;
-    for (const key of ["COMPUTE_PROVIDER", "VPS_RUNTIME_ORIGIN", "VPS_RUNTIME_TOKEN"]) {
+    for (const key of [
+      "COMPUTE_PROVIDER",
+      "VPS_RUNTIME_ORIGIN",
+      "VPS_RUNTIME_TOKEN",
+      "COMPUTE_SANDBOX_IMAGE",
+    ]) {
       if (saved[key] === undefined) delete process.env[key];
       else process.env[key] = saved[key];
     }

@@ -1,5 +1,7 @@
 # Sandbox migration scope superseded — 2026-11-01
 
+> Compute-only update (#801): the owner now requests Vercel Sandbox for document/media/render compute. See [the current compute decision](../../architecture/vercel-compute-return.md). The VPS browser decision remains in force; the report below records the earlier migration.
+
 Issue #332 requested moving the browser worker from VPS to Vercel Sandbox.
 Its latest body still describes the October 15 Sandbox checkpoint. That is
 historical evidence, not the current runtime target.

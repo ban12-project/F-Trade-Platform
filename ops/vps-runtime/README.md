@@ -1,5 +1,7 @@
 # VPS compute runtime
 
+> Compute-only update (#801): the owner now requests Vercel Sandbox for document/media/render compute. See [the current compute decision](../../docs/architecture/vercel-compute-return.md). The VPS browser decision remains in force; the report below records the earlier migration.
+
 The original deployment uses native Docker Compose and systemd for the broker;
 OpenShip manages its edge TLS route. In that deployment the broker listens on
 `127.0.0.1:9500` with `network_mode: host`; route `/v1/compute` and `/health` to

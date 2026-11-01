@@ -1,5 +1,7 @@
 # VPS 执行服务迁移与验收（#722）
 
+> Compute-only update (#801): the owner now requests Vercel Sandbox for document/media/render compute. See [the current compute decision](vercel-compute-return.md). The VPS browser decision remains in force; the report below records the earlier migration.
+
 状态：执行服务迁移、生产部署及旧云端资源退役已完成。记录日期：2026-11-01。
 
 实现见 PR #723；实际计算、私有存储与隔离证据见 `docs/testing/reports/vps-compute-20261101.md`。应用、数据库、Blob 和 Workflow 控制面仍保留在原平台，业务发布／DM 验收不因本次基础设施迁移自动通过。
