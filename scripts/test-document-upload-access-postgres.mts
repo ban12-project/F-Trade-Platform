@@ -78,6 +78,7 @@ mock.module("@vercel/blob/client", {
     },
   },
 });
+const { listEvidenceOptionsAction } = await import("../lib/actions/evidence-options");
 const { uploadProductEvidenceAction: action } = await import("../lib/actions/product-evidence");
 const { POST: signer } = await import("../app/api/product-documents/upload/route");
 const { claimDocumentUpload: claim, issueDocumentUploadReceipt: issue } = await import(
@@ -271,6 +272,24 @@ try {
       assert.deepEqual(await snapshot(f), { evidence: 1, links: 1, claimed: 1 });
       count++;
     }
+  // Sales projects may upload supporting documents, but cannot run product imports.
+  for (const role of ["user", "admin"]) {
+    const f = await fixture(role);
+    await revoke(f, "kind");
+    const r = await issue(payload(f), f, db);
+    assert.equal((await run(f, r.id)).status, "success");
+    await assert.rejects(() => issue(payload(f, "agent"), f, db));
+    const choices = await listEvidenceOptionsAction({ projectId: f.projectId });
+    assert.equal(choices.error, "");
+    assert.equal(choices.options.length, 1);
+    assert.equal(choices.options[0].label, "synthetic.csv");
+    assert.deepEqual(Object.keys(choices.options[0]).sort(), ["detail", "id", "label"]);
+    assert.equal((await listEvidenceOptionsAction({ projectId: randomUUID() })).options.length, 0);
+    assert.equal((await listEvidenceOptionsAction({ projectId: "invalid" })).options.length, 0);
+    await revoke(f, "viewer");
+    await assert.rejects(() => issue(payload(f), f, db));
+    count++;
+  }
   for (const change of [
     "revoked",
     "role",
@@ -280,7 +299,6 @@ try {
     "viewer",
     "removed",
     "archived",
-    "kind",
     "receipt-owner",
     "receipt-project",
     "receipt-purpose",
@@ -365,7 +383,7 @@ try {
           [f.projectId],
         );
       await held.query("COMMIT");
-      assert.equal((await pending).status, 400);
+      assert.equal((await pending).status, change === "kind" ? 200 : 400);
       count++;
     } finally {
       await held.query("ROLLBACK");

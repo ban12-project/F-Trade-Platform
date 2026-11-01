@@ -242,7 +242,7 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
               <FieldError errors={[form.formState.errors.model]} />
             </Field>
             <Field data-invalid={!!form.formState.errors.baseUrl}>
-              <FieldLabel htmlFor="agent-base-url">Base URL</FieldLabel>
+              <FieldLabel htmlFor="agent-base-url">服务地址（Base URL）</FieldLabel>
               <Controller
                 control={form.control}
                 name="baseUrl"
@@ -472,7 +472,7 @@ function AccountSettings({
     <Card>
       <CardHeader>
         <CardTitle>当前账号</CardTitle>
-        <CardDescription>Passkey 和登录状态属于个人账号，不进入项目流程。</CardDescription>
+        <CardDescription>管理个人登录状态和通行密钥。</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
@@ -517,7 +517,7 @@ function ChannelSettings() {
     <div className="flex flex-col gap-4">
       <Alert variant="destructive">
         <ShieldAlertIcon />
-        <AlertTitle>失败闭合</AlertTitle>
+        <AlertTitle>异常时暂停操作</AlertTitle>
         <AlertDescription>
           验证码、2FA、登录失效或结果不确定时必须暂停，不能自动重试。
         </AlertDescription>
@@ -525,18 +525,18 @@ function ChannelSettings() {
       <Card>
         <CardHeader>
           <CardTitle>社交渠道控制</CardTitle>
-          <CardDescription>启用或恢复不会绕过 Gate 01 和逐帖人工确认。</CardDescription>
+          <CardDescription>启用或恢复不会绕过 内容审核和每次发布前的人工确认。</CardDescription>
         </CardHeader>
         <CardContent>
           <form id="channel-settings" onSubmit={form.handleSubmit(submit)}>
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.channelRef}>
-                <FieldLabel htmlFor="channel-ref">渠道引用</FieldLabel>
+                <FieldLabel htmlFor="channel-ref">渠道名称</FieldLabel>
                 <Input id="channel-ref" {...form.register("channelRef")} />
                 <FieldError errors={[form.formState.errors.channelRef]} />
               </Field>
               <Field data-invalid={!!form.formState.errors.accountRef}>
-                <FieldLabel htmlFor="account-ref">账户引用</FieldLabel>
+                <FieldLabel htmlFor="account-ref">渠道账号</FieldLabel>
                 <Input id="account-ref" {...form.register("accountRef")} />
                 <FieldError errors={[form.formState.errors.accountRef]} />
               </Field>
@@ -566,8 +566,12 @@ function ChannelSettings() {
                 />
               </Field>
               <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                <FieldLabel htmlFor="channel-evidence">脱敏证据</FieldLabel>
-                <Input id="channel-evidence" {...form.register("evidenceRef")} />
+                <FieldLabel htmlFor="channel-evidence">操作原因或处理记录</FieldLabel>
+                <Input
+                  id="channel-evidence"
+                  placeholder="例如：已重新登录并完成人工检查"
+                  {...form.register("evidenceRef")}
+                />
                 <FieldError errors={[form.formState.errors.evidenceRef]} />
               </Field>
             </FieldGroup>

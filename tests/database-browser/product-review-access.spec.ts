@@ -47,7 +47,7 @@ for (const change of [
     const notes = "SYNTHETIC browser reviewer notes retained";
     const revoke = !change.startsWith("unchanged");
     const decision = change === "unchanged reject" ? "rejected" : "approved";
-    const label = decision === "approved" ? "批准产品事实" : "退回产品事实";
+    const label = decision === "approved" ? "批准产品信息" : "退回产品信息";
     const selectErrors: string[] = [];
     page.on("console", (message) => {
       if (
@@ -159,7 +159,7 @@ for (const change of [
       ).toBeDisabled();
       await form.getByRole("combobox", { name: "决定", exact: true }).click();
       await page.getByRole("option", { name: label, exact: true }).click();
-      await form.getByRole("combobox", { name: "审核证据", exact: true }).click();
+      await form.getByRole("combobox", { name: "审核依据", exact: true }).click();
       await page.getByRole("option", { name: /SYNTHETIC browser review source/ }).click();
       await form.locator('[id$="-product-review-notes"]').fill(notes);
       const submit = page
@@ -179,7 +179,7 @@ for (const change of [
         await pending;
         await expect(
           page
-            .getByRole("button", { name: "正在加载… 批准产品事实", exact: true })
+            .getByRole("button", { name: "正在加载… 批准产品信息", exact: true })
             .filter({ visible: true }),
         ).toBeDisabled();
         await expect
@@ -223,7 +223,7 @@ for (const change of [
         ).toHaveText(label);
         await expect(
           form
-            .getByRole("combobox", { name: "审核证据", exact: true })
+            .getByRole("combobox", { name: "审核依据", exact: true })
             .locator('[data-slot="select-value"]'),
         ).toHaveText("SYNTHETIC browser review source");
         await expect(submit).toBeEnabled();

@@ -65,16 +65,16 @@ export function ProductReferencePanel({
     <div className="flex flex-col gap-4">
       <div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">产品引用</Badge>
+          <Badge variant="secondary">关联产品</Badge>
           <Badge variant="outline">已核实产品</Badge>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          引用受控产品记录，不复制、不改写产品事实。
+          选择已核实的产品供当前销售项目使用，产品参数由原项目统一维护。
         </p>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>添加产品引用</CardTitle>
+          <CardTitle>添加已有产品</CardTitle>
           <CardDescription>选择已核实产品，作为当前客户报价的产品依据。</CardDescription>
         </CardHeader>
         <CardContent>
@@ -109,7 +109,7 @@ export function ProductReferencePanel({
         <CardFooter className="flex-col items-stretch gap-3">
           <Button disabled={pending || !effectiveSelectedId} onClick={link}>
             <LinkIcon data-icon="inline-start" />
-            引用到当前项目
+            添加到当前项目
           </Button>
           {message ? (
             <p className="text-sm text-muted-foreground" aria-live="polite">
@@ -120,7 +120,7 @@ export function ProductReferencePanel({
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>已引用产品</CardTitle>
+          <CardTitle>已关联产品</CardTitle>
         </CardHeader>
         <CardContent>
           {linked.length ? (
@@ -140,7 +140,7 @@ export function ProductReferencePanel({
                 <EmptyMedia variant="icon">
                   <FileSearchIcon />
                 </EmptyMedia>
-                <EmptyTitle>尚未引用产品</EmptyTitle>
+                <EmptyTitle>尚未添加产品</EmptyTitle>
                 <EmptyDescription>
                   RFQ 可先收集，但正式报价前必须由人工核对产品身份。
                 </EmptyDescription>

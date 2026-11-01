@@ -69,7 +69,7 @@ export async function registerProductMediaAction(
     revalidateProductMedia(value.projectId);
     return {
       status: "success",
-      message: "产品媒体已登记并完成技术探测，等待管理员审核权利与内容。",
+      message: "素材已上传，等待管理员核对使用授权和内容。",
       productId: value.productId,
       assetId: asset.id,
     };
@@ -112,7 +112,7 @@ export async function reviewProductMediaAction(
       message:
         asset.review.status === "approved"
           ? "产品媒体已批准，可按其授权范围进入营销视频。"
-          : "产品媒体已拒绝或撤销，不再进入 VideoReady。",
+          : "素材已拒绝或撤销，不能再用于制作视频。",
       productId: value.productId,
       assetId: asset.id,
     };

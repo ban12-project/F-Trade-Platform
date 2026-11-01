@@ -147,7 +147,7 @@ for (const operation of ["revise", "copy"] as const) {
   assert.deepEqual(
     await run(),
     operation === "revise"
-      ? { status: "success", message: "内容修订已保存，并已重新提交 Gate 01 审核。", contentId }
+      ? { status: "success", message: "内容修改已保存并重新提交审核。", contentId }
       : {
           status: "success",
           message: "已复制为当前项目的新待审草稿，原记录不会共享修改。",

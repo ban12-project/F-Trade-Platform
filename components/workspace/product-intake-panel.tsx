@@ -69,7 +69,7 @@ export function ProductIntakePanel({
           <CardHeader>
             <CardTitle>选择产品资料</CardTitle>
             <CardDescription>
-              先选择文件，再确认是单个产品资料还是包含多个产品的目录。文件会随导入自动保存为证据。
+              先选择文件，再确认是单个产品资料还是包含多个产品的目录。文件会随导入自动保存到资料库。
             </CardDescription>
           </CardHeader>
           <CardContent>

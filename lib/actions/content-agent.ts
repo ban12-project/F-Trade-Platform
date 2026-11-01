@@ -35,8 +35,7 @@ async function selectedProductFacts(projectId: string, productId: string, factPa
   const product = (await listReadyProductContentSources(projectId, productId))[0];
   const selected = product?.factOptions.find((fact) => fact.path === factPath);
   const productName = product?.factOptions.find((fact) => fact.path === "product.product_name");
-  if (!product || !selected || !productName)
-    throw new Error("只能引用仍处于 Product Ready 的已核验字段。");
+  if (!product || !selected || !productName) throw new Error("只能使用当前已审核通过的产品信息。");
   return [productName, selected]
     .filter((fact, index, facts) => facts.findIndex((other) => other.path === fact.path) === index)
     .map((fact) => ({ field: fact.path, value: fact.value, evidenceRef: fact.evidenceRef }));

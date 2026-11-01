@@ -50,7 +50,7 @@ export async function SalesRecord({ context }: { context: RecordContext }) {
       <RfqDetail projectId={projectId} entry={entry} leads={data.leads}>
         {related}
         {entry.state === "RFQ_READY" ? (
-          <Suspense fallback={<p>正在加载可引用产品</p>}>
+          <Suspense fallback={<p>正在加载可选产品</p>}>
             <ProductReferences context={context} />
           </Suspense>
         ) : null}

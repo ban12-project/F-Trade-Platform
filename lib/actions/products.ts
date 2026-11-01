@@ -65,7 +65,7 @@ export async function createProductCatalogDraftAction(
     revalidateProductPaths(projectId, result.id);
     return {
       status: "success",
-      message: `产品草稿已创建（${result.id.slice(0, 8)}）。每个事实均保留独立证据，仍需 Gate 01 人工核验。`,
+      message: `产品草稿已创建（${result.id.slice(0, 8)}）。已保存各项信息的来源资料，请等待人工核实。`,
       productId: result.id,
     };
   } catch {
@@ -82,7 +82,7 @@ export async function decideProductCatalogReviewAction(
 ): Promise<ProductActionState> {
   const session = await authorizedActionSession("product:review");
   if (!session) {
-    return { status: "error", message: "无权执行 Gate 01 审核。" };
+    return { status: "error", message: "无权审核产品资料。" };
   }
   const parsed = productReviewFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -107,8 +107,8 @@ export async function decideProductCatalogReviewAction(
       status: "success",
       message:
         result.state === "PRODUCT_READY"
-          ? "Gate 01 已批准，产品已进入 Ready。"
-          : "Gate 01 已退回，产品需要修订。",
+          ? "产品资料审核通过，可以用于制作内容和报价。"
+          : "产品资料已退回，请修改后重新提交。",
     };
   } catch (error) {
     return { status: "error", message: productReviewFailureMessage(error) };
@@ -161,7 +161,7 @@ export async function reviseProductCatalogDraftAction(
     revalidateProductPaths(projectId, parsedProductId.data);
     return {
       status: "success",
-      message: "修订及逐字段证据已保存，并重新提交 Gate 01 审核。",
+      message: "产品信息及来源资料已更新，并重新提交审核。",
       productId: parsedProductId.data,
     };
   } catch (error) {

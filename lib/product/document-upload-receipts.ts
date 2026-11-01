@@ -65,7 +65,12 @@ export async function assertDocumentUploadReceiptAccess(
   database: Database = getDatabase(),
 ) {
   return database.transaction(async (tx) => {
-    const authorization = await authorizeDocumentUpload(tx, identity, original.projectId);
+    const authorization = await authorizeDocumentUpload(
+      tx,
+      identity,
+      original.projectId,
+      original.purpose,
+    );
     if (original.ownerId !== authorization.identity.actorId) throw new ProductDocumentAccessError();
     const current = assertReceiptSnapshot(await lockReceipt(tx, original.id), original);
     if (current.evidenceId || authorization.expiresAt < original.expiresAt)
@@ -81,7 +86,12 @@ export async function issueDocumentUploadReceipt(
 ) {
   const value = documentUploadPayloadSchema.parse(input);
   return database.transaction(async (tx) => {
-    const authorization = await authorizeDocumentUpload(tx, identity, value.projectId);
+    const authorization = await authorizeDocumentUpload(
+      tx,
+      identity,
+      value.projectId,
+      value.purpose,
+    );
     const [row] = await tx
       .insert(productDocumentUploadReceipt)
       .values({
@@ -108,7 +118,12 @@ export async function claimDocumentUpload(
 ) {
   const value = documentUploadClaimSchema.parse(input);
   const row = await database.transaction(async (tx) => {
-    const authorization = await authorizeDocumentUpload(tx, identity, value.projectId);
+    const authorization = await authorizeDocumentUpload(
+      tx,
+      identity,
+      value.projectId,
+      value.purpose,
+    );
     const [receipt] = await tx
       .select()
       .from(productDocumentUploadReceipt)
@@ -130,7 +145,12 @@ export async function claimDocumentUpload(
         await new Promise((resolve) => setTimeout(resolve, 150));
         // Permission/expiry failures are outside the retry boundary.
         await database.transaction(async (tx) => {
-          const authorization = await authorizeDocumentUpload(tx, identity, value.projectId);
+          const authorization = await authorizeDocumentUpload(
+            tx,
+            identity,
+            value.projectId,
+            value.purpose,
+          );
           const current = assertReceiptSnapshot(await lockReceipt(tx, row.id), row);
           assertDocumentUploadDeadline(authorization.expiresAt, current.expiresAt);
         });
@@ -162,7 +182,12 @@ export async function claimDocumentUpload(
     throw new Error("无法核验私有文件，请重新上传。");
   })();
   const evidenceId = await database.transaction(async (tx) => {
-    const authorization = await authorizeDocumentUpload(tx, identity, value.projectId);
+    const authorization = await authorizeDocumentUpload(
+      tx,
+      identity,
+      value.projectId,
+      value.purpose,
+    );
     const actorId = authorization.identity.actorId;
     const current = assertReceiptSnapshot(await lockReceipt(tx, row.id), row);
     assertDocumentUploadDeadline(authorization.expiresAt, current.expiresAt);

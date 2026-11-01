@@ -41,6 +41,7 @@ import { decideDeliveryAction } from "@/lib/actions/closing";
 import { deliveryDecisionFormSchema } from "@/lib/form-schemas";
 import type { DeliveryConfirmationEntry } from "@/lib/sales/closing-store";
 import { useWorkspaceDirty } from "./dirty-state";
+import { EvidenceSelectField } from "./evidence-select";
 import {
   SubmissionFeedback as Message,
   salesRecordStateLabel as stateLabel,
@@ -80,7 +81,7 @@ function DeliveryDecision({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Gate 03 交期决定</CardTitle>
+        <CardTitle>确认交期</CardTitle>
         <CardDescription>系统不会预选决定；批准时必须填写人工确认的交期天数。</CardDescription>
       </CardHeader>
       <CardContent>
@@ -127,11 +128,12 @@ function DeliveryDecision({
               <FieldError errors={[form.formState.errors.leadTimeDays]} />
             </Field>
             <Field data-invalid={!!form.formState.errors.evidenceRef}>
-              <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核证据</FieldLabel>
-              <Input
+              <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核依据</FieldLabel>
+              <EvidenceSelectField
+                projectId={projectId}
+                control={form.control}
+                name="evidenceRef"
                 id={`delivery-decision-evidence-${entry.id}`}
-                {...form.register("evidenceRef")}
-                aria-invalid={!!form.formState.errors.evidenceRef}
               />
               <FieldError errors={[form.formState.errors.evidenceRef]} />
             </Field>
@@ -190,7 +192,7 @@ export function DeliveryPanel({
           <Badge variant="outline">人工核实</Badge>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          只有管理员确认且有证据的交期才能用于客户回复。
+          交期需有工厂依据，并经管理员确认后才能回复客户。
         </p>
       </div>
       {entries.length ? (

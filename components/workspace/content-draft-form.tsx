@@ -219,7 +219,9 @@ export function ContentDraftForm({
     <Card>
       <CardHeader>
         <CardTitle>{revising ? "修订内容草稿" : "新建待审内容"}</CardTitle>
-        <CardDescription>AI 只能使用所选的已核验事实；人工仍需检查文案和视觉说明。</CardDescription>
+        <CardDescription>
+          AI 只能使用所选的已已核实信息；人工仍需检查文案和视觉说明。
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -297,7 +299,7 @@ export function ContentDraftForm({
               />
             </Field>
             <Field data-invalid={!!form.formState.errors.factPath}>
-              <FieldLabel htmlFor="content-source-fact">允许引用的产品事实</FieldLabel>
+              <FieldLabel htmlFor="content-source-fact">可用于文案的产品信息</FieldLabel>
               <Controller
                 control={form.control}
                 name="factPath"

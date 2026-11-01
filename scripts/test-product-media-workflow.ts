@@ -116,6 +116,6 @@ rejectedWithoutReason.set("notes", "");
 assert.throws(() => parseProductMediaReviewFormData(rejectedWithoutReason), /必须填写原因/);
 
 review.set("evidenceRef", "https://example.com/review");
-assert.throws(() => parseProductMediaReviewFormData(review), /私有证据/);
+assert.throws(() => parseProductMediaReviewFormData(review), /请选择已保存的来源资料/);
 
 console.log("PASS ProductMedia forms bind uploads, rights, and review to server-safe inputs");

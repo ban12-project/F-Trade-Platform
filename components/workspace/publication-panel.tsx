@@ -18,8 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -157,7 +156,7 @@ export function PublicationPanel({
           <CardHeader>
             <CardTitle>确认并提交发布</CardTitle>
             <CardDescription>
-              核对最终载荷、渠道与账户。本次确认只授权这一条内容，不会授权后续自动发布。
+              核对发布内容、渠道与账户。本次确认只授权这一条内容，不会授权后续自动发布。
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -169,7 +168,14 @@ export function PublicationPanel({
                 </AlertDescription>
               </Alert>
             ) : null}
-            <form id="publication-confirmation" onSubmit={form.handleSubmit(submit)}>
+            <form
+              id="publication-confirmation"
+              onSubmit={(event) => {
+                if (!form.getValues("confirmationRef"))
+                  form.setValue("confirmationRef", `source-confirmation-${crypto.randomUUID()}`);
+                void form.handleSubmit(submit)(event);
+              }}
+            >
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.contentRef}>
                   <FieldLabel htmlFor="publication-content">已批准文字内容</FieldLabel>
@@ -180,7 +186,7 @@ export function PublicationPanel({
                 </Field>
                 {selected ? (
                   <Alert>
-                    <AlertTitle>最终载荷预览</AlertTitle>
+                    <AlertTitle>发布内容预览</AlertTitle>
                     <AlertDescription>{selected.preview}</AlertDescription>
                   </Alert>
                 ) : null}
@@ -223,18 +229,6 @@ export function PublicationPanel({
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                </Field>
-                <Field data-invalid={!!form.formState.errors.confirmationRef}>
-                  <FieldLabel htmlFor="publication-confirmation-ref">逐帖人工确认凭据</FieldLabel>
-                  <Input
-                    id="publication-confirmation-ref"
-                    aria-invalid={!!form.formState.errors.confirmationRef}
-                    {...form.register("confirmationRef")}
-                  />
-                  <FieldError errors={[form.formState.errors.confirmationRef]} />
-                  <FieldDescription>
-                    使用脱敏引用；重复提交同一凭据只会返回原任务。
-                  </FieldDescription>
                 </Field>
               </FieldGroup>
             </form>

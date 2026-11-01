@@ -190,7 +190,7 @@ test("HOT task opens its candidate, including legacy links, without unrelated le
   const panel = page.getByRole("region", { name: "业务记录" });
   await expect(panel.locator(`#follow-up-${hot}`)).toBeVisible();
   await expect(panel.locator(`#follow-up-${other}`)).toHaveCount(0);
-  await panel.getByLabel("商机确认凭据").fill("evidence-synthetic-task-navigation");
+  await expect(panel.getByRole("combobox", { name: "客户采购意向依据" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "确认有效商机", exact: true })).toBeEnabled();
   await page.goto(`/workspace/${id}?panel=lead&item=${hot}`);
   await expect(
@@ -642,7 +642,7 @@ test("object libraries retain project scope, reference ownership and stable reco
   await page.goForward();
   await expect(page).toHaveURL(new RegExp(`${product}(?:[?].*)?$`));
   await page.goto(`/workspace/products?project=${sales}`);
-  await expect(page.getByText(/引用资料，只读/).filter({ visible: true })).toBeVisible();
+  await expect(page.getByText(/来自其他项目，只读/).filter({ visible: true })).toBeVisible();
   await page
     .locator(`a[href^="/workspace/${sales}/records/product/${product}"]`)
     .filter({ visible: true })

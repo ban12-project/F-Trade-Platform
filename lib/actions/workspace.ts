@@ -65,7 +65,7 @@ export async function linkReadyProductToSalesProjectAction(
     refreshWorkspace();
     return {
       status: "success",
-      message: "已引用 Product Ready，不会复制或改写产品事实。",
+      message: "已添加已核实产品，产品信息由原项目统一维护。",
       projectId,
     };
   } catch (error) {

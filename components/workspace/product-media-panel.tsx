@@ -67,6 +67,7 @@ import {
   videoUploadBlobPath,
 } from "@/lib/video/upload-contracts";
 import { useWorkspaceDirty } from "./dirty-state";
+import { EvidenceSelectField } from "./evidence-select";
 
 const initialProductMediaActionState: ProductMediaActionState = {
   status: "idle",
@@ -97,9 +98,9 @@ const reviewLabels: Record<ProductMediaAsset["review"]["status"], string> = {
 
 function readinessLabel(status: VideoReadyAssessment["status"]) {
   return status === "ready"
-    ? "VideoReady"
+    ? "可制作视频"
     : status === "review_required"
-      ? "等待媒体审核"
+      ? "等待素材审核"
       : "暂不可制作视频";
 }
 
@@ -200,10 +201,9 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
   return (
     <Card>
       <CardHeader>
-        <CardTitle>登记可复用产品媒体</CardTitle>
+        <CardTitle>添加产品图片或视频</CardTitle>
         <CardDescription>
-          源文件先直传 Private Blob，再由 Sandbox 的 ffprobe
-          读取尺寸、时长、帧率和音轨。浏览器填写的技术参数不会被采信。
+          上传产品图片或视频，选择使用授权证明。系统会自动读取文件规格，审核通过后可用于制作营销视频。
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -345,11 +345,12 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
               </FieldDescription>
               <FieldGroup>
                 <Field data-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}>
-                  <FieldLabel htmlFor={`media-rights-${productId}`}>权利证据引用</FieldLabel>
-                  <Input
+                  <FieldLabel htmlFor={`media-rights-${productId}`}>素材使用授权证明</FieldLabel>
+                  <EvidenceSelectField
+                    projectId={projectId}
+                    control={form.control}
+                    name="rightsEvidenceRef"
                     id={`media-rights-${productId}`}
-                    placeholder="evidence-media-rights-001"
-                    {...form.register("rightsEvidenceRef")}
                   />
                   <FieldError errors={[form.formState.errors.rightsEvidenceRef]} />
                 </Field>
@@ -455,7 +456,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
           ) : (
             <UploadCloudIcon data-icon="inline-start" />
           )}
-          {uploading ? "上传中…" : pending ? "探测并登记中…" : "上传并登记待审媒体"}
+          {uploading ? "上传中…" : pending ? "探测并登记中…" : "上传素材并提交审核"}
         </Button>
         {uploadError ? (
           <p className="text-sm text-destructive" aria-live="polite">
@@ -554,16 +555,17 @@ function ReviewForm({
             <CircleAlertIcon />
             <AlertTitle>撤销已批准素材</AlertTitle>
             <AlertDescription>
-              撤销后该素材会立即退出 VideoReady。必须填写新证据和原因。
+              撤销后，该素材将无法继续用于制作视频。请选择新的审核依据并说明原因。
             </AlertDescription>
           </Alert>
         )}
         <Field data-invalid={Boolean(form.formState.errors.evidenceRef)}>
-          <FieldLabel htmlFor={`media-review-evidence-${asset.id}`}>审核证据</FieldLabel>
-          <Input
+          <FieldLabel htmlFor={`media-review-evidence-${asset.id}`}>审核依据</FieldLabel>
+          <EvidenceSelectField
+            projectId={projectId}
+            control={form.control}
+            name="evidenceRef"
             id={`media-review-evidence-${asset.id}`}
-            placeholder="evidence-media-review-001"
-            {...form.register("evidenceRef")}
           />
           <FieldError errors={[form.formState.errors.evidenceRef]} />
         </Field>
@@ -678,12 +680,12 @@ function AssetCard({
           ) : null}
         </div>
         <div className="text-xs text-muted-foreground">
-          <p>源证据：{asset.evidenceRef}</p>
-          <p>权利证据：{asset.rights.rightsEvidenceRef}</p>
+          <p>原始素材记录：{asset.evidenceRef}</p>
+          <p>授权证明：{asset.rights.rightsEvidenceRef}</p>
           {asset.rights.expiresAt ? (
             <p>授权到期：{formatRightsExpiry(asset.rights.expiresAt)}</p>
           ) : null}
-          {asset.review.evidenceRef ? <p>审核证据：{asset.review.evidenceRef}</p> : null}
+          {asset.review.evidenceRef ? <p>审核依据：{asset.review.evidenceRef}</p> : null}
         </div>
         {generative ? (
           <Alert>

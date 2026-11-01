@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { EvidenceChoicesProvider } from "@/components/workspace/evidence-select";
 import { FacebookPublicationPrerequisitesNotice } from "@/components/workspace/records/facebook-publication";
 import { VideoWorkspace } from "@/components/workspace/video-workspace";
 import type { MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
@@ -129,8 +130,12 @@ export default function VideoWorkspaceTestingPage({
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (
-    <Suspense fallback={null}>
-      <VideoWorkspaceFixture searchParams={searchParams} />
-    </Suspense>
+    <EvidenceChoicesProvider
+      options={[{ id: "evidence-synthetic-unsaved-review", label: "合成审核记录.pdf" }]}
+    >
+      <Suspense fallback={null}>
+        <VideoWorkspaceFixture searchParams={searchParams} />
+      </Suspense>
+    </EvidenceChoicesProvider>
   );
 }

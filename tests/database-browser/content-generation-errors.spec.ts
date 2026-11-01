@@ -180,7 +180,7 @@ test("ordinary editor receives safe AI errors through real Actions and can edit 
     await page.goto(`/workspace/${projectId}/new/content?product=${productId}`);
     const form = page.locator("form#create-content").filter({ visible: true });
     await expect(form).toBeVisible();
-    await form.getByRole("combobox", { name: "允许引用的产品事实", exact: true }).click();
+    await form.getByRole("combobox", { name: "可用于文案的产品信息", exact: true }).click();
     await page.getByRole("option", { name: "产品名称", exact: true }).click();
     const generate = form.getByRole("button", { name: /生成可编辑初稿/ });
     await form.getByLabel("营销目标", { exact: true }).fill("MOCK error verification");

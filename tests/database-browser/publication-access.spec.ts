@@ -73,17 +73,19 @@ for (const { op, role, change } of cases)
         op === "publish" ? "#publication-confirmation:visible" : "#channel-settings:visible",
       );
       await expect(form).toBeVisible();
-      const input = form.getByLabel(op === "publish" ? "逐帖人工确认凭据" : "脱敏证据", {
+      const input = form.getByLabel("操作原因或处理记录", {
         exact: true,
       });
       const value = "evidence-synthetic-browser-human-confirmation";
-      await input.click();
-      await input.clear();
-      await input.fill(value);
-      await expect(input).toHaveValue(value);
       if (op === "control") {
-        await form.getByLabel("渠道引用", { exact: true }).fill(f.channelRef);
-        await form.getByLabel("账户引用", { exact: true }).fill(f.accountRef);
+        await input.click();
+        await input.clear();
+        await input.fill(value);
+        await expect(input).toHaveValue(value);
+      }
+      if (op === "control") {
+        await form.getByLabel("渠道名称", { exact: true }).fill(f.channelRef);
+        await form.getByLabel("渠道账号", { exact: true }).fill(f.accountRef);
       }
       const submit = page.locator(
         `button[form="${op === "publish" ? "publication-confirmation" : "channel-settings"}"]:visible`,
@@ -145,7 +147,7 @@ for (const { op, role, change } of cases)
       await response;
       if (change !== "unchanged") {
         await expect(page.getByText(SOCIAL_HUMAN_ACCESS_MESSAGE, { exact: true })).toBeVisible();
-        await expect(input).toHaveValue(value);
+        if (op === "control") await expect(input).toHaveValue(value);
         await expect(submit).toBeEnabled();
         expect(await before()).toEqual(original);
       } else {

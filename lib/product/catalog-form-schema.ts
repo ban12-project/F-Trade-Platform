@@ -3,11 +3,11 @@ import { z } from "zod";
 const sourceReference = z
   .string()
   .trim()
-  .regex(/^(?:source|evidence)-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写脱敏的私有来源引用。");
+  .regex(/^(?:source|evidence)-[a-z0-9][a-z0-9_-]{2,120}$/i, "请选择主要来源资料。");
 const evidenceReference = z
   .string()
   .trim()
-  .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写脱敏的私有证据引用。");
+  .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请选择已保存的来源资料。");
 const optionalEvidenceReference = z.union([evidenceReference, z.literal("")]);
 const optionalCatalogText = z.string().trim().max(240, "字段不能超过 240 个字符。");
 const optionalPositiveDecimal = (label: string) =>
@@ -115,14 +115,14 @@ export const productCatalogFormSchema = z
         context.addIssue({
           code: "custom",
           path: [evidenceKey],
-          message: `${label}已填写，必须单独绑定证据引用。`,
+          message: `${label}已填写，请选择对应的来源资料。`,
         });
       }
       if (!hasFact && hasEvidence) {
         context.addIssue({
           code: "custom",
           path: [evidenceKey],
-          message: `${label}未填写，不能单独保留证据引用。`,
+          message: `${label}未填写，请同时清除对应的来源资料。`,
         });
       }
     }

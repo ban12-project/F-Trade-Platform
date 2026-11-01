@@ -80,7 +80,7 @@ for (const [label] of draftInputs) {
 
 for (const [label, option] of [
   ["产品", "SYN-002 · MOCK second product"],
-  ["允许引用的产品事实", "OE 编号"],
+  ["可用于文案的产品信息", "OE 编号"],
   ["内容类型", "工厂能力"],
 ] as const) {
   test(`generation rejects a draft after changing ${label}`, async ({ page }) => {

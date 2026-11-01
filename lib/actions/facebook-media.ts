@@ -58,7 +58,7 @@ export async function submitFacebookMediaAction(input: unknown) {
       ok: false as const,
       message: socialHumanFailureMessage(
         error,
-        "发布未提交。请检查素材权利、Gate 01、项目权限、私有文件和渠道状态。",
+        "发布未提交。请检查素材授权、内容审核结果、项目权限、文件和渠道状态。",
       ),
     };
   }

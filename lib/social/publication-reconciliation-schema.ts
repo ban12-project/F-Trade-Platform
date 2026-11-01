@@ -29,7 +29,7 @@ export const publicationReconciliationSchema = z
     evidenceRef: z
       .string()
       .trim()
-      .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写 evidence- 开头的私有核对依据编号。"),
+      .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请选择发布结果核对依据。"),
     confirmed: z.boolean().refine((value) => value, "请先核对账号、完整文案、受众和帖子链接。"),
   })
   .strict();
@@ -49,7 +49,7 @@ export const videoPublicationReconciliationSchema = z
     evidenceRef: z
       .string()
       .trim()
-      .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请填写 evidence- 开头的私有核对依据编号。"),
+      .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请选择发布结果核对依据。"),
     confirmed: z.boolean().refine((value) => value, "请核对原账号、视频画面、受众和 Reel 链接。"),
   })
   .strict();

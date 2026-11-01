@@ -164,11 +164,11 @@ assert.equal(attempts, beforeBoundary);
 form.set("projectId", projectId);
 assert.equal(refreshes, 0);
 authorized = false;
-assert.deepEqual(await run(), { status: "error", message: "无权执行 Gate 01 审核。" });
+assert.deepEqual(await run(), { status: "error", message: "无权审核产品资料。" });
 assert.equal(attempts, beforeBoundary);
 authorized = true;
 failure = undefined;
-assert.deepEqual(await run(), { status: "success", message: "Gate 01 已批准，产品已进入 Ready。" });
+assert.deepEqual(await run(), { status: "success", message: "产品资料审核通过，可以用于制作内容和报价。" });
 assert.equal(refreshes, 1);
 console.log(
   "PASS actual Gate 01 Action redacts unknown/private errors, preserves controlled guidance and forwards current identity",

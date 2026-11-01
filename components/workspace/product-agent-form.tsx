@@ -179,7 +179,7 @@ export function ProductAgentForm({
       <CardHeader>
         <CardTitle>从获授权资料导入</CardTitle>
         <CardDescription>
-          上传文件会自动持久化为证据；粘贴文本时必须选择一项已保存证据，结果仍需人工核实。
+          上传的文件会自动保存到资料库。粘贴文本时，请选择对应的来源文件；整理结果仍需人工核实。
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -279,7 +279,7 @@ export function ProductAgentForm({
               <p className="text-sm text-muted-foreground">
                 {source.file
                   ? `所选文件：${source.file.name}`
-                  : "请先在上方选择资料文件，或使用已有证据中的文本。"}
+                  : "请先在上方选择资料文件，或使用已有资料中的文本。"}
               </p>
             )}
             <Field data-invalid={!!form.formState.errors.imageFiles}>
@@ -307,28 +307,22 @@ export function ProductAgentForm({
             </Field>
             <Collapsible open={textSourceOpen} onOpenChange={setTextSourceOpen}>
               <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
-                改用已有证据中的文本
+                改用已有资料中的文本
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-4">
                 <FieldGroup>
-                  <Field data-invalid={!!form.formState.errors.sourceRef}>
-                    <FieldLabel htmlFor="agent-source">来源引用</FieldLabel>
-                    <Input
-                      id="agent-source"
-                      placeholder="source-catalog-001"
-                      {...form.register("sourceRef")}
-                    />
-                    <FieldError errors={[form.formState.errors.sourceRef]} />
-                  </Field>
                   <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                    <FieldLabel htmlFor="agent-evidence">字段证据</FieldLabel>
+                    <FieldLabel htmlFor="agent-evidence">信息来源</FieldLabel>
                     <Controller
                       control={form.control}
                       name="evidenceRef"
                       render={({ field }) => (
                         <Select
                           value={field.value ?? ""}
-                          onValueChange={(value) => field.onChange(value ?? "")}
+                          onValueChange={(value) => {
+                            field.onChange(value ?? "");
+                            form.setValue("sourceRef", value ?? "", { shouldValidate: true });
+                          }}
                           disabled={!textEvidenceOptions.length}
                         >
                           <SelectTrigger
@@ -338,7 +332,7 @@ export function ProductAgentForm({
                           >
                             <SelectValue>
                               {textEvidenceOptions.find((option) => option.id === field.value)
-                                ?.sourceLabel ?? "选择已上传证据"}
+                                ?.sourceLabel ?? "选择已上传资料"}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
@@ -413,7 +407,7 @@ export function ProductAgentForm({
                     {
                       waiting: "等待模型",
                       source_validated: "来源校验通过 · 待人工审核",
-                      needs_evidence: "待补证据",
+                      needs_evidence: "待补资料",
                       invalid: "校验失败",
                     }[field.status]
                   }

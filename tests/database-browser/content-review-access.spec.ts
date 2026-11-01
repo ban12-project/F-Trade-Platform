@@ -207,7 +207,8 @@ for (const change of [
           await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
         }
         if (change === "evidence navigation")
-          await form.getByLabel("审核证据", { exact: true }).fill(evidenceId);
+          await form.getByLabel("审核依据", { exact: true }).click();
+        await page.locator(`[data-evidence-id="${evidenceId}"]`).click();
         if (change === "notes navigation") await form.locator("#content-review-notes").fill(notes);
         if (change !== "untouched navigation")
           await page.waitForLoadState("networkidle", { timeout: 5_000 });
@@ -223,7 +224,7 @@ for (const change of [
           if (change === "decision navigation")
             await expect(form.locator('[data-slot="select-value"]')).toHaveText("退回营销内容");
           if (change === "evidence navigation")
-            await expect(form.getByLabel("审核证据", { exact: true })).toHaveValue(evidenceId);
+            await expect(form.getByLabel("审核依据", { exact: true })).toHaveValue(evidenceId);
           if (change === "notes navigation")
             await expect(form.locator("#content-review-notes")).toHaveValue(notes);
           expect(await snapshot()).toEqual(before);
@@ -239,7 +240,8 @@ for (const change of [
       }
       await form.getByRole("combobox", { name: "决定", exact: true }).click();
       await page.getByRole("option", { name: label, exact: true }).click();
-      await form.getByLabel("审核证据", { exact: true }).fill(reviewEvidence);
+      await form.getByLabel("审核依据", { exact: true }).click();
+      await page.locator(`[data-evidence-id="${reviewEvidence}"]`).click();
       await form.locator("#content-review-notes").fill(notes);
       const submit = page
         .getByRole("button", { name: label, exact: true })
@@ -307,7 +309,7 @@ for (const change of [
             .getByRole("combobox", { name: "决定", exact: true })
             .locator('[data-slot="select-value"]'),
         ).toHaveText(label);
-        await expect(form.getByLabel("审核证据", { exact: true })).toHaveValue(reviewEvidence);
+        await expect(form.getByLabel("审核依据", { exact: true })).toHaveValue(reviewEvidence);
         await expect(submit).toBeEnabled();
         expect(await snapshot()).toEqual(before);
       } else {

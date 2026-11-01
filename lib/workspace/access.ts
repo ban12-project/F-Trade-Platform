@@ -236,6 +236,7 @@ export async function listProjectEvidenceOptions(
   projectId: string,
   actorId: string,
   database: DatabaseExecutor = getDatabase(),
+  reviewVideoId?: string,
 ): Promise<EvidenceOption[]> {
   await assertWorkspaceProjectAccess(projectId, actorId, "view", database);
   const sourceLabel = sql<string>`coalesce(${productDocumentUploadReceipt.originalFilename}, ${evidence.sourceLabel})`;
@@ -271,7 +272,9 @@ export async function listProjectEvidenceOptions(
           evidence.createdAt,
           evidence.id,
         ),
-        sql`NOT EXISTS (SELECT 1 FROM video_review_working_evidence w WHERE w.evidence_id = ${evidence.id})`,
+        reviewVideoId
+          ? sql`NOT EXISTS (SELECT 1 FROM video_review_working_evidence w WHERE w.evidence_id = ${evidence.id} AND w.video_id <> ${reviewVideoId})`
+          : sql`NOT EXISTS (SELECT 1 FROM video_review_working_evidence w WHERE w.evidence_id = ${evidence.id})`,
         sql`${evidence.blobKey} NOT LIKE 'retired/%'`,
         or(
           eq(workspaceProjectEvidence.projectId, projectId),

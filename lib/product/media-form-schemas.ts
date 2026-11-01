@@ -10,7 +10,7 @@ import { productMediaRoleSchema } from "./video-readiness";
 const evidenceReferenceSchema = z
   .string()
   .trim()
-  .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "必须引用私有证据记录。");
+  .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "请选择已保存的来源资料。");
 
 const registrationShape = {
   projectId: z.uuid("项目标识无效。"),

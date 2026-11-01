@@ -107,8 +107,8 @@ export function ProductDraftForm({
         <CardTitle>{revising ? "修订产品草稿" : "手动新建产品草稿"}</CardTitle>
         <CardDescription>
           {revising
-            ? "只更正有来源依据的字段及其独立证据，提交后重新送交人工核实。"
-            : "每个事实独立绑定已持久化证据；保存后只创建待审核记录。"}
+            ? "根据来源资料更正产品信息，提交后重新审核。"
+            : "为每项产品信息选择来源资料，保存后交由负责人审核。"}
         </CardDescription>
       </CardHeader>
       <form

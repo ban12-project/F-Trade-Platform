@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { reconcilePublicationAction } from "@/lib/actions/publication-reconciliation";
 import { publicationReconciliationSchema } from "@/lib/social/publication-reconciliation-schema";
+import { EvidenceSelectField } from "./evidence-select";
 
 export function PublicationReconciliationForm({
   projectId,
@@ -63,14 +64,12 @@ export function PublicationReconciliationForm({
           <FieldError errors={[form.formState.errors.externalPublicationRef]} />
         </Field>
         <Field data-invalid={!!form.formState.errors.evidenceRef}>
-          <FieldLabel htmlFor={`receipt-evidence-${publicationId}`}>私有核对依据编号</FieldLabel>
-          <Input
+          <FieldLabel htmlFor={`receipt-evidence-${publicationId}`}>发布结果核对依据</FieldLabel>
+          <EvidenceSelectField
+            projectId={projectId}
+            control={form.control}
+            name="evidenceRef"
             id={`receipt-evidence-${publicationId}`}
-            placeholder="evidence-…"
-            autoComplete="off"
-            {...form.register("evidenceRef")}
-            aria-invalid={!!form.formState.errors.evidenceRef}
-            disabled={pending}
           />
           <FieldError errors={[form.formState.errors.evidenceRef]} />
         </Field>

@@ -137,7 +137,7 @@ for (const error of [
   claimFailure = error;
   assert.deepEqual(await run(), {
     status: "error",
-    message: "无法上传产品证据，请检查项目权限及上传回执。",
+    message: "无法保存资料，请确认项目权限后重新上传。",
   });
   count++;
 }
@@ -154,7 +154,7 @@ claimFailure = undefined;
 cacheFailure = true;
 assert.deepEqual(await run(), {
   status: "success",
-  message: "证据已持久化并加入当前项目，可在字段选择器中使用。",
+  message: "资料已保存，可在来源资料列表中选择。",
 });
 count++;
 cacheFailure = false;
@@ -172,7 +172,7 @@ for (const malformed of [
   count++;
 }
 authenticated = false;
-assert.deepEqual(await run(), { status: "error", message: "无权上传产品证据。" });
+assert.deepEqual(await run(), { status: "error", message: "无权上传资料。" });
 count++;
 await rejected(await sign(), 403);
 count++;
@@ -180,7 +180,7 @@ authenticated = true;
 authFailure = Error(privateDetail);
 assert.deepEqual(await run(), {
   status: "error",
-  message: "无法上传产品证据，请检查项目权限及上传回执。",
+  message: "无法保存资料，请确认项目权限后重新上传。",
 });
 count++;
 await rejected(await sign());
