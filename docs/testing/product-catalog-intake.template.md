@@ -24,7 +24,7 @@
 1. 在私有系统取得工厂资料的允许用途，并填入 `authorization_ref`。
 2. 录入来源文件的脱敏引用与媒介类型；尚未授权的文件保持 `pending`。
 3. 将 20 个候选项分配到 A–D：A/B 为完整资料，C/D 为不完整资料；A/C 有实物图，B/D 无实物图。
-4. 对授权且可提取的来源，在本机受控环境运行 `pnpm product-agent:catalog -- --preflight --document <authorized-file>`。只保留输出的哈希、文件类型、候选数和人工复核原因。
+4. 对授权且可提取的来源，在本机受控环境运行 `pnpm product-agent:catalog -- --preflight --document <authorized-file>`。该 CLI 预检显式使用本机 Python 转换，不需要 VPS 或模型凭据；先安装 `requirements-dev.txt`，必要时通过 `MARKITDOWN_PYTHON` 指定解释器。正常目录提取与应用上传仍使用 VPS，配置缺失不会回退到本机。只保留输出的哈希、文件类型、候选数和人工复核原因。
 5. 预检通过不等于 ProductReady。将实际资料继续交由字段级证据核对、一次修订限制和 Gate 01 人工批准。
 
 ## 契约
