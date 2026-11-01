@@ -30,6 +30,7 @@ jobs:
         run: |
           node --test ops/host-capacity/admission.test.mjs ops/browser-node/network.test.mjs
           node scripts/test-browser-agent-payload.mjs
+          node --test scripts/test-remotion-workspace.mjs
           python3 -m unittest discover -s ops/host-capacity -p 'test*.py'
           python3 scripts/test-vps-compute.py
           python3 ops/vps-runtime/test-openship.py

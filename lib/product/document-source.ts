@@ -42,7 +42,7 @@ function markItDownPython() {
   return process.env.MARKITDOWN_PYTHON ?? "python3";
 }
 
-async function preprocessInVps(documentPath: string, allowEmptySource: boolean) {
+async function preprocessInCompute(documentPath: string, allowEmptySource: boolean) {
   const simpleText = [".txt", ".md"].includes(extname(documentPath).toLowerCase());
   const light = simpleText && (await stat(documentPath)).size <= 1024 * 1024;
   const sandbox = await createComputeRuntime(light ? "light" : "heavy");
@@ -62,7 +62,7 @@ async function preprocessInVps(documentPath: string, allowEmptySource: boolean) 
     });
     if (result.exitCode !== 0) {
       throw new Error(
-        (await result.stderr()).trim().slice(0, 1_000) || "MarkItDown VPS preprocessing failed",
+        (await result.stderr()).trim().slice(0, 1_000) || "MarkItDown compute preprocessing failed",
       );
     }
     return result.stdout();
@@ -73,7 +73,7 @@ async function preprocessInVps(documentPath: string, allowEmptySource: boolean) 
 
 export async function preprocessProductAgentDocument(
   request: ProductAgentDocumentRequest,
-  execution: "vps" | "local-preflight" = "vps",
+  execution: "compute" | "vps" | "local-preflight" = "compute",
 ): Promise<ProductAgentDocumentSource> {
   if (request.imageAvailability !== "none" && request.imageAvailability !== "real_product_image") {
     throw new Error("Product Agent document image availability is invalid");
@@ -90,11 +90,12 @@ export async function preprocessProductAgentDocument(
   if (info.size > maximumDocumentBytes)
     throw new Error(`Product Agent document exceeds ${maximumDocumentBytes} byte limit`);
 
-  // Only trusted CLI preflight callers opt in; application requests use VPS.
-  z.enum(["vps", "local-preflight"]).parse(execution);
+  // Only trusted CLI preflight callers opt in; application requests use the configured compute provider.
+  // "vps" remains a legacy alias for callers predating provider selection.
+  z.enum(["compute", "vps", "local-preflight"]).parse(execution);
   const stdout =
-    execution === "vps"
-      ? await preprocessInVps(documentPath, request.allowEmptySource === true)
+    execution !== "local-preflight"
+      ? await preprocessInCompute(documentPath, request.allowEmptySource === true)
       : (
           await execFileAsync(
             markItDownPython(),

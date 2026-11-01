@@ -93,6 +93,7 @@
     "test:video-rendering": "tsx scripts/test-video-rendering.ts",
     "test:ffmpeg-renderer": "tsx scripts/test-ffmpeg-renderer.ts",
     "test:remotion-abcd": "tsx scripts/test-remotion-abcd.ts",
+    "test:remotion-workspace": "node --test scripts/test-remotion-workspace.mjs",
     "test:video-social-publication": "tsx scripts/test-video-social-publication.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -105,6 +106,7 @@
     "test:workspace-navigation": "tsx scripts/test-workspace-navigation.ts && tsx scripts/test-workspace-task-model.ts && node --conditions=react-server --import tsx scripts/test-workspace-queries.ts",
     "test:product-output": "tsx scripts/test-product-output-policy.ts && tsx scripts/test-product-evaluation-run.ts && tsx scripts/test-catalog-agent.ts && tsx scripts/test-product-selection-summary.ts && tsx scripts/test-product-selection-health.ts",
     "eval:model-selection": "tsx scripts/run-product-model-selection.ts",
+    "test:vercel-compute": "tsx scripts/test-vercel-compute.ts",
     "test:vps-compute": "tsx scripts/test-vps-compute-client.ts && tsx scripts/test-vps-compute-transport.ts"
   },
   "dependencies": {

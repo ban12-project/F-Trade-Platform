@@ -53,6 +53,12 @@ jobs:
             pnpm check:ci
           fi
 
+      - name: Verify compute provider selection and cleanup
+        run: |
+          pnpm test:vercel-compute
+          pnpm test:vps-compute
+          python3 scripts/test-compute-image-context.py
+
       - name: Test Better Auth core and Passkey schema mappings
         run: pnpm exec tsx scripts/test-auth-schema.ts
 

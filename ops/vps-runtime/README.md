@@ -1,5 +1,7 @@
 # VPS compute runtime
 
+> Compute-only update (#801): the owner now requests Vercel Sandbox for document/media/render compute. See [the current compute decision](../../docs/architecture/vercel-compute-return.md). The VPS browser decision remains in force; the report below records the earlier migration.
+
 The original deployment uses native Docker Compose and systemd for the broker;
 OpenShip manages its edge TLS route. In that deployment the broker listens on
 `127.0.0.1:9500` with `network_mode: host`; route `/v1/compute` and `/health` to
@@ -67,6 +69,18 @@ symlinks, 128 MiB aggregate, 2,000 files), stages approved sources, and serves t
 on container loopback. The renderer retains H.264/AAC/yuv420p/bt709/CRF18 and audio
 track policy; application ffprobe acceptance still runs. Keep the renderer
 package version in the image aligned with the repository Remotion packages.
+
+Remotion initializes `TMPDIR` to `/vercel/sandbox/work/tmp` before loading its
+renderer. Chrome profiles, downloaded media copies and extracted frames inherit
+this job-local scratch directory in the quota-bound workspace. They must not use
+the 256 MiB `/tmp` tmpfs: valid larger source videos can exhaust it before the
+first frame renders. Broker stop/deadline cleanup removes the scratch files with
+the rest of the workspace; host pool, per-job quota and memory limits still apply.
+Run `pnpm test:remotion-workspace` to check child-process scratch placement.
+Frame extraction uses one thread and a 128 MiB cache; the media cache is 64 MiB.
+Do not use Remotion's host-memory-derived defaults inside the 2 GiB worker:
+large decoded frames can otherwise trigger the container OOM killer even after
+scratch storage is fixed. These cache budgets are not total process-memory caps.
 
 Run local tests:
 

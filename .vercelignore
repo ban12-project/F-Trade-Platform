@@ -53,7 +53,7 @@ blob-report/
 /.swc
 
 # Authorized local catalog references must never be committed or uploaded.
-docs/reference/*.pdf
+docs/reference/*
 .vercel
 .env*.local
 
@@ -65,3 +65,7 @@ next-env.d.ts
 artifacts/browser-fleet-review/
 
 !.gitignore
+
+# Local evaluation artifacts can contain source material or provider configuration.
+jobs/
+harbor-artifacts/

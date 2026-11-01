@@ -2,9 +2,14 @@ import { createReadStream } from "node:fs";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
-import { renderMedia, selectComposition } from "@remotion/renderer";
+import { prepareRenderWorkspace } from "./render-workspace.mjs";
 
 const root = "/vercel/sandbox/work";
+// Source downloads and extracted frames can exceed the container's 256 MiB
+// /tmp tmpfs. Keep renderer/Chrome scratch files in this job's quota-bound
+// workspace, which is removed by the broker when the job stops or expires.
+await prepareRenderWorkspace(root);
+const { renderMedia, selectComposition } = await import("@remotion/renderer");
 const types = {
   ".html": "text/html",
   ".js": "text/javascript",
@@ -61,6 +66,8 @@ try {
     id: "AbcdIndustrialVertical",
     inputProps,
     browserExecutable,
+    offthreadVideoCacheSizeInBytes: 128 * 1024 * 1024,
+    offthreadVideoThreads: 1,
   });
   await renderMedia({
     composition,
@@ -74,6 +81,10 @@ try {
     crf: 18,
     enforceAudioTrack: true,
     concurrency: 1,
+    // Remotion's system-memory defaults can exceed this worker's 2 GiB cgroup.
+    offthreadVideoCacheSizeInBytes: 128 * 1024 * 1024,
+    mediaCacheSizeInBytes: 64 * 1024 * 1024,
+    offthreadVideoThreads: 1,
     outputLocation: `${root}/output.mp4`,
     timeoutInMilliseconds: 480_000,
     overwrite: true,

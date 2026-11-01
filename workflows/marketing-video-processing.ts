@@ -9,7 +9,10 @@ import {
 import { createReviewVideoExport } from "@/lib/video/export-artifact";
 import { videoExportPresets } from "@/lib/video/export-presets";
 import { VercelPrivateVideoAssetStore } from "@/lib/video/private-asset-store";
-import { videoProcessingFailureMessage } from "@/lib/video/processing-failures";
+import {
+  VideoRenderCommandError,
+  videoProcessingFailureMessage,
+} from "@/lib/video/processing-failures";
 import {
   completeVideoJob,
   failVideoJob,
@@ -97,9 +100,11 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
   const job = await markVideoJobRunning(input.jobId);
   if (job.status === "succeeded" || job.status === "failed") return;
   let rendering = false;
+  let stage = "authorization";
   try {
     const project = await beginGuardedMarketingVideoRender(input.videoId, input.actorId);
     rendering = true;
+    stage = "timeline";
     const timeline = createMarketingEditTimeline(project, project.editDraft!);
     const preset = videoExportPresets.find(
       (candidate) =>
@@ -113,6 +118,7 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
       height: preset.height,
       fps: preset.fps,
     } as const;
+    stage = "source_access";
     const sources = await issueSandboxVideoSources(
       project.editDraft!.clips.map((clip) => clip.assetRef),
     );
@@ -123,6 +129,7 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
       preset.fps === 30;
     const expectedAssetRef = `asset-render-${input.jobId}`;
     let rendered: Awaited<ReturnType<typeof renderMarketingTimelineInSandbox>> | undefined;
+    stage = "render";
     await renderApprovedMarketingTimeline(request, {
       render: async (validated) => {
         if (useRemotion) {
@@ -139,6 +146,7 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
       },
     });
     if (!rendered) throw new Error("Sandbox 未生成视频输出。");
+    stage = "export_validation";
     const exportArtifact = createReviewVideoExport({
       videoId: input.videoId,
       sourceAssetRef: expectedAssetRef,
@@ -146,16 +154,25 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
       media: rendered.probe,
       timeline: { durationSeconds: timeline.durationSeconds },
     });
+    stage = "asset_storage";
     const assetRef = await new VercelPrivateVideoAssetStore().putRenderedVideo({
       data: rendered.data,
       contentType: "video/mp4",
       assetRef: expectedAssetRef,
       videoProjectId: input.videoId,
     });
+    stage = "completion";
     await completeGuardedMarketingVideoRender(input.videoId, assetRef, exportArtifact);
     await completeVideoJob(input.jobId);
   } catch (error) {
-    const code = error instanceof VideoRetentionError ? "RETENTION_EXPIRED" : "RENDER_FAILED";
+    const code =
+      error instanceof VideoRetentionError
+        ? "RETENTION_EXPIRED"
+        : error instanceof VideoRenderCommandError
+          ? error.failureCode
+          : "RENDER_FAILED";
+    // Only controlled stage/code values; never log media URLs, payloads or raw errors.
+    console.error("marketing_video_render.failed", { stage, code });
     const message = videoProcessingFailureMessage(code);
     try {
       if (rendering) await failMarketingVideoRender(input.videoId, message);

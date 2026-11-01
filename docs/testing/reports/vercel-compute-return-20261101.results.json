@@ -1,0 +1,69 @@
+{
+  "status": "completed",
+  "result": {
+    "document": {
+      "sha256": "e2ea1e6f5da9c8770b99da4bb69a3d1078816e8a5f665eb98492c2c6291a0301",
+      "status": "converted"
+    },
+    "pdfDocument": {
+      "sha256": "52caf1f83abe16dbf6b9f4ec6487c875c71d3574d703170d6965cb73c49453d0",
+      "status": "converted"
+    },
+    "media": {
+      "mediaType": "video",
+      "technical": {
+        "contentType": "video/mp4",
+        "width": 320,
+        "height": 568,
+        "durationMs": 3000,
+        "fps": 30,
+        "hasAudio": false
+      }
+    },
+    "sampleCount": 3,
+    "ffmpeg": {
+      "resources": {
+        "fileSizeBytes": 1047566,
+        "containerBitrateBps": 2762811,
+        "videoBitrateBps": 2748002,
+        "audioBitrateBps": 2300
+      },
+      "encoding": {
+        "pixelFormat": "yuv420p",
+        "sampleAspectRatio": "1:1",
+        "audioSampleRate": 48000,
+        "audioChannels": 2
+      },
+      "container": "mp4",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationSeconds": 3.033333,
+      "subtitleStreamCount": 0
+    },
+    "remotion": {
+      "resources": {
+        "fileSizeBytes": 2340279,
+        "containerBitrateBps": 6137094,
+        "videoBitrateBps": 5905341,
+        "audioBitrateBps": 317373
+      },
+      "encoding": {
+        "pixelFormat": "yuv420p",
+        "sampleAspectRatio": "1:1",
+        "audioSampleRate": 48000,
+        "audioChannels": 2
+      },
+      "container": "mp4",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationSeconds": 3.050667,
+      "subtitleStreamCount": 0
+    }
+  }
+}

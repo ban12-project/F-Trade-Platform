@@ -4,9 +4,10 @@ import { existsSync } from "node:fs";
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { VpsCompute, vpsComputeEnabled } from "../compute/vps";
+import { type ComputeRuntime, createComputeRuntime } from "../compute/runtime";
 import { videoProbeEntries } from "./encoding-contract";
 import { parseFfprobeOutput } from "./media-probe";
+import { renderCommandFailureCode, VideoRenderCommandError } from "./processing-failures";
 import { createRemotionCompositionProps } from "./remotion-props";
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
@@ -15,7 +16,7 @@ type SignedSources = ReadonlyMap<string, SandboxVideoSource>;
 
 export const remotionCompositionId = "AbcdIndustrialVertical";
 
-/** Renders the governed ABCD composition inside an ephemeral offline VPS container. */
+/** Renders the governed ABCD composition inside an ephemeral offline compute worker. */
 export async function renderMarketingTimelineWithRemotion(
   request: VideoRenderRequest,
   sources: SignedSources,
@@ -25,13 +26,12 @@ export async function renderMarketingTimelineWithRemotion(
   if (!existsSync(bundleDir))
     throw new Error("Remotion 合成包不存在；部署前必须运行 build:remotion。");
   const inputProps = createRemotionCompositionProps(request, sources, productName);
-  vpsComputeEnabled();
-  return renderRemotionOnVps(bundleDir, inputProps, sources);
+  return renderRemotionOnCompute(bundleDir, inputProps, sources);
 }
 
 /** Upload this deployment's exact bundle. A renderer image update must not
  * silently render an old composition from a separately baked bundle. */
-async function uploadBundle(runtime: VpsCompute, localRoot: string) {
+async function uploadBundle(runtime: ComputeRuntime, localRoot: string) {
   let total = 0;
   let files = 0;
   async function visit(relative: string) {
@@ -56,12 +56,12 @@ async function uploadBundle(runtime: VpsCompute, localRoot: string) {
   await visit("");
 }
 
-async function renderRemotionOnVps(
+async function renderRemotionOnCompute(
   bundleDir: string,
   inputProps: ReturnType<typeof createRemotionCompositionProps>,
   sources: SignedSources,
 ) {
-  const runtime = await VpsCompute.create();
+  const runtime = await createComputeRuntime();
   try {
     await uploadBundle(runtime, bundleDir);
     const localSources = new Map<string, string>();
@@ -89,13 +89,14 @@ async function renderRemotionOnVps(
       cmd: "node",
       args: ["/opt/ftrade-remotion/render.mjs"],
     });
-    if (rendered.exitCode !== 0) throw new Error("VPS Remotion 渲染失败。");
+    if (rendered.exitCode !== 0)
+      throw new VideoRenderCommandError(renderCommandFailureCode(await rendered.stderr()));
     const output = "/vercel/sandbox/work/output.mp4";
     const inspected = await runtime.runCommand({
       cmd: "ffprobe",
       args: ["-v", "error", "-show_entries", videoProbeEntries, "-of", "json", output],
     });
-    if (inspected.exitCode !== 0) throw new Error("VPS Remotion 成片验收失败。");
+    if (inspected.exitCode !== 0) throw new Error("Remotion 成片验收失败。");
     const probe = parseFfprobeOutput(JSON.parse(await inspected.stdout()));
     return { data: new Uint8Array(await runtime.fs.readFile(output)), probe };
   } finally {
