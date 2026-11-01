@@ -3,6 +3,14 @@ import { summarizeInquiryMessages } from "../lib/sales/inquiry-history";
 
 const messages = (...bodies: string[]) =>
   bodies.map((body, i) => ({ id: `synthetic-${i}`, body, receivedAt: new Date(i).toISOString() }));
+const groupedOe = summarizeInquiryMessages(messages("MOCK OE: 123 456 7890;"));
+assert.equal(groupedOe.fields.oeNumber, "123 456 7890");
+assert.deepEqual(groupedOe.fieldSources.oeNumber, ["synthetic-0"]);
+const ambiguousGroupedOe = summarizeInquiryMessages(
+  messages("OE: SYN-123", "OE: 123 456 7890 or 987 654 3210"),
+);
+assert.equal(ambiguousGroupedOe.fields.oeNumber, undefined);
+assert(ambiguousGroupedOe.conflicts.includes("oeNumber"));
 const combined = summarizeInquiryMessages(
   messages("OE: SYN-123", "500 pcs", "Destination: Synthetic Port."),
 );
