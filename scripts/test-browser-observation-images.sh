@@ -20,17 +20,19 @@ trap '"${engine[@]}" rm -f "$name" "$source" >/dev/null 2>&1 || true; rm -rf "$d
 "${engine[@]}" create --name "$source" --network none "$agent" >/dev/null
 "${engine[@]}" cp "$source:/app/ops/browser-node" "$directory/runtime"
 "${engine[@]}" rm "$source" >/dev/null
-node --input-type=module -e '
-  import { readFileSync, writeFileSync } from "node:fs";
+"${engine[@]}" run --rm --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --memory 128m --cpus 1 \
+  --entrypoint node "$agent" --input-type=module -e '
+  import { readFileSync } from "node:fs";
   const config = JSON.parse(readFileSync("ops/browser-node/camofox.config.json", "utf8"));
   config.plugins["ftrade-observation-fixture"] = { enabled: true };
   config.plugins.vnc.enabled = false;
-  writeFileSync(process.argv[1], JSON.stringify(config));
-' "$directory/config.json"
+  process.stdout.write(JSON.stringify(config));
+' > "$directory/config.json"
 deadline=$(( $(date +%s) * 1000 + 90000 ))
 "${engine[@]}" run -d --name "$name" --network none --read-only --init \
   --cap-drop ALL --security-opt no-new-privileges:true \
-  "${security_options[@]}" \
+  ${security_options[@]+"${security_options[@]}"} \
   --memory 2g --memory-swap 2g --cpus 2 --pids-limit 512 --shm-size 256m \
   --tmpfs /tmp:rw,nosuid,nodev,size=512m,mode=1777 \
   --tmpfs /root/.camoufox:rw,nosuid,nodev,size=16m,mode=700 \
