@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 import { createRuntimeService } from "../ops/browser-node/official-runtime/service.mjs";
+import { scheduleBrowserRequest } from "../ops/browser-node/request-queue.mjs";
 
 const accountId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
@@ -102,6 +103,47 @@ async function fixture(t, options = {}) {
     evaluations: () => evaluations,
   };
 }
+
+test("Agent serializes a live observation and egress navigation against the actual service", async (t) => {
+  const f = await fixture(t);
+  const tab = await f.tab();
+  let entered, release;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const finish = new Promise((resolve) => {
+    release = resolve;
+  });
+  f.setEvaluation(async () => {
+    entered();
+    await finish;
+    return true;
+  });
+  const slot = { expiresAt: Date.now() + 30000, abort: new AbortController() };
+  const first = scheduleBrowserRequest(
+    slot,
+    () =>
+      f.request(`/tabs/${tab}/evaluate`, {
+        userId: accountId,
+        expression: "synthetic observation",
+      }),
+    slot.abort.signal,
+  );
+  await started;
+  const second = scheduleBrowserRequest(
+    slot,
+    () =>
+      f.request(`/tabs/${tab}/navigate`, {
+        userId: accountId,
+        url: "https://api.ipify.org/",
+      }),
+    slot.abort.signal,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  release();
+  assert.equal((await first).status, 200);
+  assert.equal((await second).status, 200);
+});
 
 test("authenticates health and scopes every created page to account and run", async (t) => {
   const f = await fixture(t);
