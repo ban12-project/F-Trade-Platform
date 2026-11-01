@@ -85,3 +85,32 @@ test("disabled start paths do not touch persistence or dispatch a workflow", asy
     else process.env.CRON_SECRET = oldSecret;
   }
 });
+
+test("old enabled flag cannot authorize or dispatch retired compute", async () => {
+  const oldEnabled = process.env.BROWSER_SANDBOX_ENABLED;
+  const oldSecret = process.env.CRON_SECRET;
+  try {
+    process.env.BROWSER_SANDBOX_ENABLED = "1";
+    process.env.CRON_SECRET = "synthetic-retired-secret";
+    const tx = new Proxy(
+      {},
+      {
+        get() {
+          throw Error("unexpected_persistence");
+        },
+      },
+    ) as DatabaseTransaction;
+    assert.equal(await authorizeManualSandboxStart(tx, "node", "operation"), null);
+    const response = await GET(
+      new Request("https://example.invalid/api/browser-sandbox-dispatch", {
+        headers: { authorization: "Bearer synthetic-retired-secret" },
+      }),
+    );
+    assert.deepEqual(await response.json(), { delivered: 0, disabled: true });
+  } finally {
+    if (oldEnabled === undefined) delete process.env.BROWSER_SANDBOX_ENABLED;
+    else process.env.BROWSER_SANDBOX_ENABLED = oldEnabled;
+    if (oldSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = oldSecret;
+  }
+});

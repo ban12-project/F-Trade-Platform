@@ -33,6 +33,7 @@ export function createGateway({
   inspectPublicationPage,
   inspectionFailureStage,
   port = 9400,
+  host = "127.0.0.1",
 }) {
   const views = new Map();
   function allowed(entry) {
@@ -176,10 +177,13 @@ export function createGateway({
       const entry = views.get(match[1]);
       if (!allowed(entry)) return fail();
       const path = safeAssetPath(match[2]);
-      const upstream = await fetch(`http://127.0.0.1:${entry.slot.vncPort}${path}`, {
-        signal: AbortSignal.timeout(5000),
-        redirect: "error",
-      });
+      const upstream = await fetch(
+        `http://${entry.slot.workerHost ?? "127.0.0.1"}:${entry.slot.vncPort}${path}`,
+        {
+          signal: AbortSignal.timeout(5000),
+          redirect: "error",
+        },
+      );
       if (!upstream.ok) {
         await upstream.body?.cancel();
         return fail();
@@ -219,12 +223,12 @@ export function createGateway({
     // cancels a handshake that has not reached its upgrade callback yet.
     entry.sockets.add(socket);
     const proxy = http.request({
-      hostname: "127.0.0.1",
+      hostname: entry.slot.workerHost ?? "127.0.0.1",
       port: entry.slot.vncPort,
       path: "/websockify",
       method: "GET",
       headers: {
-        host: `127.0.0.1:${entry.slot.vncPort}`,
+        host: `${entry.slot.workerHost ?? "127.0.0.1"}:${entry.slot.vncPort}`,
         upgrade: "websocket",
         connection: "Upgrade",
         "sec-websocket-key": request.headers["sec-websocket-key"],
@@ -269,7 +273,7 @@ export function createGateway({
   });
   server.requestTimeout = 10_000;
   server.headersTimeout = 10_000;
-  server.listen(port, "127.0.0.1");
+  server.listen(port, host);
   return {
     server,
     closeRun(runId) {

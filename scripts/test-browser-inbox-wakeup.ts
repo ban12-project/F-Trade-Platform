@@ -75,9 +75,9 @@ export async function testInboxWakeup(
     await db.execute(sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(withStaleRun)}::jsonb
       WHERE id = ${nodeId}`);
     await Promise.all(Array.from({ length: 4 }, () => enqueueDueInboxSandboxes(db, nodeId)));
-    const operation = (await read()).operation_id as string;
-    assert.ok(operation, "due inbox starts a stopped Sandbox");
-    assert.equal((await read()).phase, "starting");
+    assert.equal((await read()).operation_id, null, "retired inbox cannot start a Sandbox");
+    const operation = randomUUID();
+    assert.equal((await read()).phase, "stopped");
     const queued = await db.execute(
       sql`SELECT document FROM browser_fleet_node WHERE id = ${nodeId}`,
     );
@@ -96,12 +96,16 @@ export async function testInboxWakeup(
     assert.equal(
       (await db.execute(sql`SELECT * FROM browser_sandbox_outbox WHERE node_id = ${nodeId}`)).rows
         .length,
-      1,
-      "concurrent schedulers create one start intent",
+      0,
+      "concurrent schedulers cannot create retired provider start intents",
     );
     const authorize = () =>
       db.transaction((tx) => authorizeBrowserSandboxStart(tx, nodeId, operation));
-    assert.ok(await authorize());
+    assert.equal(
+      await authorize(),
+      null,
+      "retirement blocks credential release despite stale enable flag",
+    );
     assert.equal(
       await db.transaction((tx) => authorizeManualSandboxStart(tx, nodeId, operation)),
       null,
@@ -117,8 +121,10 @@ export async function testInboxWakeup(
         db.transaction((tx) => claimManualSandboxDispatch(tx, nodeId, operation)),
       ),
     );
-    assert.equal(claims.filter(Boolean).length, 1, "one provider claim for one poll");
-    console.log("PASS due inbox cold-start: reviewed scope, channel state and one dispatch");
+    assert.equal(claims.filter(Boolean).length, 0, "no retired provider dispatch claim");
+    console.log(
+      "PASS due inbox: scoped queue preserved, stale credentials retired, provider restart refused",
+    );
   } finally {
     await db.execute(sql`DELETE FROM browser_sandbox_outbox WHERE node_id = ${nodeId}`);
     await db.execute(sql`DELETE FROM browser_sandbox WHERE node_id = ${nodeId}`);

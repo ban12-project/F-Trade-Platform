@@ -593,12 +593,10 @@ export function WorkspaceSettingsPanel({
   canManage,
   currentUser,
   legacyWorker = false,
-  sandboxEnabled = false,
 }: {
   settings?: ProductAgentModelSettings[];
   canManage: boolean;
   legacyWorker?: boolean;
-  sandboxEnabled?: boolean;
   currentUser?: { name?: string | null; email?: string | null; role?: string | null };
 }) {
   const query = useSearchParams();
@@ -656,7 +654,7 @@ export function WorkspaceSettingsPanel({
           <TabsContent value="channels" className="space-y-4">
             {legacyWorker ? <FacebookAccountPanel /> : null}
             <ChannelSettings />
-            <BrowserNodesPanel sandboxEnabled={sandboxEnabled} />
+            <BrowserNodesPanel />
           </TabsContent>
         </>
       ) : null}

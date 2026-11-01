@@ -1,5 +1,6 @@
 import { Sandbox } from "@vercel/sandbox";
 import { z } from "zod";
+import { rejectRetiredSandboxExecution } from "./sandbox-retired";
 
 const uuid = z
   .string()
@@ -60,61 +61,19 @@ export function browserSandboxPreflightChecks(
   };
 }
 
-/** Execute once for an exclusively claimed database operation. The caller must
- * persist intent BEFORE this call. Ambiguous outcomes must go to inspection;
- * repeating create/resume on a workflow retry is not permitted.
- * The snapshot must be a reviewed credential-free runtime template.
+/** Retained signature for pending workflow compatibility. Provisioning is
+ * permanently retired, including injected providers and explicit resume calls.
+ * Existing workflows may still inspect/stop sessions through other helpers.
  */
 export async function provisionBrowserSandbox(
-  input: BrowserSandboxProviderRequest,
-  provider: BrowserSandboxProvider = Sandbox,
-) {
-  const request = requestSchema.parse(input);
-  const name = `ftrade-browser-${request.nodeId}`;
-  let sandbox: BrowserSandboxProviderHandle;
-  try {
-    if (request.mode === "create") {
-      sandbox = await provider.create({
-        name,
-        networkPolicy: "allow-all",
-        source: { type: "snapshot", snapshotId: request.templateSnapshotId },
-        ports: [9400],
-        persistent: true,
-        resources: { vcpus: 2 },
-        timeout: 20 * 60 * 1000,
-        snapshotExpiration: 30 * 86400000,
-        keepLastSnapshots: { count: 1, deleteEvicted: true },
-        env: {},
-        tags: { "ftrade-node": request.nodeId, "ftrade-created-by": request.operationId },
-      });
-    } else {
-      // Inspect first. Never use getOrCreate: a lost snapshot must not turn an
-      // established account profile into a fresh, empty runtime.
-      const existing = await provider.get({ name, resume: false });
-      const checks = browserSandboxPreflightChecks(existing, request.nodeId);
-      if (!checks.ownership || existing.status !== "stopped")
-        throw new Error("sandbox_requires_reconciliation");
-      // A stopped sandbox retains externally edited resource configuration. Do
-      // not wake a larger VM (or guess when resource metadata is missing).
-      if (!checks.resources) throw new Error("sandbox_resources_require_reconciliation");
-      // Persistent configuration can be edited outside this application. Refuse
-      // to resume if its stored deadline no longer satisfies our compute bound.
-      // Do not repair it by extending an already running session's timeout.
-      if (!checks.timeout) throw new Error("sandbox_timeout_requires_reconciliation");
-      // Persistent Sandboxes retain old allowlists. Clear them before resuming.
-      await existing.update({ networkPolicy: "allow-all" });
-      sandbox = await provider.get({ name, resume: true });
-    }
-    if (sandbox.name !== name || !sandbox.persistent || sandbox.status !== "running")
-      throw new Error("sandbox_requires_reconciliation");
-    const session = sandbox.currentSession();
-    if (session.status !== "running") throw new Error("sandbox_requires_reconciliation");
-    return { sandboxName: name, session, gatewayOrigin: sandbox.domain(9400) };
-  } catch {
-    // Do not stop/delete a name here: after a lost response it may refer to a
-    // newer session. Recovery must inspect and capture the exact session first.
-    throw new Error("sandbox_provision_unconfirmed");
-  }
+  _input: BrowserSandboxProviderRequest,
+  _provider: BrowserSandboxProvider = Sandbox,
+): Promise<{
+  sandboxName: string;
+  session: ReturnType<BrowserSandboxProviderHandle["currentSession"]>;
+  gatewayOrigin: string;
+}> {
+  return rejectRetiredSandboxExecution();
 }
 
 /** Safe for uncertain results and read-only status checks. Never resumes. */

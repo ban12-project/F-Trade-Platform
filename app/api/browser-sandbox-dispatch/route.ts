@@ -10,14 +10,6 @@ export async function GET(request: Request) {
     !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))
   )
     return Response.json({ error: "unauthorized" }, { status: 401 });
-  if (process.env.BROWSER_SANDBOX_ENABLED !== "1")
-    return Response.json({ delivered: 0, disabled: true });
-  try {
-    const { deliverQueuedBrowserSandboxes } = await import(
-      "@/lib/browser-fleet/sandbox-workflow-delivery"
-    );
-    return Response.json(await deliverQueuedBrowserSandboxes());
-  } catch {
-    return Response.json({ error: "dispatch_unavailable" }, { status: 503 });
-  }
+  // A stale cron or enabled environment flag cannot dispatch retired compute.
+  return Response.json({ delivered: 0, disabled: true });
 }

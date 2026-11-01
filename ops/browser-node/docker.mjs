@@ -157,14 +157,27 @@ export async function ensureAccountVolume(docker, nodeId, accountId, name) {
       browserFailureCode: "native_profile_volume_owner_mismatch",
     });
 }
-export function containerSpec(nodeId, run, imageId, deadline, nativeProfile = false) {
+export function containerSpec(
+  nodeId,
+  run,
+  imageId,
+  deadline,
+  nativeProfile = false,
+  maximumMemoryMb = 8192,
+  networkMode = "host",
+  cpuCores = 2,
+) {
+  if (![1, 2].includes(cpuCores)) throw new Error("browser_cpu_limit_invalid");
+  if (!["host", "bridge"].includes(networkMode)) throw new Error("agent_network_mode_invalid");
   if (typeof nativeProfile !== "boolean") throw new Error("native_profile_mode_invalid");
   if (run.initializeNativeProfile !== undefined && run.initializeNativeProfile !== true)
     throw new Error("native_profile_initialization_invalid");
   identifier(nodeId);
   identifier(run.id);
   identifier(run.accountId);
-  if (!Number.isInteger(run.memoryMb) || run.memoryMb < 1024 || run.memoryMb > 8192)
+  if (!Number.isInteger(maximumMemoryMb) || maximumMemoryMb < 1024 || maximumMemoryMb > 8192)
+    throw new Error("invalid_host_memory_limit");
+  if (!Number.isInteger(run.memoryMb) || run.memoryMb < 1024 || run.memoryMb > maximumMemoryMb)
     throw new Error("invalid_memory_limit");
   const proxy = run.proxy;
   if (
@@ -259,7 +272,7 @@ export function containerSpec(nodeId, run, imageId, deadline, nativeProfile = fa
         PidsLimit: 512,
         Memory: run.memoryMb * 1024 * 1024,
         MemorySwap: run.memoryMb * 1024 * 1024,
-        NanoCpus: 2_000_000_000,
+        NanoCpus: cpuCores * 1_000_000_000,
         ShmSize: 256 * 1024 * 1024,
         Tmpfs: {
           "/tmp": "rw,nosuid,nodev,size=512m,mode=1777",
@@ -275,10 +288,13 @@ export function containerSpec(nodeId, run, imageId, deadline, nativeProfile = fa
           { Type: "volume", Source: volume, Target: "/data", VolumeOptions: { NoCopy: true } },
         ],
         NetworkMode: name,
-        PortBindings: {
-          "9377/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }],
-          "6080/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }],
-        },
+        PortBindings:
+          networkMode === "bridge"
+            ? {}
+            : {
+                "9377/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }],
+                "6080/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }],
+              },
         LogConfig: { Type: "none" },
       },
     },

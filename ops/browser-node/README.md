@@ -392,3 +392,10 @@ session-only Cookie 跨浏览器退出保留。每次任务应先观察账号身
 自动登录配置的外层 `channelRef` / `accountRef` 用于精确绑定工作台账号，允许账号标识带备注；`profile.automation.accountRef` 则是待核对的纯数字 Facebook 身份，两者不能混用。v2 可显式采用同样严格的 `facebook-root-implicit` 页面规则；密码步骤先检查提交控件和表单，再复用原生输入，最后重新检查并提交。现有真人验证等待及一次性 TOTP/PIN 流程保持不变，切换为 v2 前仍须核验当前页面规则。
 
 Reviewed password-submit selectors must remain unique after native input as well as before it. A password-visibility control may only appear once the field is populated; use a currently verified distinguishing attribute (such as the login button’s accessibility label), and test the revealed-control state. Ambiguous selectors must still refuse submission.
+
+## VPS shared task concurrency
+
+Native OpenShip deployments use the shared host CPU/RAM admission guard and
+compute group quotas described in [host capacity](../host-capacity/README.md).
+Enable both controllers together; raising individual limits without the shared
+guard can overcommit the host. The shared compute pool remains 12 GiB.

@@ -1148,3 +1148,19 @@ test("interactive diagnostics receive account/run scope; publication runtimes do
     false,
   );
 });
+
+test("VPS browser allocations reject excess memory instead of clamping", () => {
+  assert.equal(
+    containerSpec(nodeId, run, "image", Date.now() + 60_000, true, 2048).body.HostConfig.Memory,
+    2048 * 1024 * 1024,
+  );
+  assert.throws(
+    () =>
+      containerSpec(nodeId, { ...run, memoryMb: 4096 }, "image", Date.now() + 60_000, true, 2048),
+    /invalid_memory_limit/,
+  );
+  assert.throws(
+    () => containerSpec(nodeId, run, "image", Date.now() + 60_000, true, NaN),
+    /invalid_host_memory_limit/,
+  );
+});

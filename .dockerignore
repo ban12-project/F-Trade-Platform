@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+node_modules
+.next
+.remotion
+tmp
+__pycache__
+**/__pycache__
+ops/browser-node/upstream

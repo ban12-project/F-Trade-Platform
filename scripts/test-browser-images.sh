@@ -21,6 +21,7 @@ docker run --rm --network none --entrypoint sh "$browser" -ec '
   node --input-type=module -e '"'"'import { getGeolocation } from "camoufox-js/dist/locale.js"; await getGeolocation("8.8.8.8");'"'"'
   node --check /opt/ftrade/watchdog.mjs
   node --check /app/server.js
+  node --check /app/ftrade-startup-diagnostics.mjs
   node --check /app/plugins/ftrade-diagnostics/index.js
   test ! -e /app/plugins/ftrade-compatibility/index.js
   node --input-type=module -e '"'"'import { register } from "/app/plugins/ftrade-login/index.js"; delete process.env.FTRADE_LOGIN_PROFILE_JSON; register({ get() { throw new Error("login_default_must_be_off"); }, post() { throw new Error("login_default_must_be_off"); } }, { enabled: true }, {});'"'"'
@@ -126,6 +127,7 @@ docker exec "$name" node --input-type=module -e '
   await assert.rejects(inspector({ run: { kind: "interactive", accountId: "synthetic-image-smoke" }, interactiveTabId: tabId }), error => error instanceof PublicationInspectionFailure && error.stage === "tab");
   const health = await (await fetch("http://127.0.0.1:9377/health")).json();
   assert.equal(health.browserConnected, true);
+  assert.deepEqual(health.startup, { stage: "publish", status: "ready", code: "unclassified" });
   assert.equal(health.activeTabs, 1);
   // Check the launched Firefox profile, not just plugin source/config presence.
   const profile = readdirSync("/tmp").find(name => name.startsWith("playwright_firefoxdev_profile-"));

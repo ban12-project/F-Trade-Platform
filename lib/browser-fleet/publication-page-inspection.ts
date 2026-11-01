@@ -6,6 +6,7 @@ import { hasPermission } from "../authz";
 import { type Database, getDatabase } from "../db/client";
 import { auditEvent, session, user } from "../db/schema";
 import type { FleetState } from "./policy";
+import { publicationInspectionRuntimeOrigin } from "./publication-inspection-runtime";
 import {
   type PublicationPageInspection,
   publicationPageInspectionFailureSchema,
@@ -32,7 +33,7 @@ async function currentInspectionAccess(
       .where(and(eq(session.id, actor.sessionId), eq(session.userId, actor.id)))
       .for("share");
     const rows = await tx.execute(
-      sql`SELECT n.gateway_origin,n.document FROM browser_fleet_node n JOIN browser_sandbox s ON s.node_id=n.id WHERE n.id=${value.nodeId} AND n.owner_id=${actor.id} AND n.status='active' FOR SHARE OF n`,
+      sql`SELECT n.gateway_origin,n.document,s.node_id AS managed_node_id FROM browser_fleet_node n LEFT JOIN browser_sandbox s ON s.node_id=n.id WHERE n.id=${value.nodeId} AND n.owner_id=${actor.id} AND n.status='active' FOR SHARE OF n`,
     );
     const row = rows.rows[0],
       state = row?.document as FleetState | undefined;
@@ -57,6 +58,7 @@ async function currentInspectionAccess(
       throw new Error("inspection_access_invalid");
     const access = {
       origin: secureOrigin(String(row.gateway_origin)),
+      managed: row.managed_node_id !== null,
       authExpiresAt: auth.expiresAt.getTime(),
       runDeadline: Math.min(run.deadline, run.leaseUntil),
     };
@@ -115,21 +117,14 @@ export async function inspectOwnedPublicationPage(
 ) {
   const value = publicationPageInspectionInputSchema.parse(input);
   const before = await currentInspectionAccess(value, actor, database);
-  const sandbox = await dependencies.provider.get({
-    name: `ftrade-browser-${value.nodeId}`,
-    resume: false,
-  });
-  if (
-    sandbox.name !== `ftrade-browser-${value.nodeId}` ||
-    sandbox.tags?.["ftrade-node"] !== value.nodeId ||
-    !sandbox.persistent ||
-    sandbox.status !== "running"
-  )
-    throw new Error("inspection_runtime_unavailable");
-  const origin = secureOrigin(sandbox.domain(9400));
-  if (origin !== before.origin || !new URL(origin).hostname.endsWith(".vercel.run"))
-    throw new Error("inspection_origin_invalid");
-  await currentInspectionAccess(value, actor, database);
+  const origin = await publicationInspectionRuntimeOrigin(
+    value.nodeId,
+    before,
+    dependencies.provider,
+  );
+  const current = await currentInspectionAccess(value, actor, database);
+  if (current.origin !== before.origin || current.managed !== before.managed)
+    throw new Error("inspection_runtime_changed");
   const ticket = await dependencies.ticket(value, actor);
   if (
     !ticket.connection ||

@@ -65,3 +65,27 @@ it does not exercise this candidate's automatic first-use grant in production.
 The change is not yet deployed: exact image release, Sandbox rollout, automated
 new-account initialization in production, and production two-account DM remain
 to be verified.
+
+## 2026-11-01 VPS integration checkpoint
+
+Integrated main `ffbb001` into this candidate. The Docker container specification
+retains current VPS host/bridge admission, memory limits and the one/two CPU
+startup grant. Startup diagnostics and their separate profile/Firefox stages
+remain covered alongside first-use initialization.
+
+- 111 browser fleet, node, protocol, startup, egress, viewer and native-profile
+  checks passed before the additional failure-recovery case.
+- The expanded native-profile suite passed all 14 cases, including a failed
+  first Firefox launch followed by a new runtime retaining the exact owner
+  manifest and partially written synthetic profile. No rollback deletes data.
+- TypeScript CLI and offline Agent payload import/negative control passed.
+- The actual PostgreSQL publication/broker suite passed in a dedicated local
+  database, including first-use issuance, scoped claims, ready consumption and
+  refusal to rearm an existing account. All records were synthetic.
+- Targeted Biome checks passed with three pre-existing warnings.
+
+The current deployment target is VPS, not the retired Sandbox provider. Exact
+released-image validation and current production first-use behavior still need
+their own evidence. The user has deferred publication and DM acceptance because
+a sending account is unavailable; this checkpoint sends no messages and cannot
+close those acceptance items.

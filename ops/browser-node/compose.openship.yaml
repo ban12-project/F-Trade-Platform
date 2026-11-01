@@ -1,0 +1,39 @@
+# Native OpenShip deployment input. Supply private substitutions outside Git.
+# Import only after draining/stopping the old Agent: two Agents must not share
+# one node identity. Bind the verified Mountpoint of the existing state volume;
+# retain that named volume itself, and never let OpenShip create a replacement.
+# Keep the existing capability-redacting edge route; do not add a second domain
+# route whose access log could retain viewer capability paths.
+services:
+  agent:
+    image: ${BROWSER_AGENT_IMAGE:?Pinned OpenShip Agent image ID}
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+    stop_grace_period: 60s
+    ports:
+      - "127.0.0.1:9400:9400"
+    environment:
+      BROWSER_AGENT_NETWORK_MODE: bridge
+      FTRADE_URL: ${FTRADE_URL:?HTTPS platform origin}
+      BROWSER_NODE_ACCESS_KEY_FILE: /run/secrets/node-key
+      BROWSER_IMAGE: ${BROWSER_IMAGE:?Pinned local browser image ID}
+      BROWSER_NATIVE_PROFILES: "1"
+      BROWSER_MANAGED_FACEBOOK_CONFIG_DIR: /run/facebook-config
+      FTRADE_HOST_ADAPTIVE: "1"
+      FTRADE_HOST_CAPACITY_DIR: /run/ftrade-capacity
+      MAX_RUNNING_BROWSERS: "16"
+      BROWSER_MAX_MEMORY_MB: "2048"
+      HOST_RESERVE_MB: "1536"
+      GATEWAY_PORT: "9400"
+    volumes:
+      - /opt/ftrade-vps/capacity:/run/ftrade-capacity
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${BROWSER_PRIVATE_DIR:?Private host directory}/node-key:/run/secrets/node-key:ro
+      - ${BROWSER_PRIVATE_DIR}/facebook:/run/facebook-config:ro
+      - ${BROWSER_NODE_STATE_PATH:?Verified existing state volume Mountpoint}:/var/lib/browser-node
+    healthcheck:
+      test: [CMD, node, -e, "const s=require('node:net').connect(9400,'127.0.0.1');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));s.setTimeout(2000,()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

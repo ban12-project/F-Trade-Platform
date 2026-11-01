@@ -1,4 +1,8 @@
-import { Sandbox } from "@vercel/sandbox";
+import {
+  type ComputeRuntime,
+  createComputeRuntime,
+  downloadComputeSource,
+} from "../compute/runtime";
 
 import type { VideoProject } from "./contracts";
 import { videoProbeEntries } from "./encoding-contract";
@@ -19,64 +23,44 @@ type SignedSources = ReadonlyMap<string, SandboxVideoSource>;
 
 export { maximumMarketingSourceDurationSeconds } from "./shot-candidates";
 
-function sandboxImage() {
-  const image = process.env.VIDEO_SANDBOX_IMAGE?.trim();
-  if (!image)
-    throw new Error(
-      "未配置 VIDEO_SANDBOX_IMAGE；Vercel 视频任务需要包含 FFmpeg、libass、H.264 和 AAC 的固定 Sandbox 镜像。",
-    );
-  return image;
-}
-
-async function command(sandbox: Sandbox, executable: string, args: string[]) {
+async function command(sandbox: ComputeRuntime, executable: string, args: string[]) {
   const result = await sandbox.runCommand({ cmd: executable, args, cwd: "/vercel/sandbox" });
   if (result.exitCode !== 0)
     throw new Error((await result.stderr()).trim().slice(0, 1_000) || `${executable} 执行失败。`);
   return result.stdout();
 }
 
-async function createMediaSandbox(sources: SignedSources) {
-  const sandbox = await Sandbox.create({
-    image: sandboxImage(),
-    timeout: 10 * 60 * 1_000,
-    resources: { vcpus: Number(process.env.VIDEO_SANDBOX_VCPUS ?? 2) },
-    networkPolicy: { allow: [...new Set([...sources.values()].map((source) => source.hostname))] },
-    persistent: false,
-  });
-  const filters = await command(sandbox, "ffmpeg", ["-hide_banner", "-filters"]);
-  const encoders = await command(sandbox, "ffmpeg", ["-hide_banner", "-encoders"]);
-  if (
-    !/\bsubtitles\b/.test(filters) ||
-    !/\blibx264\b/.test(encoders) ||
-    !/\baac\b/.test(encoders)
-  ) {
-    await sandbox.stop();
-    throw new Error("Sandbox FFmpeg 缺少 subtitles/libass、libx264 或 AAC 能力。");
+async function createMediaSandbox() {
+  const sandbox = await createComputeRuntime();
+  try {
+    const filters = await command(sandbox, "ffmpeg", ["-hide_banner", "-filters"]);
+    const encoders = await command(sandbox, "ffmpeg", ["-hide_banner", "-encoders"]);
+    if (
+      !/\bsubtitles\b/.test(filters) ||
+      !/\blibx264\b/.test(encoders) ||
+      !/\baac\b/.test(encoders)
+    ) {
+      throw new Error("Sandbox FFmpeg 缺少 subtitles/libass、libx264 或 AAC 能力。");
+    }
+    await sandbox.fs.mkdir("/vercel/sandbox/work", { recursive: true });
+    return sandbox;
+  } catch (error) {
+    await sandbox.stop().catch(() => undefined);
+    throw error;
   }
-  await sandbox.fs.mkdir("/vercel/sandbox/work", { recursive: true });
-  return sandbox;
 }
 
-async function downloadSources(sandbox: Sandbox, assetRefs: string[], sources: SignedSources) {
+async function downloadSources(
+  sandbox: ComputeRuntime,
+  assetRefs: string[],
+  sources: SignedSources,
+) {
   const remote = new Map<string, string>();
   for (const [index, assetRef] of [...new Set(assetRefs)].entries()) {
     const source = sources.get(assetRef);
     if (!source) throw new Error("无法读取视频任务所需的私有素材。");
     const destination = `/vercel/sandbox/work/source-${index}${source.extension}`;
-    const config = `/vercel/sandbox/work/download-${index}.conf`;
-    await sandbox.fs.writeFile(
-      config,
-      `url = "${source.signedGetUrl}"\noutput = "${destination}"\n`,
-    );
-    await command(sandbox, "curl", [
-      "--fail",
-      "--silent",
-      "--show-error",
-      "--location",
-      "--config",
-      config,
-    ]);
-    await sandbox.fs.rm(config, { force: true });
+    await downloadComputeSource(sandbox, source, destination);
     remote.set(assetRef, destination);
   }
   return remote;
@@ -113,7 +97,7 @@ export async function extractMarketingVisualSamplesInSandbox(
   sourceAssets: VideoProject["sourceAssets"],
   sources: SignedSources,
 ): Promise<{ candidates: MarketingShotCandidate[]; visualSamples: MarketingVisualSample[] }> {
-  const sandbox = await createMediaSandbox(sources);
+  const sandbox = await createMediaSandbox();
   try {
     const remote = await downloadSources(
       sandbox,
@@ -231,7 +215,7 @@ export async function renderMarketingTimelineInSandbox(
   request: VideoRenderRequest,
   sources: SignedSources,
 ) {
-  const sandbox = await createMediaSandbox(sources);
+  const sandbox = await createMediaSandbox();
   try {
     const remote = await downloadSources(
       sandbox,

@@ -11,6 +11,7 @@ RUN node --input-type=module -e "import { downloadMMDB } from 'camoufox-js/dist/
     && node --input-type=module -e "import { getGeolocation } from 'camoufox-js/dist/locale.js'; await getGeolocation('8.8.8.8');"
 LABEL io.ftrade.lease-watchdog="1" io.ftrade.login-fill="1" io.ftrade.native-profile="1"
 COPY native-profile.mjs /app/ftrade-native-profile.mjs
+COPY startup-diagnostics.mjs /app/ftrade-startup-diagnostics.mjs
 COPY patch-native-profile.mjs /opt/ftrade/patch-native-profile.mjs
 RUN node /opt/ftrade/patch-native-profile.mjs /app
 COPY watchdog.mjs /opt/ftrade/watchdog.mjs
