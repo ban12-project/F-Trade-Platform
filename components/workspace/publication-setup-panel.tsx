@@ -14,7 +14,7 @@ const reasons: Record<PublicationSetupResult["stage"], string> = {
   entry: "尚未识别到发布入口。请返回 Facebook 首页，等页面加载后重试。",
   composer: "请打开空白的创建帖子窗口，等待正文框、发布按钮和可见范围显示后重试。",
   receipt:
-    "请打开自己的个人主页，滚动到已有的文字帖子后重试。没有可核实的历史帖子时不能完成结果识别。",
+    "请打开自己的个人主页，滚动到已有帖子（头像更新也可以）后重试。系统需要核对帖子作者和时间链接。",
   identity:
     "当前页面尚不能确认是这个账号。请检查登录身份；核对首页时回到首页，核对结果时打开自己的个人主页。",
   draft: "编辑器中有正文或媒体。请先自行保存或取消草稿，再打开空白编辑器核对。",
@@ -62,9 +62,7 @@ export function PublicationSetupPanel({ nodeId, runId }: { nodeId: string; runId
       <CardContent className="flex flex-col gap-3">
         <ol className="flex list-decimal flex-col gap-2 pl-5">
           <li>Facebook 首页：确认账号和创建帖子入口。{result?.entry ? " ✓ 已核对" : ""}</li>
-          <li>
-            个人主页：查看已有文字帖子，核对发布结果识别。{result?.receipt ? " ✓ 已核对" : ""}
-          </li>
+          <li>个人主页：查看已有帖子，核对作者和时间链接。{result?.receipt ? " ✓ 已核对" : ""}</li>
           <li>
             回到首页，打开空白的创建帖子窗口，确认可见范围。{result?.composer ? " ✓ 已核对" : ""}
           </li>

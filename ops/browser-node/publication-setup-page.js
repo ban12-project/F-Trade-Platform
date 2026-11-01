@@ -88,15 +88,16 @@ function discoverPublicationSetup(expected) {
     };
   }
   if (timeline.length !== 1 || !matches(location.href)) return fail("identity");
-  const posts = all(document, selectors.post);
+  const posts = all(document, "[aria-posinset]");
   if (!posts.length) return fail("receipt");
-  // Verify the result reader against existing posts without creating a test post.
+  // A profile-photo update can prove author/timestamp structure even without a caption.
+  // The executor still scans only captioned posts and requires an exact text/author/permalink receipt.
   const valid = posts.some((post) => {
     const authors = all(post, selectors.postAuthor),
       texts = all(post, selectors.postText),
       links = all(post, selectors.postLink);
     return (
-      authors.length === 1 && matches(authors[0].href) && texts.length === 1 && links.length === 1
+      authors.length === 1 && matches(authors[0].href) && texts.length <= 1 && links.length === 1
     );
   });
   if (!valid) return fail("receipt");
