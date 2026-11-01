@@ -142,12 +142,16 @@ A separate operator-run proxy fixture uses the currently approved broker-run
 proxy without exporting its credentials to the client or mounting any real
 account profile. The first case matched independent HTTP exit and browser exit,
 and matched the official GeoIP timezone, but failed its WebRTC observation gate.
-The failure was specifically ICE gathering still incomplete after five seconds.
-The probe now waits for its completion event up to twenty seconds; the next
-execution was refused by host capacity admission, so that revision is not yet
-validated. This is not a passing network acceptance. The fixture uses independent packet
-capture with working DNS and Firefox STUN controls; private packet metadata
-excludes TCP payload and proxy authorization headers. Production cutover and
+The first failure was ICE gathering still incomplete after five seconds. Waiting
+for completion revealed a real failure: four ICE candidates and seven UDP packets
+at the independent receiver; candidates did not all match the expected proxy exit.
+GeoIP alone therefore does not establish proxy containment. The runtime now uses
+the official `block_webrtc: true` option. Viewer uses noVNC over WebSocket and
+current login, publishing and inbox contracts do not use peer connections. Browser
+voice/video calls are unavailable under this policy. The revised native and actual
+proxy gates must pass before cutover. The observer retains working DNS and actual
+Firefox STUN controls, without storing TCP payload or proxy authorization headers.
+Production cutover and
 actual account continuity remain pending while the other chat completes account
 setup. No real post or DM was sent by these migration tests.
 

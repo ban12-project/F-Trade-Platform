@@ -49,6 +49,7 @@ test("uses official persistent launcher, fixed proxy and mandatory GeoIP", async
   });
   assert.equal(await runtime.ensureBrowser(5000), browser);
   assert.equal(calls[0].geoip, true);
+  assert.equal(calls[0].block_webrtc, true);
   assert.equal(calls[0].proxy.server, "http://proxy.invalid:1234");
   assert.deepEqual(calls[0].window, [1400, 860]);
   assert.equal(calls[1].persistent_context, true);

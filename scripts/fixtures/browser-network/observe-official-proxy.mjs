@@ -42,6 +42,8 @@ async function wait(name) {
 async function rtc(page) {
   return page.evaluate(
     async ({ address, port }) => {
+      if (typeof RTCPeerConnection !== "function")
+        return { available: false, candidates: [], gatheringState: null, statsAvailable: false };
       const peer = new RTCPeerConnection({ iceServers: [{ urls: `stun:${address}:${port}` }] });
       const candidates = [];
       peer.onicecandidate = ({ candidate }) => {
@@ -68,7 +70,12 @@ async function rtc(page) {
           const stats = await peer.getStats();
           statsAvailable = typeof stats.forEach === "function";
         } catch {}
-        return { candidates, gatheringState: peer.iceGatheringState, statsAvailable };
+        return {
+          available: true,
+          candidates,
+          gatheringState: peer.iceGatheringState,
+          statsAvailable,
+        };
       } finally {
         peer.close();
       }
@@ -154,8 +161,8 @@ try {
       observerUdp: packets,
     }),
   );
-  stage = "rtc-gathering-complete";
-  assert.equal(observation.gatheringState, "complete");
+  stage = "rtc-disabled";
+  assert.equal(observation.available, false, "proxy_runtime_must_disable_webrtc");
   const candidateAddresses = observation.candidates.map((value) => value.split(" ")[4]);
   stage = "rtc-candidate-addresses";
   assert.ok(candidateAddresses.every((value) => value === expectedEgressIp));

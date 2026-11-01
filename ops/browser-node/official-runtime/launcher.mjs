@@ -81,6 +81,9 @@ export function createOfficialLauncher({
           options = await official.launchOptions({
             proxy: { ...proxy },
             geoip: true,
+            // The HTTP proxy does not tunnel WebRTC UDP. The runtime uses
+            // noVNC/WebSocket for Viewer and does not provide browser calls.
+            block_webrtc: true,
             // Preserve the current Linux runtime, cache and add-on policy.
             // The account profile owns persistence; no runtime asset downloads.
             os: "linux",
