@@ -23,8 +23,11 @@ its original Session after expiry; it did not resume a replacement VM. That
 Sandbox was then deleted. Normal task configuration uses ten minutes, light
 one-vCPU and heavy four-vCPU instances, with persistence disabled.
 
-The deployed Workflow verification and final production cutover are recorded
-below once completed. The temporary acceptance route is excluded from the final
+The isolated production-environment deployment completed its real Workflow
+step with automatic OIDC. Text and synthetic PDF conversion, private media
+probe, three samples, FFmpeg and Remotion all passed. See the
+[synthetic results](vercel-compute-return-20261101.results.json).
+No business database rows were written. Final production cutover follows this gate. The temporary acceptance route is excluded from the final
 source tree. Its first build failed on a `.mjs`/`.mts` import mismatch in the
 harness, corrected by using an ordinary TypeScript helper; no production alias
 was assigned to that failed build.
@@ -36,11 +39,13 @@ was assigned to that failed build.
 - Retained VPS client and header-timeout transport regressions passed.
 - Remotion scratch/child-process placement and safe video failure summaries passed.
 - Document and compute source-only image context tests passed.
-- TypeScript and production build passed before the temporary deployment harness;
-  the final source build is rerun after its removal.
+- TypeScript and the final production build passed after removing the temporary
+  deployment harness. The final build preserves Cache Components, Turbopack and
+  Rust React Compiler.
 - Repository validation passed using the project `.venv` Python. System Python
   lacked PyYAML and was not used to claim a pass.
-- Full Biome CI check passed with existing warnings/informational findings.
+- Full Biome CI check passed with existing warnings/informational findings;
+  changed-file checking also passed (four existing-style warnings).
 
 CLI upload exclusions now cover all `docs/reference/*`, local evaluation jobs
 and Harbor artifacts, matching the existing confidentiality boundary. The old
