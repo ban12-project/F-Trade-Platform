@@ -1,12 +1,41 @@
 name: Browser node validation
 on:
   workflow_dispatch:
+    inputs:
+      verify_images:
+        description: Build and test the native amd64/arm64 image pairs without publishing
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  images:
+    if: inputs.verify_images
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: ./.github/actions/browser-images
+        with:
+          arch: ${{ matrix.arch }}
+          publish: "false"
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -44,8 +73,10 @@ jobs:
         run: node --conditions=react-server --import tsx --test scripts/test-browser-sandbox-controller.ts scripts/test-browser-sandbox-monitor.ts scripts/test-browser-sandbox-recovery.ts scripts/test-browser-sandbox-dispatch-route.ts
       - name: Offline Agent payload imports without application dependencies
         run: node scripts/test-browser-agent-payload.mjs
-      - name: Pinned upstream source cache and refusal checks
-        run: node scripts/test-browser-upstream.mjs
+      - name: Official launcher and authenticated service contracts
+        run: |
+          npm ci --prefix ops/browser-node/official-runtime --ignore-scripts --no-audit --no-fund
+          node --import tsx --test scripts/test-official-launcher.mjs scripts/test-official-service.mjs scripts/test-browser-geoip.mjs
       - name: Real PostgreSQL reservations and migration
         run: node --conditions=react-server --import tsx scripts/test-browser-fleet-postgres.ts
         env:

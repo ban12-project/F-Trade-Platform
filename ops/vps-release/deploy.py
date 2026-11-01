@@ -9,8 +9,10 @@ import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 
@@ -102,7 +104,7 @@ def copied_inputs(dockerfile, context):
 def fingerprints(source):
     browser=source/'ops/browser-node'
     browser_paths=copied_inputs(browser/'browser.Dockerfile',browser)
-    browser_paths.update(browser/x for x in ['camofox.ref','prepare-upstream.sh','docker-bake.hcl'])
+    browser_paths.update(browser/x for x in ['docker-bake.hcl','browser.Dockerfile.dockerignore'])
     compute_paths=copied_inputs(source/'ops/vps-runtime/compute.Dockerfile',source)
     compute_paths.update(copied_inputs(source/'ops/video-sandbox/Dockerfile',source))
     release_paths=set()
@@ -154,17 +156,21 @@ def build(source, sha, previous, fp, configs):
     docker('run','--rm','--network','none','--memory','512m','--entrypoint','node',updated['browser']['image'],'ops/browser-node/smoke.mjs',timeout=90)
     docker('run','--rm','--network','none','--memory','256m','-e','FTRADE_RUNTIME_TOKEN='+'a'*64,'-e','FTRADE_COMPUTE_IMAGE=sha256:'+'b'*64,'--entrypoint','python3',updated['runtime']['image'],'-c',"import runpy;m=runpy.run_path('/app/server.py',run_name='smoke');assert m['PROFILES']['light']['memory']==512")
     if previous.get('browserWorker')!=fp['browserWorker']:
-        run(['sh','ops/browser-node/prepare-upstream.sh'],180,cwd=source)
-        hcl=(source/'ops/browser-node/docker-bake.hcl').read_text()
-        args=[key+'='+re.search(key+r'\s*=\s*"([\w.-]+)"',hcl)[1] for key in ['CAMOUFOX_VERSION','CAMOUFOX_RELEASE']]
-        base=image(source/'ops/browser-node/upstream/Dockerfile.ci','ftrade-release-camofox:'+sha,source/'ops/browser-node/upstream',args+['TARGETARCH='+arch])
-        worker=image(source/'ops/browser-node/browser.Dockerfile','ftrade-release-browser:'+sha,source/'ops/browser-node',['BROWSER_BASE_IMAGE='+base])
+        worker=image(source/'ops/browser-node/browser.Dockerfile','ftrade-release-browser:'+sha,source/'ops/browser-node',['TARGETARCH='+arch])
         updated['browser']['environment']['BROWSER_IMAGE']=worker
         # Run the existing complete offline browser-image acceptance on this exact pair.
         docker('tag',updated['browser']['image'],'ftrade-release-browser-node:'+sha+'-'+arch)
         docker('tag',worker,'ftrade-release-browser:'+sha+'-'+arch)
         env={**os.environ,'IMAGE_PREFIX':'ftrade-release','BUILD_TAG':sha,'ARCH':arch,'REVISION':sha}
-        run(['bash','scripts/test-browser-images.sh'],600,cwd=source,env=env)
+        # The VPS intentionally has no host Node installation. Use the exact
+        # Agent image's executable for the test driver, then remove the copy.
+        with tempfile.TemporaryDirectory(prefix='ftrade-release-node-') as node_dir:
+            container=docker('create',updated['browser']['image']).strip()
+            try:docker('cp',container+':/usr/local/bin/node',str(pathlib.Path(node_dir)/'node'))
+            finally:docker('rm',container)
+            env['PATH']=node_dir+os.pathsep+os.environ.get('PATH','')
+            run(['node','--version'],30,env=env)
+            run(['bash','scripts/test-browser-images.sh'],600,cwd=source,env=env)
     if previous.get('computeWorker')!=fp['computeWorker']:
         base=image(source/'ops/video-sandbox/Dockerfile','ftrade-release-media:'+sha)
         worker=image(source/'ops/vps-runtime/compute.Dockerfile','ftrade-release-compute:'+sha,args=['MEDIA_BASE='+base])
@@ -224,11 +230,98 @@ def rollback(cfg, journal):
     if 'previousState' in journal:save(ROOT/'state.json',journal['previousState'])
 
 
+def profile_backup_node_id(config):
+    env=config['environment'];key=env.get('BROWSER_NODE_ACCESS_KEY','')
+    if env.get('BROWSER_NODE_ACCESS_KEY_FILE'):
+        target=pathlib.PurePosixPath(env['BROWSER_NODE_ACCESS_KEY_FILE'])
+        if not target.is_absolute() or '..' in target.parts:raise RuntimeError('profile_backup_key_path_invalid')
+        mounts=[entry.split(':') for entry in config.get('volumes',[])]
+        candidates=[]
+        for parts in mounts:
+            if len(parts) not in [2,3] or not pathlib.Path(parts[0]).is_absolute():continue
+            inside=pathlib.PurePosixPath(parts[1])
+            if target==inside or inside in target.parents:
+                candidates.append((len(inside.parts),pathlib.Path(parts[0])/str(target.relative_to(inside))))
+        if not candidates:raise RuntimeError('profile_backup_key_mount_unavailable')
+        path=max(candidates,key=lambda value:value[0])[1]
+        with os.fdopen(os.open(path,os.O_RDONLY|os.O_NOFOLLOW),'r',encoding='ascii') as stream:
+            info=os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size>4096 or info.st_mode & 0o022:
+                raise RuntimeError('profile_backup_key_file_invalid')
+            key=stream.read(4097).strip()
+    match=re.fullmatch(r'fbn_([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\.[A-Za-z0-9_-]{43}',key)
+    if not match:raise RuntimeError('profile_backup_node_identity_unavailable')
+    return match[1]
+
+
+def backup_profiles_for_official_cutover(previous, updated, source, backup, sha):
+    old = previous.get('browser', {}).get('environment', {}).get('BROWSER_IMAGE')
+    new = updated.get('browser', {}).get('environment', {}).get('BROWSER_IMAGE')
+    if not old or not new or old == new:return None
+    def official(image):
+        value=json.loads(docker('image','inspect',image))[0]
+        return (value['Config'].get('Labels') or {}).get('io.ftrade.official-camoufox')=='1'
+    if not official(new) or official(old):return None
+    # This one-time transition needs a fresh snapshot after drain, not a potentially
+    # stale operator copy made while preparing the release. Never export the key.
+    node=profile_backup_node_id(previous['browser'])
+    destination=pathlib.Path(tempfile.mkdtemp(prefix='native-profiles-',dir=backup))
+    container='ftrade-profile-backup-'+sha[:12];created=False
+    with admission_lock():
+        drain=json.loads((CAPACITY/'drain.json').read_text())
+        if drain['revision']!=sha or workers():raise RuntimeError('profile_backup_requires_owned_drain')
+        names=docker('volume','ls','-q','--filter','label=io.ftrade.node='+node).split()
+        if not names:raise RuntimeError('profile_backup_owned_volumes_missing')
+        volumes=json.loads(docker('volume','inspect',*names))
+        for volume in volumes:
+            account=(volume.get('Labels') or {}).get('io.ftrade.account','')
+            if not re.fullmatch(r'[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}',account) or volume['Name']!='ftbrowser-'+node+'-'+account or volume['Labels'].get('io.ftrade.node')!=node:
+                raise RuntimeError('profile_backup_volume_owner_mismatch')
+        ids=docker('ps','-aq').split()
+        containers=json.loads(docker('inspect',*ids)) if ids else []
+        for current in containers:
+            if current['State']['Status'] in ['created','running','restarting','paused'] and any(m.get('Name') in names for m in current['Mounts']):
+                raise RuntimeError('profile_backup_volume_in_use')
+        # Admit only this bounded, offline maintenance task while our drain is held.
+        # All ordinary work stays refused; use the same adaptive resource checks.
+        import runpy
+        capacity=runpy.run_path(str(source/'ops/host-capacity/admission.py'))
+        for attempt in range(12):
+            mem={line.split(':')[0]:int(line.split()[1])/1024 for line in pathlib.Path('/proc/meminfo').read_text().splitlines()}
+            try:
+                capacity['check_adaptive_budget']([],256,1,mem['MemAvailable'],mem['MemTotal'],os.cpu_count() or 1,json.loads((CAPACITY/'telemetry.json').read_text()),time.time())
+                break
+            except capacity['CapacityUnavailable']:
+                if attempt==11:raise
+                time.sleep(5)
+
+        size=sum(int(run(['du','-sb',v['Mountpoint']]).split()[0]) for v in volumes)
+        if shutil.disk_usage(destination).free<size+1024**3:raise RuntimeError('profile_backup_disk_headroom')
+        save(destination/'volumes.json',volumes)
+        args=['create','--name',container,'--label','io.ftrade.compute=release-profile-backup','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','256m','--memory-swap','256m','--cpus','1','--pids-limit','32','--mount','type=bind,source='+str(destination)+',target=/backup']
+        for volume in volumes:
+            args+=['--mount','type=volume,source='+volume['Name']+',target=/profiles/'+volume['Labels']['io.ftrade.account']+',readonly,volume-nocopy']
+        args+=['--entrypoint','tar',new,'-I','gzip -1','-cpf','/backup/profiles.tar.gz','-C','/profiles','.']
+        try:
+            docker(*args);created=True
+            docker('start','--attach',container,timeout=900)
+            state=json.loads(docker('inspect',container))[0]['State']
+            if state['ExitCode'] or state['OOMKilled']:raise RuntimeError('profile_backup_failed')
+            archive=destination/'profiles.tar.gz';archive.chmod(0o600)
+            run(['gzip','-t',str(archive)],900)
+            with archive.open('rb') as stream:digest=hashlib.file_digest(stream,'sha256').hexdigest()
+            save(destination/'receipt.json',{'revision':sha,'nodeId':node,'volumes':len(volumes),'sha256':digest,'bytes':archive.stat().st_size,'quiescent':True,'readonlySources':True})
+        finally:
+            if created:docker('rm','-f',container)
+    return str(destination)
+
+
 def promote(cfg, previous, updated, source, sha):
     backup=ROOT/'backups'/sha;backup.mkdir(parents=True,exist_ok=True)
     shutil.copy2(CAPACITY/'monitor.py',backup/'monitor.py')
     shutil.copy2(pathlib.Path('/etc/systemd/system')/MONITOR,backup/'monitor.service')
-    journal={'revision':sha,'previous':previous,'backup':str(backup),'startedAt':time.time(),'previousState':json.loads((ROOT/'state.json').read_text()),'deployments':[]}
+    profile_backup=backup_profiles_for_official_cutover(previous,updated,source,backup,sha)
+    journal={'revision':sha,'profileBackup':profile_backup,'previous':previous,'backup':str(backup),'startedAt':time.time(),'previousState':json.loads((ROOT/'state.json').read_text()),'deployments':[]}
     save(ROOT/'journal.json',journal)
     try:
         for target in cfg['targets'].values():cli('service','stop',target['service'],'-p',target['project'])

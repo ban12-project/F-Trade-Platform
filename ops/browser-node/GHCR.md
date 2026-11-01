@@ -15,7 +15,7 @@ PR（包括 fork）在 AMD64 和 ARM64 原生 runner 上构建两种镜像并做
 | `ghcr.io/ban12-project/f-trade-platform-browser-node` | 常驻节点 Agent 与接管网关 |
 | `ghcr.io/ban12-project/f-trade-platform-browser` | Camofox + noVNC + 独立租约看门狗，按任务启动 |
 
-两种镜像作为同一个提交版本构建，均支持 `linux/amd64`、`linux/arm64`。Camofox 基础目标只是 Bake 构建依赖，不单独发布。`camofox.ref` 固定上游源码提交，修改该文件会触发新镜像；CI 与本地构建共享这个来源。基础镜像与软件包仍可能更新，固定源码 SHA 不等于整个供应链完全可复现。
+两种镜像作为同一个提交版本构建，支持 `linux/amd64`、`linux/arm64`。浏览器镜像直接使用官方 `camoufox@0.5.9-beta.6` 与配对的 `v158.0.1-beta.41`，固定 Linux 制品 SHA-256；不再拉取 jo-inc 服务或安装 camoufox-js。基础系统包仍可能更新，版本与制品哈希不能代表整个供应链完全可复现。
 
 每个架构先生成 `run-<workflow run id>-<attempt>-<arch>` 标签；两个架构的构建、镜像内容、API 启动和看门狗退出测试均通过后，才发布该提交的 `sha-<完整40位提交>` 多架构标签。只有该提交仍是最新 `main`，才更新 `main`、`latest`。旧提交重跑不会把这两个滚动标签回退。各架构发布失败时不会推进滚动标签，可能留下未被推广的 run 标签。
 

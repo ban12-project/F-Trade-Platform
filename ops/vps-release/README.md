@@ -82,3 +82,23 @@ Only the two dedicated project IDs in private config are mutated. Edge routes
 remain separately managed. Deployment rollback restores code/configuration; it
 cannot undo arbitrary business data writes. Storage/schema migrations need a
 separate reviewed migration and compatibility plan.
+
+### First official-browser cutover
+
+The legacy-to-official browser transition takes a fresh native-profile snapshot
+inside the release's owned drain, after all workers have stopped and before any
+service configuration changes. It resolves the current node identity using the
+Agent's key-file precedence, verifies every selected volume's ownership and
+refuses mounted or active volumes. The snapshot helper has no network, read-only
+source mounts, one CPU and 256 MiB, with the normal adaptive resource checks.
+
+The private release backup directory contains a `native-profiles-*` directory,
+volume mapping, gzip archive and SHA-256 receipt. Failure prevents promotion;
+an archive without a receipt is incomplete. Routine upgrades after the official
+cutover do not repeat this one-time migration snapshot. Earlier preparation
+snapshots remain separate evidence, since an account may change before drain.
+
+For a later manual rollback, retain a private copy of the post-cutover profiles
+before restoring any pre-cutover snapshot. Verify its receipt and ownership,
+stop account work, and use the retained previous image/configuration. Deployment
+health rollback does not automatically overwrite native account data.

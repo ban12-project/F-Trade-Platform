@@ -234,6 +234,7 @@ export function containerSpec(
         "CAMOFOX_BIND_HOST=0.0.0.0",
         "CAMOFOX_PORT=9377",
         `CAMOFOX_ACCESS_KEY=${accessKey}`,
+        `FTRADE_RUNTIME_RUN_ID=${run.id}`,
         "ENABLE_VNC=1",
         "VNC_BIND=0.0.0.0",
         "VNC_RESOLUTION=1440x900",
@@ -286,6 +287,13 @@ export function containerSpec(
         },
         Mounts: [
           { Type: "volume", Source: volume, Target: "/data", VolumeOptions: { NoCopy: true } },
+          {
+            Type: "volume",
+            Source: "ftrade-browser-geoip-v1",
+            Target: "/opt/ftrade/geoip",
+            ReadOnly: true,
+            VolumeOptions: { NoCopy: true },
+          },
         ],
         NetworkMode: name,
         PortBindings:

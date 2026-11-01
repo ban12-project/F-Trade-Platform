@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer } from "node:http";
-import { Camoufox } from "/app/node_modules/camoufox-js/dist/index.js";
+import { Camoufox } from "/app/official-runtime/node_modules/camoufox/dist/index.js";
 
 let directRequests = 0;
 const target = createServer((_request, response) => {
@@ -38,7 +38,7 @@ try {
     headless: true,
     geoip: false,
     block_webrtc: true,
-    proxy: "http://127.0.0.1:9",
+    proxy: { server: "http://127.0.0.1:9" },
     exclude_addons: ["UBO"],
   });
   const page = await browser.newPage();

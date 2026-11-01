@@ -4,8 +4,8 @@ import {
   createNativeProfileRuntime,
   initializeNativeProfile,
 } from "/app/ftrade-native-profile.mjs";
-import { launchOptions } from "/app/node_modules/camoufox-js/dist/index.js";
-import { firefox } from "/app/node_modules/playwright-core/index.mjs";
+import { launchOptions } from "/app/official-runtime/node_modules/camoufox/dist/index.js";
+import { firefox } from "/app/official-runtime/node_modules/playwright-core/index.mjs";
 
 const mode = process.argv[2];
 assert.ok(mode === "write" || mode === "read");
@@ -23,7 +23,7 @@ const runtime = createNativeProfileRuntime({
   leaseDeadline: async () => Date.now() + 30000,
 });
 const options = await launchOptions({
-  executable_path: "/root/.cache/camoufox/camoufox-bin",
+  executable_path: "/root/.cache/camoufox/browsers/official/158.0.1-beta.41/camoufox-bin",
   headless: true,
   geoip: false,
   os: "linux",

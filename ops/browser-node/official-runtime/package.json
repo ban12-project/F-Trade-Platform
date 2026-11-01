@@ -1,0 +1,10 @@
+{
+  "name": "ftrade-official-camoufox-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "camoufox": "0.5.9-beta.6",
+    "express": "5.2.1",
+    "playwright-core": "1.62.0"
+  }
+}

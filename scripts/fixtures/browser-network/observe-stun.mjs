@@ -5,7 +5,7 @@ import { createSocket } from "node:dgram";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
-import { Camoufox } from "/app/node_modules/camoufox-js/dist/index.js";
+import { Camoufox } from "/app/official-runtime/node_modules/camoufox/dist/index.js";
 
 const family = process.env.SYNTHETIC_IP_FAMILY ?? "IPv4";
 assert.ok(["IPv4", "IPv6"].includes(family), "unsupported synthetic address family");
@@ -82,7 +82,9 @@ try {
       exclude_addons: ["UBO"],
       ...(proxied
         ? {
-            proxy: `http://${proxyHost}:${mode === "proxy-unreachable" ? 9 : proxy.address().port}`,
+            proxy: {
+              server: `http://${proxyHost}:${mode === "proxy-unreachable" ? 9 : proxy.address().port}`,
+            },
           }
         : {}),
       ...(mode === "proxy-webrtc-disabled" ? { block_webrtc: true } : {}),
