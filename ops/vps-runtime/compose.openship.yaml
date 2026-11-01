@@ -11,6 +11,10 @@ services:
       - "127.0.0.1:9500:9500"
     environment:
       FTRADE_RUNTIME_BIND: 0.0.0.0
+      FTRADE_HOST_CAPACITY_DIR: /run/ftrade-capacity
+      FTRADE_COMPUTE_MAX_RUNNING: "16"
+      FTRADE_WORKSPACE_POOL_GIB: "12"
+      FTRADE_WORKSPACE_QUOTAS: "1"
       FTRADE_RUNTIME_TOKEN: ${FTRADE_RUNTIME_TOKEN:?Required}
       FTRADE_COMPUTE_IMAGE: ${FTRADE_COMPUTE_IMAGE:?Pinned local compute image ID}
       FTRADE_COMPUTE_MEMORY_MB: ${FTRADE_COMPUTE_MEMORY_MB:-2048}
@@ -18,6 +22,7 @@ services:
       FTRADE_RUNTIME_NAMESPACE: ${FTRADE_RUNTIME_NAMESPACE:-production}
       FTRADE_WORKSPACE_ROOT: ${FTRADE_WORKSPACE_ROOT:-/opt/ftrade-vps/compute/workspaces}
     volumes:
+      - /opt/ftrade-vps/capacity:/run/ftrade-capacity
       - /var/run/docker.sock:/var/run/docker.sock
       - ${FTRADE_WORKSPACE_ROOT:-/opt/ftrade-vps/compute/workspaces}:${FTRADE_WORKSPACE_ROOT:-/opt/ftrade-vps/compute/workspaces}
     healthcheck:

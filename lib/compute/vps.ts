@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const chunkBytes = 4 * 1024 * 1024;
 const maximumFileBytes = 1024 * 1024 * 1024 - 1;
+class CapacityBusy extends Error {}
 const commandResult = z.object({
   exitCode: z.number().int(),
   stdout: z.string(),
@@ -37,6 +38,10 @@ async function request(body: Record<string, unknown>): Promise<unknown> {
     signal: AbortSignal.timeout(610_000),
   });
   // Never reflect proxy responses or request payloads containing private data.
+  if (response.status === 429 && body.action === "create") {
+    const rejection = await response.text();
+    if (rejection === '{"error":"runtime_capacity_busy"}') throw new CapacityBusy();
+  }
   if (!response.ok) throw new Error("vps_runtime_request_failed");
   if (!response.body) throw new Error("vps_runtime_response_missing");
   const chunks: Uint8Array[] = [];
@@ -52,15 +57,24 @@ async function request(body: Record<string, unknown>): Promise<unknown> {
   return value.result;
 }
 
-/** Capability for one short-lived, network-disabled container. No automatic
- * retries: an ambiguous create is left to the server's independent deadline. */
+/** Retry only an explicit pre-admission capacity rejection. Ambiguous creation
+ * and command responses are never retried: the independent deadline owns them. */
 export class VpsCompute {
   private constructor(private readonly id: string) {}
 
   static async create() {
     vpsComputeEnabled();
-    const value = z.object({ id: z.uuid() }).parse(await request({ action: "create" }));
-    return new VpsCompute(value.id);
+    const deadline = Date.now() + 120_000;
+    for (;;) {
+      try {
+        const value = z.object({ id: z.uuid() }).parse(await request({ action: "create" }));
+        return new VpsCompute(value.id);
+      } catch (error) {
+        if (!(error instanceof CapacityBusy)) throw error;
+        if (Date.now() >= deadline) throw new Error("vps_runtime_capacity_wait_expired");
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
   }
 
   async download(url: string, hostname: string, path: string) {

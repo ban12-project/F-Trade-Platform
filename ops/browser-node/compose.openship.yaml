@@ -20,11 +20,13 @@ services:
       BROWSER_IMAGE: ${BROWSER_IMAGE:?Pinned local browser image ID}
       BROWSER_NATIVE_PROFILES: "1"
       BROWSER_MANAGED_FACEBOOK_CONFIG_DIR: /run/facebook-config
-      MAX_RUNNING_BROWSERS: "1"
+      FTRADE_HOST_CAPACITY_DIR: /run/ftrade-capacity
+      MAX_RUNNING_BROWSERS: "16"
       BROWSER_MAX_MEMORY_MB: "2048"
-      HOST_RESERVE_MB: "3072"
+      HOST_RESERVE_MB: "1536"
       GATEWAY_PORT: "9400"
     volumes:
+      - /opt/ftrade-vps/capacity:/run/ftrade-capacity
       - /var/run/docker.sock:/var/run/docker.sock
       - ${BROWSER_PRIVATE_DIR:?Private host directory}/node-key:/run/secrets/node-key:ro
       - ${BROWSER_PRIVATE_DIR}/facebook:/run/facebook-config:ro

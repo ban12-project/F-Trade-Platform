@@ -13,12 +13,15 @@ async function main() {
   let file = Buffer.alloc(0);
   let failed = false;
   let commandFailure = false;
+  let capacityRejects = 0;
   globalThis.fetch = async (input, init) => {
     assert.equal(String(input), "https://runtime.example.com/v1/compute");
     assert.equal(init?.cache, "no-store");
     assert.equal(init?.redirect, "error");
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     calls.push(body);
+    if (body.action === "create" && capacityRejects-- > 0)
+      return new Response('{"error":"runtime_capacity_busy"}', { status: 429 });
     if (failed) return new Response("private upstream diagnostic", { status: 503 });
     let result: unknown = null;
     if (body.action === "create") result = { id: "00000000-0000-4000-8000-000000000001" };
@@ -69,6 +72,10 @@ async function main() {
       stopCount + 1,
       "Failed runtime readiness releases capacity",
     );
+    capacityRejects = 1;
+    const beforeCapacity = calls.length;
+    await VpsCompute.create();
+    assert.equal(calls.length, beforeCapacity + 2, "Only explicit capacity rejection is retried");
     failed = true;
     const before = calls.length;
     await assert.rejects(createComputeRuntime(), /^Error: vps_runtime_request_failed$/);
@@ -83,7 +90,7 @@ async function main() {
     process.env.VPS_RUNTIME_ORIGIN = "http://runtime.example.com";
     await assert.rejects(VpsCompute.create(), /configuration_invalid/);
     console.log(
-      "PASS VPS client: provider fail-closed, bounded chunk roundtrip, private transport, no automatic create retry",
+      "PASS VPS client: provider fail-closed, bounded chunk roundtrip, private transport, capacity-only retry, no ambiguous create retry",
     );
   } finally {
     globalThis.fetch = oldFetch;
