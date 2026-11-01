@@ -13,6 +13,7 @@ RUN npm install --omit=dev --no-audit --no-fund --save-exact @remotion/renderer@
     && node --input-type=module -e 'import {ensureBrowser} from "@remotion/renderer"; import {writeFileSync} from "node:fs"; const browser=await ensureBrowser(); if(!browser.path) throw new Error("browser_not_installed"); writeFileSync("browser-path",browser.path)' \
     && chmod -R a+rX /opt/ftrade-remotion
 COPY ops/vps-runtime/render.mjs /opt/ftrade-remotion/render.mjs
+COPY ops/vps-runtime/render-workspace.mjs /opt/ftrade-remotion/render-workspace.mjs
 ENV HOME=/tmp
 WORKDIR /vercel/sandbox
 CMD ["sleep", "600"]

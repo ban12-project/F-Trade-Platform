@@ -1,10 +1,19 @@
 import assert from "node:assert/strict";
 import type { Database } from "../lib/db/client";
-import { videoProcessingFailureMessage } from "../lib/video/processing-failures";
+import {
+  renderCommandFailureCode,
+  VideoRenderCommandError,
+  videoProcessingFailureMessage,
+} from "../lib/video/processing-failures";
 import { failVideoJob, latestVideoProcessingJobs } from "../lib/video/processing-jobs";
 
 void (async () => {
   const secret = "https://private.example.invalid/source.png?token=SYNTHETIC-SECRET";
+  const diskFailure = renderCommandFailureCode(`ENOSPC: no space left on device ${secret}`);
+  assert.equal(diskFailure, "RENDER_STORAGE_EXHAUSTED");
+  assert.equal(new VideoRenderCommandError(diskFailure).message.includes(secret), false);
+  assert.equal(videoProcessingFailureMessage(diskFailure).includes(secret), false);
+  assert.equal(renderCommandFailureCode(`Unable to fetch ${secret}`), "RENDER_FAILED");
   let saved: Record<string, unknown> | undefined;
   const chain = {
     set(value: Record<string, unknown>) {
@@ -39,6 +48,9 @@ void (async () => {
   } as unknown as Database;
   await failVideoJob("synthetic-job", "RENDER_FAILED", writeDb);
   assert.equal(saved?.failureMessage, videoProcessingFailureMessage("RENDER_FAILED"));
+  await failVideoJob("synthetic-disk-job", diskFailure, writeDb);
+  assert.equal(saved?.failureCode, "RENDER_STORAGE_EXHAUSTED");
+  assert.equal(saved?.failureMessage, videoProcessingFailureMessage(diskFailure));
   await failVideoJob("synthetic-source-job", "AI_DRAFT_SOURCE_INVALID", writeDb);
   assert.equal(
     saved?.failureMessage,

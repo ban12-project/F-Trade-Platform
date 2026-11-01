@@ -93,6 +93,7 @@
     "test:video-rendering": "tsx scripts/test-video-rendering.ts",
     "test:ffmpeg-renderer": "tsx scripts/test-ffmpeg-renderer.ts",
     "test:remotion-abcd": "tsx scripts/test-remotion-abcd.ts",
+    "test:remotion-workspace": "node --test scripts/test-remotion-workspace.mjs",
     "test:video-social-publication": "tsx scripts/test-video-social-publication.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

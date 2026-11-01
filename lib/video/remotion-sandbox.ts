@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { VpsCompute, vpsComputeEnabled } from "../compute/vps";
 import { videoProbeEntries } from "./encoding-contract";
 import { parseFfprobeOutput } from "./media-probe";
+import { renderCommandFailureCode, VideoRenderCommandError } from "./processing-failures";
 import { createRemotionCompositionProps } from "./remotion-props";
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
@@ -89,7 +90,8 @@ async function renderRemotionOnVps(
       cmd: "node",
       args: ["/opt/ftrade-remotion/render.mjs"],
     });
-    if (rendered.exitCode !== 0) throw new Error("VPS Remotion 渲染失败。");
+    if (rendered.exitCode !== 0)
+      throw new VideoRenderCommandError(renderCommandFailureCode(await rendered.stderr()));
     const output = "/vercel/sandbox/work/output.mp4";
     const inspected = await runtime.runCommand({
       cmd: "ffprobe",

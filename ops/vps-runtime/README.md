@@ -68,6 +68,14 @@ on container loopback. The renderer retains H.264/AAC/yuv420p/bt709/CRF18 and au
 track policy; application ffprobe acceptance still runs. Keep the renderer
 package version in the image aligned with the repository Remotion packages.
 
+Remotion initializes `TMPDIR` to `/vercel/sandbox/work/tmp` before loading its
+renderer. Chrome profiles, downloaded media copies and extracted frames inherit
+this job-local scratch directory in the quota-bound workspace. They must not use
+the 256 MiB `/tmp` tmpfs: valid larger source videos can exhaust it before the
+first frame renders. Broker stop/deadline cleanup removes the scratch files with
+the rest of the workspace; host pool, per-job quota and memory limits still apply.
+Run `pnpm test:remotion-workspace` to check child-process scratch placement.
+
 Run local tests:
 
 ```sh
