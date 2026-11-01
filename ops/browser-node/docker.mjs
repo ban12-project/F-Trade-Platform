@@ -145,7 +145,9 @@ export function containerSpec(
   deadline,
   nativeProfile = false,
   maximumMemoryMb = 8192,
+  networkMode = "host",
 ) {
+  if (!["host", "bridge"].includes(networkMode)) throw new Error("agent_network_mode_invalid");
   if (typeof nativeProfile !== "boolean") throw new Error("native_profile_mode_invalid");
   identifier(nodeId);
   identifier(run.id);
@@ -258,10 +260,13 @@ export function containerSpec(
         },
         Mounts: [{ Type: "volume", Source: volume, Target: "/data" }],
         NetworkMode: name,
-        PortBindings: {
-          "9377/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }],
-          "6080/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }],
-        },
+        PortBindings:
+          networkMode === "bridge"
+            ? {}
+            : {
+                "9377/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }],
+                "6080/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }],
+              },
         LogConfig: { Type: "none" },
       },
     },

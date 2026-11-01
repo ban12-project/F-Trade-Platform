@@ -28,6 +28,12 @@ import {
 } from "./login.mjs";
 import { managedFacebookEnvironment } from "./managed-facebook.mjs";
 import { readPublicationMedia } from "./media.mjs";
+import {
+  agentNetworkMode,
+  findAgentContainer,
+  removeTaskNetwork,
+  workerEndpoint,
+} from "./network.mjs";
 import { createPublicationAuthorizer, createPublicationReporter } from "./publication.mjs";
 import {
   createPublicationPageInspector,
@@ -60,6 +66,8 @@ if (!Number.isInteger(maximumMemoryMb) || maximumMemoryMb < 1024 || maximumMemor
 if (!Number.isInteger(maxSlots) || !Number.isFinite(reserveMb))
   throw new Error("node_capacity_invalid");
 const docker = dockerClient(process.env.DOCKER_SOCKET ?? "/var/run/docker.sock");
+const networkMode = agentNetworkMode(process.env.BROWSER_AGENT_NETWORK_MODE);
+const agentContainerId = networkMode === "bridge" ? await findAgentContainer(docker) : null;
 const image = await docker(
   "GET",
   `/images/${encodeURIComponent(process.env.BROWSER_IMAGE ?? "ftrade-browser:lease-v1")}/json`,
@@ -134,7 +142,7 @@ async function checkpoint() {
 }
 async function browserRequest(slot, path, body, timeout = 30_000) {
   if (slot.expiresAt <= Date.now()) throw new Error("local_lease_expired");
-  const response = await fetch(`http://127.0.0.1:${slot.apiPort}${path}`, {
+  const response = await fetch(`http://${slot.workerHost}:${slot.apiPort}${path}`, {
     method: body === undefined ? "GET" : "POST",
     redirect: "error",
     headers: {
@@ -154,7 +162,6 @@ if (
 )
   throw new Error("node_memory_exceeds_host_limit");
 gatewayOrigin = secureOrigin(sync.gatewayOrigin);
-const filters = encodeURIComponent(JSON.stringify({ label: [`io.ftrade.node=${nodeId}`] }));
 // The managed Agent also carries the node label so the platform can retire its
 // exact session. Only task containers belong in browser lease recovery.
 const browserFilters = encodeURIComponent(
@@ -162,8 +169,9 @@ const browserFilters = encodeURIComponent(
 );
 const leftovers = await docker("GET", `/containers/json?all=true&filters=${browserFilters}`);
 for (const container of leftovers) await stopContainer(docker, container.Id);
-const oldNetworks = await docker("GET", `/networks?filters=${filters}`);
-for (const network of oldNetworks) await docker("DELETE", `/networks/${network.Id}`);
+const oldNetworks = await docker("GET", `/networks?filters=${browserFilters}`);
+for (const network of oldNetworks)
+  await removeTaskNetwork(docker, network.Id, nodeId, agentContainerId);
 await nodeCall("recover", {
   stoppedRunIds: sync.runs.filter(isLive).map((r) => r.id),
   capabilities: adapter.capabilities,
@@ -194,6 +202,7 @@ const gateway = createGateway({
     },
   }),
   port: Number(process.env.GATEWAY_PORT ?? 9400),
+  host: networkMode === "bridge" ? "0.0.0.0" : "127.0.0.1",
 });
 console.log("browser_node_ready");
 
@@ -210,7 +219,7 @@ async function stop(slot, outcome = "failed") {
       if (slot.apiPort && slot.expiresAt > Date.now()) {
         try {
           const response = await fetch(
-            `http://127.0.0.1:${slot.apiPort}/sessions/${slot.run.accountId}/storage_state`,
+            `http://${slot.workerHost}:${slot.apiPort}/sessions/${slot.run.accountId}/storage_state`,
             {
               headers: { Authorization: `Bearer ${slot.accessKey}` },
               redirect: "error",
@@ -223,11 +232,7 @@ async function stop(slot, outcome = "failed") {
         }
       }
       await stopContainer(docker, slot.containerId ?? slot.name);
-      try {
-        await docker("DELETE", `/networks/${slot.name}`);
-      } catch (error) {
-        if (error.status !== 404) throw error;
-      }
+      await removeTaskNetwork(docker, slot.name, nodeId, agentContainerId);
       slot.stopped = true;
       await checkpoint();
     }
@@ -260,6 +265,10 @@ async function launch(slot) {
     Labels: spec.labels,
   });
   if (slot.stopping) return;
+  if (agentContainerId) {
+    await docker("POST", `/networks/${spec.name}/connect`, { Container: agentContainerId });
+    if (slot.stopping) return;
+  }
   slot.launchStage = "container-create";
   const created = await docker("POST", `/containers/create?name=${spec.name}`, spec.body);
   slot.containerId = created.Id;
@@ -268,8 +277,7 @@ async function launch(slot) {
   await docker("POST", `/containers/${created.Id}/start`);
   slot.launchStage = "container-inspect";
   const details = await docker("GET", `/containers/${created.Id}/json`);
-  slot.apiPort = Number(details.NetworkSettings.Ports["9377/tcp"][0].HostPort);
-  slot.vncPort = Number(details.NetworkSettings.Ports["6080/tcp"][0].HostPort);
+  Object.assign(slot, workerEndpoint(details, spec.name, networkMode));
   slot.launchStage = "browser-health";
   await waitForBrowserReady((path, body, timeout) => browserRequest(slot, path, body, timeout), {
     assertActive() {
@@ -480,6 +488,7 @@ async function tick() {
           expiresAt,
           nativeProfiles,
           maximumMemoryMb,
+          networkMode,
         );
         configureLoginRuntime(spec, claim.run, loginProfileForRun(loginProfiles, claim.run));
         return { expiresAt, spec };
