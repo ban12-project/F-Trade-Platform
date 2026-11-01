@@ -11,6 +11,35 @@ spec=importlib.util.spec_from_file_location('bootstrap',pathlib.Path(__file__).w
 b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
 
 class ReleaseTest(unittest.TestCase):
+    def test_native_browser_build_sets_architecture_and_keeps_resource_limits(self):
+        from types import SimpleNamespace
+        source=pathlib.Path(__file__).resolve().parents[2]
+        for reported,expected in [('x86_64','amd64'),('amd64','amd64'),('aarch64','arm64'),('arm64','arm64')]:
+            calls=[]
+            def command(args, timeout=60, cwd=None, env=None):
+                calls.append((args,env));return ''
+            def docker(*args,**kwargs):
+                if args[:1]==('info',):return reported+'\n'
+                if args[:2]==('image','inspect'):return 'sha256:'+'a'*64
+                return ''
+            with self.subTest(reported=reported),patch.object(pathlib.Path,'stat',return_value=SimpleNamespace(st_gid=999)),patch.object(r,'run',side_effect=command),patch.object(r,'docker',side_effect=docker):
+                r.build(source,'a'*40,{'computeWorker':'same'},{'browserWorker':'changed','computeWorker':'same'},{'browser':{'environment':{}},'runtime':{'environment':{}}})
+            base=[(args,env) for args,env in calls if args[:2]==['docker','build'] and any(str(x).endswith('upstream/Dockerfile.ci') for x in args)]
+            self.assertEqual(len(base),1)
+            args,env=base[0]
+            self.assertIn('TARGETARCH='+expected,args)
+            self.assertEqual(args[args.index('--memory')+1],'2g')
+            self.assertEqual(args[args.index('--cpu-quota')+1],'200000')
+            self.assertEqual(env['DOCKER_BUILDKIT'],'0')
+            smoke=[env for args,env in calls if args==['bash','scripts/test-browser-images.sh']]
+            self.assertEqual(smoke[0]['ARCH'],expected)
+
+    def test_unknown_daemon_architecture_refuses_before_any_build(self):
+        with patch.object(r,'docker',return_value='unsupported-machine'),patch.object(r,'run') as run:
+            with self.assertRaisesRegex(RuntimeError,'unsupported_build_architecture'):
+                r.build(pathlib.Path('/unused'),'a'*40,{}, {}, {})
+            run.assert_not_called()
+
     def test_drain_waits_for_two_empty_observations(self):
         tick=[0];answers=iter([[{}],[],[]]);sleeps=[]
         def sleep(n):tick[0]+=n;sleeps.append(n)

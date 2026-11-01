@@ -138,6 +138,10 @@ def reserve_build(sha, image, timeout=1200):
 
 
 def build(source, sha, previous, fp, configs):
+    # The resource-limited legacy builder does not populate BuildKit platform ARGs.
+    reported=docker('info','--format','{{.Architecture}}').strip()
+    arch={'x86_64':'amd64','amd64':'amd64','aarch64':'arm64','arm64':'arm64'}.get(reported)
+    if arch is None:raise RuntimeError('unsupported_build_architecture')
     gid=str(pathlib.Path('/var/run/docker.sock').stat().st_gid)
     def image(file, tag, context=source, args=()):
         cmd=['docker','build','--memory','2g','--memory-swap','2g','--cpu-period','100000','--cpu-quota','200000','--label','org.opencontainers.image.revision='+sha,'-q','-t',tag,'-f',str(file)]
@@ -153,13 +157,13 @@ def build(source, sha, previous, fp, configs):
         run(['sh','ops/browser-node/prepare-upstream.sh'],180,cwd=source)
         hcl=(source/'ops/browser-node/docker-bake.hcl').read_text()
         args=[key+'='+re.search(key+r'\s*=\s*"([\w.-]+)"',hcl)[1] for key in ['CAMOUFOX_VERSION','CAMOUFOX_RELEASE']]
-        base=image(source/'ops/browser-node/upstream/Dockerfile.ci','ftrade-release-camofox:'+sha,source/'ops/browser-node/upstream',args)
+        base=image(source/'ops/browser-node/upstream/Dockerfile.ci','ftrade-release-camofox:'+sha,source/'ops/browser-node/upstream',args+['TARGETARCH='+arch])
         worker=image(source/'ops/browser-node/browser.Dockerfile','ftrade-release-browser:'+sha,source/'ops/browser-node',['BROWSER_BASE_IMAGE='+base])
         updated['browser']['environment']['BROWSER_IMAGE']=worker
         # Run the existing complete offline browser-image acceptance on this exact pair.
-        docker('tag',updated['browser']['image'],'ftrade-release-browser-node:'+sha+'-amd64')
-        docker('tag',worker,'ftrade-release-browser:'+sha+'-amd64')
-        env={**os.environ,'IMAGE_PREFIX':'ftrade-release','BUILD_TAG':sha,'ARCH':'amd64','REVISION':sha}
+        docker('tag',updated['browser']['image'],'ftrade-release-browser-node:'+sha+'-'+arch)
+        docker('tag',worker,'ftrade-release-browser:'+sha+'-'+arch)
+        env={**os.environ,'IMAGE_PREFIX':'ftrade-release','BUILD_TAG':sha,'ARCH':arch,'REVISION':sha}
         run(['bash','scripts/test-browser-images.sh'],600,cwd=source,env=env)
     if previous.get('computeWorker')!=fp['computeWorker']:
         base=image(source/'ops/video-sandbox/Dockerfile','ftrade-release-media:'+sha)

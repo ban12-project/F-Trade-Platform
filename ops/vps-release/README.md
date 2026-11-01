@@ -21,6 +21,10 @@ changes to bootstrap.py require a deliberate host update.
   `runtime_inputs_unchanged` receipt without restarting services. Worker images
   are rebuilt only when their Dockerfile, copied payload or pinned browser build
   inputs change. Both controller images are rebuilt for relevant releases.
+- Native builds read and validate the Docker daemon architecture (amd64/arm64),
+  explicitly pass `TARGETARCH` to the browser base, and use the same architecture
+  for image smoke tags. The resource-limited legacy builder does not supply
+  BuildKit automatic platform arguments. Unknown architectures fail before builds.
 - Builds reserve 2 GiB in shared admission and use the legacy Docker builder's
   2 GiB / 2 CPU limits. CPU and available memory are checked before building.
   Root-disk headroom must be at least 4 GiB (12 GiB for worker rebuilds).
