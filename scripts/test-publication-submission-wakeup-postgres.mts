@@ -43,9 +43,7 @@ mock.module("@vercel/blob", {
   },
 });
 const { ownerBrowserCommand } = await import("../lib/browser-fleet/store");
-const { enqueueQueuedPublicationSandboxes } = await import(
-  "../lib/browser-fleet/sandbox-publication-wakeup"
-);
+const { schedulePublications } = await import("../lib/browser-fleet/publication");
 const { submitControlledPublication, listProjectPublicationData } = await import(
   "../lib/social/publication-store"
 );
@@ -68,7 +66,16 @@ try {
     process.env.SOCIAL_FACEBOOK_OWNER_USER_ID = f.actorId;
     const actor = { id: f.actorId, sessionId: f.sessionId };
     const { nodeId } = await ownerBrowserCommand(
-      { operation: "create-sandbox", value: { name: "SYNTHETIC publication submission" } },
+      {
+        operation: "create",
+        value: {
+          name: "SYNTHETIC VPS publication submission",
+          gatewayOrigin: "https://synthetic-node.example.invalid",
+          maxBrowsers: 1,
+          memoryBudgetMb: 2048,
+          browserMemoryMb: 2048,
+        },
+      },
       actor,
     );
     assert(nodeId);
@@ -144,6 +151,21 @@ try {
         )
       ).rows,
     });
+    // The supported VPS agent reserves durable demand on its next claim, under
+    // the node lock. Submission must not start a retired managed Sandbox.
+    const reserve = () =>
+      db.transaction(async (tx) => {
+        const rows = await tx.execute(sql`SELECT document FROM browser_fleet_node
+        WHERE id = ${nodeId} FOR UPDATE`);
+        const current = rows.rows[0].document as FleetState;
+        await schedulePublications(tx, nodeId, current, Date.now());
+        await tx.execute(sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(current)}::jsonb
+        WHERE id = ${nodeId}`);
+      });
+    await assert.rejects(
+      ownerBrowserCommand({ operation: "create-sandbox", value: { name: "Retired" } }, actor),
+      /vercel_sandbox_retired_use_vps/,
+    );
     const before = await snapshot();
     if (scenario.endsWith("-busy")) {
       const blocker = await pool.connect();
@@ -162,33 +184,36 @@ try {
         assert.equal(deferred.publications.length, 1);
         assert.equal(deferred.outbox.length, 0);
         assert.equal(deferred.reservations.length, 0);
-        assert.equal(deferred.sandbox[0].phase, "stopped");
+        assert.equal(deferred.sandbox.length, 0);
+        assert.equal(deferred.jobs.length, 1);
       } finally {
         await blocker.query("ROLLBACK");
         blocker.release();
         await pending?.catch(() => {});
       }
-      await enqueueQueuedPublicationSandboxes(db, nodeId);
+      await reserve();
       const recovered = await snapshot();
       assert.equal(recovered.publications.length, 1);
-      assert.equal(recovered.outbox.length, 1);
+      assert.equal(recovered.outbox.length, 0);
       assert.equal(recovered.reservations.length, 1);
-      assert.equal(recovered.sandbox[0].phase, "starting");
+      assert.equal(recovered.sandbox.length, 0);
+      await reserve();
+      assert.deepEqual(await snapshot(), recovered);
       count++;
       continue;
     }
     await db.execute(
-      sql`CREATE FUNCTION synthetic_reject_publication_start() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'SYNTHETIC outbox insertion rejected'; END $$`,
+      sql`CREATE FUNCTION synthetic_reject_publication_start() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action IN ('social_publication.submitted', 'facebook_media.confirmed') THEN RAISE EXCEPTION 'SYNTHETIC publication audit rejected'; END IF; RETURN NEW; END $$`,
     );
     await db.execute(
-      sql`CREATE TRIGGER synthetic_reject_publication_start AFTER INSERT ON browser_sandbox_outbox FOR EACH ROW EXECUTE FUNCTION synthetic_reject_publication_start()`,
+      sql`CREATE TRIGGER synthetic_reject_publication_start AFTER INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION synthetic_reject_publication_start()`,
     );
     try {
-      // Failure after insertion proves that neither a job nor a start intent commits alone.
+      // Audit failure after business insertion rolls back the job and publication together.
       await assert.rejects(submit, (error: unknown) => {
         assert(
           String((error as { cause?: unknown }).cause ?? error).includes(
-            "SYNTHETIC outbox insertion rejected",
+            "SYNTHETIC publication audit rejected",
           ),
           String((error as { cause?: unknown }).cause ?? error),
         );
@@ -197,25 +222,26 @@ try {
       assert.deepEqual(await snapshot(), before);
       count++;
     } finally {
-      await db.execute(
-        sql`DROP TRIGGER synthetic_reject_publication_start ON browser_sandbox_outbox`,
-      );
+      await db.execute(sql`DROP TRIGGER synthetic_reject_publication_start ON audit_event`);
       await db.execute(sql`DROP FUNCTION synthetic_reject_publication_start()`);
     }
     const replies = await Promise.all([submit(), submit(), submit()]);
     assert.deepEqual(replies[0], replies[1]);
     assert.deepEqual(replies[1], replies[2]);
+    const submitted = await snapshot();
+    assert.equal(submitted.publications.length, 1);
+    assert.equal(submitted.jobs.length, 1);
+    assert.equal(submitted.reservations.length, 0);
+    assert.equal(submitted.outbox.length, 0);
+    assert.equal(submitted.sandbox.length, 0);
+    await reserve();
     const saved = await snapshot();
     assert.equal(saved.publications.length, 1);
     assert.equal(saved.jobs.length, 1);
     assert.equal(saved.reservations.length, 1);
-    assert.equal(
-      saved.outbox.length,
-      1,
-      "submission persists start intent without after() or cron",
-    );
-    assert.equal(saved.sandbox[0].phase, "starting");
-    await enqueueQueuedPublicationSandboxes(db, nodeId);
+    assert.equal(saved.outbox.length, 0, "VPS publication never starts retired Sandbox compute");
+    assert.equal(saved.sandbox.length, 0);
+    await reserve();
     assert.deepEqual(await snapshot(), saved, "recovery does not duplicate the committed intent");
     count++;
     for (const code of [
@@ -242,7 +268,7 @@ try {
     count++;
   }
   console.log(
-    `PASS ${count} PostgreSQL text/image/video submission, rollback, idempotency and diagnostic privacy scenarios; no external I/O`,
+    `PASS ${count} PostgreSQL VPS text/image/video submission, rollback, idempotency and diagnostic privacy scenarios; no external I/O`,
   );
 } finally {
   await closeDatabase();
