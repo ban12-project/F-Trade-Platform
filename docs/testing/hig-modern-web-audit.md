@@ -69,14 +69,16 @@ pnpm test:e2e tests/e2e/workspace-modern-ux.spec.ts tests/e2e/workspace-navigati
 
 The existing Playwright configuration builds the production testing app and uses Chromium. Passing that command does not establish Safari or assistive-technology acceptance. Run the full repository checks before merge as well.
 
-Broader device and assistive-technology acceptance remains tracked in #391:
+Broader device and assistive-technology acceptance remains tracked in #391.
+On 2026-11-01 the user explicitly removed browser/text scaling acceptance
+(including 200% text size and 400% browser zoom) from MVP1. It is not deferred
+or marked passed, and must not be reopened from historical observations below:
 
 1. Safari/iOS and an Android browser: portrait, landscape, keyboard open, long project names, large task counts, safe areas and nested sheets. Reach the last field and dismiss without relying on a swipe.
 2. Keyboard + VoiceOver/NVDA: skip link, current step, panel open/close and focus restoration, field error announcement, dirty-change confirmation and loading completion. Verify route caching does not introduce duplicate active landmarks.
-3. 200% text size and 400% desktop zoom: inspect clipping, horizontal scrolling, title wrapping and fixed-dock obstruction. Check dashboard, forms, project details, authentication, video editor and media previews.
-4. Light/dark tokens, increased contrast, forced colors, reduced motion and reduced transparency. Inspect real rendered text/control contrast rather than treating neutral-token math as a whole-page audit.
-5. Empty/error/slow-network states and business regressions: pipeline empty state, field/server errors, long model/tool forms, draft retention, explicit approvals, publication and send confirmations. No real customer, account or media data is needed.
-6. Performance: record production LCP/INP/CLS and bundle/network baselines, then compare on the same device/network. No numerical performance improvement is asserted here.
+3. Light/dark tokens, increased contrast, forced colors, reduced motion and reduced transparency. Inspect real rendered text/control contrast rather than treating neutral-token math as a whole-page audit.
+4. Empty/error/slow-network states and business regressions: pipeline empty state, field/server errors, long model/tool forms, draft retention, explicit approvals, publication and send confirmations. No real customer, account or media data is needed.
+5. Performance: record production LCP/INP/CLS and bundle/network baselines, then compare on the same device/network. No numerical performance improvement is asserted here.
 
 ## Safety and rollout
 
