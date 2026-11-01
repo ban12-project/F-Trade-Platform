@@ -29,7 +29,16 @@ if not re.fullmatch(r'[A-Za-z0-9_-]{48,256}', TOKEN) or not re.fullmatch(r'sha25
 MEMORY_MB = int(os.environ.get('FTRADE_COMPUTE_MEMORY_MB', '2048'))
 if not 1024 <= MEMORY_MB <= 3072:
     raise RuntimeError('invalid compute memory budget')
-WORKSPACE_ROOT = pathlib.Path('/opt/ftrade-vps/compute/workspaces')
+WORKSPACE_ROOT = pathlib.Path(os.environ.get('FTRADE_WORKSPACE_ROOT', '/opt/ftrade-vps/compute/workspaces'))
+# These are trusted deployment settings, never values supplied by API clients.
+# The mount must use the identical absolute path on the Docker host and broker.
+if not re.fullmatch(r'/[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*', str(WORKSPACE_ROOT)):
+    raise RuntimeError('invalid workspace root')
+NAMESPACE = os.environ.get('FTRADE_RUNTIME_NAMESPACE', 'production')
+if not re.fullmatch(r'[a-z][a-z0-9-]{0,31}', NAMESPACE):
+    raise RuntimeError('invalid runtime namespace')
+LABEL_VALUE = '1' if NAMESPACE == 'production' else NAMESPACE
+CONTAINER_PREFIX = 'ftrade-compute-' if NAMESPACE == 'production' else 'ftrade-compute-' + NAMESPACE + '-'
 MAX_FILE_BYTES = 1024**3 - 1
 MAX_DOWNLOAD_BYTES = MAX_FILE_BYTES * 3
 DOWNLOAD_BYTES = {}
@@ -216,11 +225,31 @@ def remove_container(name):
         raise ValueError('container_stop_unconfirmed')
 
 
+def instance_workspace():
+    # Never traverse a user-created symlink into another instance's workspaces.
+    # Production retains the original paths for compatibility and rollback.
+    if NAMESPACE == 'production':
+        return WORKSPACE_ROOT
+    directory = WORKSPACE_ROOT / ('instance-' + NAMESPACE)
+    if directory.is_symlink():
+        raise ValueError('workspace_namespace_symlink')
+    directory.mkdir(mode=0o700, exist_ok=True)
+    return directory
+
+
+def cleanup_previous_sessions():
+    workspace_pool_ready()
+    for cid in checked(['ps', '-aq', '--filter', f'label={LABEL}={LABEL_VALUE}']).decode().split():
+        checked(['rm', '-f', cid])
+    for directory in instance_workspace().glob('job-*'):
+        remove_workspace(directory.name.removeprefix('job-'))
+
+
 def remove_workspace(sid):
     if not re.fullmatch(r'[a-f0-9-]{36}', sid):
         raise ValueError('invalid_workspace')
     workspace_pool_ready()
-    directory = WORKSPACE_ROOT / ('job-' + sid)
+    directory = instance_workspace() / ('job-' + sid)
     if directory.exists():
         if directory.is_symlink():
             raise ValueError('workspace_symlink')
@@ -247,19 +276,19 @@ def dispatch(body):
             pool = workspace_pool_ready()
             if pool.f_bavail * pool.f_frsize < 10 * 1024**3:
                 raise ValueError('workspace_pool_capacity_unavailable')
-            active = checked(['ps', '-q', '--filter', f'label={LABEL}=1']).splitlines()
+            active = checked(['ps', '-q', '--filter', f'label={LABEL}']).splitlines()
             if active:
                 raise ValueError('capacity_exhausted')
             sid = str(uuid.uuid4())
-            name = 'ftrade-compute-' + sid
-            directory = WORKSPACE_ROOT / ('job-' + sid)
+            name = CONTAINER_PREFIX + sid
+            directory = instance_workspace() / ('job-' + sid)
             directory.mkdir(mode=0o700)
             # Register before Docker invocation: an ambiguous timeout can leave a
             # live container. Failed cleanup remains tracked for the reaper.
             DOWNLOAD_BYTES[sid] = 0
             SESSIONS[sid] = (name, time.monotonic() + 600, threading.Lock())
             try:
-                checked(['run', '-d', '--rm', '--name', name, '--label', f'{LABEL}=1',
+                checked(['run', '-d', '--rm', '--name', name, '--label', f'{LABEL}={LABEL_VALUE}',
                          '--network', 'none', '--read-only', '--cap-drop', 'ALL',
                          '--security-opt', 'no-new-privileges', '--user', '65534:65534',
                          '--memory', f'{MEMORY_MB}m', '--memory-swap', f'{MEMORY_MB}m', '--cpus', '2', '--pids-limit', '256',
@@ -413,11 +442,6 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTERM, terminate)
     # After a service restart no previous capability is valid. Remove only this
     # service's ephemeral containers; browser profile volumes are never touched.
-    workspace_pool_ready()
-    for cid in checked(['ps','-aq','--filter',f'label={LABEL}=1']).decode().split():
-        checked(['rm','-f',cid])
-    for directory in WORKSPACE_ROOT.glob('job-*'):
-        sid = directory.name.removeprefix('job-')
-        remove_workspace(sid)
+    cleanup_previous_sessions()
     threading.Thread(target=reap, daemon=True).start()
     BrokerServer((os.environ.get('FTRADE_RUNTIME_BIND', '127.0.0.1'), 9500), Handler).serve_forever()
