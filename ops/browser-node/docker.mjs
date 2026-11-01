@@ -287,6 +287,13 @@ export function containerSpec(
         },
         Mounts: [
           { Type: "volume", Source: volume, Target: "/data", VolumeOptions: { NoCopy: true } },
+          {
+            Type: "volume",
+            Source: "ftrade-browser-geoip-v1",
+            Target: "/opt/ftrade/geoip",
+            ReadOnly: true,
+            VolumeOptions: { NoCopy: true },
+          },
         ],
         NetworkMode: name,
         PortBindings:

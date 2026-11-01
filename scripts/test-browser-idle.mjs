@@ -31,7 +31,12 @@ test("invalid deployment settings fail instead of silently staying resident", ()
     );
 });
 
-test("actual Agent exits after an empty queue in on-demand mode", { timeout: 30000 }, async () => {
+// The Agent now reads Linux /proc/meminfo before claiming work. Native Linux
+// validation executes this subprocess test; other hosts retain the policy tests.
+test("actual Agent exits after an empty queue in on-demand mode", {
+  timeout: 30000,
+  skip: process.platform !== "linux",
+}, async () => {
   const { mkdir, mkdtemp, writeFile, readFile, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
@@ -87,7 +92,12 @@ test("actual Agent exits after an empty queue in on-demand mode", { timeout: 300
         res.end(
           JSON.stringify(
             body.operation === "sync"
-              ? { nodeId, gatewayOrigin: "https://browser.example", runs: [] }
+              ? {
+                  nodeId,
+                  gatewayOrigin: "https://browser.example",
+                  limits: { browserMemoryMb: 2048 },
+                  runs: [],
+                }
               : body.operation === "claim"
                 ? { run: null }
                 : {},

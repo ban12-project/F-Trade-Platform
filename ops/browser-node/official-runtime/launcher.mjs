@@ -1,5 +1,6 @@
 import { Camoufox, launchOptions } from "camoufox";
 import { createNativeProfileRuntime, nativeProfileWindowSize } from "../native-profile.mjs";
+import { assertGeoipReady } from "./geoip-store.mjs";
 import { needsUpdate } from "./node_modules/camoufox/dist/geolocation.js";
 
 // The surrounding service must supply a fixed proxy and an owned display
@@ -14,6 +15,7 @@ export function createOfficialLauncher({
   executablePath,
   official = { Camoufox, launchOptions },
   checkAssets = async () => {
+    await assertGeoipReady();
     if (await needsUpdate()) throw new Error("official_runtime_assets_stale");
   },
 }) {
@@ -71,7 +73,7 @@ export function createOfficialLauncher({
     ensureBrowser(timeoutMs) {
       return runtime.ensureBrowser(async () => {
         // Fail before official GeoIP can attempt a runtime database download.
-        // Refresh assets by rebuilding the immutable image, never by fallback.
+        // A separate updater publishes the read-only GeoIP snapshot.
         startupDiagnostics?.stage("launch-options");
         await checkAssets();
         let options;

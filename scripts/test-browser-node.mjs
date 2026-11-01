@@ -270,7 +270,14 @@ test("browser runtime cannot access the host Docker socket or choose a mount", (
   assert.ok(body.Env.includes("BROWSER_IDLE_TIMEOUT_MS=900000"));
   assert.ok(body.Env.includes("PROXY_PROTOCOL=http"));
   assert.deepEqual(body.HostConfig.CapDrop, ["ALL"]);
-  assert.equal(body.HostConfig.Mounts.length, 1);
+  assert.equal(body.HostConfig.Mounts.length, 2);
+  assert.deepEqual(body.HostConfig.Mounts[1], {
+    Type: "volume",
+    Source: "ftrade-browser-geoip-v1",
+    Target: "/opt/ftrade/geoip",
+    ReadOnly: true,
+    VolumeOptions: { NoCopy: true },
+  });
   assert.equal(body.HostConfig.Mounts[0].Type, "volume");
   assert.equal(body.HostConfig.RestartPolicy.Name, "no");
   assert.equal(body.HostConfig.Memory, 2048 * 1024 * 1024);

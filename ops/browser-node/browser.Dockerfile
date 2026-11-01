@@ -18,13 +18,11 @@ RUN set -eu; \
       *) exit 1 ;; \
     esac; \
     curl -fSL --retry 3 "https://github.com/daijro/camoufox/releases/download/v158.0.1-beta.41/camoufox-158.0.1-beta.41-lin.$arch.zip" -o /tmp/camoufox.zip; \
-    echo "$digest  /tmp/camoufox.zip" | sha256sum -c -
-# The official extractor supports the archive's differing Unicode local/central names.
-RUN set -eu; \
-    node --input-type=module -e 'import { unzip, makeExecutable } from "./node_modules/camoufox/dist/pkgman.js"; unzip("/tmp/camoufox.zip", "/root/.cache/camoufox"); makeExecutable("/root/.cache/camoufox");'; \
-    echo '{"version":"158.0.1","release":"beta.41"}' > /root/.cache/camoufox/version.json; \
+    echo "$digest  /tmp/camoufox.zip" | sha256sum -c -; \
+    node --input-type=module -e 'import { unzip, makeExecutable } from "./node_modules/camoufox/dist/pkgman.js"; const directory="/root/.cache/camoufox/browsers/official/158.0.1-beta.41"; unzip("/tmp/camoufox.zip", directory); makeExecutable(directory);'; \
+    echo '{"version":"158.0.1","release":"beta.41"}' > /root/.cache/camoufox/browsers/official/158.0.1-beta.41/version.json; \
     rm /tmp/camoufox.zip
-COPY official-runtime/prepare-assets.mjs ./
+COPY official-runtime/prepare-assets.mjs official-runtime/geoip-store.mjs ./
 RUN node prepare-assets.mjs
 WORKDIR /app
 COPY official-runtime/package.json ./package.json

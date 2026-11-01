@@ -34,6 +34,7 @@ class ReleaseTest(unittest.TestCase):
             self.assertEqual(env['DOCKER_BUILDKIT'],'0')
             smoke=[env for args,env in calls if args==['bash','scripts/test-browser-images.sh']]
             self.assertEqual(smoke[0]['ARCH'],expected)
+            self.assertIn('ftrade-release-node-',smoke[0]['PATH'].split(':')[0])
 
     def test_unknown_daemon_architecture_refuses_before_any_build(self):
         with patch.object(r,'docker',return_value='unsupported-machine'),patch.object(r,'run') as run:

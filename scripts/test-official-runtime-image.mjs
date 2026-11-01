@@ -21,6 +21,14 @@ const call = (args, options = {}) =>
   });
 const name = `ftrade-official-fixture-${randomUUID()}`;
 const volume = `${name}-data`;
+const geoipVolume = `${name}-geoip`;
+const geoipMount = (target, readonly = false) =>
+  engine === "podman"
+    ? ["--volume", `${geoipVolume}:${target}:${readonly ? "ro," : ""}nocopy`]
+    : [
+        "--mount",
+        `type=volume,source=${geoipVolume},target=${target},${readonly ? "readonly," : ""}volume-nocopy`,
+      ];
 const nodeId = "11111111-1111-4111-8111-111111111111";
 const accountId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
@@ -28,7 +36,8 @@ const fixture = resolve("scripts/fixtures/official-runtime");
 let source = resolve("ops/browser-node");
 let agentSource, agentContainer;
 let containerExists = false,
-  volumeExists = false;
+  volumeExists = false,
+  geoipVolumeExists = false;
 function runArgs(mode, detached = false, afterShutdown = false) {
   const spec = containerSpec(
     nodeId,
@@ -81,6 +90,7 @@ function runArgs(mode, detached = false, afterShutdown = false) {
   args.push(
     "-v",
     `${volume}:/data`,
+    ...geoipMount("/opt/ftrade/geoip", true),
     "-v",
     `${fixture}:/fixture:ro`,
     "-v",
@@ -114,7 +124,7 @@ try {
   assert.match(version, /158\.0\.1-beta\.41/);
   console.log(JSON.stringify({ actualBrowserVersion: version }));
   if (process.env.OFFICIAL_RUNTIME_AGENT_IMAGE) {
-    agentSource = mkdtempSync(resolve(tmpdir(), "official-agent-"));
+    agentSource = realpathSync(mkdtempSync(resolve(tmpdir(), "official-agent-")));
     agentContainer = call(["create", process.env.OFFICIAL_RUNTIME_AGENT_IMAGE]).trim();
     call(["cp", `${agentContainer}:/app/ops/browser-node`, agentSource]);
     call(["rm", agentContainer]);
@@ -123,6 +133,42 @@ try {
   }
   call(["volume", "create", volume]);
   volumeExists = true;
+  call(["volume", "create", geoipVolume]);
+  geoipVolumeExists = true;
+  call([
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--read-only",
+    "--memory",
+    "256m",
+    ...geoipMount("/test-geoip"),
+    "--entrypoint",
+    "node",
+    image,
+    "-e",
+    'require("fs").cpSync("/opt/ftrade/geoip", "/test-geoip", {recursive:true, verbatimSymlinks:true})',
+  ]);
+  const geoipCheck = [
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--read-only",
+    "--memory",
+    "512m",
+    ...geoipMount("/opt/ftrade/geoip", true),
+    "--entrypoint",
+    "node",
+    image,
+  ];
+  call([...geoipCheck, "/app/official-runtime/update-geoip.mjs", "check"]);
+  call([
+    ...geoipCheck,
+    "-e",
+    'const fs=require("fs");try {fs.writeFileSync("/opt/ftrade/geoip/write-probe","forbidden");process.exit(1)}catch(e){if(e.code!=="EROFS")throw e}',
+  ]);
   for (const mode of ["codec", "write", "read"]) {
     containerExists = true;
     console.log(call(runArgs(mode)));
@@ -185,6 +231,7 @@ try {
     } catch {}
   }
   if (volumeExists) call(["volume", "rm", volume]);
+  if (geoipVolumeExists) call(["volume", "rm", geoipVolume]);
   if (agentContainer) call(["rm", agentContainer]);
   if (agentSource) rmSync(agentSource, { recursive: true, force: true });
 }

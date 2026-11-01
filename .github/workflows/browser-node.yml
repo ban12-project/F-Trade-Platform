@@ -76,7 +76,7 @@ jobs:
       - name: Official launcher and authenticated service contracts
         run: |
           npm ci --prefix ops/browser-node/official-runtime --ignore-scripts --no-audit --no-fund
-          node --import tsx --test scripts/test-official-launcher.mjs scripts/test-official-service.mjs
+          node --import tsx --test scripts/test-official-launcher.mjs scripts/test-official-service.mjs scripts/test-browser-geoip.mjs
       - name: Real PostgreSQL reservations and migration
         run: node --conditions=react-server --import tsx scripts/test-browser-fleet-postgres.ts
         env:

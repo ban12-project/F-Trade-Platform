@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 
@@ -160,7 +161,15 @@ def build(source, sha, previous, fp, configs):
         docker('tag',updated['browser']['image'],'ftrade-release-browser-node:'+sha+'-'+arch)
         docker('tag',worker,'ftrade-release-browser:'+sha+'-'+arch)
         env={**os.environ,'IMAGE_PREFIX':'ftrade-release','BUILD_TAG':sha,'ARCH':arch,'REVISION':sha}
-        run(['bash','scripts/test-browser-images.sh'],600,cwd=source,env=env)
+        # The VPS intentionally has no host Node installation. Use the exact
+        # Agent image's executable for the test driver, then remove the copy.
+        with tempfile.TemporaryDirectory(prefix='ftrade-release-node-') as node_dir:
+            container=docker('create',updated['browser']['image']).strip()
+            try:docker('cp',container+':/usr/local/bin/node',str(pathlib.Path(node_dir)/'node'))
+            finally:docker('rm',container)
+            env['PATH']=node_dir+os.pathsep+os.environ.get('PATH','')
+            run(['node','--version'],30,env=env)
+            run(['bash','scripts/test-browser-images.sh'],600,cwd=source,env=env)
     if previous.get('computeWorker')!=fp['computeWorker']:
         base=image(source/'ops/video-sandbox/Dockerfile','ftrade-release-media:'+sha)
         worker=image(source/'ops/vps-runtime/compute.Dockerfile','ftrade-release-compute:'+sha,args=['MEDIA_BASE='+base])

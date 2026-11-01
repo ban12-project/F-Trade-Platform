@@ -1,0 +1,16 @@
+[Unit]
+Description=Refresh official browser GeoIP assets without account access
+After=docker.service ftrade-capacity-monitor.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/ftrade-vps/geoip-update/update.py
+Environment=FTRADE_HOST_CAPACITY_DIR=/run/ftrade-capacity
+Environment=FTRADE_HOST_ADAPTIVE=1
+BindPaths=/opt/ftrade-vps/capacity:/run/ftrade-capacity
+PrivateTmp=true
+NoNewPrivileges=true
+UMask=0077
+TimeoutStartSec=360
+

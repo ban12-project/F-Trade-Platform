@@ -98,6 +98,32 @@ modified. Actual proxy, current account continuity, exact Agent/browser artifact
 pair, deployed HTTPS Viewer and protected rollback remain required. Historical
 beta.40 native arm64 evidence does not validate beta.41 arm64.
 
+## Independent GeoIP update decision and Docker follow-up
+
+The owner selected independent GeoIP updates, keeping browser access read-only.
+The new host helper reserves capacity, downloads and validates public databases
+using the pinned official image, atomically publishes a generation, and retains
+a validated rollback generation. Failed or interrupted updates deny new browser
+launches. Account volumes are never mounted. Installation and initial preparation
+remain pending; see [the updater runbook](../../ops/browser-geoip/README.md).
+The 40-case GeoIP-store, container and launcher tests pass, including repeated
+failure, refusal of expired rollback, preservation of prior data and cleanup.
+The actual built-in MMDB passes the new strict freshness check in a read-only image.
+
+Manual run 41291728193 exposed a Docker-specific packaging failure on both native
+architectures: renaming a lower-overlay-layer browser directory returned EXDEV.
+Extraction now targets the final versioned directory directly. Download, checksum,
+extraction and archive removal share one layer, avoiding retention of the 1.2 GiB
+archive. Native Docker results for this correction remain pending. The manual
+validation job also exposed an outdated idle-test broker response missing the
+required memory limit; the fixture now supplies it and explicitly runs the Agent
+subprocess only on Linux, where its /proc/meminfo contract is available.
+
+The current VPS has native-profile mode enabled and still selects the legacy
+runtime. Its host has no Node executable. Release acceptance now temporarily
+extracts Node from the exact Agent image instead of requiring a new host install.
+All ten release/rollback tests pass with that path. No deployment has occurred.
+
 ## Historical beta.40 draft evidence
 
 # Official Camoufox runtime migration (#677)

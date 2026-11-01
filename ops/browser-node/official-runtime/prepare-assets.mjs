@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { ensureModel } from "fpgen-js";
+import { GEOIP_STORE, publishGeoip } from "./geoip-store.mjs";
 import {
   downloadMmdb,
   getMmdbPath,
@@ -28,14 +29,11 @@ assert.deepEqual(
   },
   "official_browser_pair_mismatch",
 );
-// Register the checksum-verified archive in the official versioned layout.
-// A flat legacy cache is insufficient for the paired package's version resolver.
+// Docker extracts directly into the versioned layout: moving lower-layer
+// directories here fails with EXDEV on Docker's overlay filesystem.
 const cache = "/root/.cache/camoufox";
 const relative = "browsers/official/158.0.1-beta.41";
 const installed = `${cache}/${relative}`;
-const entries = await readdir(cache);
-await mkdir(installed, { recursive: true });
-for (const entry of entries) await rename(`${cache}/${entry}`, `${installed}/${entry}`);
 const metadata = JSON.parse(await readFile(`${installed}/version.json`, "utf8"));
 assert.equal(metadata.version, "158.0.1");
 assert.equal(metadata.release, "beta.41");
@@ -76,3 +74,8 @@ await writeFile(
     2,
   ),
 );
+// The built-in seed supports isolated offline image tests. Production mounts a
+// separately updated volume here, read-only and with volume copy-up disabled.
+await publishGeoip(GEOIP_STORE, `${cache}/geoip`, { source: "build-seed" });
+await rm(`${cache}/geoip`, { recursive: true });
+await symlink(`${GEOIP_STORE}/current`, `${cache}/geoip`);
