@@ -64,7 +64,7 @@ async function expectConfiguration(page: Page, key: keyof typeof configurations)
   await expect(input(page, "配置名称")).toHaveValue(config.name);
   await expect(selectedValue(page, 1)).toHaveText(config.provider);
   await expect(input(page, "默认模型")).toHaveValue(config.model);
-  await expect(input(page, "Base URL")).toHaveValue(config.baseUrl);
+  await expect(input(page, "服务地址（Base URL）")).toHaveValue(config.baseUrl);
   await expect(input(page, "自定义 Headers（JSON）")).toHaveValue(config.headersJson);
   await expect(checkbox(page, "作为默认模型")).toBeChecked({ checked: config.isDefault });
   const discovered = `已发现 ${config.discoveredCount} 个模型`;
@@ -81,7 +81,7 @@ async function expectConfiguration(page: Page, key: keyof typeof configurations)
 async function editAllFields(page: Page) {
   await input(page, "配置名称").fill("Synthetic unsaved configuration");
   await input(page, "默认模型").fill("synthetic-unsaved-model");
-  await input(page, "Base URL").fill("https://unsaved.synthetic.invalid/v1");
+  await input(page, "服务地址（Base URL）").fill("https://unsaved.synthetic.invalid/v1");
   await input(page, "自定义 Headers（JSON）").fill('{"x-synthetic":"unsaved"}');
   await page.locator("#agent-api-key").fill("synthetic-unsaved-key");
   await page.locator("#agent-auth-token").fill("synthetic-unsaved-token");
@@ -128,7 +128,7 @@ test("new configuration clears edits and credentials before returning", async ({
   await expect(input(page, "配置名称")).toHaveValue("");
   await expect(input(page, "默认模型")).toHaveValue("gpt-5-mini");
   await expect(selectedValue(page, 1)).toHaveText("OpenAI");
-  await expect(input(page, "Base URL")).toHaveValue("");
+  await expect(input(page, "服务地址（Base URL）")).toHaveValue("");
   await expect(input(page, "自定义 Headers（JSON）")).toHaveValue("{}");
   await expect(checkbox(page, "作为默认模型")).not.toBeChecked();
   await expect(page.locator('label[for="agent-api-key"]')).toHaveText("API key");
