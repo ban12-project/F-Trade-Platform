@@ -1,0 +1,39 @@
+.workspace-guide-popover {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  max-width: min(24rem, calc(100vw - 2rem));
+}
+
+.workspace-guide-popover .driver-popover-title {
+  font-size: 1rem;
+}
+
+.workspace-guide-popover .driver-popover-description {
+  line-height: 1.7;
+}
+
+.workspace-guide-popover .driver-popover-progress-text,
+.workspace-guide-popover .driver-popover-close-btn {
+  color: var(--muted-foreground);
+}
+
+.workspace-guide-popover .driver-popover-navigation-btns button {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.6);
+  text-shadow: none;
+}
+
+.workspace-guide-popover .driver-popover-navigation-btns .driver-popover-next-btn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.workspace-guide-popover button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
