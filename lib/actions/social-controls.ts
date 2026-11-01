@@ -8,6 +8,12 @@ import { socialControlChangeSchema } from "@/lib/social/control-record";
 import { saveSocialChannelControl } from "@/lib/social/control-store";
 import { socialHumanFailureMessage } from "@/lib/social/human-write-access";
 
+export async function publishingAccountsAction() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session?.user.role !== "admin") throw new Error("需要账号管理权限。");
+  const { listPublishingAccounts } = await import("@/lib/social/publishing-account-store");
+  return listPublishingAccounts(undefined, session.user.id);
+}
 export type SocialControlActionState = { status: "idle" | "success" | "error"; message: string };
 /** Server-side authorization, validation and minimal return boundary for social channel operations. */
 export async function saveSocialChannelControlAction(
@@ -16,7 +22,7 @@ export async function saveSocialChannelControlAction(
 ): Promise<SocialControlActionState> {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session || session.user.role !== "admin")
+    if (session?.user.role !== "admin")
       return { status: "error", message: "无权修改社交渠道控制状态。" };
     const parsed = socialControlChangeSchema.safeParse({
       channelRef: formData.get("channelRef"),
@@ -42,7 +48,7 @@ export async function saveSocialChannelControlAction(
     }
     return {
       status: "success",
-      message: `渠道已${result.circuitStatus === "active" ? "启用" : "暂停"}；操作已写入审计记录。`,
+      message: `账号已${result.circuitStatus === "active" ? "允许发布" : "暂停发布"}；操作已写入审计记录。`,
     };
   } catch (error) {
     return {

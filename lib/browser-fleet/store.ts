@@ -76,7 +76,7 @@ async function lockNode(tx: DatabaseTransaction, id: string): Promise<NodeRow> {
     sql`SELECT * FROM browser_fleet_node WHERE id = ${id} FOR UPDATE`,
   );
   const row = result.rows[0] as NodeRow | undefined;
-  if (!row || row.document.version !== 1) throw new Error("browser_node_unavailable");
+  if (row?.document.version !== 1) throw new Error("browser_node_unavailable");
   return row;
 }
 async function save(tx: DatabaseTransaction, row: NodeRow) {
@@ -197,6 +197,7 @@ export async function listBrowserNodes(actorId: string) {
   }));
 }
 export type OwnerResult = {
+  accountId?: string;
   nodeId?: string;
   accessKey?: string;
   runId?: string;
@@ -234,11 +235,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
     if (row.owner_id !== actor.id) throw new Error("browser_node_forbidden");
     const state = row.document;
     const now = Date.now();
-    let result: {
-      accessKey?: string;
-      runId?: string;
-      connection?: { token: string; origin: string; expiresAt: number };
-    } = {};
+    let result: OwnerResult = {};
     if (command.operation === "revoke" || command.operation === "rotate") {
       const key = createAccessKey(row.id);
       row.key_hash = digest(key);
@@ -259,7 +256,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       } else if (command.operation === "rotate") result = { accessKey: key };
     } else if (command.operation === "grant") {
       if (row.status !== "active") throw new Error("node_revoked");
-      await grant(tx, row, command, actor.id, now);
+      result = { accountId: await grant(tx, row, command, actor.id, now) };
     } else if (
       command.operation === "account" ||
       command.operation === "confirm-login" ||
@@ -396,6 +393,7 @@ async function grant(
     };
     row.document.accounts.push(account);
   }
+  if (command.value.displayName) account.displayName = command.value.displayName;
   const ring = configuredFacebookKeyring();
   account.loginCiphertext = updateFacebookLoginCiphertext(
     c,
@@ -425,6 +423,7 @@ async function grant(
     if (run.accountId === account.id && (isLive(run) || run.status === "queued"))
       requestStop(row.document, run);
   await audit(tx, actorId, "browser_account.credentials_updated", account.id);
+  return account.id;
 }
 /** Single node row lock serializes capacity reservations across concurrent HTTP
  * polls. Different nodes lock different rows. No in-process mutex is relied on.
@@ -566,8 +565,7 @@ async function nodeOperation(
   if (request.operation === "admit") {
     const run = state.runs.find((r) => request.ticket.startsWith(`${r.id}.`));
     if (
-      !run ||
-      run.kind !== "interactive" ||
+      run?.kind !== "interactive" ||
       run.status !== "running" ||
       run.stopRequested ||
       !run.ticketHash ||

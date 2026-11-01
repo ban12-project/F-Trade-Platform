@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { FacebookMediaPanel } from "@/components/workspace/facebook-media-panel";
 import { facebookMediaPreviewDigest } from "@/lib/social/facebook-media-confirmation";
@@ -40,15 +41,27 @@ export default function VideoPublicationCaptionTestingPage() {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (
     <main className="mx-auto min-h-screen max-w-3xl p-6">
-      <WorkspaceDirtyProvider>
-        <FacebookMediaPanel
-          projectId={projectId}
-          contentRef={contentRef}
-          options={options}
-          channelRef="synthetic-channel"
-          accountRef="synthetic-account"
-        />
-      </WorkspaceDirtyProvider>
+      <Suspense fallback={<p>正在读取发布预览…</p>}>
+        <WorkspaceDirtyProvider>
+          <FacebookMediaPanel
+            projectId={projectId}
+            contentRef={contentRef}
+            options={options}
+            channelRef="synthetic-channel"
+            accountRef="synthetic-account"
+            accounts={[
+              {
+                channelRef: "synthetic-channel",
+                accountRef: "synthetic-account",
+                name: "合成发布账号",
+                platform: "Facebook",
+                ready: true,
+                blockers: [],
+              },
+            ]}
+          />
+        </WorkspaceDirtyProvider>
+      </Suspense>
     </main>
   );
 }

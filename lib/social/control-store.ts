@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
-
 import { and, eq, sql } from "drizzle-orm";
-
 import { type Database, getDatabase } from "@/lib/db/client";
 import { auditEvent, socialChannelControl } from "@/lib/db/schema";
-
 import {
   applySocialControlChange,
   type SocialControlRecord,
@@ -17,6 +14,8 @@ import {
   type SocialActorIdentity,
   SocialHumanAccessError,
 } from "./human-write-access";
+import { PublishingAccountUnavailableError, publishingBlockers } from "./publishing-account-policy";
+import { listPublishingAccounts } from "./publishing-account-store";
 
 export type SocialChannelControlSummary = SocialControlRecord & {
   id: string;
@@ -35,6 +34,10 @@ export async function saveSocialChannelControl(
   const identity = parseSocialActorIdentity(identityInput);
   if (parsed.actorId !== identity.actorId) throw new SocialHumanAccessError();
   return database.transaction(async (tx) => {
+    // Serialize changes with account revocation and receipt recovery; node is always first.
+    await tx.execute(sql`SELECT n.id FROM browser_fleet_node n JOIN browser_fleet_binding b ON b.node_id = n.id
+      WHERE n.owner_id = ${identity.actorId} AND b.channel_ref = ${parsed.channelRef} AND b.account_ref = ${parsed.accountRef} FOR SHARE OF n`);
+
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([parsed.channelRef, parsed.accountRef])}, 0))`,
     );
@@ -62,6 +65,25 @@ export async function saveSocialChannelControl(
           pauseReason: "not_enabled",
           pauseEvidenceRef: null,
         };
+    const accounts = await listPublishingAccounts(tx, identity.actorId);
+    const account = accounts.find(
+      (a) => a.channelRef === parsed.channelRef && a.accountRef === parsed.accountRef,
+    );
+    if (!account) throw new PublishingAccountUnavailableError(publishingBlockers.binding);
+    if (parsed.action !== "pause") {
+      if (account.publicationPaused && parsed.action !== "resume")
+        throw new PublishingAccountUnavailableError(
+          "账号因异常暂停，请先核实结果，再选择人工恢复发布。",
+        );
+      const blockers = account.blockers.filter((b) => b !== "disabled" && b !== "paused");
+      if (blockers.length)
+        throw new PublishingAccountUnavailableError(publishingBlockers[blockers[0]]);
+      const unresolved = await tx.execute(sql`SELECT id FROM social_publication p
+        WHERE p.channel_ref = ${parsed.channelRef} AND p.account_ref = ${parsed.accountRef}
+        AND p.status = 'unknown' LIMIT 1`);
+      if (unresolved.rows.length)
+        throw new PublishingAccountUnavailableError(publishingBlockers.unknown);
+    }
     const next = applySocialControlChange(current, parsed);
     const now = new Date();
     const values = {

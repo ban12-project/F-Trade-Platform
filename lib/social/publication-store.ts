@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
-
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-
 import { publishContent } from "@/lib/content/gate";
 import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
 import { productMediaAsset } from "@/lib/db/product-media-schema";
@@ -35,17 +33,25 @@ import {
 } from "./human-write-access";
 import { createControlledPublicationCommand } from "./publication-command";
 import { publicationFailureLabel } from "./publication-presentation";
+import type { PublishingAccount } from "./publishing-account-policy";
+import { assertPublishingAccountReady, listPublishingAccounts } from "./publishing-account-store";
 import { digestSocialWorkerPayload } from "./worker-protocol";
 
 export type PublicationCandidate = {
+  contentVersion?: number;
   previewDigest: string;
   id: string;
   format: "text" | "video";
   title: string;
   preview: string;
 };
-export type PublicationChannel = { channelRef: string; accountRef: string };
+export type PublicationChannel = {
+  channelRef: string;
+  accountRef: string;
+} & Partial<PublishingAccount>;
 export type PublicationEntry = {
+  publishedAt?: Date | null;
+  jobStatus?: string | null;
   humanConfirmed?: boolean;
   id: string;
   projectId: string;
@@ -180,19 +186,7 @@ export async function listProjectPublicationData(
           aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
         ),
       ),
-    database
-      .select({
-        channelRef: socialChannelControl.channelRef,
-        accountRef: socialChannelControl.accountRef,
-      })
-      .from(socialChannelControl)
-      .where(
-        and(
-          eq(socialChannelControl.enabled, true),
-          eq(socialChannelControl.circuitStatus, "active"),
-        ),
-      )
-      .orderBy(desc(socialChannelControl.changedAt)),
+    listPublishingAccounts(database),
   ]);
   const projectRecordIds = projectRecords.map(({ record }) => record.id);
   const publications = projectRecordIds.length
@@ -207,8 +201,10 @@ export async function listProjectPublicationData(
           externalPublicationRef: socialPublication.externalPublicationRef,
           failureCode: socialBrowserJob.failureCode,
           humanConfirmed: sql<boolean>`EXISTS (SELECT 1 FROM audit_event e WHERE e.subject_id = social_publication.id AND e.action = 'social_publication.reconciled')`,
+          jobStatus: socialBrowserJob.status,
           status: socialPublication.status,
           createdAt: socialPublication.createdAt,
+          publishedAt: socialPublication.publishedAt,
         })
         .from(socialPublication)
         .leftJoin(socialBrowserJob, eq(socialBrowserJob.id, socialPublication.browserJobId))
@@ -252,6 +248,7 @@ export async function listProjectPublicationData(
         return [
           {
             id: record.id,
+            contentVersion: record.version,
             previewDigest: previewDigest(record, "text"),
             format: "text",
             title: typeof payload.hook === "string" ? payload.hook : "已批准营销内容",
@@ -295,6 +292,7 @@ export async function submitControlledPublication(
   const actorId = identity.actorId;
   return database.transaction(async (tx) => {
     await assertWorkspaceProjectAccess(value.projectId, actorId, "write", tx);
+    await assertPublishingAccountReady(tx, value);
     const { control, record, gate } = await assertPublicationEligible(value, tx, () => new Date());
     if (value.previewDigest !== previewDigest({ ...record, id: value.contentRef }, value.format)) {
       throw new Error("内容已更新，请刷新页面、核对新预览后重新确认。");
@@ -404,6 +402,7 @@ export async function submitControlledPublication(
       "@/lib/browser-fleet/sandbox-publication-wakeup"
     );
     await enqueuePublicationSandboxDemand(tx, id);
+    await assertPublishingAccountReady(tx, value);
     assertSocialAuthorizationAlive(expiresAt);
     return saved;
   });

@@ -1,8 +1,16 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 test("same MP4 caption selection resets confirmation and preserves exact preview", async ({
   page,
 }) => {
+  await page.route("**/api/publication-preview?*", async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "video/webm",
+      body: await readFile("tests/fixtures/synthetic-publication-preview.webm"),
+    }),
+  );
   await page.goto("/testing/video-publication-caption");
   const media = page.getByLabel("当前内容的已审核素材");
   const confirm = page.getByRole("checkbox");

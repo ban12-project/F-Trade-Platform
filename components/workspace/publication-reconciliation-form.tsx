@@ -48,8 +48,8 @@ export function PublicationReconciliationForm({
     <form onSubmit={form.handleSubmit(submit)}>
       <FieldGroup>
         <FieldDescription>
-          仅节点所有者可确认。先在 Facebook
-          核对原账号、完整文案和受众，再填写已存在帖子的正式链接。核对不会恢复渠道或重新发帖。
+          仅账号管理员可确认。先在 Facebook
+          核对原账号、完整文案和受众，再填写已存在帖子的正式链接。核对不会恢复发布或重新发帖。若没有找到对应帖子，请保留暂停状态并联系管理员进一步检查，不能直接重发。
         </FieldDescription>
         <Field data-invalid={!!form.formState.errors.externalPublicationRef}>
           <FieldLabel htmlFor={`receipt-url-${publicationId}`}>已发布帖子的链接</FieldLabel>
