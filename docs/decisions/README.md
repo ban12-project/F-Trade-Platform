@@ -9,6 +9,7 @@
 - [ADR 0006：移除个人视频画布布局持久化](0006-retire-personal-video-canvas.md)
 - [ADR 0007：以业务任务与对象组织工作区](0007-task-oriented-workspace.md)（按批次取代 ADR 0005 的主导航）
 - [ADR 0010：产品以最终事实审核验收](0010-product-final-fact-acceptance.md)
+- [ADR 0011：移除 MVP1 数据库时间点恢复验收](0011-remove-pitr-acceptance.md)
 
 每个未确定但会影响实现的选择创建一个 `type:decision` Issue；决策关闭后再补充 ADR。
 
