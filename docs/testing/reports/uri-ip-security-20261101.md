@@ -36,5 +36,8 @@ when rejecting zone strings with repeated percent signs and a line terminator.
 
 Frozen installation, the production Turbopack build (including TypeScript),
 production fixture/anonymous-workspace boundaries and MVP acceptance-summary
-contracts passed locally. Production deployment remains unverified.
+contracts passed locally. PR #737 squash-merged as `ecf40ecac3df401742a8ab3f2a584038df44c2fe`.
+GitHub deployment records independently report success for that exact commit:
+Production `7467769214` and vps-production `7467763632`. These are deployment
+receipts, not authenticated business acceptance.
 No customer data, account operation, external publication or DM is exercised.
