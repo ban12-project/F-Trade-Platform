@@ -155,6 +155,33 @@ Production cutover and
 actual account continuity remain pending while the other chat completes account
 setup. No real post or DM was sent by these migration tests.
 
+## WebRTC containment correction and renewed session integration
+
+The corrected VPS browser `sha256:190ccb61f0c981c713ad2e126059740ef8b7e08793260f3b7e48cdb59ad683a8`
+and Agent `sha256:7ca441827b2789e8151713271eaa03abd26c547c54d1da0eb0659038c3c6d62a`
+passed both initialized and first-use native suites at `79a3a56`. These runs include
+H.264 rendering, full-DOM controls, synthetic social contracts, native storage and
+non-extractable keys, Viewer keyboard input, ticket replay/expiry and watchdog
+restart. Screen/WebGL changes remain observable; storage continuity is not stable
+identity evidence.
+
+The first actual authorized proxy passed independent HTTP/browser exit and GeoIP
+timezone checks. Working DNS and Firefox STUN positive controls precede the runtime
+capture, which observed zero unexpected DNS, other UDP, direct TCP and unparsed IP
+packets, with no capture drops. WebRTC is disabled, so no ICE/SDP or getStats API is
+available in the runtime. IPv6 through this proxy was unavailable, and the host
+uses an IPv4 Docker bridge: this does not establish dual-stack acceptance. The
+second configured proxy still needs a completed run; capacity/maintenance refusals
+are not network failures or passes. An earlier extraction failed because Docker
+archive/cp did not read the live tmpfs result; the fixture now reads it via exec
+and keeps its private permissions.
+
+Main's explicit interactive-session renewal (#784) is integrated. Related local
+checks report 98 passes and one Linux-only subprocess test skipped on macOS;
+TypeScript validation passes. Manual-only dual-architecture run
+[41296617075](https://github.com/ban12-project/F-Trade-Platform/actions/runs/41296617075)
+is in progress at `72ffeef`. Production still selects the legacy runtime.
+
 ## Historical beta.40 draft evidence
 
 # Official Camoufox runtime migration (#677)
