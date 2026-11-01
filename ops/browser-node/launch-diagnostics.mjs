@@ -27,6 +27,8 @@ const codes = new Set([
   "navigation_race",
   "session_expired",
   "concurrency_timeout",
+  "runtime_busy",
+  "operation_unknown",
   "browser_launch_timeout",
   "admission_rejected",
   "native_profile_scope_invalid",

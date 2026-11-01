@@ -47,6 +47,7 @@ import {
   publicationInspectionFailureStage,
 } from "./publication-inspection.mjs";
 import { createPublicationSetup } from "./publication-setup.mjs";
+import { scheduleBrowserRequest } from "./request-queue.mjs";
 import { stagePublicationUpload } from "./upload.mjs";
 
 const idleExit = createIdleExitPolicy();
@@ -186,18 +187,25 @@ async function checkpoint() {
   await rename(file, `${stateDir}/leases.json`);
 }
 async function browserRequest(slot, path, body, timeout = 30_000) {
-  if (slot.expiresAt <= Date.now()) throw new Error("local_lease_expired");
-  const response = await fetch(`http://${slot.workerHost}:${slot.apiPort}${path}`, {
-    method: body === undefined ? "GET" : "POST",
-    redirect: "error",
-    headers: {
-      Authorization: `Bearer ${slot.accessKey}`,
-      ...(body ? { "Content-Type": "application/json" } : {}),
+  // Waiting in the queue consumes the same request deadline as network I/O.
+  const signal = AbortSignal.any([slot.abort.signal, AbortSignal.timeout(timeout)]);
+  return scheduleBrowserRequest(
+    slot,
+    async () => {
+      const response = await fetch(`http://${slot.workerHost}:${slot.apiPort}${path}`, {
+        method: body === undefined ? "GET" : "POST",
+        redirect: "error",
+        headers: {
+          Authorization: `Bearer ${slot.accessKey}`,
+          ...(body ? { "Content-Type": "application/json" } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal,
+      });
+      return checkedBrowserResponse(response, path, body);
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-    signal: AbortSignal.any([slot.abort.signal, AbortSignal.timeout(timeout)]),
-  });
-  return checkedBrowserResponse(response, path, body);
+    signal,
+  );
 }
 const sync = await nodeCall("sync");
 if (sync.nodeId !== nodeId) throw new Error("node_identity_mismatch");
