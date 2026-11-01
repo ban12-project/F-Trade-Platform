@@ -1,7 +1,15 @@
+import { Agent } from "undici";
 import { z } from "zod";
 
 const chunkBytes = 4 * 1024 * 1024;
 const maximumFileBytes = 1024 * 1024 * 1024 - 1;
+const requestTimeoutMs = 610_000;
+// A command can run until the broker's 600-second job deadline. Node fetch's
+// default 300-second header wait otherwise expires before our AbortSignal.
+const computeDispatcher = new Agent({
+  headersTimeout: requestTimeoutMs,
+  bodyTimeout: requestTimeoutMs,
+});
 export type ComputeProfile = "light" | "heavy";
 class CapacityBusy extends Error {}
 const commandResult = z.object({
@@ -30,14 +38,16 @@ async function request(body: Record<string, unknown>): Promise<unknown> {
     !/^[A-Za-z0-9_-]{48,256}$/.test(token)
   )
     throw new Error("vps_runtime_configuration_invalid");
-  const response = await fetch(new URL("/v1/compute", origin), {
+  const options: RequestInit & { dispatcher: Agent } = {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify(body),
     cache: "no-store",
     redirect: "error",
-    signal: AbortSignal.timeout(610_000),
-  });
+    signal: AbortSignal.timeout(requestTimeoutMs),
+    dispatcher: computeDispatcher,
+  };
+  const response = await fetch(new URL("/v1/compute", origin), options);
   // Never reflect proxy responses or request payloads containing private data.
   if (response.status === 429 && body.action === "create") {
     const rejection = await response.text();
