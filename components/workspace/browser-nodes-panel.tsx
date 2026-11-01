@@ -33,10 +33,15 @@ import {
   type ViewerWindow,
   viewerWindowIsOpen,
 } from "@/components/workspace/browser-viewer-window";
+import { InteractiveSessionTimer } from "@/components/workspace/interactive-session-timer";
 import { PublicationPageInspectionPanel } from "@/components/workspace/publication-page-inspection-panel";
 import { SandboxStatus } from "@/components/workspace/sandbox-status";
 import { browserNodeCommandAction, browserNodesAction } from "@/lib/actions/browser-nodes";
-import { accountFormSchema, nodeFormSchema } from "@/lib/browser-fleet/contracts";
+import {
+  accountFormSchema,
+  nodeFormSchema,
+  ownerCommandSchema,
+} from "@/lib/browser-fleet/contracts";
 import { useWorkspaceDirty } from "./dirty-state";
 
 type Nodes = Awaited<ReturnType<typeof browserNodesAction>>;
@@ -148,7 +153,11 @@ export function BrowserNodesPanel() {
       }
       if (result.result.accessKey) setKey(result.result.accessKey);
       setNodes(await browserNodesAction());
-      setMessage("操作已记录，正在等待发布服务同步；请以账号实际状态为准。");
+      setMessage(
+        result.result.deadline
+          ? "接管已延长 30 分钟；发布核对有效期保持不变。"
+          : "操作已记录，正在等待发布服务同步；请以账号实际状态为准。",
+      );
       return result.result;
     } catch {
       setMessage("请求未完成，请先查看节点和排队记录，避免重复操作。");
@@ -722,6 +731,24 @@ export function BrowserNodesPanel() {
                     key={run.id}
                   >
                     <Badge variant="outline">{stateLabels[run.status] ?? run.status}</Badge>
+                    {run.deadline > 0 &&
+                      ["starting", "running"].includes(run.status) &&
+                      !run.stopRequested && (
+                        <InteractiveSessionTimer
+                          deadline={run.deadline}
+                          serverNow={node.serverNow}
+                          disabled={busy || run.status !== "running"}
+                          onExtend={async (expectedDeadline) => {
+                            const command = ownerCommandSchema.parse({
+                              operation: "extend",
+                              nodeId: node.id,
+                              runId: run.id,
+                              expectedDeadline,
+                            });
+                            return !!(await send(command));
+                          }}
+                        />
+                      )}
                     {run.savedLoginChallenge === "checkpoint" && !run.savedLoginOutcome && (
                       <span role="status" className="text-sm">
                         等待人工验证，请接入远程页面；完成后自动继续。
@@ -821,7 +848,8 @@ export function BrowserNodesPanel() {
           <CardHeader>
             <CardTitle>独立浏览器接管</CardTitle>
             <CardDescription>
-              连接最长 10 分钟。断线后可在资源释放前点击“重新授权连接”，取得新票后重连。2FA
+              每次接管 30 分钟，剩余不足 5 分钟时可人工延长。断线后保留 2
+              分钟，可点击“重新授权连接”取得新票后重连（接管到期或授权失效时除外）。2FA
               直接在远程页面完成，不上传验证码。退出前请核对账号与固定代理出口。
             </CardDescription>
           </CardHeader>

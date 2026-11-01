@@ -56,8 +56,8 @@ test("closing a challenge viewer preserves the bounded automatic task only", () 
     loginTask: true,
   };
   assert.equal(viewerGraceExpired(state, 100000), false);
-  assert.equal(viewerGraceExpired({ ...state, automatic: false }, 100000), true);
-  assert.equal(viewerGraceExpired({ ...state, loginTask: false }, 100000), true);
+  assert.equal(viewerGraceExpired({ ...state, automatic: false }, 120002), true);
+  assert.equal(viewerGraceExpired({ ...state, loginTask: false }, 120002), true);
   assert.equal(
     viewerGraceExpired(
       { ...state, loginTask: false, disconnectedAt: null, pendingConnection: true },
@@ -86,7 +86,7 @@ test("automatic ready preserves admission and connected viewer until normal reti
   );
   assert.equal(viewerGraceExpired({ ...state, pendingConnection: false }, 100000), true);
   assert.equal(
-    viewerGraceExpired({ ...state, connected: true, disconnectedAt: 80000 }, 100000),
+    viewerGraceExpired({ ...state, connected: true, disconnectedAt: 80000 }, 200001),
     true,
   );
   assert.equal(loginStopOutcome(2, "unknown"), null);
@@ -105,7 +105,7 @@ test("paused automatic flow grants bounded inspection after a long factor wait",
   assert.equal(viewerGraceExpired(state, 240001), true);
   assert.equal(viewerGraceExpired({ ...state, connected: true }, 240001), false);
   assert.equal(
-    viewerGraceExpired({ ...state, connected: true, disconnectedAt: 180000 }, 196000),
+    viewerGraceExpired({ ...state, connected: true, disconnectedAt: 180000 }, 300001),
     true,
   );
 });
@@ -119,7 +119,7 @@ test("uncertain fill-only result preserves bounded inspection without retry", ()
     loginTask: false,
   };
   assert.equal(viewerGraceExpired(state, 100000), false);
-  assert.equal(viewerGraceExpired({ ...state, disconnectedAt: 80000 }, 100000), true);
+  assert.equal(viewerGraceExpired({ ...state, disconnectedAt: 80000 }, 200001), true);
 });
 test("browser startup waits for Firefox prewarm and rechecks cancellation", async () => {
   const ready = { ok: true, engine: "camoufox", browserConnected: true, browserRunning: true };
@@ -1163,4 +1163,21 @@ test("VPS browser allocations reject excess memory instead of clamping", () => {
     () => containerSpec(nodeId, run, "image", Date.now() + 60_000, true, NaN),
     /invalid_host_memory_limit/,
   );
+});
+
+test("disconnect grace is two minutes, resets on reconnect and does not use initial admission timeout", () => {
+  const base = {
+    connected: false,
+    readyAt: 1,
+    disconnectedAt: 1000,
+    loginTask: false,
+    pendingConnection: false,
+  };
+  assert.equal(viewerGraceExpired(base, 121000), false);
+  assert.equal(viewerGraceExpired(base, 121001), true);
+  assert.equal(
+    viewerGraceExpired({ ...base, connected: true, disconnectedAt: null }, 121001),
+    false,
+  );
+  assert.equal(viewerGraceExpired({ ...base, disconnectedAt: null }, 60002), true);
 });

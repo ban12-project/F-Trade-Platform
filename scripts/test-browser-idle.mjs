@@ -31,7 +31,10 @@ test("invalid deployment settings fail instead of silently staying resident", ()
     );
 });
 
-test("actual Agent exits after an empty queue in on-demand mode", { timeout: 30000 }, async () => {
+test("actual Agent exits after an empty queue in on-demand mode", {
+  timeout: 30000,
+  skip: process.platform !== "linux" ? "Agent host admission reads Linux /proc/meminfo" : false,
+}, async () => {
   const { mkdir, mkdtemp, writeFile, readFile, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
@@ -87,7 +90,12 @@ test("actual Agent exits after an empty queue in on-demand mode", { timeout: 300
         res.end(
           JSON.stringify(
             body.operation === "sync"
-              ? { nodeId, gatewayOrigin: "https://browser.example", runs: [] }
+              ? {
+                  nodeId,
+                  gatewayOrigin: "https://browser.example",
+                  runs: [],
+                  limits: { browserMemoryMb: 2048 },
+                }
               : body.operation === "claim"
                 ? { run: null }
                 : {},
