@@ -224,7 +224,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
               </FieldDescription>
             </Field>
             <Field>
-              <FieldLabel>素材来源</FieldLabel>
+              <FieldLabel htmlFor={`media-origin-${productId}`}>素材来源</FieldLabel>
               <Controller
                 control={form.control}
                 name="origin"
@@ -234,7 +234,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id={`media-origin-${productId}`} className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -251,7 +251,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
               />
             </Field>
             <Field>
-              <FieldLabel>素材角色</FieldLabel>
+              <FieldLabel htmlFor={`media-role-${productId}`}>素材角色</FieldLabel>
               <Controller
                 control={form.control}
                 name="role"
@@ -261,7 +261,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     value={field.value ?? null}
                     onValueChange={field.onChange}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id={`media-role-${productId}`} className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -307,12 +307,16 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     render={({ field }) => (
                       <Checkbox
                         id={`media-product-visible-${productId}`}
+                        aria-labelledby={`media-product-visible-${productId}-label`}
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     )}
                   />
-                  <FieldLabel htmlFor={`media-product-visible-${productId}`}>
+                  <FieldLabel
+                    id={`media-product-visible-${productId}-label`}
+                    htmlFor={`media-product-visible-${productId}`}
+                  >
                     产品清晰可见
                   </FieldLabel>
                 </Field>
@@ -323,12 +327,18 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     render={({ field }) => (
                       <Checkbox
                         id={`media-logo-visible-${productId}`}
+                        aria-labelledby={`media-logo-visible-${productId}-label`}
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     )}
                   />
-                  <FieldLabel htmlFor={`media-logo-visible-${productId}`}>包含 Logo</FieldLabel>
+                  <FieldLabel
+                    id={`media-logo-visible-${productId}-label`}
+                    htmlFor={`media-logo-visible-${productId}`}
+                  >
+                    包含 Logo
+                  </FieldLabel>
                 </Field>
                 <Field orientation="horizontal">
                   <Controller
@@ -337,12 +347,18 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     render={({ field }) => (
                       <Checkbox
                         id={`media-text-present-${productId}`}
+                        aria-labelledby={`media-text-present-${productId}-label`}
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     )}
                   />
-                  <FieldLabel htmlFor={`media-text-present-${productId}`}>画面包含文字</FieldLabel>
+                  <FieldLabel
+                    id={`media-text-present-${productId}-label`}
+                    htmlFor={`media-text-present-${productId}`}
+                  >
+                    画面包含文字
+                  </FieldLabel>
                 </Field>
               </FieldGroup>
             </FieldSet>
@@ -369,12 +385,18 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     render={({ field }) => (
                       <Checkbox
                         id={`media-editing-${productId}`}
+                        aria-labelledby={`media-editing-${productId}-label`}
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     )}
                   />
-                  <FieldLabel htmlFor={`media-editing-${productId}`}>允许剪辑</FieldLabel>
+                  <FieldLabel
+                    id={`media-editing-${productId}-label`}
+                    htmlFor={`media-editing-${productId}`}
+                  >
+                    允许剪辑
+                  </FieldLabel>
                 </Field>
                 <Field orientation="horizontal">
                   <Controller
@@ -383,12 +405,18 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     render={({ field }) => (
                       <Checkbox
                         id={`media-public-${productId}`}
+                        aria-labelledby={`media-public-${productId}-label`}
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     )}
                   />
-                  <FieldLabel htmlFor={`media-public-${productId}`}>允许公开发布</FieldLabel>
+                  <FieldLabel
+                    id={`media-public-${productId}-label`}
+                    htmlFor={`media-public-${productId}`}
+                  >
+                    允许公开发布
+                  </FieldLabel>
                 </Field>
                 <Field orientation="horizontal">
                   <Controller
@@ -397,12 +425,18 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     render={({ field }) => (
                       <Checkbox
                         id={`media-paid-${productId}`}
+                        aria-labelledby={`media-paid-${productId}-label`}
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     )}
                   />
-                  <FieldLabel htmlFor={`media-paid-${productId}`}>允许付费广告</FieldLabel>
+                  <FieldLabel
+                    id={`media-paid-${productId}-label`}
+                    htmlFor={`media-paid-${productId}`}
+                  >
+                    允许付费广告
+                  </FieldLabel>
                 </Field>
                 <Field orientation="horizontal">
                   <Controller
@@ -411,12 +445,18 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     render={({ field }) => (
                       <Checkbox
                         id={`media-i2v-${productId}`}
+                        aria-labelledby={`media-i2v-${productId}-label`}
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     )}
                   />
-                  <FieldLabel htmlFor={`media-i2v-${productId}`}>允许图生视频</FieldLabel>
+                  <FieldLabel
+                    id={`media-i2v-${productId}-label`}
+                    htmlFor={`media-i2v-${productId}`}
+                  >
+                    允许图生视频
+                  </FieldLabel>
                 </Field>
                 <Field orientation="horizontal">
                   <Controller
@@ -425,12 +465,18 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                     render={({ field }) => (
                       <Checkbox
                         id={`media-r2v-${productId}`}
+                        aria-labelledby={`media-r2v-${productId}-label`}
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     )}
                   />
-                  <FieldLabel htmlFor={`media-r2v-${productId}`}>允许作为视频参考素材</FieldLabel>
+                  <FieldLabel
+                    id={`media-r2v-${productId}-label`}
+                    htmlFor={`media-r2v-${productId}`}
+                  >
+                    允许作为视频参考素材
+                  </FieldLabel>
                 </Field>
                 <Field data-invalid={Boolean(form.formState.errors.rightsExpiresAt)}>
                   <FieldLabel htmlFor={`media-expiry-${productId}`}>授权到期时间</FieldLabel>

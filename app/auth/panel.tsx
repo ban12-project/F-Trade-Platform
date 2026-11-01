@@ -135,7 +135,7 @@ export function AuthPanel() {
               </p>
             </div>
           </div>
-          <p className="text-xs text-primary-foreground/55">离合器外贸工作流 · MVP</p>
+          <p className="text-xs text-primary-foreground/75">离合器外贸工作流 · MVP</p>
         </section>
 
         <section className="flex flex-col gap-7 p-6 sm:p-8 lg:p-10">
