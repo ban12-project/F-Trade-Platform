@@ -46,3 +46,6 @@ patchedDependencies:
   braces@3.0.3: patches/braces@3.0.3.patch
   # Block __proto__ in both merge loops until upstream ships a verified fix (#498).
   deepmerge@4.3.1: patches/deepmerge@4.3.1.patch
+  # Backport upstream optimization bounds without changing consumer majors (#498).
+  minimatch@10.2.6: patches/minimatch@10.2.6.patch
+  minimatch@9.0.9: patches/minimatch@9.0.9.patch
