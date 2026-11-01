@@ -311,9 +311,36 @@ export function claimRun(
   run.claimId = input.requestId;
   run.leaseId = input.leaseId;
   run.credentialVersion = account.credentialVersion;
-  run.deadline = now + { interactive: 600_000, inbox: 120_000, publish: 900_000 }[run.kind];
+  run.deadline = now + { interactive: 1_800_000, inbox: 120_000, publish: 900_000 }[run.kind];
   run.leaseUntil = Math.min(now + LEASE_MS, run.deadline);
   return run;
+}
+/** Manual extension is independent of lease renewal, tickets and page-review freshness.
+ * Compare-and-set prevents duplicate clicks / concurrent tabs stacking time. */
+export function extendInteractiveRun(
+  state: FleetState,
+  run: Run,
+  expectedDeadline: number,
+  actor: { id: string; sessionId: string },
+  now: number,
+) {
+  const account = state.accounts.find((a) => a.id === run.accountId);
+  if (
+    run.kind !== "interactive" ||
+    run.status !== "running" ||
+    run.stopRequested ||
+    run.requestedBy !== actor.id ||
+    run.authSessionId !== actor.sessionId ||
+    !account?.enabled ||
+    account.credentialVersion !== run.credentialVersion ||
+    run.leaseUntil <= now ||
+    run.deadline <= now
+  )
+    throw new Error("interactive_extension_unavailable");
+  if (run.deadline !== expectedDeadline) throw new Error("interactive_extension_changed");
+  if (run.deadline - now > 300_000) throw new Error("interactive_extension_too_early");
+  run.deadline += 1_800_000;
+  return run.deadline;
 }
 export function renewRun(
   state: FleetState,
@@ -433,6 +460,7 @@ function savedLoginOutcome(
 }
 export function publicState(state: FleetState, now = Date.now()) {
   return {
+    serverNow: now,
     limits: state.limits,
     lastSeenAt: state.lastSeenAt,
     capabilities: state.capabilities,

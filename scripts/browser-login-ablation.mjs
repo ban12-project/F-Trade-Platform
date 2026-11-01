@@ -289,7 +289,7 @@ try {
               stops.length === 0 &&
               !viewerGraceExpired({ ...state, connected: false, pendingConnection: true }, 100001),
             idleRetires: viewerGraceExpired({ ...state, connected: false }, 60002),
-            disconnectRetires: viewerGraceExpired({ ...state, disconnectedAt: 1 }, 15002),
+            disconnectRetires: viewerGraceExpired({ ...state, disconnectedAt: 1 }, 120002),
           };
           report.rows.push(row);
           const ready =

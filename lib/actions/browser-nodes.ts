@@ -55,7 +55,17 @@ export async function browserNodeCommandAction(input: unknown) {
       }
     }
     return { ok: true as const, result };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("interactive_extension_"))
+      return {
+        ok: false as const,
+        message:
+          error.message === "interactive_extension_too_early"
+            ? "剩余不足 5 分钟时可以延长接管。"
+            : error.message === "interactive_extension_changed"
+              ? "接管时限已更新，请查看最新剩余时间；本次没有重复延长。"
+              : "当前接管已过期、正在释放或登录状态已变化，无法延长。请重新打开接管。",
+      };
     return {
       ok: false as const,
       message:
