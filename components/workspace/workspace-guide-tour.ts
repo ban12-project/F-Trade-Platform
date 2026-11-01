@@ -48,6 +48,18 @@ const hints: Hint[] = [
       "一份资料对应一个产品时使用单个产品；包含多条产品时选择产品目录。也可以手动录入已经核实的信息并绑定证据。",
   },
   {
+    selector: "#catalog-progress",
+    title: "等待目录解析完成",
+    description:
+      "扫描目录需要逐页识别，可能等待数分钟。可以刷新进度或稍后返回；若解析失败，使用原任务的重试入口，不必重新上传相同文件。",
+  },
+  {
+    selector: "#catalog-selection-heading",
+    title: "选取需要录入的产品",
+    description:
+      "按目录编号和原件页码选取记录，每批最多 20 条。先从一条开始核对也可以。抽取完成后打开对应草稿，原件不清晰的字段需要逐项核实。",
+  },
+  {
     selector: 'form[id$="-product-review"]',
     title: "核实产品事实",
     description:
