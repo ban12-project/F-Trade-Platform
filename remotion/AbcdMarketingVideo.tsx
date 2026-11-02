@@ -74,16 +74,14 @@ function Beat({
   const beat = resolveAbcdBeatState(clip, frame);
   const phaseFrame = frame - beat.phaseStartFrame;
   const phaseEnter = spring({ frame: phaseFrame, fps, config: { damping: 20, stiffness: 130 } });
-  const attentionFlash = beat.attention
-    ? interpolate(phaseFrame, [0, 4, 14], [0.72, 0.15, 0], { extrapolateRight: "clamp" })
-    : 0;
 
   return (
     <AbsoluteFill
       style={{
         backgroundColor: "#09090b",
         overflow: "hidden",
-        fontFamily: "Arial, Helvetica, sans-serif",
+        fontFamily:
+          '"Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Noto Sans CJK KR", "Noto Color Emoji", sans-serif',
       }}
     >
       <AbsoluteFill style={{ filter: "blur(42px)", opacity: 0.5, transform: "scale(1.12)" }}>
@@ -105,7 +103,12 @@ function Beat({
       >
         <MediaLayer clip={clip} />
       </AbsoluteFill>
-      <AbsoluteFill style={{ backgroundColor: accent, opacity: attentionFlash }} />
+      <AbsoluteFill
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(9,9,11,.82), transparent 25%, transparent 48%, rgba(9,9,11,.94))",
+        }}
+      />
 
       <div
         style={{
@@ -121,19 +124,17 @@ function Beat({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <div style={{ width: 14, height: 48, borderRadius: 8, backgroundColor: accent }} />
-          <div style={{ color: ink, fontSize: 32, fontWeight: 800, letterSpacing: -0.8 }}>
+          <div
+            style={{
+              color: ink,
+              fontSize: 32,
+              fontWeight: 800,
+              overflowWrap: "anywhere",
+              unicodeBidi: "plaintext",
+            }}
+          >
             {productName}
           </div>
-        </div>
-        <div
-          style={{
-            color: "rgba(255,255,255,.72)",
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: 2.4,
-          }}
-        >
-          F·TRADE
         </div>
       </div>
 
@@ -142,32 +143,21 @@ function Beat({
           position: "absolute",
           left: 74,
           right: 74,
-          bottom: 108,
+          bottom: beat.direction ? 360 : 240,
           transform: `translateY(${(1 - phaseEnter) * 42}px)`,
-          opacity: beat.direction ? 0 : phaseEnter,
+          opacity: phaseEnter,
         }}
       >
-        {beat.connection ? (
-          <div
-            style={{
-              color: accent,
-              fontSize: 24,
-              fontWeight: 800,
-              letterSpacing: 2.2,
-              marginBottom: 18,
-            }}
-          >
-            FOR DISTRIBUTOR CONVERSATIONS
-          </div>
-        ) : null}
         {clip.caption ? (
           <div
             style={{
               color: ink,
-              fontSize: 62,
-              lineHeight: 1.05,
+              fontSize: (clip.caption?.length ?? 0) > 70 ? 42 : 56,
+              lineHeight: 1.3,
+              overflowWrap: "anywhere",
+              unicodeBidi: "plaintext",
               fontWeight: 850,
-              letterSpacing: -2.4,
+              letterSpacing: 0,
               textShadow: "0 3px 24px rgba(0,0,0,.55)",
             }}
           >
@@ -182,8 +172,12 @@ function Beat({
             position: "absolute",
             left: 74,
             right: 74,
-            bottom: 74,
-            height: 104,
+            bottom: 180,
+            minHeight: 104,
+            padding: "20px 28px",
+            textAlign: "center",
+            overflowWrap: "anywhere",
+            unicodeBidi: "plaintext",
             borderRadius: 28,
             backgroundColor: accent,
             color: "#18181b",
