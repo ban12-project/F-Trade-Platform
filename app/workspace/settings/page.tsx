@@ -19,7 +19,7 @@ async function Settings() {
 }
 export default function Page() {
   return (
-    <main id="main-content" className="mx-auto max-w-4xl p-4 sm:p-6">
+    <main id="main-content" className="workspace-layout mx-auto max-w-7xl p-4 sm:p-6">
       <h1 className="mb-6 text-2xl font-semibold">工作区设置</h1>
       <Suspense fallback={<WorkspacePanelSkeleton label="正在加载账号设置" />}>
         <Settings />

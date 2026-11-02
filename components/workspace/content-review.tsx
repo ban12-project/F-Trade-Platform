@@ -129,152 +129,156 @@ export function ContentReview({
       {detail.state === "CONTENT_REVISION_REQUIRED" && product ? (
         <ContentDraftForm projectId={projectId} products={[product]} detail={detail} />
       ) : null}
-      <Card>
-        <CardHeader>
-          <CardTitle>{detail.content.hook}</CardTitle>
-          <CardDescription>{detail.productName}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <p className="whitespace-pre-wrap text-sm leading-6">{detail.content.body}</p>
-          <p className="text-sm">
-            <span className="font-medium">咨询引导：</span>
-            {detail.content.call_to_action}
-          </p>
-          <p className="text-sm">
-            <span className="font-medium">视觉：</span>
-            {detail.content.visual_instruction}
-          </p>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>事实</TableHead>
-                <TableHead>内容与来源</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {detail.content.product_facts.map((fact) => (
-                <TableRow key={fact.field}>
-                  <TableCell className="whitespace-normal">
-                    {productFactLabels[fact.field] ?? fact.field}
-                  </TableCell>
-                  <TableCell className="whitespace-normal break-words">
-                    {fact.value}
-                    <span className="mt-1 block font-mono text-xs text-muted-foreground">
-                      {fact.evidence_ref}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      {canDecide ? (
-        <Card>
+      <div className={canDecide ? "workspace-columns" : "flex flex-col gap-4"}>
+        <Card className="min-w-0">
           <CardHeader>
-            <CardTitle>内容审核决定</CardTitle>
-            <CardDescription>
-              审核版本 {detail.version}。批准不等于发布；请先明确选择。
-            </CardDescription>
+            <CardTitle>{detail.content.hook}</CardTitle>
+            <CardDescription>{detail.productName}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form
-              id={`content-review-${detail.id}`}
-              data-content-review=""
-              onSubmit={form.handleSubmit(submit)}
-            >
-              <FieldGroup>
-                <Field data-invalid={!!form.formState.errors.decision}>
-                  <FieldLabel htmlFor={`content-review-${detail.id}-decision`}>决定</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="decision"
-                    render={({ field }) => (
-                      <Select
-                        items={{ approved: "批准营销内容", rejected: "退回营销内容" }}
-                        value={field.value ?? null}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger
-                          id={`content-review-${detail.id}-decision`}
-                          className="w-full"
-                          aria-invalid={!!form.formState.errors.decision}
-                        >
-                          <SelectValue placeholder="请选择审核决定" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="approved">批准营销内容</SelectItem>
-                            <SelectItem value="rejected">退回营销内容</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError errors={[form.formState.errors.decision]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                  <FieldLabel htmlFor={`content-review-${detail.id}-evidence`}>审核依据</FieldLabel>
-                  <EvidenceSelectField
-                    projectId={projectId}
-                    control={form.control}
-                    name="evidenceRef"
-                    id={`content-review-${detail.id}-evidence`}
-                  />
-                  <FieldError errors={[form.formState.errors.evidenceRef]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.notes}>
-                  <FieldLabel htmlFor={`content-review-${detail.id}-notes`}>
-                    审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
-                  </FieldLabel>
-                  <Textarea
-                    id={`content-review-${detail.id}-notes`}
-                    aria-invalid={!!form.formState.errors.notes}
-                    {...form.register("notes")}
-                  />
-                  <FieldError errors={[form.formState.errors.notes]} />
-                </Field>
-              </FieldGroup>
-            </form>
+          <CardContent className="flex flex-col gap-4">
+            <p className="whitespace-pre-wrap text-sm leading-6">{detail.content.body}</p>
+            <p className="text-sm">
+              <span className="font-medium">咨询引导：</span>
+              {detail.content.call_to_action}
+            </p>
+            <p className="text-sm">
+              <span className="font-medium">视觉：</span>
+              {detail.content.visual_instruction}
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>事实</TableHead>
+                  <TableHead>内容与来源</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detail.content.product_facts.map((fact) => (
+                  <TableRow key={fact.field}>
+                    <TableCell className="whitespace-normal">
+                      {productFactLabels[fact.field] ?? fact.field}
+                    </TableCell>
+                    <TableCell className="whitespace-normal break-words">
+                      {fact.value}
+                      <span className="mt-1 block font-mono text-xs text-muted-foreground">
+                        {fact.evidence_ref}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
-          <CardFooter className="flex-col items-stretch gap-3">
-            <Button
-              form={`content-review-${detail.id}`}
-              type="submit"
-              variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
-              disabled={pending || !form.watch("decision")}
-            >
-              {pending ? (
-                <Spinner data-icon="inline-start" />
-              ) : form.watch("decision") === "approved" ? (
-                <CheckCircle2Icon data-icon="inline-start" />
-              ) : (
-                <XCircleIcon data-icon="inline-start" />
-              )}
-              {form.watch("decision") === "approved"
-                ? "批准营销内容"
-                : form.watch("decision") === "rejected"
-                  ? "退回营销内容"
-                  : "请先选择决定"}
-            </Button>
-            {state.message ? (
-              <p className="text-sm text-muted-foreground" aria-live="polite">
-                {state.message}
-              </p>
-            ) : null}
-          </CardFooter>
         </Card>
-      ) : detail.state === "CONTENT_REVIEW_REQUIRED" ? (
-        <Alert>
-          <ShieldCheckIcon />
-          <AlertTitle>{canReview ? "审核请求需要核对" : "等待审核者检查内容"}</AlertTitle>
-          <AlertDescription>
-            {canReview
-              ? "当前内容没有有效的待审请求，请核对记录状态。"
-              : "由有内容审核权限的项目编辑者核对当前版本，批准后再确认发布。"}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+        {canDecide ? (
+          <Card className="min-w-0">
+            <CardHeader>
+              <CardTitle>内容审核决定</CardTitle>
+              <CardDescription>
+                审核版本 {detail.version}。批准不等于发布；请先明确选择。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form
+                id={`content-review-${detail.id}`}
+                data-content-review=""
+                onSubmit={form.handleSubmit(submit)}
+              >
+                <FieldGroup>
+                  <Field data-invalid={!!form.formState.errors.decision}>
+                    <FieldLabel htmlFor={`content-review-${detail.id}-decision`}>决定</FieldLabel>
+                    <Controller
+                      control={form.control}
+                      name="decision"
+                      render={({ field }) => (
+                        <Select
+                          items={{ approved: "批准营销内容", rejected: "退回营销内容" }}
+                          value={field.value ?? null}
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger
+                            id={`content-review-${detail.id}-decision`}
+                            className="w-full"
+                            aria-invalid={!!form.formState.errors.decision}
+                          >
+                            <SelectValue placeholder="请选择审核决定" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="approved">批准营销内容</SelectItem>
+                              <SelectItem value="rejected">退回营销内容</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <FieldError errors={[form.formState.errors.decision]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                    <FieldLabel htmlFor={`content-review-${detail.id}-evidence`}>
+                      审核依据
+                    </FieldLabel>
+                    <EvidenceSelectField
+                      projectId={projectId}
+                      control={form.control}
+                      name="evidenceRef"
+                      id={`content-review-${detail.id}-evidence`}
+                    />
+                    <FieldError errors={[form.formState.errors.evidenceRef]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.notes}>
+                    <FieldLabel htmlFor={`content-review-${detail.id}-notes`}>
+                      审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
+                    </FieldLabel>
+                    <Textarea
+                      id={`content-review-${detail.id}-notes`}
+                      aria-invalid={!!form.formState.errors.notes}
+                      {...form.register("notes")}
+                    />
+                    <FieldError errors={[form.formState.errors.notes]} />
+                  </Field>
+                </FieldGroup>
+              </form>
+            </CardContent>
+            <CardFooter className="flex-col items-stretch gap-3">
+              <Button
+                form={`content-review-${detail.id}`}
+                type="submit"
+                variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
+                disabled={pending || !form.watch("decision")}
+              >
+                {pending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : form.watch("decision") === "approved" ? (
+                  <CheckCircle2Icon data-icon="inline-start" />
+                ) : (
+                  <XCircleIcon data-icon="inline-start" />
+                )}
+                {form.watch("decision") === "approved"
+                  ? "批准营销内容"
+                  : form.watch("decision") === "rejected"
+                    ? "退回营销内容"
+                    : "请先选择决定"}
+              </Button>
+              {state.message ? (
+                <p className="text-sm text-muted-foreground" aria-live="polite">
+                  {state.message}
+                </p>
+              ) : null}
+            </CardFooter>
+          </Card>
+        ) : detail.state === "CONTENT_REVIEW_REQUIRED" ? (
+          <Alert>
+            <ShieldCheckIcon />
+            <AlertTitle>{canReview ? "审核请求需要核对" : "等待审核者检查内容"}</AlertTitle>
+            <AlertDescription>
+              {canReview
+                ? "当前内容没有有效的待审请求，请核对记录状态。"
+                : "由有内容审核权限的项目编辑者核对当前版本，批准后再确认发布。"}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+      </div>
     </div>
   );
 }

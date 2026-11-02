@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { provisionInvitedUserAction } from "@/lib/actions/invitations";
 import { authClient } from "@/lib/auth-client";
+import { workspaceSignInTarget } from "@/lib/auth-navigation";
 import { authFormSchema } from "@/lib/form-schemas";
 
 export function AuthPanel() {
@@ -30,14 +31,16 @@ export function AuthPanel() {
     const searchParams = new URLSearchParams(window.location.search);
     setInviteToken(searchParams.get("invite"));
     if (searchParams.get("error") === "access-denied") {
-      setMessage("登录成功，但当前账号没有工作台访问权限。请联系管理员为该账号授予管理员权限。");
+      setMessage("登录成功，但当前账号没有工作台访问权限。请联系管理员检查账号权限。");
     }
   }, []);
 
   function enterWorkspace() {
     // Authentication changes the cookie set used by the proxy. A document
     // navigation guarantees the next request evaluates that fresh session.
-    window.location.assign("/workspace");
+    window.location.assign(
+      workspaceSignInTarget(new URLSearchParams(window.location.search).get("next")),
+    );
   }
 
   async function run(
@@ -71,7 +74,9 @@ export function AuthPanel() {
         setMessage(result.message);
         if (result.status !== "success") return;
         setInvitationProvisioned(true);
-        window.history.replaceState({}, "", "/auth");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("invite");
+        window.history.replaceState({}, "", url.pathname + url.search);
         await run(
           () => authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" }),
           "验证码已发送。验证后即可激活账户。",

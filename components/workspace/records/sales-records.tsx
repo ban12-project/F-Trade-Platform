@@ -1,3 +1,4 @@
+import { StickyPanel } from "../sticky-panel";
 import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -65,16 +66,22 @@ export async function SalesRecord({ context }: { context: RecordContext }) {
         ? await listProjectReadyProductReferences(projectId)
         : [];
     return (
-      <div className="space-y-5">
-        {related}
-        <QuotationPanel
-          projectId={projectId}
-          entries={[entry]}
-          showCreateForm={false}
-          rfqs={data.rfqs}
-          products={products}
-          canReview={canWrite && hasPermission(session.user.role, "quotation:review")}
-        />
+      <div className="workspace-columns">
+        <div className="min-w-0">
+          <QuotationPanel
+            projectId={projectId}
+            entries={[entry]}
+            showCreateForm={false}
+            rfqs={data.rfqs}
+            products={products}
+            canReview={canWrite && hasPermission(session.user.role, "quotation:review")}
+          />
+        </div>
+        <StickyPanel>
+          <aside aria-label="关联记录" className="workspace-support">
+            {related}
+          </aside>
+        </StickyPanel>
       </div>
     );
   }
@@ -82,28 +89,40 @@ export async function SalesRecord({ context }: { context: RecordContext }) {
     const entry = data.deliveries.find((item) => item.id === recordId);
     if (!entry) notFound();
     return (
-      <div className="space-y-5">
-        {related}
-        <DeliveryPanel
-          projectId={projectId}
-          entries={[entry]}
-          canReview={canWrite && hasPermission(session.user.role, "delivery:review")}
-        />
+      <div className="workspace-columns">
+        <div className="min-w-0">
+          <DeliveryPanel
+            projectId={projectId}
+            entries={[entry]}
+            canReview={canWrite && hasPermission(session.user.role, "delivery:review")}
+          />
+        </div>
+        <StickyPanel>
+          <aside aria-label="关联记录" className="workspace-support">
+            {related}
+          </aside>
+        </StickyPanel>
       </div>
     );
   }
   const entry = data.leads.find((item) => item.id === recordId);
   if (!entry) notFound();
   return (
-    <div className="space-y-5">
-      {related}
-      <LeadPanel
-        projectId={projectId}
-        entries={[entry]}
-        deliveries={data.deliveries.filter(
-          (item) => item.id === entry.lead.delivery_confirmation_ref,
-        )}
-      />
+    <div className="workspace-columns">
+      <div className="min-w-0">
+        <LeadPanel
+          projectId={projectId}
+          entries={[entry]}
+          deliveries={data.deliveries.filter(
+            (item) => item.id === entry.lead.delivery_confirmation_ref,
+          )}
+        />
+      </div>
+      <StickyPanel>
+        <aside aria-label="关联记录" className="workspace-support">
+          {related}
+        </aside>
+      </StickyPanel>
     </div>
   );
 }
@@ -147,27 +166,33 @@ export async function SalesCreate({ context }: { context: RecordContext }) {
   const products = await listProjectReadyProductReferences(projectId);
   const available = await listActorReadyProductContentSources(session.user.id);
   return (
-    <div className="space-y-5">
-      {sourceId && data ? (
-        <SalesContext
+    <div className="workspace-columns">
+      <div className="min-w-0">
+        <QuotationPanel
           projectId={projectId}
-          records={data.records}
-          kind="rfq"
-          id={sourceId}
-          canWrite
-          hideContinuation
-          returnTo={returnTo}
+          entries={[]}
+          showCreateForm
+          rfqs={rfqs}
+          products={products}
+          canReview={false}
         />
-      ) : null}
-      <QuotationPanel
-        projectId={projectId}
-        entries={[]}
-        showCreateForm
-        rfqs={rfqs}
-        products={products}
-        canReview={false}
-      />
-      <ProductReferencePanel projectId={projectId} available={available} linked={products} />
+      </div>
+      <StickyPanel>
+        <aside aria-label="关联产品与询盘" className="workspace-support">
+          {sourceId && data ? (
+            <SalesContext
+              projectId={projectId}
+              records={data.records}
+              kind="rfq"
+              id={sourceId}
+              canWrite
+              hideContinuation
+              returnTo={returnTo}
+            />
+          ) : null}
+          <ProductReferencePanel projectId={projectId} available={available} linked={products} />
+        </aside>
+      </StickyPanel>
     </div>
   );
 }

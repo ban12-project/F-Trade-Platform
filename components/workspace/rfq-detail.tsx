@@ -6,9 +6,9 @@ import { rfqCustomerRequirements } from "@/lib/rfq/customer-requirements";
 import type { LeadEntry } from "@/lib/sales/closing-store";
 import { salesStateLabels } from "@/lib/sales/journey";
 import type { RfqEntry } from "@/lib/sales/store";
-
 import { RfqForm } from "./rfq-form";
 import { RfqReadyForm } from "./rfq-ready-form";
+import { StickyPanel } from "./sticky-panel";
 
 const types = [
   ["clutch_disc", "离合器片"],
@@ -28,55 +28,61 @@ export function RfqDetail({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      {children}
-      <Card>
-        <CardHeader>
-          <CardTitle>客户需求</CardTitle>
-          <CardDescription>
-            {salesStateLabels[entry.state]} · {entry.formValues.customerName || "客户名称待补充"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm">
-            {types.find(([type]) => type === entry.productType)?.[1] ?? "产品类型待确认"} ·{" "}
-            {entry.formValues.oeNumber ||
-              `${entry.formValues.vehicleBrand} ${entry.formValues.vehicleModel}`.trim() ||
-              "产品身份待补充"}
-          </p>
-          <p className="text-sm">
-            数量：{entry.quantity ?? "待补充"} · 目的地：{entry.destination ?? "待补充"}
-          </p>
-          <Progress aria-label="需求完整度" value={entry.completenessScore}>
-            <ProgressLabel>需求完整度</ProgressLabel>
-            <ProgressValue>{() => `${entry.completenessScore}%`}</ProgressValue>
-          </Progress>
-        </CardContent>
-      </Card>
-      {rfqCustomerRequirements.some(({ field }) => entry.formValues[field]) ? (
+    <div className="workspace-columns">
+      <div className="flex min-w-0 flex-col gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>客户补充需求</CardTitle>
-            <CardDescription>客户提出的要求，尚需核实；期望交付不代表工厂承诺。</CardDescription>
+            <CardTitle>客户需求</CardTitle>
+            <CardDescription>
+              {salesStateLabels[entry.state]} · {entry.formValues.customerName || "客户名称待补充"}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <dl className="grid gap-3 text-sm">
-              {rfqCustomerRequirements.map(({ field, label }) =>
-                entry.formValues[field] ? (
-                  <div key={field} className="grid gap-1">
-                    <dt className="text-muted-foreground">{label}</dt>
-                    <dd className="whitespace-pre-wrap break-words">{entry.formValues[field]}</dd>
-                  </div>
-                ) : null,
-              )}
-            </dl>
+          <CardContent className="space-y-3">
+            <p className="text-sm">
+              {types.find(([type]) => type === entry.productType)?.[1] ?? "产品类型待确认"} ·{" "}
+              {entry.formValues.oeNumber ||
+                `${entry.formValues.vehicleBrand} ${entry.formValues.vehicleModel}`.trim() ||
+                "产品身份待补充"}
+            </p>
+            <p className="text-sm">
+              数量：{entry.quantity ?? "待补充"} · 目的地：{entry.destination ?? "待补充"}
+            </p>
+            <Progress aria-label="需求完整度" value={entry.completenessScore}>
+              <ProgressLabel>需求完整度</ProgressLabel>
+              <ProgressValue>{() => `${entry.completenessScore}%`}</ProgressValue>
+            </Progress>
           </CardContent>
         </Card>
-      ) : null}
-      {entry.state === "RFQ_COLLECTING" ? (
-        <RfqForm key={entry.id} projectId={projectId} entry={entry} leads={leads} />
-      ) : null}
-      <RfqReadyForm projectId={projectId} entry={entry} />
+        {rfqCustomerRequirements.some(({ field }) => entry.formValues[field]) ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>客户补充需求</CardTitle>
+              <CardDescription>客户提出的要求，尚需核实；期望交付不代表工厂承诺。</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-3 text-sm">
+                {rfqCustomerRequirements.map(({ field, label }) =>
+                  entry.formValues[field] ? (
+                    <div key={field} className="grid gap-1">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="whitespace-pre-wrap break-words">{entry.formValues[field]}</dd>
+                    </div>
+                  ) : null,
+                )}
+              </dl>
+            </CardContent>
+          </Card>
+        ) : null}
+        {entry.state === "RFQ_COLLECTING" ? (
+          <RfqForm key={entry.id} projectId={projectId} entry={entry} leads={leads} />
+        ) : null}
+        <RfqReadyForm projectId={projectId} entry={entry} />
+      </div>
+      <StickyPanel>
+        <aside aria-label="关联记录" className="workspace-support">
+          {children}
+        </aside>
+      </StickyPanel>
     </div>
   );
 }

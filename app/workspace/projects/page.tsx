@@ -39,7 +39,11 @@ async function Projects() {
 }
 export default function Page() {
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="workspace-layout mx-auto max-w-7xl space-y-6 p-4 sm:p-6"
+    >
       <header>
         <h1 className="text-2xl font-semibold">项目管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">

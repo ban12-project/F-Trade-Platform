@@ -42,8 +42,8 @@ export function WorkspaceLibraryPage({
   ...props
 }: LibraryPageProps & { collection: WorkspaceCollection }) {
   return (
-    <main id="main-content" tabIndex={-1} className="workspace-page bg-muted/30">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-5 sm:p-6">
+    <main id="main-content" tabIndex={-1} className="workspace-page workspace-layout bg-muted/30">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 sm:p-6">
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">{labels[collection][0]}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{labels[collection][1]}</p>

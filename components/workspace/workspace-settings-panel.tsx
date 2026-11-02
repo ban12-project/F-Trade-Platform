@@ -537,7 +537,7 @@ export function WorkspaceSettingsPanel({
           </>
         ) : null}
       </TabsList>
-      <TabsContent value="account" className="space-y-4">
+      <TabsContent value="account" className="workspace-equal-columns">
         <AccountSettings user={currentUser} />
         <SecuritySettings />
       </TabsContent>
@@ -549,7 +549,7 @@ export function WorkspaceSettingsPanel({
           <TabsContent value="agent">
             <AgentSettings settings={settings} />
           </TabsContent>
-          <TabsContent value="channels" className="space-y-4">
+          <TabsContent value="channels" className="workspace-equal-columns">
             {legacyWorker ? <FacebookAccountPanel /> : null}
             <PublishingAccountsPanel />
             <BrowserNodesPanel />
