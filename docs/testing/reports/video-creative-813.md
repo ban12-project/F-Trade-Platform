@@ -50,3 +50,12 @@ Remotion bundle 和 test-video-rendering 通过。构建报告既有 Zod 4.6.7 /
 测量仍需确认询盘事件和基线；没有自动 ABCD 数值分数或转化保证。
 
 最终表单版本再次执行新增浏览器用例：2 passed（1.6m）。另一次在热更新期间、domcontentloaded 后立即交互的运行未观察到角色变化；恢复完整 load 等待后重跑通过。最终 typecheck、video-contracts 也通过。
+
+## Merge acceptance 2026-11-02
+验收修复：保持显式 React state 驱动编辑器，同时同步 react-hook-form，修复字幕类型切换未稳定更新的问题；提交无效草稿只显示已有实时错误，避免重复提示。
+最终本地验证：typecheck 通过；完整 video-workspace Playwright 11/11 通过（37.4 秒），包含事实字幕拒绝、未保存保护、审核及下载权限展示、ABCD 编辑和简报脏状态。creative-brief、remotion-abcd、marketing-video-edit、video-contracts、video-rendering、video-timeline 共六组通过。Remotion bundle 通过。全仓 biome 无 error，234 warnings / 34 infos；保留已有 Zod 版本警告。
+
+Linux 字体验证：Podman rootless 存储不可用，改用现有 rootful 隔离容器，基于已缓存 Ubuntu 视频媒体镜像安装本 PR 相同的 fontconfig / Noto core / CJK / emoji 软件包；FFmpeg/libass 使用 Noto Sans 样式渲染合成中、日、韩、阿拉伯、英语字幕。检查输出未见缺字方框，阿拉伯文连接字形可见。对照单一 CJK drawtext 字体会缺阿拉伯字形，因此不以该路径代替实际 libass 回退验收。
+复现输入：[captions.ass](../assets/video-creative-813/captions.ass)；输出：[multilingual.png](../assets/video-creative-813/multilingual.png)。命令：ffmpeg -f lavfi -i color=c=black:s=1600x900 -vf subtitles=captions.ass -frames:v 1 multilingual.png。
+
+这是研发合并验收：覆盖编辑器、本地契约和 Linux 字体回退；不等于生产全链路验收。未调用真实收费 AI、未运行生产数据库写入，也未重新构建并部署生产 compute 镜像或验证 Chromium 最终成片。生产字体生效仍依赖镜像重建。按临时 CI 暂停政策记录本地结果后 squash merge，自动部署保持不变。

@@ -1,0 +1,10 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1600
+PlayResY: 900
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, BackColour, BorderStyle, Outline, Alignment, MarginL, MarginR, MarginV
+Style: Default,Noto Sans,42,&H00FFFFFF,&H00000000,1,1,5,60,60,60
+[Events]
+Format: Layer, Start, End, Style, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,中文：提交车型需求，由人工确认报价\N日本語：製品の詳細をご確認ください\N한국어: 제품 정보를 문의하세요\Nالعربية: تواصل معنا للحصول على التفاصيل\NEnglish: Request product details

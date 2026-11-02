@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants, LinkButton } from "@/components/ui/button";
@@ -408,8 +408,9 @@ function EditVideo({
   const draftForm = useForm<{ draft: MarketingVideoDraft }>({
     defaultValues: { draft: entry.draft },
   });
-  const draft = useWatch({ control: draftForm.control, name: "draft" });
+  const [draft, setDraftState] = useState(entry.draft);
   function setDraft(value: MarketingVideoDraft) {
+    setDraftState(value);
     draftForm.setValue("draft", value, { shouldDirty: true });
   }
   const [message, setMessage] = useState("");
@@ -420,6 +421,7 @@ function EditVideo({
   const processing =
     entry.processingJob?.status === "queued" || entry.processingJob?.status === "running";
   useEffect(() => {
+    setDraftState(entry.draft);
     draftForm.reset({ draft: entry.draft });
   }, [entry.draft, draftForm.reset]);
   useEffect(() => {
@@ -444,7 +446,7 @@ function EditVideo({
   function validatedDraft() {
     const result = marketingVideoDraftSchema.safeParse(draft);
     if (!result.success) {
-      setMessage(result.error.issues[0]?.message ?? "剪辑稿无效。");
+      setMessage(""); // The inline schema alert already exposes every validation issue.
       return null;
     }
     return result.data;
