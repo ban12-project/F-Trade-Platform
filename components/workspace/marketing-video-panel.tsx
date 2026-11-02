@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { useForm } from "react-hook-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants, LinkButton } from "@/components/ui/button";
@@ -54,7 +55,9 @@ import {
 } from "@/lib/actions/marketing-video";
 import { productFactLabels } from "@/lib/product/fact-labels";
 import {
+  assertMarketingCreativeReady,
   type MarketingVideoDraft,
+  marketingCreativeBriefSchema,
   marketingVideoDraftSchema,
   marketingVideoDurationMs,
 } from "@/lib/video/edit-contracts";
@@ -178,13 +181,22 @@ function ClipEditor({
               <FieldGroup>
                 <Field>
                   <FieldLabel>片段用途</FieldLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {clip.abcdRoles.map((role) => (
-                      <Badge key={role} variant="outline">
-                        {abcdRoleLabels[role]}
-                      </Badge>
+                  <ToggleGroup
+                    multiple
+                    aria-label={`片段 ${index + 1} ABCD 用途`}
+                    value={clip.abcdRoles}
+                    disabled={disabled}
+                    onValueChange={(roles) =>
+                      patchClip(index, { abcdRoles: roles as typeof clip.abcdRoles })
+                    }
+                    variant="outline"
+                  >
+                    {Object.entries(abcdRoleLabels).map(([role, label]) => (
+                      <ToggleGroupItem key={role} value={role}>
+                        {label}
+                      </ToggleGroupItem>
                     ))}
-                  </div>
+                  </ToggleGroup>
                   <FieldDescription>
                     整条视频应包含吸引注意、呈现品牌、建立联系和引导行动；同一片段可承担多个用途。
                   </FieldDescription>
@@ -393,7 +405,14 @@ function EditVideo({
 }) {
   const router = useRouter();
   const [pending, startAction] = useTransition();
-  const [draft, setDraft] = useState(entry.draft);
+  const draftForm = useForm<{ draft: MarketingVideoDraft }>({
+    defaultValues: { draft: entry.draft },
+  });
+  const [draft, setDraftState] = useState(entry.draft);
+  function setDraft(value: MarketingVideoDraft) {
+    setDraftState(value);
+    draftForm.setValue("draft", value, { shouldDirty: true });
+  }
   const [message, setMessage] = useState("");
   const [reviewEvidence, setReviewEvidence] = useState("");
   const dirty = JSON.stringify(draft) !== JSON.stringify(entry.draft) || Boolean(reviewEvidence);
@@ -402,8 +421,9 @@ function EditVideo({
   const processing =
     entry.processingJob?.status === "queued" || entry.processingJob?.status === "running";
   useEffect(() => {
-    setDraft(entry.draft);
-  }, [entry.draft]);
+    setDraftState(entry.draft);
+    draftForm.reset({ draft: entry.draft });
+  }, [entry.draft, draftForm.reset]);
   useEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
@@ -426,7 +446,7 @@ function EditVideo({
   function validatedDraft() {
     const result = marketingVideoDraftSchema.safeParse(draft);
     if (!result.success) {
-      setMessage(result.error.issues[0]?.message ?? "剪辑稿无效。");
+      setMessage(""); // The inline schema alert already exposes every validation issue.
       return null;
     }
     return result.data;
@@ -500,6 +520,122 @@ function EditVideo({
               <AlertDescription>请缩短片段，总时长必须不超过 15 秒。</AlertDescription>
             </Alert>
           ) : null}
+          <Card>
+            <CardHeader>
+              <CardTitle>ABCD 创意简报</CardTitle>
+              <CardDescription>
+                完整填写并保存简报后才能生成 AI 初稿。品牌必须来自授权素材；角色完整不代表审核通过。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="brand-source">含授权品牌标识的开场素材</FieldLabel>
+                  <NativeSelect
+                    id="brand-source"
+                    value={draft.creativeBrief?.brandAssetRef ?? ""}
+                    disabled={pending || processing}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        creativeBrief: {
+                          objective: "action",
+                          audience: "",
+                          buyerNeed: "",
+                          nextAction: "",
+                          platformAssumptions: "",
+                          ...draft.creativeBrief,
+                          brandAssetRef: event.target.value,
+                        },
+                      })
+                    }
+                  >
+                    <NativeSelectOption value="">请选择并人工核对品牌权利</NativeSelectOption>
+                    {draft.clips.map((clip, index) => (
+                      <NativeSelectOption key={clip.clipId} value={clip.assetRef}>
+                        片段 {index + 1} 素材
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                  <FieldDescription>
+                    选择表示该素材含获授权品牌标识；合成仍需素材权利和成片人工审核。请将其移到开场。
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="creative-objective">主要营销目标</FieldLabel>
+                  <NativeSelect
+                    id="creative-objective"
+                    disabled={pending || processing}
+                    value={draft.creativeBrief?.objective ?? "action"}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        creativeBrief: {
+                          brandAssetRef: "",
+                          audience: "",
+                          buyerNeed: "",
+                          nextAction: "",
+                          platformAssumptions: "",
+                          ...draft.creativeBrief,
+                          objective: event.target.value as "awareness" | "consideration" | "action",
+                        },
+                      })
+                    }
+                  >
+                    <NativeSelectOption value="awareness">认知：介绍供应商</NativeSelectOption>
+                    <NativeSelectOption value="consideration">
+                      考虑：展示相关产品细节
+                    </NativeSelectOption>
+                    <NativeSelectOption value="action">行动：提交需求供人工审核</NativeSelectOption>
+                  </NativeSelect>
+                </Field>
+                {(
+                  [
+                    ["audience", "目标受众"],
+                    ["buyerNeed", "一个主要买家需求"],
+                    ["nextAction", "可用的下一步与承接入口"],
+                    ["platformAssumptions", "平台与声音、字幕假设"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <Field key={key}>
+                    <FieldLabel htmlFor={`creative-${key}`}>{label}</FieldLabel>
+                    <Textarea
+                      id={`creative-${key}`}
+                      disabled={pending || processing}
+                      maxLength={key === "platformAssumptions" ? 300 : 200}
+                      value={draft.creativeBrief?.[key] ?? ""}
+                      onChange={(event) =>
+                        setDraft({
+                          ...draft,
+                          creativeBrief: {
+                            objective: "action",
+                            brandAssetRef: "",
+                            audience: "",
+                            buyerNeed: "",
+                            nextAction: "",
+                            platformAssumptions: "",
+                            ...draft.creativeBrief,
+                            [key]: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </Field>
+                ))}
+              </FieldGroup>
+            </CardContent>
+          </Card>
+          {!marketingVideoDraftSchema.safeParse(draft).success ? (
+            <Alert variant="destructive">
+              <AlertTitle>剪辑结构需要修改</AlertTitle>
+              <AlertDescription>
+                {marketingVideoDraftSchema
+                  .safeParse(draft)
+                  .error?.issues.map((issue) => issue.message)
+                  .join("；")}
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <ClipEditor
             draft={draft}
             factOptions={entry.captionFactOptions}
@@ -508,7 +644,7 @@ function EditVideo({
           />
           <Separator />
           <Field>
-            <FieldLabel htmlFor="video-cta">结尾两秒的咨询引导文案</FieldLabel>
+            <FieldLabel htmlFor="video-cta">行动引导文案</FieldLabel>
             <Input
               id="video-cta"
               maxLength={40}
@@ -516,12 +652,19 @@ function EditVideo({
               value={draft.ctaText}
               onChange={(event) => setDraft({ ...draft, ctaText: event.target.value })}
             />
-            <FieldDescription>固定居中样式，不增加视频总时长。</FieldDescription>
+            <FieldDescription>
+              由最后片段的 Direction 阶段显示；请确认实际可用的咨询入口。
+            </FieldDescription>
           </Field>
           <div className="grid gap-2 sm:grid-cols-3">
             <Button
               variant="outline"
-              disabled={pending || processing}
+              disabled={
+                pending ||
+                processing ||
+                dirty ||
+                !marketingCreativeBriefSchema.safeParse(draft.creativeBrief).success
+              }
               onClick={() => run(() => generateMarketingVideoAiDraftAction(projectId, entry.id))}
             >
               <BotIcon data-icon="inline-start" />
@@ -542,7 +685,15 @@ function EditVideo({
               disabled={pending || processing || durationMs > 15_000}
               onClick={() => {
                 const value = validatedDraft();
-                if (value) run(() => renderMarketingVideoDraftAction(projectId, entry.id, value));
+                if (value) {
+                  try {
+                    assertMarketingCreativeReady(value);
+                  } catch (error) {
+                    setMessage(error instanceof Error ? error.message : "请完善创意简报");
+                    return;
+                  }
+                  run(() => renderMarketingVideoDraftAction(projectId, entry.id, value));
+                }
               }}
             >
               <ScissorsIcon data-icon="inline-start" />

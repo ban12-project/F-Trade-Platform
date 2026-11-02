@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 ARG MARKITDOWN_VERSION=0.1.7
 
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg poppler-utils tesseract-ocr fonts-dejavu-core ca-certificates curl python3 python3-venv \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg poppler-utils tesseract-ocr fonts-dejavu-core fontconfig fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji ca-certificates curl python3 python3-venv \
   && python3 -m venv /opt/markitdown \
   && /opt/markitdown/bin/pip install --no-cache-dir "markitdown[pdf,xls,xlsx]==${MARKITDOWN_VERSION}" "pdfplumber==0.11.10" \
   && /opt/markitdown/bin/python3 -c "from markitdown import MarkItDown" \
