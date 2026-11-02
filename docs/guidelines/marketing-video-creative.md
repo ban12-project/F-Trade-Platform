@@ -51,7 +51,7 @@ The playbook extends the baseline for three objectives. These source summaries c
 | Consideration, pages 16–18 | Retain the opening hook. | Emphasize product close-ups; preserve branding, especially in the final five seconds. | Demonstrate relevant benefits in relatable situations. | Motivate action through time limits or limited availability; consider audio reinforcement. |
 | Action, pages 21–23 | Retain the opening hook. | Keep the product visible throughout; avoid distracting brand moments. | Explain the offer precisely through realistic use cases. | Connect the CTA to the offer; consider discounts or incentives. |
 
-Pages 5, 9, 14, 19, and 24 compare versions of a hypothetical dog-treat advertisement. Treat these as execution examples, not product evidence. Page 25 encourages adapting execution to the brand.
+Page 5 introduces a hypothetical dog-treat advertisement; pages 9, 14, 19, and 24 compare its versions. Treat these as execution examples, not product evidence. Page 25 encourages adapting execution to the brand.
 
 For this project, select one primary objective and explain the choice in the review record. Use the following applications as planning examples, not approved campaign claims:
 
@@ -67,7 +67,7 @@ The consideration timing advice applies to that source context, not every video 
 
 ## Project applications and limits
 
-Treat the following checks as project policy, not additional claims from Google. Explain exceptions with evidence and record unresolved decisions.
+Treat the following checks as project policy, not additional claims from Google. Explain creative adaptations with evidence and record unresolved decisions. Evidence, rights, and approval requirements remain mandatory.
 
 | Review area | Project check |
 | --- | --- |
