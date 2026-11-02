@@ -50,7 +50,12 @@ async function main() {
         throw new Error("must_not_auto_resume");
       },
       delete: async (options: unknown) => {
-        events.push({ deleted: options });
+        events.push({
+          deleted: {
+            deleteOrphanSnapshots: (options as { deleteOrphanSnapshots: boolean })
+              .deleteOrphanSnapshots,
+          },
+        });
       },
     };
   }) as unknown as typeof Sandbox.create;

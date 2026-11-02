@@ -1,5 +1,6 @@
 import { FileSystem, Sandbox, type Session } from "@vercel/sandbox";
 import { z } from "zod";
+import { cleanupComputeSandbox } from "./cleanup";
 import type { ComputeProfile } from "./vps";
 
 const maximumFileBytes = 1024 * 1024 * 1024 - 1;
@@ -78,7 +79,7 @@ export class VercelCompute {
       await runtime.fs.mkdir("/vercel/sandbox/work", { recursive: true });
       return runtime;
     } catch (error) {
-      await sandbox.delete({ deleteOrphanSnapshots: true }).catch(() => undefined);
+      await cleanupComputeSandbox(sandbox, sandbox.currentSession()).catch(() => undefined);
       throw error;
     }
   }
@@ -145,6 +146,6 @@ export class VercelCompute {
   }
 
   async stop() {
-    await this.sandbox.delete({ deleteOrphanSnapshots: true });
+    await cleanupComputeSandbox(this.sandbox, this.session);
   }
 }
