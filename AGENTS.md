@@ -17,7 +17,7 @@
 
 Apply these rules when your task affects marketing video content:
 
-- Read [the marketing video creative guide](docs/reference/marketing-video-creative.md) before designing or reviewing requirements, scripts, storyboards, captions, branding, calls to action, or AI prompts.
+- Read [the marketing video creative guide](docs/guidelines/marketing-video-creative.md) before designing or reviewing requirements, scripts, storyboards, captions, branding, calls to action, or AI prompts.
 - Use its ABCD review record to document design choices, evidence, platform assumptions, and unresolved questions in your deliverable.
 - Explain adaptations for platforms other than YouTube. Do not treat YouTube viewing assumptions as universal facts.
 - Preserve product evidence, media rights, human review, and quote confirmation requirements. Creative guidance never overrides these requirements.
