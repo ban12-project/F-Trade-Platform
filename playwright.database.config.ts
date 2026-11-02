@@ -9,6 +9,7 @@ const port = 3100;
 const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
+  outputDir: "test-results/database",
   testDir: "./tests/database-browser",
   fullyParallel: false,
   workers: 1,
@@ -16,11 +17,13 @@ export default defineConfig({
   timeout: 60_000,
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? [["blob", { outputDir: "blob-report-database" }]] : "list",
-  use: { baseURL, trace: "retain-on-failure" },
+  use: { baseURL, trace: "retain-on-failure", screenshot: "only-on-failure" },
   projects: [{ name: "chromium-database", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "pnpm exec next build && pnpm start",
+    command:
+      "pnpm exec tsx scripts/playwright-preflight.ts database && pnpm exec next build && pnpm start",
     env: {
+      PLAYWRIGHT_LAYER: "database",
       PORT: String(port),
       NEXT_ENABLE_TESTING_API: "1",
       BETTER_AUTH_SECRET: authSecret,

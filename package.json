@@ -107,7 +107,9 @@
     "test:product-output": "tsx scripts/test-product-output-policy.ts && tsx scripts/test-product-evaluation-run.ts && tsx scripts/test-catalog-agent.ts && tsx scripts/test-product-selection-summary.ts && tsx scripts/test-product-selection-health.ts",
     "eval:model-selection": "tsx scripts/run-product-model-selection.ts",
     "test:vercel-compute": "tsx scripts/test-vercel-compute.ts",
-    "test:vps-compute": "tsx scripts/test-vps-compute-client.ts && tsx scripts/test-vps-compute-transport.ts"
+    "test:vps-compute": "tsx scripts/test-vps-compute-client.ts && tsx scripts/test-vps-compute-transport.ts",
+    "test:publication:ui": "playwright test tests/e2e/publication-batch.spec.ts tests/e2e/video-publication-caption.spec.ts tests/e2e/publication-page-inspection.spec.ts tests/e2e/publication-reconciliation.spec.ts",
+    "test:publication:database": "node scripts/run-publication-database-acceptance.mjs"
   },
   "dependencies": {
     "@ai-sdk/alibaba": "^2.0.37",

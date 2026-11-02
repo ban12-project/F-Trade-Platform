@@ -67,3 +67,7 @@ artifacts/browser-fleet-review/
 # Local Harbor jobs can include provider connection configuration.
 jobs/
 harbor-artifacts/
+
+# Isolated Playwright application builds
+.next-playwright-*/
+.tsconfig-playwright-*.json

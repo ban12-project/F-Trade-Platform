@@ -4,6 +4,7 @@ const port = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
 const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
+  outputDir: "test-results/ui",
   testDir: "./tests/e2e",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
@@ -12,7 +13,8 @@ export default defineConfig({
   reporter: process.env.CI ? "blob" : "html",
   use: {
     baseURL,
-    trace: "on-first-retry",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   projects: [
     {
@@ -21,8 +23,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm build:test && pnpm start",
+    command: "pnpm exec tsx scripts/playwright-preflight.ts ui && pnpm build:test && pnpm start",
     env: {
+      PLAYWRIGHT_LAYER: "ui",
       PORT: String(port),
       NEXT_ENABLE_TESTING_API: "1",
       BETTER_AUTH_SECRET: "synthetic-playwright-secret-1234567890",
@@ -30,7 +33,7 @@ export default defineConfig({
       DATABASE_URL: "postgresql://synthetic:synthetic@127.0.0.1:9/f_trade",
     },
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

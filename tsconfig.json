@@ -44,5 +44,12 @@
     "scripts/test-facebook-video-caption-postgres.mts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "tmp", "ops/browser-node/upstream"]
+  "exclude": [
+    ".next-playwright-ui",
+    ".next-playwright-database",
+    "node_modules",
+    "tmp",
+    "ops/browser-node/upstream",
+    ".tsconfig-playwright-*.json"
+  ]
 }
