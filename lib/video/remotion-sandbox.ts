@@ -9,6 +9,7 @@ import { videoProbeEntries } from "./encoding-contract";
 import { parseFfprobeOutput } from "./media-probe";
 import { renderCommandFailureCode, VideoRenderCommandError } from "./processing-failures";
 import { createRemotionCompositionProps } from "./remotion-props";
+import { renderFailureCategory, renderStage } from "./render-diagnostics";
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
 
@@ -61,18 +62,16 @@ async function renderRemotionOnCompute(
   inputProps: ReturnType<typeof createRemotionCompositionProps>,
   sources: SignedSources,
 ) {
-  const runtime = await createComputeRuntime();
+  const runtime = await renderStage("create", () => createComputeRuntime());
   try {
-    await uploadBundle(runtime, bundleDir);
+    await renderStage("bundle_upload", () => uploadBundle(runtime, bundleDir));
     const localSources = new Map<string, string>();
     for (const [index, source] of [...sources.values()].entries()) {
       if (!/^\.(?:jpg|png|webp|mp4|mov)$/.test(source.extension))
         throw new Error("remotion_source_extension_invalid");
       const filename = `media-${index}${source.extension}`;
-      await runtime.download(
-        source.signedGetUrl,
-        source.hostname,
-        `/vercel/sandbox/work/${filename}`,
+      await renderStage("source_download", () =>
+        runtime.download(source.signedGetUrl, source.hostname, `/vercel/sandbox/work/${filename}`),
       );
       localSources.set(source.signedGetUrl, `http://127.0.0.1:8765/${filename}`);
     }
@@ -84,22 +83,37 @@ async function renderRemotionOnCompute(
         return { ...clip, src };
       }),
     };
-    await runtime.fs.writeFile("/vercel/sandbox/work/props.json", JSON.stringify(offlineProps));
-    const rendered = await runtime.runCommand({
-      cmd: "node",
-      args: ["/opt/ftrade-remotion/render.mjs"],
-    });
-    if (rendered.exitCode !== 0)
-      throw new VideoRenderCommandError(renderCommandFailureCode(await rendered.stderr()));
+    await renderStage("props_write", () =>
+      runtime.fs.writeFile("/vercel/sandbox/work/props.json", JSON.stringify(offlineProps)),
+    );
+    const rendered = await renderStage("render_command", () =>
+      runtime.runCommand({
+        cmd: "node",
+        args: ["/opt/ftrade-remotion/render.mjs"],
+      }),
+    );
+    if (rendered.exitCode !== 0) {
+      const stderr = await rendered.stderr();
+      console.error("video_render.command_failed", {
+        exitCode: rendered.exitCode,
+        category: renderFailureCategory(stderr),
+      });
+      throw new VideoRenderCommandError(renderCommandFailureCode(stderr));
+    }
     const output = "/vercel/sandbox/work/output.mp4";
-    const inspected = await runtime.runCommand({
-      cmd: "ffprobe",
-      args: ["-v", "error", "-show_entries", videoProbeEntries, "-of", "json", output],
-    });
+    const inspected = await renderStage("probe", () =>
+      runtime.runCommand({
+        cmd: "ffprobe",
+        args: ["-v", "error", "-show_entries", videoProbeEntries, "-of", "json", output],
+      }),
+    );
     if (inspected.exitCode !== 0) throw new Error("Remotion 成片验收失败。");
     const probe = parseFfprobeOutput(JSON.parse(await inspected.stdout()));
-    return { data: new Uint8Array(await runtime.fs.readFile(output)), probe };
+    return {
+      data: new Uint8Array(await renderStage("output_read", () => runtime.fs.readFile(output))),
+      probe,
+    };
   } finally {
-    await runtime.stop();
+    await renderStage("cleanup", () => runtime.stop());
   }
 }

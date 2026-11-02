@@ -98,8 +98,25 @@ export class VercelCompute {
     copyFile: (path: string, destination: string) => this.files.copyFile(path, destination),
   };
 
-  runCommand(input: { cmd: string; args: string[]; cwd?: string; env?: Record<string, string> }) {
-    return this.session.runCommand(input);
+  async runCommand(input: {
+    cmd: string;
+    args: string[];
+    cwd?: string;
+    env?: Record<string, string>;
+  }) {
+    // Long renders must not depend on one uninterrupted streaming response.
+    // Poll the original command in the original session; never rerun it.
+    const command = await this.session.runCommand({ ...input, detached: true });
+    const deadline = Date.now() + 600_000;
+    while (Date.now() < deadline) {
+      const signal = AbortSignal.timeout(30_000);
+      try {
+        return await command.wait({ signal });
+      } catch (error) {
+        if (!signal.aborted) throw error;
+      }
+    }
+    throw new Error("compute_command_deadline");
   }
 
   async download(url: string, hostname: string, destination: string) {
