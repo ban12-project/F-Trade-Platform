@@ -1,4 +1,4 @@
-FROM docker.io/library/node:24-bookworm-slim
+FROM docker.io/library/node:26.13.0-bookworm-slim
 
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 \

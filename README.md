@@ -79,7 +79,7 @@ GitHub Actions 会在 Pull Request 和 `main` 推送时运行同一套核心校�
 
 ### Next.js 与端到端测试
 
-应用基线使用 Next.js 16.3 和 Playwright。需要 Node.js 24 与 pnpm：
+应用基线使用 Next.js 16.3 和 Playwright。需要 Node.js 26.13.0 LTS 与 pnpm：
 
 ```bash
 pnpm install

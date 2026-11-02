@@ -20,7 +20,7 @@ Choose the layer that can prove the behavior you changed:
 
 ## Run isolated UI scenarios
 
-Install Node 24, repository dependencies and Playwright Chromium before running the UI suite. The preflight reports a missing browser before building the application.
+Install Node 26.13.0 LTS, repository dependencies and Playwright Chromium before running the UI suite. The preflight reports a missing browser before building the application.
 
 Run the focused publication scenarios:
 

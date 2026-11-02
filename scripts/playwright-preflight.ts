@@ -3,8 +3,8 @@ import { chromium } from "@playwright/test";
 import { Pool } from "pg";
 
 async function preflight() {
-  if (Number(process.versions.node.split(".")[0]) !== 24)
-    throw new Error("Browser acceptance requires Node 24.");
+  if (Number(process.versions.node.split(".")[0]) !== 26)
+    throw new Error("Browser acceptance requires Node 26.");
   if (!existsSync(chromium.executablePath()))
     throw new Error("Chromium is missing. Run pnpm exec playwright install chromium.");
   const layer = process.argv[2];

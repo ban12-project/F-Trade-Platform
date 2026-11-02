@@ -1,6 +1,6 @@
 # OpenShip does not preserve Compose init/cap_drop/security_opt fields. Apply
 # these process protections before Node starts, including on restart/rollback.
-FROM node:24-trixie-slim
+FROM node:26.13.0-trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends tini util-linux \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

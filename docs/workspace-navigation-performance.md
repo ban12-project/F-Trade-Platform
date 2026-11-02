@@ -30,7 +30,7 @@
 
 沿用 Next.js 官方 `examples/with-biome` 的 Git ignore、空格缩进以及 Next/React 推荐规则。固定 Biome v2 依赖并提交 lockfile；`pnpm format` 写格式，`pnpm lint:fix` 写安全修复，`pnpm check:ci` 只检查。生成物与锁文件不交给格式化器重写。底层 shadcn 标签/布局原语只对静态分析无法跨 props 推断的两处规则作局部、有理由的豁免。
 
-应用维持 Node 24，`.nvmrc` 与 package engines 对齐。CI 中 JavaScript Action 自身的 Node runtime 也必须为 Node 24；仅设置 setup-node 的 node-version 并不会升级旧 Action 的内置 runtime。Actions 更新交给 Dependabot 持续检查。保留现有发布平台集成，不添加未知部署密钥或自动生产发布。
+应用使用 Node 26.13.0 LTS，`.nvmrc` 与 package engines 对齐。CI 中 JavaScript Action 自身的 Node runtime 也必须为 Node 24；仅设置 setup-node 的 node-version 并不会升级旧 Action 的内置 runtime。Actions 更新交给 Dependabot 持续检查。保留现有发布平台集成，不添加未知部署密钥或自动生产发布。
 
 ## #319：项目页静态壳与真实路由回归
 

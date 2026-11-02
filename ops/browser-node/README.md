@@ -203,7 +203,7 @@ CI 还运行独立 PostgreSQL 容量并发/唯一绑定/迁移测试、Compose �
 
 ### Agent 打包边界检查
 
-`node scripts/test-browser-agent-payload.mjs` 从 Dockerfile 的 COPY 声明与 Git 跟踪文件构造临时运行目录，不安装应用依赖，使用原生 Node 24 执行 `ops/browser-node/smoke.mjs`。它核对运行模块可加载、固定页面资源可解析、Agent 入口语法，以及未配置页面契约时适配器明确拒绝启动。反向对照删除临时目录中的收件箱页面资源，确认同一检查因 ENOENT 失败，避免把遗漏资源的包记为通过。
+`node scripts/test-browser-agent-payload.mjs` 从 Dockerfile 的 COPY 声明与 Git 跟踪文件构造临时运行目录，不安装应用依赖，使用原生 Node 26 执行 `ops/browser-node/smoke.mjs`。它核对运行模块可加载、固定页面资源可解析、Agent 入口语法，以及未配置页面契约时适配器明确拒绝启动。反向对照删除临时目录中的收件箱页面资源，确认同一检查因 ENOENT 失败，避免把遗漏资源的包记为通过。
 
 镜像检查脚本也在 `--network none` 下调用同一 smoke。离线目录检查已在本地通过正反对照，但不等于镜像构建或容器启动通过：当前主机没有 Docker，实际 amd64/arm64 镜像检查仍需可运行的 Docker/CI 环境。该检查不会启动真实账号或读取私人配置，也不能验证代理、Camofox 页面行为或运维日志隐私。
 
