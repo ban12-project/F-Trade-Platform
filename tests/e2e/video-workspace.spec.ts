@@ -109,3 +109,20 @@ test("review evidence is protected when leaving the selected video", async ({ pa
   await dialog.getByRole("button", { name: "继续编辑" }).click();
   await expect(page.getByLabel("审核依据")).toContainText("合成审核记录.pdf");
 });
+
+test("ABCD roles are editable and missing opening attention is reported", async ({ page }) => {
+  await page.goto("/testing/video-workspace");
+  await expect(page.getByText("ABCD 创意简报", { exact: true })).toBeVisible();
+  await page
+    .getByRole("group", { name: "片段 1 ABCD 用途" })
+    .getByRole("button", { name: "吸引注意" })
+    .click();
+  await expect(page.getByText(/Attention 必须从第一个片段开始/)).toBeVisible();
+});
+
+test("creative brief edits require saving before AI regeneration", async ({ page }) => {
+  await page.goto("/testing/video-workspace");
+  await page.getByLabel("目标受众", { exact: true }).fill("配件采购商");
+  await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeDisabled();
+  await expect(page.getByLabel("目标受众", { exact: true })).toHaveValue("配件采购商");
+});

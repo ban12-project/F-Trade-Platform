@@ -29,6 +29,7 @@ import {
   type VideoDraftIdentity,
 } from "./draft-write-access";
 import {
+  assertMarketingCreativeReady,
   createMarketingVideoDraftFormSchema,
   type MarketingVideoDraft,
   marketingVideoDraftSchema,
@@ -614,6 +615,8 @@ async function saveMarketingVideoEditDraft(
   database: Database,
 ) {
   const draft = marketingVideoDraftSchema.parse(draftInput);
+  if (writer.kind === "ai" || writer.processingKind === "render")
+    assertMarketingCreativeReady(draft);
   const actorId = writer.kind === "human" ? writer.identity.actorId : writer.actorId;
   const expectedVersion = writer.kind === "ai" ? writer.expectedVersion : undefined;
   return database.transaction(async (tx) => {

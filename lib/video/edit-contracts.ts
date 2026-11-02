@@ -377,10 +377,22 @@ export const marketingVideoClipSchema = z
     }
   });
 
+export const marketingCreativeBriefSchema = z
+  .object({
+    brandAssetRef: z.string().trim().min(1).max(500),
+    objective: z.enum(["awareness", "consideration", "action"]),
+    audience: z.string().trim().min(1).max(200),
+    buyerNeed: z.string().trim().min(1).max(200),
+    nextAction: z.string().trim().min(1).max(200),
+    platformAssumptions: z.string().trim().min(1).max(300),
+  })
+  .strict();
+
 const marketingVideoDraftV3Schema = z
   .object({
     version: z.literal(3),
     creativeFramework: z.literal("google_abcd"),
+    creativeBrief: marketingCreativeBriefSchema.optional(),
     platform: editingPlatformSchema,
     clips: z
       .array(marketingVideoClipSchema)
@@ -611,4 +623,26 @@ export type MarketingVideoAiDraft = z.infer<typeof marketingVideoAiDraftSchema>;
 
 export function marketingVideoDurationMs(draft: MarketingVideoDraft) {
   return draft.clips.reduce((total, clip) => total + clip.durationMs, 0);
+}
+
+/** Creative readiness is separate from saving an unfinished/legacy draft. */
+export function assertMarketingCreativeReady(draft: MarketingVideoDraft) {
+  const brief = marketingCreativeBriefSchema.parse(draft.creativeBrief);
+  const first = draft.clips[0];
+  if (!first || first.assetRef !== brief.brandAssetRef)
+    throw new Error("开场必须使用所选的授权品牌素材。");
+  if (
+    !draft.clips.some(
+      (clip) => clip.abcdRoles.includes("connection") && clip.caption.kind !== "none",
+    )
+  )
+    throw new Error("Connection 片段需要表达买家需求的字幕或已核实事实。");
+  if (
+    brief.objective === "consideration" &&
+    !draft.clips.some(
+      (clip) => clip.abcdRoles.includes("connection") && clip.caption.kind === "verified_fact",
+    )
+  )
+    throw new Error("考虑目标需要在 Connection 片段展示已核实产品细节。");
+  return brief;
 }
