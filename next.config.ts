@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
 
+const browserLayer = process.env.PLAYWRIGHT_LAYER;
+if (browserLayer && !["ui", "database"].includes(browserLayer))
+  throw new Error("Unknown Playwright layer");
+
 const nextConfig: NextConfig = {
+  distDir: browserLayer ? `.next-playwright-${browserLayer}` : ".next",
+  typescript: browserLayer ? { tsconfigPath: `.tsconfig-playwright-${browserLayer}.json` } : {},
   allowedDevOrigins: ["127.0.0.1"],
   cacheComponents: true,
   reactCompiler: true,

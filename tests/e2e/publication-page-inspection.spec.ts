@@ -81,7 +81,9 @@ test("inspection UI keeps expired candidates explicit and unauthenticated reques
       exact: true,
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "确认以上范围，让文字发布配置生效" }),
-  ).toBeDisabled();
+  await expect(page.getByText(/配置未生效。请确认接管页面仍在运行并重新核对/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "登录完成，重试连接", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "确认以上范围，让文字发布配置生效" })).toHaveCount(
+    0,
+  );
 });
