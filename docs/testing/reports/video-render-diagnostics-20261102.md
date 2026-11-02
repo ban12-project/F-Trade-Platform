@@ -45,3 +45,9 @@ product text or credential values are emitted by this diagnostic layer.
 This verifies an isolated render, not a production UI retry, saved preview or
 publication. Production acceptance should verify the newly deployed revision.
 CI remains temporarily paused under `docs/operations/temporary-ci-pause.md`.
+
+## Creative review applicability
+
+ABCD creative review does not apply: this changes compute command waiting and
+operational diagnostics only. Composition, captions, prompts, branding, CTA,
+source selection and output encoding are unchanged.
