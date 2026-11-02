@@ -104,7 +104,7 @@ export class VercelCompute {
     cwd?: string;
     env?: Record<string, string>;
   }) {
-    // A quiet renderer can outlive the HTTP response body's idle deadline.
+    // Long renders must not depend on one uninterrupted streaming response.
     // Poll the original command in the original session; never rerun it.
     const command = await this.session.runCommand({ ...input, detached: true });
     const deadline = Date.now() + 600_000;
