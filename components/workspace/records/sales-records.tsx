@@ -27,7 +27,8 @@ async function ProductReferences({ context }: { context: RecordContext }) {
 }
 export async function SalesRecord({ context }: { context: RecordContext }) {
   const { projectId, recordId, session, kind, canWrite } = context;
-  const selected = { kind: kind as SalesRelationRecord["kind"], id: recordId! };
+  if (!recordId) notFound();
+  const selected = { kind: kind as SalesRelationRecord["kind"], id: recordId };
   const data = await readSalesJourney(
     projectId,
     session.user.id,
@@ -39,7 +40,7 @@ export async function SalesRecord({ context }: { context: RecordContext }) {
       projectId={projectId}
       records={data.records}
       kind={selected.kind}
-      id={recordId!}
+      id={recordId}
       canWrite={canWrite}
       returnTo={context.returnTo}
     />

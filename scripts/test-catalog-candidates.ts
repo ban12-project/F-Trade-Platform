@@ -51,9 +51,9 @@ const records = discover(
   "<!-- f-trade:pdf-page=1 -->\nPart No.: RYC-SYN999\nSynthetic attribute: A\n\n<!-- f-trade:pdf-page=2 -->\n\n<!-- f-trade:pdf-page=3 -->\nPart No.: RYC-SYN999\nSynthetic attribute: B",
 );
 assert.equal(records.length, 2);
-assert.notEqual(records[0]!.record_id, records[1]!.record_id);
-assert.notEqual(records[0]!.source.evidence_refs[0], records[1]!.source.evidence_refs[0]);
-assert.match(records[1]!.source.evidence_refs[0]!, /pdf-page=3/);
+assert.notEqual(records[0].record_id, records[1].record_id);
+assert.notEqual(records[0].source.evidence_refs[0], records[1].source.evidence_refs[0]);
+assert.match(records[1].source.evidence_refs[0], /pdf-page=3/);
 assert.ok(
   records.every((record) => record.review_status === "duplicate_identifier_review_required"),
 );
@@ -70,9 +70,9 @@ const spatialKit = discover(
   "<!-- f-trade:pdf-page=2 -->\nOriginal OCR (unverified):\n> Kit No.: 9999 999 990\n> Part No.: SYN-COMP\n\nKit No.: 9999 999 990\nComponent 1 source [ocr-pixels=100,70,210,120]: Part No.: SYN-COMP / Type No.: MOCK-TYPE / Size: 1*2",
 );
 assert.equal(spatialKit.length, 1);
-assert.match(spatialKit[0]!.source.source_text, /Component 1 source/);
-assert.match(spatialKit[0]!.source.source_text, /Size: 1\*2/);
-assert.match(spatialKit[0]!.source.evidence_refs[0]!, /pdf-page=2/);
+assert.match(spatialKit[0].source.source_text, /Component 1 source/);
+assert.match(spatialKit[0].source.source_text, /Size: 1\*2/);
+assert.match(spatialKit[0].source.evidence_refs[0], /pdf-page=2/);
 
 const labelsOnly = discover(
   "<!-- f-trade:pdf-page=4 -->\nOriginal OCR (unverified):\n> Kit No.: 999 999 9999\n> Part No.: SYN-UNOWNED\n\nKit No.: 999 999 9999\nSource kit label (unverified OCR); component associations were not recovered.",

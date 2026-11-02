@@ -124,11 +124,11 @@ function ClipEditor({
     const clips = [...draft.clips];
     const target = index + offset;
     if (target < 0 || target >= clips.length) return;
-    [clips[index], clips[target]] = [clips[target]!, clips[index]!];
+    [clips[index], clips[target]] = [clips[target], clips[index]];
     onChange({ ...draft, clips });
   }
   function changeCaptionKind(index: number, kind: "none" | "creative" | "verified_fact") {
-    const current = draft.clips[index]!.caption;
+    const current = draft.clips[index].caption;
     if (kind === "none") patchClip(index, { caption: { kind } });
     else if (kind === "creative")
       patchClip(index, {
@@ -875,7 +875,7 @@ export function MarketingVideoPanel({
                   items={Object.fromEntries(
                     copyCandidates.map((item) => [
                       item.id,
-                      item.projectTitle + " · " + item.productName + " · " + item.objective,
+                      `${item.projectTitle} · ${item.productName} · ${item.objective}`,
                     ]),
                   )}
                   value={copyId}
@@ -909,11 +909,10 @@ export function MarketingVideoPanel({
                   setCopyMessage(result.message);
                   if (result.status === "success") {
                     setCopiedId(result.videoId ?? "");
-                    if (result.videoId)
+                    const videoId = result.videoId;
+                    if (videoId)
                       requestNavigation(() =>
-                        router.push(
-                          workspaceRecordHref(projectId, "video", result.videoId!, returnTo),
-                        ),
+                        router.push(workspaceRecordHref(projectId, "video", videoId, returnTo)),
                       );
                   }
                 })

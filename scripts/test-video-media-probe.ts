@@ -5,6 +5,7 @@ import {
   videoExportManifestHeaders,
 } from "../lib/video/export-manifest";
 import { parseFfprobeOutput, validateProbedVideoExport } from "../lib/video/media-probe";
+import { required } from "./test-required";
 
 const measured = parseFfprobeOutput({
   format: {
@@ -166,7 +167,7 @@ for (const [field, actual] of [
     () =>
       validateProbedVideoExport("tiktok", {
         ...measured,
-        encoding: { ...measured.encoding!, [field]: actual },
+        encoding: { ...required(measured.encoding), [field]: actual },
       }),
     new RegExp(field),
   );
@@ -259,7 +260,7 @@ assert.throws(() =>
     ...receipt,
     measured: {
       ...receipt.measured,
-      resources: { ...measured.resources!, fileSizeBytes: Number.MAX_SAFE_INTEGER + 1 },
+      resources: { ...required(measured.resources), fileSizeBytes: Number.MAX_SAFE_INTEGER + 1 },
     },
   }),
 );

@@ -10,6 +10,7 @@ import * as schema from "../../lib/db/schema";
 import { videoProjectSchema } from "../../lib/video/contracts";
 import { failVideoJob } from "../../lib/video/processing-jobs";
 import { authSecret, databaseURL } from "../../playwright.database.config";
+import { required } from "../../scripts/test-required";
 
 // This file never reads developer credentials or contacts media/model providers.
 const pool = new Pool({ connectionString: databaseURL });
@@ -292,7 +293,9 @@ test("copy opens its returned draft, protects other input, and repeated saves cl
   const open = page.getByRole("link", { name: "打开复制的剪辑稿" });
   await expect(open).toBeVisible();
   const href = await open.getAttribute("href");
-  const copiedId = new URL(href!, "http://synthetic.invalid").searchParams.get("item")!;
+  const copiedId = required(
+    new URL(required(href), "http://synthetic.invalid").searchParams.get("item"),
+  );
   // Retain the actual copy and its append-only audit trail in the synthetic database.
   expect(videoIds).not.toContain(copiedId);
   const [copy] = await db

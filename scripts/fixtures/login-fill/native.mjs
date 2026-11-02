@@ -104,7 +104,7 @@ try {
     reviewRef: "evidence-native-root-totp",
     reviewedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 60000).toISOString(),
-    url: base + "/",
+    url: `${base}/`,
     form: "#login_form",
     username: '#login_form input[name="email"]',
     password: '#login_form input[name="pass"]',
@@ -115,14 +115,14 @@ try {
       passwordSubmit: '#login_form [role="button"][tabindex="0"][aria-label="Log In"]',
       totp: {
         mode: "facebook-authenticator",
-        url: base + "/two_step_verification/two_factor/",
+        url: `${base}/two_step_verification/two_factor/`,
         marker: "h2",
         input: 'form input[type="text"][autocomplete="off"]',
         submit: '[role="button"]',
       },
-      pin: { url: base + "/messages/", marker: "#pin", input: "#pin-code", submit: null },
+      pin: { url: `${base}/messages/`, marker: "#pin", input: "#pin-code", submit: null },
       ready: {
-        url: base + "/messages/",
+        url: `${base}/messages/`,
         marker: "#chats",
         empty: "#empty",
         emptyText: "No chats",
@@ -149,7 +149,7 @@ try {
     requestId: randomUUID(),
     expiresAt: Date.now() + 30000,
   };
-  await page.goto(base + "/");
+  await page.goto(`${base}/`);
   assert.equal(
     (
       await runtime("submit", {
@@ -172,7 +172,7 @@ try {
     ).outcome,
     "submitted",
   );
-  await page.waitForURL(base + "/messages/");
+  await page.waitForURL(`${base}/messages/`);
   assert.equal((await runtime("observe", { ...packet })).state, "ready");
   assert.equal(
     (

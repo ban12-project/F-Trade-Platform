@@ -41,12 +41,7 @@ export async function readProductSourceImage(
   if (!record || !["image/png", "image/jpeg"].includes(record.contentType) || !record.sizeBytes)
     return null;
   const blob = await readBlob(record.blobKey, { access: "private", useCache: false });
-  if (
-    !blob ||
-    blob.statusCode !== 200 ||
-    !blob.stream ||
-    blob.blob.contentType !== record.contentType
-  )
+  if (blob?.statusCode !== 200 || !blob.stream || blob.blob.contentType !== record.contentType)
     return null;
   const verified = await verifyDocumentUploadBytes(
     blob.stream,

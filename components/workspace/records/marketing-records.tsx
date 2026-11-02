@@ -27,14 +27,16 @@ import { WorkspaceLink } from "../workspace-link";
 import { WorkspacePanelSkeleton } from "../workspace-loading-skeleton";
 
 async function ProductMedia({ context }: { context: RecordContext }) {
+  const recordId = context.recordId;
+  if (!recordId) notFound();
   const [assets, assessment] = await Promise.all([
-    listProductMediaAssets(context.recordId!),
-    getProductVideoReadiness(context.recordId!),
+    listProductMediaAssets(recordId),
+    getProductVideoReadiness(recordId),
   ]);
   return (
     <ProductMediaPanel
       projectId={context.projectId}
-      productId={context.recordId!}
+      productId={recordId}
       assets={assets}
       assessment={assessment}
       canReview={context.canWrite && hasPermission(context.session.user.role, "product:review")}
@@ -57,16 +59,17 @@ export async function ProductCreate({ context }: { context: RecordContext }) {
 }
 export async function ProductRecord({ context }: { context: RecordContext }) {
   const { projectId, recordId, session, canWrite, returnTo } = context;
-  const detail = await getProjectProductCatalogDetail(projectId, recordId!);
+  if (!recordId) notFound();
+  const detail = await getProjectProductCatalogDetail(projectId, recordId);
   if (!detail) notFound();
   const [evidenceOptions, sourceDocuments] = await Promise.all([
     listProjectEvidenceOptions(projectId, session.user.id),
-    listProductEvidencePreviews(projectId, recordId!, session.user.id),
+    listProductEvidencePreviews(projectId, recordId, session.user.id),
   ]);
   return (
     <div className="space-y-6">
       <ProductReview
-        key={detail.id + ":" + detail.version}
+        key={`${detail.id}:${detail.version}`}
         projectId={projectId}
         detail={detail}
         canReview={canWrite && hasPermission(session.user.role, "product:review")}
@@ -165,7 +168,8 @@ async function ContentPublication({
   );
 }
 export async function ContentRecord({ context }: { context: RecordContext }) {
-  const detail = await getProjectContentCatalogDetail(context.projectId, context.recordId!);
+  if (!context.recordId) notFound();
+  const detail = await getProjectContentCatalogDetail(context.projectId, context.recordId);
   if (!detail) notFound();
   const products =
     detail.state === "CONTENT_REVISION_REQUIRED"
@@ -174,7 +178,7 @@ export async function ContentRecord({ context }: { context: RecordContext }) {
   return (
     <div className="space-y-5">
       <ContentReview
-        key={detail.id + ":" + detail.version}
+        key={`${detail.id}:${detail.version}`}
         projectId={context.projectId}
         detail={detail}
         product={products.find((product) => product.id === detail.productId)}

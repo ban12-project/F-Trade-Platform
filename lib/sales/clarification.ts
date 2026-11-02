@@ -1,6 +1,4 @@
-import { updateRfqDraft } from "../rfq/assessment";
-
-type Rfq = Record<string, any>;
+import { type Rfq, updateRfqDraft } from "../rfq/assessment";
 
 /** Supported request vocabulary only; alternatives and corrections need human confirmation. */
 export function inquiryProductType(message: string) {
@@ -91,7 +89,10 @@ export function inquiryVehicle(message: string) {
 }
 
 export function applyInquiryMessage(rfq: Rfq, message: string) {
-  const patch: Rfq = { product: {}, commercial: {} };
+  const patch = {
+    product: {} as Record<string, unknown>,
+    commercial: {} as Record<string, unknown>,
+  };
   const productType = inquiryProductType(message);
   if (productType.value) patch.product.product_type = productType.value;
   // Only a single unambiguous explicit value is suggested. Unsupported prose stays manual.
@@ -131,7 +132,8 @@ export function applyInquiryMessage(rfq: Rfq, message: string) {
 }
 
 export function nextClarification(rfq: Rfq) {
-  const missing = rfq.missing_fields as string[];
+  const missing = rfq.missing_fields;
+  if (!missing) throw new Error("RFQ assessment is required before clarification");
   const first = missing[0];
   if (!first)
     return {
@@ -153,7 +155,7 @@ export function nextClarification(rfq: Rfq) {
 }
 
 export function assertNoAgentQuotation(rfq: Rfq) {
-  if (rfq.missing_fields.length)
+  if (rfq.missing_fields?.length)
     throw new Error("Agent must continue clarification and cannot quote an incomplete RFQ");
   throw new Error("Agent cannot send a formal quotation; hand off to a human");
 }

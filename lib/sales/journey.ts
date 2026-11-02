@@ -51,7 +51,7 @@ export function salesRelations(
     (kind !== "rfq" && kind !== "lead" && selectedRfqs.length === 0) ||
     (kind === "rfq" && Boolean(current.leadId) && selectedLeads.length === 0) ||
     (kind === "lead" &&
-      ((Boolean(current.rfqId) && !rfqIds.has(current.rfqId!)) ||
+      ((current.rfqId && !rfqIds.has(current.rfqId)) ||
         (Boolean(current.quotationId) &&
           !selectedQuotes.some((quote) => quote.id === current.quotationId)) ||
         (Boolean(current.deliveryId) &&

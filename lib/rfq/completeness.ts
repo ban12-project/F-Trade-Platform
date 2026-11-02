@@ -1,8 +1,7 @@
 import readySchema from "../../contracts/sales/rfq-ready.schema.json";
 import { compileContract } from "../contracts/validator";
-import { assessRfq } from "./assessment";
+import { assessRfq, type Rfq } from "./assessment";
 
-type Rfq = Record<string, any>;
 const validateReady = compileContract<Rfq>(readySchema);
 
 export { assessRfq, updateRfqDraft } from "./assessment";

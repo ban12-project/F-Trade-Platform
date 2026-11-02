@@ -1,5 +1,7 @@
 "use client";
+
 import { zodResolver } from "@hookform/resolvers/zod";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -305,11 +307,14 @@ export function PublicationComposer({
                   <track kind="captions" />
                 </video>
               ) : (
-                <img
+                <Image
+                  unoptimized
                   key={previewUrl}
                   src={previewUrl}
+                  width={1280}
+                  height={720}
                   alt="本次发布图片"
-                  className="max-h-80 max-w-full object-contain"
+                  className="h-auto max-h-80 w-auto max-w-full object-contain"
                   onError={() => setPreviewFailed(true)}
                 />
               )

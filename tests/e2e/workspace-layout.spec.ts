@@ -28,7 +28,8 @@ test("video preview sticks only when it fits and releases on small screens", asy
   await page.evaluate(() => window.scrollTo(0, 300));
   const toolbar = await page.locator(".workspace-toolbar").boundingBox();
   const panel = await preview.boundingBox();
-  expect(panel!.y).toBeGreaterThanOrEqual(toolbar!.y + toolbar!.height);
+  if (!panel || !toolbar) throw new Error("Expected visible preview and toolbar");
+  expect(panel.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
   await page.setViewportSize({ width: 390, height: 700 });
   await expect(preview).toHaveCSS("position", "static");
   await page.setViewportSize({ width: 1440, height: 200 });

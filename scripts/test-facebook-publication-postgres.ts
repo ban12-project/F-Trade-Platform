@@ -33,6 +33,7 @@ import { testPublicationWakeup } from "./test-browser-publication-wakeup";
 import { testBrowserSandboxOwner } from "./test-browser-sandbox-owner";
 import { testFacebookInbound } from "./test-facebook-inbound-postgres";
 import { testPublicationReconciliation } from "./test-publication-reconciliation-postgres";
+import { required } from "./test-required";
 import { testVideoPublicationReconciliation } from "./test-video-publication-reconciliation-postgres";
 
 async function main() {
@@ -742,7 +743,7 @@ async function main() {
     });
     const requests = [request, { ...request, requestId: randomUUID() }];
     const responses = await Promise.all(
-      requests.map((item) => handleBrowserNodeRequest(node.accessKey!, item)),
+      requests.map((item) => handleBrowserNodeRequest(required(node.accessKey), item)),
     );
     const leases = responses.map((r) => r.run).filter(Boolean) as Array<{
       id: string;

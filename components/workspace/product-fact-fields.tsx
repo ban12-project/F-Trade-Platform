@@ -234,7 +234,7 @@ function EvidenceInput({
             >
               <SelectValue>
                 {options.find((option) => option.id === field.value)
-                  ? `${options.find((option) => option.id === field.value)!.sourceLabel} · ${field.value.slice(-8)}`
+                  ? `${options.find((option) => option.id === field.value)?.sourceLabel} · ${field.value.slice(-8)}`
                   : field.value === retainedRef && retainedRef
                     ? "保留原来源资料"
                     : "选择已上传资料"}

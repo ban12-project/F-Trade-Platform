@@ -112,7 +112,9 @@ export async function extractMarketingVisualSamplesInSandbox(
       Math.floor(maximumMarketingVisualCandidates / Math.max(1, boundedSources.length)),
     );
     for (const [sourceIndex, source] of boundedSources.entries()) {
-      const input = remote.get(source.assetRef)!;
+      const input = remote.get(source.assetRef);
+      const signedSource = sources.get(source.assetRef);
+      if (!input || !signedSource) throw new Error("缺少已授权的源素材。");
       if (source.mediaType === "image") {
         const candidate = createMarketingShotCandidate({
           sourceIndex,
@@ -125,7 +127,7 @@ export async function extractMarketingVisualSamplesInSandbox(
         samples.push({
           label: `${candidate.id} · image · max ${candidate.maximumDurationMs}ms`,
           data: new Uint8Array(await sandbox.fs.readFile(input)),
-          mediaType: sources.get(source.assetRef)!.contentType,
+          mediaType: signedSource.contentType,
         });
         continue;
       }
@@ -224,7 +226,8 @@ export async function renderMarketingTimelineInSandbox(
     );
     const normalized: string[] = [];
     for (const [index, scene] of request.timeline.scenes.entries()) {
-      const input = remote.get(scene.assetRef)!;
+      const input = remote.get(scene.assetRef);
+      if (!input) throw new Error("缺少镜头源素材。");
       const output = `/vercel/sandbox/work/scene-${index}.mp4`;
       let hasAudio = false;
       if (scene.mediaType === "video") {
@@ -305,7 +308,7 @@ export async function renderMarketingTimelineInSandbox(
     const concatFile = "/vercel/sandbox/work/concat.txt";
     await sandbox.fs.writeFile(
       concatFile,
-      normalized.map((path) => `file '${path}'`).join("\n") + "\n",
+      `${normalized.map((path) => `file '${path}'`).join("\n")}\n`,
     );
     const joined = "/vercel/sandbox/work/joined.mp4";
     await command(sandbox, "ffmpeg", [

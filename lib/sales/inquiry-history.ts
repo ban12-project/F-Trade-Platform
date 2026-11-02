@@ -19,13 +19,14 @@ export function summarizeInquiryMessages(messages: readonly InquiryMessageInput[
   const uncertain = new Set<InquiryField>();
   for (const message of messages) {
     const draft = applyInquiryMessage({ product: {}, commercial: {} }, message.body);
+    const text = (value: unknown) => (typeof value === "string" ? value : undefined);
     const fields: InquiryFields = {
-      productType: draft.product.product_type,
-      oeNumber: draft.product.oe_number,
-      vehicleBrand: draft.product.vehicle_brand,
-      vehicleModel: draft.product.vehicle_model,
+      productType: text(draft.product.product_type),
+      oeNumber: text(draft.product.oe_number),
+      vehicleBrand: text(draft.product.vehicle_brand),
+      vehicleModel: text(draft.product.vehicle_model),
       quantity: draft.commercial.quantity ? String(draft.commercial.quantity) : undefined,
-      destination: draft.commercial.destination,
+      destination: text(draft.commercial.destination),
     };
     // Do not resurrect an earlier value when a later reply is an unsupported
     // range, alternative, or correction. The customer conversation remains the source.

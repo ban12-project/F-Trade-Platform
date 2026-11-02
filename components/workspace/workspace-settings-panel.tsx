@@ -503,7 +503,7 @@ export function WorkspaceSettingsPanel({
   const { requestNavigation } = useWorkspaceDirtyState();
   const requested = query.get("section");
   const section =
-    canManage && ["team", "agent", "channels"].includes(requested ?? "") ? requested! : "account";
+    canManage && ["team", "agent", "channels"].includes(requested ?? "") ? requested : "account";
   return (
     <Tabs
       value={section}

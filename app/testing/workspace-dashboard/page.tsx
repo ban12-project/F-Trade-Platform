@@ -93,7 +93,7 @@ for (const [id, state, title, detail] of [
 }
 const overview: WorkspaceProjectOverview[] = [
   {
-    ...projects[0]!,
+    ...projects[0],
     taskCount: 1,
     statusLabel: "已有发布成果",
     nextAction: "查看成果与入站转化",
@@ -103,7 +103,7 @@ const overview: WorkspaceProjectOverview[] = [
     opportunityCount: 0,
   },
   {
-    ...projects[1]!,
+    ...projects[1],
     taskCount: 1,
     statusLabel: "跟进",
     nextAction: "执行下一次人工跟进",

@@ -201,17 +201,16 @@ for (const outcome of [
         });
       return route.fulfill({
         contentType: "application/x-ndjson",
-        body:
-          events
-            .map((event, index) =>
-              JSON.stringify({
-                protocol: "product-agent.v1",
-                runId,
-                sequence: index + 1,
-                ...event,
-              }),
-            )
-            .join("\n") + "\n",
+        body: `${events
+          .map((event, index) =>
+            JSON.stringify({
+              protocol: "product-agent.v1",
+              runId,
+              sequence: index + 1,
+              ...event,
+            }),
+          )
+          .join("\n")}\n`,
       });
     });
     await page.goto("/testing/project-workflow?record=product");

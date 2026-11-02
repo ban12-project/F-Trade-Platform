@@ -191,12 +191,12 @@ html {
   .motion-landing-enter,
   .workspace-task-arrow,
   .workspace-link-progress {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-delay: 0ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    transition-delay: 0ms !important;
+    scroll-behavior: auto;
+    animation-duration: 0.01ms;
+    animation-delay: 0ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    transition-delay: 0ms;
   }
 
   .motion-landing-enter {
@@ -207,8 +207,8 @@ html {
   [class~="group/button"],
   .workspace-task-arrow,
   .workspace-link-progress {
-    scale: none !important;
-    translate: none !important;
+    scale: none;
+    translate: none;
   }
 }
 
@@ -218,8 +218,8 @@ html {
   [data-slot="drawer-popup"],
   nav,
   header {
-    background: var(--background) !important;
-    backdrop-filter: none !important;
+    background: var(--background);
+    backdrop-filter: none;
   }
 }
 
@@ -298,7 +298,7 @@ html {
   [data-slot="dialog-overlay"],
   [data-slot="sheet-overlay"],
   [data-slot="drawer-overlay"] {
-    backdrop-filter: none !important;
+    backdrop-filter: none;
   }
 }
 

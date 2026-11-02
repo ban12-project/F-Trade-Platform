@@ -28,8 +28,8 @@ function entry(state: "draft" | "review" | "approved"): MarketingVideoEditorEntr
           ? "VIDEO_REVIEW_REQUIRED"
           : "VIDEO_DRAFT",
     createdAt: new Date("2026-09-01T00:00:00.000Z"),
-    productId: products[0]!.id,
-    productName: products[0]!.productName,
+    productId: products[0].id,
+    productName: products[0].productName,
     objective: "Create a concise product inquiry video",
     targetAudience: "Overseas distributors",
     platforms: ["facebook"],

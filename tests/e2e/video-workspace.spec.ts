@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { required } from "../../scripts/test-required";
 
 test("review copies require an explicit declaration and preserve the original cutoff", async ({
   page,
@@ -82,7 +83,7 @@ test("approved video offers a private manifest download while review drafts do n
   await expect(manifest).toHaveAttribute("download", "");
   const href = await manifest.getAttribute("href");
   expect(href).toBe("/api/video-download/00000000-0000-4000-8000-000000000401/manifest");
-  const denied = await request.get(href!);
+  const denied = await request.get(required(href));
   expect(denied.status()).toBe(403);
   expect(denied.headers()["cache-control"]).toBe("no-store");
   await page.goto("/testing/video-workspace?state=review");

@@ -97,7 +97,7 @@ export function WorkspaceDashboard({
     },
     { id: "scheduled", label: "已安排", rows: tasks.filter((task) => task.state === "scheduled") },
   ];
-  const selected = groups.find((group) => group.id === view) ?? groups[0]!;
+  const selected = groups.find((group) => group.id === view) ?? groups[0];
   const pendingCount = groups[0]?.rows.length + inbound.length;
   return (
     <WorkspaceDirtyProvider>

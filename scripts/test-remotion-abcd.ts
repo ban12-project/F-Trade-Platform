@@ -33,20 +33,20 @@ assert.deepEqual(migrated.clips[0]?.abcdRoles, [
 
 const incomplete = {
   ...migrated,
-  clips: [{ ...migrated.clips[0]!, abcdRoles: ["attention", "branding", "direction"] as const }],
+  clips: [{ ...migrated.clips[0], abcdRoles: ["attention", "branding", "direction"] as const }],
 };
 assert.equal(marketingVideoDraftSchema.safeParse(incomplete).success, false);
 assert.equal(
   marketingVideoDraftSchema.safeParse({
     ...migrated,
-    clips: [{ ...migrated.clips[0]!, abcdRoles: ["branding", "connection", "direction"] }],
+    clips: [{ ...migrated.clips[0], abcdRoles: ["branding", "connection", "direction"] }],
   }).success,
   false,
 );
 assert.equal(
   marketingVideoDraftSchema.safeParse({
     ...migrated,
-    clips: [{ ...migrated.clips[0]!, abcdRoles: ["attention", "connection", "direction"] }],
+    clips: [{ ...migrated.clips[0], abcdRoles: ["attention", "connection", "direction"] }],
   }).success,
   false,
 );

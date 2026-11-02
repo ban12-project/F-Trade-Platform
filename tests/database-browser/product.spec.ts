@@ -425,7 +425,7 @@ test("authenticated browser reviews a mock product and its content through real 
 
   await page.getByRole("button", { name: "制作图文内容", exact: true }).click();
   await expect(page).toHaveURL(
-    new RegExp("/workspace/" + projectId + "/new/content[?]product=" + created.id + "&returnTo="),
+    new RegExp(`/workspace/${projectId}/new/content[?]product=${created.id}&returnTo=`),
   );
   const contentForm = page.locator("form#create-content").filter({ visible: true });
   await contentForm.getByRole("combobox").nth(2).click();
