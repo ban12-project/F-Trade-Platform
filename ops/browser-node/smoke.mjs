@@ -35,7 +35,7 @@ registerLogin(
   {},
 );
 if (process.argv[2]) assert.equal(process.arch, process.argv[2]);
-assert.equal(Number(process.versions.node.split(".")[0]), 24);
+assert.equal(Number(process.versions.node.split(".")[0]), 26);
 assert.equal(
   initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 }).runs.length,
   0,
@@ -74,5 +74,5 @@ delete process.env.FACEBOOK_DOM_PROFILES_FILE;
 delete process.env.FACEBOOK_INBOX_PROFILES_FILE;
 await assert.rejects(import("./facebook-adapter.mjs"), /facebook_dom_profiles_required/);
 console.log(
-  "PASS offline Agent payload: native Node 24 imports, fixed page assets and explicit adapter configuration",
+  "PASS offline Agent payload: native Node 26 imports, fixed page assets and explicit adapter configuration",
 );
