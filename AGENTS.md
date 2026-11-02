@@ -13,6 +13,17 @@
 - 正式报价和交期必须由人工确认；Agent 只能整理信息和提出问题。
 - Agent 之间只交换结构化契约，不依赖自然语言“聊天”。
 
+## Marketing video creative guidance
+
+Apply these rules when your task affects marketing video content:
+
+- Read [the marketing video creative guide](docs/guidelines/marketing-video-creative.md) before designing or reviewing requirements, scripts, storyboards, captions, branding, calls to action, or AI prompts.
+- Use its ABCD review record to document design choices, evidence, platform assumptions, and unresolved questions in your deliverable.
+- Explain adaptations for platforms other than YouTube. Do not treat YouTube viewing assumptions as universal facts.
+- Preserve product evidence, media rights, human review, and quote confirmation requirements. Creative guidance never overrides these requirements.
+- For infrastructure work without content effects, record that the creative review does not apply and explain why.
+- Repository instructions do not configure runtime agents. Changes to runtime prompts or validation require explicit implementation and verification.
+
 ## GitHub 约束
 
 - GitHub 只用于研发交付，不能用 Issues 记录真实业务流水。
