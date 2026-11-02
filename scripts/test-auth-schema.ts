@@ -44,9 +44,9 @@ async function main() {
     }),
     [],
   );
-  assert.match(queries[0]!.sql, /from "passkey"/);
-  assert.match(queries[0]!.sql, /"user_id"/);
-  assert.ok(queries[0]!.params.includes("synthetic-passkey-owner"));
+  assert.match(queries[0].sql, /from "passkey"/);
+  assert.match(queries[0].sql, /"user_id"/);
+  assert.ok(queries[0].params.includes("synthetic-passkey-owner"));
 
   assert.equal(
     await adapter.findOne({
@@ -55,8 +55,8 @@ async function main() {
     }),
     null,
   );
-  assert.match(queries[1]!.sql, /"credential_id"/);
-  assert.ok(queries[1]!.params.includes("synthetic-credential-id"));
+  assert.match(queries[1].sql, /"credential_id"/);
+  assert.ok(queries[1].params.includes("synthetic-credential-id"));
 
   for (const model of ["user", "session", "account", "verification"]) {
     assert.deepEqual(await adapter.findMany({ model }), []);

@@ -28,7 +28,7 @@ type Stored = {
   id: string;
   state: string;
   version: number;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   project_id: string;
   created_by_id: string;
 };

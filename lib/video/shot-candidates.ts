@@ -105,28 +105,28 @@ export function createMarketingShotCandidate(input: {
   sourceDurationMs?: number;
   sourceAnalysis?: ShotSourceAnalysis;
 }) {
-  if (
-    input.mediaType === "video" &&
-    (!Number.isInteger(input.sourceDurationMs) ||
-      input.sourceDurationMs! - input.trimStartMs < 1_000)
-  ) {
-    throw new Error("视频候选镜头必须保留至少 1 秒可用源素材。");
+  let maximumDurationMs = 10_000;
+  if (input.mediaType === "video") {
+    const sourceDurationMs = input.sourceDurationMs;
+    if (
+      typeof sourceDurationMs !== "number" ||
+      !Number.isInteger(sourceDurationMs) ||
+      sourceDurationMs - input.trimStartMs < 1_000
+    ) {
+      throw new Error("视频候选镜头必须保留至少 1 秒可用源素材。");
+    }
+    maximumDurationMs = Math.min(
+      10_000,
+      Math.min(input.sourceAnalysis?.intervalEndMs ?? sourceDurationMs, sourceDurationMs) -
+        input.trimStartMs,
+    );
   }
   return marketingShotCandidateSchema.parse({
     id: `shot-${String(input.sourceIndex + 1).padStart(3, "0")}-${String(input.candidateIndex + 1).padStart(3, "0")}`,
     assetRef: input.assetRef,
     mediaType: input.mediaType,
     trimStartMs: input.trimStartMs,
-    maximumDurationMs:
-      input.mediaType === "image"
-        ? 10_000
-        : Math.min(
-            10_000,
-            Math.min(
-              input.sourceAnalysis?.intervalEndMs ?? input.sourceDurationMs!,
-              input.sourceDurationMs!,
-            ) - input.trimStartMs,
-          ),
+    maximumDurationMs,
     sourceAnalysis: input.sourceAnalysis,
   });
 }
@@ -159,9 +159,7 @@ export function createScoredVideoShotCandidates(input: {
     const desiredStartMs =
       selected.length >= desiredCount
         ? analysis.representativeMs - 1_000
-        : videoShotCandidateStarts(input.sourceDurationMs, input.maximumCandidates)[
-            candidateIndex
-          ]!;
+        : videoShotCandidateStarts(input.sourceDurationMs, input.maximumCandidates)[candidateIndex];
     const trimStartMs = Math.max(
       analysis.intervalStartMs,
       Math.min(desiredStartMs, analysis.intervalEndMs - 1_000),

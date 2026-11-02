@@ -19,6 +19,7 @@ import {
   workspaceProjectItem,
 } from "@/lib/db/schema";
 import {
+  type DeliveryConfirmation,
   decideDeliveryConfirmation,
   expireDeliveryConfirmation,
   requestDeliveryConfirmation,
@@ -108,7 +109,9 @@ export type DeliveryConfirmationEntry = {
   id: string;
   state: string;
   createdAt: Date;
-  confirmation: Record<string, any>;
+  confirmation: Omit<Partial<DeliveryConfirmation>, "result"> & {
+    result?: Partial<NonNullable<DeliveryConfirmation["result"]>>;
+  };
   approvalId: string | null;
   approvalStatus: "pending" | "approved" | "rejected" | null;
   reviewNotes?: string | null;
@@ -941,6 +944,7 @@ export async function recordControlledReplyResult(
       )
       .for("update");
     if (value.outcome === "sent") {
+      if (!value.externalMessageRef) throw new Error("成功发送结果缺少平台消息凭证。");
       if (!control?.enabled || control.circuitStatus !== "active")
         throw new Error("渠道已暂停，不能接受成功发送结果。");
       const [duplicate] = await tx
@@ -949,7 +953,7 @@ export async function recordControlledReplyResult(
         .where(
           and(
             eq(socialMessage.conversationId, message.conversationId),
-            eq(socialMessage.externalMessageRef, value.externalMessageRef!),
+            eq(socialMessage.externalMessageRef, value.externalMessageRef),
             ne(socialMessage.id, message.id),
           ),
         )
@@ -967,7 +971,7 @@ export async function recordControlledReplyResult(
         .returning();
       await tx
         .update(socialMessage)
-        .set({ externalMessageRef: value.externalMessageRef!, receivedAt: now })
+        .set({ externalMessageRef: value.externalMessageRef, receivedAt: now })
         .where(eq(socialMessage.id, message.id));
       await tx
         .update(socialConversation)
@@ -1528,6 +1532,7 @@ export async function listProjectLeads(
         return row.state === "DELIVERY_CONFIRMATION_CONFIRMED" &&
           validUntil &&
           Date.parse(validUntil) > Date.now() &&
+          typeof days === "number" &&
           Number.isInteger(days) &&
           confirmation.related_entity_type === "rfq"
           ? [
@@ -1535,7 +1540,7 @@ export async function listProjectLeads(
                 row.id,
                 {
                   id: row.id,
-                  leadTimeDays: days!,
+                  leadTimeDays: days,
                   validUntil,
                   rfqId: confirmation.related_entity_id,
                 },

@@ -57,11 +57,11 @@ async function worker() {
             source_ref: prepared.source_ref,
             evidence_refs: refs,
             field_evidence: {
-              "product.product_name": refs[["wrong_location", "both"].includes(kind) ? 2 : 0]!,
-              "product.product_type": refs[1]!,
-              "product.internal_sku": refs[2]!,
+              "product.product_name": refs[["wrong_location", "both"].includes(kind) ? 2 : 0],
+              "product.product_type": refs[1],
+              "product.internal_sku": refs[2],
               "product.oe_numbers":
-                kind === "unknown_evidence" ? "synthetic-unknown-evidence" : refs[3]!,
+                kind === "unknown_evidence" ? "synthetic-unknown-evidence" : refs[3],
             },
             verification_status: "review_required",
             blocking_missing_fields: [],
@@ -151,14 +151,14 @@ async function main() {
       symlinkSync(realpathSync(join(root, "node_modules")), join(sandbox, "node_modules"), "dir");
       if (["without_location", "without_both"].includes(variant)) {
         replaceExactly(
-          join(sandbox, files[0]!),
+          join(sandbox, files[0]),
           "    assertProductAgentEvidenceLocations(result.draft, source, finalizeProductAgentDraft);",
           "    // Experiment only: bounded location validation removed.",
         );
       }
       if (["without_human_actor", "without_both"].includes(variant)) {
         replaceExactly(
-          join(sandbox, files[1]!),
+          join(sandbox, files[1]),
           '  if (approval.decision.actor_type !== "human") {\n    throw new Error("Product approval requires a human actor");\n  }',
           "  // Experiment only: human actor validation removed.",
         );

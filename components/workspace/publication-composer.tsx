@@ -1,5 +1,7 @@
 "use client";
+
 import { zodResolver } from "@hookform/resolvers/zod";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -8,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { submitPublicationBatchAction } from "@/lib/actions/publication-batch";
 import type { listFacebookMediaOptions } from "@/lib/social/facebook-media-store";
@@ -128,13 +130,13 @@ export function PublicationComposer({
       !a.ready || a.audience !== "Public" || (selected?.content.format !== "text" && a.textOnly),
   );
   return (
-    <Card>
+    <Card className="workspace-layout">
       <CardHeader>
         <CardTitle>预览并发布</CardTitle>
       </CardHeader>
       <CardContent>
         <form
-          className="space-y-4"
+          className="workspace-columns"
           onSubmit={form.handleSubmit(async () => {
             if (
               inFlight.current ||
@@ -183,179 +185,186 @@ export function PublicationComposer({
             }
           })}
         >
-          <Field>
-            <FieldLabel htmlFor={`content-${contentRef}`}>正文与素材</FieldLabel>
-            <NativeSelect
-              id={`content-${contentRef}`}
-              value={choice}
-              disabled={!form.formState.isReady || busy || !!results.length}
-              onChange={(e) => {
-                form.setValue("choice", e.target.value, { shouldDirty: true });
-                setPreviewFailed(false);
-                remember();
-              }}
-            >
-              <NativeSelectOption value="">请选择已审核内容与素材</NativeSelectOption>
-              {choices.map((c) => (
-                <NativeSelectOption key={c.key} value={c.key}>
-                  {c.label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-            <FieldError errors={[form.formState.errors.choice]} />
-            <p className="text-sm text-muted-foreground">
-              当前执行器每帖支持一张图片或一个视频。多图、混合素材和多个视频暂不能无损发布，系统不会自动拆帖。
-            </p>
-          </Field>
-          <Field>
-            <FieldLabel>发布账号（可多选）</FieldLabel>
-            {accounts.map((a) => {
-              const key = accountKey(a);
-              const recovery =
-                (a.recoveryHref
-                  ? `${a.recoveryHref}?returnTo=${encodeURIComponent(returnTo)}`
-                  : undefined) ??
-                `/workspace/settings?section=channels&returnTo=${encodeURIComponent(returnTo)}`;
-              return (
-                <div key={key} className="space-y-1 rounded-md border p-3">
-                  <label
-                    htmlFor={`target-${encodeURIComponent(key)}`}
-                    className="flex items-center gap-2"
-                  >
-                    <Checkbox
-                      id={`target-${encodeURIComponent(key)}`}
-                      aria-label={`${a.platform} · ${a.name}`}
-                      checked={keys.includes(key)}
-                      disabled={!form.formState.isReady || busy || !!results.length}
-                      onCheckedChange={(checked) => {
-                        form.setValue(
-                          "accounts",
-                          checked ? [...keys, key] : keys.filter((k) => k !== key),
-                          { shouldDirty: true },
-                        );
-                        remember();
-                      }}
-                    />
-                    {a.platform} · {a.name} ·{" "}
-                    {a.ready
-                      ? a.audience === "Public"
-                        ? "可以发布"
-                        : "发布服务正在更新公开范围支持，请稍后重试"
-                      : publishingBlockers[a.blockers?.[0] ?? "binding"]}
-                  </label>
-                  {keys.includes(key) && selected?.content.format !== "text" && a.textOnly ? (
-                    <p role="alert">
-                      此账号暂不支持所选素材，系统无法核对附件。选择已保留，请更换账号或稍后重试。
-                    </p>
-                  ) : null}
-                  {!a.ready ? (
-                    <WorkspaceLink className="text-sm underline" href={recovery}>
-                      处理此账号 · 返回后继续发布
-                    </WorkspaceLink>
-                  ) : null}
-                </div>
-              );
-            })}
-            {keys.some((key) => !accounts.some((a) => accountKey(a) === key)) ? (
-              <p role="alert">某个已选账号已移除。本次不会提交，请重新选择账号。</p>
-            ) : null}
-            {!accounts.length ? (
-              <WorkspaceLink
-                href={`/workspace/settings?section=channels&returnTo=${encodeURIComponent(returnTo)}`}
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor={`content-${contentRef}`}>正文与素材</FieldLabel>
+              <NativeSelect
+                id={`content-${contentRef}`}
+                value={choice}
+                disabled={!form.formState.isReady || busy || !!results.length}
+                onChange={(e) => {
+                  form.setValue("choice", e.target.value, { shouldDirty: true });
+                  setPreviewFailed(false);
+                  remember();
+                }}
               >
-                添加发布账号
-              </WorkspaceLink>
-            ) : null}
-            <FieldError errors={[form.formState.errors.accounts]} />
-          </Field>
-          {selected ? (
-            <Alert>
-              <AlertTitle>本次发布预览 · 版本 {selected.version ?? "已审核"}</AlertTitle>
-              <AlertDescription className="whitespace-pre-wrap">
-                <p>{selected.preview}</p>
-                <p>范围：公开（所有人）</p>
-                <p>
-                  账号：{targets.map((a) => `${a.platform} · ${a.name}`).join("、") || "尚未选择"}
-                </p>
-                <p>
-                  共 {keys.length} 条帖子，每个账号一条；形式：
-                  {selected.content.format === "text"
-                    ? "文字"
-                    : selected.content.format === "image"
-                      ? "图文"
-                      : "视频＋正文（按页面流程发布视频或 Reels）"}
-                  。
-                </p>
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          {previewUrl ? (
-            selected?.content.format === "video" ? (
-              <video
-                key={previewUrl}
-                controls
-                preload="metadata"
-                className="max-h-80 w-full"
-                src={previewUrl}
-                onError={() => setPreviewFailed(true)}
-              >
-                <track kind="captions" />
-              </video>
-            ) : (
-              <img
-                key={previewUrl}
-                src={previewUrl}
-                alt="本次发布图片"
-                className="max-h-80 max-w-full object-contain"
-                onError={() => setPreviewFailed(true)}
-              />
-            )
-          ) : null}
-          {previewFailed ? <p role="alert">素材预览加载失败，请重新加载预览后再确认。</p> : null}
-          <Button
-            type="submit"
-            disabled={
-              busy ||
-              !!results.length ||
-              !selected ||
-              !keys.length ||
-              unavailable ||
-              previewFailed ||
-              keys.length !== targets.length
-            }
-          >
-            {busy ? "正在提交…" : `确认公开发布到 ${keys.length} 个账号`}
-          </Button>
-          <p role="status">{message}</p>
-          {retryTargets.length ? (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => {
-                form.setValue("accounts", retryTargets.map(accountKey), { shouldDirty: true });
-                batch.current = null;
-                setResults([]);
-                setMessage(
-                  "已仅选择可安全重试的失败目标。成功或结果不确定的账号不会重试，请预览后确认。",
+                <NativeSelectOption value="">请选择已审核内容与素材</NativeSelectOption>
+                {choices.map((c) => (
+                  <NativeSelectOption key={c.key} value={c.key}>
+                    {c.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <FieldError errors={[form.formState.errors.choice]} />
+              <p className="text-sm text-muted-foreground">
+                当前执行器每帖支持一张图片或一个视频。多图、混合素材和多个视频暂不能无损发布，系统不会自动拆帖。
+              </p>
+            </Field>
+            <Field>
+              <FieldLabel>发布账号（可多选）</FieldLabel>
+              {accounts.map((a) => {
+                const key = accountKey(a);
+                const recovery =
+                  (a.recoveryHref
+                    ? `${a.recoveryHref}?returnTo=${encodeURIComponent(returnTo)}`
+                    : undefined) ??
+                  `/workspace/settings?section=channels&returnTo=${encodeURIComponent(returnTo)}`;
+                return (
+                  <div key={key} className="space-y-1 rounded-md border p-3">
+                    <label
+                      htmlFor={`target-${encodeURIComponent(key)}`}
+                      className="flex items-center gap-2"
+                    >
+                      <Checkbox
+                        id={`target-${encodeURIComponent(key)}`}
+                        aria-label={`${a.platform} · ${a.name}`}
+                        checked={keys.includes(key)}
+                        disabled={!form.formState.isReady || busy || !!results.length}
+                        onCheckedChange={(checked) => {
+                          form.setValue(
+                            "accounts",
+                            checked ? [...keys, key] : keys.filter((k) => k !== key),
+                            { shouldDirty: true },
+                          );
+                          remember();
+                        }}
+                      />
+                      {a.platform} · {a.name} ·{" "}
+                      {a.ready
+                        ? a.audience === "Public"
+                          ? "可以发布"
+                          : "发布服务正在更新公开范围支持，请稍后重试"
+                        : publishingBlockers[a.blockers?.[0] ?? "binding"]}
+                    </label>
+                    {keys.includes(key) && selected?.content.format !== "text" && a.textOnly ? (
+                      <p role="alert">
+                        此账号暂不支持所选素材，系统无法核对附件。选择已保留，请更换账号或稍后重试。
+                      </p>
+                    ) : null}
+                    {!a.ready ? (
+                      <WorkspaceLink className="text-sm underline" href={recovery}>
+                        处理此账号 · 返回后继续发布
+                      </WorkspaceLink>
+                    ) : null}
+                  </div>
                 );
-                remember();
-              }}
+              })}
+              {keys.some((key) => !accounts.some((a) => accountKey(a) === key)) ? (
+                <p role="alert">某个已选账号已移除。本次不会提交，请重新选择账号。</p>
+              ) : null}
+              {!accounts.length ? (
+                <WorkspaceLink
+                  href={`/workspace/settings?section=channels&returnTo=${encodeURIComponent(returnTo)}`}
+                >
+                  添加发布账号
+                </WorkspaceLink>
+              ) : null}
+              <FieldError errors={[form.formState.errors.accounts]} />
+            </Field>
+          </FieldGroup>
+          <div className="flex min-w-0 flex-col gap-4">
+            {selected ? (
+              <Alert>
+                <AlertTitle>本次发布预览 · 版本 {selected.version ?? "已审核"}</AlertTitle>
+                <AlertDescription className="whitespace-pre-wrap">
+                  <p>{selected.preview}</p>
+                  <p>范围：公开（所有人）</p>
+                  <p>
+                    账号：{targets.map((a) => `${a.platform} · ${a.name}`).join("、") || "尚未选择"}
+                  </p>
+                  <p>
+                    共 {keys.length} 条帖子，每个账号一条；形式：
+                    {selected.content.format === "text"
+                      ? "文字"
+                      : selected.content.format === "image"
+                        ? "图文"
+                        : "视频＋正文（按页面流程发布视频或 Reels）"}
+                    。
+                  </p>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {previewUrl ? (
+              selected?.content.format === "video" ? (
+                <video
+                  key={previewUrl}
+                  controls
+                  preload="metadata"
+                  className="max-h-80 w-full"
+                  src={previewUrl}
+                  onError={() => setPreviewFailed(true)}
+                >
+                  <track kind="captions" />
+                </video>
+              ) : (
+                <Image
+                  unoptimized
+                  key={previewUrl}
+                  src={previewUrl}
+                  width={1280}
+                  height={720}
+                  alt="本次发布图片"
+                  className="h-auto max-h-80 w-auto max-w-full object-contain"
+                  onError={() => setPreviewFailed(true)}
+                />
+              )
+            ) : null}
+            {previewFailed ? <p role="alert">素材预览加载失败，请重新加载预览后再确认。</p> : null}
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                !!results.length ||
+                !selected ||
+                !keys.length ||
+                unavailable ||
+                previewFailed ||
+                keys.length !== targets.length
+              }
             >
-              仅重新预览可安全重试的失败账号
+              {busy ? "正在提交…" : `确认公开发布到 ${keys.length} 个账号`}
             </Button>
-          ) : null}
-          {results.map((r) => (
-            <p key={r.publicationId}>
-              <WorkspaceLink
-                className="underline"
-                href={`/workspace/${projectId}/records/publication/${r.publicationId}`}
+            <p role="status">{message}</p>
+            {retryTargets.length ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  form.setValue("accounts", retryTargets.map(accountKey), { shouldDirty: true });
+                  batch.current = null;
+                  setResults([]);
+                  setMessage(
+                    "已仅选择可安全重试的失败目标。成功或结果不确定的账号不会重试，请预览后确认。",
+                  );
+                  remember();
+                }}
               >
-                {accounts.find((a) => accountKey(a) === accountKey(r))?.name ?? "所选账号"}
-                ：查看执行状态与回执
-              </WorkspaceLink>
-            </p>
-          ))}
+                仅重新预览可安全重试的失败账号
+              </Button>
+            ) : null}
+            {results.map((r) => (
+              <p key={r.publicationId}>
+                <WorkspaceLink
+                  className="underline"
+                  href={`/workspace/${projectId}/records/publication/${r.publicationId}`}
+                >
+                  {accounts.find((a) => accountKey(a) === accountKey(r))?.name ?? "所选账号"}
+                  ：查看执行状态与回执
+                </WorkspaceLink>
+              </p>
+            ))}
+          </div>
         </form>
       </CardContent>
     </Card>

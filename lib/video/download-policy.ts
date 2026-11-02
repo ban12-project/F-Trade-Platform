@@ -42,7 +42,7 @@ export async function resolveApprovedVideoAccess(
   const videoId = z.uuid().safeParse(videoIdInput);
   if (!videoId.success) return { kind: "not_found" };
   const record = await findVideo(videoId.data, session.user.id);
-  if (!record || record.state !== "VIDEO_APPROVED") return { kind: "not_found" };
+  if (record?.state !== "VIDEO_APPROVED") return { kind: "not_found" };
   const parsed = videoProjectSchema.safeParse(record.payload);
   if (!parsed.success) return { kind: "unavailable" };
   const project = parsed.data;

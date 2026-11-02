@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { required } from "../../scripts/test-required";
 
 test("workspace prioritizes tasks and overview without a canvas", async ({ page }) => {
   await page.goto("/testing/workspace-dashboard");
@@ -82,8 +83,8 @@ for (const empty of [false, true]) {
     const start = page.getByRole("button", { name: "开始新工作", exact: true });
     await expect(start).toBeEnabled();
     const bounds = await start.boundingBox();
-    expect(bounds!.height).toBeGreaterThanOrEqual(44);
-    expect(bounds!.y + bounds!.height).toBeLessThan(844);
+    expect(required(bounds).height).toBeGreaterThanOrEqual(44);
+    expect(required(bounds).y + required(bounds).height).toBeLessThan(844);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       390,
     );

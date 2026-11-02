@@ -1,5 +1,5 @@
 export function decideContent(
-  content: Record<string, any>,
+  content: Record<string, unknown>,
   decision: {
     actorType: "human" | "agent";
     approved: boolean;
@@ -20,7 +20,7 @@ export function decideContent(
   };
 }
 export function publishContent(
-  content: Record<string, any>,
+  content: Record<string, unknown>,
   actorType: "human" | "agent" | "system",
   publishedRef: string,
 ) {

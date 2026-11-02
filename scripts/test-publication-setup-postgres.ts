@@ -150,7 +150,7 @@ async function main() {
   assert.equal(state.publicationScopes?.[0].accountRef, "synthetic-account");
   assert.equal(state.publicationScopes?.[0].textOnly, true);
   const mediaScope = {
-    ...state.publicationScopes![0],
+    ...state.publicationScopes[0],
     textOnly: false,
     expiresAt: Date.now() + 123456,
   };

@@ -45,11 +45,11 @@ function locationContaining(prepared: ProductAgentEvidenceLocatedSource, text: s
 }
 
 const firstLocations = buildProductAgentEvidenceLocations(
-  source.evidence_refs[0]!,
+  source.evidence_refs[0],
   source.source_text,
 );
 const secondLocations = buildProductAgentEvidenceLocations(
-  source.evidence_refs[0]!,
+  source.evidence_refs[0],
   source.source_text,
 );
 assert.deepEqual(firstLocations, secondLocations, "Evidence location refs must be deterministic");
@@ -141,7 +141,7 @@ const literalOeSource = prepareProductAgentEvidenceSource({
   ...source,
   source_text: "OEM No.: Syn-Oe  901, SYN-OE-902.",
 });
-const literalOeRef = literalOeSource.evidence_refs[0]!;
+const literalOeRef = literalOeSource.evidence_refs[0];
 function literalOeDraft(oeNumbers: string[]) {
   return {
     record_id: literalOeSource.record_id,
@@ -166,7 +166,7 @@ const interiorTabSource = prepareProductAgentEvidenceSource({
 const interiorTabDraft = {
   ...literalOeDraft(["SYN-OE\t901"]),
   evidence_refs: interiorTabSource.evidence_refs,
-  field_evidence: { "product.oe_numbers": interiorTabSource.evidence_refs[0]! },
+  field_evidence: { "product.oe_numbers": interiorTabSource.evidence_refs[0] },
 };
 assert.deepEqual(
   finalizeProductAgentDraft(interiorTabDraft, interiorTabSource).product.oe_numbers,
@@ -266,7 +266,7 @@ for (const text of [
         {
           field: "product.oe_numbers",
           value: [oe],
-          evidenceRef: unreadableLocated.evidence_refs[0]!,
+          evidenceRef: unreadableLocated.evidence_refs[0],
         },
         unreadableLocated,
       ).status,
@@ -418,13 +418,13 @@ for (const location of tablePrepared.evidence_locations) {
   assert.match(location.text, /\| --- \| --- \| --- \| --- \| --- \|/);
   assert.equal(location.text.split("\n").length, 3);
 }
-assert.match(tablePrepared.evidence_locations[0]!.text, /RYC251/);
-assert.doesNotMatch(tablePrepared.evidence_locations[0]!.text, /RYC302/);
-assert.match(tablePrepared.evidence_locations[1]!.text, /RYC302/);
-assert.doesNotMatch(tablePrepared.evidence_locations[1]!.text, /RYC251/);
+assert.match(tablePrepared.evidence_locations[0].text, /RYC251/);
+assert.doesNotMatch(tablePrepared.evidence_locations[0].text, /RYC302/);
+assert.match(tablePrepared.evidence_locations[1].text, /RYC302/);
+assert.doesNotMatch(tablePrepared.evidence_locations[1].text, /RYC251/);
 
-const row251Ref = tablePrepared.evidence_locations[0]!.ref;
-const row302Ref = tablePrepared.evidence_locations[1]!.ref;
+const row251Ref = tablePrepared.evidence_locations[0].ref;
+const row302Ref = tablePrepared.evidence_locations[1].ref;
 const row251Draft = finalizeProductAgentDraft(
   {
     record_id: tablePrepared.record_id,
@@ -489,7 +489,7 @@ for (const identifierLabel of ["TQ NO.", "TQNO.", "天奇编号"]) {
     ].join("\n"),
     candidate_identifier: "999XD901",
   });
-  const ownRef = discSource.evidence_locations[0]!.ref;
+  const ownRef = discSource.evidence_locations[0].ref;
   assert.match(ownRef, /^evidence-loc-row-page-7-/);
   const discDraft = finalizeProductAgentDraft(
     {
@@ -645,7 +645,7 @@ assert.equal(pagedLocations[0]?.source_ref, "document:synthetic#pdf-page=1");
 assert.equal(pagedLocations[1]?.source_ref, "document:synthetic#pdf-page=3");
 assert.notEqual(pagedLocations[0]?.ref, pagedLocations[1]?.ref);
 
-assert.match(pagedLocations[1]!.ref, /-page-3-/);
+assert.match(pagedLocations[1].ref, /-page-3-/);
 const chineseSource = { ...source, source_text: "编号: 999999XD99999" };
 const chineseDraft = finalizeProductAgentDraft(
   {

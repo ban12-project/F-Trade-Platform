@@ -94,8 +94,8 @@ export function buildProductAgentEvidenceLocations(
   const locations: ProductAgentEvidenceLocation[] = [];
 
   for (let index = 0; index < lines.length - 1; index += 1) {
-    const header = markdownRow(lines[index]!);
-    const separator = markdownRow(lines[index + 1]!);
+    const header = markdownRow(lines[index]);
+    const separator = markdownRow(lines[index + 1]);
     if (
       !header ||
       !separator ||
@@ -107,14 +107,14 @@ export function buildProductAgentEvidenceLocations(
 
     tableLines.add(index);
     tableLines.add(index + 1);
-    const headerLine = lines[index]!;
-    const separatorLine = lines[index + 1]!;
+    const headerLine = lines[index];
+    const separatorLine = lines[index + 1];
     index += 2;
     while (index < lines.length) {
-      const row = markdownRow(lines[index]!);
+      const row = markdownRow(lines[index]);
       if (!row || row.length !== header.length) break;
       tableLines.add(index);
-      const text = [headerLine, separatorLine, lines[index]!].join("\n");
+      const text = [headerLine, separatorLine, lines[index]].join("\n");
       const rowLine = index + 1;
       locations.push({
         ref: locationRef(pageRefs[index] ?? baseEvidenceRef, "table_row", rowLine, rowLine, text),
@@ -181,7 +181,7 @@ export function prepareProductAgentEvidenceSource<T extends LocatableProductAgen
     throw new Error("Product Agent bounded locations require exactly one base evidence reference");
   }
   const evidenceLocations = buildProductAgentEvidenceLocations(
-    source.evidence_refs[0]!,
+    source.evidence_refs[0],
     source.source_text,
   );
   return {

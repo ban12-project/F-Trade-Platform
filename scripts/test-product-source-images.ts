@@ -73,7 +73,7 @@ const located = prepareProductAgentEvidenceSource({
   source_text: "Product name: Synthetic image guard",
 });
 const empty = emptyProductStreamDraft(located);
-for (const evidenceRef of [source.image_refs[0]!, located.evidence_refs[0]!]) {
+for (const evidenceRef of [source.image_refs[0], located.evidence_refs[0]]) {
   const checked = validateProductStreamProposal(
     empty,
     { field: "product.oe_numbers", value: ["IMAGE-ONLY-OE"], evidenceRef },

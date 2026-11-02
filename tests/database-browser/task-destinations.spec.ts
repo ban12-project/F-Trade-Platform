@@ -236,9 +236,7 @@ test("quotation tasks and default entry survive existing leads and target the se
   await expect(panel.locator(`#quote-decision-${other}`)).toHaveCount(0);
   await expect(panel.locator("#quotation-new")).toHaveCount(0);
   await page.getByRole("main").getByRole("link", { name: "返回清单" }).click();
-  await expect(page).toHaveURL(
-    new RegExp("/workspace/customers[?]project=" + id + "&type=quotation$"),
-  );
+  await expect(page).toHaveURL(new RegExp(`/workspace/customers[?]project=${id}&type=quotation$`));
   await expect(page.getByRole("heading", { name: "客户与询盘", exact: true })).toBeVisible();
   await expect(
     page.getByRole("main").locator(`a[href^="/workspace/${id}/records/quotation/${other}"]`),
@@ -726,13 +724,13 @@ test("filtered library returns retain type and state across refresh, back and fo
   const id = await project();
   const chosen = await record(id, "rfq", "RFQ_COLLECTING", rfq, "sales_rfq");
   const other = await record(id, "rfq", "RFQ_READY", rfq, "sales_rfq");
-  const source = "/workspace/customers?project=" + id + "&type=rfq&state=RFQ_COLLECTING";
+  const source = `/workspace/customers?project=${id}&type=rfq&state=RFQ_COLLECTING`;
   await page.goto(source);
   const main = page.getByRole("main");
   await expect(main.getByLabel("记录类型")).toHaveValue("rfq");
   await expect(main.getByLabel("状态", { exact: true })).toHaveValue("RFQ_COLLECTING");
-  await expect(main.locator('a[href*="' + other + '"]')).toHaveCount(0);
-  await main.locator('a[href*="' + chosen + '"]').click();
+  await expect(main.locator(`a[href*="${other}"]`)).toHaveCount(0);
+  await main.locator(`a[href*="${chosen}"]`).click();
   await expect(main.getByRole("link", { name: "返回清单" })).toHaveAttribute("href", source);
   await page.reload();
   await main.getByRole("link", { name: "返回清单" }).click();
@@ -750,12 +748,12 @@ test("legacy stage parameters stop without selecting records or new forms", asyn
   const id = await project();
   for (const param of [
     "panel=rfq",
-    "item=" + randomUUID(),
-    "lead=" + randomUUID(),
-    "product=" + randomUUID(),
-    "rfq=" + randomUUID(),
+    `item=${randomUUID()}`,
+    `lead=${randomUUID()}`,
+    `product=${randomUUID()}`,
+    `rfq=${randomUUID()}`,
   ]) {
-    await page.goto("/workspace/" + id + "?" + param);
+    await page.goto(`/workspace/${id}?${param}`);
     await expect(
       page.getByText("旧阶段链接已停用", { exact: true }).filter({ visible: true }),
     ).toHaveCount(1);
@@ -766,7 +764,7 @@ test("legacy stage parameters stop without selecting records or new forms", asyn
 
 test("project names are owner managed and archived metadata stays editable", async ({ page }) => {
   const id = await project();
-  await page.goto("/workspace/" + id);
+  await page.goto(`/workspace/${id}`);
   await page.getByLabel("项目名称", { exact: true }).fill("SYNTHETIC renamed project");
   await page.getByRole("button", { name: "保存名称" }).click();
   await expect

@@ -62,8 +62,7 @@ export async function registerVideoReviewWorkingEvidence(
       .where(eq(evidence.id, value.evidenceRef))
       .for("update");
     if (
-      !file ||
-      file.uploadedByType !== "human" ||
+      file?.uploadedByType !== "human" ||
       file.uploadedById !== identity.actorId ||
       file.blobKey.startsWith("retired/")
     )

@@ -67,7 +67,7 @@ void (async () => {
     );
     assert.ok(
       sampling.visualSamples.every((sample, index) =>
-        sample.label.includes(sampling.candidates[index]!.id),
+        sample.label.includes(sampling.candidates[index].id),
       ),
     );
     assert.ok(sampling.visualSamples.every((sample) => sample.label.includes("action 0/100")));

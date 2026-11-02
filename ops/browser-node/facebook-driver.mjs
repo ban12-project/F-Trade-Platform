@@ -30,8 +30,7 @@ const selectors = [
 ];
 export function validateFacebookProfile(value, now = Date.now()) {
   if (
-    !value ||
-    value.version !== 1 ||
+    value?.version !== 1 ||
     typeof value.accountRef !== "string" ||
     typeof value.channelRef !== "string" ||
     !value.accountRef.trim() ||

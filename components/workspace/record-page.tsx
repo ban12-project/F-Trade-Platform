@@ -94,8 +94,8 @@ const readRecordContext = cache(
     const sourceKind = mode === "create" && !unavailable ? givenSources[0] : undefined;
     const sourceId = sourceKind ? (query[sourceKind] as string) : undefined;
     const record =
-      mode === "record" && !unavailable
-        ? await readWorkspaceRecord(projectId, kind, recordId!, session.user.id)
+      mode === "record" && !unavailable && recordId
+        ? await readWorkspaceRecord(projectId, kind, recordId, session.user.id)
         : null;
     if (mode === "record" && !record) unavailable = true;
     const source =
@@ -217,9 +217,10 @@ async function RecordBody(props: RecordPageProps & { mode: "record" | "create" }
   const context = await readRecordContext(props.params, props.searchParams, props.mode);
   if (context.unavailable) return <Unavailable />;
   if (context.kind === "video") {
+    if (context.mode === "record" && !context.recordId) notFound();
     redirect(
-      context.mode === "record"
-        ? workspaceRecordHref(context.projectId, "video", context.recordId!, context.returnTo)
+      context.mode === "record" && context.recordId
+        ? workspaceRecordHref(context.projectId, "video", context.recordId, context.returnTo)
         : `/workspace/${context.projectId}/video?new=1${context.sourceId ? `&product=${context.sourceId}` : ""}&returnTo=${encodeURIComponent(context.returnTo)}`,
     );
   }

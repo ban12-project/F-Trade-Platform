@@ -216,7 +216,7 @@ export function ContentDraftForm({
       </Empty>
     );
   return (
-    <Card>
+    <Card className="workspace-layout">
       <CardHeader>
         <CardTitle>{revising ? "修订内容草稿" : "新建待审内容"}</CardTitle>
         <CardDescription>
@@ -230,153 +230,161 @@ export function ContentDraftForm({
             if (!generating && !saving) startTransition(() => saveAction(data(values)));
           })}
         >
-          <FieldGroup>
-            <Field data-invalid={!!form.formState.errors.productId}>
-              <FieldLabel htmlFor="content-source-product">产品</FieldLabel>
-              <Controller
-                control={form.control}
-                name="productId"
-                render={({ field }) => (
-                  <Select
-                    items={Object.fromEntries(
-                      products.map((item) => [
-                        item.id,
-                        `${item.internalSku} · ${item.productName}`,
-                      ]),
-                    )}
-                    value={field.value}
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      form.setValue(
-                        "factPath",
-                        products.find((item) => item.id === value)?.factOptions[0]?.path ?? "",
-                      );
-                    }}
-                    disabled={revising}
-                  >
-                    <SelectTrigger id="content-source-product" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {products.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.internalSku} · {item.productName}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+          <div className="workspace-equal-columns">
+            <FieldGroup>
+              <Field data-invalid={!!form.formState.errors.productId}>
+                <FieldLabel htmlFor="content-source-product">产品</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="productId"
+                  render={({ field }) => (
+                    <Select
+                      items={Object.fromEntries(
+                        products.map((item) => [
+                          item.id,
+                          `${item.internalSku} · ${item.productName}`,
+                        ]),
+                      )}
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue(
+                          "factPath",
+                          products.find((item) => item.id === value)?.factOptions[0]?.path ?? "",
+                        );
+                      }}
+                      disabled={revising}
+                    >
+                      <SelectTrigger id="content-source-product" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {products.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.internalSku} · {item.productName}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError errors={[form.formState.errors.productId]} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="content-kind">内容类型</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="contentType"
+                  render={({ field }) => (
+                    <Select
+                      items={Object.fromEntries(contentTypes)}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger id="content-kind" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {contentTypes.map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.factPath}>
+                <FieldLabel htmlFor="content-source-fact">可用于文案的产品信息</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="factPath"
+                  render={({ field }) => (
+                    <Select
+                      items={Object.fromEntries(
+                        (product?.factOptions ?? []).map((fact) => [fact.path, fact.label]),
+                      )}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger id="content-source-fact" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {product?.factOptions.map((fact) => (
+                            <SelectItem key={fact.path} value={fact.path}>
+                              {fact.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError errors={[form.formState.errors.factPath]} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.objective}>
+                <FieldLabel htmlFor="content-objective">营销目标</FieldLabel>
+                <Input id="content-objective" {...form.register("objective")} />
+                <FieldError errors={[form.formState.errors.objective]} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.targetCustomer}>
+                <FieldLabel htmlFor="target-customer">目标客户</FieldLabel>
+                <Input id="target-customer" {...form.register("targetCustomer")} />
+                <FieldError errors={[form.formState.errors.targetCustomer]} />
+              </Field>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={generating || saving}
+                onClick={generate}
+              >
+                {generating ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <BotIcon data-icon="inline-start" />
                 )}
-              />
-              <FieldError errors={[form.formState.errors.productId]} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="content-kind">内容类型</FieldLabel>
-              <Controller
-                control={form.control}
-                name="contentType"
-                render={({ field }) => (
-                  <Select
-                    items={Object.fromEntries(contentTypes)}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger id="content-kind" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {contentTypes.map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.factPath}>
-              <FieldLabel htmlFor="content-source-fact">可用于文案的产品信息</FieldLabel>
-              <Controller
-                control={form.control}
-                name="factPath"
-                render={({ field }) => (
-                  <Select
-                    items={Object.fromEntries(
-                      (product?.factOptions ?? []).map((fact) => [fact.path, fact.label]),
-                    )}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger id="content-source-fact" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {product?.factOptions.map((fact) => (
-                          <SelectItem key={fact.path} value={fact.path}>
-                            {fact.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[form.formState.errors.factPath]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.objective}>
-              <FieldLabel htmlFor="content-objective">营销目标</FieldLabel>
-              <Input id="content-objective" {...form.register("objective")} />
-              <FieldError errors={[form.formState.errors.objective]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.targetCustomer}>
-              <FieldLabel htmlFor="target-customer">目标客户</FieldLabel>
-              <Input id="target-customer" {...form.register("targetCustomer")} />
-              <FieldError errors={[form.formState.errors.targetCustomer]} />
-            </Field>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={generating || saving}
-              onClick={generate}
-            >
-              {generating ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <BotIcon data-icon="inline-start" />
-              )}
-              生成可编辑初稿
-            </Button>
-            <Field data-invalid={!!form.formState.errors.hook}>
-              <FieldLabel htmlFor="content-hook">开场句</FieldLabel>
-              <Textarea id="content-hook" rows={2} {...form.register("hook")} />
-              <FieldError errors={[form.formState.errors.hook]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.body}>
-              <FieldLabel htmlFor="content-body">正文</FieldLabel>
-              <Textarea id="content-body" rows={8} {...form.register("body")} />
-              <FieldError errors={[form.formState.errors.body]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.callToAction}>
-              <FieldLabel htmlFor="content-cta">行动号召</FieldLabel>
-              <Input id="content-cta" {...form.register("callToAction")} />
-              <FieldError errors={[form.formState.errors.callToAction]} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="content-hashtags">标签</FieldLabel>
-              <Input id="content-hashtags" {...form.register("hashtags")} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.visualInstruction}>
-              <FieldLabel htmlFor="visual-instruction">视觉说明</FieldLabel>
-              <Textarea id="visual-instruction" rows={4} {...form.register("visualInstruction")} />
-              <FieldDescription>不能推断尺寸、材料、结构或零件数量。</FieldDescription>
-              <FieldError errors={[form.formState.errors.visualInstruction]} />
-            </Field>
-          </FieldGroup>
+                生成可编辑初稿
+              </Button>
+            </FieldGroup>
+            <FieldGroup>
+              <Field data-invalid={!!form.formState.errors.hook}>
+                <FieldLabel htmlFor="content-hook">开场句</FieldLabel>
+                <Textarea id="content-hook" rows={2} {...form.register("hook")} />
+                <FieldError errors={[form.formState.errors.hook]} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.body}>
+                <FieldLabel htmlFor="content-body">正文</FieldLabel>
+                <Textarea id="content-body" rows={8} {...form.register("body")} />
+                <FieldError errors={[form.formState.errors.body]} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.callToAction}>
+                <FieldLabel htmlFor="content-cta">行动号召</FieldLabel>
+                <Input id="content-cta" {...form.register("callToAction")} />
+                <FieldError errors={[form.formState.errors.callToAction]} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="content-hashtags">标签</FieldLabel>
+                <Input id="content-hashtags" {...form.register("hashtags")} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.visualInstruction}>
+                <FieldLabel htmlFor="visual-instruction">视觉说明</FieldLabel>
+                <Textarea
+                  id="visual-instruction"
+                  rows={4}
+                  {...form.register("visualInstruction")}
+                />
+                <FieldDescription>不能推断尺寸、材料、结构或零件数量。</FieldDescription>
+                <FieldError errors={[form.formState.errors.visualInstruction]} />
+              </Field>
+            </FieldGroup>
+          </div>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">

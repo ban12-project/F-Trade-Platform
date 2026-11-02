@@ -146,7 +146,7 @@ export function ProductReview({
           <EvidenceLibrary projectId={projectId} evidenceOptions={evidenceOptions} />
         </div>
       ) : null}
-      <div className="grid items-start gap-4 xl:grid-cols-2">
+      <div className="workspace-equal-columns">
         <Card>
           <CardHeader>
             <CardTitle>{detail.productName}</CardTitle>

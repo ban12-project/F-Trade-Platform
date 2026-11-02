@@ -103,7 +103,7 @@ assert.deepEqual(selected.sourceAssets, [
     productMediaId: heroId,
   },
 ]);
-assert.equal("signedGetUrl" in selected.sourceAssets[0]!, false);
+assert.equal("signedGetUrl" in selected.sourceAssets[0], false);
 
 assert.throws(
   () =>

@@ -66,7 +66,7 @@ function rfqFromInput(input: RfqFormInput, id: string, previous?: unknown) {
 }
 
 function entryFromRecord(row: typeof aggregateRecord.$inferSelect): RfqEntry | null {
-  const payload = row.payload as Record<string, any>;
+  const payload = row.payload as Record<string, unknown>;
   const customer = payload.customer as Record<string, unknown> | undefined;
   const product = payload.product as Record<string, unknown> | undefined;
   const commercial = payload.commercial as Record<string, unknown> | undefined;

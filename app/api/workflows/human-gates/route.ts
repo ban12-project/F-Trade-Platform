@@ -33,7 +33,7 @@ function parseInput(value: unknown): HumanGateWorkflowInput {
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session || session.user.role !== "admin") {
+  if (session?.user.role !== "admin") {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 

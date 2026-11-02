@@ -65,11 +65,11 @@ export function unprotectedWorkingEvidenceCondition() {
     EXISTS (SELECT 1 FROM video_review_working_evidence w WHERE w.evidence_id = ${evidence.id})
     AND NOT ${reviewEvidenceSourceProtectedCondition(evidence.id)}
   )`,
-  )!;
+  );
 }
 
 function workingEvidenceExpiredCondition() {
-  return or(expired(evidence.createdAt), videoReviewEvidenceExpiredCondition(evidence.id))!;
+  return or(expired(evidence.createdAt), videoReviewEvidenceExpiredCondition(evidence.id));
 }
 
 /** Enqueue and redact under the same row lock. No raw payload enters the outbox/audit. */

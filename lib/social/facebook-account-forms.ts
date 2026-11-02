@@ -9,7 +9,7 @@ function validBase32(value: string) {
   if (!/^[A-Z2-7]{16,128}$/.test(normalized)) return false;
   const remainder = normalized.length % 8;
   if (![0, 2, 4, 5, 7].includes(remainder)) return false;
-  const last = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".indexOf(normalized.at(-1)!);
+  const last = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".indexOf(normalized.at(-1) ?? "");
   return (last & ((1 << ((normalized.length * 5) % 8)) - 1)) === 0;
 }
 export const facebookCredentialFormSchema = z

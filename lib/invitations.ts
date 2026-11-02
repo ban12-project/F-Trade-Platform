@@ -110,11 +110,7 @@ export async function activateInvitationAfterEmailProof(userId: string) {
   const now = new Date();
   await database.transaction(async (tx) => {
     const [invitedUser] = await tx.select().from(user).where(eq(user.id, userId)).limit(1);
-    if (
-      !invitedUser ||
-      !invitedUser.emailVerified ||
-      invitedUser.banReason !== PENDING_INVITATION_BAN_REASON
-    )
+    if (!invitedUser?.emailVerified || invitedUser.banReason !== PENDING_INVITATION_BAN_REASON)
       return;
     const [matched] = await tx
       .select({ id: invitation.id })

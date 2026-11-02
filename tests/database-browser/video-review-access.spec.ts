@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";

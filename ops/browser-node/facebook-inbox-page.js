@@ -70,7 +70,7 @@ function readInbox(profile, mode, expectedConversation, advance) {
     };
     const reference = (el, attr) => {
       const value = el.getAttribute(attr);
-      if (!value || !value.trim() || value.length > 200 || value !== value.trim())
+      if (!value?.trim() || value.length > 200 || value !== value.trim())
         throw new Error("inbox_reference_missing");
       return value;
     };

@@ -1,4 +1,8 @@
-type Rfq = Record<string, any>;
+export type Rfq = Record<string, unknown> & {
+  product?: Record<string, unknown>;
+  commercial?: Record<string, unknown>;
+  missing_fields?: string[];
+};
 
 export function assessRfq(rfq: Rfq) {
   const product = rfq.product ?? {};
@@ -9,7 +13,12 @@ export function assessRfq(rfq: Rfq) {
   else missing.push("product_type");
   if (product.oe_number || (product.vehicle_brand && product.vehicle_model)) score += 40;
   else missing.push("vehicle_model_or_oe_number");
-  if (Number.isInteger(commercial.quantity) && commercial.quantity > 0) score += 25;
+  if (
+    typeof commercial.quantity === "number" &&
+    Number.isInteger(commercial.quantity) &&
+    commercial.quantity > 0
+  )
+    score += 25;
   else missing.push("quantity");
   if (typeof commercial.destination === "string" && commercial.destination.trim()) score += 25;
   else missing.push("destination");

@@ -19,3 +19,8 @@ const filled = updateRfqDraft(draft, {
 assert.equal(promoteRfqReady(filled).status, "ready");
 assert.throws(() => promoteRfqReady(draft), /incomplete/);
 console.log("PASS RFQ completeness rules");
+
+assert.equal(
+  assessRfq({ ...filled, commercial: { ...filled.commercial, quantity: "1" } }).ready,
+  false,
+);

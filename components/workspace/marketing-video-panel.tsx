@@ -70,6 +70,7 @@ import { workspaceRecordHref, workspaceReturnTo } from "@/lib/workspace/navigati
 import { useWorkspaceDirtyState } from "./dirty-state";
 import { EvidenceSelect } from "./evidence-select";
 import { MarketingVideoCreateForm } from "./marketing-video-create-form";
+import { StickyPanel } from "./sticky-panel";
 import { VideoReviewEvidenceCopies } from "./video-review-evidence-copies";
 import { WorkspaceLink } from "./workspace-link";
 
@@ -123,11 +124,11 @@ function ClipEditor({
     const clips = [...draft.clips];
     const target = index + offset;
     if (target < 0 || target >= clips.length) return;
-    [clips[index], clips[target]] = [clips[target]!, clips[index]!];
+    [clips[index], clips[target]] = [clips[target], clips[index]];
     onChange({ ...draft, clips });
   }
   function changeCaptionKind(index: number, kind: "none" | "creative" | "verified_fact") {
-    const current = draft.clips[index]!.caption;
+    const current = draft.clips[index].caption;
     if (kind === "none") patchClip(index, { caption: { kind } });
     else if (kind === "creative")
       patchClip(index, {
@@ -464,344 +465,358 @@ function EditVideo({
         <h2 className="font-medium">{entry.productName}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{entry.objective}</p>
       </div>
-      {entry.previewAssetRef ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>私有预览</CardTitle>
-            <CardDescription>
-              {entry.privateTestOnly
-                ? "互联网测试素材不能批准、下载或发布。"
-                : "审核通过也不会自动发布。"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <video
-              muted
-              className="aspect-video w-full rounded-lg bg-muted"
-              controls
-              preload="metadata"
-              src={`/api/video-preview/${entry.previewAssetRef}`}
-            />
-          </CardContent>
-          {entry.downloadAvailable ? (
-            <CardFooter className="flex flex-wrap gap-2">
-              <LinkButton
-                className="flex-1"
-                href={`/api/video-download/${entry.id}`}
-                download
-                prefetch={false}
-              >
-                <DownloadIcon data-icon="inline-start" />
-                下载 MP4
-              </LinkButton>
-              <LinkButton
-                variant="outline"
-                className="flex-1"
-                href={`/api/video-download/${entry.id}/manifest`}
-                download
-                prefetch={false}
-              >
-                <DownloadIcon data-icon="inline-start" />
-                下载导出清单
-              </LinkButton>
-            </CardFooter>
+      <div className={entry.previewAssetRef ? "workspace-columns" : "flex flex-col gap-4"}>
+        <div className="flex min-w-0 flex-col gap-4">
+          {editable ? (
+            <>
+              <Progress aria-label="视频总时长" value={Math.min(100, durationMs / 150)}>
+                <ProgressLabel>总时长</ProgressLabel>
+                <ProgressValue>{() => `${(durationMs / 1_000).toFixed(1)} / 15 秒`}</ProgressValue>
+              </Progress>
+              {durationMs > 15_000 ? (
+                <Alert variant="destructive">
+                  <AlertTitle>视频过长</AlertTitle>
+                  <AlertDescription>请缩短片段，总时长必须不超过 15 秒。</AlertDescription>
+                </Alert>
+              ) : null}
+              <Card>
+                <CardHeader>
+                  <CardTitle>ABCD 创意简报</CardTitle>
+                  <CardDescription>
+                    完整填写并保存简报后才能生成 AI
+                    初稿。品牌必须来自授权素材；角色完整不代表审核通过。
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="brand-source">含授权品牌标识的开场素材</FieldLabel>
+                      <NativeSelect
+                        id="brand-source"
+                        value={draft.creativeBrief?.brandAssetRef ?? ""}
+                        disabled={pending || processing}
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            creativeBrief: {
+                              objective: "action",
+                              audience: "",
+                              buyerNeed: "",
+                              nextAction: "",
+                              platformAssumptions: "",
+                              ...draft.creativeBrief,
+                              brandAssetRef: event.target.value,
+                            },
+                          })
+                        }
+                      >
+                        <NativeSelectOption value="">请选择并人工核对品牌权利</NativeSelectOption>
+                        {draft.clips.map((clip, index) => (
+                          <NativeSelectOption key={clip.clipId} value={clip.assetRef}>
+                            片段 {index + 1} 素材
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                      <FieldDescription>
+                        选择表示该素材含获授权品牌标识；合成仍需素材权利和成片人工审核。请将其移到开场。
+                      </FieldDescription>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="creative-objective">主要营销目标</FieldLabel>
+                      <NativeSelect
+                        id="creative-objective"
+                        disabled={pending || processing}
+                        value={draft.creativeBrief?.objective ?? "action"}
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            creativeBrief: {
+                              brandAssetRef: "",
+                              audience: "",
+                              buyerNeed: "",
+                              nextAction: "",
+                              platformAssumptions: "",
+                              ...draft.creativeBrief,
+                              objective: event.target.value as
+                                | "awareness"
+                                | "consideration"
+                                | "action",
+                            },
+                          })
+                        }
+                      >
+                        <NativeSelectOption value="awareness">认知：介绍供应商</NativeSelectOption>
+                        <NativeSelectOption value="consideration">
+                          考虑：展示相关产品细节
+                        </NativeSelectOption>
+                        <NativeSelectOption value="action">
+                          行动：提交需求供人工审核
+                        </NativeSelectOption>
+                      </NativeSelect>
+                    </Field>
+                    {(
+                      [
+                        ["audience", "目标受众"],
+                        ["buyerNeed", "一个主要买家需求"],
+                        ["nextAction", "可用的下一步与承接入口"],
+                        ["platformAssumptions", "平台与声音、字幕假设"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <Field key={key}>
+                        <FieldLabel htmlFor={`creative-${key}`}>{label}</FieldLabel>
+                        <Textarea
+                          id={`creative-${key}`}
+                          disabled={pending || processing}
+                          maxLength={key === "platformAssumptions" ? 300 : 200}
+                          value={draft.creativeBrief?.[key] ?? ""}
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              creativeBrief: {
+                                objective: "action",
+                                brandAssetRef: "",
+                                audience: "",
+                                buyerNeed: "",
+                                nextAction: "",
+                                platformAssumptions: "",
+                                ...draft.creativeBrief,
+                                [key]: event.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </Field>
+                    ))}
+                  </FieldGroup>
+                </CardContent>
+              </Card>
+              {!marketingVideoDraftSchema.safeParse(draft).success ? (
+                <Alert variant="destructive">
+                  <AlertTitle>剪辑结构需要修改</AlertTitle>
+                  <AlertDescription>
+                    {marketingVideoDraftSchema
+                      .safeParse(draft)
+                      .error?.issues.map((issue) => issue.message)
+                      .join("；")}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              <ClipEditor
+                draft={draft}
+                factOptions={entry.captionFactOptions}
+                onChange={setDraft}
+                disabled={pending || processing}
+              />
+              <Separator />
+              <Field>
+                <FieldLabel htmlFor="video-cta">行动引导文案</FieldLabel>
+                <Input
+                  id="video-cta"
+                  maxLength={40}
+                  disabled={pending || processing}
+                  value={draft.ctaText}
+                  onChange={(event) => setDraft({ ...draft, ctaText: event.target.value })}
+                />
+                <FieldDescription>
+                  由最后片段的 Direction 阶段显示；请确认实际可用的咨询入口。
+                </FieldDescription>
+              </Field>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Button
+                  variant="outline"
+                  disabled={
+                    pending ||
+                    processing ||
+                    dirty ||
+                    !marketingCreativeBriefSchema.safeParse(draft.creativeBrief).success
+                  }
+                  onClick={() =>
+                    run(() => generateMarketingVideoAiDraftAction(projectId, entry.id))
+                  }
+                >
+                  <BotIcon data-icon="inline-start" />
+                  AI 初稿
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={pending || processing || !dirty}
+                  onClick={() => {
+                    const value = validatedDraft();
+                    if (value) run(() => saveMarketingVideoDraftAction(projectId, entry.id, value));
+                  }}
+                >
+                  <SaveIcon data-icon="inline-start" />
+                  保存
+                </Button>
+                <Button
+                  disabled={pending || processing || durationMs > 15_000}
+                  onClick={() => {
+                    const value = validatedDraft();
+                    if (value) {
+                      try {
+                        assertMarketingCreativeReady(value);
+                      } catch (error) {
+                        setMessage(error instanceof Error ? error.message : "请完善创意简报");
+                        return;
+                      }
+                      run(() => renderMarketingVideoDraftAction(projectId, entry.id, value));
+                    }
+                  }}
+                >
+                  <ScissorsIcon data-icon="inline-start" />
+                  合成预览
+                </Button>
+              </div>
+            </>
           ) : null}
-        </Card>
-      ) : null}
-      {editable ? (
-        <>
-          <Progress aria-label="视频总时长" value={Math.min(100, durationMs / 150)}>
-            <ProgressLabel>总时长</ProgressLabel>
-            <ProgressValue>{() => `${(durationMs / 1_000).toFixed(1)} / 15 秒`}</ProgressValue>
-          </Progress>
-          {durationMs > 15_000 ? (
-            <Alert variant="destructive">
-              <AlertTitle>视频过长</AlertTitle>
-              <AlertDescription>请缩短片段，总时长必须不超过 15 秒。</AlertDescription>
+          {entry.state === "VIDEO_RENDERING" ? (
+            <Alert>
+              <FilmIcon />
+              <AlertTitle>正在合成</AlertTitle>
+              <AlertDescription>服务器正在生成私有预览，请稍后刷新。</AlertDescription>
             </Alert>
           ) : null}
-          <Card>
-            <CardHeader>
-              <CardTitle>ABCD 创意简报</CardTitle>
-              <CardDescription>
-                完整填写并保存简报后才能生成 AI 初稿。品牌必须来自授权素材；角色完整不代表审核通过。
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="brand-source">含授权品牌标识的开场素材</FieldLabel>
-                  <NativeSelect
-                    id="brand-source"
-                    value={draft.creativeBrief?.brandAssetRef ?? ""}
-                    disabled={pending || processing}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        creativeBrief: {
-                          objective: "action",
-                          audience: "",
-                          buyerNeed: "",
-                          nextAction: "",
-                          platformAssumptions: "",
-                          ...draft.creativeBrief,
-                          brandAssetRef: event.target.value,
-                        },
-                      })
-                    }
-                  >
-                    <NativeSelectOption value="">请选择并人工核对品牌权利</NativeSelectOption>
-                    {draft.clips.map((clip, index) => (
-                      <NativeSelectOption key={clip.clipId} value={clip.assetRef}>
-                        片段 {index + 1} 素材
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                  <FieldDescription>
-                    选择表示该素材含获授权品牌标识；合成仍需素材权利和成片人工审核。请将其移到开场。
-                  </FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="creative-objective">主要营销目标</FieldLabel>
-                  <NativeSelect
-                    id="creative-objective"
-                    disabled={pending || processing}
-                    value={draft.creativeBrief?.objective ?? "action"}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        creativeBrief: {
-                          brandAssetRef: "",
-                          audience: "",
-                          buyerNeed: "",
-                          nextAction: "",
-                          platformAssumptions: "",
-                          ...draft.creativeBrief,
-                          objective: event.target.value as "awareness" | "consideration" | "action",
-                        },
-                      })
-                    }
-                  >
-                    <NativeSelectOption value="awareness">认知：介绍供应商</NativeSelectOption>
-                    <NativeSelectOption value="consideration">
-                      考虑：展示相关产品细节
-                    </NativeSelectOption>
-                    <NativeSelectOption value="action">行动：提交需求供人工审核</NativeSelectOption>
-                  </NativeSelect>
-                </Field>
-                {(
-                  [
-                    ["audience", "目标受众"],
-                    ["buyerNeed", "一个主要买家需求"],
-                    ["nextAction", "可用的下一步与承接入口"],
-                    ["platformAssumptions", "平台与声音、字幕假设"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <Field key={key}>
-                    <FieldLabel htmlFor={`creative-${key}`}>{label}</FieldLabel>
-                    <Textarea
-                      id={`creative-${key}`}
-                      disabled={pending || processing}
-                      maxLength={key === "platformAssumptions" ? 300 : 200}
-                      value={draft.creativeBrief?.[key] ?? ""}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          creativeBrief: {
-                            objective: "action",
-                            brandAssetRef: "",
-                            audience: "",
-                            buyerNeed: "",
-                            nextAction: "",
-                            platformAssumptions: "",
-                            ...draft.creativeBrief,
-                            [key]: event.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </Field>
-                ))}
-              </FieldGroup>
-            </CardContent>
-          </Card>
-          {!marketingVideoDraftSchema.safeParse(draft).success ? (
+          {entry.processingJob?.status === "failed" ? (
             <Alert variant="destructive">
-              <AlertTitle>剪辑结构需要修改</AlertTitle>
+              <AlertTitle>
+                {entry.processingJob.kind === "render" ? "合成失败" : "AI 初稿失败"}
+              </AlertTitle>
               <AlertDescription>
-                {marketingVideoDraftSchema
-                  .safeParse(draft)
-                  .error?.issues.map((issue) => issue.message)
-                  .join("；")}
+                {entry.processingJob.failureMessage ?? "后台任务失败，请重试。"}
               </AlertDescription>
             </Alert>
           ) : null}
-          <ClipEditor
-            draft={draft}
-            factOptions={entry.captionFactOptions}
-            onChange={setDraft}
-            disabled={pending || processing}
-          />
-          <Separator />
-          <Field>
-            <FieldLabel htmlFor="video-cta">行动引导文案</FieldLabel>
-            <Input
-              id="video-cta"
-              maxLength={40}
-              disabled={pending || processing}
-              value={draft.ctaText}
-              onChange={(event) => setDraft({ ...draft, ctaText: event.target.value })}
-            />
-            <FieldDescription>
-              由最后片段的 Direction 阶段显示；请确认实际可用的咨询入口。
-            </FieldDescription>
-          </Field>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Button
-              variant="outline"
-              disabled={
-                pending ||
-                processing ||
-                dirty ||
-                !marketingCreativeBriefSchema.safeParse(draft.creativeBrief).success
-              }
-              onClick={() => run(() => generateMarketingVideoAiDraftAction(projectId, entry.id))}
-            >
-              <BotIcon data-icon="inline-start" />
-              AI 初稿
-            </Button>
-            <Button
-              variant="outline"
-              disabled={pending || processing || !dirty}
-              onClick={() => {
-                const value = validatedDraft();
-                if (value) run(() => saveMarketingVideoDraftAction(projectId, entry.id, value));
-              }}
-            >
-              <SaveIcon data-icon="inline-start" />
-              保存
-            </Button>
-            <Button
-              disabled={pending || processing || durationMs > 15_000}
-              onClick={() => {
-                const value = validatedDraft();
-                if (value) {
-                  try {
-                    assertMarketingCreativeReady(value);
-                  } catch (error) {
-                    setMessage(error instanceof Error ? error.message : "请完善创意简报");
-                    return;
+          {entry.state === "VIDEO_REVIEW_REQUIRED" && entry.privateTestOnly ? (
+            <Alert>
+              <AlertTitle>保持私有测试</AlertTitle>
+              <AlertDescription>
+                该视频包含互联网检索素材，系统不会提供批准或下载操作。需要正式使用时，请换成已授权
+                产品素材。
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {entry.state === "VIDEO_REVIEW_REQUIRED" && !canReview && !entry.privateTestOnly ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              等待有审核权限的项目编辑者检查成片。审核通过不会自动发布。
+            </p>
+          ) : null}
+          {entry.state === "VIDEO_REVIEW_REQUIRED" && canReview && !entry.privateTestOnly ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>成片审核</CardTitle>
+                <CardDescription>
+                  核对画面、字幕、引导客户咨询的文案和产品信息后再决定。
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Field>
+                  <FieldLabel htmlFor="video-review-evidence">审核依据</FieldLabel>
+                  <EvidenceSelect
+                    projectId={projectId}
+                    id="video-review-evidence"
+                    videoId={entry.id}
+                    value={reviewEvidence}
+                    onValueChange={setReviewEvidence}
+                  />
+                </Field>
+              </CardContent>
+              <CardFooter className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  disabled={pending || !reviewEvidence}
+                  onClick={() =>
+                    run(() =>
+                      reviewMarketingVideoAction(
+                        projectId,
+                        entry.id,
+                        "rejected",
+                        reviewEvidence,
+                        "成片需要修改",
+                      ),
+                    )
                   }
-                  run(() => renderMarketingVideoDraftAction(projectId, entry.id, value));
-                }
-              }}
-            >
-              <ScissorsIcon data-icon="inline-start" />
-              合成预览
-            </Button>
-          </div>
-        </>
-      ) : null}
-      {entry.state === "VIDEO_RENDERING" ? (
-        <Alert>
-          <FilmIcon />
-          <AlertTitle>正在合成</AlertTitle>
-          <AlertDescription>服务器正在生成私有预览，请稍后刷新。</AlertDescription>
-        </Alert>
-      ) : null}
-      {entry.processingJob?.status === "failed" ? (
-        <Alert variant="destructive">
-          <AlertTitle>
-            {entry.processingJob.kind === "render" ? "合成失败" : "AI 初稿失败"}
-          </AlertTitle>
-          <AlertDescription>
-            {entry.processingJob.failureMessage ?? "后台任务失败，请重试。"}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {entry.state === "VIDEO_REVIEW_REQUIRED" && entry.privateTestOnly ? (
-        <Alert>
-          <AlertTitle>保持私有测试</AlertTitle>
-          <AlertDescription>
-            该视频包含互联网检索素材，系统不会提供批准或下载操作。需要正式使用时，请换成已授权
-            产品素材。
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {entry.state === "VIDEO_REVIEW_REQUIRED" && !canReview && !entry.privateTestOnly ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          等待有审核权限的项目编辑者检查成片。审核通过不会自动发布。
-        </p>
-      ) : null}
-      {entry.state === "VIDEO_REVIEW_REQUIRED" && canReview && !entry.privateTestOnly ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>成片审核</CardTitle>
-            <CardDescription>
-              核对画面、字幕、引导客户咨询的文案和产品信息后再决定。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Field>
-              <FieldLabel htmlFor="video-review-evidence">审核依据</FieldLabel>
-              <EvidenceSelect
-                projectId={projectId}
-                id="video-review-evidence"
-                videoId={entry.id}
-                value={reviewEvidence}
-                onValueChange={setReviewEvidence}
-              />
-            </Field>
-          </CardContent>
-          <CardFooter className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              disabled={pending || !reviewEvidence}
-              onClick={() =>
-                run(() =>
-                  reviewMarketingVideoAction(
-                    projectId,
-                    entry.id,
-                    "rejected",
-                    reviewEvidence,
-                    "成片需要修改",
-                  ),
-                )
-              }
-            >
-              退回修改
-            </Button>
-            <Button
-              disabled={pending || !reviewEvidence}
-              onClick={() =>
-                run(() =>
-                  reviewMarketingVideoAction(
-                    projectId,
-                    entry.id,
-                    "approved",
-                    reviewEvidence,
-                    "成片已人工确认",
-                  ),
-                )
-              }
-            >
-              通过成片
-            </Button>
-          </CardFooter>
-        </Card>
-      ) : null}
-      {canReview ? (
-        <VideoReviewEvidenceCopies
-          projectId={projectId}
-          videoId={entry.id}
-          copies={entry.reviewEvidenceCopies ?? []}
-        />
-      ) : null}
-      {message ? (
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          {message}
-        </p>
-      ) : null}
+                >
+                  退回修改
+                </Button>
+                <Button
+                  disabled={pending || !reviewEvidence}
+                  onClick={() =>
+                    run(() =>
+                      reviewMarketingVideoAction(
+                        projectId,
+                        entry.id,
+                        "approved",
+                        reviewEvidence,
+                        "成片已人工确认",
+                      ),
+                    )
+                  }
+                >
+                  通过成片
+                </Button>
+              </CardFooter>
+            </Card>
+          ) : null}
+          {canReview ? (
+            <VideoReviewEvidenceCopies
+              projectId={projectId}
+              videoId={entry.id}
+              copies={entry.reviewEvidenceCopies ?? []}
+            />
+          ) : null}
+          {message ? (
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {message}
+            </p>
+          ) : null}
+        </div>
+        {entry.previewAssetRef ? (
+          <StickyPanel>
+            <Card>
+              <CardHeader>
+                <CardTitle>私有预览</CardTitle>
+                <CardDescription>
+                  {entry.privateTestOnly
+                    ? "互联网测试素材不能批准、下载或发布。"
+                    : "审核通过也不会自动发布。"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <video
+                  muted
+                  className="aspect-video w-full rounded-lg bg-muted"
+                  controls
+                  preload="metadata"
+                  src={`/api/video-preview/${entry.previewAssetRef}`}
+                />
+              </CardContent>
+              {entry.downloadAvailable ? (
+                <CardFooter className="flex flex-wrap gap-2">
+                  <LinkButton
+                    className="flex-1"
+                    href={`/api/video-download/${entry.id}`}
+                    download
+                    prefetch={false}
+                  >
+                    <DownloadIcon data-icon="inline-start" />
+                    下载 MP4
+                  </LinkButton>
+                  <LinkButton
+                    variant="outline"
+                    className="flex-1"
+                    href={`/api/video-download/${entry.id}/manifest`}
+                    download
+                    prefetch={false}
+                  >
+                    <DownloadIcon data-icon="inline-start" />
+                    下载导出清单
+                  </LinkButton>
+                </CardFooter>
+              ) : null}
+            </Card>
+          </StickyPanel>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -860,7 +875,7 @@ export function MarketingVideoPanel({
                   items={Object.fromEntries(
                     copyCandidates.map((item) => [
                       item.id,
-                      item.projectTitle + " · " + item.productName + " · " + item.objective,
+                      `${item.projectTitle} · ${item.productName} · ${item.objective}`,
                     ]),
                   )}
                   value={copyId}
@@ -894,11 +909,10 @@ export function MarketingVideoPanel({
                   setCopyMessage(result.message);
                   if (result.status === "success") {
                     setCopiedId(result.videoId ?? "");
-                    if (result.videoId)
+                    const videoId = result.videoId;
+                    if (videoId)
                       requestNavigation(() =>
-                        router.push(
-                          workspaceRecordHref(projectId, "video", result.videoId!, returnTo),
-                        ),
+                        router.push(workspaceRecordHref(projectId, "video", videoId, returnTo)),
                       );
                   }
                 })
