@@ -11,9 +11,24 @@ async function main() {
   let failCreate = false;
   let failInit = false;
   let creates = 0;
+  let polls = 0;
+  let failWait = false;
   const session = {
-    runCommand: async (input: string | { cmd: string; env?: Record<string, string> }) => {
+    runCommand: async (
+      input: string | { cmd: string; detached?: boolean; env?: Record<string, string> },
+    ) => {
       events.push(input);
+      if (typeof input !== "string" && input.detached)
+        return {
+          cmdId: "original-command",
+          exitCode: null,
+          wait: async ({ signal }: { signal: AbortSignal }) => {
+            polls++;
+            signal.throwIfAborted();
+            if (failWait) throw new Error("synthetic_transport_failure");
+            return { exitCode: 0, stdout: async () => "finished", stderr: async () => "" };
+          },
+        };
       return {
         exitCode: (typeof input === "string" ? failInit : failDownload) ? 1 : 0,
         stdout: async () => "100",
@@ -49,6 +64,32 @@ async function main() {
     assert.equal(computeSandboxOptions("heavy").persistent, false);
     assert.equal(computeSandboxOptions("heavy").timeout, 600_000);
     assert.equal(computeSandboxOptions("heavy").networkPolicy, "deny-all");
+    const originalTimeout = AbortSignal.timeout;
+    let waits = 0;
+    AbortSignal.timeout = (ms) =>
+      ++waits === 1 ? AbortSignal.abort(new Error("synthetic wait timeout")) : originalTimeout(ms);
+    let result: Awaited<ReturnType<typeof runtime.runCommand>>;
+    try {
+      result = await runtime.runCommand({ cmd: "node", args: ["synthetic-render"] });
+    } finally {
+      AbortSignal.timeout = originalTimeout;
+    }
+    assert.equal(result.exitCode, 0);
+    assert.equal(await result.stdout(), "finished");
+    assert.equal(polls, 2);
+    assert.equal(
+      events.filter((event) => typeof event === "object" && event !== null && "detached" in event)
+        .length,
+      1,
+    );
+    failWait = true;
+    const beforeFailure = polls;
+    await assert.rejects(
+      runtime.runCommand({ cmd: "node", args: [] }),
+      /synthetic_transport_failure/,
+    );
+    assert.equal(polls, beforeFailure + 1, "non-timeout errors are not retried");
+    failWait = false;
     const host = "synthetic.private.blob.vercel-storage.com";
     const url = `https://${host}/fixture.mp4?signature=synthetic`;
     const destination = "/vercel/sandbox/work/input.mp4";
