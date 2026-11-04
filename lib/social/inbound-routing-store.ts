@@ -24,6 +24,12 @@ import {
   type SocialActorIdentity,
   SocialHumanAccessError,
 } from "./human-write-access";
+import {
+  assertInboundMessagesRetained,
+  inboundContextDigest,
+  lockInboundConversationAccount,
+  readRetainedInboundMessages,
+} from "./inbound-context-store";
 
 type InitialLead = {
   lead_id: string;
@@ -77,10 +83,13 @@ export async function routeInboundConversation(
   const identity = parseSocialActorIdentity(identityInput);
   const actorId = identity.actorId;
   return database.transaction(async (tx) => {
+    const scope = await lockInboundConversationAccount(tx, value.conversationId, actorId);
     const [conversation] = await tx
       .select({
         id: socialConversation.id,
         channelRef: socialConversation.channelRef,
+        accountRef: socialConversation.accountRef,
+        lastMessageAt: socialConversation.lastMessageAt,
         leadId: socialConversation.leadId,
       })
       .from(socialConversation)
@@ -88,6 +97,14 @@ export async function routeInboundConversation(
       .for("update");
     if (!conversation) throw new Error("入站消息不存在或已过期。");
     if (conversation.leadId) throw new Error("该入站消息已完成分流，请刷新工作台。");
+
+    if (
+      conversation.channelRef !== scope.channelRef ||
+      conversation.accountRef !== scope.accountRef
+    )
+      throw new SocialHumanAccessError();
+    if (conversation.lastMessageAt.toISOString() !== value.reviewedMessageAt)
+      throw new Error("入站消息已有更新，请重新查看上下文并确认分流。");
 
     let projectId = value.projectId || "";
     if (value.mode === "link") {
@@ -111,7 +128,17 @@ export async function routeInboundConversation(
       if (project?.kind !== "sales" || project.status !== "active" || !member)
         throw new SocialHumanAccessError();
     }
+    // Revalidate after conversation/account/project lock waits, then reserve the actor
+    // through ciphertext access and commit. Earlier locks must not hide revocation.
     const expiresAt = await authorizeSocialActor(tx, identity, ["sales:write"]);
+    const reviewedMessages = await readRetainedInboundMessages(tx, conversation.id);
+    if (!reviewedMessages.length) throw new Error("没有仍在保留期内的入站消息，请刷新后核对。");
+    if (
+      inboundContextDigest(reviewedMessages, conversation.lastMessageAt) !==
+      value.reviewedContextDigest
+    )
+      throw new Error("入站消息已有更新，请重新查看上下文并确认分流。");
+
     if (value.mode === "create") {
       projectId = randomUUID();
       const now = new Date();
@@ -185,6 +212,7 @@ export async function routeInboundConversation(
       occurredAt: new Date(),
     });
     assertSocialAuthorizationAlive(expiresAt);
+    assertInboundMessagesRetained(reviewedMessages);
     return { projectId, leadId };
   });
 }

@@ -32,6 +32,9 @@ test("unassigned inbound offers explicit create and link decisions without custo
   await expect(
     page.getByRole("dialog").getByText("不会暴露客户姓名或账号", { exact: false }),
   ).toBeVisible();
+  await expect(page.getByRole("region", { name: "入站上下文" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "创建“入站线索 A1B2C3D4”" })).toBeDisabled();
+  await expect(page.getByRole("checkbox")).not.toBeChecked();
   await page.getByRole("button", { name: "Close" }).click();
   await page.getByRole("button", { name: "关联现有项目" }).click();
   await expect(
@@ -95,3 +98,19 @@ for (const empty of [false, true]) {
     await expect(page.getByRole("button", { name: "在此项目开始录入产品" })).toBeDisabled();
   });
 }
+
+test("task cards show customer, need, local deadline and overdue context", async ({ browser }) => {
+  const context = await browser.newContext({ timezoneId: "Asia/Shanghai" });
+  const page = await context.newPage();
+  await page.goto("/testing/workspace-dashboard");
+  const task = page.getByRole("link").filter({ hasText: "客户跟进到期" });
+  await expect(task).toContainText("客户 / 公司：SYNTHETIC Company · SYNTHETIC Buyer");
+  await expect(task).toContainText("产品 / 需求：离合器套件 · 数量 25");
+  await expect(task).toContainText("下一动作：了解目标预算，交由人工销售评估");
+  await expect(task).toContainText("处理角色：项目编辑者");
+  await expect(task).toContainText("已逾期");
+  await expect(task.locator("time")).toContainText("09:00");
+  await expect(task.locator("time")).toContainText("Asia/Shanghai");
+  await expect(task.locator("time")).toHaveAttribute("datetime", "2026-09-03T01:00:00.000Z");
+  await context.close();
+});

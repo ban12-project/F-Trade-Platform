@@ -56,13 +56,16 @@ export async function testBrowserSandboxOwner(
         owner,
       ),
     );
-    const before = await listBrowserNodes(owner.id);
+    // Compare durable rows, not the read DTO's freshly generated serverNow.
+    const persistedNodes = async () =>
+      (
+        await database.execute(sql`SELECT to_jsonb(n) AS node, to_jsonb(s) AS sandbox
+        FROM browser_fleet_node n LEFT JOIN browser_sandbox s ON s.node_id=n.id
+        WHERE n.owner_id=${owner.id} ORDER BY n.id`)
+      ).rows;
+    const before = await persistedNodes();
     await assert.rejects(ownerBrowserCommand(command, owner), /vercel_sandbox_retired_use_vps/);
-    assert.deepEqual(
-      await listBrowserNodes(owner.id),
-      before,
-      "retired creation makes no database changes",
-    );
+    assert.deepEqual(await persistedNodes(), before, "retired creation makes no database changes");
     const result = await legacyManagedFixture(database, owner, command.value.name);
     assert.ok(result.nodeId);
     assert.deepEqual(Object.keys(result), ["nodeId"], "managed keys never go to the page");

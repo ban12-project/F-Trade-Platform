@@ -16,7 +16,8 @@ let role = "user",
   cacheFailure = false,
   failure: unknown,
   calls = 0,
-  received: unknown;
+  received: unknown,
+  receivedInput: unknown;
 mock.module("next/headers", { exports: { headers: async () => new Headers() } });
 mock.module("next/cache", {
   exports: {
@@ -39,9 +40,10 @@ mock.module(new URL("../lib/auth.ts", import.meta.url).href, {
 });
 mock.module(new URL("../lib/social/inbound-routing-store.ts", import.meta.url).href, {
   exports: {
-    routeInboundConversation: async (_input: unknown, identity: unknown) => {
+    routeInboundConversation: async (input: unknown, identity: unknown) => {
       calls++;
       received = identity;
+      receivedInput = input;
       if (failure) throw failure;
       return { projectId, leadId, PRIVATE: "database and raw message details" };
     },
@@ -55,6 +57,9 @@ function form(mode = "create") {
   const fd = new FormData();
   fd.set("conversationId", randomUUID());
   fd.set("mode", mode);
+  fd.set("confirmed", "yes");
+  fd.set("reviewedMessageAt", "2026-11-04T00:00:00.000Z");
+  fd.set("reviewedContextDigest", "a".repeat(64));
   if (mode === "link") fd.set("projectId", projectId);
   fd.set("actorId", "untrusted");
   fd.set("sessionId", "untrusted");
@@ -68,6 +73,12 @@ for (const mode of ["create", "link"]) {
     const result = await action(initial, form(mode));
     assert.deepEqual(received, { actorId, sessionId });
     assert.equal(result.status, "success");
+    assert.equal((receivedInput as { confirmed: string }).confirmed, "yes");
+    assert.equal(
+      (receivedInput as { reviewedContextDigest: string }).reviewedContextDigest,
+      "a".repeat(64),
+    );
+    assert.equal("actorId" in (receivedInput as object), false);
     assert.equal(result.id, leadId);
     assert.equal(result.projectId, projectId);
     assert.deepEqual(Object.keys(result).sort(), ["id", "message", "projectId", "status"]);
@@ -114,6 +125,10 @@ for (const [key, value] of [
   ["conversationId", ""],
   ["mode", "bad-mode"],
   ["projectId", "bad-uuid"],
+  ["confirmed", ""],
+  ["confirmed", "no"],
+  ["reviewedMessageAt", "not-a-time"],
+  ["reviewedContextDigest", ""],
 ]) {
   const fd = form("link");
   fd.set(key, value);
@@ -125,6 +140,8 @@ for (const [key, value] of [
 for (const message of [
   "入站消息不存在或已过期。",
   "该入站消息已完成分流，请刷新工作台。",
+  "入站消息已有更新，请重新查看上下文并确认分流。",
+  "没有仍在保留期内的入站消息，请刷新后核对。",
   "项目已归档，请重开后再写入业务资料。",
   "你没有该项目的编辑权限。",
 ]) {

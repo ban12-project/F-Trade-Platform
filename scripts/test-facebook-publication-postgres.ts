@@ -6,6 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
+import { initialState } from "../lib/browser-fleet/policy";
 import { schedulePublications } from "../lib/browser-fleet/publication";
 import { handleBrowserNodeRequest, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import { closeDatabase, type Database } from "../lib/db/client";
@@ -64,6 +65,61 @@ async function main() {
   process.env.SOCIAL_WORKER_ACCOUNT_REF = accountRef;
   process.env.SOCIAL_WORKER_SIGNING_KEY = Buffer.alloc(32, 7).toString("base64");
 
+  // The first phase exercises already-queued legacy jobs. Current submissions
+  // still require a live owner-bound account: seed that prerequisite only for
+  // submission, then detach this synthetic account before testing legacy claims.
+  // Once the real fleet phase begins, use its existing binding unchanged.
+  async function submitText(
+    input: Parameters<typeof submitControlledPublication>[0],
+    identity: Parameters<typeof submitControlledPublication>[1],
+    target: Database,
+  ) {
+    const existing = await db.execute(sql`SELECT id FROM browser_fleet_binding
+      WHERE channel_ref=${channelRef} AND account_ref=${accountRef}`);
+    if (existing.rows.length) return submitControlledPublication(input, identity, target);
+    const submissionCounts = async () =>
+      (
+        await db.execute(sql`SELECT
+        (SELECT count(*)::int FROM social_publication WHERE project_id=${projectId}) AS publications,
+        (SELECT count(*)::int FROM social_browser_job WHERE channel_ref=${channelRef} AND account_ref=${accountRef}) AS jobs,
+        (SELECT count(*)::int FROM audit_event WHERE actor_id=${actor}) AS audits`)
+      ).rows;
+    const before = await submissionCounts();
+    await assert.rejects(submitControlledPublication(input, identity, target), /账号关联缺失/);
+    assert.deepEqual(await submissionCounts(), before, "unbound submission makes no writes");
+    const nodeId = randomUUID(),
+      bindingId = randomUUID();
+    const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
+    state.installationId = randomUUID();
+    state.bootId = randomUUID();
+    state.lastSeenAt = Date.now();
+    state.capabilities = ["publish"];
+    state.accounts.push({
+      id: bindingId,
+      channelRef,
+      accountRef,
+      enabled: true,
+      authState: "ready",
+      expectedEgressIp: "203.0.113.10",
+      credentialVersion: 1,
+      loginCiphertext: null,
+      proxyCiphertext: "SYNTHETIC",
+      pollSeconds: 0,
+      nextPollAt: 0,
+      lastCheckedAt: null,
+    });
+    await db.execute(sql`INSERT INTO browser_fleet_node(id,owner_id,name,key_hash,document)
+      VALUES(${nodeId},${actor},'SYNTHETIC submission prerequisite',${randomUUID()},${JSON.stringify(state)}::jsonb)`);
+    await db.execute(sql`INSERT INTO browser_fleet_binding(id,node_id,account_ref,channel_ref)
+      VALUES(${bindingId},${nodeId},${accountRef},${channelRef})`);
+    try {
+      return await submitControlledPublication(input, identity, target);
+    } finally {
+      await db.execute(sql`DELETE FROM browser_fleet_binding WHERE id=${bindingId}`);
+      await db.execute(sql`DELETE FROM browser_fleet_node WHERE id=${nodeId}`);
+    }
+  }
+
   async function fixture(format = "text", jobAccount = accountRef, stalePreview = false) {
     const contentRef = randomUUID();
     const id = randomUUID();
@@ -106,7 +162,7 @@ async function main() {
           .set({ version: 2 })
           .where(eq(schema.aggregateRecord.id, contentRef));
         await assert.rejects(
-          submitControlledPublication(
+          submitText(
             {
               projectId,
               contentRef,
@@ -132,7 +188,7 @@ async function main() {
         );
       }
 
-      const saved = await submitControlledPublication(
+      const saved = await submitText(
         {
           projectId,
           contentRef,
@@ -425,7 +481,7 @@ async function main() {
         (item) => item.id === beforeClaim.contentRef,
       ),
     );
-    const reconfirmed = await submitControlledPublication(
+    const reconfirmed = await submitText(
       {
         projectId,
         contentRef: beforeClaim.contentRef,
