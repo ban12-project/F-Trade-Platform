@@ -40,6 +40,12 @@ assert.equal(
 const returnTo =
   "/workspace/content?project=00000000-0000-4000-8000-000000000101&type=content&state=CONTENT_APPROVED";
 assert.equal(workspaceReturnTo(returnTo), returnTo);
+const searchedList = "/workspace/products?q=synoe1002";
+assert.equal(workspaceReturnTo(searchedList), searchedList);
+assert.equal(
+  workspaceTaskHref(task, searchedList),
+  `/workspace/project/records/product/object?returnTo=${encodeURIComponent(searchedList)}`,
+);
 assert.equal(workspaceReturnTo("/workspace?view=waiting"), "/workspace?view=waiting");
 for (const bad of [
   "https://example.org",
@@ -49,6 +55,11 @@ for (const bad of [
   "/workspace/content#x",
   "/workspace/content?next=https://example.org",
   "/workspace/content?project=a&project=b",
+  "/workspace/products?q=a&q=b",
+  "/workspace?q=search",
+  `/workspace/products?q=${"x".repeat(201)}`,
+  "/workspace/products?q=%00",
+  "/workspace/products?q=%5c",
   "/workspace\\content",
   "/workspace/products/../content",
   "/workspace/%2e%2e/workspace",
