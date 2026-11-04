@@ -102,6 +102,7 @@ export async function readInboundContext(
       };
     });
     assertSocialAuthorizationAlive(expiresAt);
+    assertInboundMessagesRetained(rows);
     return {
       reviewedMessageAt: conversation.lastMessageAt.toISOString(),
       reviewedContextDigest,
@@ -112,7 +113,7 @@ export async function readInboundContext(
 
 export async function readRetainedInboundMessages(tx: DatabaseTransaction, conversationId: string) {
   const now = new Date();
-  return tx
+  const rows = await tx
     .select({
       id: socialMessage.id,
       bodyCiphertext: socialMessage.bodyCiphertext,
@@ -132,6 +133,17 @@ export async function readRetainedInboundMessages(tx: DatabaseTransaction, conve
     .orderBy(desc(socialMessage.receivedAt), desc(socialMessage.id))
     .limit(3)
     .for("share");
+  // The SELECT can wait on message locks after its timestamp was captured.
+  // Never decrypt a body whose retention elapsed during that wait.
+  const afterLocks = Date.now();
+  return rows.filter((row) => row.expiresAt.getTime() > afterLocks);
+}
+
+export function assertInboundMessagesRetained(
+  rows: Awaited<ReturnType<typeof readRetainedInboundMessages>>,
+) {
+  if (rows.some((row) => row.expiresAt.getTime() <= Date.now()))
+    throw new Error("没有仍在保留期内的入站消息，请刷新后核对。");
 }
 
 export function inboundContextDigest(

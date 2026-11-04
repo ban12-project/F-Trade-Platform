@@ -407,6 +407,42 @@ try {
       );
     }
   }
+  for (const operation of ["preview", "create", "link"] as const) {
+    const f = await fixture();
+    const expiresAt = new Date(Date.now() + 2000);
+    await db.update(s.socialMessage).set({ expiresAt }).where(eq(s.socialMessage.id, f.messageId));
+    const identity = { actorId: f.actorId, sessionId: f.sessionId };
+    const preview = await readInboundContext({ conversationId: f.conversationId }, identity, db);
+    f.reviewedContextDigest = preview.reviewedContextDigest;
+    const before = await snapshot(f);
+    const held = await pool.connect();
+    await held.query("BEGIN");
+    const {
+      rows: [{ pid }],
+    } = await held.query("SELECT pg_backend_pid() AS pid");
+    await held.query("SELECT id FROM social_message WHERE id=$1 FOR UPDATE", [f.messageId]);
+    try {
+      const pending =
+        operation === "preview"
+          ? readInboundContext({ conversationId: f.conversationId }, identity, db)
+          : run(f, operation);
+      await observeWait(pid);
+      assert(
+        Date.now() < expiresAt.getTime(),
+        "Message must still be retained when lock wait begins",
+      );
+      await delay(Math.max(0, expiresAt.getTime() - Date.now() + 50));
+      await held.query("COMMIT");
+      const result = await pending;
+      if ("messages" in result) assert.equal(result.messages.length, 0);
+      else assert.equal(result.status, "error");
+      assert.deepEqual(await snapshot(f), before);
+      count++;
+    } finally {
+      await held.query("ROLLBACK");
+      held.release();
+    }
+  }
   const editor = await fixture();
   await db
     .update(s.workspaceProjectMember)

@@ -25,6 +25,7 @@ import {
   SocialHumanAccessError,
 } from "./human-write-access";
 import {
+  assertInboundMessagesRetained,
   inboundContextDigest,
   lockInboundConversationAccount,
   readRetainedInboundMessages,
@@ -211,6 +212,7 @@ export async function routeInboundConversation(
       occurredAt: new Date(),
     });
     assertSocialAuthorizationAlive(expiresAt);
+    assertInboundMessagesRetained(reviewedMessages);
     return { projectId, leadId };
   });
 }
