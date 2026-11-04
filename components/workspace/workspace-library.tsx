@@ -110,6 +110,8 @@ export function WorkspaceLibrary({
           <Field className="min-w-0 flex-1">
             <FieldLabel htmlFor={`${id}-search`}>搜索记录</FieldLabel>
             <Input
+              key={search}
+              defaultValue={search}
               id={`${id}-search`}
               type="search"
               placeholder="SKU、OE、产品名称、客户或公司"
