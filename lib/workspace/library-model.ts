@@ -6,7 +6,7 @@ import {
   workspaceCollection,
   workspaceRecordHref,
 } from "./navigation";
-import type { WorkspaceTaskSnapshot } from "./task-model";
+import type { TaskRecord, WorkspaceTaskSnapshot } from "./task-model";
 
 export const recordKindLabels: Record<WorkspaceRecordKind, string> = {
   product: "产品资料",
@@ -77,6 +77,7 @@ export type WorkspaceLibraryRecord = {
   relation: string;
   updatedAt: Date;
   href: string;
+  identifiers?: { label: string; value: string }[];
   publications?: WorkspaceLibraryPublication[];
 };
 function object(value: unknown): Record<string, unknown> {
@@ -88,9 +89,72 @@ function text(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+// Only these visible business identifiers enter the client projection/search index.
+function businessIdentifiers(record: TaskRecord, records: Map<string, TaskRecord>) {
+  const related = (kind: string, id: unknown) =>
+    typeof id === "string" ? records.get(`${record.projectId}:${kind}:${id}`) : undefined;
+  let rfq = record.type === "rfq" ? record : undefined;
+  if (record.type === "lead") rfq = related("rfq", record.payload.rfq_ref);
+  if (record.type === "quotation") rfq = related("rfq", record.payload.rfq_id);
+  if (record.type === "delivery_confirmation") {
+    if (record.payload.related_entity_type === "rfq") {
+      rfq = related("rfq", record.payload.related_entity_id);
+    } else if (record.payload.related_entity_type === "opportunity") {
+      const lead = related("lead", record.payload.related_entity_id);
+      rfq = related("rfq", lead?.payload.rfq_ref);
+    }
+  }
+  const productRecord =
+    record.type === "product"
+      ? record
+      : related("product", record.payload.product_id ?? record.payload.productId);
+  const product = object(productRecord?.payload.product);
+  const requestedProduct = object((rfq ?? record).payload.product);
+  const customer = object((rfq ?? record).payload.customer);
+  const oeNumbers = [
+    ...(Array.isArray(product.oe_numbers) ? product.oe_numbers : []),
+    requestedProduct.oe_number,
+  ].flatMap((value) => (text(value).trim() ? [text(value).trim()] : []));
+  return [
+    { label: "SKU", value: text(product.internal_sku).trim() },
+    { label: "OE", value: [...new Set(oeNumbers)].join("、") },
+    { label: "产品", value: text(product.product_name).trim() },
+    { label: "客户", value: text(customer.name).trim() },
+    { label: "公司", value: text(customer.company).trim() },
+  ].filter((field) => field.value);
+}
+
+function normalizedSearch(value: string) {
+  return value.normalize("NFKC").toLocaleLowerCase().trim();
+}
+
+export function matchesWorkspaceLibrarySearch(record: WorkspaceLibraryRecord, search: string) {
+  const terms = normalizedSearch(search).split(/\s+/).filter(Boolean);
+  const fields = [
+    record.title,
+    record.projectTitle,
+    ...(record.identifiers ?? []).map((field) => field.value),
+  ];
+  const searchable = fields.map(normalizedSearch).join(" ");
+  // SKU/OE can be copied with or without spaces/hyphens. Do not normalize other private data.
+  const identifiers = (record.identifiers ?? [])
+    .filter((field) => field.label === "SKU" || field.label === "OE")
+    .map((field) => normalizedSearch(field.value).replace(/[\s-]+/g, ""));
+  return terms.every(
+    (term) =>
+      searchable.includes(term) ||
+      identifiers.some((value) => value.includes(term.replace(/[\s-]+/g, ""))),
+  );
+}
+
 // Project membership has already scoped the snapshot. Return display fields only, never raw payloads.
 export function deriveWorkspaceLibrary(snapshot: WorkspaceTaskSnapshot): WorkspaceLibraryRecord[] {
   const projects = new Map(snapshot.projects.map((project) => [project.id, project]));
+  const scopedRecords = new Map(
+    snapshot.records
+      .filter((record) => projects.has(record.projectId))
+      .map((record) => [`${record.projectId}:${record.type}:${record.id}`, record]),
+  );
   const rows: WorkspaceLibraryRecord[] = [];
   for (const record of snapshot.records) {
     const project = projects.get(record.projectId);
@@ -98,12 +162,16 @@ export function deriveWorkspaceLibrary(snapshot: WorkspaceTaskSnapshot): Workspa
     if (!project || !isWorkspaceRecordKind(kind)) continue;
     const product = object(record.payload.product);
     const customer = object(record.payload.customer);
+    const identifiers = businessIdentifiers(record, scopedRecords);
     const name =
       text(product.product_name) ||
       text(record.payload.hook) ||
       text(customer.company) ||
       text(customer.name) ||
-      text(record.payload.objective);
+      text(record.payload.objective) ||
+      identifiers.find((field) => field.label === "公司")?.value ||
+      identifiers.find((field) => field.label === "客户")?.value ||
+      identifiers.find((field) => field.label === "产品")?.value;
     rows.push({
       id: record.id,
       projectId: project.id,
@@ -114,6 +182,7 @@ export function deriveWorkspaceLibrary(snapshot: WorkspaceTaskSnapshot): Workspa
       state: record.state,
       statusLabel: recordStateLabels[record.state] ?? "状态待核对",
       relation: record.relation,
+      identifiers,
       updatedAt: record.updatedAt,
       href: workspaceRecordHref(project.id, kind, record.id),
     });

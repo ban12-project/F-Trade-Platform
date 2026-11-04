@@ -35,6 +35,9 @@ export type WorkspaceTaskSummary = {
   priority: "attention" | "overdue" | "review" | "complete";
   state?: "actionable" | "waiting" | "processing" | "attention" | "scheduled";
   responsibleLabel?: string;
+  customerLabel?: string;
+  needLabel?: string;
+  nextAction?: string;
   source?: { kind: "product" | "rfq" | "lead"; id: string };
   destination: WorkspaceTaskDestination;
   createdAt: Date;
