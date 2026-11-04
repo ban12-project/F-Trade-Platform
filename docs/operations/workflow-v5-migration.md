@@ -229,15 +229,15 @@ Executed successfully:
   synthetic PostgreSQL cluster on loopback port 55432. External adapters remain
   synthetic; this is not live provider acceptance.
 
-Failed, independently reproduced:
+Initially failed, independently reproduced (resolved by #843 below):
 
 - `test-video-ai-draft-version-postgres.mts` fails its first success assertion
   (line 373: `failed` instead of `succeeded`). The fixture omits `creativeBrief`,
   which the current workflow requires at its schema boundary. Reproduced in a
   separate checkout of current main with its own frozen Workflow 4.8.8 install.
   A temporary synthetic-only diagnostic was restored afterwards. No assertion
-  or production guard was relaxed. Tracked in #842; later cases in this script
-  were not reached and are not counted as passed.
+  or production guard was relaxed. Tracked in #842; later cases in this initial
+  execution were not reached and were not counted as passed.
 
 Read-only operational evidence:
 
@@ -270,7 +270,35 @@ Not executed and still blocking promotion:
    fixtures, and requires provider credentials. No production credentials were
    pulled or repurposed; no suitable isolated resource/credential scope was
    established in this task.
-4. Repair and rerun the complete video PostgreSQL fixture suite tracked by #842.
+
+### Video fixture gate resolved by #843
+
+#843 repaired #842 on its own branch and was squash-merged as
+`004f087ed59ccd0b0d23b063a139cdb3bbbf7ecb` after passing the full video
+PostgreSQL suite, creative-brief guards, video/domain regression, production
+build and standard repository validation. Only the synthetic test file changed:
+the fixture now includes an action brief bound to its existing source asset and
+an allowed Connection caption. Every existing assertion remains; a new negative
+case proves missing brief rejects before model execution with no draft save or
+save audit. No application schema, workflow, prompt or guard was changed.
+
+Merged this latest main into #822 without conflicts. Tested code commit
+`b4bbc0dbc2269e0d45ab113efca8533d5c3d1266` passes:
+
+- Frozen v5 installation and the entire video AI version PostgreSQL suite,
+  including all 9 source/permission/rights-change cases, natural rights expiry
+  during an observed row-lock wait, concurrent writes, and stale human edits.
+- `pnpm test:workflow-runtime`: 10 outer tests, 20 fresh actual v5 runs and
+  isolated original v4 historical compatibility; no skips.
+- Full publication/Chromium/signed-loopback/PostgreSQL/human-routing suite,
+  catalog PostgreSQL suite, creative-brief guards, and 5 video/domain entries.
+- Full production build, unmodified standard repository validator and diff
+  hygiene checks.
+
+All database inputs and external adapters were synthetic; no provider request
+or real message was made. #842 is resolved, but the three live operational gates
+above remain unchanged. In particular, designated isolated Sandbox/Blob scope
+and a cost ceiling still require the user's decision. #822 remains draft.
 
 PR #822 remains draft. No merge, manual deployment, real message, production
 database write, retention adjustment, permission change or CI-setting change
