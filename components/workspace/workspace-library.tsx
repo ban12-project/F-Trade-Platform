@@ -1,7 +1,7 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useId } from "react";
+import { useId, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,12 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  type LibraryFilterKey,
+  updateWorkspaceLibraryFilter,
+  workspaceLibraryEmptyState,
+  workspaceLibraryFilterOptions,
+} from "@/lib/workspace/library-filters";
 import {
   matchesWorkspaceLibrarySearch,
   recordKindLabels,
@@ -61,38 +67,28 @@ export function WorkspaceLibrary({
     values: { q: search },
   });
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const { requestNavigation } = useWorkspaceDirtyState();
   const unavailable = !!projectId && !projects.some((project) => project.id === projectId);
-  const collectionRecords = records.filter(
-    (record) => record.collection === collection && (!projectId || record.projectId === projectId),
-  );
-  const types = [
-    ...new Set(
-      records.filter((record) => record.collection === collection).map((record) => record.kind),
-    ),
-  ];
-  const states = [
-    ...new Set(
-      collectionRecords
-        .filter((record) => !recordType || record.kind === recordType)
-        .map((record) => record.state),
-    ),
-  ];
   const query = new URLSearchParams();
   if (projectId) query.set("project", projectId);
   if (recordType) query.set("type", recordType);
   if (state) query.set("state", state);
   if (search) query.set("q", search);
   const returnTo = `/workspace/${collection}${query.size ? `?${query.toString()}` : ""}`;
-  function filter(key: "project" | "type" | "state" | "q", value: string) {
-    const next = new URLSearchParams(query);
-    if (value) next.set(key, value);
-    else next.delete(key);
+  const { types, states } = workspaceLibraryFilterOptions(records, collection, query);
+  const emptyState = workspaceLibraryEmptyState(unavailable, query);
+  function navigate(next: URLSearchParams) {
     requestNavigation(() =>
-      router.push(
-        `${basePath ?? `/workspace/${collection}`}${next.size ? `?${next.toString()}` : ""}`,
+      startTransition(() =>
+        router.push(
+          `${basePath ?? `/workspace/${collection}`}${next.size ? `?${next.toString()}` : ""}`,
+        ),
       ),
     );
+  }
+  function filter(key: LibraryFilterKey, value: string) {
+    navigate(updateWorkspaceLibraryFilter(records, collection, query, key, value));
   }
   const rows = unavailable
     ? []
@@ -120,10 +116,11 @@ export function WorkspaceLibrary({
               type="search"
               placeholder="SKU、OE、产品名称、客户或公司"
               maxLength={200}
+              disabled={isPending}
               {...searchForm.register("q")}
             />
           </Field>
-          <Button type="submit" variant="outline">
+          <Button type="submit" variant="outline" disabled={isPending}>
             搜索
           </Button>
         </form>
@@ -132,6 +129,7 @@ export function WorkspaceLibrary({
         <Field className="w-full sm:w-72">
           <FieldLabel htmlFor={id}>归属项目</FieldLabel>
           <NativeSelect
+            disabled={isPending}
             className="w-full"
             id={id}
             value={projectId ?? ""}
@@ -160,6 +158,7 @@ export function WorkspaceLibrary({
             {collection === "content" ? "内容类型" : "记录类型"}
           </FieldLabel>
           <NativeSelect
+            disabled={isPending}
             id={`${id}-type`}
             value={recordType ?? ""}
             onChange={(event) => filter("type", event.target.value)}
@@ -180,6 +179,7 @@ export function WorkspaceLibrary({
             {collection === "content" ? "内容状态" : "状态"}
           </FieldLabel>
           <NativeSelect
+            disabled={isPending}
             id={`${id}-state`}
             value={state ?? ""}
             onChange={(event) => filter("state", event.target.value)}
@@ -195,6 +195,16 @@ export function WorkspaceLibrary({
             ))}
           </NativeSelect>
         </Field>
+        {query.size ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => navigate(new URLSearchParams())}
+          >
+            清除全部筛选
+          </Button>
+        ) : null}
         <NewWorkButton
           projectId={projectId}
           returnTo={returnTo}
@@ -282,18 +292,22 @@ export function WorkspaceLibrary({
         <Empty className="border bg-background">
           <EmptyHeader>
             <EmptyTitle>
-              {unavailable
+              {emptyState === "unavailable"
                 ? "这个项目不可访问"
-                : `没有符合筛选的${collectionLabels[collection]}记录`}
+                : emptyState === "no_matches"
+                  ? "没有匹配的记录"
+                  : `暂无${collectionLabels[collection]}记录`}
             </EmptyTitle>
             <EmptyDescription>
-              {unavailable
+              {emptyState === "unavailable"
                 ? "链接中的项目不存在或你不是成员。请选择可访问项目。"
-                : collection === "products"
-                  ? "从工厂资料或人工录入开始，核验后才能用于营销与报价。"
-                  : collection === "content"
-                    ? "先完成产品资料核验，再选择已核验产品制作内容；视频是可选形式。"
-                    : "记录客户已经提出的需求，再补齐产品、数量和目的地。"}
+                : emptyState === "no_matches"
+                  ? "试试其他关键词，或调整项目、类型和状态。也可以清除全部筛选查看所有可访问记录。"
+                  : collection === "products"
+                    ? "从工厂资料或人工录入开始，核验后才能用于营销与报价。"
+                    : collection === "content"
+                      ? "先完成产品资料核验，再选择已核验产品制作内容；视频是可选形式。"
+                      : "记录客户已经提出的需求，再补齐产品、数量和目的地。"}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
