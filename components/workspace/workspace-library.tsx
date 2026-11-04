@@ -1,15 +1,21 @@
 "use client";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useId } from "react";
+import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
+  matchesWorkspaceLibrarySearch,
   recordKindLabels,
   recordStateLabels,
   type WorkspaceLibraryRecord,
 } from "@/lib/workspace/library-model";
+import { librarySearchSchema } from "@/lib/workspace/library-search";
 import { type WorkspaceCollection, withWorkspaceReturnTo } from "@/lib/workspace/navigation";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 import { useWorkspaceDirtyState } from "./dirty-state";
@@ -37,6 +43,8 @@ export function WorkspaceLibrary({
   projectId,
   recordType,
   state,
+  search = "",
+  basePath,
 }: {
   collection: WorkspaceCollection;
   records: WorkspaceLibraryRecord[];
@@ -44,8 +52,14 @@ export function WorkspaceLibrary({
   projectId?: string;
   recordType?: string;
   state?: string;
+  search?: string;
+  basePath?: string;
 }) {
   const id = useId();
+  const searchForm = useForm({
+    resolver: zodResolver(librarySearchSchema),
+    values: { q: search },
+  });
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
   const unavailable = !!projectId && !projects.some((project) => project.id === projectId);
@@ -68,13 +82,16 @@ export function WorkspaceLibrary({
   if (projectId) query.set("project", projectId);
   if (recordType) query.set("type", recordType);
   if (state) query.set("state", state);
+  if (search) query.set("q", search);
   const returnTo = `/workspace/${collection}${query.size ? `?${query.toString()}` : ""}`;
-  function filter(key: "project" | "type" | "state", value: string) {
+  function filter(key: "project" | "type" | "state" | "q", value: string) {
     const next = new URLSearchParams(query);
     if (value) next.set(key, value);
     else next.delete(key);
     requestNavigation(() =>
-      router.push(`/workspace/${collection}${next.size ? `?${next.toString()}` : ""}`),
+      router.push(
+        `${basePath ?? `/workspace/${collection}`}${next.size ? `?${next.toString()}` : ""}`,
+      ),
     );
   }
   const rows = unavailable
@@ -84,10 +101,33 @@ export function WorkspaceLibrary({
           record.collection === collection &&
           (!projectId || record.projectId === projectId) &&
           (!recordType || record.kind === recordType) &&
-          (!state || record.state === state),
+          (!state || record.state === state) &&
+          matchesWorkspaceLibrarySearch(record, search),
       );
   return (
     <div className="flex flex-col gap-5">
+      <search aria-label="搜索资料库">
+        <form
+          className="flex items-end gap-2"
+          onSubmit={searchForm.handleSubmit(({ q }) => filter("q", q))}
+        >
+          <Field className="min-w-0 flex-1">
+            <FieldLabel htmlFor={`${id}-search`}>搜索记录</FieldLabel>
+            <Input
+              key={search}
+              defaultValue={search}
+              id={`${id}-search`}
+              type="search"
+              placeholder="SKU、OE、产品名称、客户或公司"
+              maxLength={200}
+              {...searchForm.register("q")}
+            />
+          </Field>
+          <Button type="submit" variant="outline">
+            搜索
+          </Button>
+        </form>
+      </search>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <Field className="w-full sm:w-72">
           <FieldLabel htmlFor={id}>归属项目</FieldLabel>
@@ -184,6 +224,13 @@ export function WorkspaceLibrary({
               >
                 <div className="min-w-0 flex-1">
                   <p className="break-words font-medium">{record.title}</p>
+                  {record.identifiers?.length ? (
+                    <p className="mt-1 break-words text-sm text-muted-foreground">
+                      {record.identifiers
+                        .map((field) => `${field.label}：${field.value}`)
+                        .join(" · ")}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-sm text-muted-foreground">
                     {recordKindLabels[record.kind]} · {record.projectTitle}
                     {record.relation !== "owned" ? " · 来自其他项目，只读" : ""}

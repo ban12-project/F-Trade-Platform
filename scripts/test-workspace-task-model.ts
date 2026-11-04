@@ -1,3 +1,4 @@
+import "./test-workspace-library";
 import assert from "node:assert/strict";
 import { deriveWorkspaceLibrary } from "../lib/workspace/library-model";
 import { workspaceTaskHref } from "../lib/workspace/navigation";
