@@ -371,10 +371,17 @@ export const opportunityDecisionFormSchema = z.object({
   evidenceRef: privateReference,
 });
 
+export const inboundContextRequestSchema = z.object({
+  conversationId: z.string().trim().min(1, "入站会话标识无效。").max(160),
+});
+
 export const inboundRoutingFormSchema = z
   .object({
     conversationId: z.string().trim().min(1, "入站会话标识无效。").max(160),
     mode: z.enum(["create", "link"]),
+    confirmed: z.literal("yes", { error: "请核对上下文和目标后确认分流。" }),
+    reviewedMessageAt: z.iso.datetime({ error: "请先查看入站上下文。" }),
+    reviewedContextDigest: z.string().regex(/^[a-f0-9]{64}$/, "请重新查看入站上下文。"),
     projectId: z.uuid("请选择要关联的销售项目。").optional().or(z.literal("")),
   })
   .superRefine((value, context) => {
