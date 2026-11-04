@@ -32,6 +32,9 @@ test("unassigned inbound offers explicit create and link decisions without custo
   await expect(
     page.getByRole("dialog").getByText("不会暴露客户姓名或账号", { exact: false }),
   ).toBeVisible();
+  await expect(page.getByRole("region", { name: "入站上下文" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "创建“入站线索 A1B2C3D4”" })).toBeDisabled();
+  await expect(page.getByRole("checkbox")).not.toBeChecked();
   await page.getByRole("button", { name: "Close" }).click();
   await page.getByRole("button", { name: "关联现有项目" }).click();
   await expect(
