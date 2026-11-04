@@ -1,6 +1,6 @@
 "use client";
 import { ArrowRightIcon, CheckCircle2Icon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/empty";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
+import { formatTaskDeadline, isTaskOverdue } from "@/lib/workspace/task-context";
 import { isActionableTask, taskStateLabel } from "@/lib/workspace/task-model";
 import type {
   WorkspaceProjectOverview,
@@ -24,15 +25,22 @@ import { InboundRoutingList } from "./inbound-routing-list";
 import { NewWorkButton } from "./new-work";
 import { WorkspaceLink as Link } from "./workspace-link";
 
+const subscribeToTimeZone = () => () => {};
+const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+const serverTimeZone = () => "UTC";
+
 function TaskRows({
   tasks,
   empty,
   selectedReturnTo,
+  currentTime,
 }: {
   tasks: WorkspaceTaskSummary[];
   empty: string;
   selectedReturnTo: string;
+  currentTime: number;
 }) {
+  const timeZone = useSyncExternalStore(subscribeToTimeZone, browserTimeZone, serverTimeZone);
   if (!tasks.length)
     return (
       <Empty className="border-0 py-8">
@@ -60,10 +68,41 @@ function TaskRows({
                 {task.actionLabel ?? (task.priority === "review" ? "审核" : "处理")}
               </Badge>
               {task.state ? <Badge variant="outline">{taskStateLabel(task)}</Badge> : null}
+              {isTaskOverdue(task.dueAt, currentTime) ? (
+                <Badge variant="destructive">已逾期</Badge>
+              ) : null}
             </div>
+            {task.customerLabel ||
+            ["lead", "rfq", "quotation", "delivery"].includes(task.recordKind) ? (
+              <p className="mt-2 break-words text-sm">
+                客户 / 公司：{task.customerLabel ?? "尚未录入"}
+              </p>
+            ) : null}
+            {task.needLabel ||
+            ["lead", "rfq", "quotation", "delivery"].includes(task.recordKind) ? (
+              <p className="mt-1 break-words text-sm">
+                产品 / 需求：{task.needLabel ?? "尚未录入"}
+              </p>
+            ) : null}
+            <p className="mt-1 break-words text-sm">
+              下一动作：{task.nextAction ?? task.actionLabel ?? "打开记录核对"}
+            </p>
             <p className="mt-1 break-words text-sm text-muted-foreground">
               {task.projectTitle} · {task.detail}
             </p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span>
+                {task.state === "waiting" ? "等待对象" : "处理角色"}：
+                {task.responsibleLabel ?? "未指定"}
+              </span>
+              {task.dueAt ? (
+                <time dateTime={task.dueAt.toISOString()}>
+                  截止：{formatTaskDeadline(task.dueAt, timeZone)}（{timeZone}）
+                </time>
+              ) : (
+                <span>截止：未安排</span>
+              )}
+            </div>
           </div>
           <ArrowRightIcon className="workspace-task-arrow size-4 shrink-0 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
         </Link>
@@ -78,6 +117,7 @@ export function WorkspaceDashboard({
   tasks,
   overview,
   inbound = [],
+  currentTime,
   view = "actionable",
   basePath = "/workspace",
 }: {
@@ -153,6 +193,7 @@ export function WorkspaceDashboard({
                 ) : null}
                 <TaskRows
                   tasks={selected.rows}
+                  currentTime={currentTime}
                   selectedReturnTo={
                     selected.id === "actionable" ? "/workspace" : `/workspace?view=${selected.id}`
                   }
