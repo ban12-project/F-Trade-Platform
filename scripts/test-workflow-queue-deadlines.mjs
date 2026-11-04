@@ -148,7 +148,7 @@ test("queue limits have bounded defaults and reject unsafe configuration values"
     assert.equal(options.bodyTimeout, 30_000);
     assert.equal(options.allowH2, false);
     assert.equal(options.pipelining, 1);
-    assert.ok(options.connections > http.getAgentOptions().connections);
+    assert.ok(options.connections > http.DEFAULT_AGENT_OPTIONS.connections);
   });
   for (const [input, deadline, connections] of [
     ["0", 5_000, 1],
