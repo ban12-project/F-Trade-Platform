@@ -277,9 +277,9 @@ const syntheticProductDetail: ProductCatalogDetail = {
   draft: {
     record_id: syntheticProduct.id,
     source_ref: "source-product-001",
-    evidence_refs: ["evidence-product-001"],
+    evidence_refs: ["evidence-product-001", "evidence-loc-synthetic-name"],
     field_evidence: {
-      "product.product_name": "evidence-product-001",
+      "product.product_name": "evidence-loc-synthetic-name",
       "product.product_type": "evidence-product-001",
       "product.internal_sku": "evidence-product-001",
       "product.oe_numbers": "evidence-product-001",
@@ -403,7 +403,32 @@ async function ProjectWorkflowFixture({
   }
   const productDetail =
     state === "product-review" || state === "product-review-locations"
-      ? syntheticProductDetail
+      ? {
+          ...syntheticProductDetail,
+          draft: {
+            ...syntheticProductDetail.draft,
+            commercial: { sample_available: false },
+            evidence_refs:
+              state === "product-review-locations"
+                ? [
+                    "evidence-product-001",
+                    "evidence-loc-mock-page-3-name",
+                    "evidence-paged-mock",
+                    "evidence-loc-mock-csv-name",
+                  ]
+                : syntheticProductDetail.draft.evidence_refs,
+            field_evidence: {
+              ...syntheticProductDetail.draft.field_evidence,
+              ...(state === "product-review-locations"
+                ? {
+                    "product.product_name": "evidence-loc-mock-page-3-name",
+                    "product.internal_sku": "evidence-paged-mock",
+                    "product.oe_numbers": "evidence-loc-mock-csv-name",
+                  }
+                : {}),
+            },
+          },
+        }
       : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
   const panels = {
@@ -460,7 +485,7 @@ async function ProjectWorkflowFixture({
                   contentType: "text/csv",
                   fields: [
                     {
-                      path: "product.product_name",
+                      path: "product.oe_numbers",
                       reference: "evidence-loc-mock-csv-name",
                       excerpt: "MOCK CSV product",
                       location: { recordLine: 3 },
