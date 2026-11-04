@@ -7,9 +7,13 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool, type PoolClient } from "pg";
 import type { Database } from "../../lib/db/client";
 import * as s from "../../lib/db/schema";
-import { authSecret, databaseURL } from "../../playwright.database.config";
-import { seedInboundRoutingFixture } from "../fixtures/inbound-routing";
+import { authSecret, databaseURL, socialMessageKey } from "../../playwright.database.config";
+import {
+  SYNTHETIC_INBOUND_ROUTING_BODY,
+  seedInboundRoutingContextFixture,
+} from "../fixtures/inbound-routing";
 
+process.env.SOCIAL_MESSAGE_ENCRYPTION_KEY = socialMessageKey;
 const pool = new Pool({ connectionString: databaseURL }),
   db = drizzle(pool, { schema: s });
 test.beforeAll(async () => {
@@ -47,7 +51,7 @@ for (const { mode, role, change } of cases)
     baseURL,
   }) => {
     if (!baseURL) throw Error("Local browser base URL required");
-    const f = await seedInboundRoutingFixture(db as unknown as Database, role);
+    const f = await seedInboundRoutingContextFixture(db as unknown as Database, role);
     async function snapshot() {
       const r = await db.execute(sql`SELECT
         (SELECT count(*)::int FROM workspace_project WHERE created_by_id=${f.actorId}) AS projects,
@@ -90,6 +94,9 @@ for (const { mode, role, change } of cases)
           .click();
       }
       const submit = dialog.locator('button[type="submit"]');
+      await expect(submit).toBeDisabled();
+      await expect(dialog.getByText(SYNTHETIC_INBOUND_ROUTING_BODY, { exact: true })).toBeVisible();
+      await dialog.getByRole("checkbox").check();
       await expect(submit).toBeEnabled();
       const before = await snapshot();
       const response = page.waitForResponse(

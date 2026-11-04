@@ -35,7 +35,7 @@
     "test:publication-result": "tsx scripts/test-publication-result-protocol.ts",
     "test:reply-result": "tsx scripts/test-reply-result-protocol.ts",
     "test:controlled-reply": "tsx scripts/test-controlled-reply.ts",
-    "test:inbound-routing-context": "node --conditions=react-server --import tsx scripts/test-inbound-routing-context.ts",
+    "test:inbound-routing-context": "node --conditions=react-server --import tsx scripts/test-inbound-routing-context.ts && node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-inbound-routing-action-errors.mts",
     "test:inbound-lead-intake": "tsx scripts/test-inbound-lead-intake.ts",
     "test:rfq-reply-policy": "tsx scripts/test-rfq-reply-policy.ts",
     "test:social-control-record": "tsx scripts/test-social-control-record.ts",

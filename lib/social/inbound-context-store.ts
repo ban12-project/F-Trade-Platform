@@ -44,6 +44,25 @@ export async function assertInboundAccountOwner(
     throw new SocialHumanAccessError();
 }
 
+/** Match inbox/executor order: account node/binding before locking a conversation.
+ * The caller must lock and recheck the returned scope before reading any ciphertext. */
+export async function lockInboundConversationAccount(
+  tx: DatabaseTransaction,
+  conversationId: string,
+  actorId: string,
+) {
+  const [scope] = await tx
+    .select({
+      channelRef: socialConversation.channelRef,
+      accountRef: socialConversation.accountRef,
+    })
+    .from(socialConversation)
+    .where(eq(socialConversation.id, conversationId));
+  if (!scope) throw new SocialHumanAccessError();
+  await assertInboundAccountOwner(tx, scope, actorId);
+  return scope;
+}
+
 export async function readInboundContext(
   input: unknown,
   identityInput: SocialActorIdentity,
@@ -52,7 +71,7 @@ export async function readInboundContext(
   const value = inboundContextRequestSchema.parse(input);
   const identity = parseSocialActorIdentity(identityInput);
   return database.transaction(async (tx) => {
-    const expiresAt = await authorizeSocialActor(tx, identity, ["sales:write"]);
+    const scope = await lockInboundConversationAccount(tx, value.conversationId, identity.actorId);
     const [conversation] = await tx
       .select({
         channelRef: socialConversation.channelRef,
@@ -64,8 +83,13 @@ export async function readInboundContext(
         and(eq(socialConversation.id, value.conversationId), isNull(socialConversation.leadId)),
       )
       .for("share");
-    if (!conversation) throw new SocialHumanAccessError();
-    await assertInboundAccountOwner(tx, conversation, identity.actorId);
+    if (
+      !conversation ||
+      conversation.channelRef !== scope.channelRef ||
+      conversation.accountRef !== scope.accountRef
+    )
+      throw new SocialHumanAccessError();
+    const expiresAt = await authorizeSocialActor(tx, identity, ["sales:write"]);
     const rows = await readRetainedInboundMessages(tx, value.conversationId);
     const reviewedContextDigest = inboundContextDigest(rows, conversation.lastMessageAt);
     const messages = rows.reverse().map((row) => {

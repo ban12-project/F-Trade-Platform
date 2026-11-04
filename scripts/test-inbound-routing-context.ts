@@ -17,6 +17,7 @@ class Query implements PromiseLike<Row[]> {
   condition = "";
   params: unknown[] = [];
   count = 0;
+  lock = "";
   constructor(private db: FakeDatabase) {}
   from(table: Table) {
     this.table = getTableName(table);
@@ -31,7 +32,8 @@ class Query implements PromiseLike<Row[]> {
     this.params = query.params;
     return this;
   }
-  for(_lock: string) {
+  for(lock: string) {
+    this.lock = lock;
     return this;
   }
   orderBy(..._args: unknown[]) {
@@ -57,11 +59,13 @@ class FakeDatabase {
   bindings = true;
   empty = false;
   queries: Query[] = [];
+  events: string[] = [];
   ciphertext = encryptSocialMessageBody(`SYNTHETIC ${"x".repeat(700)}`);
   select(_columns: unknown) {
     return new Query(this);
   }
   async execute(condition: SQL) {
+    this.events.push("account:share");
     const query = dialect.sqlToQuery(condition);
     assert.match(query.sql, /FOR SHARE OF n, b/);
     assert.deepEqual(query.params, ["synthetic-channel", "synthetic-account"]);
@@ -72,6 +76,7 @@ class FakeDatabase {
   }
   async read(query: Query): Promise<Row[]> {
     this.queries.push(query);
+    this.events.push(`${query.table}:${query.lock}`);
     if (query.table === "user")
       return this.authorized
         ? [
@@ -196,6 +201,24 @@ async function main() {
     routeInboundConversation(form, identity, changed.asDatabase()),
     /已有更新/,
     "Same timestamp but changed message content invalidates review",
+  );
+  assert.deepEqual(
+    changed.events,
+    [
+      "social_conversation:",
+      "account:share",
+      "social_conversation:update",
+      "user:share",
+      "social_message:share",
+    ],
+    "Account lock precedes conversation; authentication follows waits and precedes ciphertext",
+  );
+  const revoked = new FakeDatabase();
+  revoked.authorized = false;
+  await assert.rejects(routeInboundConversation(form, identity, revoked.asDatabase()));
+  assert.equal(
+    revoked.queries.some((query) => query.table === "social_message"),
+    false,
   );
   changed.queries = [];
   await assert.rejects(
