@@ -41,7 +41,7 @@ let suggestion = marketingVideoAiDraftSchema.parse({
       durationMs: 3000,
       fitMode: "contain",
       audioMode: "muted",
-      caption: { kind: "none", text: "", claimRef: "" },
+      caption: { kind: "creative", text: "For distributor inquiries", claimRef: "" },
       abcdRoles: ["attention", "branding", "connection", "direction"],
       motionPreset: "cta_hold",
     },
@@ -104,7 +104,7 @@ const { registerProductMediaAsset, reviewProductMediaAsset } = await import(
 );
 const db = getDatabase();
 type MediaBinding = { id: string; evidenceRef: string; rightsEvidenceRef: string };
-async function createVideo(media?: MediaBinding) {
+async function createVideo(media?: MediaBinding, withCreativeBrief = true) {
   const id = randomUUID();
   const assetRef = media?.evidenceRef ?? "evidence-synthetic-ai-version-image";
   const project = videoProjectSchema.parse({
@@ -141,6 +141,18 @@ async function createVideo(media?: MediaBinding) {
     editDraft: {
       version: 3,
       creativeFramework: "google_abcd",
+      ...(withCreativeBrief
+        ? {
+            creativeBrief: {
+              objective: "action",
+              audience: "SYNTHETIC distributors",
+              buyerNeed: "SYNTHETIC product inquiry",
+              nextAction: "Submit requirements for human review",
+              platformAssumptions: "Synthetic silent Facebook placement; captions required",
+              brandAssetRef: assetRef,
+            },
+          }
+        : {}),
       platform: "facebook",
       ctaText: "Contact us",
       clips: [
@@ -152,7 +164,7 @@ async function createVideo(media?: MediaBinding) {
           durationMs: 3000,
           fitMode: "contain",
           audioMode: "muted",
-          caption: { kind: "none" },
+          caption: { kind: "creative", text: "For distributor inquiries" },
           abcdRoles: ["attention", "branding", "connection", "direction"],
           motionPreset: "cta_hold",
         },
@@ -358,6 +370,24 @@ try {
     role: "product_source",
     relation: "owned",
   });
+
+  const missingBrief = await createVideo(undefined, false);
+  const callsBeforeMissingBrief = modelCalls;
+  const missingBriefJob = await runDraft(missingBrief.id);
+  assert.equal(missingBriefJob.status, "failed");
+  assert.equal(missingBriefJob.failureCode, "AI_DRAFT_FAILED");
+  assert.equal(
+    modelCalls,
+    callsBeforeMissingBrief,
+    "Missing brief must fail before model execution",
+  );
+  assert.deepEqual(
+    (await getMarketingVideoEditProject(missingBrief.id)).project.editDraft,
+    missingBrief.draft,
+    "Missing brief must not save an AI draft",
+  );
+  assert.equal((await saves(missingBrief.id)).length, 0);
+  console.log("PASS missing creative brief rejects before generation without draft saves");
 
   const normal = await createVideo();
   const normalJob = await queueVideoProcessingJob(normal.id, "ai_draft", {
