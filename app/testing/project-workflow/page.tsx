@@ -336,6 +336,24 @@ async function ProjectWorkflowFixture({
 }) {
   const { state, kind, record } = await searchParams;
   if (kind === "sales") {
+    const previewState =
+      state === "quote-approved" ||
+      state === "quote-approval-mismatch" ||
+      state === "quote-missing-context";
+    const previewQuote: QuotationEntry = {
+      ...syntheticQuote,
+      version: 4,
+      state: "QUOTE_APPROVED",
+      approvalStatus: "approved",
+      quotation: {
+        ...syntheticQuote.quotation,
+        status: "approved",
+        approval_ref:
+          state === "quote-approval-mismatch"
+            ? "synthetic-stale-approval"
+            : (syntheticQuote.approvalId ?? undefined),
+      },
+    };
     const context = (recordKind: SalesRelationRecord["kind"], id: string) => (
       <SalesContext
         projectId={syntheticSalesProject.id}
@@ -360,10 +378,16 @@ async function ProjectWorkflowFixture({
           {state === "quote-revision" ? context("quotation", syntheticQuote.id) : null}
           <QuotationPanel
             projectId={syntheticSalesProject.id}
-            rfqs={[syntheticRfq]}
-            products={[{ ...syntheticProduct, id: syntheticProduct.id }]}
-            entries={state === "quote-revision" ? [syntheticQuote] : []}
-            showCreateForm={state !== "quote-revision"}
+            rfqs={state === "quote-missing-context" ? [] : [syntheticRfq]}
+            products={
+              state === "quote-missing-context"
+                ? []
+                : [{ ...syntheticProduct, id: syntheticProduct.id }]
+            }
+            entries={
+              previewState ? [previewQuote] : state === "quote-revision" ? [syntheticQuote] : []
+            }
+            showCreateForm={!previewState && state !== "quote-revision"}
             canReview
           />
         </div>

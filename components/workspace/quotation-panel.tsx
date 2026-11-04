@@ -54,6 +54,7 @@ import { productTypeLabel } from "@/lib/sales/journey";
 import type { RfqEntry } from "@/lib/sales/store";
 import { workspaceCreateHref, workspaceRecordHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProductReference } from "@/lib/workspace/types";
+import { ApprovedQuotationPreview } from "./approved-quotation-preview";
 import { useWorkspaceDirty } from "./dirty-state";
 import { EvidenceSelectField } from "./evidence-select";
 import {
@@ -673,7 +674,15 @@ export function QuotationPanel({
             )
           ) : null}
           {entry.state === "QUOTE_APPROVED" ? (
-            <QuoteSend projectId={projectId} entry={entry} />
+            <>
+              <ApprovedQuotationPreview
+                key={`${entry.id}:${entry.version}:${entry.approvalId}`}
+                entry={entry}
+                rfqs={rfqs}
+                products={products}
+              />
+              <QuoteSend projectId={projectId} entry={entry} />
+            </>
           ) : null}
         </div>
       ))}
