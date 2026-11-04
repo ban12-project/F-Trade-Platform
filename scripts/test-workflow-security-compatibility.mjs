@@ -9,9 +9,9 @@ import { pathToFileURL } from "node:url";
 const require = createRequire(import.meta.url);
 const workflowRequire = createRequire(require.resolve("workflow/api"));
 const coreRequire = createRequire(workflowRequire.resolve("@workflow/core"));
-const { createReplayNanoid } = await import(
+const { createSeededNanoid } = await import(
   pathToFileURL(
-    join(dirname(workflowRequire.resolve("@workflow/core/runtime")), "workflow/replay-nanoid.js"),
+    join(dirname(workflowRequire.resolve("@workflow/core/runtime")), "seeded-nanoid.js"),
   )
 );
 const devalue = await import(pathToFileURL(coreRequire.resolve("devalue")));
@@ -23,11 +23,12 @@ const fixture = JSON.parse(
   ),
 );
 
-// Workflow uses this fixed-size generator during replay. A patch must keep existing IDs stable.
+// Upstream v5 embeds the legacy generator. Verify tokens AND shared RNG consumption.
+// This is a value-level compatibility check, not permission to replay v4 event logs.
 for (const { seed, ids } of fixture.replay) {
   const random = seedrandom(seed);
   let draws = 0;
-  const next = createReplayNanoid(() => {
+  const next = createSeededNanoid(() => {
     draws++;
     return random();
   });
@@ -41,7 +42,7 @@ for (const { seed, ids } of fixture.replay) {
   assert.equal(random(), expectedRandom());
 }
 
-// A payload written by the old runtime must remain readable after the patch.
+// Check serializer payload compatibility separately from incompatible event-log formats.
 const old = devalue.parse(fixture.devalue_wire);
 assert.equal(old.name, "SYNTHETIC workflow data");
 assert.equal(old.createdAt.toISOString(), "2026-01-01T00:00:00.000Z");
@@ -121,5 +122,5 @@ try {
 }
 
 console.log(
-  "Workflow replay, legacy data, Buffer isolation and HTTP compatibility passed (synthetic)",
+  "Workflow v5 token vectors, legacy payloads, Buffer isolation and HTTP compatibility passed (synthetic)",
 );

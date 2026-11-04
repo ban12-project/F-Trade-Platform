@@ -28,11 +28,11 @@ const parentPins = [
   "@remotion/studio@4.0.520",
   "@vercel/cli-auth@0.0.1",
   "@vercel/cli-config@0.2.4",
-  "@workflow/cli@4.3.12",
-  "@workflow/core@4.8.8",
-  "@workflow/world-local@4.4.1",
-  "@workflow/world-vercel@4.7.4",
-  "@workflow/world@4.5.0",
+  "@workflow/cli@5.0.7",
+  "@workflow/core@5.3.0",
+  "@workflow/world-local@5.2.0",
+  "@workflow/world-vercel@5.3.0",
+  "@workflow/world@5.1.0",
 ];
 const store = resolve("node_modules/.pnpm");
 const entries = readdirSync(store);
@@ -113,7 +113,7 @@ test("actual product model OE bound rejects one oversized collection without per
 
 test("actual Workflow queue schemas retain date coercion, namespace parsing and rejection", () => {
   const parent = createRequire(
-    resolve(store, "@workflow+world@4.5.0/node_modules/@workflow/world/package.json"),
+    resolve(store, "@workflow+world@5.1.0/node_modules/@workflow/world/package.json"),
   );
   const { WorkflowInvokePayloadSchema, parseQueueName, getQueueTopicPrefix } =
     parent("./dist/queue.js");
@@ -134,7 +134,6 @@ test("actual Workflow queue schemas retain date coercion, namespace parsing and 
   assert.equal(getQueueTopicPrefix("workflow", "synthetic"), "__synthetic_wkf_workflow_");
   assert.deepEqual(parseQueueName("__synthetic_wkf_workflow_run1"), {
     prefix: "__synthetic_wkf_workflow_",
-    kind: "workflow",
     id: "run1",
   });
   assert.throws(() => getQueueTopicPrefix("workflow", "INVALID namespace"));

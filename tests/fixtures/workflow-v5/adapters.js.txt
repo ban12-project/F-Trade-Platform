@@ -1,0 +1,181 @@
+// SYNTHETIC ONLY. Infrastructure replacements prove orchestration, not database
+// isolation, provider behavior, authorization, factual correctness or media quality.
+import { RetryableError } from "workflow";
+
+const state = () => globalThis[Symbol.for("ftrade.workflow.v5.synthetic")];
+const record = (name, ...args) => state().calls.push({ name, args });
+const scenario = (id) => state().scenarios[id] ?? {};
+export async function dispatchManualBrowserSandbox(nodeId, operationId) {
+  record("dispatch", nodeId, operationId);
+  return scenario(operationId).uncertain
+    ? { status: "uncertain" }
+    : { status: "running", sessionId: operationId };
+}
+export async function monitorBrowserSandboxSession(nodeId, sessionId) {
+  record("observe", nodeId, sessionId);
+  return scenario(sessionId).status ?? "stopped";
+}
+export async function recoverBrowserSandboxDispatch(nodeId, operationId) {
+  record("recover", nodeId, operationId);
+  return scenario(operationId).status ?? "stopped";
+}
+export async function wakeQueuedManualBrowserSandbox(nodeId) {
+  record("wake", nodeId);
+}
+export class CatalogAccessError extends Error {}
+export async function claimCatalogAttempt(id) {
+  record("catalog.claim", id);
+  const item = scenario(id);
+  if (item.claimed) return null;
+  item.claimed = true;
+  if (item.accessDenied) throw new CatalogAccessError("synthetic access denied");
+  return item.work;
+}
+export async function completeCatalogCandidate(id, result) {
+  record("catalog.candidate", id, result);
+}
+export async function completeCatalogParsing(id, document) {
+  record("catalog.parsed", id, document);
+}
+export async function failCatalogAttempt(id, code) {
+  record("catalog.failed", id, code);
+}
+export async function resolveProductAgentModelConfig(id) {
+  if (id === "synthetic-config-failure") throw new Error("synthetic model config unavailable");
+  return { synthetic: true };
+}
+export function createProductAgentModel() {
+  return { synthetic: true };
+}
+class CatalogRejectedError extends Error {}
+export async function runCatalogProductAgent({ source }) {
+  if (source === "synthetic-model-failure") throw new Error("synthetic provider failure");
+  if (source === "synthetic-rejected") throw new CatalogRejectedError();
+  return { synthetic: true, source };
+}
+export function isRejectedCatalogOutput(error) {
+  return error instanceof CatalogRejectedError;
+}
+export async function get(path) {
+  record("blob.get", path);
+  if (path === "synthetic-missing") return null;
+  return { statusCode: 200, blob: { contentType: "application/pdf" }, stream: "synthetic-stream" };
+}
+export async function verifyDocumentUploadBytes() {
+  return { sha256: "synthetic-sha", bytes: Buffer.from("SYNTHETIC ONLY") };
+}
+export async function preprocessProductAgentDocument({ recordId }) {
+  record("catalog.preprocess", recordId);
+  return { synthetic: true, recordId };
+}
+export class VideoRetentionError extends Error {}
+export class MarketingVideoDraftChangedError extends Error {}
+export class MarketingVideoSourceInvalidError extends Error {}
+export class VideoRenderCommandError extends Error {}
+export async function markVideoJobRunning(id) {
+  record("video.running", id);
+  const item = scenario(id);
+  if (item.retry && !item.retried) {
+    item.retried = true;
+    throw new RetryableError("synthetic database transient", { retryAfter: 50 });
+  }
+  if (item.completed) return { status: "succeeded" };
+  if (item.failed) return { status: "failed" };
+  return { status: "running", requestKey: item.requestKey ?? "synthetic-key" };
+}
+export function videoProcessingRequestKey() {
+  return "synthetic-key";
+}
+export async function completeVideoJob(id) {
+  record("video.completed", id);
+  scenario(id).completed = true;
+}
+export async function failVideoJob(id, code) {
+  record("video.failed", id, code);
+  scenario(id).failed = true;
+}
+function project(id) {
+  return {
+    synthetic: true,
+    sourceAssets: [],
+    factualClaims: [],
+    editDraft: { platform: "synthetic", clips: [], creativeBrief: { synthetic: true } },
+    ...scenario(id).project,
+  };
+}
+export async function getMarketingVideoEditProject(id) {
+  record("video.project", id);
+  if (scenario(id).expired) throw new VideoRetentionError();
+  return { project: project(id), state: "VIDEO_DRAFT", version: 1 };
+}
+export async function assertCurrentProductFactsForVideo() {
+  record("video.fact-guard");
+}
+export async function assertCurrentProductMediaUsageForVideo() {
+  record("video.media-guard");
+}
+export const marketingCreativeBriefSchema = { parse: (value) => value };
+export const marketingVideoDraftSchema = { parse: (value) => value };
+export const marketingVideoAiDraftSchema = {};
+export const safeAiCreativeCaptions = [];
+export const safeAiCtaTexts = [];
+export async function issueSandboxVideoSources() {
+  record("video.sources");
+  return [];
+}
+export async function extractMarketingVisualSamplesInSandbox() {
+  record("video.samples");
+  return { candidates: [], visualSamples: [] };
+}
+export class AiSdkStructuredGenerator {
+  async generate() {
+    record("video.generate");
+    return { synthetic: true };
+  }
+}
+export function compileMarketingVideoAiDraft() {
+  record("video.compile");
+  return { synthetic: true };
+}
+export async function applyMarketingVideoAiDraft(id, draft, actorId, version) {
+  record("video.apply", id, draft, actorId, version);
+}
+export async function beginGuardedMarketingVideoRender(id, actorId) {
+  record("video.begin-guard", id, actorId);
+  if (scenario(id).expired) throw new VideoRetentionError();
+  return project(id);
+}
+export function createMarketingEditTimeline() {
+  return { durationSeconds: 1, synthetic: true };
+}
+export const videoExportPresets = [
+  { platform: "synthetic", availability: "enabled", width: 64, height: 64, fps: 30 },
+];
+export async function renderApprovedMarketingTimeline(request, adapter) {
+  record("video.render-guard");
+  return adapter.render(request);
+}
+export async function renderMarketingTimelineInSandbox() {
+  record("video.render");
+  return { data: Buffer.from("SYNTHETIC ONLY"), probe: { synthetic: true } };
+}
+export const renderMarketingTimelineWithRemotion = renderMarketingTimelineInSandbox;
+export function createReviewVideoExport() {
+  record("video.export");
+  return { synthetic: true };
+}
+export class VercelPrivateVideoAssetStore {
+  async putRenderedVideo({ assetRef }) {
+    record("video.put", assetRef);
+    return assetRef;
+  }
+}
+export async function completeGuardedMarketingVideoRender(id, assetRef) {
+  record("video.complete-guard", id, assetRef);
+}
+export function videoProcessingFailureMessage(code) {
+  return code;
+}
+export async function failMarketingVideoRender(id, message) {
+  record("video.render-failed", id, message);
+}
