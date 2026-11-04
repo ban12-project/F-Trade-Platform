@@ -1,6 +1,6 @@
 "use client";
 import { ArrowRightIcon, CheckCircle2Icon } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -112,6 +112,7 @@ function TaskRows({
 }
 
 export function WorkspaceDashboard({
+  children,
   projects,
   tasks,
   overview,
@@ -120,6 +121,7 @@ export function WorkspaceDashboard({
   view = "actionable",
   basePath = "/workspace",
 }: {
+  children?: ReactNode;
   projects: WorkspaceProjectSummary[];
   tasks: WorkspaceTaskSummary[];
   overview: WorkspaceProjectOverview[];
@@ -210,6 +212,7 @@ export function WorkspaceDashboard({
               </CardContent>
             </Card>
           </section>
+          {children}
           <section id="overview" className="flex flex-col gap-3" aria-label="项目概况">
             <div>
               <h2 className="text-base font-semibold">项目概况</h2>
