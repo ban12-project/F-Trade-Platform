@@ -277,7 +277,7 @@ const syntheticProductDetail: ProductCatalogDetail = {
   draft: {
     record_id: syntheticProduct.id,
     source_ref: "source-product-001",
-    evidence_refs: ["evidence-product-001"],
+    evidence_refs: ["evidence-product-001", "evidence-loc-synthetic-name"],
     field_evidence: {
       "product.product_name": "evidence-loc-synthetic-name",
       "product.product_type": "evidence-product-001",
@@ -408,6 +408,15 @@ async function ProjectWorkflowFixture({
           draft: {
             ...syntheticProductDetail.draft,
             commercial: { sample_available: false },
+            evidence_refs:
+              state === "product-review-locations"
+                ? [
+                    "evidence-product-001",
+                    "evidence-loc-mock-page-3-name",
+                    "evidence-paged-mock",
+                    "evidence-loc-mock-csv-name",
+                  ]
+                : syntheticProductDetail.draft.evidence_refs,
             field_evidence: {
               ...syntheticProductDetail.draft.field_evidence,
               ...(state === "product-review-locations"
