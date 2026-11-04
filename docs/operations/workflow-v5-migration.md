@@ -203,3 +203,76 @@ and workers until v4 runs finish; no automatic state-format migration is offered
   tokens? The repository exposes only the start endpoint.
 - Full PostgreSQL/provider acceptance and any out-of-repository tracing/env
   dependencies need a suitable authorized staging environment.
+
+## MacBook acceptance, 2026-11-04
+
+Merged current main `f29ff15f9be1a882cf16288156537c4e31f435c9` without
+conflicts; tested code commit `5f4b183db88447203578bd2021daf01315019989`.
+Node 26.13.0 and pnpm 12.3.4; frozen install succeeded. The original user
+workspace was not modified. This section supersedes the earlier host-limit
+results, but does not waive the deployment gates.
+
+Executed successfully:
+
+- Full `pnpm test:workflow-runtime`: 10 outer tests, including 20 fresh compiled
+  v5 runs, real durable sleep, original-deployment producer routing, queue
+  boundaries, serde compatibility, and isolated frozen v4 replay (original 1+2
+  child tests). No historical events were executed under v5.
+- Full production `pnpm build` and the unmodified
+  `python3 scripts/validate_repository.py`; no no-IPC launcher needed.
+- Zod importer tests 18/18; Undici TLS/body-parser/minimatch tests 20/20;
+  browser/catalog/video/domain suite 40/40; production route boundaries.
+- Full `test-facebook-publication-postgres.ts`, including real Chromium,
+  signed loopback HTTP, PostgreSQL and human routing; and
+  `test-catalog-import-postgres.ts`, including concurrent claims, retry fences,
+  authorization and independent review drafts. These used only the task-owned
+  synthetic PostgreSQL cluster on loopback port 55432. External adapters remain
+  synthetic; this is not live provider acceptance.
+
+Failed, independently reproduced:
+
+- `test-video-ai-draft-version-postgres.mts` fails its first success assertion
+  (line 373: `failed` instead of `succeeded`). The fixture omits `creativeBrief`,
+  which the current workflow requires at its schema boundary. Reproduced in a
+  separate checkout of current main with its own frozen Workflow 4.8.8 install.
+  A temporary synthetic-only diagnostic was restored afterwards. No assertion
+  or production guard was relaxed. Tracked in #842; later cases in this script
+  were not reached and are not counted as passed.
+
+Read-only operational evidence:
+
+- Existing authorized Vercel access confirms the original baseline deployment
+  for `8194706` is still Ready and has no deletion timestamp.
+- The project's actual expiration settings are 30 days for production, preview,
+  canceled and errored deployments, with 10 deployments retained. Team defaults
+  are also 30 days. This is not a guarantee that every long-lived approval's
+  creating deployment remains protected until completion.
+- Production and preview running/pending queries returned no records in the
+  visible window. Although the request began at project creation, the service
+  explicitly capped results at 30 days. Therefore this is **not** an inventory
+  of all historical nonterminal runs. Private query output stays outside Git.
+- No project-level `WORKFLOW_*` environment keys were listed. This does not
+  independently verify out-of-repository tracing consumers or all deployment
+  runtime defaults. No credential values were retrieved or changed.
+- The repository still only exposes the Human Gate start endpoint; an approved
+  live resume operator/integration has not been identified.
+
+Not executed and still blocking promotion:
+
+1. Complete historical nonterminal-run inventory, including beyond the service's
+   30-day query window, with the responsible operator and retention guarantee.
+2. In an explicitly isolated staging context, create a synthetic gate on the
+   retained v4 deployment, resume its hook through the v5 caller, and prove the
+   original deployment completes it exactly once. This writes live service
+   state, so it was not attempted against production or any real approval.
+3. Live Sandbox/Blob/provider acceptance using designated test resources. The
+   repository smoke creates billed compute, writes and deletes private Blob
+   fixtures, and requires provider credentials. No production credentials were
+   pulled or repurposed; no suitable isolated resource/credential scope was
+   established in this task.
+4. Repair and rerun the complete video PostgreSQL fixture suite tracked by #842.
+
+PR #822 remains draft. No merge, manual deployment, real message, production
+database write, retention adjustment, permission change or CI-setting change
+was performed. Marketing creative review is not applicable: this continuation
+only updates integration evidence and does not change content or prompts.
