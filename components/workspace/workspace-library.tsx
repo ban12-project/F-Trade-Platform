@@ -1,7 +1,7 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,9 +61,13 @@ export function WorkspaceLibrary({
     values: { q: search },
   });
   const { reset: resetSearch } = searchForm;
+  const connectedSearch = useRef(false);
   // Cache Components can restore a previously hidden list with an unsent input
   // value. Effects reconnect on restoration, so restore the committed URL query.
-  useEffect(() => resetSearch({ q: search }), [search, resetSearch]);
+  useEffect(() => {
+    if (connectedSearch.current) resetSearch({ q: search });
+    connectedSearch.current = true;
+  }, [search, resetSearch]);
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
   const unavailable = !!projectId && !projects.some((project) => project.id === projectId);
