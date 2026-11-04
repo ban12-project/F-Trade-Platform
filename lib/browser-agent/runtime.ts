@@ -19,7 +19,16 @@ export type Decision = {
   outputTokens?: number;
   modelId?: string;
 };
-export type Decide = (snapshot: Snapshot, signal: AbortSignal) => Promise<Decision>;
+export type DecisionContext = {
+  remainingCalls: number;
+  unchangedObservations: number;
+  recentActions: Array<{ action: Command["action"]; changed: boolean }>;
+};
+export type Decide = (
+  snapshot: Snapshot,
+  signal: AbortSignal,
+  context?: DecisionContext,
+) => Promise<Decision>;
 export type Capability = {
   action: Exclude<Command["action"], "read" | "finish">;
   target: string;
@@ -105,10 +114,19 @@ export async function runBrowserAgent(options: {
   try {
     let snapshot = await bounded(() => options.port.observe(signal), signal);
     let unchanged = 0;
+    const recentActions: DecisionContext["recentActions"] = [];
     while (result.calls < maximum) {
       signal.throwIfAborted();
       result.calls++;
-      const decision = await bounded(() => options.decide(snapshot, signal), signal);
+      const decision = await bounded(
+        () =>
+          options.decide(snapshot, signal, {
+            remainingCalls: maximum - result.calls,
+            unchangedObservations: unchanged,
+            recentActions: recentActions.map((entry) => ({ ...entry })),
+          }),
+        signal,
+      );
       result.inputTokens += decision.inputTokens ?? 0;
       result.outputTokens += decision.outputTokens ?? 0;
       result.usageComplete &&=
@@ -144,7 +162,10 @@ export async function runBrowserAgent(options: {
         await bounded(() => capability.execute(command.valueRef, signal), signal);
       }
       const next = await bounded(() => options.port.observe(signal), signal);
-      unchanged = hash(next) === hash(snapshot) ? unchanged + 1 : 0;
+      const changed = hash(next) !== hash(snapshot);
+      recentActions.push({ action: command.action, changed });
+      if (recentActions.length > 6) recentActions.shift();
+      unchanged = changed ? 0 : unchanged + 1;
       snapshot = next;
       if (unchanged >= 3) {
         result.reason = "no_progress";

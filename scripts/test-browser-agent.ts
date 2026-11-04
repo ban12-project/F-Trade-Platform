@@ -120,3 +120,35 @@ test("credentials stay out of observations and audit; publish is single use", as
     await browser.close();
   }
 });
+
+test("feedback reports executed actions without leaking page content and is isolated per run", async () => {
+  const p = port();
+  let observations = 0;
+  p.observe = async () => ({ controls: [], state: `private-state-${observations++}` });
+  p.verify = async () => true;
+  let calls = 0;
+  const result = await runBrowserAgent({
+    port: p,
+    signal: signal(),
+    decide: async (_snapshot, _signal, feedback) => {
+      assert.ok(feedback);
+      assert.equal(JSON.stringify(feedback).includes("private-state"), false);
+      assert.equal(feedback.remainingCalls, 39 - calls);
+      if (calls++ === 0) {
+        assert.deepEqual(feedback.recentActions, []);
+        return { command: { action: "read", target: "", valueRef: "" } };
+      }
+      assert.deepEqual(feedback.recentActions, [{ action: "read", changed: true }]);
+      return { command: { action: "finish", target: "", valueRef: "" } };
+    },
+  });
+  assert.equal(result.outcome, "completed");
+  await runBrowserAgent({
+    port: p,
+    signal: signal(),
+    decide: async (_snapshot, _signal, feedback) => {
+      assert.deepEqual(feedback?.recentActions, []);
+      return { command: { action: "finish", target: "", valueRef: "" } };
+    },
+  });
+});

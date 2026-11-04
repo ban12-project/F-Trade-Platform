@@ -125,7 +125,19 @@ async function main() {
                 let outcome = "failed";
                 try {
                   const f = await fixture(page, operation, variant, fault);
-                  const task = `Complete ${operation}. Use approved-copy for copy, approved-media for file, credential for password. Login after filling password. Open inbox to read. For inspection finish after observing. For text/image/video fill copy and attach media if needed, then finish without publishing.`;
+                  const task = {
+                    login:
+                      "Fill password using credential, then click login. Completion condition: observed status is authenticated. When authenticated, finish immediately; do not fill or click again. A challenge requires human handling.",
+                    inspection:
+                      "Inspect the supplied observation, which already contains identity. Finish immediately after observing identity; no navigation, clicks or additional reads are required. Independent verification validates identity.",
+                    inbox:
+                      "Open inbox. Completion condition: inboxVisible is true. Then finish immediately: the independent verifier reads and validates messages and deduplicates them. Repeated read actions do not extract messages.",
+                    text: "Fill copy with approved-copy. When copyFilled is true, finish. Do not publish.",
+                    image:
+                      "Fill copy with approved-copy and upload approved-media to file. When copyFilled and attached are true, finish. Do not publish.",
+                    video:
+                      "Fill copy with approved-copy and upload approved-media to file. When copyFilled and attached are true, finish. Do not publish.",
+                  }[operation];
                   // Contract mode is explicitly not model evidence. It exercises the
                   // same tool boundary with deterministic decisions.
                   const scripted: Decide = async (snapshot) => {
