@@ -2,6 +2,7 @@ import "server-only";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { requirePermission } from "@/lib/auth-guard";
+import { parseLibrarySearch } from "@/lib/workspace/library-search";
 import type { WorkspaceCollection } from "@/lib/workspace/navigation";
 import { readWorkspaceLibrary, readWorkspaceProjects } from "@/lib/workspace/read-model";
 import { WorkspaceLibrary } from "./workspace-library";
@@ -13,7 +14,7 @@ const labels = {
   customers: ["客户与询盘", "从客户线索、需求确认到人工报价与跟进。"],
 };
 export type LibraryPageProps = {
-  searchParams: Promise<{ project?: string; type?: string; state?: string }>;
+  searchParams: Promise<{ project?: string; type?: string; state?: string; q?: string }>;
 };
 async function Records({
   collection,
@@ -31,6 +32,7 @@ async function Records({
       collection={collection}
       projects={projects}
       records={records}
+      search={parseLibrarySearch(query.q)}
       projectId={query.project}
       recordType={collection === "content" && query.type === "publication" ? undefined : query.type}
       state={collection === "content" && query.type === "publication" ? undefined : query.state}
