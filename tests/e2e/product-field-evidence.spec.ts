@@ -61,7 +61,9 @@ test("manual product intake exposes evidence-bound specification and commercial 
   await expect(images).toHaveAttribute("multiple", "");
   await expect(images).toHaveAttribute("accept", ".png,.jpg,.jpeg");
   await expect(form.getByText("图片随草稿私有保存", { exact: false })).toBeVisible();
-  await expect(form.getByRole("progressbar", { name: "产品信息与来源填写进度" })).toBeVisible();
+  await expect(form.getByText("关键资料准备", { exact: true })).toBeVisible();
+  await expect(form.getByRole("progressbar")).toHaveCount(0);
+  await expect(form.getByText("未知的可选规格和商业信息可留空", { exact: false })).toBeVisible();
   await expect(form.getByText("为多项信息选择同一份资料", { exact: true })).toBeVisible();
   await expect(form.getByRole("button", { name: "应用到 0 个目标字段" })).toBeDisabled();
   await form.getByLabel("产品名称来源", { exact: true }).click();
@@ -114,7 +116,7 @@ test("product evidence feedback follows edits and product type without a batch i
   await page.goto("/testing/product-field-evidence");
   await page.getByRole("tab", { name: "手动录入" }).click();
   const form = page.locator('form[id$="-create-product"]:visible');
-  const meter = form.getByRole("progressbar", { name: "产品信息与来源填写进度" });
+  const coverage = form.getByRole("status");
   const chooseEvidence = async (label: string) => {
     await form.getByLabel(label, { exact: true }).click();
     await page.getByRole("option", { name: /合成产品目录/ }).click();
@@ -129,24 +131,52 @@ test("product evidence feedback follows edits and product type without a batch i
   for (const label of ["产品名称来源", "产品类型来源", "内部编号来源"]) {
     await chooseEvidence(label);
   }
-  await expect(meter).toHaveAttribute("aria-valuenow", "16");
+  await expect(coverage).toHaveText("来源覆盖：3 / 3 项已填写信息已关联当前可选资料");
+  await expect(form.getByText(/^待补充有来源的 OE 编号/)).toBeVisible();
 
   await form.getByRole("textbox", { name: "产品名称", exact: true }).fill("");
   await expect(form.getByRole("checkbox", { name: "产品名称", exact: true })).toHaveCount(0);
-  await expect(meter).toHaveAttribute("aria-valuenow", "11");
+  await expect(coverage).toHaveText("来源覆盖：2 / 2 项已填写信息已关联当前可选资料");
+  await expect(form.getByText(/^仅有来源而未填写值：产品名称/)).toBeVisible();
 
   await form.getByRole("combobox", { name: "产品类型", exact: true }).click();
   await page.getByRole("option", { name: "离合器套件", exact: true }).click();
   await expect(form.getByLabel("套件组成来源", { exact: true })).toBeEnabled();
-  await expect(meter).toHaveAttribute("aria-valuenow", "10");
+  await expect(coverage).toHaveText("来源覆盖：2 / 2 项已填写信息已关联当前可选资料");
   await form.getByRole("button", { name: "离合器片", exact: true }).click();
   await chooseEvidence("套件组成来源");
-  await expect(meter).toHaveAttribute("aria-valuenow", "15");
+  await expect(coverage).toHaveText("来源覆盖：3 / 3 项已填写信息已关联当前可选资料");
 
   await form.getByRole("combobox", { name: "产品类型", exact: true }).click();
   await page.getByRole("option", { name: "离合器片", exact: true }).click();
   await expect(form.getByLabel("套件组成来源", { exact: true })).toBeDisabled();
   await expect(form.getByLabel("套件组成来源", { exact: true })).toContainText("选择已上传资料");
-  await expect(meter).toHaveAttribute("aria-valuenow", "11");
+  await expect(coverage).toHaveText("来源覆盖：2 / 2 项已填写信息已关联当前可选资料");
   await expect(form.getByRole("button", { name: "创建待审核草稿", exact: true })).toBeVisible();
 });
+
+for (const width of [390, 1280]) {
+  test(`readiness distinguishes optional facts and evidence at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/testing/product-field-evidence?method=manual");
+    const form = page.locator('form[id$="-create-product"]:visible');
+    const coverage = form.getByRole("status");
+    await expect(coverage).toHaveText("来源覆盖：0 / 1 项已填写信息已关联当前可选资料");
+    await form.getByRole("textbox", { name: "OE / OEM 编号", exact: true }).fill("SYNTHETIC-OE");
+    await expect(coverage).toHaveText("来源覆盖：0 / 2 项已填写信息已关联当前可选资料");
+    await form.getByLabel("OE / OEM 编号来源", { exact: true }).click();
+    await page.getByRole("option", { name: /合成产品目录/ }).click();
+    await expect(coverage).toHaveText("来源覆盖：1 / 2 项已填写信息已关联当前可选资料");
+    await expect(form.getByText("OE 资料已关联，仍需人工核实", { exact: true })).toBeVisible();
+    await form.getByLabel("OE / OEM 编号来源", { exact: true }).click();
+    await page.getByRole("option", { name: /合成规格表/ }).click();
+    await expect(coverage).toHaveText("来源覆盖：1 / 2 项已填写信息已关联当前可选资料");
+    await form.getByRole("textbox", { name: "OE / OEM 编号", exact: true }).fill("");
+    await expect(coverage).toHaveText("来源覆盖：0 / 1 项已填写信息已关联当前可选资料");
+    await expect(form.getByText(/^待补充有来源的 OE 编号/)).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    );
+    await expect(form.getByRole("progressbar")).toHaveCount(0);
+  });
+}
