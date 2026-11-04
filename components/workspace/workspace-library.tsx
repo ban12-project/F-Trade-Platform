@@ -1,7 +1,7 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef } from "react";
+import { useId } from "react";
 import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,14 +60,6 @@ export function WorkspaceLibrary({
     resolver: zodResolver(librarySearchSchema),
     values: { q: search },
   });
-  const { reset: resetSearch } = searchForm;
-  const connectedSearch = useRef(false);
-  // Cache Components can restore a previously hidden list with an unsent input
-  // value. Effects reconnect on restoration, so restore the committed URL query.
-  useEffect(() => {
-    if (connectedSearch.current) resetSearch({ q: search });
-    connectedSearch.current = true;
-  }, [search, resetSearch]);
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
   const unavailable = !!projectId && !projects.some((project) => project.id === projectId);
@@ -122,6 +114,8 @@ export function WorkspaceLibrary({
           <Field className="min-w-0 flex-1">
             <FieldLabel htmlFor={`${id}-search`}>搜索记录</FieldLabel>
             <Input
+              key={search}
+              defaultValue={search}
               id={`${id}-search`}
               type="search"
               placeholder="SKU、OE、产品名称、客户或公司"
