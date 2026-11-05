@@ -1,0 +1,156 @@
+{
+  "model": {
+    "provider": "openai-compatible",
+    "model": "gpt-6.1-terra",
+    "source": "database-snapshot",
+    "declaredRevision": null
+  },
+  "sourceSha256": "5cc78233700e48c451b5643bc08e92c86ee5ce8a5fea19994c58b86df18afe0d",
+  "commit": "93ce6d2e7eff1f87701e3eaeb6886064cc43a315",
+  "matrix": [
+    {
+      "operation": "login",
+      "verdict": "fail",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "inspection",
+      "verdict": "fail",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "text",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "image",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "video",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "inbox",
+      "verdict": "fail",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    }
+  ],
+  "reportSha256": "d0662c81304f4e7c8cf1584ac890286bb87426dc8dca2f234beacbd885f54ca1",
+  "counts": {
+    "total": 1080,
+    "passed": 980,
+    "failed": 100
+  },
+  "operations": [
+    {
+      "operation": "login",
+      "normalAndVariants": {
+        "normal": 3,
+        "moved": 1,
+        "renamed": 0,
+        "delayed": 1
+      },
+      "normalCases": 40,
+      "normalHumanRequired": 35,
+      "normalMedianMs": 13731,
+      "agentCalls": 287,
+      "inputTokens": 160712,
+      "outputTokens": 10857,
+      "failureReasons": {
+        "no_progress": 45
+      }
+    },
+    {
+      "operation": "inspection",
+      "normalAndVariants": {
+        "normal": 10,
+        "moved": 8,
+        "renamed": 8,
+        "delayed": 9
+      },
+      "normalCases": 40,
+      "normalHumanRequired": 5,
+      "normalMedianMs": 4768,
+      "agentCalls": 98,
+      "inputTokens": 51786,
+      "outputTokens": 5298,
+      "failureReasons": {
+        "no_progress": 5
+      }
+    },
+    {
+      "operation": "text",
+      "normalAndVariants": {
+        "normal": 10,
+        "moved": 10,
+        "renamed": 10,
+        "delayed": 10
+      },
+      "normalCases": 40,
+      "normalHumanRequired": 0,
+      "normalMedianMs": 5136,
+      "agentCalls": 161,
+      "inputTokens": 87901,
+      "outputTokens": 5394,
+      "failureReasons": {}
+    },
+    {
+      "operation": "image",
+      "normalAndVariants": {
+        "normal": 10,
+        "moved": 10,
+        "renamed": 10,
+        "delayed": 10
+      },
+      "normalCases": 40,
+      "normalHumanRequired": 0,
+      "normalMedianMs": 7556,
+      "agentCalls": 270,
+      "inputTokens": 172233,
+      "outputTokens": 9212,
+      "failureReasons": {}
+    },
+    {
+      "operation": "video",
+      "normalAndVariants": {
+        "normal": 10,
+        "moved": 10,
+        "renamed": 10,
+        "delayed": 10
+      },
+      "normalCases": 40,
+      "normalHumanRequired": 0,
+      "normalMedianMs": 7590,
+      "agentCalls": 270,
+      "inputTokens": 155417,
+      "outputTokens": 9075,
+      "failureReasons": {}
+    },
+    {
+      "operation": "inbox",
+      "normalAndVariants": {
+        "normal": 0,
+        "moved": 0,
+        "renamed": 0,
+        "delayed": 0
+      },
+      "normalCases": 40,
+      "normalHumanRequired": 40,
+      "normalMedianMs": 9577,
+      "agentCalls": 240,
+      "inputTokens": 132351,
+      "outputTokens": 7613,
+      "failureReasons": {
+        "no_progress": 50
+      }
+    }
+  ],
+  "costUsd": null,
+  "costReason": "Database configuration has no reviewed token prices; no cost inferred.",
+  "safetyRejectFailures": 0,
+  "maximumSubmitClicks": 1
+}

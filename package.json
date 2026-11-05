@@ -111,7 +111,9 @@
     "test:vercel-compute": "tsx scripts/test-vercel-compute.ts && tsx scripts/test-compute-cleanup.mts",
     "test:vps-compute": "tsx scripts/test-vps-compute-client.ts && tsx scripts/test-vps-compute-transport.ts",
     "test:publication:ui": "playwright test tests/e2e/publication-batch.spec.ts tests/e2e/video-publication-caption.spec.ts tests/e2e/publication-page-inspection.spec.ts tests/e2e/publication-reconciliation.spec.ts",
-    "test:publication:database": "node scripts/run-publication-database-acceptance.mjs"
+    "test:publication:database": "node scripts/run-publication-database-acceptance.mjs",
+    "test:browser-agent": "tsx --test scripts/test-browser-agent.ts",
+    "eval:browser-agent": "tsx scripts/eval-browser-agent.ts"
   },
   "dependencies": {
     "@ai-sdk/alibaba": "^2.0.37",
