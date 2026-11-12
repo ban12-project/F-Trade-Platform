@@ -503,6 +503,27 @@ test("unused ready product and RFQ tasks open the intended creation context", as
   await expect(quotePanel.getByRole("combobox", { name: "客户需求", exact: true })).toContainText(
     "Synthetic Buyer · 500",
   );
+  const productLink = page.getByRole("link", { name: /^查看产品资料：/ });
+  await expect(productLink).toHaveAttribute(
+    "href",
+    `/workspace/${sales}/records/product/${product}`,
+  );
+  const price = quotePanel.getByLabel("单价", { exact: true });
+  await price.fill("12.50");
+  await productLink.click();
+  const leave = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await expect(leave).toBeVisible();
+  await leave.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await expect(price).toHaveValue("12.50");
+  await productLink.click();
+  await leave.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/workspace/${sales}/records/product/${product}$`));
+  await expect(
+    page.getByRole("heading", { name: "SYNTHETIC chosen source", level: 1, exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("当前为只读视图。写入和审核由有权限的项目编辑者处理。", { exact: true }),
+  ).toBeVisible();
 });
 
 test("revisions, scheduled follow-ups and pending publication receipts have distinct task states", async ({
@@ -629,14 +650,14 @@ test("object libraries retain project scope, reference ownership and stable reco
   await expect(page.getByText("SYNTHETIC library inaccessible")).toHaveCount(0);
   await page.locator(`a[href^="${chosenHref}"]`).filter({ visible: true }).click();
   await expect(
-    page.getByRole("cell", { name: "SYNTHETIC library selected", exact: true }),
+    page.getByRole("heading", { name: "SYNTHETIC library selected", level: 1, exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("cell", { name: "SYNTHETIC library selected", exact: true }),
+    page.getByRole("heading", { name: "SYNTHETIC library selected", level: 1, exact: true }),
   ).toBeVisible();
   await page.goBack();
-  await expect(page.getByLabel("归属项目")).toHaveValue(marketing);
+  await expect(page.getByLabel("归属项目", { exact: true })).toHaveValue(marketing);
   await page.goForward();
   await expect(page).toHaveURL(new RegExp(`${product}(?:[?].*)?$`));
   await page.goto(`/workspace/products?project=${sales}`);

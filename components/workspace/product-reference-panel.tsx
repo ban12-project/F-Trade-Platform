@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { linkReadyProductToSalesProjectAction } from "@/lib/actions/workspace";
 import type { ReadyProductContentSource } from "@/lib/content/store";
+import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProductReference } from "@/lib/workspace/types";
 import { WorkspaceLink } from "./workspace-link";
 
@@ -154,6 +155,15 @@ export function ProductReferencePanel({
                     <CardTitle>{item.internalSku}</CardTitle>
                     <CardDescription>{item.productName}</CardDescription>
                   </CardHeader>
+                  <CardFooter>
+                    <WorkspaceLink
+                      href={workspaceRecordHref(projectId, "product", item.id)}
+                      aria-label={`查看产品资料：${item.internalSku}`}
+                      className={buttonVariants({ variant: "outline" })}
+                    >
+                      查看产品资料
+                    </WorkspaceLink>
+                  </CardFooter>
                 </Card>
               ))}
             </div>
