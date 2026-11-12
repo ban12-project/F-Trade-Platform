@@ -1,6 +1,27 @@
 import { expect, test } from "@playwright/test";
 import { required } from "../../scripts/test-required";
 
+test("account-independent task summaries explain missing requirements and scheduled work", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/testing/workspace-dashboard?offline=1");
+  const rfq = page.getByRole("link").filter({ hasText: "还缺 2 项资料：数量、目的地。" });
+  await expect(rfq).toBeVisible();
+  await expect(rfq).toHaveAttribute("href", /records\/rfq\/00000000-0000-4000-8000-000000000731/);
+  await expect(page.getByRole("link").filter({ hasText: "收集样品需求" })).toHaveCount(0);
+  await page.goto("/testing/workspace-dashboard?offline=1&view=scheduled");
+  const followUp = page
+    .getByRole("link")
+    .filter({ hasText: "下一动作：收集样品需求，交由人工确认。" });
+  await expect(followUp).toBeVisible();
+  await expect(followUp).toHaveAttribute(
+    "href",
+    /records\/lead\/00000000-0000-4000-8000-000000000732/,
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
 test("workspace prioritizes tasks and overview without a canvas", async ({ page }) => {
   await page.goto("/testing/workspace-dashboard");
   await expect(page.getByRole("heading", { name: "今日任务" })).toBeVisible();

@@ -94,16 +94,13 @@ export const salesNextActionLabels: Record<string, string> = {
 };
 
 export function rfqMissingLabel(field: string) {
-  return (
-    (
-      {
-        product_type: "产品类型",
-        vehicle_model_or_oe_number: "OE 编号或完整车型",
-        quantity: "数量",
-        destination: "目的地",
-      } as Record<string, string>
-    )[field] ?? "待补充资料"
-  );
+  const labels: Record<string, string> = {
+    product_type: "产品类型",
+    vehicle_model_or_oe_number: "OE 编号或完整车型",
+    quantity: "数量",
+    destination: "目的地",
+  };
+  return Object.hasOwn(labels, field) ? labels[field] : "待补充资料";
 }
 export function productTypeLabel(type: string) {
   return (

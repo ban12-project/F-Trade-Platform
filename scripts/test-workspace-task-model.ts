@@ -262,3 +262,72 @@ assert.equal(
 console.log(
   "PASS content-owned publication grouping, cross-project isolation, source state and receipt links",
 );
+
+// Account-independent work remains actionable, with enough context to choose the next record.
+const offline = snapshot([
+  record("RFQ_COLLECTING", "rfq", "incomplete", {
+    missing_fields: ["quantity", "destination", "quantity", null, ""],
+  }),
+  record("FOLLOW_UP", "lead", "planned", {
+    next_action: "collect_sample_requirements_and_escalate",
+    next_follow_up_at: "2026-09-20T00:00:00Z",
+  }),
+  record("FOLLOW_UP", "lead", "unscheduled", {
+    next_action: "ask_target_budget_and_escalate",
+  }),
+  record("CONTENT_APPROVED", "content", "approved"),
+]);
+offline.hasActiveChannel = false;
+const offlineTasks = tasks(offline);
+assert.equal(
+  offlineTasks.find((task) => task.id === "incomplete")?.detail,
+  "还缺 2 项资料：数量、目的地。",
+);
+const planned = offlineTasks.find((task) => task.id === "planned");
+assert.equal(planned?.state, "scheduled");
+assert.match(planned?.detail ?? "", /下一动作：收集样品需求，交由人工确认/);
+assert.match(planned?.detail ?? "", /2026-09-20T00:00:00.000Z/);
+assert.equal(offlineTasks.find((task) => task.id === "approved")?.state, "waiting");
+assert.deepEqual(
+  offlineTasks
+    .filter(isActionableTask)
+    .map((task) => task.id)
+    .sort(),
+  ["incomplete", "unscheduled"],
+);
+assert.match(
+  offlineTasks.find((task) => task.id === "unscheduled")?.detail ?? "",
+  /了解目标预算，交由人工销售评估.*尚未安排下次跟进/,
+);
+for (const next_action of ["unknown_internal_action", "constructor", "__proto__", null]) {
+  const [task] = tasks(snapshot([record("FOLLOW_UP", "lead", "fallback", { next_action })]));
+  assert.equal(task.detail, "尚未安排下次跟进，请核对客户上下文。");
+}
+assert.equal(
+  tasks(
+    snapshot([
+      record("RFQ_COLLECTING", "rfq", "unknown", {
+        missing_fields: ["constructor", "__proto__", "private_internal_field"],
+      }),
+    ]),
+  )[0].detail,
+  "还缺 3 项资料：待补充资料。",
+);
+assert.equal(
+  tasks(
+    snapshot([
+      record("FOLLOW_UP", "lead", "hot", {
+        score_band: "HOT",
+        next_action: "ask_target_budget_and_escalate",
+        next_follow_up_at: "2026-09-20T00:00:00Z",
+      }),
+    ]),
+  )[0].detail,
+  "规则评分达到 HOT，仍需人工认定。",
+);
+const viewerOffline = tasks({ ...offline, projects: [{ ...project, memberRole: "viewer" }] });
+assert.equal(viewerOffline.filter(isActionableTask).length, 0);
+assert.equal(viewerOffline.find((task) => task.id === "planned")?.state, "scheduled");
+console.log(
+  "PASS offline task summaries: saved actions, missing fields, unknown values and human gates",
+);
