@@ -43,7 +43,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "quantity": { "type": "integer", "minimum": 1 },
+        "quantity": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
         "destination": { "type": "string" },
         "packaging_requirement": { "type": "string" },
         "expected_delivery": { "type": "string" },

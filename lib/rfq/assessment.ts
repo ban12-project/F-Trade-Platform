@@ -15,7 +15,7 @@ export function assessRfq(rfq: Rfq) {
   else missing.push("vehicle_model_or_oe_number");
   if (
     typeof commercial.quantity === "number" &&
-    Number.isInteger(commercial.quantity) &&
+    Number.isSafeInteger(commercial.quantity) &&
     commercial.quantity > 0
   )
     score += 25;
