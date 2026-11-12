@@ -764,12 +764,14 @@ export function ProductMediaPanel({
   assets,
   assessment,
   canReview,
+  canWrite,
 }: {
   projectId: string;
   productId: string;
   assets: ProductMediaAsset[];
   assessment: VideoReadyAssessment;
   canReview: boolean;
+  canWrite: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -810,7 +812,7 @@ export function ProductMediaPanel({
           </CardContent>
         </Card>
       ) : null}
-      <RegistrationForm projectId={projectId} productId={productId} />
+      {canWrite ? <RegistrationForm projectId={projectId} productId={productId} /> : null}
       <div className="flex flex-col gap-3">
         {assets.length ? (
           assets.map((asset) => (
@@ -819,7 +821,7 @@ export function ProductMediaPanel({
               projectId={projectId}
               productId={productId}
               asset={asset}
-              canReview={canReview}
+              canReview={canWrite && canReview}
             />
           ))
         ) : (

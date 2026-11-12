@@ -45,3 +45,42 @@ test("field review fits mobile and supports keyboard selection without changing 
     .analyze();
   expect(accessibility.violations).toEqual([]);
 });
+
+for (const state of ["product-review", "product-revision"]) {
+  test(`read-only ${state} permits evidence navigation without mutation controls`, async ({
+    page,
+  }) => {
+    const writes: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST") writes.push(request.url());
+    });
+    await page.goto(`/testing/project-workflow?record=product&state=${state}&readonly=1`);
+    await expect(
+      page.getByText("当前为只读视图。写入和审核由有权限的项目编辑者处理。", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "下一字段" }).press("Enter");
+    await expect(
+      page.getByRole("region", { name: "当前字段核对" }).getByText("clutch_kit", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("combobox", { name: "核对字段" }).click();
+    await page.getByRole("option", { name: "产品名称", exact: true }).click();
+    await expect(
+      page
+        .getByRole("region", { name: "当前字段核对" })
+        .getByRole("link", { name: "打开来源原件（新窗口）" }),
+    ).toBeVisible();
+    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+    expect(writes).toEqual([]);
+  });
+}
+
+test("read-only content still disables mutation controls outside product browsing", async ({
+  page,
+}) => {
+  await page.goto("/testing/project-workflow?record=content&state=content-revision&readonly=1");
+  await expect(page.getByRole("button", { name: "提交修订并送审" })).toBeDisabled();
+  const inputs = page.locator('input:not([type="hidden"]), textarea');
+  expect(await inputs.count()).toBeGreaterThan(0);
+  for (const input of await inputs.all()) await expect(input).toBeDisabled();
+});

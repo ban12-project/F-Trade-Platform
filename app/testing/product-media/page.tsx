@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { ProductMediaPanel } from "@/components/workspace/product-media-panel";
 import type { ProductMediaAsset, VideoReadyAssessment } from "@/lib/product/video-readiness";
@@ -64,7 +65,12 @@ const assessment: VideoReadyAssessment = {
 };
 
 /** Test-only ProductMedia fixture; production access remains permission protected. */
-export default function ProductMediaTestingPage() {
+async function ProductMediaFixture({
+  searchParams,
+}: {
+  searchParams: Promise<{ readonly?: string }>;
+}) {
+  const { readonly } = await searchParams;
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (
     <main className="mx-auto min-h-screen max-w-3xl p-6">
@@ -74,9 +80,20 @@ export default function ProductMediaTestingPage() {
           productId={productId}
           assets={[asset]}
           assessment={assessment}
+          canWrite={readonly !== "1"}
           canReview
         />
       </WorkspaceDirtyProvider>
     </main>
+  );
+}
+
+export default function ProductMediaTestingPage(props: {
+  searchParams: Promise<{ readonly?: string }>;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <ProductMediaFixture {...props} />
+    </Suspense>
   );
 }
