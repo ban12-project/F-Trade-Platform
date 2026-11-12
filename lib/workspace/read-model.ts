@@ -4,7 +4,12 @@ import { listStoredProductAgentModelSettings } from "@/lib/ai/product-agent-mode
 import { deriveBusinessFunnel } from "./business-funnel";
 import { readHumanOpportunityIds } from "./business-funnel-store";
 import { deriveWorkspaceLibrary } from "./library-model";
-import { getWorkspaceProject, listWorkspaceProjects, readWorkspaceTaskSnapshot } from "./store";
+import {
+  getWorkspaceProject,
+  listWorkspaceProjects,
+  readWorkspaceLibrarySnapshot,
+  readWorkspaceTaskSnapshot,
+} from "./store";
 import { deriveWorkspaceProjectOverview, deriveWorkspaceTasks } from "./task-model";
 
 // Request-local only. Never persist another actor's records, permissions or time-based tasks in a shared cache.
@@ -27,7 +32,7 @@ export const readWorkspaceProject = cache((projectId: string, actorId: string) =
 export const readWorkspaceModelSettings = cache(() => listStoredProductAgentModelSettings());
 
 export const readWorkspaceLibrary = cache(async (actorId: string) =>
-  deriveWorkspaceLibrary((await readWorkspaceWork(actorId)).snapshot),
+  deriveWorkspaceLibrary(await readWorkspaceLibrarySnapshot(actorId)),
 );
 
 export const readWorkspaceBusinessFunnel = cache(async (actorId: string) => {
