@@ -15,6 +15,7 @@ import { ProductReview } from "@/components/workspace/product-review";
 import { RecordAccessBoundary } from "@/components/workspace/record-access-boundary";
 import { RecordFrame } from "@/components/workspace/record-frame";
 import { RfqDetail } from "@/components/workspace/rfq-detail";
+import { RfqForm } from "@/components/workspace/rfq-form";
 import { SalesContext } from "@/components/workspace/sales-context";
 import { WorkspaceLink } from "@/components/workspace/workspace-link";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
@@ -400,6 +401,45 @@ async function ProjectWorkflowFixture({
       />
     );
     const panels = {
+      "rfq-new": (
+        <RfqForm
+          projectId={syntheticSalesProject.id}
+          selectedLeadId={state === "rfq-source-locked" ? syntheticLead.id : undefined}
+          leads={[
+            ...["601", "611", "621"].map(
+              (suffix, index): LeadEntry => ({
+                ...syntheticLead,
+                id: `00000000-0000-4000-8000-000000000${suffix}`,
+                state: "LEAD_RECEIVED",
+                timeline:
+                  index === 2
+                    ? syntheticLead.timeline.filter((message) => message.direction === "outbound")
+                    : [
+                        {
+                          ...syntheticLead.timeline[0],
+                          body:
+                            index === 0
+                              ? "SYNTHETIC buyer requests 500 clutch kits"
+                              : "SYNTHETIC-".repeat(15),
+                          receivedAt: new Date("2026-09-05T08:00:00Z"),
+                        },
+                        {
+                          ...syntheticLead.timeline[0],
+                          body: "SYNTHETIC older customer message",
+                          receivedAt: new Date("2026-09-04T08:00:00Z"),
+                        },
+                        {
+                          ...syntheticLead.timeline[0],
+                          direction: "outbound",
+                          body: "SYNTHETIC seller reply must not label customer",
+                          receivedAt: new Date("2026-09-06T08:00:00Z"),
+                        },
+                      ],
+              }),
+            ),
+          ]}
+        />
+      ),
       rfq: (
         <RfqDetail projectId={syntheticSalesProject.id} entry={rfqDetail} leads={[syntheticLead]}>
           {context("rfq", syntheticRfq.id)}
