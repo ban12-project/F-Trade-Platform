@@ -217,7 +217,11 @@ export const rfqFormSchema = z.object({
   quantity: z
     .string()
     .trim()
-    .regex(/^$|^[1-9]\d*$/, "数量必须是正整数。"),
+    .regex(/^$|^[1-9]\d*$/, "数量必须是正整数。")
+    .refine(
+      (value) => value === "" || Number.isSafeInteger(Number(value)),
+      "数量超出可准确保存的整数范围，请核对。",
+    ),
   destination: optionalRfqText,
   evidenceRef: privateReference,
 });

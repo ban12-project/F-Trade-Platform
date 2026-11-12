@@ -52,3 +52,31 @@ test("RFQ text errors remain associated and recover after editing on mobile", as
   await expect(year).not.toHaveAttribute("aria-describedby");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test("RFQ rejects quantities that would change during saving and preserves unknown quantity", async ({
+  page,
+}) => {
+  await page.goto(path);
+  await page.getByRole("combobox", { name: "产品类型", exact: true }).click();
+  await page.getByRole("option", { name: "离合器套件", exact: true }).click();
+  await page.getByRole("combobox", { name: "客户需求来源", exact: true }).click();
+  await page.getByRole("option", { name: "合成审核记录.pdf", exact: true }).click();
+  const quantity = page.getByRole("textbox", { name: "数量", exact: true });
+  const posts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST") posts.push(request.url());
+  });
+  for (const invalid of ["9007199254740993", "9".repeat(400)]) {
+    await quantity.fill(invalid);
+    await page.getByRole("button", { name: "保存询盘", exact: true }).click();
+    await expect(quantity).toBeFocused();
+    await expect(quantity).toHaveValue(invalid);
+    await expect(quantity).toHaveAccessibleDescription("数量超出可准确保存的整数范围，请核对。");
+  }
+  await quantity.fill("500");
+  await expect(quantity).toHaveAttribute("aria-invalid", "false");
+  await quantity.fill("");
+  await expect(quantity).toHaveAttribute("aria-invalid", "false");
+  await expect(quantity).not.toHaveAttribute("aria-describedby");
+  expect(posts).toEqual([]);
+});
