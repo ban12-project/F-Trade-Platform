@@ -91,14 +91,20 @@ export function EvidenceLibrary({
                     required
                     disabled={pending}
                     aria-invalid={Boolean(form.formState.errors.document)}
+                    aria-describedby={[
+                      `${fileId}-help`,
+                      form.formState.errors.document ? `${fileId}-error` : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     onChange={(event) => field.onChange(event.target.files?.[0])}
                   />
                 )}
               />
-              <FieldDescription>
+              <FieldDescription id={`${fileId}-help`}>
                 支持 PDF、CSV、XLS、XLSX，最大 25 MiB；文件保存在私有存储。
               </FieldDescription>
-              <FieldError errors={[form.formState.errors.document]} />
+              <FieldError id={`${fileId}-error`} errors={[form.formState.errors.document]} />
             </Field>
             <Button type="submit" variant="outline" className="min-h-11 w-full" disabled={pending}>
               {pending ? (
@@ -106,7 +112,7 @@ export function EvidenceLibrary({
               ) : (
                 <FileUpIcon data-icon="inline-start" />
               )}
-              保存到项目资料库
+              {pending ? "正在上传并保存资料…" : "保存到项目资料库"}
             </Button>
             {state.message ? (
               <p
