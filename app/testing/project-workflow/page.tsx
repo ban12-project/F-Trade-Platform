@@ -336,6 +336,41 @@ async function ProjectWorkflowFixture({
 }) {
   const { state, kind, record } = await searchParams;
   if (kind === "sales") {
+    const rfqDetail: RfqEntry = {
+      ...syntheticRfq,
+      state: state === "rfq-collecting" || state === "rfq-missing" ? "RFQ_COLLECTING" : "RFQ_READY",
+      formValues: {
+        ...syntheticRfq.formValues,
+        vehicleBrand: "SYNTHETIC brand",
+        vehicleModel: "SYNTHETIC model",
+        packagingRequirement: "SYNTHETIC individual packaging",
+        expectedDelivery: "SYNTHETIC requested month",
+        ...(state === "rfq-long"
+          ? {
+              customerCompany: "SYNTHETIC-LONG-COMPANY-".repeat(10),
+              vehicleModel: "SYNTHETIC-LONG-MODEL-".repeat(10),
+            }
+          : {}),
+      },
+    };
+    if (state === "rfq-missing") {
+      rfqDetail.quantity = null;
+      rfqDetail.destination = null;
+      rfqDetail.completenessScore = 10;
+      rfqDetail.missingFields = ["vehicle_model_or_oe_number", "quantity", "destination"];
+      rfqDetail.formValues = {
+        leadId: "",
+        customerName: "",
+        customerCompany: "",
+        customerCountry: "",
+        productType: syntheticRfq.formValues.productType,
+        oeNumber: "",
+        vehicleBrand: "",
+        vehicleModel: "",
+        quantity: "",
+        destination: "",
+      };
+    }
     const previewState =
       state === "quote-approved" ||
       state === "quote-approval-mismatch" ||
@@ -365,11 +400,7 @@ async function ProjectWorkflowFixture({
     );
     const panels = {
       rfq: (
-        <RfqDetail
-          projectId={syntheticSalesProject.id}
-          entry={syntheticRfq}
-          leads={[syntheticLead]}
-        >
+        <RfqDetail projectId={syntheticSalesProject.id} entry={rfqDetail} leads={[syntheticLead]}>
           {context("rfq", syntheticRfq.id)}
         </RfqDetail>
       ),
