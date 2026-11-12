@@ -148,7 +148,9 @@ export function matchesWorkspaceLibrarySearch(record: WorkspaceLibraryRecord, se
 }
 
 // Project membership has already scoped the snapshot. Return display fields only, never raw payloads.
-export function deriveWorkspaceLibrary(snapshot: WorkspaceTaskSnapshot): WorkspaceLibraryRecord[] {
+export function deriveWorkspaceLibrary(
+  snapshot: Pick<WorkspaceTaskSnapshot, "projects" | "records" | "publications">,
+): WorkspaceLibraryRecord[] {
   const projects = new Map(snapshot.projects.map((project) => [project.id, project]));
   const scopedRecords = new Map(
     snapshot.records

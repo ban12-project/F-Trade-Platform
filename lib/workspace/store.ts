@@ -62,11 +62,12 @@ export async function listWorkspaceProjects(
     .orderBy(desc(workspaceProject.updatedAt));
 }
 
-/** Load authorized data once, then derive all next-action surfaces from the same snapshot. */
-export async function readWorkspaceTaskSnapshot(
+/** Share membership and retention rules; load task-only dependencies only when requested. */
+async function readWorkspaceSnapshot(
   actorId: string,
-  database: Database = getDatabase(),
-  projectId?: string,
+  database: Database,
+  projectId: string | undefined,
+  includeTaskDependencies: boolean,
 ): Promise<WorkspaceTaskSnapshot> {
   const projects = await database
     .select({
@@ -111,23 +112,28 @@ export async function readWorkspaceTaskSnapshot(
           aggregateRetentionCondition(aggregateRecord.type, aggregateRecord.createdAt),
         ),
       ),
-    database
-      .select({
-        id: approval.id,
-        aggregateId: approval.aggregateId,
-        gate: approval.gate,
-        status: approval.status,
-        requestedAt: approval.requestedAt,
-        createdAt: approval.createdAt,
-      })
-      .from(approval)
-      .innerJoin(workspaceProjectItem, eq(workspaceProjectItem.aggregateId, approval.aggregateId))
-      .where(
-        and(
-          inArray(workspaceProjectItem.projectId, ids),
-          eq(workspaceProjectItem.relation, "owned"),
-        ),
-      ),
+    includeTaskDependencies
+      ? database
+          .select({
+            id: approval.id,
+            aggregateId: approval.aggregateId,
+            gate: approval.gate,
+            status: approval.status,
+            requestedAt: approval.requestedAt,
+            createdAt: approval.createdAt,
+          })
+          .from(approval)
+          .innerJoin(
+            workspaceProjectItem,
+            eq(workspaceProjectItem.aggregateId, approval.aggregateId),
+          )
+          .where(
+            and(
+              inArray(workspaceProjectItem.projectId, ids),
+              eq(workspaceProjectItem.relation, "owned"),
+            ),
+          )
+      : Promise.resolve([]),
     database
       .select({
         id: socialPublication.id,
@@ -149,18 +155,41 @@ export async function readWorkspaceTaskSnapshot(
       .from(socialPublication)
       .leftJoin(socialBrowserJob, eq(socialBrowserJob.id, socialPublication.browserJobId))
       .where(inArray(socialPublication.projectId, ids)),
-    database
-      .select({ id: socialChannelControl.id })
-      .from(socialChannelControl)
-      .where(
-        and(
-          eq(socialChannelControl.enabled, true),
-          eq(socialChannelControl.circuitStatus, "active"),
-        ),
-      )
-      .limit(1),
+    includeTaskDependencies
+      ? database
+          .select({ id: socialChannelControl.id })
+          .from(socialChannelControl)
+          .where(
+            and(
+              eq(socialChannelControl.enabled, true),
+              eq(socialChannelControl.circuitStatus, "active"),
+            ),
+          )
+          .limit(1)
+      : Promise.resolve([]),
   ]);
   return { projects, records, approvals, publications, hasActiveChannel: channels.length > 0 };
+}
+
+export function readWorkspaceTaskSnapshot(
+  actorId: string,
+  database: Database = getDatabase(),
+  projectId?: string,
+): Promise<WorkspaceTaskSnapshot> {
+  return readWorkspaceSnapshot(actorId, database, projectId, true);
+}
+
+export async function readWorkspaceLibrarySnapshot(
+  actorId: string,
+  database: Database = getDatabase(),
+): Promise<Pick<WorkspaceTaskSnapshot, "projects" | "records" | "publications">> {
+  const { projects, records, publications } = await readWorkspaceSnapshot(
+    actorId,
+    database,
+    undefined,
+    false,
+  );
+  return { projects, records, publications };
 }
 
 export async function listWorkspaceTasks(

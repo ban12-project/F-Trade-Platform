@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { getTableName, type SQL, type Table } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { Database } from "../lib/db/client";
-import { listWorkspaceProjectOverview, listWorkspaceTasks } from "../lib/workspace/store";
+import {
+  listWorkspaceProjectOverview,
+  listWorkspaceTasks,
+  readWorkspaceLibrarySnapshot,
+} from "../lib/workspace/store";
 
 type Row = Record<string, unknown>;
 const projectId = "00000000-0000-4000-8000-000000000263";
@@ -127,6 +131,27 @@ async function main() {
     4,
     "Project overview must derive from the same parallel snapshot reads",
   );
+  const library = new FakeDatabase();
+  const snapshot = await readWorkspaceLibrarySnapshot(actorId, library.asDatabase());
+  assert.deepEqual(Object.keys(snapshot).sort(), ["projects", "publications", "records"]);
+  assert.equal(
+    library.maximum,
+    2,
+    "Only records and publication reads are needed after membership",
+  );
+  assert.deepEqual(
+    library.queries.map((query) => query.table),
+    ["workspace_project_member", "workspace_project_item", "social_publication"],
+  );
+  assert.ok(library.queries[0]?.params.includes(actorId));
+  for (const query of library.queries.slice(1)) assert.ok(query.params.includes(projectId));
+  const emptyLibrary = new FakeDatabase(false);
+  assert.deepEqual(await readWorkspaceLibrarySnapshot(actorId, emptyLibrary.asDatabase()), {
+    projects: [],
+    records: [],
+    publications: [],
+  });
+  assert.equal(emptyLibrary.queries.length, 1, "No library data reads without visible membership");
   console.log(
     "PASS deterministic query concurrency: shared snapshot 4-way; project and actor authorization filters retained",
   );
