@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   typescript: browserLayer ? { tsconfigPath: `.tsconfig-playwright-${browserLayer}.json` } : {},
   allowedDevOrigins: ["127.0.0.1"],
   cacheComponents: true,
+  partialPrefetching: true,
   reactCompiler: true,
   outputFileTracingIncludes: {
     "/.well-known/workflow/v1/*": [".remotion/**/*"],
