@@ -14,7 +14,7 @@ const labels = {
   customers: ["客户与询盘", "从客户线索、需求确认到人工报价与跟进。"],
 };
 export type LibraryPageProps = {
-  searchParams: Promise<{ project?: string; type?: string; state?: string; q?: string }>;
+  searchParams: Promise<{ project?: string; type?: string; state?: string; q?: string | string[] }>;
 };
 async function Records({
   collection,
@@ -27,12 +27,14 @@ async function Records({
     readWorkspaceLibrary(session.user.id),
     searchParams,
   ]);
+  const search = parseLibrarySearch(query.q);
   return (
     <WorkspaceLibrary
       collection={collection}
       projects={projects}
       records={records}
-      search={parseLibrarySearch(query.q)}
+      search={search.q}
+      searchError={search.error}
       projectId={query.project}
       recordType={collection === "content" && query.type === "publication" ? undefined : query.type}
       state={collection === "content" && query.type === "publication" ? undefined : query.state}

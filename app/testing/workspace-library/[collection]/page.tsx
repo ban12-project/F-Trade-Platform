@@ -13,7 +13,7 @@ type Props = {
     project?: string;
     type?: string;
     state?: string;
-    q?: string;
+    q?: string | string[];
     empty?: string;
   }>;
 };
@@ -23,6 +23,7 @@ async function Content({ searchParams, params }: Props) {
   const { collection } = await params;
   if (!["customers", "content", "products"].includes(collection)) notFound();
   const selectedCollection = collection as "customers" | "content" | "products";
+  const search = parseLibrarySearch(query.q);
   return (
     <WorkspaceShell projects={librarySnapshot.projects}>
       <main id="main-content" className="p-6">
@@ -33,7 +34,8 @@ async function Content({ searchParams, params }: Props) {
           projectId={query.project}
           recordType={query.type}
           state={query.state}
-          search={parseLibrarySearch(query.q)}
+          search={search.q}
+          searchError={search.error}
           basePath={`/testing/workspace-library/${collection}`}
         />
         <NavigationEditor href={`/testing/workspace-library/${collection}`} />
