@@ -250,3 +250,79 @@ for (const collection of ["products", "customers", "content"]) {
     });
   }
 }
+
+for (const scenario of [
+  {
+    collection: "products",
+    scope: "",
+    action: "录入产品",
+    message: "产品资料需在营销项目录入；销售项目仅引用产品。",
+    kind: "营销",
+  },
+  {
+    collection: "content",
+    scope: "",
+    action: "制作内容",
+    message: "内容和视频需在营销项目中制作。",
+    kind: "营销",
+  },
+  {
+    collection: "customers",
+    scope: "marketing",
+    action: "记录询盘",
+    message: "客户询盘需记录在销售项目中。",
+    kind: "销售",
+  },
+  {
+    collection: "customers",
+    scope: "viewer",
+    action: "记录询盘",
+    message: "你在此项目只有查看权限，不能新增记录。",
+    kind: "销售",
+  },
+  {
+    collection: "customers",
+    scope: "archived",
+    action: "记录询盘",
+    message: "此项目已归档，不能新增记录。",
+    kind: "销售",
+  },
+]) {
+  test(`unavailable creation explains and recovers ${scenario.collection}/${scenario.scope || "sales"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const path = `/testing/workspace-library/${scenario.collection}?project=${libraryIds.first}&scope=${scenario.scope}`;
+    await page.goto(path);
+    await expect(page.getByRole("button", { name: scenario.action, exact: true })).toBeDisabled();
+    const explanation = page.getByRole("region", { name: "新增记录说明" });
+    await expect(explanation).toContainText(scenario.message);
+    const recovery = explanation.getByRole("button", { name: "选择其他项目开始" });
+    await expect(recovery).toBeEnabled();
+    await recovery.click();
+    const dialog = page.getByRole("dialog", { name: "开始新工作" });
+    await expect(dialog).toBeVisible();
+    const projects = dialog.getByRole("combobox", { name: "归属项目" });
+    await expect(projects).toHaveValue("");
+    await expect(projects.getByRole("option")).toHaveCount(2);
+    await expect(
+      projects.getByRole("option", { name: `创建新的${scenario.kind}项目` }),
+    ).toBeAttached();
+    await expect(
+      dialog.getByRole("button", { name: `在此项目开始${scenario.action}` }),
+    ).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page).toHaveURL(path);
+    await expect(recovery).toBeFocused();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      390,
+    );
+  });
+}
+
+test("compatible editable library scope retains its direct creation action", async ({ page }) => {
+  await page.goto(`${customers}?project=${libraryIds.first}`);
+  await expect(page.getByRole("button", { name: "记录询盘", exact: true })).toBeEnabled();
+  await expect(page.getByRole("region", { name: "新增记录说明" })).toHaveCount(0);
+});

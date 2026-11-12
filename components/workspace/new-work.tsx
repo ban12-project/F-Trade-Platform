@@ -32,10 +32,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createWorkspaceProjectAction, type WorkspaceActionState } from "@/lib/actions/workspace";
 import { createWorkspaceProjectSchema } from "@/lib/workspace/contracts";
 import { workspaceCreateHref } from "@/lib/workspace/navigation";
+import { type NewWorkIntent, workspaceCreationRestriction } from "@/lib/workspace/new-work";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
 
-export type NewWorkIntent = "product" | "content" | "rfq" | "video";
+export type { NewWorkIntent } from "@/lib/workspace/new-work";
+
 const intents = [
   { id: "product", label: "录入产品" },
   { id: "content", label: "制作内容" },
@@ -165,8 +167,7 @@ function NewWorkDialog({
   const [selectedIntent, setIntent] = useState(intent);
   const kind = selectedIntent === "rfq" ? "sales" : "marketing";
   const available = projects.filter(
-    (project) =>
-      project.kind === kind && project.status === "active" && project.memberRole !== "viewer",
+    (project) => !workspaceCreationRestriction(project, selectedIntent),
   );
   const [projectId, setProjectId] = useState("");
   const selected =
@@ -292,12 +293,7 @@ export function NewWorkProvider({
             }
             if (projectId) {
               const project = loadedProjects?.find((project) => project.id === projectId);
-              if (
-                project?.status !== "active" ||
-                project.memberRole === "viewer" ||
-                project.kind !== (nextIntent === "rfq" ? "sales" : "marketing")
-              )
-                return;
+              if (workspaceCreationRestriction(project, nextIntent)) return;
               setDestination(workspaceCreateHref(projectId, nextIntent, undefined, origin));
               return;
             }
@@ -353,12 +349,7 @@ export function NewWorkButton({
     serverHydrationSnapshot,
   );
   const selectedProject = context?.projects.find((project) => project.id === projectId);
-  const knownProjectReady =
-    !projectId ||
-    (!!selectedProject &&
-      selectedProject.status === "active" &&
-      selectedProject.memberRole !== "viewer" &&
-      selectedProject.kind === (intent === "rfq" ? "sales" : "marketing"));
+  const knownProjectReady = !projectId || !workspaceCreationRestriction(selectedProject, intent);
   return (
     <Button
       className="min-h-11"
