@@ -72,6 +72,7 @@ export function ProductReview({
   );
   const form = useForm<ReviewValues>({
     resolver: zodResolver(productReviewFormSchema),
+    shouldFocusError: false,
     defaultValues: {
       productId: detail.id,
       reviewedVersion: String(detail.version),
@@ -182,7 +183,15 @@ export function ProductReview({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form id={fieldId("product-review")} onSubmit={form.handleSubmit(submit)}>
+            <form
+              id={fieldId("product-review")}
+              onSubmit={form.handleSubmit(submit, (errors) => {
+                const first = (
+                  ["decision", "imageConsistencyConfirmed", "evidenceRef", "notes"] as const
+                ).find((name) => errors[name]);
+                if (first) form.setFocus(first);
+              })}
+            >
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.decision}>
                   <FieldLabel htmlFor={fieldId("product-review-decision")}>决定</FieldLabel>
@@ -197,8 +206,13 @@ export function ProductReview({
                       >
                         <SelectTrigger
                           id={fieldId("product-review-decision")}
+                          ref={field.ref}
+                          onBlur={field.onBlur}
                           className="min-h-11 w-full"
                           aria-invalid={!!form.formState.errors.decision}
+                          aria-describedby={
+                            form.formState.errors.decision ? fieldId("decision-error") : undefined
+                          }
                         >
                           <SelectValue placeholder="请选择审核决定" />
                         </SelectTrigger>
@@ -211,7 +225,10 @@ export function ProductReview({
                       </Select>
                     )}
                   />
-                  <FieldError errors={[form.formState.errors.decision]} />
+                  <FieldError
+                    id={fieldId("decision-error")}
+                    errors={[form.formState.errors.decision]}
+                  />
                 </Field>
                 {detail.sourceImages.length ? (
                   <Field>
@@ -230,7 +247,11 @@ export function ProductReview({
                             true: "已核对全部原始图片，与当前产品一致",
                           }}
                         >
-                          <SelectTrigger id={fieldId("product-image-confirmation")}>
+                          <SelectTrigger
+                            id={fieldId("product-image-confirmation")}
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                          >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -262,6 +283,14 @@ export function ProductReview({
                       >
                         <SelectTrigger
                           id={fieldId("product-review-evidence")}
+                          ref={field.ref}
+                          onBlur={field.onBlur}
+                          aria-invalid={!!form.formState.errors.evidenceRef}
+                          aria-describedby={
+                            form.formState.errors.evidenceRef
+                              ? fieldId("evidence-error")
+                              : undefined
+                          }
                           className="min-h-11 w-full"
                         >
                           <SelectValue>
@@ -281,7 +310,10 @@ export function ProductReview({
                       </Select>
                     )}
                   />
-                  <FieldError errors={[form.formState.errors.evidenceRef]} />
+                  <FieldError
+                    id={fieldId("evidence-error")}
+                    errors={[form.formState.errors.evidenceRef]}
+                  />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.notes}>
                   <FieldLabel htmlFor={fieldId("product-review-notes")}>
@@ -290,9 +322,12 @@ export function ProductReview({
                   <Textarea
                     id={fieldId("product-review-notes")}
                     aria-invalid={!!form.formState.errors.notes}
+                    aria-describedby={
+                      form.formState.errors.notes ? fieldId("notes-error") : undefined
+                    }
                     {...form.register("notes")}
                   />
-                  <FieldError errors={[form.formState.errors.notes]} />
+                  <FieldError id={fieldId("notes-error")} errors={[form.formState.errors.notes]} />
                 </Field>
               </FieldGroup>
             </form>
