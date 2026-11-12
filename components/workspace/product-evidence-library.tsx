@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileUpIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, useId } from "react";
+import { startTransition, useActionState, useEffect, useId, useRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ export function EvidenceLibrary({
 }) {
   const router = useRouter();
   const fileId = useId();
+  const uploadForm = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState(
     async (previous: typeof initialProductEvidenceActionState, file: File) => {
       try {
@@ -55,8 +56,12 @@ export function EvidenceLibrary({
     resolver: zodResolver(documentUploadFormSchema),
   });
   useEffect(() => {
-    if (state.status === "success") router.refresh();
-  }, [router, state]);
+    if (state.status === "success") {
+      form.reset();
+      uploadForm.current?.reset();
+      router.refresh();
+    }
+  }, [form, router, state]);
   return (
     <Card size="sm">
       <CardHeader>
@@ -67,6 +72,7 @@ export function EvidenceLibrary({
       </CardHeader>
       <CardContent>
         <form
+          ref={uploadForm}
           onSubmit={(event) => {
             event.stopPropagation();
             void form.handleSubmit(({ document }) => startTransition(() => action(document)))(
