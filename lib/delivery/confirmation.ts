@@ -75,8 +75,13 @@ export function decideDeliveryConfirmation(
     nonEmpty(value, label);
   if (Number.isNaN(Date.parse(decision.decidedAt)))
     throw new Error("Gate 03 decisions require an ISO date-time");
-  if (decision.status === "confirmed" && !Number.isInteger(decision.leadTimeDays))
-    throw new Error("A confirmed delivery requires a human-confirmed lead time");
+  if (
+    decision.status === "confirmed" &&
+    (!Number.isSafeInteger(decision.leadTimeDays) || (decision.leadTimeDays ?? -1) < 0)
+  )
+    throw new Error(
+      "A confirmed delivery requires a nonnegative safe integer human-confirmed lead time",
+    );
   if (
     decision.status === "confirmed" &&
     (!decision.validUntil ||

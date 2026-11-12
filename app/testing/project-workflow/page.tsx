@@ -506,7 +506,17 @@ async function ProjectWorkflowFixture({
           {context("delivery", syntheticDelivery.id)}
           <DeliveryPanel
             projectId={syntheticSalesProject.id}
-            entries={[syntheticDelivery]}
+            entries={[
+              state === "delivery-pending"
+                ? {
+                    ...syntheticDelivery,
+                    state: "DELIVERY_CONFIRMATION_PENDING",
+                    approvalId: "30000000-0000-4000-8000-000000000011",
+                    approvalStatus: "pending",
+                    confirmation: { ...syntheticDelivery.confirmation, result: undefined },
+                  }
+                : syntheticDelivery,
+            ]}
             canReview
           />
         </div>
