@@ -15,6 +15,7 @@ test.beforeEach(async ({ page }) => {
 
 test("results associate each status with its account", async ({ page }) => {
   const results = page.getByRole("main");
+  await expect(page.getByRole("region", { name: "发布记录为空" })).toHaveCount(0);
   const alpha = results.locator('[data-slot="card"]').filter({
     has: page.locator('[data-slot="card-description"]').getByText("Alpha", { exact: true }),
   });

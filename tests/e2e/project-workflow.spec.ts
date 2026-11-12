@@ -81,9 +81,14 @@ test("follow-up shows the authorized timeline and explicit human send", async ({
 test("publication waits for explicit confirmation and platform receipt", async ({ page }) => {
   await page.goto("/testing/project-workflow?record=publication");
   const detail = page.getByRole("region", { name: "业务记录" });
-  await expect(detail.getByText("尚无可发布内容", { exact: true })).toBeVisible();
+  await expect(detail.getByRole("heading", { name: "暂无发布记录", exact: true })).toBeVisible();
   await expect(detail.getByText("平台回执前不会显示为已发布", { exact: false })).toBeVisible();
   await expect(detail.locator("#publication-confirmation")).toHaveCount(0);
+  await expect(detail.getByText(/这些工作无需连接社媒账号/)).toBeVisible();
+  await expect(detail.getByRole("link", { name: "查看项目内容", exact: true })).toHaveAttribute(
+    "href",
+    "/workspace/content?project=00000000-0000-4000-8000-000000000202",
+  );
 });
 
 test("editor uses the main document width and appears before related tasks", async ({ page }) => {
