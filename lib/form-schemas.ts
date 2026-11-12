@@ -244,11 +244,22 @@ const positiveMoney = z
   .string()
   .trim()
   .regex(/^\d+(?:\.\d{1,4})?$/, "单价必须是正数，最多四位小数。")
-  .refine((value) => Number(value) > 0, "单价必须大于 0。");
+  .refine((value) => Number(value) > 0, "单价必须大于 0。")
+  .refine((value) => {
+    if (!/^\d+(?:\.\d{1,4})?$/.test(value)) return true;
+    const numeric = Number(value);
+    const [integer, fraction = ""] = value.split(".");
+    const significantFraction = fraction.replace(/0+$/, "");
+    const canonical =
+      integer.replace(/^0+(?=\d)/, "") + (significantFraction ? `.${significantFraction}` : "");
+    // Compare the serialized decimal, not binary arithmetic: never silently round human prices.
+    return Number.isSafeInteger(Math.trunc(numeric)) && String(numeric) === canonical;
+  }, "单价超出可准确保存的范围，请核对金额；系统不会自动四舍五入。");
 const positiveIntegerText = z
   .string()
   .trim()
-  .regex(/^[1-9]\d*$/, "必须填写正整数。");
+  .regex(/^[1-9]\d*$/, "必须填写正整数。")
+  .refine((value) => Number.isSafeInteger(Number(value)), "数值超出可准确保存的整数范围，请核对。");
 
 export const quotationDraftFormSchema = z.object({
   evidenceRef: privateReference,
@@ -262,7 +273,14 @@ export const quotationDraftFormSchema = z.object({
     .trim()
     .regex(/^[A-Z]{3}$/, "币种必须是三位大写 ISO 代码。"),
   moq: positiveIntegerText,
-  leadTimeDays: z.string().trim().regex(/^\d+$/, "交期天数必须是非负整数。"),
+  leadTimeDays: z
+    .string()
+    .trim()
+    .regex(/^\d+$/, "交期天数必须是非负整数。")
+    .refine(
+      (value) => Number.isSafeInteger(Number(value)),
+      "交期超出可准确保存的整数范围，请核对。",
+    ),
   paymentTerms: z.string().trim().min(1, "请填写付款条件。").max(500),
   validityDays: positiveIntegerText,
 });

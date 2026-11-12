@@ -22,6 +22,53 @@ const quoteInput = {
   evidenceRef: "evidence-mock-quotation",
 };
 assert.equal(quotationDraftFormSchema.safeParse(quoteInput).success, true);
+for (const unitPrice of ["0.0001", "0.1", "12.5000", "00012.50", " 12.50 ", "9007199254740991"]) {
+  assert.equal(
+    quotationDraftFormSchema.safeParse({ ...quoteInput, unitPrice }).success,
+    true,
+    unitPrice,
+  );
+}
+for (const unitPrice of [
+  "0",
+  "-1",
+  "1e3",
+  "12.12345",
+  "9007199254740993",
+  "9999999999999.9999",
+  "9007199254740991.1",
+  "9".repeat(400),
+]) {
+  assert.equal(
+    quotationDraftFormSchema.safeParse({ ...quoteInput, unitPrice }).success,
+    false,
+    unitPrice,
+  );
+}
+for (const field of ["moq", "leadTimeDays", "validityDays"] as const) {
+  for (const value of [
+    "9007199254740992",
+    "9007199254740993",
+    "9".repeat(400),
+    "1.5",
+    "1e3",
+    "-1",
+  ]) {
+    assert.equal(
+      quotationDraftFormSchema.safeParse({ ...quoteInput, [field]: value }).success,
+      false,
+      `${field}: ${value}`,
+    );
+  }
+  assert.equal(
+    quotationDraftFormSchema.safeParse({ ...quoteInput, [field]: "9007199254740991" }).success,
+    true,
+  );
+  assert.equal(
+    quotationDraftFormSchema.safeParse({ ...quoteInput, [field]: "0" }).success,
+    field === "leadTimeDays",
+  );
+}
 for (const evidenceRef of [undefined, "", "untraceable"]) {
   assert.equal(quotationDraftFormSchema.safeParse({ ...quoteInput, evidenceRef }).success, false);
 }
@@ -63,6 +110,22 @@ const draft = createManualQuotation({
     validity_days: 1,
   },
 });
+for (const field of ["unit_price", "moq", "lead_time_days", "validity_days"] as const) {
+  for (const value of [Number.MAX_SAFE_INTEGER + 1, Infinity, NaN]) {
+    assert.throws(
+      () =>
+        createManualQuotation({
+          handoffId: "synthetic-unsafe-number",
+          rfqId: draft.rfq_id,
+          actorType: "human",
+          actorId: "synthetic-sales-user",
+          quote: { ...draft.quote, [field]: value },
+        }),
+      /Contract validation failed/,
+      `${field}: ${value}`,
+    );
+  }
+}
 const approved = applyHumanQuoteDecision(draft, {
   actorType: "human",
   actorId: "synthetic-quote-reviewer",
