@@ -15,6 +15,7 @@ type Props = {
     state?: string;
     q?: string | string[];
     empty?: string;
+    long?: string;
   }>;
 };
 async function Content({ searchParams, params }: Props) {
@@ -24,13 +25,22 @@ async function Content({ searchParams, params }: Props) {
   if (!["customers", "content", "products"].includes(collection)) notFound();
   const selectedCollection = collection as "customers" | "content" | "products";
   const search = parseLibrarySearch(query.q);
+  const snapshot = query.long
+    ? {
+        ...librarySnapshot,
+        projects: librarySnapshot.projects.map((project) => ({
+          ...project,
+          title: `SyntheticProject${"X".repeat(104)}`,
+        })),
+      }
+    : librarySnapshot;
   return (
-    <WorkspaceShell projects={librarySnapshot.projects}>
+    <WorkspaceShell projects={snapshot.projects}>
       <main id="main-content" className="p-6">
         <WorkspaceLibrary
           collection={selectedCollection}
-          projects={librarySnapshot.projects}
-          records={query.empty ? [] : deriveWorkspaceLibrary(librarySnapshot)}
+          projects={snapshot.projects}
+          records={query.empty ? [] : deriveWorkspaceLibrary(snapshot)}
           projectId={query.project}
           recordType={query.type}
           state={query.state}

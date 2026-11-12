@@ -358,7 +358,7 @@ export function WorkspaceLibrary({
                         .join(" · ")}
                     </p>
                   ) : null}
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 break-words text-sm text-muted-foreground">
                     {recordKindLabels[record.kind]} · {record.projectTitle}
                     {record.relation !== "owned" ? " · 来自其他项目，只读" : ""}
                   </p>
