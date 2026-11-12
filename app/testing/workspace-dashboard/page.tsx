@@ -3,6 +3,11 @@ import { Suspense } from "react";
 import { WorkspaceDashboard } from "@/components/workspace/workspace-dashboard";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
+import {
+  deriveWorkspaceProjectOverview,
+  deriveWorkspaceTasks,
+  type WorkspaceTaskSnapshot,
+} from "@/lib/workspace/task-model";
 import type {
   WorkspaceProjectOverview,
   WorkspaceProjectSummary,
@@ -127,10 +132,42 @@ const inbound: InboundRoutingSummary[] = [
   },
 ];
 
+const offlineSnapshot: WorkspaceTaskSnapshot = {
+  projects: projects.map((project) => ({ ...project, memberRole: "editor", appRole: "admin" })),
+  records: [
+    {
+      id: "00000000-0000-4000-8000-000000000731",
+      type: "rfq",
+      state: "RFQ_COLLECTING",
+      payload: { missing_fields: ["quantity", "destination"] },
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000732",
+      type: "lead",
+      state: "FOLLOW_UP",
+      payload: {
+        next_action: "collect_sample_requirements_and_escalate",
+        next_follow_up_at: "2026-09-05T00:00:00Z",
+      },
+    },
+  ].map((record) => ({
+    ...record,
+    projectId: projects[1].id,
+    version: 1,
+    relation: "owned",
+    createdAt: new Date("2026-09-03T00:00:00Z"),
+    updatedAt: new Date("2026-09-03T00:00:00Z"),
+  })),
+  approvals: [],
+  publications: [],
+  hasActiveChannel: false,
+};
+const offlineTasks = deriveWorkspaceTasks(offlineSnapshot, new Date("2026-09-04T00:00:00Z"));
+
 async function Content({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; empty?: string }>;
+  searchParams: Promise<{ view?: string; empty?: string; offline?: string }>;
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   const query = await searchParams;
@@ -138,9 +175,15 @@ async function Content({
     <WorkspaceShell projects={query.empty ? [] : projects}>
       <WorkspaceDashboard
         projects={query.empty ? [] : projects}
-        tasks={query.empty ? [] : tasks}
-        overview={query.empty ? [] : overview}
-        inbound={query.empty ? [] : inbound}
+        tasks={query.empty ? [] : query.offline ? offlineTasks : tasks}
+        overview={
+          query.empty
+            ? []
+            : query.offline
+              ? deriveWorkspaceProjectOverview(offlineSnapshot, offlineTasks)
+              : overview
+        }
+        inbound={query.empty || query.offline ? [] : inbound}
         view={query.view}
         basePath="/testing/workspace-dashboard"
         currentTime={new Date("2026-09-04T00:00:00Z").getTime()}
@@ -149,7 +192,9 @@ async function Content({
   );
 }
 
-export default function Page(props: { searchParams: Promise<{ view?: string; empty?: string }> }) {
+export default function Page(props: {
+  searchParams: Promise<{ view?: string; empty?: string; offline?: string }>;
+}) {
   return (
     <Suspense>
       <Content {...props} />
