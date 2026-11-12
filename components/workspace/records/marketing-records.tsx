@@ -39,6 +39,7 @@ async function ProductMedia({ context }: { context: RecordContext }) {
       productId={recordId}
       assets={assets}
       assessment={assessment}
+      canWrite={context.canWrite}
       canReview={context.canWrite && hasPermission(context.session.user.role, "product:review")}
     />
   );
@@ -72,6 +73,7 @@ export async function ProductRecord({ context }: { context: RecordContext }) {
         key={`${detail.id}:${detail.version}`}
         projectId={projectId}
         detail={detail}
+        canWrite={canWrite}
         canReview={canWrite && hasPermission(session.user.role, "product:review")}
         evidenceOptions={evidenceOptions}
         sourceDocuments={sourceDocuments}

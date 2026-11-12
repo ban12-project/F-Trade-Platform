@@ -32,3 +32,14 @@ test("ProductMedia workspace exposes governed rights, review, and VideoReady sta
   await expect(assetCard.getByRole("button", { name: "撤销素材授权" })).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });
+
+test("read-only media remains inspectable without upload or review controls", async ({ page }) => {
+  await page.goto("/testing/product-media?readonly=1");
+  await expect(page.getByText("可制作视频", { exact: true })).toBeVisible();
+  await expect(page.getByText("1600×1600")).toBeVisible();
+  await expect(page.getByText("图生视频授权", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "撤销素材授权" })).toHaveCount(0);
+  await expect(page.getByText("添加产品图片或视频", { exact: true })).toHaveCount(0);
+  await expect(page.locator("form")).toHaveCount(0);
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+});

@@ -12,6 +12,7 @@ import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { EvidenceChoicesProvider } from "@/components/workspace/evidence-select";
 import { ProductIntakePanel } from "@/components/workspace/product-intake-panel";
 import { ProductReview } from "@/components/workspace/product-review";
+import { RecordAccessBoundary } from "@/components/workspace/record-access-boundary";
 import { RecordFrame } from "@/components/workspace/record-frame";
 import { RfqDetail } from "@/components/workspace/rfq-detail";
 import { SalesContext } from "@/components/workspace/sales-context";
@@ -332,9 +333,9 @@ const syntheticContentDetail: ContentCatalogDetail = {
 async function ProjectWorkflowFixture({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string; kind?: string; record?: string }>;
+  searchParams: Promise<{ state?: string; kind?: string; record?: string; readonly?: string }>;
 }) {
-  const { state, kind, record } = await searchParams;
+  const { state, kind, record, readonly } = await searchParams;
   if (kind === "sales") {
     const rfqDetail: RfqEntry = {
       ...syntheticRfq,
@@ -457,9 +458,15 @@ async function ProjectWorkflowFixture({
     );
   }
   const productDetail =
-    state === "product-review" || state === "product-review-locations"
+    state === "product-review" ||
+    state === "product-review-locations" ||
+    state === "product-revision"
       ? {
           ...syntheticProductDetail,
+          state:
+            state === "product-revision"
+              ? "PRODUCT_REVISION_REQUIRED"
+              : syntheticProductDetail.state,
           draft: {
             ...syntheticProductDetail.draft,
             commercial: { sample_available: false },
@@ -491,6 +498,7 @@ async function ProjectWorkflowFixture({
       <ProductReview
         projectId={syntheticMarketingProject.id}
         detail={productDetail}
+        canWrite={readonly !== "1"}
         canReview
         evidenceOptions={[
           {
@@ -609,7 +617,13 @@ async function ProjectWorkflowFixture({
       <RecordFrame
         header={<h1 className="text-2xl font-semibold">{syntheticMarketingProject.title}</h1>}
       >
-        {panels[active as keyof typeof panels]}
+        <RecordAccessBoundary
+          canWrite={readonly !== "1"}
+          kind={active === "product" ? "product" : "content"}
+          mode={active === "product" && !productDetail ? "create" : "record"}
+        >
+          {panels[active as keyof typeof panels]}
+        </RecordAccessBoundary>
       </RecordFrame>
     </WorkspaceDirtyProvider>
   );
@@ -619,7 +633,7 @@ async function ProjectWorkflowFixture({
 export default function ProjectWorkflowTestingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string; kind?: string; record?: string }>;
+  searchParams: Promise<{ state?: string; kind?: string; record?: string; readonly?: string }>;
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (

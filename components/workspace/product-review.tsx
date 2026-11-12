@@ -52,12 +52,14 @@ export function ProductReview({
   projectId,
   detail,
   canReview,
+  canWrite,
   evidenceOptions,
   sourceDocuments,
 }: {
   projectId: string;
   detail: ProductCatalogDetail;
   canReview: boolean;
+  canWrite: boolean;
   evidenceOptions: EvidenceOption[];
   sourceDocuments: ProductEvidencePreview[];
 }) {
@@ -100,7 +102,10 @@ export function ProductReview({
     })),
   );
   const canDecide =
-    canReview && detail.state === "PRODUCT_REVIEW_REQUIRED" && detail.approvalStatus === "pending";
+    canWrite &&
+    canReview &&
+    detail.state === "PRODUCT_REVIEW_REQUIRED" &&
+    detail.approvalStatus === "pending";
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
@@ -125,7 +130,7 @@ export function ProductReview({
           </AlertDescription>
         </Alert>
       ) : null}
-      {detail.state === "PRODUCT_REVISION_REQUIRED" ? (
+      {canWrite && detail.state === "PRODUCT_REVISION_REQUIRED" ? (
         <div className="flex flex-col gap-4">
           <ProductDraftForm
             projectId={projectId}
@@ -322,9 +327,11 @@ export function ProductReview({
       ) : detail.state === "PRODUCT_REVIEW_REQUIRED" ? (
         <Alert>
           <ShieldCheckIcon />
-          <AlertTitle>{canReview ? "审核请求需要核对" : "等待审核者核实产品"}</AlertTitle>
+          <AlertTitle>
+            {canWrite && canReview ? "审核请求需要核对" : "等待审核者核实产品"}
+          </AlertTitle>
           <AlertDescription>
-            {canReview
+            {canWrite && canReview
               ? "当前记录没有有效的待审请求，请核对记录状态。"
               : "由有产品审核权限的项目编辑者核对当前版本。"}
           </AlertDescription>

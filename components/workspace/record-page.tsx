@@ -21,6 +21,7 @@ import {
 } from "@/lib/workspace/navigation";
 import { readWorkspaceProject } from "@/lib/workspace/read-model";
 import { readWorkspaceRecord, readWorkspaceRecordTasks } from "@/lib/workspace/record-read-model";
+import { RecordAccessBoundary } from "./record-access-boundary";
 import { RecordFrame } from "./record-frame";
 import {
   ContentCreate,
@@ -253,16 +254,9 @@ async function RecordBody(props: RecordPageProps & { mode: "record" | "create" }
         <SalesRecord context={context} />
       );
   return (
-    <div className="space-y-5">
-      {!context.canWrite ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          当前为只读视图。写入和审核由有权限的项目编辑者处理。
-        </p>
-      ) : null}
-      <fieldset disabled={!context.canWrite} className="min-w-0 border-0 p-0">
-        {body}
-      </fieldset>
-    </div>
+    <RecordAccessBoundary canWrite={context.canWrite} kind={context.kind} mode={context.mode}>
+      {body}
+    </RecordAccessBoundary>
   );
 }
 export function RecordPage(props: RecordPageProps & { mode: "record" | "create" }) {
