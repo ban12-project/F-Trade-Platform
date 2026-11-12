@@ -106,6 +106,10 @@ for (const outcome of [
   "zero accepted fields",
   "source format",
   "private failure",
+  "network failure",
+  "malformed data",
+  "failed stage only",
+  "interrupted stage only",
 ]) {
   test(`streamed product fields keep actionable feedback after ${outcome}`, async ({ page }) => {
     const zeroAccepted = outcome === "zero accepted fields";
@@ -188,6 +192,13 @@ for (const outcome of [
           { type: "error", code: "run_failed", message: "生成已停止；已保存的字段仍需人工审核。" },
           { type: "stage", stage: "failed" },
         ];
+    if (outcome === "failed stage only" || outcome === "interrupted stage only") {
+      events.splice(events.length - 2, 1);
+      events[events.length - 1] = {
+        type: "stage",
+        stage: outcome === "failed stage only" ? "failed" : "interrupted",
+      };
+    }
     await page.route("**/api/product-agent/stream", (route) => {
       expect(uploaded).toBe(true);
       expect(receiptId).not.toBe("");
@@ -195,6 +206,22 @@ for (const outcome of [
       expect(body).toContain(receiptId);
       expect(body).not.toContain("filename=");
       expect(body).not.toContain(sourceBytes.toString());
+      if (outcome === "network failure") return route.abort("failed");
+      if (outcome === "malformed data")
+        return route.fulfill({
+          contentType: "application/x-ndjson",
+          body: `${events
+            .slice(0, 3)
+            .map((event, index) =>
+              JSON.stringify({
+                protocol: "product-agent.v1",
+                runId,
+                sequence: index + 1,
+                ...event,
+              }),
+            )
+            .join("\n")}\n{"SYNTHETIC_PRIVATE_PARSE_DETAIL":`,
+        });
       if (outcome === "source format" || outcome === "private failure")
         return route.fulfill({
           status: 400,
@@ -226,6 +253,16 @@ for (const outcome of [
       buffer: sourceBytes,
     });
     await page.getByRole("button", { name: "生成待审核草稿", exact: true }).click();
+    if (outcome === "network failure") {
+      await expect(
+        page.getByText("生成连接未能完成，请检查网络；若已有草稿，可先查看已保存字段。", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(page.getByRole("link", { name: "打开已保存草稿（新窗口）" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "生成待审核草稿", exact: true })).toBeEnabled();
+      return;
+    }
     if (outcome === "source format" || outcome === "private failure") {
       await expect(
         page.getByText(
@@ -246,8 +283,10 @@ for (const outcome of [
     if (!zeroAccepted) {
       await expect(progress.getByText("Synthetic streamed clutch", { exact: true })).toBeVisible();
       await expect(progress.getByText("来源校验通过 · 待人工审核", { exact: true })).toBeVisible();
-      await expect(progress.getByText("待补资料", { exact: true })).toBeVisible();
-      await expect(progress.getByText("校验失败", { exact: true })).toBeVisible();
+      if (outcome !== "malformed data") {
+        await expect(progress.getByText("待补资料", { exact: true })).toBeVisible();
+        await expect(progress.getByText("校验失败", { exact: true })).toBeVisible();
+      }
     }
     await expect(page.getByRole("link", { name: "打开已保存草稿（新窗口）" })).toHaveAttribute(
       "href",
@@ -257,10 +296,18 @@ for (const outcome of [
       page.getByText(
         zeroAccepted
           ? "未提取到可由来源验证的字段，本次导入未成功。CSV 可使用 Product name、OE、Application。"
-          : "生成已停止；已保存的字段仍需人工审核。",
+          : outcome === "malformed data"
+            ? "生成数据格式异常；若已有草稿，请先核对已保存字段，再决定是否重新生成。"
+            : outcome === "failed stage only"
+              ? "生成未完成，请核对资料；若已有草稿，可先查看已保存字段。"
+              : outcome === "interrupted stage only"
+                ? "生成已中断，已保存字段仍可在草稿中查看。"
+                : "生成已停止；已保存的字段仍需人工审核。",
         { exact: true },
       ),
     ).toBeVisible();
+    await expect(page.getByText("SYNTHETIC_PRIVATE_PARSE_DETAIL", { exact: false })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "生成待审核草稿", exact: true })).toBeEnabled();
   });
 }
 

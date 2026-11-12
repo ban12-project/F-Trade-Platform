@@ -6,7 +6,7 @@ import {
   PRODUCT_INTAKE_ERROR_HEADER,
   productIntakeErrorMessage,
 } from "@/lib/product/intake-errors";
-import { consumeProductStream } from "@/lib/product/stream-client";
+import { consumeProductStream, ProductStreamError } from "@/lib/product/stream-client";
 import type { ProductStreamEvent } from "@/lib/product/stream-contract";
 
 type FieldEvent = Extract<ProductStreamEvent, { type: "field" }>;
@@ -31,7 +31,7 @@ export function useProductStream() {
       });
       if (!response.ok || !response.body) {
         void response.body?.cancel().catch(() => {});
-        throw new Error(
+        throw new ProductStreamError(
           productIntakeErrorMessage(response.headers.get(PRODUCT_INTAKE_ERROR_HEADER)),
         );
       }
@@ -60,7 +60,13 @@ export function useProductStream() {
                 ? "生成已完成，已保存字段仍需人工审核。"
                 : event.stage === "generating"
                   ? "正在逐字段核对来源并保存…"
-                  : previous.message,
+                  : event.stage === "failed" || event.stage === "interrupted"
+                    ? previous.status === "error" && previous.message
+                      ? previous.message
+                      : event.stage === "interrupted"
+                        ? "生成已中断，已保存字段仍可在草稿中查看。"
+                        : "生成未完成，请核对资料；若已有草稿，可先查看已保存字段。"
+                    : previous.message,
           }));
       });
     } catch (error) {
@@ -69,9 +75,9 @@ export function useProductStream() {
         status: "error",
         message: active.signal.aborted
           ? "生成已停止，已保存字段仍可在草稿中查看。"
-          : error instanceof Error
+          : error instanceof ProductStreamError
             ? error.message
-            : "生成失败。",
+            : "生成连接未能完成，请检查网络；若已有草稿，可先查看已保存字段。",
       }));
     } finally {
       controller.current = null;

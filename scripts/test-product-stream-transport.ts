@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { consumeProductStream } from "../lib/product/stream-client";
+import { consumeProductStream, ProductStreamError } from "../lib/product/stream-client";
 import type { ProductStreamEvent } from "../lib/product/stream-contract";
 import { productStreamResponse, readProductStreamForm } from "../lib/product/stream-response";
 
@@ -74,6 +74,24 @@ async function verify() {
       ),
     /连接已中断/,
   );
+  for (const payload of [
+    '{"SYNTHETIC_PRIVATE_PARSE_DETAIL":',
+    JSON.stringify({ ...event, stage: "SYNTHETIC_PRIVATE_PARSE_DETAIL" }),
+  ]) {
+    const body = new ReadableStream<Uint8Array>({
+      start(output) {
+        output.enqueue(new TextEncoder().encode(payload));
+        output.close();
+      },
+    });
+    await assert.rejects(
+      () => consumeProductStream(body, () => assert.fail("invalid event must not be accepted")),
+      (error: unknown) =>
+        error instanceof ProductStreamError &&
+        error.message === "生成数据格式异常；若已有草稿，请先核对已保存字段，再决定是否重新生成。",
+    );
+    assert.equal(body.locked, false);
+  }
   const form = new FormData();
   form.set("sourceText", "synthetic 中文");
   const request = new Request("https://example.invalid", { method: "POST", body: form });
