@@ -11,6 +11,7 @@ import { ContentReview } from "@/components/workspace/content-review";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { EvidenceChoicesProvider } from "@/components/workspace/evidence-select";
 import { ProductIntakePanel } from "@/components/workspace/product-intake-panel";
+import { ProductReferencePanel } from "@/components/workspace/product-reference-panel";
 import { ProductReview } from "@/components/workspace/product-review";
 import { RecordAccessBoundary } from "@/components/workspace/record-access-boundary";
 import { RecordFrame } from "@/components/workspace/record-frame";
@@ -450,9 +451,18 @@ async function ProjectWorkflowFixture({
           {state === "quote-revision" ? context("quotation", syntheticQuote.id) : null}
           <QuotationPanel
             projectId={syntheticSalesProject.id}
-            rfqs={state === "quote-missing-context" ? [] : [syntheticRfq]}
+            rfqs={
+              ["quote-missing-context", "quote-needs-both", "quote-needs-rfq"].includes(state ?? "")
+                ? []
+                : [syntheticRfq]
+            }
             products={
-              state === "quote-missing-context"
+              [
+                "quote-missing-context",
+                "quote-needs-both",
+                "quote-needs-product",
+                "quote-product-candidate",
+              ].includes(state ?? "")
                 ? []
                 : [{ ...syntheticProduct, id: syntheticProduct.id }]
             }
@@ -462,6 +472,23 @@ async function ProjectWorkflowFixture({
             showCreateForm={!previewState && state !== "quote-revision"}
             canReview
           />
+          {state?.startsWith("quote-needs-") ||
+          state === "quote-product-candidate" ||
+          state === "quote-products-linked" ? (
+            <ProductReferencePanel
+              projectId={syntheticSalesProject.id}
+              available={
+                state === "quote-product-candidate" || state === "quote-products-linked"
+                  ? [{ ...syntheticProduct, factOptions: [] }]
+                  : []
+              }
+              linked={
+                state === "quote-needs-rfq" || state === "quote-products-linked"
+                  ? [syntheticProduct]
+                  : []
+              }
+            />
+          ) : null}
         </div>
       ),
       lead: (

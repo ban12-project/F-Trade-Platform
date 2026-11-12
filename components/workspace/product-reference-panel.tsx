@@ -3,7 +3,7 @@ import { FileSearchIcon, LinkIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -31,6 +32,7 @@ import {
 import { linkReadyProductToSalesProjectAction } from "@/lib/actions/workspace";
 import type { ReadyProductContentSource } from "@/lib/content/store";
 import type { WorkspaceProductReference } from "@/lib/workspace/types";
+import { WorkspaceLink } from "./workspace-link";
 
 export function ProductReferencePanel({
   projectId,
@@ -103,14 +105,35 @@ export function ProductReferencePanel({
               </Select>
             </Field>
           ) : (
-            <p className="text-sm text-muted-foreground">没有可添加的已核实产品。</p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>
+                  {linked.length ? "暂无其他可添加产品" : "尚无可添加的已核实产品"}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {linked.length
+                    ? "已关联产品可继续用于报价。如需其他产品，请先在产品资料库完成资料核实，再回到这里关联。"
+                    : "请先在产品资料库整理工厂来源并完成人工核实，再回到这里将已核实产品添加到当前项目。"}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <WorkspaceLink
+                  href="/workspace/products"
+                  className={buttonVariants({ variant: "outline" })}
+                >
+                  前往产品资料库
+                </WorkspaceLink>
+              </EmptyContent>
+            </Empty>
           )}
         </CardContent>
         <CardFooter className="flex-col items-stretch gap-3">
-          <Button disabled={pending || !effectiveSelectedId} onClick={link}>
-            <LinkIcon data-icon="inline-start" />
-            添加到当前项目
-          </Button>
+          {candidates.length ? (
+            <Button disabled={pending || !effectiveSelectedId} onClick={link}>
+              <LinkIcon data-icon="inline-start" />
+              添加到当前项目
+            </Button>
+          ) : null}
           {message ? (
             <p className="text-sm text-muted-foreground" aria-live="polite">
               {message}
