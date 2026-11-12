@@ -71,7 +71,6 @@ async function ProductMediaFixture({
   searchParams: Promise<{ readonly?: string }>;
 }) {
   const { readonly } = await searchParams;
-  if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (
     <main className="mx-auto min-h-screen max-w-3xl p-6">
       <WorkspaceDirtyProvider>
@@ -91,6 +90,7 @@ async function ProductMediaFixture({
 export default function ProductMediaTestingPage(props: {
   searchParams: Promise<{ readonly?: string }>;
 }) {
+  if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (
     <Suspense fallback={null}>
       <ProductMediaFixture {...props} />
