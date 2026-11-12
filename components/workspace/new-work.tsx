@@ -271,12 +271,6 @@ export function NewWorkProvider({
   const router = useRouter();
   const { requestNavigation } = useWorkspaceDirtyState();
   const dialogId = useId();
-  // Preloaded projects do not make the server-rendered trigger interactive.
-  const hydrated = useSyncExternalStore(
-    subscribeToHydration,
-    clientHydrationSnapshot,
-    serverHydrationSnapshot,
-  );
   const [loadedProjects, setProjects] = useState(projects);
   const [intent, setIntent] = useState<NewWorkIntent | null>(null);
   const [destination, setDestination] = useState<string | null>(null);
@@ -310,7 +304,7 @@ export function NewWorkProvider({
             setReturnTo(origin);
             setIntent(nextIntent);
           },
-          ready: hydrated && loadedProjects !== undefined,
+          ready: loadedProjects !== undefined,
           dialogId,
           open: !!intent,
         }}
@@ -351,6 +345,13 @@ export function NewWorkButton({
   returnTo?: string;
 }) {
   const context = useContext(NewWorkContext);
+  // A provider can hydrate before this trigger's Suspense boundary. Match this
+  // button's server snapshot until its own event handlers are attached.
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    clientHydrationSnapshot,
+    serverHydrationSnapshot,
+  );
   const selectedProject = context?.projects.find((project) => project.id === projectId);
   const knownProjectReady =
     !projectId ||
@@ -369,7 +370,7 @@ export function NewWorkButton({
         onOpen?.();
         context?.start(intent, projectId, returnTo);
       }}
-      disabled={!context?.ready || !knownProjectReady}
+      disabled={!hydrated || !context?.ready || !knownProjectReady}
     >
       <PlusIcon data-icon="inline-start" />
       {children}
