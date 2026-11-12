@@ -30,6 +30,7 @@ import {
 } from "@/lib/workspace/library-model";
 import { librarySearchSchema } from "@/lib/workspace/library-search";
 import { type WorkspaceCollection, withWorkspaceReturnTo } from "@/lib/workspace/navigation";
+import { workspaceCreationRestriction } from "@/lib/workspace/new-work";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 import { useWorkspaceDirtyState } from "./dirty-state";
 import { NewWorkButton } from "./new-work";
@@ -90,6 +91,14 @@ export function WorkspaceLibrary({
   const controlsDisabled = !hydrated || isPending;
   const focusAfterNavigation = useRef<{ controlId: string; query: string } | null>(null);
   const { requestNavigation } = useWorkspaceDirtyState();
+  const creationIntent =
+    collection === "products" ? "product" : collection === "content" ? "content" : "rfq";
+  const creationRestriction = projectId
+    ? workspaceCreationRestriction(
+        projects.find((project) => project.id === projectId),
+        creationIntent,
+      )
+    : undefined;
   const unavailable = !!projectId && !projects.some((project) => project.id === projectId);
   const query = new URLSearchParams();
   if (projectId) query.set("project", projectId);
@@ -275,13 +284,7 @@ export function WorkspaceLibrary({
             清除全部筛选
           </Button>
         ) : null}
-        <NewWorkButton
-          projectId={projectId}
-          returnTo={returnTo}
-          intent={
-            collection === "products" ? "product" : collection === "content" ? "content" : "rfq"
-          }
-        >
+        <NewWorkButton projectId={projectId} returnTo={returnTo} intent={creationIntent}>
           {collection === "products"
             ? "录入产品"
             : collection === "content"
@@ -294,6 +297,17 @@ export function WorkspaceLibrary({
           </NewWorkButton>
         ) : null}
       </div>
+      {creationRestriction ? (
+        <section
+          aria-label="新增记录说明"
+          className="flex flex-wrap items-center gap-3 rounded-xl border p-4"
+        >
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">{creationRestriction}</p>
+          <NewWorkButton intent={creationIntent} returnTo={returnTo} variant="outline">
+            选择其他项目开始
+          </NewWorkButton>
+        </section>
+      ) : null}
       <div className="flex flex-col gap-2">
         <p
           role="status"
