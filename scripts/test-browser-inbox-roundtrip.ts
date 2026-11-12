@@ -11,6 +11,7 @@ import { handleBrowserNodeRequest } from "../lib/browser-fleet/store";
 import type { Database } from "../lib/db/client";
 import { aggregateRecord, socialConversation, socialMessage } from "../lib/db/schema";
 import type { SocialActorIdentity } from "../lib/social/human-write-access";
+import { readInboundContext } from "../lib/social/inbound-context-store";
 import { routeInboundConversation } from "../lib/social/inbound-routing-store";
 import { decryptSocialMessageBody } from "../lib/social/message-crypto";
 import { createFacebookInbox } from "../ops/browser-node/facebook-inbox.mjs";
@@ -261,8 +262,19 @@ export async function testInboxRoundTrip(
       .from(socialConversation)
       .where(eq(socialConversation.id, messages[0].conversationId));
     assert.equal(conversation.leadId, null);
+    const preview = await readInboundContext(
+      { conversationId: conversation.id },
+      humanIdentity,
+      database,
+    );
     const routed = await routeInboundConversation(
-      { conversationId: conversation.id, mode: "create" },
+      {
+        conversationId: conversation.id,
+        mode: "create",
+        confirmed: "yes",
+        reviewedMessageAt: conversation.lastMessageAt.toISOString(),
+        reviewedContextDigest: preview.reviewedContextDigest,
+      },
       humanIdentity,
       database,
     );
@@ -274,7 +286,13 @@ export async function testInboxRoundTrip(
     assert.equal(lead.payload.next_action, "collect_rfq");
     await assert.rejects(
       routeInboundConversation(
-        { conversationId: conversation.id, mode: "create" },
+        {
+          conversationId: conversation.id,
+          mode: "create",
+          confirmed: "yes",
+          reviewedMessageAt: conversation.lastMessageAt.toISOString(),
+          reviewedContextDigest: preview.reviewedContextDigest,
+        },
         humanIdentity,
         database,
       ),

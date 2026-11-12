@@ -27,36 +27,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { initialProductActionState } from "@/lib/action-states";
 import { decideProductCatalogReviewAction } from "@/lib/actions/products";
 import { productReviewFormSchema } from "@/lib/form-schemas";
 import type { ProductEvidencePreview } from "@/lib/product/evidence-preview";
-import { productBlockerLabel, productFactLabels } from "@/lib/product/fact-labels";
+import { productBlockerLabel } from "@/lib/product/fact-labels";
+import { productReviewValue } from "@/lib/product/field-review";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
 import { recordStateLabels } from "@/lib/workspace/library-model";
 import { useWorkspaceDirty } from "./dirty-state";
 import { ProductDraftForm } from "./product-draft-form";
 import { EvidenceLibrary } from "./product-evidence-library";
-import { ProductEvidenceSources } from "./product-evidence-preview";
+import { ProductFieldReview } from "./product-field-review";
 
 type ReviewValues = z.infer<typeof productReviewFormSchema>;
 
 function stateLabel(state: string) {
   return recordStateLabels[state] ?? "状态待核对";
-}
-
-function textValue(value: unknown) {
-  return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
 
 export function ProductReview({
@@ -106,8 +95,8 @@ export function ProductReview({
   const facts = (["product", "specifications", "commercial"] as const).flatMap((section) =>
     Object.entries(detail.draft[section] ?? {}).map(([field, value]) => ({
       path: `${section}.${field}`,
-      value: Array.isArray(value) ? value.join(", ") : textValue(value),
-      evidence: detail.draft.field_evidence[`${section}.${field}`] ?? "缺失",
+      value: productReviewValue(value),
+      evidence: detail.draft.field_evidence[`${section}.${field}`] ?? "",
     })),
   );
   const canDecide =
@@ -146,49 +135,12 @@ export function ProductReview({
           <EvidenceLibrary projectId={projectId} evidenceOptions={evidenceOptions} />
         </div>
       ) : null}
-      <div className="workspace-equal-columns">
-        <Card>
-          <CardHeader>
-            <CardTitle>{detail.productName}</CardTitle>
-            <CardDescription>
-              逐项核对产品信息与来源资料；没有依据的信息请先补充资料。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>字段</TableHead>
-                  <TableHead>当前值</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {facts.map((fact) => (
-                  <TableRow key={fact.path}>
-                    <TableCell className="max-w-36 whitespace-normal break-words">
-                      <span>{productFactLabels[fact.path] ?? fact.path}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">
-                        {evidenceOptions.find((item) => item.id === fact.evidence)?.sourceLabel ??
-                          fact.evidence}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-48 whitespace-normal break-words">
-                      {fact.value || "未提供"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-          <CardFooter>
-            阻塞项：
-            {detail.blockingFields.length
-              ? detail.blockingFields.map(productBlockerLabel).join("、")
-              : "无自动阻塞项，仍需人工核对。"}
-          </CardFooter>
-        </Card>
-        <ProductEvidenceSources sources={sourceDocuments} />
-      </div>
+      <ProductFieldReview
+        key={`${detail.id}-${detail.version}`}
+        productName={detail.productName}
+        facts={facts}
+        sources={sourceDocuments}
+      />
       <Card>
         <CardHeader>
           <CardTitle>原始实物图片</CardTitle>

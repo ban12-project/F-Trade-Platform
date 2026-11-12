@@ -1,6 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { listStoredProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
+import { deriveBusinessFunnel } from "./business-funnel";
+import { readHumanOpportunityIds } from "./business-funnel-store";
 import { deriveWorkspaceLibrary } from "./library-model";
 import { getWorkspaceProject, listWorkspaceProjects, readWorkspaceTaskSnapshot } from "./store";
 import { deriveWorkspaceProjectOverview, deriveWorkspaceTasks } from "./task-model";
@@ -27,3 +29,21 @@ export const readWorkspaceModelSettings = cache(() => listStoredProductAgentMode
 export const readWorkspaceLibrary = cache(async (actorId: string) =>
   deriveWorkspaceLibrary((await readWorkspaceWork(actorId)).snapshot),
 );
+
+export const readWorkspaceBusinessFunnel = cache(async (actorId: string) => {
+  const { snapshot } = await readWorkspaceWork(actorId);
+  const ids = snapshot.records
+    .filter(
+      (record) =>
+        record.type === "lead" && record.state === "OPPORTUNITY" && record.relation === "owned",
+    )
+    .map((record) => record.id);
+  // Failure to load confirmation evidence is unknown, never a zero or inferred success.
+  let humanOpportunityIds: string[] | null = null;
+  try {
+    humanOpportunityIds = await readHumanOpportunityIds(actorId, ids);
+  } catch {
+    /* Render explicit unavailable state. */
+  }
+  return deriveBusinessFunnel(snapshot, humanOpportunityIds);
+});

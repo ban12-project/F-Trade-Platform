@@ -1,15 +1,27 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { BusinessFunnelPanel } from "@/components/workspace/business-funnel";
 import { WorkspaceDashboard } from "@/components/workspace/workspace-dashboard";
 import { WorkspaceLoadingSkeleton } from "@/components/workspace/workspace-loading-skeleton";
 import { requirePermission } from "@/lib/auth-guard";
 import { hasPermission } from "@/lib/authz";
 import { listUnassignedInboundConversations } from "@/lib/social/inbound-routing-store";
 import {
+  readWorkspaceBusinessFunnel,
   readWorkspaceProjectOverview,
   readWorkspaceProjects,
   readWorkspaceTasks,
 } from "@/lib/workspace/read-model";
+
+async function BusinessFunnelContent({ actorId }: { actorId: string }) {
+  let funnel = null;
+  try {
+    funnel = await readWorkspaceBusinessFunnel(actorId);
+  } catch {
+    /* Keep task access available if this optional read fails. */
+  }
+  return <BusinessFunnelPanel funnel={funnel} />;
+}
 
 type Props = { searchParams: Promise<{ view?: string }> };
 export const prefetch = "partial";
@@ -32,7 +44,11 @@ async function WorkspaceContent({ searchParams }: Props) {
       inbound={inbound}
       currentTime={Date.now()}
       view={(await searchParams).view}
-    />
+    >
+      <Suspense fallback={<p role="status">正在读取业务漏斗…</p>}>
+        <BusinessFunnelContent actorId={session.user.id} />
+      </Suspense>
+    </WorkspaceDashboard>
   );
 }
 export default function WorkspacePage(props: Props) {

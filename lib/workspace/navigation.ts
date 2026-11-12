@@ -54,7 +54,8 @@ export function workspaceReturnTo(value: unknown): string | undefined {
   for (const entry of url.searchParams.values())
     if ([...entry].some((character) => character.charCodeAt(0) < 32 || character === "\\"))
       return undefined;
-  const allowed = url.pathname === "/workspace" ? ["view"] : ["project", "type", "state"];
+  const allowed = url.pathname === "/workspace" ? ["view"] : ["project", "type", "state", "q"];
+  if ((url.searchParams.get("q")?.length ?? 0) > 200) return undefined;
   if (
     [...url.searchParams.keys()].some(
       (key) => !allowed.includes(key) || url.searchParams.getAll(key).length !== 1,

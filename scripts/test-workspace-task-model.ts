@@ -1,3 +1,4 @@
+import "./test-workspace-library";
 import assert from "node:assert/strict";
 import { deriveWorkspaceLibrary } from "../lib/workspace/library-model";
 import { workspaceTaskHref } from "../lib/workspace/navigation";
@@ -286,7 +287,7 @@ assert.equal(
 const planned = offlineTasks.find((task) => task.id === "planned");
 assert.equal(planned?.state, "scheduled");
 assert.match(planned?.detail ?? "", /下一动作：收集样品需求，交由人工确认/);
-assert.match(planned?.detail ?? "", /2026-09-20T00:00:00.000Z/);
+assert.equal(planned?.dueAt?.toISOString(), "2026-09-20T00:00:00.000Z");
 assert.equal(offlineTasks.find((task) => task.id === "approved")?.state, "waiting");
 assert.deepEqual(
   offlineTasks

@@ -1,6 +1,7 @@
 import { hasPermission, type Permission } from "@/lib/authz";
 import { rfqMissingLabel, salesNextActionLabels } from "@/lib/sales/journey";
 import { workspaceCollection, workspaceTaskHref } from "./navigation";
+import { workspaceTaskContext } from "./task-context";
 import type {
   WorkspaceProjectOverview,
   WorkspaceProjectSummary,
@@ -180,6 +181,7 @@ export function deriveWorkspaceTasks(
       const responsibleLabel =
         values.responsibleLabel ??
         (permission.endsWith(":review") ? "有审核权限的项目编辑者" : "项目编辑者");
+      const context = workspaceTaskContext(record, records);
       tasks.push({
         id: record.id,
         projectId: project.id,
@@ -188,6 +190,11 @@ export function deriveWorkspaceTasks(
         priority: "complete",
         createdAt: record.createdAt,
         ...values,
+        ...context,
+        nextAction:
+          values.taskType === "opportunity"
+            ? values.actionLabel
+            : (context.nextAction ?? values.actionLabel),
         destination:
           values.destination ??
           (values.source
@@ -368,7 +375,7 @@ export function deriveWorkspaceTasks(
               ? "规则评分达到 HOT，仍需人工认定。"
               : `${nextActionLabel ? `下一动作：${nextActionLabel}。` : ""}${
                   dueAt
-                    ? `计划跟进：${dueAt.toISOString()}`
+                    ? "按计划时间跟进，先核对客户最新情况。"
                     : "尚未安排下次跟进，请核对客户上下文。"
                 }`,
             state: scheduled ? "scheduled" : "actionable",

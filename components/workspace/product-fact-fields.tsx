@@ -12,6 +12,7 @@ import { Controller, type UseFormReturn, useFormState, useWatch } from "react-ho
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
@@ -23,7 +24,6 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { kitContentValues, type ProductCatalogForm } from "@/lib/product/catalog-form-schema";
+import { productFormFactStatusLabels, productFormReadiness } from "@/lib/product/form-readiness";
 import { isProductEvidenceLocationRef } from "@/lib/product/retained-evidence";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
@@ -294,11 +295,11 @@ export function ProductFields({
       productEvidenceBindings.filter(([valueName]) => valueName !== "kitContents" || !kitDisabled),
     [kitDisabled],
   );
-  const completed = visibleBindings.filter(
-    ([valueName, evidenceName]) =>
-      String(values[valueName] ?? "").trim() && String(values[evidenceName] ?? "").trim(),
-  ).length;
-  const completion = Math.round((completed / visibleBindings.length) * 100);
+  const readiness = productFormReadiness(
+    values,
+    evidenceOptions.map((option) => option.id),
+    form.formState.defaultValues,
+  );
   const errorEntries = Object.entries(errors).filter(([, error]) => Boolean(error));
   useEffect(() => {
     if (!submitCount || !errorEntries.length) return;
@@ -326,10 +327,45 @@ export function ProductFields({
   return (
     <EvidenceOptionsContext.Provider value={evidenceOptions}>
       <div ref={rootRef} className="flex flex-col gap-5">
-        <Progress value={completion}>
-          <ProgressLabel>产品信息与来源填写进度</ProgressLabel>
-          <ProgressValue />
-        </Progress>
+        <Card aria-labelledby={fieldId("readiness-title")}>
+          <CardHeader>
+            <CardTitle id={fieldId("readiness-title")}>关键资料准备</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 text-sm">
+            <dl className="grid gap-2">
+              {readiness.core.map((fact) => (
+                <div key={fact.name} className="flex flex-wrap justify-between gap-2">
+                  <dt>{fact.label}</dt>
+                  <dd>{productFormFactStatusLabels[fact.status]}</dd>
+                </div>
+              ))}
+            </dl>
+            <p>{readiness.identity}</p>
+            <p>{readiness.sourceStatus}</p>
+            <p role="status" aria-atomic="true">
+              来源覆盖：{readiness.linked} / {readiness.filled} 项已填写信息已关联当前可选资料
+              {readiness.retained ? `；${readiness.retained} 项保留原来源，待确认访问` : ""}
+            </p>
+            {readiness.needsAttention.length ? (
+              <p>
+                待处理：
+                {readiness.needsAttention
+                  .map((fact) => `${fact.label}（${productFormFactStatusLabels[fact.status]}）`)
+                  .join("、")}
+              </p>
+            ) : null}
+            {readiness.orphaned.length ? (
+              <p>
+                仅有来源而未填写值：{readiness.orphaned.map((fact) => fact.label).join("、")}
+                。请核对或清除对应来源。
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              未知的可选规格和商业信息可留空，不影响来源覆盖。关联资料不代表事实已核实， 也不代表
+              Product Ready；所有已填写事实仍须核对来源，正式报价和交期须由人工确认。
+            </p>
+          </CardContent>
+        </Card>
         {submitCount > 0 && errorEntries.length ? (
           <Alert variant="destructive" role="alert">
             <AlertTitle>还有 {errorEntries.length} 项需要处理</AlertTitle>

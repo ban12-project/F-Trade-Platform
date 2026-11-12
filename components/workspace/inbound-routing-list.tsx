@@ -1,10 +1,14 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { FolderInputIcon, FolderPlusIcon, InboxIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useRef, useState, useTransition } from "react";
+import { Controller, useForm } from "react-hook-form";
+import type { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +29,9 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { type ClosingActionState, initialClosingActionState } from "@/lib/action-states";
 import { routeInboundConversationAction } from "@/lib/actions/closing";
+import { readInboundContextAction } from "@/lib/actions/inbound-context";
+import { inboundRoutingFormSchema } from "@/lib/form-schemas";
+import type { InboundContextPreview } from "@/lib/social/inbound-context-store";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
@@ -40,7 +47,41 @@ function RoutingDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [projectId, setProjectId] = useState("");
+  const [preview, setPreview] = useState<InboundContextPreview | null>(null);
+  const [previewError, setPreviewError] = useState("");
+  const [loading, loadTransition] = useTransition();
+  const generation = useRef(0);
+  const form = useForm<z.infer<typeof inboundRoutingFormSchema>>({
+    resolver: zodResolver(inboundRoutingFormSchema),
+    defaultValues: {
+      conversationId: inbound.id,
+      mode,
+      projectId: "",
+      reviewedMessageAt: "",
+      reviewedContextDigest: "",
+    },
+  });
+  const projectId = form.watch("projectId");
+  const confirmed = form.watch("confirmed");
+  function loadPreview() {
+    const request = ++generation.current;
+    setPreview(null);
+    setPreviewError("");
+    form.resetField("confirmed");
+    loadTransition(async () => {
+      try {
+        const result = await readInboundContextAction({ conversationId: inbound.id });
+        if (generation.current !== request) return;
+        if (result.preview) {
+          setPreview(result.preview);
+          form.setValue("reviewedMessageAt", result.preview.reviewedMessageAt);
+          form.setValue("reviewedContextDigest", result.preview.reviewedContextDigest);
+        } else setPreviewError(result.error);
+      } catch {
+        if (generation.current === request) setPreviewError("上下文未加载，请检查连接后重试。");
+      }
+    });
+  }
   const [state, action, pending] = useActionState(
     async (previous: ClosingActionState, formData: FormData) => {
       const result = await routeInboundConversationAction(previous, formData);
@@ -55,7 +96,20 @@ function RoutingDialog({
   );
   const creating = mode === "create";
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (pending) return;
+        setOpen(next);
+        form.reset();
+        if (next) loadPreview();
+        else {
+          generation.current++;
+          setPreview(null);
+          setPreviewError("");
+        }
+      }}
+    >
       <DialogTrigger
         render={
           <Button
@@ -78,19 +132,61 @@ function RoutingDialog({
           <DialogDescription>
             {creating
               ? `项目名将使用“入站线索 ${inbound.shortReference}”，不会暴露客户姓名或账号。`
-              : "只显示你有权编辑的销售项目；原始消息仍留在受控会话存储中。"}
+              : "只显示你有权编辑的销售项目；关联后，该项目的授权成员可查看保留期内的客户会话。"}
           </DialogDescription>
         </DialogHeader>
-        <form action={action} className="space-y-4">
-          <input type="hidden" name="conversationId" value={inbound.id} />
-          <input type="hidden" name="mode" value={mode} />
+        <form
+          onSubmit={form.handleSubmit((value) => {
+            const data = new FormData();
+            for (const [key, entry] of Object.entries(value)) if (entry) data.set(key, entry);
+            startTransition(() => action(data));
+          })}
+          className="space-y-4"
+        >
+          <section aria-label="入站上下文" className="space-y-2 rounded-lg border p-3">
+            <p className="text-sm font-medium">最近 3 条入站消息片段</p>
+            <p className="text-xs text-muted-foreground">
+              仅入站账号负责人可查看。原文是客户陈述，不代表产品事实已核实；不会复制到项目名。
+            </p>
+            {loading ? <p role="status">正在核对权限并加载上下文…</p> : null}
+            {previewError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {previewError}
+              </p>
+            ) : null}
+            {preview?.messages.map((message) => (
+              <div key={message.id} className="rounded bg-muted p-2">
+                <time dateTime={message.receivedAt} className="text-xs text-muted-foreground">
+                  {new Date(message.receivedAt).toLocaleString("zh-CN")}
+                </time>
+                <p className="whitespace-pre-wrap break-words text-sm">{message.excerpt}</p>
+                {message.truncated ? (
+                  <p className="text-xs text-muted-foreground">片段已截断</p>
+                ) : null}
+              </div>
+            ))}
+            {preview && !preview.messages.length ? (
+              <p className="text-sm">没有仍在保留期内的入站消息，暂不能确认分流。</p>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={loadPreview}
+              disabled={loading || pending}
+            >
+              重新查看上下文
+            </Button>
+          </section>
           {!creating ? (
             <Field>
               <FieldLabel htmlFor={`project-${inbound.id}`}>销售项目</FieldLabel>
               <Select
                 name="projectId"
                 value={projectId}
-                onValueChange={(value) => setProjectId(value ?? "")}
+                onValueChange={(value) => {
+                  form.setValue("projectId", value ?? "");
+                  form.resetField("confirmed");
+                }}
               >
                 <SelectTrigger id={`project-${inbound.id}`} className="min-h-11 w-full">
                   <SelectValue>
@@ -105,9 +201,37 @@ function RoutingDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <FieldDescription>关联后，这条入站会话会成为该项目的线索入口。</FieldDescription>
+              <FieldDescription>
+                请核对所选项目及其成员范围，确认这条客户会话可以归入该项目。
+              </FieldDescription>
             </Field>
           ) : null}
+          <Controller
+            control={form.control}
+            name="confirmed"
+            render={({ field }) => (
+              <Field orientation="horizontal">
+                <Checkbox
+                  id={`confirm-${mode}-${inbound.id}`}
+                  checked={field.value === "yes"}
+                  onCheckedChange={(checked) => field.onChange(checked ? "yes" : undefined)}
+                  disabled={
+                    loading || pending || !preview?.messages.length || (!creating && !projectId)
+                  }
+                />
+                <FieldLabel htmlFor={`confirm-${mode}-${inbound.id}`}>
+                  {creating
+                    ? `我已核对上下文，确认创建“入站线索 ${inbound.shortReference}”`
+                    : `我已核对上下文，确认关联“${salesProjects.find((project) => project.id === projectId)?.title ?? "所选项目"}”`}
+                </FieldLabel>
+              </Field>
+            )}
+          />
+          {Object.values(form.formState.errors).map((error) => (
+            <p key={error.message} role="alert" className="text-sm text-destructive">
+              {error.message}
+            </p>
+          ))}
           {state.message ? (
             <p
               aria-live="polite"
@@ -124,7 +248,13 @@ function RoutingDialog({
             <Button
               type="submit"
               className="min-h-11"
-              disabled={pending || (!creating && !projectId)}
+              disabled={
+                pending ||
+                loading ||
+                !preview?.messages.length ||
+                confirmed !== "yes" ||
+                (!creating && !projectId)
+              }
             >
               {pending ? <Spinner data-icon="inline-start" /> : null}
               {creating ? `创建“入站线索 ${inbound.shortReference}”` : "关联所选项目"}

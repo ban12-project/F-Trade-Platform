@@ -1,0 +1,34 @@
+// SYNTHETIC ONLY: no database, media services, customer data or external adapters.
+import { FatalError, getStepMetadata, RetryableError, sleep } from "workflow";
+
+async function syntheticStep(value: number) {
+  "use step";
+  return { value: value + 1, stepId: getStepMetadata().stepId };
+}
+
+async function retryOnce() {
+  "use step";
+  const { attempt } = getStepMetadata();
+  if (attempt === 1) throw new RetryableError("synthetic transient failure", { retryAfter: 50 });
+  return attempt;
+}
+
+async function fatalStep() {
+  "use step";
+  throw new FatalError("synthetic terminal failure");
+}
+
+export async function syntheticLifecycle(value: number) {
+  "use workflow";
+  const first = await syntheticStep(value);
+  await sleep("100ms");
+  const attempt = await retryOnce();
+  const last = await syntheticStep(first.value);
+  return { first, last, attempt };
+}
+
+export async function syntheticFailure() {
+  "use workflow";
+  await syntheticStep(0);
+  await fatalStep();
+}

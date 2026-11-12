@@ -6,7 +6,7 @@ const port = "3119";
 const origin = `http://127.0.0.1:${port}`;
 const child = spawn(
   process.execPath,
-  ["node_modules/next/dist/bin/next", "start", "--port", port],
+  ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", port],
   {
     env: { ...process.env, NEXT_ENABLE_TESTING_API: "0" },
     stdio: ["ignore", "inherit", "inherit"],

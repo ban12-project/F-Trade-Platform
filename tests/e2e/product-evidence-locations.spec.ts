@@ -20,6 +20,8 @@ test("PDF source positions stay attached to the matched field", async ({ page })
   await expect(
     source.getByRole("link", { name: "打开来源原件（新窗口）", exact: true }),
   ).toHaveAttribute("href", original);
+  await page.getByRole("combobox", { name: "核对字段" }).click();
+  await page.getByRole("option", { name: "产品编号", exact: true }).click();
   const missingField = source
     .locator("div")
     .filter({ has: page.getByText("产品编号", { exact: true }) });
@@ -31,9 +33,12 @@ test("PDF source positions stay attached to the matched field", async ({ page })
 
 test("CSV positions and legacy sources do not create PDF page targets", async ({ page }) => {
   await page.goto(path);
+  await page.getByRole("combobox", { name: "核对字段" }).click();
+  await page.getByRole("option", { name: "OE 编号", exact: true }).click();
   const csv = page.getByRole("region", { name: "MOCK CSV source locations", exact: true });
   await expect(csv.getByText("来源位置：解析文本第 3 行", { exact: true })).toBeVisible();
   await expect(csv.locator('a[href*="#page="]')).toHaveCount(0);
+  await page.goto("/testing/project-workflow?record=product&state=product-review");
   const legacy = page.getByRole("region", { name: "MOCK mixed source coverage", exact: true });
   await expect(legacy.locator('a[href*="#page="]')).toHaveCount(0);
   await expect(legacy.getByText(/来源位置：/)).toHaveCount(0);
