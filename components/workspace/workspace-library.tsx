@@ -6,8 +6,14 @@ import { useEffect, useId, useRef, useSyncExternalStore, useTransition } from "r
 import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
@@ -55,6 +61,7 @@ export function WorkspaceLibrary({
   recordType,
   state,
   search = "",
+  searchError,
   basePath,
 }: {
   collection: WorkspaceCollection;
@@ -64,6 +71,7 @@ export function WorkspaceLibrary({
   recordType?: string;
   state?: string;
   search?: string;
+  searchError?: string;
   basePath?: string;
 }) {
   const id = useId();
@@ -113,16 +121,17 @@ export function WorkspaceLibrary({
   function filter(key: LibraryFilterKey, value: string) {
     navigate(updateWorkspaceLibraryFilter(records, collection, query, key, value));
   }
-  const rows = unavailable
-    ? []
-    : records.filter(
-        (record) =>
-          record.collection === collection &&
-          (!projectId || record.projectId === projectId) &&
-          (!recordType || record.kind === recordType) &&
-          (!state || record.state === state) &&
-          matchesWorkspaceLibrarySearch(record, search),
-      );
+  const rows =
+    unavailable || searchError
+      ? []
+      : records.filter(
+          (record) =>
+            record.collection === collection &&
+            (!projectId || record.projectId === projectId) &&
+            (!recordType || record.kind === recordType) &&
+            (!state || record.state === state) &&
+            matchesWorkspaceLibrarySearch(record, search),
+        );
   const activeFilters: {
     key: LibraryFilterKey;
     label: string;
@@ -164,7 +173,7 @@ export function WorkspaceLibrary({
           className="flex items-end gap-2"
           onSubmit={searchForm.handleSubmit(({ q }) => filter("q", q))}
         >
-          <Field className="min-w-0 flex-1">
+          <Field className="min-w-0 flex-1" data-invalid={Boolean(searchError)}>
             <FieldLabel htmlFor={`${id}-search`}>搜索记录</FieldLabel>
             <Input
               key={search}
@@ -175,8 +184,11 @@ export function WorkspaceLibrary({
               placeholder="SKU、OE、产品名称、客户或公司"
               maxLength={200}
               disabled={controlsDisabled}
+              aria-invalid={Boolean(searchError)}
+              aria-describedby={searchError ? `${id}-search-error` : undefined}
               {...searchForm.register("q")}
             />
+            <FieldError id={`${id}-search-error`}>{searchError}</FieldError>
           </Field>
           <Button type="submit" variant="outline" disabled={controlsDisabled}>
             搜索
@@ -293,7 +305,9 @@ export function WorkspaceLibrary({
             ? "正在更新结果…"
             : unavailable
               ? "项目不可访问，请调整筛选。"
-              : `${query.size ? "找到" : "共"} ${new Intl.NumberFormat("zh-CN").format(rows.length)} 条记录`}
+              : searchError
+                ? "搜索条件无效，请修改后重新搜索。"
+                : `${query.size ? "找到" : "共"} ${new Intl.NumberFormat("zh-CN").format(rows.length)} 条记录`}
         </p>
         {activeFilters.length ? (
           <ul aria-label="已选筛选条件" className="flex flex-wrap gap-2">
@@ -397,22 +411,37 @@ export function WorkspaceLibrary({
             <EmptyTitle>
               {emptyState === "unavailable"
                 ? "这个项目不可访问"
-                : emptyState === "no_matches"
-                  ? "没有匹配的记录"
-                  : `暂无${collectionLabels[collection]}记录`}
+                : searchError
+                  ? "无法执行搜索"
+                  : emptyState === "no_matches"
+                    ? "没有匹配的记录"
+                    : `暂无${collectionLabels[collection]}记录`}
             </EmptyTitle>
             <EmptyDescription>
               {emptyState === "unavailable"
                 ? "链接中的项目不存在或你不是成员。请选择可访问项目。"
-                : emptyState === "no_matches"
-                  ? "试试其他关键词，或调整项目、类型和状态。也可以清除全部筛选查看所有可访问记录。"
-                  : collection === "products"
-                    ? "从工厂资料或人工录入开始，核验后才能用于营销与报价。"
-                    : collection === "content"
-                      ? "先完成产品资料核验，再选择已核验产品制作内容；视频是可选形式。"
-                      : "记录客户已经提出的需求，再补齐产品、数量和目的地。"}
+                : searchError
+                  ? "请重新输入关键词，或清除无效搜索后查看当前筛选范围内的记录。"
+                  : emptyState === "no_matches"
+                    ? "试试其他关键词，或调整项目、类型和状态。也可以清除全部筛选查看所有可访问记录。"
+                    : collection === "products"
+                      ? "从工厂资料或人工录入开始，核验后才能用于营销与报价。"
+                      : collection === "content"
+                        ? "先完成产品资料核验，再选择已核验产品制作内容；视频是可选形式。"
+                        : "记录客户已经提出的需求，再补齐产品、数量和目的地。"}
             </EmptyDescription>
           </EmptyHeader>
+          {searchError ? (
+            <EmptyContent>
+              <Button
+                variant="outline"
+                disabled={controlsDisabled}
+                onClick={() => navigate(query, `${id}-search`)}
+              >
+                清除无效搜索
+              </Button>
+            </EmptyContent>
+          ) : null}
         </Empty>
       )}
     </div>

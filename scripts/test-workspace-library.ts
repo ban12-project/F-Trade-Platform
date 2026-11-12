@@ -70,9 +70,12 @@ assert.equal(matchesWorkspaceLibrarySearch(missing, "undefined"), false);
 assert.equal(JSON.stringify(rows).includes("excluded-"), false);
 assert.equal(JSON.stringify(rows).includes("unit_price"), false);
 assert.equal(JSON.stringify(librarySnapshot), before);
-assert.equal(parseLibrarySearch("  Alice  "), "Alice");
-assert.equal(parseLibrarySearch(["Alice"]), "");
-assert.equal(parseLibrarySearch("x".repeat(201)), "");
+assert.deepEqual(parseLibrarySearch("  Alice  "), { q: "Alice", error: undefined });
+assert.deepEqual(parseLibrarySearch(undefined), { q: "", error: undefined });
+assert.deepEqual(parseLibrarySearch(" "), { q: "", error: undefined });
+assert.equal(parseLibrarySearch("x".repeat(200)).q.length, 200);
+assert.equal(parseLibrarySearch(["Alice"]).error, "搜索链接格式无效，请重新输入关键词。");
+assert.equal(parseLibrarySearch("x".repeat(201)).error, "搜索内容不能超过 200 个字符");
 console.log("Workspace library search and safe business projection checks passed.");
 
 const current = new URLSearchParams({

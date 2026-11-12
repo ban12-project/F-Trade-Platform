@@ -196,3 +196,35 @@ test("empty, unmatched and inaccessible project states stay distinct and recover
   await page.getByRole("button", { name: "清除全部筛选" }).click();
   await expect(page.getByRole("link", { name: /Synthetic clutch kit/ })).toBeVisible();
 });
+
+for (const invalid of [
+  { query: `q=${"x".repeat(201)}`, message: "搜索内容不能超过 200 个字符" },
+  { query: "q=alice&q=bob", message: "搜索链接格式无效，请重新输入关键词。" },
+]) {
+  test(`invalid search is explicit and preserves other filters: ${invalid.message}`, async ({
+    page,
+  }) => {
+    const scope = `project=${libraryIds.first}&type=product&state=PRODUCT_READY`;
+    await page.goto(`${root}?${scope}&${invalid.query}`);
+    const search = page.getByRole("searchbox", { name: "搜索记录", exact: true });
+    await expect(search).toHaveAccessibleDescription(invalid.message);
+    await expect(search).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByText("无法执行搜索", { exact: true })).toBeVisible();
+    await expect(page.getByRole("list", { name: "资料库记录", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("status").filter({ hasText: "搜索条件无效" })).toBeVisible();
+    await page.getByRole("button", { name: "清除无效搜索", exact: true }).click();
+    await expect(page).toHaveURL(`${root}?${scope}`);
+    await expect(search).toBeFocused();
+    await expect(search).toHaveAttribute("aria-invalid", "false");
+    await expect(page.getByRole("list", { name: "资料库记录", exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(search).toHaveAccessibleDescription(invalid.message);
+    await search.fill("SYN-CLUTCH-001");
+    await page.getByRole("button", { name: "搜索", exact: true }).click();
+    await expect(page).toHaveURL(`${root}?${scope}&q=SYN-CLUTCH-001`);
+    await expect(search).not.toHaveAttribute("aria-describedby");
+    await expect(page.getByRole("list", { name: "资料库记录", exact: true })).toContainText(
+      "Synthetic clutch kit",
+    );
+  });
+}
