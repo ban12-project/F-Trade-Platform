@@ -1,8 +1,103 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { libraryIds } from "../fixtures/workspace-library";
 
 const root = "/testing/workspace-library/products";
 const customers = "/testing/workspace-library/customers";
+
+test("library controls wait for hydration before accepting filter changes", async ({ page }) => {
+  let release = () => {};
+  const scriptsReady = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(/\/_next\/static\/.*\.js(?:\?|$)/, async (route) => {
+    await scriptsReady;
+    await route.continue();
+  });
+  const project = page.getByRole("combobox", { name: "归属项目" });
+  try {
+    await page.goto(`${customers}?project=${libraryIds.first}&q=alice`, { waitUntil: "commit" });
+    await expect(project).toBeVisible();
+    await expect(project).toBeDisabled();
+    await expect(page.getByRole("searchbox", { name: "搜索记录" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "移除筛选：关键词：alice" })).toBeDisabled();
+    await expect(page.getByRole("status").filter({ hasText: "找到 4 条记录" })).toBeVisible();
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+  await expect(project).toBeEnabled();
+  await project.selectOption(libraryIds.second);
+  await expect(page).toHaveURL(`${customers}?project=${libraryIds.second}&q=alice`);
+  await expect(page.getByRole("status").filter({ hasText: "找到 0 条记录" })).toBeVisible();
+});
+
+test("filter summary counts results and removes one condition with keyboard focus and history", async ({
+  page,
+}) => {
+  await page.goto(
+    `${customers}?project=${libraryIds.first}&type=rfq&state=RFQ_COLLECTING&q=missing`,
+  );
+  const status = page.getByRole("status").filter({ hasText: /条记录|正在更新/ });
+  await expect(status).toHaveText("找到 0 条记录");
+  const filters = page.getByRole("list", { name: "已选筛选条件" });
+  await expect(filters.getByRole("button")).toHaveCount(4);
+  const removeSearch = filters.getByRole("button", { name: "移除筛选：关键词：missing" });
+  await removeSearch.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(
+    `${customers}?project=${libraryIds.first}&type=rfq&state=RFQ_COLLECTING`,
+  );
+  await expect(status).toHaveText("找到 1 条记录");
+  await expect(page.getByRole("searchbox", { name: "搜索记录" })).toBeFocused();
+  await expect(filters.getByRole("button")).toHaveCount(3);
+  await page.reload();
+  await expect(status).toHaveText("找到 1 条记录");
+  await page.goBack();
+  await expect(status).toHaveText("找到 0 条记录");
+  await expect(removeSearch).toBeVisible();
+});
+
+test("individual filter removal preserves dirty drafts until confirmed", async ({ page }) => {
+  await page.goto(`${customers}?project=${libraryIds.first}&type=rfq&state=RFQ_COLLECTING&q=alice`);
+  await page.getByLabel("测试草稿").fill("Synthetic pending change");
+  const removeType = page.getByRole("button", { name: "移除筛选：类型：客户询盘" });
+  await removeType.click();
+  const confirmation = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await confirmation.getByRole("button", { name: "继续编辑" }).click();
+  await expect(page).toHaveURL(/type=rfq&state=RFQ_COLLECTING&q=alice/);
+  await expect(page.getByLabel("测试草稿")).toHaveValue("Synthetic pending change");
+  await removeType.click();
+  await confirmation.getByRole("button", { name: "放弃修改并离开" }).click();
+  await expect(page).toHaveURL(
+    `${customers}?project=${libraryIds.first}&state=RFQ_COLLECTING&q=alice`,
+  );
+  await expect(page.getByRole("combobox", { name: "记录类型" })).toBeFocused();
+});
+
+test("long and unknown filters stay accessible and recoverable on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const longSearch = "SYNTHETIC".repeat(22);
+  await page.goto(
+    `${root}?project=private-project-code&type=constructor&state=private-state&q=${longSearch}`,
+  );
+  await expect(page.getByRole("status").filter({ hasText: "项目不可访问" })).toBeVisible();
+  const filters = page.getByRole("list", { name: "已选筛选条件" });
+  await expect(filters).not.toContainText("private-project-code");
+  await expect(filters).not.toContainText("constructor");
+  await expect(filters).not.toContainText("private-state");
+  for (const button of await filters.getByRole("button").all()) {
+    const bounds = await button.boundingBox();
+    expect(bounds?.height).toBeGreaterThanOrEqual(44);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  const audit = await new AxeBuilder({ page }).include('[aria-label="已选筛选条件"]').analyze();
+  expect(audit.violations).toEqual([]);
+  await page.getByRole("button", { name: "清除全部筛选" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "共 2 条记录" })).toBeVisible();
+  await expect(filters).toHaveCount(0);
+  await expect(page.getByRole("searchbox", { name: "搜索记录" })).toBeFocused();
+});
 test("business search keeps identifiers and URL state across reload and history", async ({
   page,
 }) => {
