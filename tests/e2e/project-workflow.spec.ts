@@ -366,3 +366,39 @@ test("customer delivery is optional and an ineligible opportunity is explained",
   await expect(panel.getByRole("button", { name: "确认有效商机", exact: true })).toHaveCount(0);
   await expect(panel.getByText(/采购意向尚待确认/)).toBeVisible();
 });
+
+test("product review validation focuses missing evidence then rejection notes without submitting", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/testing/project-workflow?record=product&state=product-review");
+  let writes = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"]) writes++;
+  });
+  const detail = page.getByRole("region", { name: "业务记录", exact: true });
+  const decision = detail.getByRole("combobox", { name: "决定", exact: true });
+  const evidence = detail.getByRole("combobox", { name: "审核依据", exact: true });
+  const notes = detail.getByRole("textbox", { name: "审核备注", exact: false });
+  await decision.click();
+  await page.getByRole("option", { name: "退回产品信息", exact: true }).click();
+  const submit = detail.getByRole("button", { name: "退回产品信息", exact: true });
+  await submit.click();
+  await expect(evidence).toBeFocused();
+  await expect(evidence).toHaveAttribute("aria-invalid", "true");
+  await expect(evidence).toHaveAccessibleDescription("请选择来源资料。");
+  await evidence.press("ArrowDown");
+  await page.getByRole("option", { name: /Synthetic review evidence/ }).click();
+  await submit.click();
+  await expect(notes).toBeFocused();
+  await expect(notes).toHaveAccessibleDescription("退回产品事实时必须填写原因。");
+  await expect(notes).toHaveAttribute("aria-invalid", "true");
+  await expect(evidence).toHaveAttribute("aria-invalid", "false");
+  await expect(evidence).not.toHaveAttribute("aria-describedby");
+  await notes.fill("Synthetic: please provide the original factory evidence.");
+  await expect(notes).toHaveAttribute("aria-invalid", "false");
+  await expect(notes).not.toHaveAttribute("aria-describedby");
+  await expect(decision).toContainText("退回产品信息");
+  await expect(evidence).toContainText("Synthetic review evidence");
+  expect(writes).toBe(0);
+});
