@@ -597,11 +597,20 @@ export function QuotationPanel({
           <QuotationForm key="new" projectId={projectId} rfqs={ready} products={products} />
         ) : (
           <Alert>
-            <AlertTitle>{!ready.length ? "先确认客户需求" : "先添加报价产品"}</AlertTitle>
+            <AlertTitle>
+              {!ready.length && !products.length
+                ? "先准备客户需求与报价产品"
+                : !ready.length
+                  ? "先确认客户需求"
+                  : "先添加报价产品"}
+            </AlertTitle>
             <AlertDescription>
-              {!ready.length
-                ? "客户需求确认完整后，才能填写正式报价。"
-                : "在下方添加已核实产品后，即可填写价格和交易条件。"}
+              {!ready.length ? <p>客户需求确认完整后，才能填写正式报价。</p> : null}
+              {!products.length ? (
+                <p>
+                  请在“添加已有产品”中关联已核实产品；若没有可添加产品，请先前往产品资料库完成资料核实。
+                </p>
+              ) : null}
             </AlertDescription>
             {!ready.length ? (
               <WorkspaceLink
