@@ -42,6 +42,7 @@ export function EvidenceSelect({
   onValueChange,
   onBlur,
   inputRef,
+  "aria-describedby": describedBy,
   invalid,
   disabled,
   videoId,
@@ -54,6 +55,7 @@ export function EvidenceSelect({
   onValueChange: (value: string) => void;
   onBlur?: () => void;
   inputRef?: React.Ref<HTMLButtonElement>;
+  "aria-describedby"?: string;
   invalid?: boolean;
   disabled?: boolean;
   options?: EvidenceChoice[];
@@ -98,7 +100,7 @@ export function EvidenceSelect({
           ref={inputRef}
           onBlur={onBlur}
           aria-invalid={invalid}
-          aria-describedby={descriptionId}
+          aria-describedby={[descriptionId, describedBy].filter(Boolean).join(" ")}
           className="w-full"
         >
           <SelectValue placeholder="请选择已保存的资料">
