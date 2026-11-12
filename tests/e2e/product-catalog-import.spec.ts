@@ -197,3 +197,98 @@ test("shared intake keeps the chosen file across methods and protects abandoning
   await expect(page.getByText("所选文件：synthetic-shared.csv", { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+for (const outcome of ["transport", "permission"]) {
+  test(`catalog lookup ${outcome} failure retries reading without losing source or creating work`, async ({
+    page,
+  }) => {
+    let reads = 0;
+    let uploads = 0;
+    let releaseRetry = () => {};
+    const retryReady = new Promise<void>((resolve) => {
+      releaseRetry = resolve;
+    });
+    const projectId = "00000000-0000-4000-8000-000000000202";
+    const productId = "00000000-0000-4000-8000-000000000902";
+    const view: CatalogImportView | null =
+      outcome === "transport"
+        ? {
+            id: "00000000-0000-4000-8000-000000000901",
+            status: "ready",
+            failureCode: null,
+            candidates: [
+              {
+                id: productId,
+                identifier: "SYNTHETIC-RESTORED",
+                physicalPage: 1,
+                recordLine: 1,
+                duplicateIdentifier: false,
+                status: "completed",
+                attempts: 1,
+                failureCode: null,
+                productId,
+              },
+            ],
+          }
+        : null;
+    await page.route("**/api/product-documents/upload", async (route) => {
+      uploads++;
+      await route.abort();
+    });
+    await page.route("**/testing/project-workflow?**", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      // A lookup accepts just the project id; all intake/selection/retry writes accept objects.
+      expect(JSON.parse(route.request().postData() ?? "[]")).toEqual([projectId]);
+      reads++;
+      if (reads === 2) await retryReady;
+      if (reads === 1 && outcome === "transport") return route.abort("failed");
+      const result =
+        reads === 1
+          ? { status: "error", message: "Synthetic: project access unavailable." }
+          : { status: "success", view };
+      return route.fulfill({
+        contentType: "text/x-component",
+        body: `0:{"a":"$@1","f":"","b":"synthetic"}\n1:${JSON.stringify(result)}\n`,
+      });
+    });
+    await page.goto("/testing/project-workflow?record=product");
+    const source = page.getByLabel("产品资料", { exact: true });
+    await source.setInputFiles({
+      name: "synthetic-preserved.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("Product name,SKU\nSynthetic,MOCK-RECOVERY\n"),
+    });
+    await page.getByRole("tab", { name: "产品目录", exact: true }).click();
+    const retry = page.getByRole("button", { name: "重试读取已有任务", exact: true });
+    await expect(retry).toBeEnabled();
+    await expect(page.getByRole("button", { name: "上传并解析目录" })).toBeDisabled();
+    await expect(
+      page.getByText("所选文件：synthetic-preserved.csv", { exact: true }),
+    ).toBeVisible();
+    await retry.click();
+    try {
+      await expect(retry).toBeDisabled();
+      await expect(page.getByRole("button", { name: "上传并解析目录" })).toBeDisabled();
+    } finally {
+      releaseRetry();
+    }
+    await expect(retry).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "上传并解析目录" })).toBeEnabled();
+    await expect(
+      page.getByText("所选文件：synthetic-preserved.csv", { exact: true }),
+    ).toBeVisible();
+    if (view)
+      await expect(page.getByRole("button", { name: "查看草稿" })).toHaveAttribute(
+        "href",
+        `/workspace/${projectId}/records/product/${productId}`,
+      );
+    else await expect(page.getByRole("button", { name: "刷新进度" })).toHaveCount(0);
+    await expect(
+      view
+        ? page.locator("#catalog-progress")
+        : page.getByRole("button", { name: "上传并解析目录" }),
+    ).toBeFocused();
+    expect(reads).toBe(2);
+    expect(uploads).toBe(0);
+  });
+}

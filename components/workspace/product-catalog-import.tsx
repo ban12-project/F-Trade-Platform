@@ -104,6 +104,11 @@ export function ProductCatalogImport({
   const router = useRouter();
   const [view, setView] = useState<CatalogImportView | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const restoreFocus = useRef(false);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -153,25 +158,34 @@ export function ProductCatalogImport({
   const model = useWatch({ control: selection.control, name: "model" });
   const working = Boolean(isWorking(view));
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: The retry counter intentionally restarts this cancellable read.
   useEffect(() => {
     let cancelled = false;
+    setRestoring(true);
     void getLatestProductCatalogAction(projectId)
       .then((result) => {
         if (cancelled) return;
-        if (result.status === "success") setView(result.view);
-        else setError(result.message);
+        if (result.status === "success") {
+          setView(result.view);
+          setRestoreFailed(false);
+          setError("");
+        } else {
+          setRestoreFailed(true);
+          setError(result.message);
+        }
         setRestoring(false);
       })
       .catch(() => {
         if (!cancelled) {
-          setError("无法恢复目录任务，请刷新后重试。");
+          setRestoreFailed(true);
+          setError("无法恢复目录任务，请重试读取已有任务。");
           setRestoring(false);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, restoreAttempt]);
 
   useEffect(() => {
     if (!view || !working) return;
@@ -194,6 +208,13 @@ export function ProductCatalogImport({
       clearTimeout(timer);
     };
   }, [view, working, projectId, router]);
+
+  useEffect(() => {
+    if (!restoreFocus.current || restoring || restoreFailed) return;
+    restoreFocus.current = false;
+    if (view) progressRef.current?.focus();
+    else uploadButtonRef.current?.focus();
+  }, [restoring, restoreFailed, view]);
 
   function accept(result: CatalogActionResult) {
     if (result.status === "error") {
@@ -272,7 +293,7 @@ export function ProductCatalogImport({
                   ref={fileRef}
                   type="file"
                   accept=".pdf,.csv,.xls,.xlsx"
-                  disabled={pending || restoring || working}
+                  disabled={pending || restoring || restoreFailed || working}
                   aria-invalid={Boolean(uploadForm.formState.errors.document)}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -294,7 +315,11 @@ export function ProductCatalogImport({
               </FieldDescription>
               <FieldError errors={[uploadForm.formState.errors.document]} />
             </Field>
-            <Button type="submit" disabled={pending || restoring || working}>
+            <Button
+              ref={uploadButtonRef}
+              type="submit"
+              disabled={pending || restoring || restoreFailed || working}
+            >
               {pending ? "提交中…" : "上传并解析目录"}
             </Button>
           </FieldGroup>
@@ -304,10 +329,34 @@ export function ProductCatalogImport({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+        {restoreFailed && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted-foreground">
+              尚未确认是否有已提交的目录任务。请先恢复读取，避免重复上传；所选文件会保留。
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={restoring}
+              onClick={() => {
+                restoreFocus.current = true;
+                setRestoreAttempt((attempt) => attempt + 1);
+              }}
+            >
+              重试读取已有任务
+            </Button>
+          </div>
+        )}
         {restoring && <p role="status">正在恢复目录任务…</p>}
         {view && (
           <>
-            <div id="catalog-progress" className="flex flex-wrap items-center gap-2" role="status">
+            <div
+              ref={progressRef}
+              tabIndex={-1}
+              id="catalog-progress"
+              className="flex flex-wrap items-center gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+              role="status"
+            >
               <Badge variant="secondary">
                 {view.status === "ready"
                   ? `${view.candidates.length} 条候选`
