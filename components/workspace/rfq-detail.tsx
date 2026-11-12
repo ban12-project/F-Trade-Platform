@@ -32,25 +32,60 @@ export function RfqDetail({
       <div className="flex min-w-0 flex-col gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>客户需求</CardTitle>
-            <CardDescription>
-              {salesStateLabels[entry.state]} · {entry.formValues.customerName || "客户名称待补充"}
-            </CardDescription>
+            <CardTitle role="heading" aria-level={2}>
+              客户需求
+            </CardTitle>
+            <CardDescription>{salesStateLabels[entry.state]}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm">
-              {types.find(([type]) => type === entry.productType)?.[1] ?? "产品类型待确认"} ·{" "}
-              {entry.formValues.oeNumber ||
-                `${entry.formValues.vehicleBrand} ${entry.formValues.vehicleModel}`.trim() ||
-                "产品身份待补充"}
-            </p>
-            <p className="text-sm">
-              数量：{entry.quantity ?? "待补充"} · 目的地：{entry.destination ?? "待补充"}
-            </p>
+          <CardContent className="flex min-w-0 flex-col gap-5">
+            <section aria-label="已保存的客户信息" className="flex min-w-0 flex-col gap-3">
+              <h3 className="text-sm font-medium">客户信息</h3>
+              <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
+                {[
+                  ["客户名称", entry.formValues.customerName],
+                  ["公司", entry.formValues.customerCompany],
+                  ["客户国家", entry.formValues.customerCountry],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="mt-1 whitespace-pre-wrap break-words">{value || "未提供"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+            <section aria-label="已保存的采购需求" className="flex min-w-0 flex-col gap-3">
+              <h3 className="text-sm font-medium">采购需求</h3>
+              <p className="text-sm text-muted-foreground">
+                以下为客户提出的需求；OE、车型与规格仍需对照已核验产品，不能据此认定适配。
+              </p>
+              <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
+                {[
+                  ["产品类型", types.find(([type]) => type === entry.productType)?.[1]],
+                  ["OE / OEM 编号", entry.formValues.oeNumber],
+                  ["车辆品牌", entry.formValues.vehicleBrand],
+                  ["车型", entry.formValues.vehicleModel],
+                  [
+                    "数量",
+                    entry.quantity === null
+                      ? undefined
+                      : new Intl.NumberFormat("zh-CN").format(entry.quantity),
+                  ],
+                  ["目的地国家或港口", entry.destination],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="mt-1 whitespace-pre-wrap break-words">{value || "未提供"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
             <Progress aria-label="需求完整度" value={entry.completenessScore}>
               <ProgressLabel>需求完整度</ProgressLabel>
               <ProgressValue>{() => `${entry.completenessScore}%`}</ProgressValue>
             </Progress>
+            <p className="text-sm text-muted-foreground">
+              完整度仅表示需求收集情况，不代表产品事实已核实或报价已批准。
+            </p>
           </CardContent>
         </Card>
         {rfqCustomerRequirements.some(({ field }) => entry.formValues[field]) ? (
