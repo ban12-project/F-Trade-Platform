@@ -136,6 +136,19 @@ void (async () => {
     assert.equal(own.replyAvailable, true);
     assert.equal(own.timeline.length, 1);
     assert.equal(own.timeline[0].body, body);
+    const sourceContext = await readSalesJourney(project, actor, leadB, {
+      kind: "lead",
+      id: leadB,
+    });
+    assert.equal(
+      required(sourceContext.leads.find((entry) => entry.id === leadB)).timeline[0].body,
+      body,
+    );
+    assert(
+      sourceContext.leads
+        .filter((entry) => entry.id !== leadB)
+        .every((entry) => entry.timeline.length === 0),
+    );
   }
   for (const timelineLeadId of [leadA, leadC, foreignLead, randomUUID()]) {
     const entries = await listProjectLeads(project, owner, db, { timelineLeadId });

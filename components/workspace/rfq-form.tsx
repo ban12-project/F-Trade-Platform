@@ -46,6 +46,7 @@ import { nextClarification } from "@/lib/sales/clarification";
 import type { LeadEntry } from "@/lib/sales/closing-store";
 import { type InquiryField, inquiryFieldLabels } from "@/lib/sales/inquiry-history";
 import type { InquirySuggestion } from "@/lib/sales/inquiry-suggestions";
+import { leadChoiceLabel } from "@/lib/sales/lead-choice-label";
 import type { RfqEntry } from "@/lib/sales/store";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
@@ -100,6 +101,7 @@ export function RfqForm({
       : { ...emptyRfq, leadId: selectedLeadId ?? "" },
   });
   const values = useWatch({ control: form.control });
+  const leadLabels = new Map(leads.map((lead) => [lead.id, leadChoiceLabel(lead)]));
   const [suggesting, startSuggesting] = useTransition();
   const [suggestion, setSuggestion] = useState<InquirySuggestion | null>(null);
   const [suggestionMessage, setSuggestionMessage] = useState("");
@@ -221,10 +223,14 @@ export function RfqForm({
                       <SelectTrigger
                         aria-invalid={!!form.formState.errors.leadId}
                         id="rfq-lead"
-                        className="min-h-11 w-full"
+                        className="min-h-11 w-full py-2 data-[size=default]:h-auto [&_[data-slot=select-value]]:line-clamp-none"
                       >
                         <SelectValue>
-                          {field.value ? `客户会话 ${field.value.slice(0, 8)}` : "不关联客户会话"}
+                          <span className="min-w-0 whitespace-normal wrap-anywhere text-left">
+                            {field.value
+                              ? (leadLabels.get(field.value) ?? "已选会话暂不可显示，请核对来源")
+                              : "不关联客户会话"}
+                          </span>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -233,9 +239,15 @@ export function RfqForm({
                           {leads
                             .filter((lead) => lead.state === "LEAD_RECEIVED")
                             .map((lead) => (
-                              <SelectItem key={lead.id} value={lead.id}>
-                                {"客户会话 "}
-                                {lead.id.slice(0, 8)}
+                              <SelectItem
+                                key={lead.id}
+                                value={lead.id}
+                                className="min-h-11 [&>span]:min-w-0 [&>span]:shrink"
+                                title={lead.id}
+                              >
+                                <span className="min-w-0 whitespace-normal wrap-anywhere">
+                                  {leadLabels.get(lead.id)}
+                                </span>
                               </SelectItem>
                             ))}
                         </SelectGroup>
@@ -244,7 +256,7 @@ export function RfqForm({
                   )}
                 />
                 <FieldDescription>
-                  明确选择后，报价发送会继续同一条线索，不会创建重复线索。
+                  摘要来自最近一条有效客户消息，仅用于识别会话；选择不会自动填写询盘。明确选择后，报价发送会继续同一条线索。
                 </FieldDescription>
                 <FieldError errors={[form.formState.errors.leadId]} />
               </Field>

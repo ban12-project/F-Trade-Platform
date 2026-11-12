@@ -131,7 +131,7 @@ export async function SalesCreate({ context }: { context: RecordContext }) {
   const { projectId, kind, sourceId, sourceKind, session, returnTo } = context;
   if (kind === "rfq") {
     const data = sourceId
-      ? await readSalesJourney(projectId, session.user.id, undefined, {
+      ? await readSalesJourney(projectId, session.user.id, sourceId, {
           kind: "lead",
           id: sourceId,
         })
