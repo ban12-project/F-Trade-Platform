@@ -3,7 +3,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon, RotateCcwIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, useRef, useState, useTransition } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -89,6 +97,7 @@ export function RfqForm({
   selectedLeadId?: string;
 }) {
   const router = useRouter();
+  const errorPrefix = useId();
   const revising = Boolean(entry);
   const [state, action, pending] = useActionState(
     revising ? reviseRfqAction : createRfqAction,
@@ -100,6 +109,9 @@ export function RfqForm({
       ? { ...entry.formValues, evidenceRef: "" }
       : { ...emptyRfq, leadId: selectedLeadId ?? "" },
   });
+  function errorDescription(field: keyof RfqValues) {
+    return form.formState.errors[field] ? `${errorPrefix}-${field}-error` : undefined;
+  }
   const values = useWatch({ control: form.control });
   const leadLabels = new Map(leads.map((lead) => [lead.id, leadChoiceLabel(lead)]));
   const [suggesting, startSuggesting] = useTransition();
@@ -221,7 +233,10 @@ export function RfqForm({
                       onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
                     >
                       <SelectTrigger
+                        ref={field.ref}
+                        onBlur={field.onBlur}
                         aria-invalid={!!form.formState.errors.leadId}
+                        aria-describedby={errorDescription("leadId")}
                         id="rfq-lead"
                         className="min-h-11 w-full py-2 data-[size=default]:h-auto [&_[data-slot=select-value]]:line-clamp-none"
                       >
@@ -258,7 +273,10 @@ export function RfqForm({
                 <FieldDescription>
                   摘要来自最近一条有效客户消息，仅用于识别会话；选择不会自动填写询盘。明确选择后，报价发送会继续同一条线索。
                 </FieldDescription>
-                <FieldError errors={[form.formState.errors.leadId]} />
+                <FieldError
+                  id={errorDescription("leadId")}
+                  errors={[form.formState.errors.leadId]}
+                />
               </Field>
             ) : null}
             {values.leadId ? (
@@ -339,8 +357,12 @@ export function RfqForm({
                     id={`${entry?.id ?? "new"}-customer-name`}
                     {...form.register("customerName")}
                     aria-invalid={!!form.formState.errors.customerName}
+                    aria-describedby={errorDescription("customerName")}
                   />
-                  <FieldError errors={[form.formState.errors.customerName]} />
+                  <FieldError
+                    id={errorDescription("customerName")}
+                    errors={[form.formState.errors.customerName]}
+                  />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.customerCompany}>
                   <FieldLabel htmlFor={`${entry?.id ?? "new"}-company`}>公司</FieldLabel>
@@ -348,8 +370,12 @@ export function RfqForm({
                     id={`${entry?.id ?? "new"}-company`}
                     {...form.register("customerCompany")}
                     aria-invalid={!!form.formState.errors.customerCompany}
+                    aria-describedby={errorDescription("customerCompany")}
                   />
-                  <FieldError errors={[form.formState.errors.customerCompany]} />
+                  <FieldError
+                    id={errorDescription("customerCompany")}
+                    errors={[form.formState.errors.customerCompany]}
+                  />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.customerCountry}>
                   <FieldLabel htmlFor={`${entry?.id ?? "new"}-country`}>国家</FieldLabel>
@@ -357,8 +383,12 @@ export function RfqForm({
                     id={`${entry?.id ?? "new"}-country`}
                     {...form.register("customerCountry")}
                     aria-invalid={!!form.formState.errors.customerCountry}
+                    aria-describedby={errorDescription("customerCountry")}
                   />
-                  <FieldError errors={[form.formState.errors.customerCountry]} />
+                  <FieldError
+                    id={errorDescription("customerCountry")}
+                    errors={[form.formState.errors.customerCountry]}
+                  />
                 </Field>
               </FieldGroup>
             </FieldSet>
@@ -377,7 +407,10 @@ export function RfqForm({
                         onValueChange={field.onChange}
                       >
                         <SelectTrigger
+                          ref={field.ref}
+                          onBlur={field.onBlur}
                           aria-invalid={!!form.formState.errors.productType}
+                          aria-describedby={errorDescription("productType")}
                           id={`${entry?.id ?? "new"}-product-type`}
                           className="w-full"
                         >
@@ -395,7 +428,10 @@ export function RfqForm({
                       </Select>
                     )}
                   />
-                  <FieldError errors={[form.formState.errors.productType]} />
+                  <FieldError
+                    id={errorDescription("productType")}
+                    errors={[form.formState.errors.productType]}
+                  />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.oeNumber}>
                   <FieldLabel htmlFor={`${entry?.id ?? "new"}-oe`}>OE / OEM 编号</FieldLabel>
@@ -403,8 +439,12 @@ export function RfqForm({
                     id={`${entry?.id ?? "new"}-oe`}
                     {...form.register("oeNumber")}
                     aria-invalid={!!form.formState.errors.oeNumber}
+                    aria-describedby={errorDescription("oeNumber")}
                   />
-                  <FieldError errors={[form.formState.errors.oeNumber]} />
+                  <FieldError
+                    id={errorDescription("oeNumber")}
+                    errors={[form.formState.errors.oeNumber]}
+                  />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.vehicleBrand}>
                   <FieldLabel htmlFor={`${entry?.id ?? "new"}-brand`}>车辆品牌</FieldLabel>
@@ -412,8 +452,12 @@ export function RfqForm({
                     id={`${entry?.id ?? "new"}-brand`}
                     {...form.register("vehicleBrand")}
                     aria-invalid={!!form.formState.errors.vehicleBrand}
+                    aria-describedby={errorDescription("vehicleBrand")}
                   />
-                  <FieldError errors={[form.formState.errors.vehicleBrand]} />
+                  <FieldError
+                    id={errorDescription("vehicleBrand")}
+                    errors={[form.formState.errors.vehicleBrand]}
+                  />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.vehicleModel}>
                   <FieldLabel htmlFor={`${entry?.id ?? "new"}-model`}>车型</FieldLabel>
@@ -421,8 +465,12 @@ export function RfqForm({
                     id={`${entry?.id ?? "new"}-model`}
                     {...form.register("vehicleModel")}
                     aria-invalid={!!form.formState.errors.vehicleModel}
+                    aria-describedby={errorDescription("vehicleModel")}
                   />
-                  <FieldError errors={[form.formState.errors.vehicleModel]} />
+                  <FieldError
+                    id={errorDescription("vehicleModel")}
+                    errors={[form.formState.errors.vehicleModel]}
+                  />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.quantity}>
                   <FieldLabel htmlFor={`${entry?.id ?? "new"}-quantity`}>数量</FieldLabel>
@@ -431,8 +479,12 @@ export function RfqForm({
                     inputMode="numeric"
                     {...form.register("quantity")}
                     aria-invalid={!!form.formState.errors.quantity}
+                    aria-describedby={errorDescription("quantity")}
                   />
-                  <FieldError errors={[form.formState.errors.quantity]} />
+                  <FieldError
+                    id={errorDescription("quantity")}
+                    errors={[form.formState.errors.quantity]}
+                  />
                 </Field>
                 <Field data-invalid={!!form.formState.errors.destination}>
                   <FieldLabel htmlFor={`${entry?.id ?? "new"}-destination`}>
@@ -442,8 +494,12 @@ export function RfqForm({
                     id={`${entry?.id ?? "new"}-destination`}
                     {...form.register("destination")}
                     aria-invalid={!!form.formState.errors.destination}
+                    aria-describedby={errorDescription("destination")}
                   />
-                  <FieldError errors={[form.formState.errors.destination]} />
+                  <FieldError
+                    id={errorDescription("destination")}
+                    errors={[form.formState.errors.destination]}
+                  />
                 </Field>
               </FieldGroup>
             </FieldSet>
@@ -460,8 +516,12 @@ export function RfqForm({
                       id={`${entry?.id ?? "new"}-${field}`}
                       {...form.register(field)}
                       aria-invalid={!!form.formState.errors[field]}
+                      aria-describedby={errorDescription(field)}
                     />
-                    <FieldError errors={[form.formState.errors[field]]} />
+                    <FieldError
+                      id={errorDescription(field)}
+                      errors={[form.formState.errors[field]]}
+                    />
                   </Field>
                 ))}
               </FieldGroup>
@@ -472,9 +532,13 @@ export function RfqForm({
                 projectId={projectId}
                 control={form.control}
                 name="evidenceRef"
+                aria-describedby={errorDescription("evidenceRef")}
                 id={`${entry?.id ?? "new"}-evidence`}
               />
-              <FieldError errors={[form.formState.errors.evidenceRef]} />
+              <FieldError
+                id={errorDescription("evidenceRef")}
+                errors={[form.formState.errors.evidenceRef]}
+              />
             </Field>
           </FieldGroup>
         </form>
