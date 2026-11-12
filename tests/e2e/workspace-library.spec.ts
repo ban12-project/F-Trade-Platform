@@ -228,3 +228,25 @@ for (const invalid of [
     );
   });
 }
+
+for (const collection of ["products", "customers", "content"]) {
+  for (const width of [320, 390]) {
+    test(`long project names remain readable in ${collection} at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(`/testing/workspace-library/${collection}?long=1`);
+      const list = page.getByRole("list", { name: "资料库记录", exact: true });
+      await expect(list).toBeVisible();
+      await expect(list).toContainText(`SyntheticProject${"X".repeat(104)}`);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width,
+      );
+      for (const link of await list.getByRole("link").all()) {
+        await link.focus();
+        await expect(link).toBeFocused();
+        expect(await link.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+          true,
+        );
+      }
+    });
+  }
+}
