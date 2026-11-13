@@ -126,7 +126,11 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
   }, [form, entry.lead.next_follow_up_at]);
   const nextFollowUpInput = useRef<HTMLInputElement>(null);
   const nextFollowUpField = form.register("nextFollowUpAt");
-  const timeChoices = followUpTimeChoices(form.watch("nextFollowUpAt"), timeZone);
+  const timeChoices = followUpTimeChoices(
+    form.watch("nextFollowUpAt"),
+    timeZone,
+    entry.lead.next_follow_up_at,
+  );
   const context = form.watch("context");
   const recommendation = nextFollowUp(context);
   const requiresDeliveryConfirmation = context === "asks_lead_time" || context === "asks_sample";
@@ -156,7 +160,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
   }
   function readFollowUpInstant(value?: string) {
     if (!value) return "";
-    const choices = followUpTimeChoices(value, timeZone);
+    const choices = followUpTimeChoices(value, timeZone, entry.lead.next_follow_up_at);
     if (!choices.length) {
       form.setError(
         "nextFollowUpAt",
