@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { initialClosingActionState } from "@/lib/action-states";
 import { decideDeliveryAction } from "@/lib/actions/closing";
 import { deliveryDecisionFormSchema } from "@/lib/form-schemas";
@@ -230,6 +231,7 @@ export function DeliveryPanel({
   entries: DeliveryConfirmationEntry[];
   canReview: boolean;
 }) {
+  const timeZone = useBrowserTimeZone();
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -255,9 +257,7 @@ export function DeliveryPanel({
                 工厂确认交期：{entry.confirmation.result?.confirmed_lead_time_days} 天 · 有效至{" "}
                 {entry.confirmation.result?.valid_until &&
                 Number.isFinite(Date.parse(entry.confirmation.result.valid_until))
-                  ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(
-                      new Date(entry.confirmation.result.valid_until),
-                    )
+                  ? `${new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(entry.confirmation.result.valid_until))}（${timeZone}）`
                   : "待核对"}
                 。是否可用于回复以当前有效性检查为准。
               </p>

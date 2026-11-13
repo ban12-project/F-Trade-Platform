@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { type ClosingActionState, initialClosingActionState } from "@/lib/action-states";
 import { routeInboundConversationAction } from "@/lib/actions/closing";
 import { readInboundContextAction } from "@/lib/actions/inbound-context";
@@ -45,6 +46,7 @@ function RoutingDialog({
   mode: "create" | "link";
   salesProjects: WorkspaceProjectSummary[];
 }) {
+  const timeZone = useBrowserTimeZone();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<InboundContextPreview | null>(null);
@@ -157,7 +159,12 @@ function RoutingDialog({
             {preview?.messages.map((message) => (
               <div key={message.id} className="rounded bg-muted p-2">
                 <time dateTime={message.receivedAt} className="text-xs text-muted-foreground">
-                  {new Date(message.receivedAt).toLocaleString("zh-CN")}
+                  {new Intl.DateTimeFormat("zh-CN", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                    timeZone,
+                  }).format(new Date(message.receivedAt))}
+                  （{timeZone}）
                 </time>
                 <p className="whitespace-pre-wrap break-words text-sm">{message.excerpt}</p>
                 {message.truncated ? (
@@ -273,6 +280,7 @@ export function InboundRoutingList({
   items: InboundRoutingSummary[];
   projects: WorkspaceProjectSummary[];
 }) {
+  const timeZone = useBrowserTimeZone();
   const salesProjects = projects.filter(
     (project) =>
       project.kind === "sales" && project.status === "active" && project.memberRole !== "viewer",
@@ -292,7 +300,13 @@ export function InboundRoutingList({
                 <Badge>待分流</Badge>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {item.channelLabel} · {item.lastMessageAt.toLocaleString("zh-CN")}
+                {item.channelLabel} ·{" "}
+                {new Intl.DateTimeFormat("zh-CN", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                  timeZone,
+                }).format(item.lastMessageAt)}
+                （{timeZone}）
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 选择新建项目或关联现有项目后，直接进入销售项目的客户线索步骤。
