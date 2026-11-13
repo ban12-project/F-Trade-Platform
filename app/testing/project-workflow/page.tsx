@@ -525,7 +525,14 @@ async function ProjectWorkflowFixture({
           {context("lead", syntheticLead.id)}
           <LeadPanel
             projectId={syntheticSalesProject.id}
-            entries={[syntheticLead]}
+            entries={[
+              state === "lead-fold-later"
+                ? {
+                    ...syntheticLead,
+                    lead: { ...syntheticLead.lead, next_follow_up_at: "2027-11-07T06:30:00.000Z" },
+                  }
+                : syntheticLead,
+            ]}
             deliveries={[syntheticDelivery]}
           />
         </div>
