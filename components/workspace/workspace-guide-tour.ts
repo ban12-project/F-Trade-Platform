@@ -18,6 +18,12 @@ const hints: Hint[] = [
       "录入产品、制作内容和记录询盘都从这里开始。已有项目可以继续使用；只有需要独立管理资料和成员时才新建。",
   },
   {
+    selector: '[data-guide="task-refresh"]',
+    title: "确认任务列表是否最新",
+    description:
+      "列表更新时间按当前设备时区显示。页面停留期间，任务状态或跟进到期不会自动更新；退出引导后可点刷新任务重新读取，并保留当前筛选。刷新只读取状态，不会发送消息或提交审核。",
+  },
+  {
     selector: '[data-guide="products"]',
     title: "1 · 产品资料",
     description:
