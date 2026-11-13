@@ -5,7 +5,7 @@ import { CheckCircle2Icon, Clock3Icon, MessageSquareTextIcon } from "lucide-reac
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useRef } from "react";
 import { Controller, useForm } from "react-hook-form";
-import type { z } from "zod";
+import { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   Select,
   SelectContent,
@@ -55,6 +56,7 @@ import {
   saveFollowUpPlanAction,
 } from "@/lib/actions/closing";
 import { nextFollowUp } from "@/lib/follow-up/cadence";
+import { followUpTimeChoices } from "@/lib/follow-up/local-time";
 import {
   deliveryRequestFormSchema,
   followUpFormSchema,
@@ -78,15 +80,8 @@ function localDateTime(value?: string) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-// Date normalizes nonexistent local times across daylight-saving gaps.
-// Only convert a minute value when it round-trips without changing the user's input.
-function followUpInstant(value?: string) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return null;
-  const instant = date.toISOString();
-  return localDateTime(instant) === value ? instant : null;
-}
+// Selection is an editor-only hint; actions receive the resolved UTC instant.
+const followUpEditorSchema = followUpFormSchema.safeExtend({ selectedInstant: z.string() });
 
 function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntry }) {
   const timeZone = useBrowserTimeZone();
@@ -96,8 +91,8 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
     saveFollowUpPlanAction,
     initialClosingActionState,
   );
-  const form = useForm<z.infer<typeof followUpFormSchema>>({
-    resolver: zodResolver(followUpFormSchema),
+  const form = useForm<z.infer<typeof followUpEditorSchema>>({
+    resolver: zodResolver(followUpEditorSchema),
     defaultValues: {
       projectId,
       leadId: entry.id,
@@ -110,16 +105,28 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       draft: "",
       confirmationRef: "",
       nextFollowUpAt: "",
+      selectedInstant: "",
     },
   });
+  const occurrenceField = form.register("selectedInstant");
   useEffect(() => {
-    if (!form.getFieldState("nextFollowUpAt").isDirty)
+    if (
+      !form.getFieldState("nextFollowUpAt").isDirty &&
+      !form.getFieldState("selectedInstant").isDirty
+    ) {
       form.resetField("nextFollowUpAt", {
         defaultValue: localDateTime(entry.lead.next_follow_up_at),
       });
+      form.resetField("selectedInstant", {
+        defaultValue: entry.lead.next_follow_up_at
+          ? new Date(entry.lead.next_follow_up_at).toISOString()
+          : "",
+      });
+    }
   }, [form, entry.lead.next_follow_up_at]);
   const nextFollowUpInput = useRef<HTMLInputElement>(null);
   const nextFollowUpField = form.register("nextFollowUpAt");
+  const timeChoices = followUpTimeChoices(form.watch("nextFollowUpAt"), timeZone);
   const context = form.watch("context");
   const recommendation = nextFollowUp(context);
   const requiresDeliveryConfirmation = context === "asks_lead_time" || context === "asks_sample";
@@ -134,7 +141,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
   }, [form, router, state]);
   useEffect(() => {
     if (planState.status === "success") {
-      for (const key of ["context", "triggeredRules", "nextFollowUpAt"] as const)
+      for (const key of ["context", "triggeredRules", "nextFollowUpAt", "selectedInstant"] as const)
         form.resetField(key, { defaultValue: form.getValues(key) });
       router.refresh();
     }
@@ -142,21 +149,33 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
   function clearValidFollowUpError() {
     if (
       nextFollowUpInput.current?.validity.valid &&
-      followUpInstant(nextFollowUpInput.current.value) !== null
+      (!nextFollowUpInput.current.value ||
+        followUpTimeChoices(nextFollowUpInput.current.value, timeZone).length > 0)
     )
       form.clearErrors("nextFollowUpAt");
   }
   function readFollowUpInstant(value?: string) {
-    const instant = followUpInstant(value);
-    if (instant === null)
+    if (!value) return "";
+    const choices = followUpTimeChoices(value, timeZone);
+    if (!choices.length) {
       form.setError(
         "nextFollowUpAt",
-        {
-          message: "此时间在当前设备时区中不存在或无效，请调整后再提交。",
-        },
+        { message: "此时间在当前设备时区中不存在或无效，请调整后再提交。" },
         { shouldFocus: true },
       );
-    return instant;
+      return null;
+    }
+    if (choices.length === 1) return choices[0].instant;
+    const selected = choices.find((choice) => choice.instant === form.getValues("selectedInstant"));
+    if (!selected) {
+      form.setError(
+        "selectedInstant",
+        { message: "此本地时间出现两次，请选择具体时刻。" },
+        { shouldFocus: true },
+      );
+      return null;
+    }
+    return selected.instant;
   }
   function savePlan() {
     if (!form.formState.isReady || pending || planPending) return;
@@ -190,12 +209,13 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
     }
     startTransition(() => planAction(data));
   }
-  function submit(value: z.infer<typeof followUpFormSchema>) {
+  function submit(value: z.infer<typeof followUpEditorSchema>) {
     if (!form.formState.isReady || pending || planPending) return;
     const instant = readFollowUpInstant(value.nextFollowUpAt);
     if (instant === null) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) {
+      if (key === "selectedInstant") continue;
       if (key === "triggeredRules") for (const rule of item as string[]) data.append(key, rule);
       else if (key === "nextFollowUpAt" && item) data.set(key, instant);
       else data.set(key, String(item));
@@ -348,6 +368,11 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                     nextFollowUpField.ref(input);
                     nextFollowUpInput.current = input;
                   }}
+                  onChange={(event) => {
+                    void nextFollowUpField.onChange(event);
+                    form.setValue("selectedInstant", "", { shouldDirty: true });
+                    form.clearErrors("selectedInstant");
+                  }}
                   onInput={clearValidFollowUpError}
                   // Native date segments can change validity without emitting an input event.
                   onKeyUp={clearValidFollowUpError}
@@ -366,6 +391,35 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                   errors={[form.formState.errors.nextFollowUpAt]}
                 />
               </Field>
+              {timeChoices.length > 1 ? (
+                <Field data-invalid={!!form.formState.errors.selectedInstant}>
+                  <FieldLabel htmlFor={`occurrence-${entry.id}`}>重复时间选择</FieldLabel>
+                  <NativeSelect
+                    id={`occurrence-${entry.id}`}
+                    {...occurrenceField}
+                    aria-invalid={!!form.formState.errors.selectedInstant}
+                    aria-describedby={`occurrence-help-${entry.id}${form.formState.errors.selectedInstant ? ` occurrence-error-${entry.id}` : ""}`}
+                    onChange={(event) => {
+                      form.setValue("selectedInstant", event.target.value, { shouldDirty: true });
+                      form.clearErrors("selectedInstant");
+                    }}
+                  >
+                    <NativeSelectOption value="">请选择具体时刻</NativeSelectOption>
+                    {timeChoices.map((choice, index) => (
+                      <NativeSelectOption key={choice.instant} value={choice.instant}>
+                        {index === 0 ? "第一次" : "第二次"}（UTC{choice.offset}）
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                  <FieldDescription id={`occurrence-help-${entry.id}`}>
+                    时钟回拨使此时间出现两次。已保存的提醒会保留原时刻；修改日期后需重新选择。
+                  </FieldDescription>
+                  <FieldError
+                    id={`occurrence-error-${entry.id}`}
+                    errors={[form.formState.errors.selectedInstant]}
+                  />
+                </Field>
+              ) : null}
             </FieldGroup>
           </FieldSet>
         </form>

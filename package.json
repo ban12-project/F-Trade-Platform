@@ -127,6 +127,7 @@
     "@base-ui/react": "^1.7.0",
     "@better-auth/passkey": "1.7.14",
     "@hookform/resolvers": "^5.9.1",
+    "@js-temporal/polyfill": "0.5.1",
     "@neondatabase/serverless": "1.1.0",
     "@remotion/bundler": "4.0.520",
     "@remotion/cli": "4.0.520",
