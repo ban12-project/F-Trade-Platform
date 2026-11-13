@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2Icon, Clock3Icon, MessageSquareTextIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useRef } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useFormState } from "react-hook-form";
 import { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -549,6 +549,8 @@ function LeadActions({
     resolver: zodResolver(opportunityDecisionFormSchema),
     defaultValues: { projectId, leadId: entry.id, evidenceRef: "" },
   });
+  const { errors: deliveryErrors } = useFormState({ control: deliveryForm.control });
+  const { errors: opportunityErrors } = useFormState({ control: opportunityForm.control });
   const deliveryBusy = !deliveryForm.formState.isReady || deliveryPending;
   const opportunityBusy = !opportunityForm.formState.isReady || opportunityPending;
   useWorkspaceDirty(`delivery-request-${entry.id}`, deliveryForm.formState.isDirty);
@@ -617,7 +619,7 @@ function LeadActions({
               {delivery?.reviewNotes ? (
                 <p className="text-sm text-destructive">上次未通过：{delivery.reviewNotes}</p>
               ) : null}
-              <Field data-invalid={!!deliveryForm.formState.errors.evidenceRef}>
+              <Field data-invalid={!!deliveryErrors.evidenceRef}>
                 <FieldLabel htmlFor={`delivery-evidence-${entry.id}`}>客户交期要求依据</FieldLabel>
                 <EvidenceSelectField
                   projectId={projectId}
@@ -625,8 +627,14 @@ function LeadActions({
                   control={deliveryForm.control}
                   name="evidenceRef"
                   id={`delivery-evidence-${entry.id}`}
+                  aria-describedby={
+                    deliveryErrors.evidenceRef ? `delivery-evidence-error-${entry.id}` : undefined
+                  }
                 />
-                <FieldError errors={[deliveryForm.formState.errors.evidenceRef]} />
+                <FieldError
+                  id={`delivery-evidence-error-${entry.id}`}
+                  errors={[deliveryErrors.evidenceRef]}
+                />
               </Field>
               <Button type="submit" variant="outline" disabled={deliveryBusy}>
                 申请工厂确认交期
@@ -663,7 +671,7 @@ function LeadActions({
                 startTransition(() => opportunityAction(data));
               })}
             >
-              <Field data-invalid={!!opportunityForm.formState.errors.evidenceRef}>
+              <Field data-invalid={!!opportunityErrors.evidenceRef}>
                 <FieldLabel htmlFor={`opportunity-evidence-${entry.id}`}>
                   客户采购意向依据
                 </FieldLabel>
@@ -673,8 +681,16 @@ function LeadActions({
                   control={opportunityForm.control}
                   name="evidenceRef"
                   id={`opportunity-evidence-${entry.id}`}
+                  aria-describedby={
+                    opportunityErrors.evidenceRef
+                      ? `opportunity-evidence-error-${entry.id}`
+                      : undefined
+                  }
                 />
-                <FieldError errors={[opportunityForm.formState.errors.evidenceRef]} />
+                <FieldError
+                  id={`opportunity-evidence-error-${entry.id}`}
+                  errors={[opportunityErrors.evidenceRef]}
+                />
               </Field>
             </form>
           </CardContent>
