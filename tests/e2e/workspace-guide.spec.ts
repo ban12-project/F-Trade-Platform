@@ -137,6 +137,11 @@ test("mobile dashboard guide explains snapshot refresh without reading or writin
   await popover.getByRole("button", { name: "下一步", exact: true }).click();
   await expect(popover.getByText("打开工作区导航", { exact: true })).toBeVisible();
   await popover.getByRole("button", { name: "下一步", exact: true }).click();
+  await expect(popover.getByText("先选工作，再选项目", { exact: true })).toBeVisible();
+  await expect(page.locator(".driver-active-element")).toHaveRole("button");
+  await expect(page.locator(".driver-active-element")).toHaveAccessibleName("开始新工作");
+  await expect(page.getByRole("dialog", { name: "开始新工作", exact: true })).toHaveCount(0);
+  await popover.getByRole("button", { name: "下一步", exact: true }).click();
   await expect(popover.getByText("确认任务列表是否最新", { exact: true })).toBeVisible();
   await expect(page.locator(".driver-active-element")).toHaveAttribute(
     "data-guide",

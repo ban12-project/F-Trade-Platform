@@ -169,7 +169,7 @@ export function WorkspaceDashboard({
                 {refreshing ? <Spinner aria-hidden="true" /> : null}
                 {refreshing ? "正在刷新任务…" : "刷新任务"}
               </Button>
-              <NewWorkButton />
+              <NewWorkButton data-guide="new-work" />
             </div>
             <p className="w-full text-xs text-muted-foreground">
               列表更新于{" "}

@@ -332,6 +332,7 @@ export function NewWorkButton({
   onOpen,
   projectId,
   returnTo,
+  "data-guide": guideTarget,
 }: {
   intent?: NewWorkIntent;
   children?: ReactNode;
@@ -339,6 +340,7 @@ export function NewWorkButton({
   onOpen?: () => void;
   projectId?: string;
   returnTo?: string;
+  "data-guide"?: "new-work";
 }) {
   const context = useContext(NewWorkContext);
   // A provider can hydrate before this trigger's Suspense boundary. Match this
@@ -353,6 +355,7 @@ export function NewWorkButton({
   return (
     <Button
       className="min-h-11"
+      data-guide={guideTarget}
       aria-haspopup={projectId ? undefined : "dialog"}
       aria-expanded={context?.open ?? false}
       aria-controls={context?.open ? context.dialogId : undefined}
