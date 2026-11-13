@@ -2,7 +2,7 @@
 
 当前逐项结论以 [MVP1 验收状态](testing/mvp1-acceptance-status.md)为入口（2026-11-14）。不依赖社媒账号的产品、内容审核、模拟销售与交互持续迭代；模拟 DM 至商机流程已有验收，真实渠道发布／入站按用户要求延后。MVP1 总验收保持 pending，最终 Go/No-Go 由人工决定。
 
-最新完整 UI 回归为 [11 月 14 日当前 main 检查点](https://github.com/ban12-project/F-Trade-Platform/issues/936#issuecomment-6860747780) 的 612/612 通过，测试提交 `4b846162918c90239bf53a8a8590d6d10c4d5165`，4 workers、0 retries、3.7 分钟；包含 #1012 后的表单错误关联、移动端诊断及产品／目录上传取消改动。完整 PostgreSQL 浏览器回归仍为 [PR #992](https://github.com/ban12-project/F-Trade-Platform/pull/992) 的 187/187；两组来自不同提交，不能写成当前版本同时通过两套完整回归。生产部署存在 [#982](https://github.com/ban12-project/F-Trade-Platform/issues/982) 的构建跳过配置待决事项，不能将已合并功能都视为已上线。完整版本、范围和未完成条件见验收入口。
+最新完整 UI 回归为 [11 月 14 日当前 main 检查点](https://github.com/ban12-project/F-Trade-Platform/issues/936#issuecomment-6860747780) 的 612/612 通过，测试提交 `4b846162918c90239bf53a8a8590d6d10c4d5165`，4 workers、0 retries、3.7 分钟；包含 #1012 后的表单错误关联、移动端诊断及产品／目录上传取消改动。最新完整 PostgreSQL 浏览器回归为 [#1043](https://github.com/ban12-project/F-Trade-Platform/issues/1043) 的 188/188，测试提交 `963c04aa1e7b971cc84fd5899ba69449fafd28d5`，1 worker、0 retries、6.0 分钟；首轮 187/188 的 RFQ 选择器失败与测试就绪修正分别保留。两组来自不同提交，不能写成当前版本同时通过两套完整回归。生产部署存在 [#982](https://github.com/ban12-project/F-Trade-Platform/issues/982) 的构建跳过配置待决事项，不能将已合并功能都视为已上线。完整版本、范围和未完成条件见验收入口。
 
 ## 阶段目标
 
