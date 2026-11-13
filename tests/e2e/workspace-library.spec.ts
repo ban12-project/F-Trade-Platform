@@ -43,7 +43,9 @@ test("filter summary counts results and removes one condition with keyboard focu
   const filters = page.getByRole("list", { name: "已选筛选条件" });
   await expect(filters.getByRole("button")).toHaveCount(4);
   const removeSearch = filters.getByRole("button", { name: "移除筛选：关键词：missing" });
+  await expect(removeSearch).toBeEnabled();
   await removeSearch.focus();
+  await expect(removeSearch).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(
     `${customers}?project=${libraryIds.first}&type=rfq&state=RFQ_COLLECTING`,
