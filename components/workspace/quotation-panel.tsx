@@ -473,6 +473,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
       notes: "",
     },
   });
+  const busy = !form.formState.isReady || pending;
   useWorkspaceDirty(`quote-decision-${entry.id}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
@@ -481,6 +482,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
     }
   }, [form, router, state]);
   function submit(value: z.infer<typeof quotationDecisionFormSchema>) {
+    if (busy) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item ?? "");
     startTransition(() => action(data));
@@ -495,7 +497,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
       </CardHeader>
       <CardContent>
         <form
-          aria-busy={pending}
+          aria-busy={busy}
           id={`quote-decision-${entry.id}`}
           onSubmit={form.handleSubmit(submit, (errors) => {
             const first = (["decision", "evidenceRef", "notes"] as const).find(
@@ -504,7 +506,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
             if (first) form.setFocus(first);
           })}
         >
-          <FieldSet disabled={pending} className="min-w-0">
+          <FieldSet disabled={busy} className="min-w-0">
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.decision}>
                 <FieldLabel htmlFor={`quote-decision-${entry.id}-decision`}>决定</FieldLabel>
@@ -513,6 +515,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                   name="decision"
                   render={({ field }) => (
                     <Select
+                      disabled={busy}
                       items={{ approved: "批准人工报价", rejected: "退回人工报价" }}
                       value={field.value ?? null}
                       onValueChange={field.onChange}
@@ -551,6 +554,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                   projectId={projectId}
                   control={form.control}
                   name="evidenceRef"
+                  disabled={busy}
                   aria-describedby={
                     form.formState.errors.evidenceRef
                       ? `closing-review-${entry.id}-evidenceRef-error`
@@ -591,7 +595,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
           form={`quote-decision-${entry.id}`}
           type="submit"
           variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
-          disabled={pending || !form.watch("decision")}
+          disabled={busy || !form.watch("decision")}
         >
           {pending ? (
             <Spinner data-icon="inline-start" />
@@ -617,6 +621,7 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
     resolver: zodResolver(quotationSendFormSchema),
     defaultValues: { projectId, quotationId: entry.id, channelRef: "", externalRef: "" },
   });
+  const busy = !form.formState.isReady || pending;
   useWorkspaceDirty(`quote-send-${entry.id}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
@@ -625,6 +630,7 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
     }
   }, [form, router, state]);
   function submit(value: z.infer<typeof quotationSendFormSchema>) {
+    if (busy) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item ?? "");
     startTransition(() => action(data));
@@ -638,12 +644,8 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form
-          aria-busy={pending}
-          id={`quote-send-${entry.id}`}
-          onSubmit={form.handleSubmit(submit)}
-        >
-          <FieldSet disabled={pending} className="min-w-0">
+        <form aria-busy={busy} id={`quote-send-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
+          <FieldSet disabled={busy} className="min-w-0">
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.channelRef}>
                 <FieldLabel htmlFor={`send-channel-${entry.id}`}>发送渠道</FieldLabel>
@@ -670,7 +672,7 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button form={`quote-send-${entry.id}`} type="submit" disabled={pending}>
+        <Button form={`quote-send-${entry.id}`} type="submit" disabled={busy}>
           {pending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
           核验凭证并登记已发送
         </Button>

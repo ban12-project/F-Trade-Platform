@@ -76,6 +76,7 @@ function DeliveryDecision({
       notes: "",
     },
   });
+  const busy = !form.formState.isReady || pending;
   useWorkspaceDirty(`delivery-decision-${entry.id}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
@@ -84,6 +85,7 @@ function DeliveryDecision({
     }
   }, [form, router, state]);
   function submit(value: z.infer<typeof deliveryDecisionFormSchema>) {
+    if (busy) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item);
     startTransition(() => action(data));
@@ -99,7 +101,7 @@ function DeliveryDecision({
       </CardHeader>
       <CardContent>
         <form
-          aria-busy={pending}
+          aria-busy={busy}
           id={`delivery-${entry.id}`}
           onSubmit={form.handleSubmit(submit, (errors) => {
             const first = (["decision", "leadTimeDays", "evidenceRef", "notes"] as const).find(
@@ -108,7 +110,7 @@ function DeliveryDecision({
             if (first) form.setFocus(first);
           })}
         >
-          <FieldSet disabled={pending} className="min-w-0">
+          <FieldSet disabled={busy} className="min-w-0">
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.decision}>
                 <FieldLabel htmlFor={`delivery-decision-${entry.id}-decision`}>决定</FieldLabel>
@@ -117,6 +119,7 @@ function DeliveryDecision({
                   name="decision"
                   render={({ field }) => (
                     <Select
+                      disabled={busy}
                       items={{ confirmed: "确认交期", rejected: "拒绝确认" }}
                       value={field.value ?? null}
                       onValueChange={field.onChange}
@@ -181,6 +184,7 @@ function DeliveryDecision({
                   projectId={projectId}
                   control={form.control}
                   name="evidenceRef"
+                  disabled={busy}
                   aria-describedby={
                     form.formState.errors.evidenceRef
                       ? `closing-review-${entry.id}-evidenceRef-error`
@@ -221,7 +225,7 @@ function DeliveryDecision({
           form={`delivery-${entry.id}`}
           type="submit"
           variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
-          disabled={pending || !form.watch("decision")}
+          disabled={busy || !form.watch("decision")}
         >
           {pending ? (
             <Spinner data-icon="inline-start" />
