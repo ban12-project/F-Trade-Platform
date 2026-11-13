@@ -1,6 +1,6 @@
 "use client";
 import { ArrowRightIcon, CheckCircle2Icon } from "lucide-react";
-import { type ReactNode, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
 import { formatTaskDeadline, isTaskOverdue } from "@/lib/workspace/task-context";
@@ -25,10 +26,6 @@ import { InboundRoutingList } from "./inbound-routing-list";
 import { NewWorkButton } from "./new-work";
 import { WorkspaceLink as Link } from "./workspace-link";
 
-const subscribeToTimeZone = () => () => {};
-const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
-const serverTimeZone = () => "UTC";
-
 function TaskRows({
   tasks,
   empty,
@@ -40,7 +37,7 @@ function TaskRows({
   selectedReturnTo: string;
   currentTime: number;
 }) {
-  const timeZone = useSyncExternalStore(subscribeToTimeZone, browserTimeZone, serverTimeZone);
+  const timeZone = useBrowserTimeZone();
   if (!tasks.length)
     return (
       <Empty className="border-0 py-8">
