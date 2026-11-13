@@ -139,7 +139,8 @@ for (const failure of ["denied", "transport"] as const) {
     await expect(field).toHaveAccessibleDescription(
       failure === "denied" ? /请重新登录并确认项目权限/ : /资料加载失败，请重试/,
     );
-    await expect(field).toContainText("请重新选择资料");
+    await expect(field).toContainText("已保留选择，暂时无法核对");
+    await expect(field).toHaveAccessibleDescription(/已保留原选择，请恢复资料列表后核对。/);
     await field.click();
     await expect(page.getByRole("option", { name: "暂时无法加载资料" })).toBeDisabled();
     await expect(page.getByRole("option", { name: /合成工厂授权书/ })).toHaveCount(0);

@@ -76,6 +76,7 @@ export function EvidenceSelect({
       : option.label,
   );
   const selectedLabel = labels[options.findIndex((option) => option.id === value)];
+  const selectionUnverified = Boolean(value && result?.error);
   function refresh() {
     startTransition(async () => {
       try {
@@ -112,7 +113,12 @@ export function EvidenceSelect({
           className="w-full"
         >
           <SelectValue placeholder="请选择已保存的资料">
-            {selectedLabel ?? (value ? "请重新选择资料" : undefined)}
+            {selectedLabel ??
+              (selectionUnverified
+                ? "已保留选择，暂时无法核对"
+                : value
+                  ? "请重新选择资料"
+                  : undefined)}
           </SelectValue>
         </SelectTrigger>
         <SelectContent alignItemWithTrigger={false}>
@@ -131,12 +137,13 @@ export function EvidenceSelect({
         </SelectContent>
       </Select>
       <FieldDescription id={descriptionId} aria-live="polite" className="break-all">
-        {result?.error ||
-          (result && !options.length
+        {result?.error
+          ? `${result.error}${selectionUnverified ? " 已保留原选择，请恢复资料列表后核对。" : ""}`
+          : result && !options.length
             ? "暂无可用资料，请上传文件后选择。"
             : selectedLabel
               ? `已选择：${selectedLabel}。请核对是否与本次操作对应。`
-              : "请选择与本次操作对应的文件。")}
+              : "请选择与本次操作对应的文件。"}
       </FieldDescription>
       <Button
         type="button"
