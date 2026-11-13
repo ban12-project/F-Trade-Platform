@@ -567,8 +567,13 @@ for (const inbound of [false, true]) {
     await revise.getByLabel("目的地国家或港口", { exact: true }).fill("MOCK destination");
     await revise.getByLabel("客户需求来源", { exact: true }).click();
     await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
+    // The previous select can remain visible during its closing animation.
+    await expect(page.getByRole("listbox")).toBeHidden();
     await page.getByRole("button", { name: "保存补充资料", exact: true }).click();
     await expect.poll(async () => (await records("rfq"))[0].version).toBe(2);
+    // Database commit precedes the refreshed UI becoming ready for the next gate.
+    await expect(page.getByRole("button", { name: "保存补充资料", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "确认需求完整", exact: true })).toBeEnabled();
     await page.getByLabel("需求确认依据", { exact: true }).click();
     await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "确认需求完整", exact: true }).click();
