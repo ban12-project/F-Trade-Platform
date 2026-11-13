@@ -1,9 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,6 +93,9 @@ export function BrowserNodesPanel() {
     timeZone,
   });
   const [nodes, setNodes] = useState<Nodes>([]);
+  const [listState, setListState] = useState<"loading" | "ready" | "error">("loading");
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshRef = useRef<(() => Promise<void>) | null>(null);
   const [editingAccount, setEditingAccount] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -128,19 +132,26 @@ export function BrowserNodesPanel() {
     const refresh = async () => {
       if (loading || document.visibilityState === "hidden") return;
       loading = true;
+      setRefreshing(true);
       try {
         const rows = await browserNodesAction();
-        if (!disposed) setNodes(rows);
+        if (!disposed) {
+          setNodes(rows);
+          setListState("ready");
+        }
       } catch {
-        if (!disposed) setMessage("无法读取发布服务，请重试或联系管理员检查配置。");
+        if (!disposed) setListState("error");
       } finally {
         loading = false;
+        if (!disposed) setRefreshing(false);
       }
     };
+    refreshRef.current = refresh;
     void refresh();
     const timer = setInterval(refresh, 5000);
     return () => {
       disposed = true;
+      refreshRef.current = null;
       clearInterval(timer);
     };
   }, []);
@@ -160,6 +171,7 @@ export function BrowserNodesPanel() {
       }
       if (result.result.accessKey) setKey(result.result.accessKey);
       setNodes(await browserNodesAction());
+      setListState("ready");
       setMessage(
         result.result.deadline
           ? "接管已延长 30 分钟；发布核对有效期保持不变。"
@@ -248,6 +260,31 @@ export function BrowserNodesPanel() {
                   : "仅填入已保存的账号和密码；请在远程页面检查并提交登录。")));
   return (
     <div className="space-y-6">
+      {listState === "loading" && (
+        <p role="status" className="text-sm text-muted-foreground">
+          正在读取发布服务…
+        </p>
+      )}
+      {listState === "error" && (
+        <Alert>
+          <AlertTitle>无法读取发布服务</AlertTitle>
+          <AlertDescription>
+            <p>
+              {nodes.length > 0
+                ? "下方保留上次成功读取的列表，当前状态尚未确认。请重新读取或联系管理员检查配置。"
+                : "请重新读取或联系管理员检查配置。"}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={refreshing}
+              onClick={() => void refreshRef.current?.()}
+            >
+              {refreshing ? "正在重试…" : "重新读取发布服务"}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       <p role="status" className="text-sm text-muted-foreground">
         {message}
       </p>
