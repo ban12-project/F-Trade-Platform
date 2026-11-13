@@ -163,6 +163,7 @@ export function WorkspaceDashboard({
                 variant="outline"
                 disabled={refreshing}
                 aria-busy={refreshing}
+                data-guide="task-refresh"
                 onClick={() => startRefresh(() => router.refresh())}
               >
                 {refreshing ? <Spinner aria-hidden="true" /> : null}

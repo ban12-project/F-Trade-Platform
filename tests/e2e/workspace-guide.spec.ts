@@ -112,3 +112,47 @@ test.describe("follow-up reminders", () => {
     expect(writes).toBe(0);
   });
 });
+
+test("mobile dashboard guide explains snapshot refresh without reading or writing", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/testing/workspace-dashboard?offline=1&view=scheduled");
+  await page.waitForLoadState("networkidle");
+  const before = await page.locator("header time").getAttribute("datetime");
+  let refreshes = 0;
+  let writes = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST") writes++;
+    if (
+      request.url().includes("/testing/workspace-dashboard") &&
+      request.headers().rsc === "1" &&
+      !request.headers()["next-router-prefetch"]
+    )
+      refreshes++;
+  });
+  const trigger = page.getByRole("button", { name: "使用引导", exact: true });
+  await trigger.click();
+  const popover = page.locator(".workspace-guide-popover");
+  await popover.getByRole("button", { name: "下一步", exact: true }).click();
+  await expect(popover.getByText("打开工作区导航", { exact: true })).toBeVisible();
+  await popover.getByRole("button", { name: "下一步", exact: true }).click();
+  await expect(popover.getByText("确认任务列表是否最新", { exact: true })).toBeVisible();
+  await expect(page.locator(".driver-active-element")).toHaveAttribute(
+    "data-guide",
+    "task-refresh",
+  );
+  await expect(popover).toContainText("不会自动更新");
+  await expect(popover).toContainText("保留当前筛选");
+  await expect(popover).toContainText("不会发送消息或提交审核");
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(page).toHaveURL(/offline=1&view=scheduled$/);
+  await expect(page.locator("header time")).toHaveAttribute("datetime", before ?? "");
+  await expect(
+    page.getByRole("link").filter({ hasText: "下一动作：收集样品需求，交由人工确认。" }),
+  ).toBeVisible();
+  expect(refreshes).toBe(0);
+  expect(writes).toBe(0);
+});
