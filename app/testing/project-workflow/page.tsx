@@ -543,9 +543,21 @@ async function ProjectWorkflowFixture({
                             : "2027-11-07T06:30:00.000Z",
                     },
                   }
-                : syntheticLead,
+                : state === "lead-actions"
+                  ? {
+                      ...syntheticLead,
+                      confirmedDelivery: null,
+                      lead: {
+                        ...syntheticLead.lead,
+                        follow_up_context: "asks_lead_time",
+                        score: 80,
+                        score_band: "HOT",
+                        delivery_confirmation_ref: undefined,
+                      },
+                    }
+                  : syntheticLead,
             ]}
-            deliveries={[syntheticDelivery]}
+            deliveries={state === "lead-actions" ? [] : [syntheticDelivery]}
           />
         </div>
       ),
