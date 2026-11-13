@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHmac, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
@@ -5,9 +6,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import { initialState } from "../../lib/browser-fleet/policy";
-import type { Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
-import { listProjectPublicationData } from "../../lib/social/publication-store";
 import { authSecret, databaseURL } from "../../playwright.database.config";
 
 const connectionString = process.env.BROWSER_FLEET_UI_TEST_DATABASE_URL ?? databaseURL;
@@ -500,12 +499,18 @@ test("older unknown results stay addressable and cannot reappear as publish cand
       createdAt: new Date(Date.now() + index * 1000),
     })),
   );
-  const data = await listProjectPublicationData(projectId, db as unknown as Database);
-  expect(data.publications.some((item) => item.id === older)).toBe(true);
-  expect(data.candidates).toHaveLength(0);
-  expect(
-    data.publications.every((item) => !("textConfirmation" in item) && !("browserJobId" in item)),
-  ).toBe(true);
+  execFileSync(
+    process.execPath,
+    [
+      "--conditions=react-server",
+      "--import",
+      "tsx",
+      "scripts/assert-synthetic-publication-history.ts",
+      projectId,
+      older,
+    ],
+    { env: { ...process.env, DATABASE_URL: connectionString }, timeout: 15_000, encoding: "utf8" },
+  );
   await page.goto(`/workspace/${projectId}/records/publication/${older}`);
   const detail = page.getByRole("region", { name: "业务记录" });
   await expect(detail.getByText("结果待人工核对", { exact: true })).toBeVisible();
