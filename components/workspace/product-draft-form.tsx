@@ -93,6 +93,7 @@ export function ProductDraftForm({
     resolver: zodResolver(productCatalogFormSchema),
     defaultValues: detail ? productDraftValues(detail) : emptyProduct,
   });
+  const busy = !form.formState.isReady || !images.formState.isReady || pending;
   useWorkspaceDirty(`${formId}-product-draft-${detail?.id ?? "new"}`, form.formState.isDirty);
   useWorkspaceDirty(`${formId}-product-images-${detail?.id ?? "new"}`, images.formState.isDirty);
   useEffect(() => {
@@ -105,7 +106,7 @@ export function ProductDraftForm({
   }, [form, images, revising, router, state.status]);
   useCreatedRecord(projectId, "product", state.status, state.productId, !revising);
   async function submit(values: ProductValues) {
-    if (pending) return;
+    if (busy) return;
     if (!(await images.trigger())) return;
     startTransition(() => action({ values, imageFiles: images.getValues().imageFiles }));
   }
@@ -122,14 +123,14 @@ export function ProductDraftForm({
       <form
         id={`${formId}-${revising ? "revise-product" : "create-product"}`}
         onSubmit={form.handleSubmit(submit)}
-        aria-busy={pending}
+        aria-busy={busy}
         noValidate
       >
-        <FieldSet disabled={pending} className="gap-0">
+        <FieldSet disabled={busy} className="gap-0">
           <CardContent>
-            <ProductFields form={form} evidenceOptions={evidenceOptions} disabled={pending} />
+            <ProductFields form={form} evidenceOptions={evidenceOptions} disabled={busy} />
             <FieldGroup className="mt-4">
-              <Field data-invalid={!!images.formState.errors.imageFiles} data-disabled={pending}>
+              <Field data-invalid={!!images.formState.errors.imageFiles} data-disabled={busy}>
                 <FieldLabel htmlFor={imageId}>产品图片（可选）</FieldLabel>
                 <Controller
                   control={images.control}
@@ -145,7 +146,7 @@ export function ProductDraftForm({
                       type="file"
                       accept=".png,.jpg,.jpeg"
                       multiple
-                      disabled={pending}
+                      disabled={busy}
                       onBlur={field.onBlur}
                       aria-invalid={!!images.formState.errors.imageFiles}
                       onChange={(event) => field.onChange(Array.from(event.target.files ?? []))}
@@ -163,7 +164,7 @@ export function ProductDraftForm({
             </FieldGroup>
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-3">
-            <Button type="submit" disabled={pending || !evidenceOptions.length}>
+            <Button type="submit" disabled={busy || !evidenceOptions.length}>
               {pending ? (
                 <Spinner data-icon="inline-start" />
               ) : revising ? (

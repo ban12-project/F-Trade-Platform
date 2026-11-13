@@ -17,7 +17,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -81,6 +88,7 @@ export function ProductReview({
       notes: "",
     },
   });
+  const busy = !form.formState.isReady || pending;
   useWorkspaceDirty(`${idPrefix}-product-review-${detail.id}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
@@ -89,6 +97,7 @@ export function ProductReview({
     }
   }, [form, router, state.status]);
   function submit(values: ReviewValues) {
+    if (busy) return;
     const data = new FormData();
     data.set("projectId", projectId);
     for (const [key, value] of Object.entries(values))
@@ -185,6 +194,7 @@ export function ProductReview({
           <CardContent>
             <form
               id={fieldId("product-review")}
+              aria-busy={busy}
               onSubmit={form.handleSubmit(submit, (errors) => {
                 const first = (
                   ["decision", "imageConsistencyConfirmed", "evidenceRef", "notes"] as const
@@ -192,144 +202,151 @@ export function ProductReview({
                 if (first) form.setFocus(first);
               })}
             >
-              <FieldGroup>
-                <Field data-invalid={!!form.formState.errors.decision}>
-                  <FieldLabel htmlFor={fieldId("product-review-decision")}>决定</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="decision"
-                    render={({ field }) => (
-                      <Select
-                        items={{ approved: "批准产品信息", rejected: "退回产品信息" }}
-                        value={field.value ?? null}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger
-                          id={fieldId("product-review-decision")}
-                          ref={field.ref}
-                          onBlur={field.onBlur}
-                          className="min-h-11 w-full"
-                          aria-invalid={!!form.formState.errors.decision}
-                          aria-describedby={
-                            form.formState.errors.decision ? fieldId("decision-error") : undefined
-                          }
-                        >
-                          <SelectValue placeholder="请选择审核决定" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="approved">批准产品信息</SelectItem>
-                            <SelectItem value="rejected">退回产品信息</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError
-                    id={fieldId("decision-error")}
-                    errors={[form.formState.errors.decision]}
-                  />
-                </Field>
-                {detail.sourceImages.length ? (
-                  <Field>
-                    <FieldLabel htmlFor={fieldId("product-image-confirmation")}>
-                      图片一致性
-                    </FieldLabel>
+              <FieldSet disabled={busy}>
+                <FieldGroup>
+                  <Field data-invalid={!!form.formState.errors.decision}>
+                    <FieldLabel htmlFor={fieldId("product-review-decision")}>决定</FieldLabel>
                     <Controller
                       control={form.control}
-                      name="imageConsistencyConfirmed"
+                      name="decision"
                       render={({ field }) => (
                         <Select
-                          value={field.value ?? "false"}
+                          disabled={busy}
+                          items={{ approved: "批准产品信息", rejected: "退回产品信息" }}
+                          value={field.value ?? null}
                           onValueChange={field.onChange}
-                          items={{
-                            false: "尚未确认或不一致",
-                            true: "已核对全部原始图片，与当前产品一致",
-                          }}
                         >
                           <SelectTrigger
-                            id={fieldId("product-image-confirmation")}
+                            id={fieldId("product-review-decision")}
                             ref={field.ref}
                             onBlur={field.onBlur}
+                            className="min-h-11 w-full"
+                            aria-invalid={!!form.formState.errors.decision}
+                            aria-describedby={
+                              form.formState.errors.decision ? fieldId("decision-error") : undefined
+                            }
                           >
-                            <SelectValue />
+                            <SelectValue placeholder="请选择审核决定" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
-                              <SelectItem value="false">尚未确认或不一致</SelectItem>
-                              <SelectItem value="true">
-                                已核对全部原始图片，与当前产品一致
-                              </SelectItem>
+                              <SelectItem value="approved">批准产品信息</SelectItem>
+                              <SelectItem value="rejected">退回产品信息</SelectItem>
                             </SelectGroup>
                           </SelectContent>
                         </Select>
                       )}
                     />
-                    <FieldDescription>
-                      批准前必须确认；无法确认时请退回并说明原因。
-                    </FieldDescription>
+                    <FieldError
+                      id={fieldId("decision-error")}
+                      errors={[form.formState.errors.decision]}
+                    />
                   </Field>
-                ) : null}
-                <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                  <FieldLabel htmlFor={fieldId("product-review-evidence")}>审核依据</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="evidenceRef"
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={(value) => field.onChange(value ?? "")}
-                        disabled={!evidenceOptions.length}
-                      >
-                        <SelectTrigger
-                          id={fieldId("product-review-evidence")}
-                          ref={field.ref}
-                          onBlur={field.onBlur}
-                          aria-invalid={!!form.formState.errors.evidenceRef}
-                          aria-describedby={
-                            form.formState.errors.evidenceRef
-                              ? fieldId("evidence-error")
-                              : undefined
-                          }
-                          className="min-h-11 w-full"
+                  {detail.sourceImages.length ? (
+                    <Field>
+                      <FieldLabel htmlFor={fieldId("product-image-confirmation")}>
+                        图片一致性
+                      </FieldLabel>
+                      <Controller
+                        control={form.control}
+                        name="imageConsistencyConfirmed"
+                        render={({ field }) => (
+                          <Select
+                            disabled={busy}
+                            value={field.value ?? "false"}
+                            onValueChange={field.onChange}
+                            items={{
+                              false: "尚未确认或不一致",
+                              true: "已核对全部原始图片，与当前产品一致",
+                            }}
+                          >
+                            <SelectTrigger
+                              id={fieldId("product-image-confirmation")}
+                              ref={field.ref}
+                              onBlur={field.onBlur}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectItem value="false">尚未确认或不一致</SelectItem>
+                                <SelectItem value="true">
+                                  已核对全部原始图片，与当前产品一致
+                                </SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      <FieldDescription>
+                        批准前必须确认；无法确认时请退回并说明原因。
+                      </FieldDescription>
+                    </Field>
+                  ) : null}
+                  <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                    <FieldLabel htmlFor={fieldId("product-review-evidence")}>审核依据</FieldLabel>
+                    <Controller
+                      control={form.control}
+                      name="evidenceRef"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={(value) => field.onChange(value ?? "")}
+                          disabled={busy || !evidenceOptions.length}
                         >
-                          <SelectValue>
-                            {evidenceOptions.find((option) => option.id === field.value)
-                              ?.sourceLabel ?? "选择已上传资料"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {evidenceOptions.map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                                {option.sourceLabel} · {option.id.slice(-8)}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError
-                    id={fieldId("evidence-error")}
-                    errors={[form.formState.errors.evidenceRef]}
-                  />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.notes}>
-                  <FieldLabel htmlFor={fieldId("product-review-notes")}>
-                    审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
-                  </FieldLabel>
-                  <Textarea
-                    id={fieldId("product-review-notes")}
-                    aria-invalid={!!form.formState.errors.notes}
-                    aria-describedby={
-                      form.formState.errors.notes ? fieldId("notes-error") : undefined
-                    }
-                    {...form.register("notes")}
-                  />
-                  <FieldError id={fieldId("notes-error")} errors={[form.formState.errors.notes]} />
-                </Field>
-              </FieldGroup>
+                          <SelectTrigger
+                            id={fieldId("product-review-evidence")}
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                            aria-invalid={!!form.formState.errors.evidenceRef}
+                            aria-describedby={
+                              form.formState.errors.evidenceRef
+                                ? fieldId("evidence-error")
+                                : undefined
+                            }
+                            className="min-h-11 w-full"
+                          >
+                            <SelectValue>
+                              {evidenceOptions.find((option) => option.id === field.value)
+                                ?.sourceLabel ?? "选择已上传资料"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {evidenceOptions.map((option) => (
+                                <SelectItem key={option.id} value={option.id}>
+                                  {option.sourceLabel} · {option.id.slice(-8)}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <FieldError
+                      id={fieldId("evidence-error")}
+                      errors={[form.formState.errors.evidenceRef]}
+                    />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.notes}>
+                    <FieldLabel htmlFor={fieldId("product-review-notes")}>
+                      审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
+                    </FieldLabel>
+                    <Textarea
+                      id={fieldId("product-review-notes")}
+                      aria-invalid={!!form.formState.errors.notes}
+                      aria-describedby={
+                        form.formState.errors.notes ? fieldId("notes-error") : undefined
+                      }
+                      {...form.register("notes")}
+                    />
+                    <FieldError
+                      id={fieldId("notes-error")}
+                      errors={[form.formState.errors.notes]}
+                    />
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
             </form>
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-3">
@@ -337,7 +354,7 @@ export function ProductReview({
               form={fieldId("product-review")}
               type="submit"
               variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
-              disabled={pending || !form.watch("decision") || !evidenceOptions.length}
+              disabled={busy || !form.watch("decision") || !evidenceOptions.length}
             >
               {pending ? (
                 <Spinner data-icon="inline-start" />
