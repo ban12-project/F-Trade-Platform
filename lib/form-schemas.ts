@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { productImageFilesSchema } from "./product/source-image-contracts";
+import { quotationValidityDays, quotationValiditySchema } from "./quotation/validity";
 
 export const emailSchema = z
   .string()
@@ -265,29 +266,61 @@ const positiveIntegerText = z
   .regex(/^[1-9]\d*$/, "必须填写正整数。")
   .refine((value) => Number.isSafeInteger(Number(value)), "数值超出可准确保存的整数范围，请核对。");
 
-export const quotationDraftFormSchema = z.object({
-  evidenceRef: privateReference,
-  projectId: z.uuid("项目标识无效。"),
-  quotationId: z.uuid("报价标识无效。").optional().or(z.literal("")),
-  rfqId: z.uuid("请选择已确认完整的客户需求。"),
-  productId: z.uuid("请选择已核实的产品。"),
-  unitPrice: positiveMoney,
-  currency: z
-    .string()
-    .trim()
-    .regex(/^[A-Z]{3}$/, "币种必须是三位大写 ISO 代码。"),
-  moq: positiveIntegerText,
-  leadTimeDays: z
-    .string()
-    .trim()
-    .regex(/^\d+$/, "交期天数必须是非负整数。")
-    .refine(
-      (value) => Number.isSafeInteger(Number(value)),
-      "交期超出可准确保存的整数范围，请核对。",
-    ),
-  paymentTerms: z.string().trim().min(1, "请填写付款条件。").max(500),
-  validityDays: positiveIntegerText,
-});
+export const quotationDraftFormSchema = z
+  .object({
+    evidenceRef: privateReference,
+    projectId: z.uuid("项目标识无效。"),
+    quotationId: z.uuid("报价标识无效。").optional().or(z.literal("")),
+    rfqId: z.uuid("请选择已确认完整的客户需求。"),
+    productId: z.uuid("请选择已核实的产品。"),
+    unitPrice: positiveMoney,
+    currency: z
+      .string()
+      .trim()
+      .regex(/^[A-Z]{3}$/, "币种必须是三位大写 ISO 代码。"),
+    moq: positiveIntegerText,
+    leadTimeDays: z
+      .string()
+      .trim()
+      .regex(/^\d+$/, "交期天数必须是非负整数。")
+      .refine(
+        (value) => Number.isSafeInteger(Number(value)),
+        "交期超出可准确保存的整数范围，请核对。",
+      ),
+    paymentTerms: z.string().trim().min(1, "请填写付款条件。").max(500),
+    validityDays: positiveIntegerText,
+    validityStart: z.string().trim().optional(),
+    validityEnd: z.string().trim().optional(),
+    validityTimeZone: z.string().trim().optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.validityStart && !value.validityEnd && !value.validityTimeZone) return;
+    const result = quotationValiditySchema.safeParse({
+      version: 1,
+      starts_on: value.validityStart,
+      expires_on: value.validityEnd,
+      time_zone: value.validityTimeZone,
+    });
+    if (!result.success) {
+      const fields: Record<string, string> = {
+        starts_on: "validityStart",
+        expires_on: "validityEnd",
+        time_zone: "validityTimeZone",
+      };
+      for (const issue of result.error.issues)
+        context.addIssue({
+          code: "custom",
+          path: [fields[String(issue.path[0])] ?? "validityStart"],
+          message: issue.message,
+        });
+    } else if (quotationValidityDays(result.data) !== Number(value.validityDays)) {
+      context.addIssue({
+        code: "custom",
+        path: ["validityDays"],
+        message: "有效天数须与起止日期一致，包含首尾日期。",
+      });
+    }
+  });
 
 export const quotationDecisionFormSchema = z
   .object({

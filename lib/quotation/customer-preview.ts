@@ -1,6 +1,7 @@
 import type { QuotationEntry } from "@/lib/sales/closing-store";
 import type { RfqEntry } from "@/lib/sales/store";
 import type { WorkspaceProductReference } from "@/lib/workspace/types";
+import { quotationValidityDays, quotationValiditySchema } from "./validity";
 
 type PreviewEntry = Pick<
   QuotationEntry,
@@ -30,6 +31,11 @@ export function buildApprovedQuotationPreview(
     (item) => item.id === entry.productId && item.id === entry.quotation.product_id,
   );
   const quote = entry.quotation.quote;
+  if (quote.validity) {
+    const validity = quotationValiditySchema.safeParse(quote.validity);
+    if (!validity.success || quotationValidityDays(validity.data) !== quote.validity_days)
+      return null;
+  }
   const unknown = "Not recorded; please confirm";
   const customer = rfq?.formValues.customerName.trim() || unknown;
   const company = rfq?.formValues.customerCompany.trim() || unknown;
@@ -39,8 +45,8 @@ export function buildApprovedQuotationPreview(
     rfq?.quantity !== null && rfq?.quantity !== undefined ? String(rfq.quantity) : unknown;
 
   // RFQ quantity is a customer request, not an approved order quantity. The legacy
-  // contract has a validity duration but no start/expiry date or quantity unit.
-  // Do not derive dates from creation/approval or invent a unit, total, or promise.
+  // contract may have only a duration and has no quantity unit. Preserve missing
+  // dates; never derive them from creation/approval or invent a unit or total.
   const text = [
     "QUOTATION",
     `Reference: ${entry.id}`,
@@ -60,8 +66,14 @@ export function buildApprovedQuotationPreview(
     `Lead time: ${quote.lead_time_days} days`,
     `Payment terms: ${quote.payment_terms}`,
     `Validity period: ${quote.validity_days} days`,
-    "Validity start / expiry date: Not recorded; please confirm before sending",
+    ...(quote.validity
+      ? [
+          `Valid from: ${quote.validity.starts_on}`,
+          `Valid through: ${quote.validity.expires_on} (inclusive)`,
+          `Validity timezone: ${quote.validity.time_zone}`,
+        ]
+      : ["Validity start / expiry date: Not recorded; please confirm before sending"]),
   ].join("\n");
 
-  return { text, version: entry.version };
+  return { text, version: entry.version, hasValidityDates: Boolean(quote.validity) };
 }

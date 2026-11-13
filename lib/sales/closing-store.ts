@@ -125,6 +125,16 @@ function quoteFromValues(value: QuotationDraftValues) {
     lead_time_days: Number(value.leadTimeDays),
     payment_terms: value.paymentTerms,
     validity_days: Number(value.validityDays),
+    ...(value.validityStart && value.validityEnd && value.validityTimeZone
+      ? {
+          validity: {
+            version: 1 as const,
+            starts_on: value.validityStart,
+            expires_on: value.validityEnd,
+            time_zone: value.validityTimeZone,
+          },
+        }
+      : {}),
   };
 }
 

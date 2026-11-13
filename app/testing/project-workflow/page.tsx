@@ -376,6 +376,7 @@ async function ProjectWorkflowFixture({
     }
     const previewState =
       state === "quote-approved" ||
+      state === "quote-dated" ||
       state === "quote-approval-mismatch" ||
       state === "quote-missing-context";
     const previewQuote: QuotationEntry = {
@@ -385,6 +386,20 @@ async function ProjectWorkflowFixture({
       approvalStatus: "approved",
       quotation: {
         ...syntheticQuote.quotation,
+        ...(state === "quote-dated"
+          ? {
+              quote: {
+                ...syntheticQuote.quotation.quote,
+                validity_days: 3,
+                validity: {
+                  version: 1 as const,
+                  starts_on: "2026-03-07",
+                  expires_on: "2026-03-09",
+                  time_zone: "America/New_York",
+                },
+              },
+            }
+          : {}),
         status: "approved",
         approval_ref:
           state === "quote-approval-mismatch"

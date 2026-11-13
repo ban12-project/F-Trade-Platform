@@ -93,6 +93,9 @@ function QuotationForm({
           leadTimeDays: String(entry.quotation.quote.lead_time_days),
           paymentTerms: entry.quotation.quote.payment_terms,
           validityDays: String(entry.quotation.quote.validity_days),
+          validityStart: entry.quotation.quote.validity?.starts_on ?? "",
+          validityEnd: entry.quotation.quote.validity?.expires_on ?? "",
+          validityTimeZone: entry.quotation.quote.validity?.time_zone ?? "",
         }
       : {
           projectId,
@@ -106,6 +109,9 @@ function QuotationForm({
           leadTimeDays: "",
           paymentTerms: "",
           validityDays: "30",
+          validityStart: "",
+          validityEnd: "",
+          validityTimeZone: "",
         },
   });
   const selectedRfqId = useWatch({ control: form.control, name: "rfqId" });
@@ -120,7 +126,7 @@ function QuotationForm({
   useCreatedRecord(projectId, "quotation", state.status, state.id, !entry);
   function submit(value: QuoteValues) {
     const data = new FormData();
-    for (const [key, item] of Object.entries(value)) data.set(key, item);
+    for (const [key, item] of Object.entries(value)) data.set(key, item ?? "");
     startTransition(() => action(data));
   }
   return (
@@ -319,6 +325,45 @@ function QuotationForm({
                     </FieldDescription>
                     <FieldError errors={[form.formState.errors.evidenceRef]} />
                   </Field>
+                  <FieldDescription>
+                    可补充人工确认的起止日期和时区；三项须一起填写，首尾日期均计入有效天数。留空表示日期尚未记录，不会自动推算。
+                  </FieldDescription>
+                  <Field data-invalid={!!form.formState.errors.validityStart}>
+                    <FieldLabel htmlFor={`validityStart-${entry?.id ?? "new"}`}>
+                      有效期起算日
+                    </FieldLabel>
+                    <Input
+                      id={`validityStart-${entry?.id ?? "new"}`}
+                      type="date"
+                      {...form.register("validityStart")}
+                      aria-invalid={!!form.formState.errors.validityStart}
+                    />
+                    <FieldError errors={[form.formState.errors.validityStart]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.validityEnd}>
+                    <FieldLabel htmlFor={`validityEnd-${entry?.id ?? "new"}`}>
+                      有效期截止日
+                    </FieldLabel>
+                    <Input
+                      id={`validityEnd-${entry?.id ?? "new"}`}
+                      type="date"
+                      {...form.register("validityEnd")}
+                      aria-invalid={!!form.formState.errors.validityEnd}
+                    />
+                    <FieldError errors={[form.formState.errors.validityEnd]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.validityTimeZone}>
+                    <FieldLabel htmlFor={`validityTimeZone-${entry?.id ?? "new"}`}>
+                      有效期适用时区
+                    </FieldLabel>
+                    <Input
+                      id={`validityTimeZone-${entry?.id ?? "new"}`}
+                      type="text"
+                      {...form.register("validityTimeZone")}
+                      aria-invalid={!!form.formState.errors.validityTimeZone}
+                    />
+                    <FieldError errors={[form.formState.errors.validityTimeZone]} />
+                  </Field>
                   <Field data-invalid={!!form.formState.errors.validityDays}>
                     <FieldLabel htmlFor={`validity-${entry?.id ?? "new"}`}>有效期（天）</FieldLabel>
                     <Input
@@ -386,7 +431,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
   }, [form, router, state]);
   function submit(value: z.infer<typeof quotationDecisionFormSchema>) {
     const data = new FormData();
-    for (const [key, item] of Object.entries(value)) data.set(key, item);
+    for (const [key, item] of Object.entries(value)) data.set(key, item ?? "");
     startTransition(() => action(data));
   }
   return (
@@ -530,7 +575,7 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
   }, [form, router, state]);
   function submit(value: z.infer<typeof quotationSendFormSchema>) {
     const data = new FormData();
-    for (const [key, item] of Object.entries(value)) data.set(key, item);
+    for (const [key, item] of Object.entries(value)) data.set(key, item ?? "");
     startTransition(() => action(data));
   }
   return (
@@ -694,6 +739,11 @@ export function QuotationPanel({
             </CardHeader>
             <CardContent>
               <p className="text-sm">付款条件：{entry.quotation.quote.payment_terms}</p>
+              <p className="text-sm">
+                {entry.quotation.quote.validity
+                  ? `有效日期：${entry.quotation.quote.validity.starts_on} 至 ${entry.quotation.quote.validity.expires_on}（包含首尾日期；${entry.quotation.quote.validity.time_zone}）`
+                  : "有效日期：尚未记录，请人工确认。"}
+              </p>
             </CardContent>
           </Card>
           {entry.state === "QUOTE_REVISION_REQUIRED" ? (

@@ -581,6 +581,9 @@ for (const inbound of [false, true]) {
     ]) {
       await quote.getByLabel(label, { exact: true }).fill(value);
     }
+    await quote.getByLabel("有效期起算日", { exact: true }).fill("2026-03-01");
+    await quote.getByLabel("有效期截止日", { exact: true }).fill("2026-03-30");
+    await quote.getByLabel("有效期适用时区", { exact: true }).fill("America/New_York");
     await quote.getByLabel("报价依据", { exact: true }).click();
     await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "创建报价并提交审核", exact: true }).click();
@@ -590,7 +593,18 @@ for (const inbound of [false, true]) {
     expect(draft.payload).toMatchObject({
       rfq_id: rfq.id,
       product_id: productId,
-      quote: { unit_price: 12.5, currency: "USD", moq: 10, lead_time_days: 30 },
+      quote: {
+        unit_price: 12.5,
+        currency: "USD",
+        moq: 10,
+        lead_time_days: 30,
+        validity: {
+          version: 1,
+          starts_on: "2026-03-01",
+          expires_on: "2026-03-30",
+          time_zone: "America/New_York",
+        },
+      },
     });
     await expect(page).toHaveURL(new RegExp(`/records/quotation/${draft.id}(?:[?].*)?$`));
     const staleContext = await browser.newContext({ baseURL });
@@ -615,6 +629,9 @@ for (const inbound of [false, true]) {
       .poll(async () => (await records("quotation"))[0].state)
       .toBe("QUOTE_REVISION_REQUIRED");
     const revision = page.locator(`form#quotation-${draft.id}`).filter({ visible: true });
+    await expect(revision.getByLabel("有效期起算日", { exact: true })).toHaveValue("2026-03-01");
+    await revision.getByLabel("有效期起算日", { exact: true }).fill("2026-04-01");
+    await revision.getByLabel("有效期截止日", { exact: true }).fill("2026-04-30");
     await revision.getByLabel("单价", { exact: true }).fill("13.25");
     await revision.getByLabel("报价依据", { exact: true }).click();
     await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
@@ -671,6 +688,12 @@ for (const inbound of [false, true]) {
     expect(approved.payload.quote).toEqual({
       ...(draft.payload.quote as object),
       unit_price: 13.25,
+      validity: {
+        version: 1,
+        starts_on: "2026-04-01",
+        expires_on: "2026-04-30",
+        time_zone: "America/New_York",
+      },
     });
     const approvals = await db
       .select()
