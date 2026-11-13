@@ -91,6 +91,15 @@ export const librarySnapshot: WorkspaceTaskSnapshot = {
     ),
   ],
   approvals: [],
-  publications: [],
+  publications: [
+    {
+      id: "00000000-0000-4000-8000-000000000931",
+      projectId: libraryIds.first,
+      contentRef: "00000000-0000-4000-8000-000000000916",
+      accountLabel: "Synthetic publication account",
+      status: "failed",
+      createdAt: new Date("2026-01-01T00:30:00Z"),
+    },
+  ],
   hasActiveChannel: false,
 };

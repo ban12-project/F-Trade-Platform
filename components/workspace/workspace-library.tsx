@@ -16,6 +16,7 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import {
   type LibraryFilterKey,
   updateWorkspaceLibraryFilter,
@@ -35,15 +36,6 @@ import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 import { useWorkspaceDirtyState } from "./dirty-state";
 import { NewWorkButton } from "./new-work";
 import { WorkspaceLink } from "./workspace-link";
-
-const publicationTimeFormat = new Intl.DateTimeFormat("zh-CN", {
-  timeZone: "Asia/Shanghai",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
 
 const subscribeToHydration = () => () => {};
 const clientHydrationSnapshot = () => true;
@@ -76,6 +68,12 @@ export function WorkspaceLibrary({
   basePath?: string;
 }) {
   const id = useId();
+  const timeZone = useBrowserTimeZone();
+  const publicationTimeFormat = new Intl.DateTimeFormat("zh-CN", {
+    timeZone,
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
   const searchForm = useForm({
     resolver: zodResolver(librarySearchSchema),
     values: { q: search },
@@ -397,15 +395,15 @@ export function WorkspaceLibrary({
                             href={withWorkspaceReturnTo(publication.href, returnTo)}
                             className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 rounded-md py-1 text-sm hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
                           >
-                            <span className="min-w-0 flex-1 break-words">
+                            <span className="min-w-0 flex-1 basis-full break-words sm:basis-auto">
                               {publication.accountLabel}
                             </span>
                             <time
                               dateTime={publication.createdAt.toISOString()}
-                              title="提交时间（北京时间）"
-                              className="text-xs text-muted-foreground"
+                              className="basis-full break-words text-xs text-muted-foreground sm:basis-auto"
                             >
-                              {publicationTimeFormat.format(publication.createdAt)}
+                              提交时间：{publicationTimeFormat.format(publication.createdAt)}（
+                              {timeZone}）
                             </time>
                             <Badge variant="outline">{publication.statusLabel}</Badge>
                             <span className="text-xs text-muted-foreground">查看详情</span>
