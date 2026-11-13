@@ -14,7 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { initialProductActionState } from "@/lib/action-states";
@@ -98,6 +105,7 @@ export function ProductDraftForm({
   }, [form, images, revising, router, state.status]);
   useCreatedRecord(projectId, "product", state.status, state.productId, !revising);
   async function submit(values: ProductValues) {
+    if (pending) return;
     if (!(await images.trigger())) return;
     startTransition(() => action({ values, imageFiles: images.getValues().imageFiles }));
   }
@@ -114,76 +122,79 @@ export function ProductDraftForm({
       <form
         id={`${formId}-${revising ? "revise-product" : "create-product"}`}
         onSubmit={form.handleSubmit(submit)}
+        aria-busy={pending}
         noValidate
       >
-        <CardContent>
-          <ProductFields form={form} evidenceOptions={evidenceOptions} />
-          <FieldGroup className="mt-4">
-            <Field data-invalid={!!images.formState.errors.imageFiles} data-disabled={pending}>
-              <FieldLabel htmlFor={imageId}>产品图片（可选）</FieldLabel>
-              <Controller
-                control={images.control}
-                name="imageFiles"
-                render={({ field }) => (
-                  <Input
-                    ref={(input) => {
-                      imageRef.current = input;
-                      field.ref(input);
-                    }}
-                    id={imageId}
-                    name={field.name}
-                    type="file"
-                    accept=".png,.jpg,.jpeg"
-                    multiple
-                    disabled={pending}
-                    onBlur={field.onBlur}
-                    aria-invalid={!!images.formState.errors.imageFiles}
-                    onChange={(event) => field.onChange(Array.from(event.target.files ?? []))}
-                  />
-                )}
-              />
-              <FieldDescription>
-                {revising
-                  ? `已有 ${detail.sourceImages.length} 张，新增后共最多 4 张。`
-                  : "最多 4 张 PNG / JPEG，每张不超过 5 MiB。"}
-                图片随草稿私有保存，须核对与当前产品一致，不能证明尺寸、OE 或材料。
-              </FieldDescription>
-              <FieldError errors={[images.formState.errors.imageFiles]} />
-            </Field>
-          </FieldGroup>
-        </CardContent>
-        <CardFooter className="flex-col items-stretch gap-3">
-          <Button type="submit" disabled={pending || !evidenceOptions.length}>
-            {pending ? (
-              <Spinner data-icon="inline-start" />
-            ) : revising ? (
-              <RotateCcwIcon data-icon="inline-start" />
-            ) : (
-              <PlusIcon data-icon="inline-start" />
-            )}
-            {revising ? "提交修订并送审" : "创建待审核草稿"}
-          </Button>
-          {state.status === "success" && state.productId && !revising ? (
-            <Button
-              render={<Link href={workspaceRecordHref(projectId, "product", state.productId)} />}
-              variant="outline"
-            >
-              打开产品草稿
+        <FieldSet disabled={pending} className="gap-0">
+          <CardContent>
+            <ProductFields form={form} evidenceOptions={evidenceOptions} disabled={pending} />
+            <FieldGroup className="mt-4">
+              <Field data-invalid={!!images.formState.errors.imageFiles} data-disabled={pending}>
+                <FieldLabel htmlFor={imageId}>产品图片（可选）</FieldLabel>
+                <Controller
+                  control={images.control}
+                  name="imageFiles"
+                  render={({ field }) => (
+                    <Input
+                      ref={(input) => {
+                        imageRef.current = input;
+                        field.ref(input);
+                      }}
+                      id={imageId}
+                      name={field.name}
+                      type="file"
+                      accept=".png,.jpg,.jpeg"
+                      multiple
+                      disabled={pending}
+                      onBlur={field.onBlur}
+                      aria-invalid={!!images.formState.errors.imageFiles}
+                      onChange={(event) => field.onChange(Array.from(event.target.files ?? []))}
+                    />
+                  )}
+                />
+                <FieldDescription>
+                  {revising
+                    ? `已有 ${detail.sourceImages.length} 张，新增后共最多 4 张。`
+                    : "最多 4 张 PNG / JPEG，每张不超过 5 MiB。"}
+                  图片随草稿私有保存，须核对与当前产品一致，不能证明尺寸、OE 或材料。
+                </FieldDescription>
+                <FieldError errors={[images.formState.errors.imageFiles]} />
+              </Field>
+            </FieldGroup>
+          </CardContent>
+          <CardFooter className="flex-col items-stretch gap-3">
+            <Button type="submit" disabled={pending || !evidenceOptions.length}>
+              {pending ? (
+                <Spinner data-icon="inline-start" />
+              ) : revising ? (
+                <RotateCcwIcon data-icon="inline-start" />
+              ) : (
+                <PlusIcon data-icon="inline-start" />
+              )}
+              {revising ? "提交修订并送审" : "创建待审核草稿"}
             </Button>
-          ) : null}
-          {state.message ? (
-            <p
-              className={
-                state.status === "error"
-                  ? "text-sm text-destructive"
-                  : "text-sm text-muted-foreground"
-              }
-              aria-live="polite"
-            >
-              {state.message}
-            </p>
-          ) : null}
-        </CardFooter>
+            {state.status === "success" && state.productId && !revising ? (
+              <Button
+                render={<Link href={workspaceRecordHref(projectId, "product", state.productId)} />}
+                variant="outline"
+              >
+                打开产品草稿
+              </Button>
+            ) : null}
+            {state.message ? (
+              <p
+                className={
+                  state.status === "error"
+                    ? "text-sm text-destructive"
+                    : "text-sm text-muted-foreground"
+                }
+                aria-live="polite"
+              >
+                {state.message}
+              </p>
+            ) : null}
+          </CardFooter>
+        </FieldSet>
       </form>
     </Card>
   );

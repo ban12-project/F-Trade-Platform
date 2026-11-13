@@ -704,8 +704,11 @@ test("authenticated browser reviews a mock product and its content through real 
   );
   await expect(publish).toBeEnabled();
   await publish.click();
-  await expect(page.getByRole("link", { name: /查看执行状态与回执/ })).toBeVisible();
-  await expect(publish).toBeDisabled();
+  // Refresh replaces the composer with persisted progress; do not assert its transient button.
+  await expect(
+    page.getByText("发布任务已提交，等待服务执行。提交成功不代表已发布。", { exact: true }),
+  ).toBeVisible();
+  await expect(publish).toHaveCount(0);
   await expect(page.getByText("已发布", { exact: true })).toHaveCount(0);
   const [submitted] = await db
     .select()
