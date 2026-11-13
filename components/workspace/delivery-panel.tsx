@@ -58,6 +58,7 @@ function DeliveryDecision({
   const [state, action, pending] = useActionState(decideDeliveryAction, initialClosingActionState);
   const form = useForm<z.infer<typeof deliveryDecisionFormSchema>>({
     resolver: zodResolver(deliveryDecisionFormSchema),
+    shouldFocusError: false,
     defaultValues: {
       projectId,
       confirmationId: entry.id,
@@ -85,7 +86,15 @@ function DeliveryDecision({
         <CardDescription>系统不会预选决定；批准时必须填写人工确认的交期天数。</CardDescription>
       </CardHeader>
       <CardContent>
-        <form id={`delivery-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
+        <form
+          id={`delivery-${entry.id}`}
+          onSubmit={form.handleSubmit(submit, (errors) => {
+            const first = (["decision", "leadTimeDays", "evidenceRef", "notes"] as const).find(
+              (name) => errors[name],
+            );
+            if (first) form.setFocus(first);
+          })}
+        >
           <FieldGroup>
             <Field data-invalid={!!form.formState.errors.decision}>
               <FieldLabel htmlFor={`delivery-decision-${entry.id}-decision`}>决定</FieldLabel>
@@ -99,7 +108,14 @@ function DeliveryDecision({
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger
+                      ref={field.ref}
+                      onBlur={field.onBlur}
                       aria-invalid={!!form.formState.errors.decision}
+                      aria-describedby={
+                        form.formState.errors.decision
+                          ? `closing-review-${entry.id}-decision-error`
+                          : undefined
+                      }
                       id={`delivery-decision-${entry.id}-decision`}
                       className="w-full"
                     >
@@ -114,7 +130,10 @@ function DeliveryDecision({
                   </Select>
                 )}
               />
-              <FieldError errors={[form.formState.errors.decision]} />
+              <FieldError
+                id={`closing-review-${entry.id}-decision-error`}
+                errors={[form.formState.errors.decision]}
+              />
             </Field>
             <Field data-invalid={!!form.formState.errors.leadTimeDays}>
               <FieldLabel htmlFor={`confirmed-days-${entry.id}`}>确认交期（天）</FieldLabel>
@@ -124,8 +143,16 @@ function DeliveryDecision({
                 disabled={form.watch("decision") !== "confirmed"}
                 {...form.register("leadTimeDays")}
                 aria-invalid={!!form.formState.errors.leadTimeDays}
+                aria-describedby={
+                  form.formState.errors.leadTimeDays
+                    ? `closing-review-${entry.id}-leadTimeDays-error`
+                    : undefined
+                }
               />
-              <FieldError errors={[form.formState.errors.leadTimeDays]} />
+              <FieldError
+                id={`closing-review-${entry.id}-leadTimeDays-error`}
+                errors={[form.formState.errors.leadTimeDays]}
+              />
             </Field>
             <Field data-invalid={!!form.formState.errors.evidenceRef}>
               <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核依据</FieldLabel>
@@ -133,9 +160,17 @@ function DeliveryDecision({
                 projectId={projectId}
                 control={form.control}
                 name="evidenceRef"
+                aria-describedby={
+                  form.formState.errors.evidenceRef
+                    ? `closing-review-${entry.id}-evidenceRef-error`
+                    : undefined
+                }
                 id={`delivery-decision-evidence-${entry.id}`}
               />
-              <FieldError errors={[form.formState.errors.evidenceRef]} />
+              <FieldError
+                id={`closing-review-${entry.id}-evidenceRef-error`}
+                errors={[form.formState.errors.evidenceRef]}
+              />
             </Field>
             <Field data-invalid={!!form.formState.errors.notes}>
               <FieldLabel htmlFor={`delivery-notes-${entry.id}`}>
@@ -145,8 +180,14 @@ function DeliveryDecision({
                 id={`delivery-notes-${entry.id}`}
                 {...form.register("notes")}
                 aria-invalid={!!form.formState.errors.notes}
+                aria-describedby={
+                  form.formState.errors.notes ? `closing-review-${entry.id}-notes-error` : undefined
+                }
               />
-              <FieldError errors={[form.formState.errors.notes]} />
+              <FieldError
+                id={`closing-review-${entry.id}-notes-error`}
+                errors={[form.formState.errors.notes]}
+              />
             </Field>
           </FieldGroup>
         </form>
