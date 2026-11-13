@@ -367,6 +367,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
   const [state, action, pending] = useActionState(decideQuotationAction, initialClosingActionState);
   const form = useForm<z.infer<typeof quotationDecisionFormSchema>>({
     resolver: zodResolver(quotationDecisionFormSchema),
+    shouldFocusError: false,
     defaultValues: {
       projectId,
       quotationId: entry.id,
@@ -397,7 +398,15 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form id={`quote-decision-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
+        <form
+          id={`quote-decision-${entry.id}`}
+          onSubmit={form.handleSubmit(submit, (errors) => {
+            const first = (["decision", "evidenceRef", "notes"] as const).find(
+              (name) => errors[name],
+            );
+            if (first) form.setFocus(first);
+          })}
+        >
           <FieldGroup>
             <Field data-invalid={!!form.formState.errors.decision}>
               <FieldLabel htmlFor={`quote-decision-${entry.id}-decision`}>决定</FieldLabel>
@@ -411,7 +420,14 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                     onValueChange={field.onChange}
                   >
                     <SelectTrigger
+                      ref={field.ref}
+                      onBlur={field.onBlur}
                       aria-invalid={!!form.formState.errors.decision}
+                      aria-describedby={
+                        form.formState.errors.decision
+                          ? `closing-review-${entry.id}-decision-error`
+                          : undefined
+                      }
                       id={`quote-decision-${entry.id}-decision`}
                       className="w-full"
                     >
@@ -426,7 +442,10 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                   </Select>
                 )}
               />
-              <FieldError errors={[form.formState.errors.decision]} />
+              <FieldError
+                id={`closing-review-${entry.id}-decision-error`}
+                errors={[form.formState.errors.decision]}
+              />
             </Field>
             <Field data-invalid={!!form.formState.errors.evidenceRef}>
               <FieldLabel htmlFor={`quote-evidence-${entry.id}`}>审核依据</FieldLabel>
@@ -434,9 +453,17 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                 projectId={projectId}
                 control={form.control}
                 name="evidenceRef"
+                aria-describedby={
+                  form.formState.errors.evidenceRef
+                    ? `closing-review-${entry.id}-evidenceRef-error`
+                    : undefined
+                }
                 id={`quote-evidence-${entry.id}`}
               />
-              <FieldError errors={[form.formState.errors.evidenceRef]} />
+              <FieldError
+                id={`closing-review-${entry.id}-evidenceRef-error`}
+                errors={[form.formState.errors.evidenceRef]}
+              />
             </Field>
             <Field data-invalid={!!form.formState.errors.notes}>
               <FieldLabel htmlFor={`quote-notes-${entry.id}`}>
@@ -446,8 +473,14 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
                 id={`quote-notes-${entry.id}`}
                 {...form.register("notes")}
                 aria-invalid={!!form.formState.errors.notes}
+                aria-describedby={
+                  form.formState.errors.notes ? `closing-review-${entry.id}-notes-error` : undefined
+                }
               />
-              <FieldError errors={[form.formState.errors.notes]} />
+              <FieldError
+                id={`closing-review-${entry.id}-notes-error`}
+                errors={[form.formState.errors.notes]}
+              />
             </Field>
           </FieldGroup>
         </form>

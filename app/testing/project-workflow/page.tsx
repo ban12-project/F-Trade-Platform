@@ -467,9 +467,23 @@ async function ProjectWorkflowFixture({
                 : [{ ...syntheticProduct, id: syntheticProduct.id }]
             }
             entries={
-              previewState ? [previewQuote] : state === "quote-revision" ? [syntheticQuote] : []
+              previewState
+                ? [previewQuote]
+                : state === "quote-review"
+                  ? [
+                      {
+                        ...syntheticQuote,
+                        state: "QUOTE_REVIEW_REQUIRED",
+                        approvalStatus: "pending",
+                        reviewNotes: null,
+                        quotation: { ...syntheticQuote.quotation, status: "review_required" },
+                      },
+                    ]
+                  : state === "quote-revision"
+                    ? [syntheticQuote]
+                    : []
             }
-            showCreateForm={!previewState && state !== "quote-revision"}
+            showCreateForm={!previewState && state !== "quote-revision" && state !== "quote-review"}
             canReview
           />
           {state?.startsWith("quote-needs-") ||
