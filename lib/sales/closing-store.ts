@@ -25,6 +25,7 @@ import {
   requestDeliveryConfirmation,
   validateDeliveryConfirmation,
 } from "@/lib/delivery/confirmation";
+import { DELIVERY_CONFIRMATION_VALIDITY_MS } from "@/lib/delivery/validity";
 import { nextFollowUp } from "@/lib/follow-up/cadence";
 import { buildControlledReply } from "@/lib/follow-up/controlled-reply";
 import { scoreLead } from "@/lib/follow-up/lead-scoring";
@@ -152,7 +153,6 @@ async function assertSalesProject(
   if (project?.kind !== "sales") throw new Error("该操作只能在销售机会项目中执行。");
 }
 
-const DELIVERY_CONFIRMATION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1_000;
 async function prepareControlledFollowUp(
   tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
   projectId: string,

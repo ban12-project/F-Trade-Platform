@@ -54,9 +54,11 @@ test("delivery confirmation focuses missing days before evidence", async ({ page
   await page.getByRole("button", { name: "确认人工交期", exact: true }).click();
   const days = form.getByLabel("确认交期（天）", { exact: true });
   await expect(days).toBeFocused();
-  await expect(days).toHaveAccessibleDescription("批准交期时必须填写非负整数天数。");
+  await expect(days).toHaveAccessibleDescription(/批准交期时必须填写非负整数天数。/);
   await days.fill("30");
   await page.getByRole("button", { name: "确认人工交期", exact: true }).click();
   await expect(form.getByRole("combobox", { name: "审核依据", exact: true })).toBeFocused();
-  await expect(days).not.toHaveAttribute("aria-describedby");
+  await expect(days).toHaveAccessibleDescription(
+    /填写工厂核实的交期天数；与确认结果的 7\s*天有效期不同/,
+  );
 });
