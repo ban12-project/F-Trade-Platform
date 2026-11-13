@@ -17,6 +17,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { publicationProgress } from "@/lib/social/publication-presentation";
 import type {
   PublicationCandidate,
@@ -41,6 +42,12 @@ export function PublicationPanel({
   publications: PublicationEntry[];
   mediaOptions?: PublicationMediaOptions;
 }) {
+  const timeZone = useBrowserTimeZone();
+  const timestampFormat = new Intl.DateTimeFormat("zh-CN", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+    timeZone,
+  });
   const router = useRouter();
   const waiting = publications.some((p) => ["submitted", "pending", "queued"].includes(p.status));
   useEffect(() => {
@@ -89,10 +96,18 @@ export function PublicationPanel({
             <CardContent className="flex flex-col gap-2">
               <p className="text-sm">{progress.detail}</p>
               <p className="text-sm text-muted-foreground">
-                提交时间：{new Date(item.createdAt).toLocaleString()}
+                提交时间：
+                <time dateTime={new Date(item.createdAt).toISOString()}>
+                  {timestampFormat.format(new Date(item.createdAt))}（{timeZone}）
+                </time>
               </p>
               {item.publishedAt && (
-                <p className="text-sm">发布时间：{new Date(item.publishedAt).toLocaleString()}</p>
+                <p className="text-sm">
+                  发布时间：
+                  <time dateTime={new Date(item.publishedAt).toISOString()}>
+                    {timestampFormat.format(new Date(item.publishedAt))}（{timeZone}）
+                  </time>
+                </p>
               )}
               {item.failureLabel ? (
                 <details className="text-sm text-muted-foreground">
