@@ -134,10 +134,10 @@ function QuotationForm({
       <CardContent>
         <form
           id={`quotation-${entry?.id ?? "new"}`}
-          aria-busy={!form.formState.isReady}
+          aria-busy={!form.formState.isReady || pending}
           onSubmit={form.handleSubmit(submit)}
         >
-          <FieldSet disabled={!form.formState.isReady} className="min-w-0">
+          <FieldSet disabled={!form.formState.isReady || pending} className="min-w-0">
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.rfqId}>
                 <FieldLabel htmlFor={`quotation-rfq-${entry?.id ?? "new"}`}>客户需求</FieldLabel>
