@@ -261,8 +261,14 @@ export function ProductCatalogImport({
         if (fileRef.current) fileRef.current.value = "";
       }
     } catch {
-      if (uploadAttempt.current === active)
-        setError("上传失败，请检查文件大小、网络及项目权限后重试。");
+      if (uploadAttempt.current === active) {
+        if (active.dispatched) {
+          setRestoreFailed(true);
+          setError("无法确认目录任务是否已提交。请先读取已有任务，再决定是否重新上传。");
+        } else {
+          setError("上传失败，请检查文件大小、网络及项目权限后重试。");
+        }
+      }
     } finally {
       if (uploadAttempt.current === active) {
         uploadAttempt.current = null;
