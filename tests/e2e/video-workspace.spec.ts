@@ -127,3 +127,22 @@ test("creative brief edits require saving before AI regeneration", async ({ page
   await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeDisabled();
   await expect(page.getByLabel("目标受众", { exact: true })).toHaveValue("配件采购商");
 });
+
+test("AI draft explains missing brief fields and unsaved changes at the action", async ({
+  page,
+}) => {
+  await page.goto("/testing/video-workspace");
+  const ai = page.getByRole("button", { name: "AI 初稿", exact: true });
+  await expect(ai).toBeDisabled();
+  const audience = page.getByLabel("目标受众", { exact: true });
+  await audience.fill("");
+  await expect(ai).toBeDisabled();
+  await expect(ai).toHaveAccessibleDescription("请完整填写上方创意简报并保存，再生成 AI 初稿。");
+  await audience.fill("SYNTHETIC revised audience");
+  await page.getByLabel("含授权品牌标识的开场素材").selectOption("evidence-video-001");
+  await page.getByLabel("一个主要买家需求").fill("SYNTHETIC workflow demonstration");
+  await page.getByLabel("可用的下一步与承接入口").fill("SYNTHETIC contact form");
+  await page.getByLabel("平台与声音、字幕假设").fill("SYNTHETIC muted preview");
+  await expect(ai).toBeDisabled();
+  await expect(ai).toHaveAccessibleDescription("请先保存当前修改，再生成 AI 初稿。");
+});
