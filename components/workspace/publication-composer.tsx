@@ -136,6 +136,7 @@ export function PublicationComposer({
       </CardHeader>
       <CardContent>
         <form
+          data-publication-composer="true"
           className="workspace-columns"
           onSubmit={form.handleSubmit(async () => {
             if (
