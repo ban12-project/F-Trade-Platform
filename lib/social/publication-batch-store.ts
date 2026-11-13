@@ -29,12 +29,6 @@ export async function submitPublicationBatch(
     .digest("hex");
   return database.transaction(async (tx) => {
     await assertWorkspaceProjectAccess(value.content.projectId, identity.actorId, "write", tx);
-    await authorizeSocialActor(
-      tx,
-      identity,
-      [value.content.format === "text" ? "content:write" : "content:review"],
-      value.content.format !== "text",
-    );
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`publication-batch:${identity.actorId}:${value.batchId}`}, 0))`,
     );
@@ -49,6 +43,13 @@ export async function submitPublicationBatch(
         ),
       );
     if (existing) {
+      await assertWorkspaceProjectAccess(value.content.projectId, identity.actorId, "write", tx);
+      await authorizeSocialActor(
+        tx,
+        identity,
+        [value.content.format === "text" ? "content:write" : "content:review"],
+        value.content.format !== "text",
+      );
       if (existing.metadata?.digest !== digest)
         throw new Error("同一批次的内容或账号发生变化，请重新预览后确认。");
       return existing.metadata.results as PublicationBatchResult[];
@@ -69,6 +70,8 @@ export async function submitPublicationBatch(
     for (const target of targets)
       await assertPublicPublishingAccountReady(tx, target, identity.actorId);
     const results: PublicationBatchResult[] = [];
+    // Each writer reserves current project/actor authorization after its source
+    // waits. Reserving the actor here would block revocation behind those waits.
     for (const target of targets) {
       const saved =
         value.content.format === "text"
@@ -93,6 +96,12 @@ export async function submitPublicationBatch(
     }
     for (const target of targets)
       await assertPublicPublishingAccountReady(tx, target, identity.actorId);
+    await authorizeSocialActor(
+      tx,
+      identity,
+      [value.content.format === "text" ? "content:write" : "content:review"],
+      value.content.format !== "text",
+    );
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       actorType: "human",
