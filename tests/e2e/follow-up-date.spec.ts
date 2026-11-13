@@ -84,7 +84,8 @@ test("clearing a partial date removes its error even when the serialized value s
     .toBe(true);
   await expect(date).toHaveValue("");
   await expect(date).toHaveAttribute("aria-invalid", "false");
-  await expect(date).not.toHaveAttribute("aria-describedby");
+  await expect(date).toHaveAccessibleDescription(/按当前设备时区/);
+  await expect(date).not.toHaveAccessibleDescription(/请填写完整有效/);
   await save.click();
   await expect.poll(() => writes).toBe(1);
 });

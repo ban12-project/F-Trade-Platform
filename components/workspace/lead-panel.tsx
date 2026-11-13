@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { initialClosingActionState } from "@/lib/action-states";
 import {
   confirmOpportunityAction,
@@ -78,6 +79,7 @@ function localDateTime(value?: string) {
 }
 
 function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntry }) {
+  const timeZone = useBrowserTimeZone();
   const router = useRouter();
   const [state, action, pending] = useActionState(recordFollowUpAction, initialClosingActionState);
   const [planState, planAction, planPending] = useActionState(
@@ -246,10 +248,12 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                     </AlertTitle>
                     <AlertDescription>
                       交期确认有效至{" "}
-                      {new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(
-                        new Date(entry.confirmedDelivery.validUntil),
-                      )}
-                      。交期句由服务端插入，请勿写入自由文本。
+                      {new Intl.DateTimeFormat("zh-CN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone,
+                      }).format(new Date(entry.confirmedDelivery.validUntil))}
+                      （{timeZone}）。交期句由服务端插入，请勿写入自由文本。
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -327,11 +331,12 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                     void nextFollowUpField.onBlur(event);
                     clearValidFollowUpError();
                   }}
-                  aria-describedby={
-                    form.formState.errors.nextFollowUpAt ? `next-error-${entry.id}` : undefined
-                  }
+                  aria-describedby={`next-help-${entry.id}${form.formState.errors.nextFollowUpAt ? ` next-error-${entry.id}` : ""}`}
                   aria-invalid={!!form.formState.errors.nextFollowUpAt}
                 />
+                <FieldDescription id={`next-help-${entry.id}`}>
+                  按当前设备时区（{timeZone}）填写；留空并保存可取消提醒。
+                </FieldDescription>
                 <FieldError
                   id={`next-error-${entry.id}`}
                   errors={[form.formState.errors.nextFollowUpAt]}
@@ -382,6 +387,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
 }
 
 function LeadTimeline({ entry }: { entry: LeadEntry }) {
+  const timeZone = useBrowserTimeZone();
   const statusLabel = {
     received: "已接收",
     queued: "等待发送",
@@ -417,7 +423,9 @@ function LeadTimeline({ entry }: { entry: LeadEntry }) {
                 {new Intl.DateTimeFormat("zh-CN", {
                   dateStyle: "medium",
                   timeStyle: "short",
+                  timeZone,
                 }).format(message.receivedAt)}
+                （{timeZone}）
               </p>
             </div>
           ))
@@ -606,6 +614,7 @@ export function LeadPanel({
   entries: LeadEntry[];
   deliveries?: DeliveryConfirmationEntry[];
 }) {
+  const timeZone = useBrowserTimeZone();
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -633,7 +642,7 @@ export function LeadPanel({
               <AlertDescription>
                 {entry.state === "LEAD_RECEIVED"
                   ? "下一步整理客户的产品、数量和目的地需求；相关需求和报价可从上方继续。"
-                  : `下一动作：${salesNextActionLabels[entry.lead.next_action] ?? "查看客户最新消息并决定跟进事项"}${entry.lead.next_follow_up_at ? ` · ${new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.lead.next_follow_up_at))}` : ""}`}
+                  : `下一动作：${salesNextActionLabels[entry.lead.next_action] ?? "查看客户最新消息并决定跟进事项"}${entry.lead.next_follow_up_at ? ` · ${new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(entry.lead.next_follow_up_at))}（${timeZone}）` : ""}`}
               </AlertDescription>
             </Alert>
             <LeadTimeline entry={entry} />
