@@ -134,7 +134,9 @@ for (const failure of ["denied", "transport"] as const) {
     await page.keyboard.press("Escape");
     await refresh.click();
     await expect(field).toContainText("合成工厂授权书.pdf");
-    await expect(field).toHaveAccessibleDescription("请选择与本次操作对应的文件。");
+    await expect(field).toHaveAccessibleDescription(
+      "已选择：合成工厂授权书.pdf。请核对是否与本次操作对应。",
+    );
     await expect(page.getByLabel("提交结果")).toBeEmpty();
     await page.getByRole("button", { name: "保存选择", exact: true }).click();
     await expect(page.getByLabel("提交结果")).toHaveText("evidence-synthetic-rights-761");
@@ -147,3 +149,27 @@ for (const failure of ["denied", "transport"] as const) {
     expect(requests).toBe(3);
   });
 }
+
+test("long duplicate evidence labels remain readable and verifiable on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/testing/evidence-select");
+  const field = page.getByRole("combobox", { name: "素材使用授权证明", exact: true });
+  await field.click();
+  const selected = page.getByRole("option", { name: /synthetic-catalogue.*2026-10-04/ });
+  await expect(selected).toBeVisible();
+  expect(await selected.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+    true,
+  );
+  await selected.click();
+  await expect(field).toHaveAccessibleDescription(/已选择：synthetic-catalogue.*2026-10-04/);
+  const description = page.locator(`[id="${await field.getAttribute("aria-describedby")}"]`);
+  await expect(description).toBeVisible();
+  expect(await description.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+    true,
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("button", { name: "保存选择", exact: true }).click();
+  await expect(page.getByLabel("提交结果")).toHaveText("evidence-synthetic-long-1");
+});

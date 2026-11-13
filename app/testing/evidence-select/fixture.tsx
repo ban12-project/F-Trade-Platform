@@ -36,6 +36,11 @@ export function EvidenceSelectFixture() {
                 label: "合成工厂授权书.pdf",
                 detail: "2026-10-02",
               },
+              ...["2026-10-03", "2026-10-04"].map((detail, index) => ({
+                id: `evidence-synthetic-long-${index}`,
+                label: `synthetic-${"catalogue".repeat(24)}.pdf`,
+                detail,
+              })),
             ]}
           />
           <FieldError errors={[form.formState.errors.evidenceRef]} />
