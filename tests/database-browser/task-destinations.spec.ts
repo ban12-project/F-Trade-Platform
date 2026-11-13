@@ -258,13 +258,13 @@ test("new lead task opens RFQ creation with that lead selected and reopens its e
   const form = panel.locator("#create-rfq");
   await expect(form).toBeVisible();
   await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toContainText(
-    `客户会话 ${received.slice(0, 8)}`,
+    `暂无可显示的客户消息 · 会话 ${received.slice(0, 8)}…${received.slice(-8)}`,
   );
   await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toBeDisabled();
   await page.goto(`/workspace/${id}/new/rfq?lead=${received}`);
   await expect(form).toBeVisible();
   await expect(form.getByRole("combobox", { name: "来源客户会话（可选）" })).toContainText(
-    `客户会话 ${received.slice(0, 8)}`,
+    `暂无可显示的客户消息 · 会话 ${received.slice(0, 8)}…${received.slice(-8)}`,
   );
   const linked = await record(
     id,
@@ -333,7 +333,8 @@ test("publication link selects its approved payload and unavailable targets cann
   const panel = page.getByRole("region", { name: "业务记录" });
   await expect(
     panel
-      .locator("#publication-confirmation")
+      .getByRole("alert")
+      .filter({ hasText: "本次发布预览" })
       .getByText("Chosen synthetic payload", { exact: true }),
   ).toBeVisible();
   await expect(panel.getByText("Other synthetic payload", { exact: true })).toHaveCount(0);
@@ -362,10 +363,13 @@ test("publication link selects its approved payload and unavailable targets cann
     },
   ]);
   await page.goto(`/workspace/${id}/records/publication/${publicationId}`);
-  await expect(panel.getByText("synthetic-chosen-channel", { exact: false })).toBeVisible();
+  await expect(panel.getByRole("link", { name: "查看发布内容", exact: true })).toHaveAttribute(
+    "href",
+    `/workspace/${id}/records/content/${chosen}`,
+  );
   await expect(panel.getByText("结果待人工核对", { exact: true })).toBeVisible();
   await expect(panel.getByText(/系统不会自动重试/)).toBeVisible();
-  await expect(panel.locator("#publication-confirmation")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: /确认公开发布到/ })).toHaveCount(0);
   for (const [status, label] of [
     ["failed", "发布失败"],
     ["paused", "发布已暂停"],
@@ -382,7 +386,7 @@ test("publication link selects its approved payload and unavailable targets cann
   await expect(panel.getByText("Other synthetic payload", { exact: true })).toHaveCount(0);
   await page.goto(`/workspace/${id}/records/publication/${randomUUID()}`);
   await expect(panel.getByText("这条记录已不可用", { exact: true })).toBeVisible();
-  await expect(panel.locator("#publication-confirmation")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: /确认公开发布到/ })).toHaveCount(0);
 });
 
 test("review tasks respect application role, project role and archival without changing approval gates", async ({
