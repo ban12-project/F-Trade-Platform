@@ -199,7 +199,7 @@ export function ProductCatalogImport({
   }, [projectId, restoreAttempt]);
 
   useEffect(() => {
-    if (!view || !working) return;
+    if (!view || !working || pending) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       void getProductCatalogAction({ projectId, importId: view.id })
@@ -219,7 +219,7 @@ export function ProductCatalogImport({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [view, working, projectId, router]);
+  }, [view, working, pending, projectId, router]);
 
   useEffect(() => {
     if (!restoreFocus.current || restoring || restoreFailed) return;
