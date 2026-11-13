@@ -128,6 +128,30 @@ test("creative brief edits require saving before AI regeneration", async ({ page
   await expect(page.getByLabel("目标受众", { exact: true })).toHaveValue("配件采购商");
 });
 
+test("rendering an incomplete brief names the required input without technical errors", async ({
+  page,
+}) => {
+  await page.goto("/testing/video-workspace");
+  let submissions = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"]) submissions++;
+  });
+  const render = page.getByRole("button", { name: "合成预览", exact: true });
+  await render.click();
+  await expect(
+    page.getByText("请先填写上方 ABCD 创意简报，再合成预览。", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("目标受众", { exact: true }).fill("SYNTHETIC audience");
+  await render.click();
+  const errors = page.getByRole("alert").filter({ hasText: "剪辑结构需要修改" });
+  await expect(errors).toContainText("请选择含授权品牌标识的开场素材。");
+  await expect(errors).toContainText("请填写一个主要买家需求。");
+  await expect(errors).toContainText("请填写可用的下一步与承接入口。");
+  await expect(errors).toContainText("请填写平台与声音、字幕假设。");
+  await expect(errors).not.toContainText("Too small");
+  expect(submissions).toBe(0);
+});
+
 test("AI draft explains missing brief fields and unsaved changes at the action", async ({
   page,
 }) => {

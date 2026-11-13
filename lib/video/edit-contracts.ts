@@ -379,12 +379,26 @@ export const marketingVideoClipSchema = z
 
 export const marketingCreativeBriefSchema = z
   .object({
-    brandAssetRef: z.string().trim().min(1).max(500),
-    objective: z.enum(["awareness", "consideration", "action"]),
-    audience: z.string().trim().min(1).max(200),
-    buyerNeed: z.string().trim().min(1).max(200),
-    nextAction: z.string().trim().min(1).max(200),
-    platformAssumptions: z.string().trim().min(1).max(300),
+    brandAssetRef: z.string().trim().min(1, "请选择含授权品牌标识的开场素材。").max(500),
+    objective: z.enum(["awareness", "consideration", "action"], {
+      error: "请选择主要营销目标。",
+    }),
+    audience: z.string().trim().min(1, "请填写目标受众。").max(200, "目标受众不能超过 200 字。"),
+    buyerNeed: z
+      .string()
+      .trim()
+      .min(1, "请填写一个主要买家需求。")
+      .max(200, "买家需求不能超过 200 字。"),
+    nextAction: z
+      .string()
+      .trim()
+      .min(1, "请填写可用的下一步与承接入口。")
+      .max(200, "下一步与承接入口不能超过 200 字。"),
+    platformAssumptions: z
+      .string()
+      .trim()
+      .min(1, "请填写平台与声音、字幕假设。")
+      .max(300, "平台与声音、字幕假设不能超过 300 字。"),
   })
   .strict();
 
@@ -627,6 +641,7 @@ export function marketingVideoDurationMs(draft: MarketingVideoDraft) {
 
 /** Creative readiness is separate from saving an unfinished/legacy draft. */
 export function assertMarketingCreativeReady(draft: MarketingVideoDraft) {
+  if (!draft.creativeBrief) throw new Error("请先填写上方 ABCD 创意简报，再合成预览。");
   const brief = marketingCreativeBriefSchema.parse(draft.creativeBrief);
   const first = draft.clips[0];
   if (!first || first.assetRef !== brief.brandAssetRef)
