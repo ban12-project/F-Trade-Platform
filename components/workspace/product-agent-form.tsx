@@ -87,6 +87,14 @@ export function ProductAgentForm({
     initialProductAgentActionState,
   );
   const stream = useProductStream();
+  const uploadController = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      uploadController.current?.abort();
+      uploadController.current = null;
+    },
+    [],
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const state = canStream ? stream.state : actionState;
@@ -157,7 +165,9 @@ export function ProductAgentForm({
   }, [emptyAgent, initialChoice, form, router, state.status]);
   useCreatedRecord(projectId, "product", state.status, state.productId);
   async function submit(values: AgentValues) {
-    if (pending) return;
+    if (pending || uploadController.current) return;
+    const active = new AbortController();
+    uploadController.current = active;
     setUploadError("");
     setUploading(true);
     try {
@@ -170,16 +180,38 @@ export function ProductAgentForm({
       data.set("evidenceRef", values.evidenceRef ?? "");
       data.set("sourceText", values.sourceText);
       const file = source ? source.file : fileRef.current?.files?.[0];
-      if (file) data.set("receiptId", await uploadProductDocument(file, projectId, "agent"));
+      if (file)
+        data.set("receiptId", await uploadProductDocument(file, projectId, "agent", active.signal));
       for (const image of images)
-        data.append("imageReceiptId", await uploadProductDocument(image, projectId, "agent_image"));
+        data.append(
+          "imageReceiptId",
+          await uploadProductDocument(image, projectId, "agent_image", active.signal),
+        );
+      active.signal.throwIfAborted();
       if (canStream) void stream.start(data);
       else startTransition(() => action(data));
     } catch {
-      setUploadError("文件上传失败，请检查格式、大小与项目权限后重试。");
+      if (uploadController.current === active) {
+        setUploadError(
+          active.signal.aborted
+            ? "已停止上传，未开始生成。文件选择已保留，可重新尝试。"
+            : "文件上传失败，请检查格式、大小与项目权限后重试。",
+        );
+      }
     } finally {
-      setUploading(false);
+      if (uploadController.current === active) {
+        uploadController.current = null;
+        setUploading(false);
+      }
     }
+  }
+  function stopUpload() {
+    const active = uploadController.current;
+    if (!active) return;
+    active.abort();
+    uploadController.current = null;
+    setUploading(false);
+    setUploadError("已停止上传，未开始生成。文件选择已保留，可重新尝试。");
   }
   const choiceItems = Object.fromEntries(choices.map((choice) => [choice.value, choice.label]));
   return (
@@ -381,6 +413,11 @@ export function ProductAgentForm({
           {pending ? <Spinner data-icon="inline-start" /> : <BotIcon data-icon="inline-start" />}
           生成待审核草稿
         </Button>
+        {uploading ? (
+          <Button type="button" variant="outline" onClick={stopUpload}>
+            停止上传
+          </Button>
+        ) : null}
         {canStream && stream.pending ? (
           <Button variant="outline" onClick={stream.stop}>
             停止生成
