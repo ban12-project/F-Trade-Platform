@@ -24,7 +24,14 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldError, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -39,6 +46,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { initialClosingActionState } from "@/lib/action-states";
 import { decideDeliveryAction } from "@/lib/actions/closing";
+import { DELIVERY_CONFIRMATION_VALIDITY_DAYS } from "@/lib/delivery/validity";
 import { deliveryDecisionFormSchema } from "@/lib/form-schemas";
 import type { DeliveryConfirmationEntry } from "@/lib/sales/closing-store";
 import { useWorkspaceDirty } from "./dirty-state";
@@ -84,7 +92,10 @@ function DeliveryDecision({
     <Card>
       <CardHeader>
         <CardTitle>确认交期</CardTitle>
-        <CardDescription>系统不会预选决定；批准时必须填写人工确认的交期天数。</CardDescription>
+        <CardDescription>
+          系统不会预选决定；批准时必须填写人工确认的交期天数。确认结果自提交成功起
+          {DELIVERY_CONFIRMATION_VALIDITY_DAYS} 天内可用于回复，过期需重新申请确认。
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -146,12 +157,19 @@ function DeliveryDecision({
                   disabled={form.watch("decision") !== "confirmed"}
                   {...form.register("leadTimeDays")}
                   aria-invalid={!!form.formState.errors.leadTimeDays}
-                  aria-describedby={
+                  aria-describedby={[
+                    `confirmed-days-${entry.id}-help`,
                     form.formState.errors.leadTimeDays
                       ? `closing-review-${entry.id}-leadTimeDays-error`
-                      : undefined
-                  }
+                      : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 />
+                <FieldDescription id={`confirmed-days-${entry.id}-help`}>
+                  填写工厂核实的交期天数；与确认结果的 {DELIVERY_CONFIRMATION_VALIDITY_DAYS}
+                  天有效期不同。
+                </FieldDescription>
                 <FieldError
                   id={`closing-review-${entry.id}-leadTimeDays-error`}
                   errors={[form.formState.errors.leadTimeDays]}
