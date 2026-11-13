@@ -110,6 +110,15 @@ export function ProductCatalogImport({
   const progressRef = useRef<HTMLDivElement>(null);
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const [pending, setPending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const uploadAttempt = useRef<{ controller: AbortController; dispatched: boolean } | null>(null);
+  useEffect(
+    () => () => {
+      uploadAttempt.current?.controller.abort();
+      uploadAttempt.current = null;
+    },
+    [],
+  );
   const [error, setError] = useState("");
   useEffect(() => {
     onBusyChange?.(pending);
@@ -227,21 +236,51 @@ export function ProductCatalogImport({
   }
 
   async function upload(values: z.infer<typeof documentUploadFormSchema>) {
+    if (pending || restoring || restoreFailed || working || uploadAttempt.current) return;
+    const active = { controller: new AbortController(), dispatched: false };
+    uploadAttempt.current = active;
     setPending(true);
+    setUploading(true);
     setError("");
     try {
-      const receiptId = await uploadProductDocument(values.document, projectId, "agent");
-      if (accept(await intakeProductCatalogAction({ projectId, receiptId }))) {
+      const receiptId = await uploadProductDocument(
+        values.document,
+        projectId,
+        "agent",
+        active.controller.signal,
+      );
+      active.controller.signal.throwIfAborted();
+      active.dispatched = true;
+      setUploading(false);
+      const result = await intakeProductCatalogAction({ projectId, receiptId });
+      if (uploadAttempt.current !== active) return;
+      if (accept(result)) {
         uploadForm.reset();
         source?.clear();
         selection.reset({ ...selection.getValues(), candidateIds: [] });
         if (fileRef.current) fileRef.current.value = "";
       }
     } catch {
-      setError("上传失败，请检查文件大小、网络及项目权限后重试。");
+      if (uploadAttempt.current === active)
+        setError("上传失败，请检查文件大小、网络及项目权限后重试。");
     } finally {
-      setPending(false);
+      if (uploadAttempt.current === active) {
+        uploadAttempt.current = null;
+        setUploading(false);
+        setPending(false);
+      }
     }
+  }
+
+  function stopUpload() {
+    const active = uploadAttempt.current;
+    if (!active || active.dispatched) return;
+    active.controller.abort();
+    // Credential retrieval in the Blob SDK may settle late; detach it immediately.
+    uploadAttempt.current = null;
+    setUploading(false);
+    setPending(false);
+    setError("已停止上传，未创建目录任务。文件选择已保留，可重新尝试。");
   }
 
   async function submit(values: CatalogSelection) {
@@ -283,7 +322,7 @@ export function ProductCatalogImport({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <form onSubmit={uploadForm.handleSubmit(upload)}>
+        <form aria-busy={pending} onSubmit={uploadForm.handleSubmit(upload)}>
           <FieldGroup>
             <Field data-invalid={Boolean(uploadForm.formState.errors.document)}>
               <FieldLabel htmlFor="catalog-document">产品目录文件</FieldLabel>
@@ -322,6 +361,11 @@ export function ProductCatalogImport({
             >
               {pending ? "提交中…" : "上传并解析目录"}
             </Button>
+            {uploading && (
+              <Button type="button" variant="outline" onClick={stopUpload}>
+                停止上传
+              </Button>
+            )}
           </FieldGroup>
         </form>
         {error && (
