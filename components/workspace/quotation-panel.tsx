@@ -132,206 +132,214 @@ function QuotationForm({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form id={`quotation-${entry?.id ?? "new"}`} onSubmit={form.handleSubmit(submit)}>
-          <FieldGroup>
-            <Field data-invalid={!!form.formState.errors.rfqId}>
-              <FieldLabel htmlFor={`quotation-rfq-${entry?.id ?? "new"}`}>客户需求</FieldLabel>
-              <Controller
-                control={form.control}
-                name="rfqId"
-                render={({ field }) => (
-                  <Select
-                    disabled={Boolean(entry) || rfqs.length === 1}
-                    items={Object.fromEntries(
-                      rfqs.map((item) => [
-                        item.id,
-                        `${item.formValues.customerName || productTypeLabel(item.productType)} · ${item.quantity ?? "数量待补"}`,
-                      ]),
-                    )}
-                    value={field.value ?? null}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      aria-invalid={!!form.formState.errors.rfqId}
-                      id={`quotation-rfq-${entry?.id ?? "new"}`}
-                      className="w-full"
+        <form
+          id={`quotation-${entry?.id ?? "new"}`}
+          aria-busy={!form.formState.isReady}
+          onSubmit={form.handleSubmit(submit)}
+        >
+          <FieldSet disabled={!form.formState.isReady} className="min-w-0">
+            <FieldGroup>
+              <Field data-invalid={!!form.formState.errors.rfqId}>
+                <FieldLabel htmlFor={`quotation-rfq-${entry?.id ?? "new"}`}>客户需求</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="rfqId"
+                  render={({ field }) => (
+                    <Select
+                      disabled={Boolean(entry) || rfqs.length === 1}
+                      items={Object.fromEntries(
+                        rfqs.map((item) => [
+                          item.id,
+                          `${item.formValues.customerName || productTypeLabel(item.productType)} · ${item.quantity ?? "数量待补"}`,
+                        ]),
+                      )}
+                      value={field.value ?? null}
+                      onValueChange={field.onChange}
                     >
-                      <SelectValue placeholder="选择已确认需求" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {rfqs.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.formValues.customerName || productTypeLabel(item.productType)} ·{" "}
-                            {item.quantity}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[form.formState.errors.rfqId]} />
-            </Field>
-            {selectedRfq ? (
-              <FieldSet>
-                <FieldLegend>所选客户需求</FieldLegend>
-                <FieldDescription>
-                  以下是客户要求，不代表已核实产品信息或工厂承诺。请核对后填写报价。
-                </FieldDescription>
-                <dl className="grid gap-3 text-sm">
-                  {[
-                    ["产品类型", productTypeLabel(selectedRfq.productType)],
-                    ["OE / OEM 编号", selectedRfq.formValues.oeNumber],
-                    [
-                      "车辆品牌与车型",
-                      `${selectedRfq.formValues.vehicleBrand} ${selectedRfq.formValues.vehicleModel}`.trim(),
-                    ],
-                    ["数量", selectedRfq.quantity === null ? "" : String(selectedRfq.quantity)],
-                    ["目的地", selectedRfq.destination],
-                    ...rfqCustomerRequirements.map(({ field, label }) => [
-                      label,
-                      selectedRfq.formValues[field],
-                    ]),
-                  ].map(([label, value]) =>
-                    value ? (
-                      <div key={label} className="grid gap-1">
-                        <dt className="text-muted-foreground">{label}</dt>
-                        <dd className="whitespace-pre-wrap break-words">{value}</dd>
-                      </div>
-                    ) : null,
+                      <SelectTrigger
+                        aria-invalid={!!form.formState.errors.rfqId}
+                        id={`quotation-rfq-${entry?.id ?? "new"}`}
+                        className="w-full"
+                      >
+                        <SelectValue placeholder="选择已确认需求" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {rfqs.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.formValues.customerName || productTypeLabel(item.productType)} ·{" "}
+                              {item.quantity}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   )}
-                </dl>
-                <WorkspaceLink href={workspaceRecordHref(projectId, "rfq", selectedRfq.id)}>
-                  查看完整询盘
-                </WorkspaceLink>
-              </FieldSet>
-            ) : null}
-            <Field data-invalid={!!form.formState.errors.productId}>
-              <FieldLabel htmlFor={`quotation-product-${entry?.id ?? "new"}`}>报价产品</FieldLabel>
-              <Controller
-                control={form.control}
-                name="productId"
-                render={({ field }) => (
-                  <Select
-                    items={Object.fromEntries(
-                      products.map((item) => [
-                        item.id,
-                        `${item.internalSku} · ${item.productName}`,
-                      ]),
-                    )}
-                    value={field.value ?? null}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      aria-invalid={!!form.formState.errors.productId}
-                      id={`quotation-product-${entry?.id ?? "new"}`}
-                      className="w-full"
-                    >
-                      <SelectValue placeholder="选择已核验产品" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {products.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.internalSku} · {item.productName}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[form.formState.errors.productId]} />
-            </Field>
-            <FieldSet>
-              <FieldLegend>人工商业条款</FieldLegend>
-              <FieldGroup>
-                <Field data-invalid={!!form.formState.errors.unitPrice}>
-                  <FieldLabel htmlFor={`price-${entry?.id ?? "new"}`}>单价</FieldLabel>
-                  <Input
-                    id={`price-${entry?.id ?? "new"}`}
-                    inputMode="decimal"
-                    aria-invalid={!!form.formState.errors.unitPrice}
-                    {...form.register("unitPrice")}
-                  />
-                  <FieldError errors={[form.formState.errors.unitPrice]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.currency}>
-                  <FieldLabel htmlFor={`currency-${entry?.id ?? "new"}`}>币种</FieldLabel>
-                  <Input
-                    id={`currency-${entry?.id ?? "new"}`}
-                    maxLength={3}
-                    {...form.register("currency")}
-                    aria-invalid={!!form.formState.errors.currency}
-                  />
-                  <FieldError errors={[form.formState.errors.currency]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.moq}>
-                  <FieldLabel htmlFor={`moq-${entry?.id ?? "new"}`}>最小起订量（MOQ）</FieldLabel>
-                  <Input
-                    id={`moq-${entry?.id ?? "new"}`}
-                    inputMode="numeric"
-                    {...form.register("moq")}
-                    aria-invalid={!!form.formState.errors.moq}
-                  />
-                  <FieldError errors={[form.formState.errors.moq]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.leadTimeDays}>
-                  <FieldLabel htmlFor={`lead-time-${entry?.id ?? "new"}`}>交期（天）</FieldLabel>
-                  <Input
-                    id={`lead-time-${entry?.id ?? "new"}`}
-                    inputMode="numeric"
-                    {...form.register("leadTimeDays")}
-                    aria-invalid={!!form.formState.errors.leadTimeDays}
-                  />
-                  <FieldError errors={[form.formState.errors.leadTimeDays]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.paymentTerms}>
-                  <FieldLabel htmlFor={`terms-${entry?.id ?? "new"}`}>付款条件</FieldLabel>
-                  <Textarea
-                    id={`terms-${entry?.id ?? "new"}`}
-                    rows={3}
-                    {...form.register("paymentTerms")}
-                    aria-invalid={!!form.formState.errors.paymentTerms}
-                  />
-                  <FieldError errors={[form.formState.errors.paymentTerms]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                  <FieldLabel htmlFor={`quotation-source-${entry?.id ?? "new"}`}>
-                    报价依据
-                  </FieldLabel>
-                  <EvidenceSelectField
-                    projectId={projectId}
-                    control={form.control}
-                    name="evidenceRef"
-                    id={`quotation-source-${entry?.id ?? "new"}`}
-                  />
+                />
+                <FieldError errors={[form.formState.errors.rfqId]} />
+              </Field>
+              {selectedRfq ? (
+                <FieldSet>
+                  <FieldLegend>所选客户需求</FieldLegend>
                   <FieldDescription>
-                    选择支持本次价格和交易条件的资料；修改报价时请重新选择。
+                    以下是客户要求，不代表已核实产品信息或工厂承诺。请核对后填写报价。
                   </FieldDescription>
-                  <FieldError errors={[form.formState.errors.evidenceRef]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.validityDays}>
-                  <FieldLabel htmlFor={`validity-${entry?.id ?? "new"}`}>有效期（天）</FieldLabel>
-                  <Input
-                    id={`validity-${entry?.id ?? "new"}`}
-                    inputMode="numeric"
-                    {...form.register("validityDays")}
-                    aria-invalid={!!form.formState.errors.validityDays}
-                  />
-                  <FieldError errors={[form.formState.errors.validityDays]} />
-                </Field>
-              </FieldGroup>
-            </FieldSet>
-          </FieldGroup>
+                  <dl className="grid gap-3 text-sm">
+                    {[
+                      ["产品类型", productTypeLabel(selectedRfq.productType)],
+                      ["OE / OEM 编号", selectedRfq.formValues.oeNumber],
+                      [
+                        "车辆品牌与车型",
+                        `${selectedRfq.formValues.vehicleBrand} ${selectedRfq.formValues.vehicleModel}`.trim(),
+                      ],
+                      ["数量", selectedRfq.quantity === null ? "" : String(selectedRfq.quantity)],
+                      ["目的地", selectedRfq.destination],
+                      ...rfqCustomerRequirements.map(({ field, label }) => [
+                        label,
+                        selectedRfq.formValues[field],
+                      ]),
+                    ].map(([label, value]) =>
+                      value ? (
+                        <div key={label} className="grid gap-1">
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd className="whitespace-pre-wrap break-words">{value}</dd>
+                        </div>
+                      ) : null,
+                    )}
+                  </dl>
+                  <WorkspaceLink href={workspaceRecordHref(projectId, "rfq", selectedRfq.id)}>
+                    查看完整询盘
+                  </WorkspaceLink>
+                </FieldSet>
+              ) : null}
+              <Field data-invalid={!!form.formState.errors.productId}>
+                <FieldLabel htmlFor={`quotation-product-${entry?.id ?? "new"}`}>
+                  报价产品
+                </FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="productId"
+                  render={({ field }) => (
+                    <Select
+                      items={Object.fromEntries(
+                        products.map((item) => [
+                          item.id,
+                          `${item.internalSku} · ${item.productName}`,
+                        ]),
+                      )}
+                      value={field.value ?? null}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger
+                        aria-invalid={!!form.formState.errors.productId}
+                        id={`quotation-product-${entry?.id ?? "new"}`}
+                        className="w-full"
+                      >
+                        <SelectValue placeholder="选择已核验产品" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {products.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.internalSku} · {item.productName}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError errors={[form.formState.errors.productId]} />
+              </Field>
+              <FieldSet>
+                <FieldLegend>人工商业条款</FieldLegend>
+                <FieldGroup>
+                  <Field data-invalid={!!form.formState.errors.unitPrice}>
+                    <FieldLabel htmlFor={`price-${entry?.id ?? "new"}`}>单价</FieldLabel>
+                    <Input
+                      id={`price-${entry?.id ?? "new"}`}
+                      inputMode="decimal"
+                      aria-invalid={!!form.formState.errors.unitPrice}
+                      {...form.register("unitPrice")}
+                    />
+                    <FieldError errors={[form.formState.errors.unitPrice]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.currency}>
+                    <FieldLabel htmlFor={`currency-${entry?.id ?? "new"}`}>币种</FieldLabel>
+                    <Input
+                      id={`currency-${entry?.id ?? "new"}`}
+                      maxLength={3}
+                      {...form.register("currency")}
+                      aria-invalid={!!form.formState.errors.currency}
+                    />
+                    <FieldError errors={[form.formState.errors.currency]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.moq}>
+                    <FieldLabel htmlFor={`moq-${entry?.id ?? "new"}`}>最小起订量（MOQ）</FieldLabel>
+                    <Input
+                      id={`moq-${entry?.id ?? "new"}`}
+                      inputMode="numeric"
+                      {...form.register("moq")}
+                      aria-invalid={!!form.formState.errors.moq}
+                    />
+                    <FieldError errors={[form.formState.errors.moq]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.leadTimeDays}>
+                    <FieldLabel htmlFor={`lead-time-${entry?.id ?? "new"}`}>交期（天）</FieldLabel>
+                    <Input
+                      id={`lead-time-${entry?.id ?? "new"}`}
+                      inputMode="numeric"
+                      {...form.register("leadTimeDays")}
+                      aria-invalid={!!form.formState.errors.leadTimeDays}
+                    />
+                    <FieldError errors={[form.formState.errors.leadTimeDays]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.paymentTerms}>
+                    <FieldLabel htmlFor={`terms-${entry?.id ?? "new"}`}>付款条件</FieldLabel>
+                    <Textarea
+                      id={`terms-${entry?.id ?? "new"}`}
+                      rows={3}
+                      {...form.register("paymentTerms")}
+                      aria-invalid={!!form.formState.errors.paymentTerms}
+                    />
+                    <FieldError errors={[form.formState.errors.paymentTerms]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                    <FieldLabel htmlFor={`quotation-source-${entry?.id ?? "new"}`}>
+                      报价依据
+                    </FieldLabel>
+                    <EvidenceSelectField
+                      projectId={projectId}
+                      control={form.control}
+                      name="evidenceRef"
+                      id={`quotation-source-${entry?.id ?? "new"}`}
+                    />
+                    <FieldDescription>
+                      选择支持本次价格和交易条件的资料；修改报价时请重新选择。
+                    </FieldDescription>
+                    <FieldError errors={[form.formState.errors.evidenceRef]} />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.validityDays}>
+                    <FieldLabel htmlFor={`validity-${entry?.id ?? "new"}`}>有效期（天）</FieldLabel>
+                    <Input
+                      id={`validity-${entry?.id ?? "new"}`}
+                      inputMode="numeric"
+                      {...form.register("validityDays")}
+                      aria-invalid={!!form.formState.errors.validityDays}
+                    />
+                    <FieldError errors={[form.formState.errors.validityDays]} />
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
         <Button
           form={`quotation-${entry?.id ?? "new"}`}
           type="submit"
-          disabled={pending || !rfqs.length || !products.length}
+          disabled={!form.formState.isReady || pending || !rfqs.length || !products.length}
         >
           {pending ? (
             <Spinner data-icon="inline-start" />

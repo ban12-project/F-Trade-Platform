@@ -53,3 +53,44 @@ for (const revision of [false, true]) {
     expect(posts).toEqual([]);
   });
 }
+
+for (const revision of [false, true]) {
+  test(`${revision ? "revised" : "new"} quotation waits for initialization and preserves the first edit`, async ({
+    page,
+  }) => {
+    let release = () => {};
+    const scriptsReady = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/_next\/static\/.*\.js(?:\?|$)/, async (route) => {
+      await scriptsReady;
+      await route.continue();
+    });
+    const form = page.locator('form[id^="quotation-"]');
+    const terms = form.getByLabel("付款条件", { exact: true });
+    const submit = page.getByRole("button", {
+      name: revision ? "提交修订并再次送审" : "创建报价并提交审核",
+      exact: true,
+    });
+    try {
+      await page.goto(
+        `/testing/project-workflow?kind=sales&record=quotation${revision ? "&state=quote-revision" : ""}`,
+        { waitUntil: "commit" },
+      );
+      await expect(terms).toBeVisible();
+      await expect(terms).toBeDisabled();
+      await expect(form.getByLabel("单价", { exact: true })).toBeDisabled();
+      await expect(form.getByRole("combobox", { name: "报价产品", exact: true })).toBeDisabled();
+      await expect(submit).toBeDisabled();
+    } finally {
+      release();
+      await page.unrouteAll({ behavior: "wait" });
+    }
+    await expect(terms).toBeEnabled();
+    await expect(terms).toHaveValue(revision ? "MOCK terms; synthetic only" : "");
+    await terms.fill("SYNTHETIC first manual edit");
+    await form.getByLabel("单价", { exact: true }).fill("12.50");
+    await expect(terms).toHaveValue("SYNTHETIC first manual edit");
+    await expect(submit).toBeEnabled();
+  });
+}
