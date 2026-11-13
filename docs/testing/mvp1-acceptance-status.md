@@ -18,7 +18,7 @@
 | 依赖风险 | [11 月 13 日审计](https://github.com/ban12-project/F-Trade-Platform/issues/498#issuecomment-6853250230)：0 critical／0 high／1 moderate／1 low；minimatch/deepmerge 16 项已安装副本回归通过 | 带日期的审计快照，不是本页更新时重新扫描；局部补丁不消除版本告警或证明所有调用路径安全，#498 保持开放 |
 | 应用交付 | [#982](https://github.com/ban12-project/F-Trade-Platform/issues/982) 独立核对发现 `commandForIgnoringBuildStep: "exit 0"`，#981 的部署为 CANCELED；当时生产域名仍指向 #979 的 `efffb688aae326c24ea695811703ae538591d255` READY 部署 | 这是检查时的部署快照，不是持续状态保证。设置变更待用户决定；GitHub 绿色状态、VPS 的 `runtime_inputs_unchanged` 或 main 合并均不能证明应用已更新 |
 
-回归失败与修正分别保留：`0bc98f0` 首轮 592/593 后，[#1002](https://github.com/ban12-project/F-Trade-Platform/pull/1002) 按 trace 修正素材文件赋值早于表单就绪的测试；`75dd9f7` 首轮 600/602 后，#1012 按 trace 修正目录文件赋值及 RFQ 键盘操作早于控件可用的测试。最终 602/602 是修正后的完整运行；这些测试修正未提高超时、增加重试或删除业务断言，也不解释 #936 原有四项间歇失败。
+回归失败与修正分别保留：`0bc98f0` 首轮 592/593 后，[#1002](https://github.com/ban12-project/F-Trade-Platform/pull/1002) 按 trace 修正素材文件赋值早于表单就绪的测试；`75dd9f7` 首轮 600/602 后，#1012 按 trace 修正目录文件赋值及 RFQ 键盘操作早于控件可用的测试。最终 602/602 是修正后的完整运行；这些测试修正未提高超时、增加重试或删除业务断言，也不据此关闭 #936。该问题中的资料库键盘失败已由原始 trace 定位：移除关键词按钮在聚焦前后均为 disabled；[#937](https://github.com/ban12-project/F-Trade-Platform/pull/937) 已增加可用与实际聚焦断言，当前测试仍保留。原产品流式导入停滞及两项移动端失败的完整原因仍未确定；#937 的导航初始化修复和后续通过不替代对这三项原始失败的解释。
 
 本轮适用本地检查按 #711 记录，不能写成自动 CI 已通过。测试服务、数据库、构建产物及已完成分支已清理，保留本机失败轨迹与验收日志；它们不是生产业务流水。最终验收前仍须恢复 CI，核对实际部署，并补齐延期渠道、到期清除、实机／辅助技术与人工决定的各自证据。#348/#664/#674/#936 的历史间歇问题未因后续绿测自动关闭。
 
