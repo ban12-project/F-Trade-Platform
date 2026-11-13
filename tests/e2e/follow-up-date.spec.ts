@@ -13,7 +13,9 @@ test("partial follow-up dates never dispatch cancellation and can be corrected",
   });
   const date = page.getByLabel("下次跟进时间（可选）", { exact: true });
   const save = page.getByRole("button", { name: "保存跟进计划", exact: true });
+  await expect(date).toBeEnabled();
   await date.focus();
+  await expect(date).toBeFocused();
   await date.press("ArrowUp");
   await expect
     .poll(() => date.evaluate((element: HTMLInputElement) => element.validity.badInput))
@@ -65,7 +67,9 @@ test("clearing a partial date removes its error even when the serialized value s
   });
   const date = page.getByLabel("下次跟进时间（可选）", { exact: true });
   const save = page.getByRole("button", { name: "保存跟进计划", exact: true });
+  await expect(date).toBeEnabled();
   await date.focus();
+  await expect(date).toBeFocused();
   await date.press("ArrowUp");
   await expect
     .poll(() => date.evaluate((element: HTMLInputElement) => element.validity.badInput))
