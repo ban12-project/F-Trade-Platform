@@ -32,12 +32,29 @@ test("a stalled iframe reports a bounded failure without another ticket or reloa
   await page.clock.install();
   await page.route("http://127.0.0.1:9427/viewer", (route) => {
     loads++;
-    return route.fulfill({ contentType: "text/html", body: "<body>Unresponsive fixture</body>" });
+    return route.fulfill({
+      contentType: "text/html",
+      body: `<body>Unresponsive fixture<script>
+        let tickets = 0;
+        addEventListener('message', event => {
+          if (event.source !== parent || event.origin !== location.ancestorOrigins[0]) return;
+          if (event.data?.type === 'ftrade-browser-ticket') document.body.dataset.tickets = String(++tickets);
+          if (event.data?.type === 'ftrade-browser-probe') document.body.dataset.probed = 'true';
+        });
+        // Observe the handshake without reporting ready or connected.
+      </script></body>`,
+    });
   });
   await page.goto("/testing/browser-viewer");
-  await expect(page.frameLocator("iframe").locator("body")).toHaveText("Unresponsive fixture");
+  const remote = page.frameLocator("iframe").locator("body");
+  // SSR can load the frame before the parent effect installs its timeout.
+  // The actual probe proves initialization has reached the handshake.
+  await expect(remote).toHaveAttribute("data-probed", "true");
+  const tickets = await remote.getAttribute("data-tickets");
+  expect(Number(tickets)).toBeGreaterThan(0);
   await page.clock.fastForward(35_001);
   await expect(page.getByRole("status")).toContainText("尚未确认远程连接");
+  await expect(remote).toHaveAttribute("data-tickets", tickets ?? "");
   expect(loads).toBe(1);
 });
 
