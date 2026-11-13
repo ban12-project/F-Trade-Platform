@@ -277,9 +277,11 @@ function FactPair({ children }: { children: ReactNode }) {
 export function ProductFields({
   form,
   evidenceOptions,
+  disabled = false,
 }: {
   form: UseFormReturn<ProductValues>;
   evidenceOptions: EvidenceOption[];
+  disabled?: boolean;
 }) {
   const idPrefix = useId();
   const fieldId = (name: string) => `${idPrefix}-${name}`;
@@ -404,6 +406,7 @@ export function ProductFields({
                 {eligibleBatchTargets.map(([, evidenceName, label]) => (
                   <Field key={evidenceName} orientation="horizontal">
                     <Checkbox
+                      disabled={disabled}
                       id={fieldId(`batch-${evidenceName}`)}
                       checked={batchTargets.has(evidenceName)}
                       onCheckedChange={(checked) =>

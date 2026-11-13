@@ -1,5 +1,52 @@
 import { expect, test } from "@playwright/test";
 
+test("manual product submission locks facts and restores pending input after rejection", async ({
+  page,
+}) => {
+  await page.goto("/testing/product-field-evidence?method=manual");
+  await page.waitForLoadState("networkidle");
+  const form = page.locator('form[id$="-create-product"]:visible');
+  const name = form.getByRole("textbox", { name: "产品名称", exact: true });
+  await name.fill("SYNTHETIC submitted product");
+  await form.getByRole("textbox", { name: "内部编号", exact: true }).fill("SYNTHETIC-PENDING");
+  for (const label of ["主要来源资料", "产品名称来源", "产品类型来源", "内部编号来源"]) {
+    await form.getByLabel(label, { exact: true }).click();
+    await page.getByRole("option", { name: /合成产品目录/ }).click();
+  }
+  let release = () => {};
+  let requested = false;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/testing/product-field-evidence?**", async (route) => {
+    if (route.request().method() === "POST") {
+      requested = true;
+      await held;
+    }
+    await route.continue();
+  });
+  const submit = form.getByRole("button", { name: "创建待审核草稿", exact: true });
+  try {
+    await submit.click();
+    await expect.poll(() => requested).toBe(true);
+    await expect(name).toBeDisabled();
+    for (const control of await form
+      .locator('input:not([type="hidden"]), textarea, button, [role="checkbox"]')
+      .all())
+      await expect(control).toBeDisabled();
+    await expect(form).toHaveAttribute("aria-busy", "true");
+  } finally {
+    release();
+  }
+  // The real Action rejects this unsigned session without storing business data.
+  await expect(submit).toBeEnabled();
+  await expect(form).toHaveAttribute("aria-busy", "false");
+  await expect(name).toHaveValue("SYNTHETIC submitted product");
+  await expect(form.getByLabel("产品名称来源", { exact: true })).toContainText("合成产品目录");
+  await name.fill("SYNTHETIC corrected product");
+  await expect(name).toHaveValue("SYNTHETIC corrected product");
+});
+
 test("manual product intake exposes evidence-bound specification and commercial facts", async ({
   page,
 }) => {
