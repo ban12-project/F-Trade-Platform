@@ -118,6 +118,7 @@ for (const outcome of [
     const sourceBytes = Buffer.from("Product name,Synthetic streamed clutch");
     let receiptId = "";
     let uploaded = false;
+    let streamRequested = false;
     // This test exercises the browser transport and stream display with synthetic services.
     // Real signing, authorization and private readback have separate integration coverage.
     await page.route("**/api/product-documents/upload", async (route) => {
@@ -200,6 +201,7 @@ for (const outcome of [
       };
     }
     await page.route("**/api/product-agent/stream", (route) => {
+      streamRequested = true;
       expect(uploaded).toBe(true);
       expect(receiptId).not.toBe("");
       const body = route.request().postData() ?? "";
@@ -246,13 +248,17 @@ for (const outcome of [
       });
     });
     await page.goto("/testing/project-workflow?record=product");
-    await page.waitForLoadState("networkidle");
-    await page.getByLabel("产品资料", { exact: true }).setInputFiles({
+    const sourceInput = page.getByLabel("产品资料", { exact: true });
+    await expect(sourceInput).toBeEnabled();
+    await sourceInput.setInputFiles({
       name: "synthetic.csv",
       mimeType: "text/csv",
       buffer: sourceBytes,
     });
     await page.getByRole("button", { name: "生成待审核草稿", exact: true }).click();
+    await expect.poll(() => receiptId, { message: "upload credentials requested" }).not.toBe("");
+    await expect.poll(() => uploaded, { message: "synthetic file upload received" }).toBe(true);
+    await expect.poll(() => streamRequested, { message: "generation stream requested" }).toBe(true);
     if (outcome === "network failure") {
       await expect(
         page.getByText("生成连接未能完成，请检查网络；若已有草稿，可先查看已保存字段。", {
