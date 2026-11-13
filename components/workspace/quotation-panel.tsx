@@ -399,6 +399,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
       </CardHeader>
       <CardContent>
         <form
+          aria-busy={pending}
           id={`quote-decision-${entry.id}`}
           onSubmit={form.handleSubmit(submit, (errors) => {
             const first = (["decision", "evidenceRef", "notes"] as const).find(
@@ -407,82 +408,86 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
             if (first) form.setFocus(first);
           })}
         >
-          <FieldGroup>
-            <Field data-invalid={!!form.formState.errors.decision}>
-              <FieldLabel htmlFor={`quote-decision-${entry.id}-decision`}>决定</FieldLabel>
-              <Controller
-                control={form.control}
-                name="decision"
-                render={({ field }) => (
-                  <Select
-                    items={{ approved: "批准人工报价", rejected: "退回人工报价" }}
-                    value={field.value ?? null}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      ref={field.ref}
-                      onBlur={field.onBlur}
-                      aria-invalid={!!form.formState.errors.decision}
-                      aria-describedby={
-                        form.formState.errors.decision
-                          ? `closing-review-${entry.id}-decision-error`
-                          : undefined
-                      }
-                      id={`quote-decision-${entry.id}-decision`}
-                      className="w-full"
+          <FieldSet disabled={pending} className="min-w-0">
+            <FieldGroup>
+              <Field data-invalid={!!form.formState.errors.decision}>
+                <FieldLabel htmlFor={`quote-decision-${entry.id}-decision`}>决定</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="decision"
+                  render={({ field }) => (
+                    <Select
+                      items={{ approved: "批准人工报价", rejected: "退回人工报价" }}
+                      value={field.value ?? null}
+                      onValueChange={field.onChange}
                     >
-                      <SelectValue placeholder="请选择审核决定" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="approved">批准人工报价</SelectItem>
-                        <SelectItem value="rejected">退回人工报价</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError
-                id={`closing-review-${entry.id}-decision-error`}
-                errors={[form.formState.errors.decision]}
-              />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.evidenceRef}>
-              <FieldLabel htmlFor={`quote-evidence-${entry.id}`}>审核依据</FieldLabel>
-              <EvidenceSelectField
-                projectId={projectId}
-                control={form.control}
-                name="evidenceRef"
-                aria-describedby={
-                  form.formState.errors.evidenceRef
-                    ? `closing-review-${entry.id}-evidenceRef-error`
-                    : undefined
-                }
-                id={`quote-evidence-${entry.id}`}
-              />
-              <FieldError
-                id={`closing-review-${entry.id}-evidenceRef-error`}
-                errors={[form.formState.errors.evidenceRef]}
-              />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.notes}>
-              <FieldLabel htmlFor={`quote-notes-${entry.id}`}>
-                备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
-              </FieldLabel>
-              <Textarea
-                id={`quote-notes-${entry.id}`}
-                {...form.register("notes")}
-                aria-invalid={!!form.formState.errors.notes}
-                aria-describedby={
-                  form.formState.errors.notes ? `closing-review-${entry.id}-notes-error` : undefined
-                }
-              />
-              <FieldError
-                id={`closing-review-${entry.id}-notes-error`}
-                errors={[form.formState.errors.notes]}
-              />
-            </Field>
-          </FieldGroup>
+                      <SelectTrigger
+                        ref={field.ref}
+                        onBlur={field.onBlur}
+                        aria-invalid={!!form.formState.errors.decision}
+                        aria-describedby={
+                          form.formState.errors.decision
+                            ? `closing-review-${entry.id}-decision-error`
+                            : undefined
+                        }
+                        id={`quote-decision-${entry.id}-decision`}
+                        className="w-full"
+                      >
+                        <SelectValue placeholder="请选择审核决定" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="approved">批准人工报价</SelectItem>
+                          <SelectItem value="rejected">退回人工报价</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-decision-error`}
+                  errors={[form.formState.errors.decision]}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                <FieldLabel htmlFor={`quote-evidence-${entry.id}`}>审核依据</FieldLabel>
+                <EvidenceSelectField
+                  projectId={projectId}
+                  control={form.control}
+                  name="evidenceRef"
+                  aria-describedby={
+                    form.formState.errors.evidenceRef
+                      ? `closing-review-${entry.id}-evidenceRef-error`
+                      : undefined
+                  }
+                  id={`quote-evidence-${entry.id}`}
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-evidenceRef-error`}
+                  errors={[form.formState.errors.evidenceRef]}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.notes}>
+                <FieldLabel htmlFor={`quote-notes-${entry.id}`}>
+                  备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
+                </FieldLabel>
+                <Textarea
+                  id={`quote-notes-${entry.id}`}
+                  {...form.register("notes")}
+                  aria-invalid={!!form.formState.errors.notes}
+                  aria-describedby={
+                    form.formState.errors.notes
+                      ? `closing-review-${entry.id}-notes-error`
+                      : undefined
+                  }
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-notes-error`}
+                  errors={[form.formState.errors.notes]}
+                />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
@@ -537,29 +542,35 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form id={`quote-send-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
-          <FieldGroup>
-            <Field data-invalid={!!form.formState.errors.channelRef}>
-              <FieldLabel htmlFor={`send-channel-${entry.id}`}>发送渠道</FieldLabel>
-              <Input
-                id={`send-channel-${entry.id}`}
-                placeholder="例如 WhatsApp 或电子邮件"
-                {...form.register("channelRef")}
-                aria-invalid={!!form.formState.errors.channelRef}
-              />
-              <FieldError errors={[form.formState.errors.channelRef]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.externalRef}>
-              <FieldLabel htmlFor={`send-ref-${entry.id}`}>平台消息编号或回执链接</FieldLabel>
-              <Input
-                id={`send-ref-${entry.id}`}
-                placeholder="填写发送记录中的消息编号或回执链接"
-                {...form.register("externalRef")}
-                aria-invalid={!!form.formState.errors.externalRef}
-              />
-              <FieldError errors={[form.formState.errors.externalRef]} />
-            </Field>
-          </FieldGroup>
+        <form
+          aria-busy={pending}
+          id={`quote-send-${entry.id}`}
+          onSubmit={form.handleSubmit(submit)}
+        >
+          <FieldSet disabled={pending} className="min-w-0">
+            <FieldGroup>
+              <Field data-invalid={!!form.formState.errors.channelRef}>
+                <FieldLabel htmlFor={`send-channel-${entry.id}`}>发送渠道</FieldLabel>
+                <Input
+                  id={`send-channel-${entry.id}`}
+                  placeholder="例如 WhatsApp 或电子邮件"
+                  {...form.register("channelRef")}
+                  aria-invalid={!!form.formState.errors.channelRef}
+                />
+                <FieldError errors={[form.formState.errors.channelRef]} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.externalRef}>
+                <FieldLabel htmlFor={`send-ref-${entry.id}`}>平台消息编号或回执链接</FieldLabel>
+                <Input
+                  id={`send-ref-${entry.id}`}
+                  placeholder="填写发送记录中的消息编号或回执链接"
+                  {...form.register("externalRef")}
+                  aria-invalid={!!form.formState.errors.externalRef}
+                />
+                <FieldError errors={[form.formState.errors.externalRef]} />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
