@@ -121,6 +121,7 @@ export function ProductCatalogImport({
   );
   const [error, setError] = useState("");
   const [progressError, setProgressError] = useState("");
+  const [selectionNotice, setSelectionNotice] = useState("");
   useEffect(() => {
     onBusyChange?.(pending);
     return () => onBusyChange?.(false);
@@ -167,6 +168,22 @@ export function ProductCatalogImport({
   const modelConfigId = useWatch({ control: selection.control, name: "modelConfigId" });
   const model = useWatch({ control: selection.control, name: "model" });
   const working = Boolean(isWorking(view));
+
+  useEffect(() => {
+    if (view?.status !== "ready") return;
+    const eligible = new Set(
+      view.candidates
+        .filter((candidate) => candidate.status === "available" || candidate.status === "failed")
+        .map((candidate) => candidate.id),
+    );
+    const current = selection.getValues("candidateIds");
+    const retained = current.filter((id) => eligible.has(id));
+    if (retained.length === current.length) return;
+    selection.setValue("candidateIds", retained, { shouldDirty: true });
+    setSelectionNotice(
+      `目录状态已更新，已从选择中移除 ${current.length - retained.length} 条当前不可生成的记录。`,
+    );
+  }, [view, selection]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: The retry counter intentionally restarts this cancellable read.
   useEffect(() => {
@@ -244,6 +261,7 @@ export function ProductCatalogImport({
     const active = { controller: new AbortController(), dispatched: false };
     uploadAttempt.current = active;
     setPending(true);
+    setSelectionNotice("");
     setUploading(true);
     setError("");
     try {
@@ -295,6 +313,7 @@ export function ProductCatalogImport({
 
   async function submit(values: CatalogSelection) {
     setPending(true);
+    setSelectionNotice("");
     setError("");
     try {
       if (accept(await selectProductCatalogAction(values)))
@@ -530,6 +549,11 @@ export function ProductCatalogImport({
                       <FieldDescription>
                         相同编号的不同页记录须分别核对。失败项可再次选择，已完成草稿不会重复生成。
                       </FieldDescription>
+                      {selectionNotice && (
+                        <p role="status" className="text-sm text-muted-foreground">
+                          {selectionNotice}
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
