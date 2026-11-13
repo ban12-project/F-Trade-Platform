@@ -18,6 +18,7 @@ import { RecordFrame } from "@/components/workspace/record-frame";
 import { RfqDetail } from "@/components/workspace/rfq-detail";
 import { RfqForm } from "@/components/workspace/rfq-form";
 import { SalesContext } from "@/components/workspace/sales-context";
+import { WorkspaceGuide } from "@/components/workspace/workspace-guide";
 import { WorkspaceLink } from "@/components/workspace/workspace-link";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import type { ContentCatalogDetail } from "@/lib/content/store";
@@ -522,6 +523,7 @@ async function ProjectWorkflowFixture({
       ),
       lead: (
         <div className="space-y-6">
+          {state === "lead-guide" ? <WorkspaceGuide /> : null}
           {context("lead", syntheticLead.id)}
           <LeadPanel
             projectId={syntheticSalesProject.id}
