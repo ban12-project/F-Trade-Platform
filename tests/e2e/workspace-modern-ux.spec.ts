@@ -212,7 +212,9 @@ test("small mobile dialogs stay within the viewport and keep submission reachabl
     const page = await context.newPage();
     await page.goto(navigationFixture);
     await page.getByRole("button", { name: "打开导航" }).tap();
-    await page.getByRole("button", { name: "开始新工作", exact: true }).tap();
+    const drawer = page.getByRole("dialog", { name: "工作区导航", exact: true });
+    await expect(drawer).toBeVisible();
+    await drawer.getByRole("button", { name: "开始新工作", exact: true }).tap();
     const dialog = page.getByRole("dialog", { name: "开始新工作", exact: true });
     await expect(dialog).toBeVisible();
     await expect
