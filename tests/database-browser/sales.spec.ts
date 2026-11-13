@@ -289,148 +289,175 @@ test("inbound history suggestions preserve manual edits and require a separate R
   expect(rfq.payload.commercial).toEqual({ quantity: 750, destination: "Human Confirmed Port" });
 });
 
-test("expired delivery can be requested again through the authenticated UI without approval", async ({
-  page,
-  context,
-  baseURL,
-}) => {
-  const rfqId = randomUUID();
-  const leadId = randomUUID();
-  await db.insert(schema.aggregateRecord).values([
-    {
-      id: rfqId,
-      type: "rfq",
-      state: "RFQ_READY",
-      payload: { ...readyRfq, rfq_id: rfqId },
-      createdByType: "human",
-      createdById: actorId,
-    },
-    {
-      id: leadId,
-      type: "lead",
-      state: "FOLLOW_UP",
-      payload: {
-        lead_id: leadId,
-        rfq_ref: rfqId,
-        status: "follow_up",
-        follow_up_context: "asks_lead_time",
-        score: 0,
-        score_reasons: [],
-        next_action: "confirm_delivery",
+test.describe("saved repeated follow-up time", () => {
+  test.use({ timezoneId: "America/New_York" });
+  test("expired delivery can be requested again through the authenticated UI without approval", async ({
+    page,
+    context,
+    baseURL,
+  }) => {
+    const rfqId = randomUUID();
+    const leadId = randomUUID();
+    await db.insert(schema.aggregateRecord).values([
+      {
+        id: rfqId,
+        type: "rfq",
+        state: "RFQ_READY",
+        payload: { ...readyRfq, rfq_id: rfqId },
+        createdByType: "human",
+        createdById: actorId,
       },
-      createdByType: "human",
-      createdById: actorId,
-    },
-  ]);
-  await db.insert(schema.workspaceProjectItem).values([
-    { id: randomUUID(), projectId, aggregateId: rfqId, role: "sales_rfq", relation: "owned" },
-    { id: randomUUID(), projectId, aggregateId: leadId, role: "sales_lead", relation: "owned" },
-  ]);
-  const database = db as unknown as Database;
-  const original = await createDeliveryRequest(
-    { projectId, leadId, evidenceRef: evidenceId },
-    actorId,
-    database,
-  );
-  await decideDelivery(
-    {
-      projectId,
-      confirmationId: original.id,
-      decision: "confirmed",
-      leadTimeDays: "20",
-      evidenceRef: evidenceId,
-      notes: "SYNTHETIC expired approval",
-    },
-    actorId,
-    database,
-  );
-  const [confirmed] = await db
-    .select()
-    .from(schema.aggregateRecord)
-    .where(eq(schema.aggregateRecord.id, original.id));
-  await db
-    .update(schema.aggregateRecord)
-    .set({
-      payload: {
-        ...confirmed.payload,
-        result: {
-          ...(confirmed.payload.result as object),
-          valid_until: new Date(Date.now() - 1_000).toISOString(),
+      {
+        id: leadId,
+        type: "lead",
+        state: "FOLLOW_UP",
+        payload: {
+          lead_id: leadId,
+          rfq_ref: rfqId,
+          status: "follow_up",
+          follow_up_context: "asks_lead_time",
+          score: 0,
+          score_reasons: [],
+          next_action: "confirm_delivery",
         },
+        createdByType: "human",
+        createdById: actorId,
       },
-    })
-    .where(eq(schema.aggregateRecord.id, original.id));
-  const signature = createHmac("sha256", authSecret).update(token).digest("base64");
-  await context.addCookies([
-    {
-      name: "better-auth.session_token",
-      value: encodeURIComponent(`${token}.${signature}`),
-      url: baseURL,
-      httpOnly: true,
-      sameSite: "Lax",
-    },
-  ]);
-  await page.goto(`/workspace/${projectId}/records/lead/${leadId}`);
-  await expect(
-    page
-      .getByText("上次交期确认已过期或不再适用于该需求，请重新申请工厂确认。")
-      .filter({ visible: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
-  ).toBeDisabled();
-  const plannedTime = "2030-11-01T10:00";
-  await page.getByLabel("待人工发送内容", { exact: true }).fill("MOCK unsent draft stays editable");
-  await page.getByLabel("下次跟进时间（可选）", { exact: true }).fill(plannedTime);
-  await page.getByRole("button", { name: "保存跟进计划", exact: true }).click();
-  await expect(page.getByText("跟进计划已保存，未发送客户消息。", { exact: true })).toBeVisible();
-  const [planned] = await db
-    .select()
-    .from(schema.aggregateRecord)
-    .where(eq(schema.aggregateRecord.id, leadId));
-  expect(planned.payload.next_follow_up_at).toBeTruthy();
-  expect(planned.payload.delivery_confirmation_ref).toBe(original.id);
-  expect(planned.payload.last_outbound_ref).toBeUndefined();
-  await expect(page.getByLabel("待人工发送内容", { exact: true })).toHaveValue(
-    "MOCK unsent draft stays editable",
-  );
-  await page.getByLabel("待人工发送内容", { exact: true }).fill("");
-  await page.reload();
-  await expect(page.getByLabel("下次跟进时间（可选）", { exact: true })).toHaveValue(plannedTime);
-  await expect(
-    page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
-  ).toBeDisabled();
-  await page.getByLabel("客户交期要求依据", { exact: true }).filter({ visible: true }).click();
-  await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
-  await page.getByRole("button", { name: "申请工厂确认交期", exact: true }).click();
-  const readLead = async () =>
-    (
-      await db.select().from(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, leadId))
-    )[0];
-  await expect
-    .poll(async () => (await readLead()).payload.delivery_confirmation_ref)
-    .not.toBe(original.id);
-  const freshId = String((await readLead()).payload.delivery_confirmation_ref);
-  const [fresh] = await db
-    .select()
-    .from(schema.aggregateRecord)
-    .where(eq(schema.aggregateRecord.id, freshId));
-  expect(fresh.state).toBe("DELIVERY_CONFIRMATION_PENDING");
-  expect(fresh.payload.result).toBeUndefined();
-  expect(fresh.payload.approval_ref).toBeUndefined();
-  const [pending] = await db
-    .select()
-    .from(schema.approval)
-    .where(eq(schema.approval.aggregateId, freshId));
-  expect(pending.status).toBe("pending");
-  await page.reload();
-  await expect(
-    page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
-  ).toBeDisabled();
-  await expect(page.getByRole("link", { name: "查看交期确认", exact: true })).toHaveAttribute(
-    "href",
-    `/workspace/${projectId}/records/delivery/${freshId}`,
-  );
+    ]);
+    await db.insert(schema.workspaceProjectItem).values([
+      { id: randomUUID(), projectId, aggregateId: rfqId, role: "sales_rfq", relation: "owned" },
+      { id: randomUUID(), projectId, aggregateId: leadId, role: "sales_lead", relation: "owned" },
+    ]);
+    const database = db as unknown as Database;
+    const original = await createDeliveryRequest(
+      { projectId, leadId, evidenceRef: evidenceId },
+      actorId,
+      database,
+    );
+    await decideDelivery(
+      {
+        projectId,
+        confirmationId: original.id,
+        decision: "confirmed",
+        leadTimeDays: "20",
+        evidenceRef: evidenceId,
+        notes: "SYNTHETIC expired approval",
+      },
+      actorId,
+      database,
+    );
+    const [confirmed] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, original.id));
+    await db
+      .update(schema.aggregateRecord)
+      .set({
+        payload: {
+          ...confirmed.payload,
+          result: {
+            ...(confirmed.payload.result as object),
+            valid_until: new Date(Date.now() - 1_000).toISOString(),
+          },
+        },
+      })
+      .where(eq(schema.aggregateRecord.id, original.id));
+    const signature = createHmac("sha256", authSecret).update(token).digest("base64");
+    await context.addCookies([
+      {
+        name: "better-auth.session_token",
+        value: encodeURIComponent(`${token}.${signature}`),
+        url: baseURL,
+        httpOnly: true,
+        sameSite: "Lax",
+      },
+    ]);
+    await page.goto(`/workspace/${projectId}/records/lead/${leadId}`);
+    await expect(
+      page
+        .getByText("上次交期确认已过期或不再适用于该需求，请重新申请工厂确认。")
+        .filter({ visible: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
+    ).toBeDisabled();
+    const plannedTime = "2027-11-07T01:30";
+    const plannedInstant = "2027-11-07T06:30:00.000Z";
+    await page
+      .getByLabel("待人工发送内容", { exact: true })
+      .fill("MOCK unsent draft stays editable");
+    await page.getByLabel("下次跟进时间（可选）", { exact: true }).fill(plannedTime);
+    await page
+      .getByRole("combobox", { name: "重复时间选择", exact: true })
+      .selectOption(plannedInstant);
+    await page.getByRole("button", { name: "保存跟进计划", exact: true }).click();
+    await expect(page.getByText("跟进计划已保存，未发送客户消息。", { exact: true })).toBeVisible();
+    const [planned] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, leadId));
+    expect(planned.payload.next_follow_up_at).toBe(plannedInstant);
+    expect(planned.payload.delivery_confirmation_ref).toBe(original.id);
+    expect(planned.payload.last_outbound_ref).toBeUndefined();
+    await expect(page.getByLabel("待人工发送内容", { exact: true })).toHaveValue(
+      "MOCK unsent draft stays editable",
+    );
+    await page.getByLabel("待人工发送内容", { exact: true }).fill("");
+    await page.reload();
+    await expect(page.getByLabel("下次跟进时间（可选）", { exact: true })).toHaveValue(plannedTime);
+    await expect(page.getByRole("combobox", { name: "重复时间选择", exact: true })).toHaveValue(
+      plannedInstant,
+    );
+    await page.getByRole("checkbox", { name: "主动询盘", exact: true }).check();
+    await page.getByRole("button", { name: "保存跟进计划", exact: true }).click();
+    await expect(page.getByText("跟进计划已保存，未发送客户消息。", { exact: true })).toBeVisible();
+    const [replanned] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, leadId));
+    expect(replanned.version).toBe(planned.version + 1);
+    expect(replanned.payload.next_follow_up_at).toBe(plannedInstant);
+    expect(replanned.payload.last_outbound_ref).toBeUndefined();
+    await page.reload();
+    await expect(page.getByRole("combobox", { name: "重复时间选择", exact: true })).toHaveValue(
+      plannedInstant,
+    );
+
+    await expect(
+      page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
+    ).toBeDisabled();
+    await page.getByLabel("客户交期要求依据", { exact: true }).filter({ visible: true }).click();
+    await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
+    await page.getByRole("button", { name: "申请工厂确认交期", exact: true }).click();
+    const readLead = async () =>
+      (
+        await db.select().from(schema.aggregateRecord).where(eq(schema.aggregateRecord.id, leadId))
+      )[0];
+    await expect
+      .poll(async () => (await readLead()).payload.delivery_confirmation_ref)
+      .not.toBe(original.id);
+    const freshId = String((await readLead()).payload.delivery_confirmation_ref);
+    const [fresh] = await db
+      .select()
+      .from(schema.aggregateRecord)
+      .where(eq(schema.aggregateRecord.id, freshId));
+    expect(fresh.state).toBe("DELIVERY_CONFIRMATION_PENDING");
+    expect(fresh.payload.result).toBeUndefined();
+    expect(fresh.payload.approval_ref).toBeUndefined();
+    const [pending] = await db
+      .select()
+      .from(schema.approval)
+      .where(eq(schema.approval.aggregateId, freshId));
+    expect(pending.status).toBe("pending");
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "人工确认并发送此回复", exact: true }),
+    ).toBeDisabled();
+    await expect(page.getByRole("link", { name: "查看交期确认", exact: true })).toHaveAttribute(
+      "href",
+      `/workspace/${projectId}/records/delivery/${freshId}`,
+    );
+  });
 });
 
 for (const inbound of [false, true]) {
