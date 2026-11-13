@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { localTimeChoices } from "../local-time";
 
 import {
   type RegisterProductMediaInput,
@@ -53,16 +54,43 @@ function validateRegistrationRights(
 }
 
 const productMediaRegistrationFieldsBaseSchema = z
-  .object(registrationShape)
+  .object({ ...registrationShape, selectedRightsExpiryInstant: z.string().optional() })
   .strict()
   .superRefine(validateRegistrationRights);
 
-/** Browser-local datetime values are normalized in the browser before submission. */
+/** Resolve device-local expiry without silently shifting gaps or choosing a fold. */
 export const productMediaRegistrationFieldsSchema =
-  productMediaRegistrationFieldsBaseSchema.transform((value) => ({
-    ...value,
-    rightsExpiresAt: value.rightsExpiresAt ? new Date(value.rightsExpiresAt).toISOString() : "",
-  }));
+  productMediaRegistrationFieldsBaseSchema.transform((value, context) => {
+    const { selectedRightsExpiryInstant, ...fields } = value;
+    if (!value.rightsExpiresAt) return { ...fields, rightsExpiresAt: "" };
+    if (z.iso.datetime({ offset: true }).safeParse(value.rightsExpiresAt).success)
+      return { ...fields, rightsExpiresAt: new Date(value.rightsExpiresAt).toISOString() };
+    const choices = localTimeChoices(
+      value.rightsExpiresAt,
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
+    if (!choices.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["rightsExpiresAt"],
+        message: "此时间在当前设备时区中不存在或无效，请调整后再提交。",
+      });
+      return z.NEVER;
+    }
+    const selected =
+      choices.length === 1
+        ? choices[0]
+        : choices.find((choice) => choice.instant === selectedRightsExpiryInstant);
+    if (!selected) {
+      context.addIssue({
+        code: "custom",
+        path: ["selectedRightsExpiryInstant"],
+        message: "此本地时间出现两次，请选择具体授权到期时刻。",
+      });
+      return z.NEVER;
+    }
+    return { ...fields, rightsExpiresAt: selected.instant };
+  });
 
 const rightsExpirySubmissionSchema = z.union([
   z.literal(""),

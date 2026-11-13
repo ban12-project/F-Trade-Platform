@@ -56,13 +56,13 @@ import {
   saveFollowUpPlanAction,
 } from "@/lib/actions/closing";
 import { nextFollowUp } from "@/lib/follow-up/cadence";
-import { followUpTimeChoices } from "@/lib/follow-up/local-time";
 import {
   deliveryRequestFormSchema,
   followUpFormSchema,
   followUpPlanFormSchema,
   opportunityDecisionFormSchema,
 } from "@/lib/form-schemas";
+import { localTimeChoices } from "@/lib/local-time";
 import type { DeliveryConfirmationEntry, LeadEntry } from "@/lib/sales/closing-store";
 import { salesNextActionLabels } from "@/lib/sales/journey";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
@@ -126,7 +126,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
   }, [form, entry.lead.next_follow_up_at]);
   const nextFollowUpInput = useRef<HTMLInputElement>(null);
   const nextFollowUpField = form.register("nextFollowUpAt");
-  const timeChoices = followUpTimeChoices(
+  const timeChoices = localTimeChoices(
     form.watch("nextFollowUpAt"),
     timeZone,
     entry.lead.next_follow_up_at,
@@ -154,13 +154,13 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
     if (
       nextFollowUpInput.current?.validity.valid &&
       (!nextFollowUpInput.current.value ||
-        followUpTimeChoices(nextFollowUpInput.current.value, timeZone).length > 0)
+        localTimeChoices(nextFollowUpInput.current.value, timeZone).length > 0)
     )
       form.clearErrors("nextFollowUpAt");
   }
   function readFollowUpInstant(value?: string) {
     if (!value) return "";
-    const choices = followUpTimeChoices(value, timeZone, entry.lead.next_follow_up_at);
+    const choices = localTimeChoices(value, timeZone, entry.lead.next_follow_up_at);
     if (!choices.length) {
       form.setError(
         "nextFollowUpAt",

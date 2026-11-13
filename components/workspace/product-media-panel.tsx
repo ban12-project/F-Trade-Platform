@@ -38,6 +38,7 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import {
   Select,
@@ -49,11 +50,13 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import {
   type ProductMediaActionState,
   registerProductMediaAction,
   reviewProductMediaAction,
 } from "@/lib/actions/product-media";
+import { localTimeChoices } from "@/lib/local-time";
 import {
   type ProductMediaRegistrationFields,
   type ProductMediaReviewForm,
@@ -116,6 +119,7 @@ function formatRightsExpiry(value: string) {
 }
 
 function RegistrationForm({ projectId, productId }: { projectId: string; productId: string }) {
+  const timeZone = useBrowserTimeZone();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [hasFile, setHasFile] = useState(false);
@@ -145,8 +149,11 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
       imageToVideoAllowed: false,
       referenceToVideoAllowed: false,
       rightsExpiresAt: "",
+      selectedRightsExpiryInstant: "",
     },
   });
+  const expiryField = form.register("rightsExpiresAt");
+  const expiryChoices = localTimeChoices(form.watch("rightsExpiresAt"), timeZone);
   useWorkspaceDirty(`product-media-${productId}`, form.formState.isDirty || hasFile || uploading);
 
   useEffect(() => {
@@ -483,11 +490,56 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
                   <Input
                     id={`media-expiry-${productId}`}
                     type="datetime-local"
-                    {...form.register("rightsExpiresAt")}
+                    {...expiryField}
+                    onChange={(event) => {
+                      void expiryField.onChange(event);
+                      form.setValue("selectedRightsExpiryInstant", "", { shouldDirty: true });
+                      form.clearErrors(["rightsExpiresAt", "selectedRightsExpiryInstant"]);
+                    }}
+                    aria-invalid={Boolean(form.formState.errors.rightsExpiresAt)}
+                    aria-describedby={`media-expiry-help-${productId}${form.formState.errors.rightsExpiresAt ? ` media-expiry-error-${productId}` : ""}`}
                   />
-                  <FieldDescription>长期有效可留空。</FieldDescription>
-                  <FieldError errors={[form.formState.errors.rightsExpiresAt]} />
+                  <FieldDescription id={`media-expiry-help-${productId}`}>
+                    按当前设备时区（{timeZone}）填写；长期有效可留空。
+                  </FieldDescription>
+                  <FieldError
+                    id={`media-expiry-error-${productId}`}
+                    errors={[form.formState.errors.rightsExpiresAt]}
+                  />
                 </Field>
+                {expiryChoices.length > 1 ? (
+                  <Field data-invalid={Boolean(form.formState.errors.selectedRightsExpiryInstant)}>
+                    <FieldLabel htmlFor={`media-expiry-occurrence-${productId}`}>
+                      授权到期重复时间选择
+                    </FieldLabel>
+                    <NativeSelect
+                      id={`media-expiry-occurrence-${productId}`}
+                      {...form.register("selectedRightsExpiryInstant")}
+                      onChange={(event) => {
+                        form.setValue("selectedRightsExpiryInstant", event.target.value, {
+                          shouldDirty: true,
+                        });
+                        form.clearErrors("selectedRightsExpiryInstant");
+                      }}
+                      aria-invalid={Boolean(form.formState.errors.selectedRightsExpiryInstant)}
+                      aria-describedby={`media-occurrence-help-${productId}${form.formState.errors.selectedRightsExpiryInstant ? ` media-occurrence-error-${productId}` : ""}`}
+                    >
+                      <NativeSelectOption value="">请选择具体时刻</NativeSelectOption>
+                      {expiryChoices.map((choice, index) => (
+                        <NativeSelectOption key={choice.instant} value={choice.instant}>
+                          {index === 0 ? "第一次" : "第二次"}（UTC{choice.offset}）
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                    <FieldDescription id={`media-occurrence-help-${productId}`}>
+                      时钟回拨使此时间出现两次，请按授权证明选择具体时刻。
+                    </FieldDescription>
+                    <FieldError
+                      id={`media-occurrence-error-${productId}`}
+                      errors={[form.formState.errors.selectedRightsExpiryInstant]}
+                    />
+                  </Field>
+                ) : null}
               </FieldGroup>
             </FieldSet>
             {uploading ? (

@@ -60,6 +60,68 @@ const browserFields = productMediaRegistrationFieldsSchema.parse({
 });
 assert.equal(browserFields.rightsExpiresAt, new Date(browserLocalExpiry).toISOString());
 
+const originalTimeZone = process.env.TZ;
+try {
+  for (const scenario of [
+    {
+      zone: "America/New_York",
+      gap: "2027-03-14T02:30",
+      fold: "2027-11-07T01:30",
+      later: "2027-11-07T06:30:00.000Z",
+    },
+    {
+      zone: "Australia/Lord_Howe",
+      gap: "2027-10-03T02:15",
+      fold: "2027-04-04T01:45",
+      later: "2027-04-03T15:15:00.000Z",
+    },
+  ]) {
+    process.env.TZ = scenario.zone;
+    assert.equal(
+      productMediaRegistrationFieldsSchema.safeParse({
+        ...browserFields,
+        rightsExpiresAt: scenario.gap,
+      }).success,
+      false,
+      `${scenario.zone} must reject a nonexistent expiry`,
+    );
+    assert.equal(
+      productMediaRegistrationFieldsSchema.safeParse({
+        ...browserFields,
+        rightsExpiresAt: scenario.fold,
+      }).success,
+      false,
+      `${scenario.zone} must require an occurrence`,
+    );
+    const resolved = productMediaRegistrationFieldsSchema.parse({
+      ...browserFields,
+      rightsExpiresAt: scenario.fold,
+      selectedRightsExpiryInstant: scenario.later,
+    });
+    assert.equal(resolved.rightsExpiresAt, scenario.later);
+    assert.equal("selectedRightsExpiryInstant" in resolved, false);
+    assert.equal(
+      productMediaRegistrationFieldsSchema.safeParse({
+        ...browserFields,
+        rightsExpiresAt: scenario.fold,
+        selectedRightsExpiryInstant: "2028-01-01T00:00:00.000Z",
+      }).success,
+      false,
+    );
+    assert.equal(
+      productMediaRegistrationFieldsSchema.parse({
+        ...browserFields,
+        rightsExpiresAt: "",
+        selectedRightsExpiryInstant: scenario.later,
+      }).rightsExpiresAt,
+      "",
+    );
+  }
+} finally {
+  if (originalTimeZone === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTimeZone;
+}
+
 assert.throws(
   () =>
     productMediaRegistrationFieldsSchema.parse({
