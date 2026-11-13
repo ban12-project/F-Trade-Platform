@@ -4,12 +4,16 @@ for (const revision of [false, true]) {
   test(`quotation date validation retains ${revision ? "revised" : "new"} terms without writes`, async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(
       `/testing/project-workflow?kind=sales&record=quotation${revision ? "&state=quote-revision" : ""}`,
     );
     const form = page.locator('form[id^="quotation-"]');
     await expect(form.getByLabel("有效期起算日", { exact: true })).toBeEmpty();
     await expect(form.getByLabel("有效期适用时区", { exact: true })).toBeEmpty();
+    await expect(form.getByLabel("有效期适用时区", { exact: true })).toHaveAccessibleDescription(
+      /Asia\/Shanghai.*America\/New_York/,
+    );
     await form.getByLabel("单价", { exact: true }).fill("12.50");
     await form.getByLabel("最小起订量（MOQ）", { exact: true }).fill("10");
     await form.getByLabel("交期（天）", { exact: true }).fill("3");
@@ -31,6 +35,12 @@ for (const revision of [false, true]) {
       .click();
     await expect(form.getByText("截止日期不能早于起算日期。", { exact: true })).toBeVisible();
     await expect(form.getByText("请选择有效的 IANA 时区。", { exact: true })).toBeVisible();
+    await expect(form.getByLabel("有效期截止日", { exact: true })).toHaveAccessibleDescription(
+      /截止日期不能早于起算日期/,
+    );
+    await expect(form.getByLabel("有效期适用时区", { exact: true })).toHaveAccessibleDescription(
+      /请选择有效的 IANA 时区/,
+    );
     await form.getByLabel("有效期截止日", { exact: true }).fill("2026-03-09");
     await form.getByLabel("有效期适用时区", { exact: true }).fill("America/New_York");
     await page
@@ -48,6 +58,12 @@ for (const revision of [false, true]) {
       "false",
     );
     await expect(form.getByLabel("付款条件", { exact: true })).toHaveValue("SYNTHETIC terms");
+    await expect(
+      form.getByLabel("有效期适用时区", { exact: true }),
+    ).not.toHaveAccessibleDescription(/请选择有效的 IANA 时区/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      390,
+    );
     expect(posts).toBe(0);
   });
 }

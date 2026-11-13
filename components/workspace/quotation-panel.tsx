@@ -325,7 +325,7 @@ function QuotationForm({
                     </FieldDescription>
                     <FieldError errors={[form.formState.errors.evidenceRef]} />
                   </Field>
-                  <FieldDescription>
+                  <FieldDescription id={`validity-help-${entry?.id ?? "new"}`}>
                     可补充人工确认的起止日期和时区；三项须一起填写，首尾日期均计入有效天数。留空表示日期尚未记录，不会自动推算。
                   </FieldDescription>
                   <Field data-invalid={!!form.formState.errors.validityStart}>
@@ -337,8 +337,19 @@ function QuotationForm({
                       type="date"
                       {...form.register("validityStart")}
                       aria-invalid={!!form.formState.errors.validityStart}
+                      aria-describedby={[
+                        `validity-help-${entry?.id ?? "new"}`,
+                        form.formState.errors.validityStart
+                          ? `validityStart-error-${entry?.id ?? "new"}`
+                          : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     />
-                    <FieldError errors={[form.formState.errors.validityStart]} />
+                    <FieldError
+                      id={`validityStart-error-${entry?.id ?? "new"}`}
+                      errors={[form.formState.errors.validityStart]}
+                    />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.validityEnd}>
                     <FieldLabel htmlFor={`validityEnd-${entry?.id ?? "new"}`}>
@@ -349,8 +360,19 @@ function QuotationForm({
                       type="date"
                       {...form.register("validityEnd")}
                       aria-invalid={!!form.formState.errors.validityEnd}
+                      aria-describedby={[
+                        `validity-help-${entry?.id ?? "new"}`,
+                        form.formState.errors.validityEnd
+                          ? `validityEnd-error-${entry?.id ?? "new"}`
+                          : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     />
-                    <FieldError errors={[form.formState.errors.validityEnd]} />
+                    <FieldError
+                      id={`validityEnd-error-${entry?.id ?? "new"}`}
+                      errors={[form.formState.errors.validityEnd]}
+                    />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.validityTimeZone}>
                     <FieldLabel htmlFor={`validityTimeZone-${entry?.id ?? "new"}`}>
@@ -359,10 +381,28 @@ function QuotationForm({
                     <Input
                       id={`validityTimeZone-${entry?.id ?? "new"}`}
                       type="text"
+                      autoComplete="off"
+                      spellCheck={false}
                       {...form.register("validityTimeZone")}
                       aria-invalid={!!form.formState.errors.validityTimeZone}
+                      aria-describedby={[
+                        `validity-help-${entry?.id ?? "new"}`,
+                        `validity-zone-help-${entry?.id ?? "new"}`,
+                        form.formState.errors.validityTimeZone
+                          ? `validityTimeZone-error-${entry?.id ?? "new"}`
+                          : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     />
-                    <FieldError errors={[form.formState.errors.validityTimeZone]} />
+                    <FieldDescription id={`validity-zone-help-${entry?.id ?? "new"}`}>
+                      填写双方确认的时区标识，例如 Asia/Shanghai 或
+                      America/New_York；不会使用浏览器时区自动填写。
+                    </FieldDescription>
+                    <FieldError
+                      id={`validityTimeZone-error-${entry?.id ?? "new"}`}
+                      errors={[form.formState.errors.validityTimeZone]}
+                    />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.validityDays}>
                     <FieldLabel htmlFor={`validity-${entry?.id ?? "new"}`}>有效期（天）</FieldLabel>
@@ -371,8 +411,19 @@ function QuotationForm({
                       inputMode="numeric"
                       {...form.register("validityDays")}
                       aria-invalid={!!form.formState.errors.validityDays}
+                      aria-describedby={[
+                        `validity-help-${entry?.id ?? "new"}`,
+                        form.formState.errors.validityDays
+                          ? `validityDays-error-${entry?.id ?? "new"}`
+                          : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     />
-                    <FieldError errors={[form.formState.errors.validityDays]} />
+                    <FieldError
+                      id={`validityDays-error-${entry?.id ?? "new"}`}
+                      errors={[form.formState.errors.validityDays]}
+                    />
                   </Field>
                 </FieldGroup>
               </FieldSet>
