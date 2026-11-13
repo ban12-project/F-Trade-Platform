@@ -64,3 +64,20 @@ export function EvidenceSelectFixture() {
     </FieldGroup>
   );
 }
+
+export function AsyncEvidenceSelectFixture() {
+  const [value, setValue] = useState("");
+  return (
+    <main className="mx-auto w-80 max-w-full px-4 pt-[500px]">
+      <Field>
+        <FieldLabel htmlFor="async-evidence">审核依据</FieldLabel>
+        <EvidenceSelect
+          projectId={projectId}
+          id="async-evidence"
+          value={value}
+          onValueChange={setValue}
+        />
+      </Field>
+    </main>
+  );
+}

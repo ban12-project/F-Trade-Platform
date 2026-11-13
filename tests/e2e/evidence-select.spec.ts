@@ -173,3 +173,32 @@ test("long duplicate evidence labels remain readable and verifiable on mobile", 
   await page.getByRole("button", { name: "保存选择", exact: true }).click();
   await expect(page.getByLabel("提交结果")).toHaveText("evidence-synthetic-long-1");
 });
+
+test("late evidence options remain pointer selectable on first open", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  let release = () => {};
+  const ready = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/testing/evidence-async", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await ready;
+    await route.fulfill({
+      contentType: "text/x-component",
+      body: `0:{"a":"$@1","f":"","b":"synthetic"}\n1:${JSON.stringify({ options: [{ id: "evidence-synthetic-late", label: "MOCK evidence — synthetic test only" }], error: "" })}\n`,
+    });
+  });
+  await page.goto("/testing/evidence-async");
+  const field = page.getByRole("combobox", { name: "审核依据", exact: true });
+  try {
+    await field.click();
+    await expect(page.getByRole("option", { name: "正在加载资料…" })).toBeVisible();
+  } finally {
+    release();
+  }
+  await page
+    .getByRole("option", { name: "MOCK evidence — synthetic test only", exact: true })
+    .click();
+  await expect(field).toContainText("MOCK evidence — synthetic test only");
+  await expect(field).toHaveAccessibleDescription(/已选择：MOCK evidence/);
+});

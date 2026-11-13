@@ -115,7 +115,7 @@ export function EvidenceSelect({
             {selectedLabel ?? (value ? "请重新选择资料" : undefined)}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent alignItemWithTrigger={false}>
           <SelectGroup>
             {options.map((option, index) => (
               <SelectItem key={option.id} value={option.id} data-evidence-id={option.id}>
