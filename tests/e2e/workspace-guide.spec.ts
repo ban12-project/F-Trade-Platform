@@ -2,6 +2,36 @@ import { expect, test } from "@playwright/test";
 
 const root = "/testing/workspace-navigation";
 
+test("guide explains the current publication composer without changing selections or submitting", async ({
+  page,
+}) => {
+  await page.goto("/testing/publication-batch");
+  await page.waitForLoadState("networkidle");
+  const account = page.getByRole("checkbox", { name: /Facebook · Alpha/ });
+  await account.check();
+  let writes = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST") writes++;
+  });
+  const trigger = page.getByRole("button", { name: "使用引导", exact: true });
+  await trigger.click();
+  const popover = page.locator(".workspace-guide-popover");
+  await popover.getByRole("button", { name: "下一步", exact: true }).click();
+  await expect(popover.getByText("审核通过后安排发布", { exact: true })).toBeVisible();
+  await expect(page.locator(".driver-active-element")).toHaveAttribute(
+    "data-publication-composer",
+    "true",
+  );
+  await expect(popover).toContainText("逐个选择本次账号");
+  await expect(popover).toContainText("已批准不代表已发布");
+  await popover.getByRole("button", { name: "下一步", exact: true }).click();
+  await popover.getByRole("button", { name: "开始操作", exact: true }).click();
+  await expect(popover).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(account).toBeChecked();
+  expect(writes).toBe(0);
+});
+
 test("guide explains visible navigation without submitting or changing a draft", async ({
   page,
 }) => {

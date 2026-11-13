@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { PublicationPanel } from "@/components/workspace/publication-panel";
+import { WorkspaceGuide } from "@/components/workspace/workspace-guide";
 
 const projectId = "00000000-0000-4000-8000-000000000851";
 const contentRef = "00000000-0000-4000-8000-000000000852";
@@ -11,6 +12,7 @@ export default function PublicationBatchFixture() {
     <main className="mx-auto max-w-3xl p-6">
       <Suspense fallback={null}>
         <WorkspaceDirtyProvider>
+          <WorkspaceGuide />
           <PublicationPanel
             projectId={projectId}
             candidates={[
