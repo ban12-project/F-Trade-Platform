@@ -245,6 +245,15 @@ export async function seedPublicationAccessFixture(
     fleet.bootId = randomUUID();
     fleet.lastSeenAt = Date.now();
     fleet.capabilities = ["publish"];
+    fleet.publicationScopes = [
+      {
+        channelRef,
+        accountRef,
+        audience: "Public",
+        expiresAt: Date.now() + 3600000,
+        textOnly: false,
+      },
+    ];
     const accountId = randomUUID();
     fleet.accounts = [
       {

@@ -34,6 +34,9 @@ fleet.installationId = randomUUID();
 fleet.bootId = randomUUID();
 fleet.lastSeenAt = Date.now();
 fleet.capabilities = ["interactive", "publish"];
+fleet.publicationScopes = [
+  { channelRef, accountRef, audience: "Public", expiresAt: Date.now() + 3600000, textOnly: false },
+];
 fleet.accounts = [
   {
     id: accountId,
@@ -191,12 +194,19 @@ test("account status explains blockers, controls select stable accounts, and pre
     [accountRef],
   );
   await page.goto(`/workspace/${projectId}/records/content/${contentRef}`);
-  await page.locator("#publication-channel").selectOption(JSON.stringify([channelRef, accountRef]));
+  await page.getByRole("checkbox", { name: /合成出口账号/ }).check();
   await expect(
-    page.getByText("尚未允许发布，请在账号设置中允许发布。", { exact: true }),
+    page.getByText("尚未允许发布，请在账号设置中允许发布。", { exact: false }),
   ).toBeVisible();
-  await expect(page.locator('button[form="publication-confirmation"]')).toBeDisabled();
-  await page.getByRole("link", { name: "去配置渠道（发布账号）" }).click();
+  await expect(
+    page.getByRole("button", { name: "确认公开发布到 1 个账号", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("checkbox", { name: /合成出口账号/ })
+    .locator("..")
+    .locator("..")
+    .getByRole("link", { name: "处理此账号 · 返回后继续发布", exact: true })
+    .click();
   // Existing dirty-state guard preserves user changes until explicitly leaving.
   const leave = page.getByRole("button", { name: /离开|放弃/ });
   if (await leave.count()) await leave.first().click();
@@ -222,7 +232,7 @@ test("account status explains blockers, controls select stable accounts, and pre
   await expect(accountCard.getByRole("status")).toContainText("允许发布");
   fleet.capabilities = ["interactive"];
   await saveFleet();
-  await expect(accountCard.getByText(/当前服务没有发布执行能力/)).toBeVisible({ timeout: 12000 });
+  await expect(accountCard.getByText(/这个账号尚未接通发布/)).toBeVisible({ timeout: 12000 });
   fleet.capabilities = ["interactive", "publish"];
   fleet.accounts[0].authState = "needs_2fa";
   await saveFleet();
@@ -236,9 +246,7 @@ test("account status explains blockers, controls select stable accounts, and pre
   await expect(accountCard.getByText(/发布服务未连接/)).toBeVisible({ timeout: 12000 });
   await saveFleet();
   await page.getByRole("link", { name: "返回所选内容，继续发布" }).click();
-  await expect(page.locator("#publication-channel")).toHaveValue(
-    JSON.stringify([channelRef, accountRef]),
-  );
+  await expect(page.getByRole("checkbox", { name: /合成出口账号/ })).toBeChecked();
 });
 
 test("submit rechecks authorization and content review without discarding the selected account", async ({
@@ -258,15 +266,15 @@ test("submit rechecks authorization and content review without discarding the se
   ]);
   await saveFleet();
   await page.goto(`/workspace/${projectId}/records/content/${contentRef}`);
-  await page.locator("#publication-channel").selectOption(JSON.stringify([channelRef, accountRef]));
+  await page.getByRole("checkbox", { name: /合成出口账号/ }).check();
   fleet.accounts[0].enabled = false;
   await saveFleet();
-  const submit = page.locator('button[form="publication-confirmation"]');
+  const submit = page.locator(
+    'form[data-publication-composer="true"]:visible button[type="submit"]',
+  );
   await submit.click();
   await expect(page.getByText("账号授权已停用，请先启用账号授权。", { exact: true })).toBeVisible();
-  await expect(page.locator("#publication-channel")).toHaveValue(
-    JSON.stringify([channelRef, accountRef]),
-  );
+  await expect(page.getByRole("checkbox", { name: /合成出口账号/ })).toBeChecked();
   fleet.accounts[0].enabled = true;
   await saveFleet();
   await pool.query("UPDATE aggregate_record SET state='CONTENT_DRAFT' WHERE id=$1", [contentRef]);
@@ -415,17 +423,19 @@ test("stale displayed preview cannot create a publication; refreshed preview con
     },
   ]);
   await page.goto(`/workspace/${projectId}/records/content/${contentRef}`);
-  await page.locator("#publication-channel").selectOption(JSON.stringify([channelRef, accountRef]));
-  const confirmation = page.locator("#publication-confirmation:visible");
-  const submit = page.locator('button[form="publication-confirmation"]:visible');
+  await page.getByRole("checkbox", { name: /合成出口账号/ }).check();
+  const confirmation = page.locator('form[data-publication-composer="true"]:visible');
+  const submit = page.locator(
+    'form[data-publication-composer="true"]:visible button[type="submit"]',
+  );
   await expect(confirmation).toHaveCount(1);
   await expect(submit).toHaveCount(1);
-  await expect(submit).toHaveAccessibleName("确认并提交此条发布");
+  await expect(submit).toHaveAccessibleName("确认公开发布到 1 个账号");
   await expect
     .poll(() =>
       submit.evaluate(
         (button: HTMLButtonElement) =>
-          button.form === document.querySelector("#publication-confirmation:not([hidden])") &&
+          button.form === document.querySelector('form[data-publication-composer="true"]') &&
           !!button.form?.checkVisibility(),
       ),
     )
@@ -450,7 +460,7 @@ test("stale displayed preview cannot create a publication; refreshed preview con
       .where(eq(schema.socialPublication.contentRef, contentRef)),
   ).toHaveLength(0);
   await page.reload();
-  await page.locator("#publication-channel").selectOption(JSON.stringify([channelRef, accountRef]));
+  await page.getByRole("checkbox", { name: /合成出口账号/ }).check();
   await expect(confirmation).toHaveCount(1);
   await expect(confirmation.getByText("SYNTHETIC preview two", { exact: true })).toBeVisible();
 
@@ -514,5 +524,5 @@ test("older unknown results stay addressable and cannot reappear as publish cand
   await page.goto(`/workspace/${projectId}/records/publication/${older}`);
   const detail = page.getByRole("region", { name: "业务记录" });
   await expect(detail.getByText("结果待人工核对", { exact: true })).toBeVisible();
-  await expect(detail.locator("#publication-confirmation")).toHaveCount(0);
+  await expect(detail.locator('form[data-publication-composer="true"]')).toHaveCount(0);
 });
