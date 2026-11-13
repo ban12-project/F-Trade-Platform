@@ -343,8 +343,16 @@ export const quotationDecisionFormSchema = z
 export const quotationSendFormSchema = z.object({
   projectId: z.uuid("项目标识无效。"),
   quotationId: z.uuid("报价标识无效。"),
-  channelRef: z.string().trim().min(1, "请填写发送渠道。").max(240),
-  externalRef: z.string().trim().min(1, "请填写外部发送凭证。").max(240),
+  channelRef: z
+    .string()
+    .trim()
+    .min(1, "请填写发送渠道。")
+    .max(240, "发送渠道不能超过 240 个字符。"),
+  externalRef: z
+    .string()
+    .trim()
+    .min(1, "请填写外部发送凭证。")
+    .max(240, "发送凭证不能超过 240 个字符，请核对消息编号或回执链接。"),
 });
 
 export const followUpFormSchema = z

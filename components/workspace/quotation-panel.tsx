@@ -718,8 +718,16 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
                   placeholder="例如 WhatsApp 或电子邮件"
                   {...form.register("channelRef")}
                   aria-invalid={!!form.formState.errors.channelRef}
+                  aria-describedby={
+                    form.formState.errors.channelRef
+                      ? `quote-send-${entry.id}-channelRef-error`
+                      : undefined
+                  }
                 />
-                <FieldError errors={[form.formState.errors.channelRef]} />
+                <FieldError
+                  id={`quote-send-${entry.id}-channelRef-error`}
+                  errors={[form.formState.errors.channelRef]}
+                />
               </Field>
               <Field data-invalid={!!form.formState.errors.externalRef}>
                 <FieldLabel htmlFor={`send-ref-${entry.id}`}>平台消息编号或回执链接</FieldLabel>
@@ -728,8 +736,16 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
                   placeholder="填写发送记录中的消息编号或回执链接"
                   {...form.register("externalRef")}
                   aria-invalid={!!form.formState.errors.externalRef}
+                  aria-describedby={
+                    form.formState.errors.externalRef
+                      ? `quote-send-${entry.id}-externalRef-error`
+                      : undefined
+                  }
                 />
-                <FieldError errors={[form.formState.errors.externalRef]} />
+                <FieldError
+                  id={`quote-send-${entry.id}-externalRef-error`}
+                  errors={[form.formState.errors.externalRef]}
+                />
               </Field>
             </FieldGroup>
           </FieldSet>
