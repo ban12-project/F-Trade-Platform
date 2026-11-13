@@ -232,14 +232,14 @@ export function ContentDraftForm({
       </CardHeader>
       <CardContent>
         <form
-          aria-busy={!form.formState.isReady}
+          aria-busy={!form.formState.isReady || saving}
           id={revising ? "revise-content" : "create-content"}
           onSubmit={form.handleSubmit((values) => {
             if (form.formState.isReady && !generating && !saving)
               startTransition(() => saveAction(data(values)));
           })}
         >
-          <FieldSet disabled={!form.formState.isReady} className="min-w-0">
+          <FieldSet disabled={!form.formState.isReady || saving} className="min-w-0">
             <div className="workspace-equal-columns">
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.productId}>
