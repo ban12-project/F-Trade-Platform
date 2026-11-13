@@ -123,13 +123,13 @@ const hints: Hint[] = [
     selector: 'form#quotation-new, form[id^="quotation-"]',
     title: "录入人工报价",
     description:
-      "确认所选产品和 RFQ，再填写经人工确认的价格、MOQ、交期、付款条件和报价依据，提交审核。演示数据必须标明模拟。",
+      "确认产品和 RFQ，填写人工确认的商业条款与依据。有效日期可留空；填写时须同时确认起止日期和时区，有效天数包含首尾日期。演示数据须标明模拟。",
   },
   {
     selector: 'form[id^="quote-decision-"]',
     title: "审核报价",
     description:
-      "检查当前版本的商业条款及依据，再批准或退回。报价修订后，旧版本的批准不能继续使用。",
+      "核对当前版本的商业条款、有效日期和时区及其依据，再批准或退回。日期留空表示尚未记录；修订后旧版本的批准不能继续使用。",
   },
   {
     selector: "#content-source-product",
@@ -158,7 +158,7 @@ const hints: Hint[] = [
     selector: 'form[id^="quote-send-"]',
     title: "登记报价发送凭据",
     description:
-      "通过审核后，按实际发送情况填写渠道和凭据。演示时使用明确标记的模拟凭据；登记状态不会代替真实外部投递。",
+      "先核对已批准文案、有效期和收件人，再人工发送并登记渠道与凭据。复制文案不会发送或登记；演示凭据须标明模拟，登记不代替真实投递。",
   },
   {
     selector: 'form[id^="delivery-"]',
