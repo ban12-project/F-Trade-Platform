@@ -80,6 +80,9 @@ test("upload explains invalid files, retains failed files and allows retry", asy
     await expect.poll(() => uploads).toBe(attempt);
     await expect(dialog.getByRole("button", { name: /正在上传并保存资料…/ })).toBeDisabled();
     await expect(file).toBeDisabled();
+    await expect(
+      dialog.getByText("文件上传失败，请检查文件与项目权限后重试。", { exact: true }),
+    ).toHaveCount(0);
     release?.();
     await expect(
       dialog.getByText("文件上传失败，请检查文件与项目权限后重试。", { exact: true }),
@@ -89,6 +92,15 @@ test("upload explains invalid files, retains failed files and allows retry", asy
       "synthetic.csv",
     );
   }
+  await file.setInputFiles({
+    name: "synthetic-replacement.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("SYNTHETIC,value\nreplacement,2"),
+  });
+  await expect(
+    dialog.getByText("文件上传失败，请检查文件与项目权限后重试。", { exact: true }),
+  ).toHaveCount(0);
+  expect(uploads).toBe(2);
 });
 
 for (const failure of ["denied", "transport"] as const) {
