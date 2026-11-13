@@ -131,6 +131,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
     if (nextFollowUpInput.current?.validity.valid) form.clearErrors("nextFollowUpAt");
   }
   function savePlan() {
+    if (!form.formState.isReady || pending || planPending) return;
     if (nextFollowUpInput.current && !nextFollowUpInput.current.validity.valid) {
       form.setError(
         "nextFollowUpAt",
@@ -165,6 +166,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
     startTransition(() => planAction(data));
   }
   function submit(value: z.infer<typeof followUpFormSchema>) {
+    if (!form.formState.isReady || pending || planPending) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) {
       if (key === "triggeredRules") for (const rule of item as string[]) data.append(key, rule);
@@ -185,6 +187,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       </CardHeader>
       <CardContent>
         <form
+          aria-busy={!form.formState.isReady || pending || planPending}
           id={`follow-up-${entry.id}`}
           onSubmit={(event) => {
             if (!form.getValues("confirmationRef"))
@@ -192,7 +195,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
             void form.handleSubmit(submit)(event);
           }}
         >
-          <FieldSet disabled={pending || planPending}>
+          <FieldSet disabled={!form.formState.isReady || pending || planPending}>
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.context}>
                 <FieldLabel htmlFor={`context-${entry.id}`}>当前场景</FieldLabel>
@@ -274,7 +277,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                         name="triggeredRules"
                         render={({ field }) => (
                           <Checkbox
-                            disabled={pending || planPending}
+                            disabled={!form.formState.isReady || pending || planPending}
                             id={`${entry.id}-${id}`}
                             checked={field.value.includes(id)}
                             onCheckedChange={(checked) =>
@@ -343,7 +346,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
           type="button"
           variant="outline"
           onClick={savePlan}
-          disabled={pending || planPending}
+          disabled={!form.formState.isReady || pending || planPending}
         >
           {planPending ? (
             <Spinner data-icon="inline-start" />
@@ -356,7 +359,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
         <Button
           form={`follow-up-${entry.id}`}
           type="submit"
-          disabled={pending || planPending || !canSend}
+          disabled={!form.formState.isReady || pending || planPending || !canSend}
         >
           {pending ? (
             <Spinner data-icon="inline-start" />
