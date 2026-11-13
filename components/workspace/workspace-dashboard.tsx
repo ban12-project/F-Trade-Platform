@@ -1,8 +1,9 @@
 "use client";
 import { ArrowRightIcon, CheckCircle2Icon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { type ReactNode, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Empty,
@@ -11,6 +12,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Spinner } from "@/components/ui/spinner";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
@@ -46,7 +48,7 @@ function TaskRows({
             <CheckCircle2Icon />
           </EmptyMedia>
           <EmptyTitle>{empty}</EmptyTitle>
-          <EmptyDescription>新的事项出现后会自动汇总到这里。</EmptyDescription>
+          <EmptyDescription>刷新任务可查看最新事项。</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -127,6 +129,9 @@ export function WorkspaceDashboard({
   view?: string;
   basePath?: string;
 }) {
+  const router = useRouter();
+  const timeZone = useBrowserTimeZone();
+  const [refreshing, startRefresh] = useTransition();
   const groups = [
     { id: "actionable", label: "我可处理", rows: tasks.filter(isActionableTask) },
     { id: "waiting", label: "等待他人", rows: tasks.filter((task) => task.state === "waiting") },
@@ -152,7 +157,26 @@ export function WorkspaceDashboard({
                   : "有新工作可直接开始；等待中的事项会随状态更新。"}
               </p>
             </div>
-            <NewWorkButton />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={refreshing}
+                aria-busy={refreshing}
+                onClick={() => startRefresh(() => router.refresh())}
+              >
+                {refreshing ? <Spinner aria-hidden="true" /> : null}
+                {refreshing ? "正在刷新任务…" : "刷新任务"}
+              </Button>
+              <NewWorkButton />
+            </div>
+            <p className="w-full text-xs text-muted-foreground">
+              列表更新于{" "}
+              <time dateTime={new Date(currentTime).toISOString()}>
+                {formatTaskDeadline(new Date(currentTime), timeZone)}
+              </time>
+              。状态或跟进时间变化后，可刷新任务。
+            </p>
           </header>
           <section id="my-tasks" aria-label="任务清单" className="min-w-0">
             <nav aria-label="任务状态" className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
