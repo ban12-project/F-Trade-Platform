@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { listEvidenceOptionsAction } from "@/lib/actions/evidence-options";
+import { useWorkspaceDirtyState } from "./dirty-state";
 import { EvidenceLibrary } from "./product-evidence-library";
 
 export type EvidenceChoice = { id: string; label: string; detail?: string };
@@ -60,6 +61,9 @@ export function EvidenceSelect({
   disabled?: boolean;
   options?: EvidenceChoice[];
 }) {
+  const { requestNavigation } = useWorkspaceDirtyState();
+  const [uploadDirty, setUploadDirty] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
   const sharedOptions = useContext(EvidenceChoicesContext);
   const descriptionId = useId();
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -154,7 +158,16 @@ export function EvidenceSelect({
       >
         {pending ? "正在加载…" : "刷新资料列表"}
       </Button>
-      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+      <Dialog
+        open={uploadOpen}
+        onOpenChange={(open) => {
+          if (open) setUploadOpen(true);
+          else if (!uploadBusy) {
+            if (uploadDirty) requestNavigation(() => setUploadOpen(false));
+            else setUploadOpen(false);
+          }
+        }}
+      >
         <DialogTrigger
           render={<Button type="button" variant="outline" size="sm" disabled={disabled} />}
         >
@@ -168,6 +181,8 @@ export function EvidenceSelect({
             <EvidenceLibrary
               projectId={projectId}
               evidenceOptions={[]}
+              onDraftDirty={setUploadDirty}
+              onBusyChange={setUploadBusy}
               onUploaded={() => {
                 setUploadOpen(false);
                 refresh();

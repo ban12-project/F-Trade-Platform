@@ -75,6 +75,11 @@ test("standalone evidence upload clears only after success and accepts the next 
     await expect(save).toBeEnabled();
     await expect(file).toHaveValue("");
     expect(await file.evaluate((input: HTMLInputElement) => input.files?.length)).toBe(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.dispatchEvent(new Event("beforeunload", { cancelable: true }))),
+      )
+      .toBe(true);
     // Native required validation must prevent re-upload of the previously saved file.
     await save.click();
     await expect(file).toBeFocused();
