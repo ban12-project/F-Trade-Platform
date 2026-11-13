@@ -36,6 +36,7 @@ for (const scenario of [
         });
         await page.goto("/testing/product-media");
         const file = page.getByLabel("图片或视频", { exact: true });
+        await expect(file).toBeEnabled();
         await file.setInputFiles({
           name: "synthetic.jpg",
           mimeType: "image/jpeg",
