@@ -94,3 +94,43 @@ for (const revision of [false, true]) {
     await expect(submit).toBeEnabled();
   });
 }
+
+test("quotation submission locks commercial terms and rejection restores the same draft", async ({
+  page,
+}) => {
+  await page.goto("/testing/project-workflow?kind=sales&record=quotation&state=quote-revision");
+  const form = page.locator('form[id^="quotation-"]');
+  const terms = form.getByLabel("付款条件", { exact: true });
+  await terms.fill("SYNTHETIC submitted terms");
+  await form.getByRole("combobox", { name: "报价依据", exact: true }).click();
+  await page.getByRole("option", { name: "合成审核记录.pdf", exact: true }).click();
+  let release = () => {};
+  let requested = false;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/testing/project-workflow?**", async (route) => {
+    if (route.request().method() === "POST") {
+      requested = true;
+      await held;
+    }
+    await route.continue();
+  });
+  const submit = page.locator('button[type="submit"][form^="quotation-"]');
+  try {
+    await submit.click();
+    await expect.poll(() => requested).toBe(true);
+    await expect(terms).toBeDisabled();
+    await expect(form.getByLabel("单价", { exact: true })).toBeDisabled();
+    await expect(form.getByRole("combobox", { name: "报价产品", exact: true })).toBeDisabled();
+    await expect(submit).toBeDisabled();
+    await expect(form).toHaveAttribute("aria-busy", "true");
+  } finally {
+    release();
+  }
+  // The fixture has no signed session; the real Action rejects without a business write.
+  await expect(submit).toBeEnabled();
+  await expect(terms).toBeEnabled();
+  await expect(terms).toHaveValue("SYNTHETIC submitted terms");
+  await expect(form).toHaveAttribute("aria-busy", "false");
+});
