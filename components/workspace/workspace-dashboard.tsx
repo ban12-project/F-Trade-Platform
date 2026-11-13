@@ -158,7 +158,7 @@ export function WorkspaceDashboard({
             <NewWorkButton />
           </header>
           <section id="my-tasks" aria-label="任务清单" className="min-w-0">
-            <nav aria-label="任务状态" className="mb-3 flex flex-wrap gap-2">
+            <nav aria-label="任务状态" className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {groups.map((group) => (
                 <Link
                   key={group.id}
