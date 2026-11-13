@@ -313,7 +313,7 @@ test("copy opens its returned draft, protects other input, and repeated saves cl
   await expect(page).toHaveURL(`${path}?item=${copiedId}`);
   await expect(page.getByRole("heading", { name: names[2], exact: true })).toBeVisible();
   for (const ctaText of ["Ask our team", "Contact the team"]) {
-    await page.getByLabel("结尾两秒的咨询引导文案").fill(ctaText);
+    await page.getByLabel("行动引导文案").fill(ctaText);
     await expect(page.getByRole("main").getByText("有未保存修改", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "保存", exact: true }).click();
     await expect(page.getByRole("main").getByText("已同步", { exact: true })).toBeVisible();
@@ -448,7 +448,7 @@ test("processing locks CTA and a failed job restores editing through a real pend
     let release!: () => void;
     try {
       await page.goto(`${path}?item=${videoId}`);
-      const cta = page.getByLabel("结尾两秒的咨询引导文案", { exact: true });
+      const cta = page.getByLabel("行动引导文案", { exact: true });
       const processing = page.getByRole("main").getByText("后台处理中", { exact: true });
       await expect(cta).toHaveValue("Contact us");
       await expect(processing).toBeVisible();
@@ -497,7 +497,8 @@ test("processing locks CTA and a failed job restores editing through a real pend
         ).toBeVisible();
         await expect(cta).toHaveValue("Contact us");
       }
-      await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeEnabled();
+      // This legacy fixture has no creative brief: manual editing recovers, AI stays gated.
+      await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeDisabled();
       const manual = `MOCK ${failureCode} saved CTA`;
       await cta.fill(manual);
       let started!: () => void;
