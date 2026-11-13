@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileUpIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, useId, useRef } from "react";
+import { startTransition, useActionState, useEffect, useId, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ export function EvidenceLibrary({
   const router = useRouter();
   const fileId = useId();
   const uploadForm = useRef<HTMLFormElement>(null);
+  const [showResult, setShowResult] = useState(false);
   const [state, action, pending] = useActionState(
     async (previous: typeof initialProductEvidenceActionState, file: File) => {
       try {
@@ -75,9 +76,10 @@ export function EvidenceLibrary({
           ref={uploadForm}
           onSubmit={(event) => {
             event.stopPropagation();
-            void form.handleSubmit(({ document }) => startTransition(() => action(document)))(
-              event,
-            );
+            void form.handleSubmit(({ document }) => {
+              setShowResult(true);
+              startTransition(() => action(document));
+            })(event);
           }}
         >
           <FieldGroup>
@@ -103,7 +105,10 @@ export function EvidenceLibrary({
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                    onChange={(event) => field.onChange(event.target.files?.[0])}
+                    onChange={(event) => {
+                      setShowResult(false);
+                      field.onChange(event.target.files?.[0]);
+                    }}
                   />
                 )}
               />
@@ -120,7 +125,7 @@ export function EvidenceLibrary({
               )}
               {pending ? "正在上传并保存资料…" : "保存到项目资料库"}
             </Button>
-            {state.message ? (
+            {showResult && !pending && state.message ? (
               <p
                 aria-live="polite"
                 className={

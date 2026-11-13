@@ -62,11 +62,13 @@ test("standalone evidence upload clears only after success and accepts the next 
   const file = page.getByLabel("资料文件", { exact: true });
   const save = page.getByRole("button", { name: "保存到项目资料库", exact: true });
   for (const [index, name] of ["synthetic-first.csv", "synthetic-second.csv"].entries()) {
+    await expect(file).toBeEnabled();
     await file.setInputFiles({
       name,
       mimeType: "text/csv",
       buffer: Buffer.from("SYNTHETIC,value\nexample,1"),
     });
+    await expect(page.getByText("SYNTHETIC 资料已保存", { exact: true })).toHaveCount(0);
     await save.click();
     await expect.poll(() => registrations).toBe(index + 1);
     await expect(page.getByText("SYNTHETIC 资料已保存", { exact: true })).toBeVisible();
