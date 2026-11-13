@@ -164,6 +164,11 @@ function QuotationForm({
                     >
                       <SelectTrigger
                         aria-invalid={!!form.formState.errors.rfqId}
+                        aria-describedby={
+                          form.formState.errors.rfqId
+                            ? `quotation-${entry?.id ?? "new"}-rfqId-error`
+                            : undefined
+                        }
                         id={`quotation-rfq-${entry?.id ?? "new"}`}
                         className="w-full"
                       >
@@ -182,7 +187,10 @@ function QuotationForm({
                     </Select>
                   )}
                 />
-                <FieldError errors={[form.formState.errors.rfqId]} />
+                <FieldError
+                  id={`quotation-${entry?.id ?? "new"}-rfqId-error`}
+                  errors={[form.formState.errors.rfqId]}
+                />
               </Field>
               {selectedRfq ? (
                 <FieldSet>
@@ -238,6 +246,11 @@ function QuotationForm({
                     >
                       <SelectTrigger
                         aria-invalid={!!form.formState.errors.productId}
+                        aria-describedby={
+                          form.formState.errors.productId
+                            ? `quotation-${entry?.id ?? "new"}-productId-error`
+                            : undefined
+                        }
                         id={`quotation-product-${entry?.id ?? "new"}`}
                         className="w-full"
                       >
@@ -255,7 +268,10 @@ function QuotationForm({
                     </Select>
                   )}
                 />
-                <FieldError errors={[form.formState.errors.productId]} />
+                <FieldError
+                  id={`quotation-${entry?.id ?? "new"}-productId-error`}
+                  errors={[form.formState.errors.productId]}
+                />
               </Field>
               <FieldSet>
                 <FieldLegend>人工商业条款</FieldLegend>
@@ -266,9 +282,17 @@ function QuotationForm({
                       id={`price-${entry?.id ?? "new"}`}
                       inputMode="decimal"
                       aria-invalid={!!form.formState.errors.unitPrice}
+                      aria-describedby={
+                        form.formState.errors.unitPrice
+                          ? `quotation-${entry?.id ?? "new"}-unitPrice-error`
+                          : undefined
+                      }
                       {...form.register("unitPrice")}
                     />
-                    <FieldError errors={[form.formState.errors.unitPrice]} />
+                    <FieldError
+                      id={`quotation-${entry?.id ?? "new"}-unitPrice-error`}
+                      errors={[form.formState.errors.unitPrice]}
+                    />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.currency}>
                     <FieldLabel htmlFor={`currency-${entry?.id ?? "new"}`}>币种</FieldLabel>
@@ -277,8 +301,16 @@ function QuotationForm({
                       maxLength={3}
                       {...form.register("currency")}
                       aria-invalid={!!form.formState.errors.currency}
+                      aria-describedby={
+                        form.formState.errors.currency
+                          ? `quotation-${entry?.id ?? "new"}-currency-error`
+                          : undefined
+                      }
                     />
-                    <FieldError errors={[form.formState.errors.currency]} />
+                    <FieldError
+                      id={`quotation-${entry?.id ?? "new"}-currency-error`}
+                      errors={[form.formState.errors.currency]}
+                    />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.moq}>
                     <FieldLabel htmlFor={`moq-${entry?.id ?? "new"}`}>最小起订量（MOQ）</FieldLabel>
@@ -287,8 +319,16 @@ function QuotationForm({
                       inputMode="numeric"
                       {...form.register("moq")}
                       aria-invalid={!!form.formState.errors.moq}
+                      aria-describedby={
+                        form.formState.errors.moq
+                          ? `quotation-${entry?.id ?? "new"}-moq-error`
+                          : undefined
+                      }
                     />
-                    <FieldError errors={[form.formState.errors.moq]} />
+                    <FieldError
+                      id={`quotation-${entry?.id ?? "new"}-moq-error`}
+                      errors={[form.formState.errors.moq]}
+                    />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.leadTimeDays}>
                     <FieldLabel htmlFor={`lead-time-${entry?.id ?? "new"}`}>交期（天）</FieldLabel>
@@ -297,8 +337,16 @@ function QuotationForm({
                       inputMode="numeric"
                       {...form.register("leadTimeDays")}
                       aria-invalid={!!form.formState.errors.leadTimeDays}
+                      aria-describedby={
+                        form.formState.errors.leadTimeDays
+                          ? `quotation-${entry?.id ?? "new"}-leadTimeDays-error`
+                          : undefined
+                      }
                     />
-                    <FieldError errors={[form.formState.errors.leadTimeDays]} />
+                    <FieldError
+                      id={`quotation-${entry?.id ?? "new"}-leadTimeDays-error`}
+                      errors={[form.formState.errors.leadTimeDays]}
+                    />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.paymentTerms}>
                     <FieldLabel htmlFor={`terms-${entry?.id ?? "new"}`}>付款条件</FieldLabel>
@@ -307,8 +355,16 @@ function QuotationForm({
                       rows={3}
                       {...form.register("paymentTerms")}
                       aria-invalid={!!form.formState.errors.paymentTerms}
+                      aria-describedby={
+                        form.formState.errors.paymentTerms
+                          ? `quotation-${entry?.id ?? "new"}-paymentTerms-error`
+                          : undefined
+                      }
                     />
-                    <FieldError errors={[form.formState.errors.paymentTerms]} />
+                    <FieldError
+                      id={`quotation-${entry?.id ?? "new"}-paymentTerms-error`}
+                      errors={[form.formState.errors.paymentTerms]}
+                    />
                   </Field>
                   <Field data-invalid={!!form.formState.errors.evidenceRef}>
                     <FieldLabel htmlFor={`quotation-source-${entry?.id ?? "new"}`}>
@@ -318,12 +374,20 @@ function QuotationForm({
                       projectId={projectId}
                       control={form.control}
                       name="evidenceRef"
+                      aria-describedby={
+                        form.formState.errors.evidenceRef
+                          ? `quotation-${entry?.id ?? "new"}-evidenceRef-error`
+                          : undefined
+                      }
                       id={`quotation-source-${entry?.id ?? "new"}`}
                     />
                     <FieldDescription>
                       选择支持本次价格和交易条件的资料；修改报价时请重新选择。
                     </FieldDescription>
-                    <FieldError errors={[form.formState.errors.evidenceRef]} />
+                    <FieldError
+                      id={`quotation-${entry?.id ?? "new"}-evidenceRef-error`}
+                      errors={[form.formState.errors.evidenceRef]}
+                    />
                   </Field>
                   <FieldDescription id={`validity-help-${entry?.id ?? "new"}`}>
                     可补充人工确认的起止日期和时区；三项须一起填写，首尾日期均计入有效天数。留空表示日期尚未记录，不会自动推算。
