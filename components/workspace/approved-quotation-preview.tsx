@@ -71,7 +71,10 @@ export function ApprovedQuotationPreview({
         <Alert>
           <AlertTitle>核对有效期后，由你手动发送</AlertTitle>
           <AlertDescription>
-            报价只记录有效天数，未记录起算日期或到期日；文案不会推算这些日期，也不会补写数量单位或订单总额。复制不会发送消息或登记已发送。
+            {preview.hasValidityDates
+              ? "文案包含人工确认的有效日期和时区，请核对发送时间；系统不会自动判断报价当前是否仍有效。"
+              : "报价只记录有效天数，未记录起算日期或到期日；文案不会推算这些日期。"}
+            不会补写数量单位或订单总额。复制不会发送消息或登记已发送。
           </AlertDescription>
         </Alert>
         <Field>

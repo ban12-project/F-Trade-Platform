@@ -22,6 +22,22 @@ const quoteInput = {
   evidenceRef: "evidence-mock-quotation",
 };
 assert.equal(quotationDraftFormSchema.safeParse(quoteInput).success, true);
+const datedInput = {
+  ...quoteInput,
+  validityStart: "2026-03-01",
+  validityEnd: "2026-03-30",
+  validityTimeZone: "America/New_York",
+};
+assert.equal(quotationDraftFormSchema.safeParse(datedInput).success, true);
+for (const change of [
+  { validityDays: "29" },
+  { validityEnd: "2026-02-28" },
+  { validityStart: "2026-02-29" },
+  { validityTimeZone: "Invalid/Zone" },
+  { validityEnd: "" },
+])
+  assert.equal(quotationDraftFormSchema.safeParse({ ...datedInput, ...change }).success, false);
+
 for (const unitPrice of ["0.0001", "0.1", "12.5000", "00012.50", " 12.50 ", "9007199254740991"]) {
   assert.equal(
     quotationDraftFormSchema.safeParse({ ...quoteInput, unitPrice }).success,
@@ -277,3 +293,38 @@ assert.ok(missingProductId);
 assert.match(missingProductId.text, /Product: Not recorded; please confirm/);
 assert.match(missingProductId.text, /Requested quantity: Not recorded; please confirm/);
 console.log("PASS approved quotation customer preview and fail-closed source matching");
+const datedPreviewEntry = {
+  ...previewEntry,
+  quotation: {
+    ...previewEntry.quotation,
+    quote: {
+      ...previewEntry.quotation.quote,
+      validity_days: 3,
+      validity: {
+        version: 1 as const,
+        starts_on: "2026-03-07",
+        expires_on: "2026-03-09",
+        time_zone: "America/New_York",
+      },
+    },
+  },
+};
+const datedPreview = buildApprovedQuotationPreview(datedPreviewEntry, [], []);
+assert.ok(datedPreview?.hasValidityDates);
+assert.match(datedPreview.text, /Valid from: 2026-03-07/);
+assert.match(datedPreview.text, /Valid through: 2026-03-09 \(inclusive\)/);
+assert.match(datedPreview.text, /Validity timezone: America\/New_York/);
+assert.equal(
+  buildApprovedQuotationPreview(
+    {
+      ...datedPreviewEntry,
+      quotation: {
+        ...datedPreviewEntry.quotation,
+        quote: { ...datedPreviewEntry.quotation.quote, validity_days: 2 },
+      },
+    },
+    [],
+    [],
+  ),
+  null,
+);

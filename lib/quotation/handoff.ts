@@ -1,5 +1,6 @@
 import quotationHandoffSchema from "../../contracts/sales/quotation-handoff.schema.json";
 import { compileContract } from "../contracts/validator";
+import { type QuotationValidity, quotationValidityDays } from "./validity";
 
 export type Quote = {
   unit_price: number;
@@ -8,6 +9,7 @@ export type Quote = {
   lead_time_days: number;
   payment_terms: string;
   validity_days: number;
+  validity?: QuotationValidity;
 };
 
 export interface ManualQuotationInput {
@@ -41,7 +43,16 @@ export type QuotationHandoff = {
   sent_ref?: string;
 };
 
-const validateQuotation = compileContract<QuotationHandoff>(quotationHandoffSchema);
+const validateContract = compileContract<QuotationHandoff>(quotationHandoffSchema);
+function validateQuotation(value: QuotationHandoff) {
+  const result = validateContract(value);
+  if (
+    result.quote.validity &&
+    quotationValidityDays(result.quote.validity) !== result.quote.validity_days
+  )
+    throw new Error("报价有效天数必须与人工确认的起止日期一致（包含首尾日期）。");
+  return result;
+}
 
 function assertNonEmpty(value: string, name: string) {
   if (!value.trim()) throw new Error(`Quotation handoff requires ${name}`);
