@@ -263,7 +263,9 @@ for (const outcome of ["transport", "permission"]) {
     await expect(retry).toBeEnabled();
     await expect(page.getByRole("button", { name: "上传并解析目录" })).toBeDisabled();
     await expect(
-      page.getByText("所选文件：synthetic-preserved.csv", { exact: true }),
+      page
+        .getByRole("tabpanel", { name: "产品目录", exact: true })
+        .getByText("所选文件：synthetic-preserved.csv", { exact: true }),
     ).toBeVisible();
     await retry.click();
     try {
@@ -275,7 +277,9 @@ for (const outcome of ["transport", "permission"]) {
     await expect(retry).toHaveCount(0);
     await expect(page.getByRole("button", { name: "上传并解析目录" })).toBeEnabled();
     await expect(
-      page.getByText("所选文件：synthetic-preserved.csv", { exact: true }),
+      page
+        .getByRole("tabpanel", { name: "产品目录", exact: true })
+        .getByText("所选文件：synthetic-preserved.csv", { exact: true }),
     ).toBeVisible();
     if (view)
       await expect(page.getByRole("button", { name: "查看草稿" })).toHaveAttribute(
