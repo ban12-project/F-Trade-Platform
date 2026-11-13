@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { EvidenceSelect, EvidenceSelectField } from "@/components/workspace/evidence-select";
 
 const schema = z.object({ evidenceRef: z.string().min(1, "请选择授权证明。") });
@@ -68,16 +69,18 @@ export function EvidenceSelectFixture() {
 export function AsyncEvidenceSelectFixture() {
   const [value, setValue] = useState("");
   return (
-    <main className="mx-auto w-80 max-w-full px-4 pt-[500px]">
-      <Field>
-        <FieldLabel htmlFor="async-evidence">审核依据</FieldLabel>
-        <EvidenceSelect
-          projectId={projectId}
-          id="async-evidence"
-          value={value}
-          onValueChange={setValue}
-        />
-      </Field>
-    </main>
+    <WorkspaceDirtyProvider>
+      <main className="mx-auto w-80 max-w-full px-4 pt-[500px]">
+        <Field>
+          <FieldLabel htmlFor="async-evidence">审核依据</FieldLabel>
+          <EvidenceSelect
+            projectId={projectId}
+            id="async-evidence"
+            value={value}
+            onValueChange={setValue}
+          />
+        </Field>
+      </main>
+    </WorkspaceDirtyProvider>
   );
 }

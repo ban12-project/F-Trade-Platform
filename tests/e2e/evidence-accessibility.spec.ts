@@ -72,6 +72,10 @@ for (const theme of ["light", "dark"] as const) {
         .toBe(true);
     }
     await page.keyboard.press("Escape");
+    const discard = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+    await expect(discard).toBeVisible();
+    await audit("discard-upload-confirmation");
+    await discard.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await expect(upload).toBeFocused();
     await expect(field).toHaveAccessibleDescription(/2026-10-04/);

@@ -215,3 +215,64 @@ test("late evidence options remain pointer selectable on first open", async ({ p
   await expect(field).toContainText("MOCK evidence — synthetic test only");
   await expect(field).toHaveAccessibleDescription(/已选择：MOCK evidence/);
 });
+
+test("upload dialog protects selected files and stays open while saving", async ({ page }) => {
+  await page.goto("/testing/evidence-select");
+  const open = page.getByRole("button", { name: "上传资料", exact: true }).first();
+  await open.click();
+  const dialog = page.getByRole("dialog", { name: "添加来源资料" });
+  const file = dialog.getByLabel("资料文件", { exact: true });
+  await file.setInputFiles({
+    name: "synthetic.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("SYNTHETIC,value\nexample,1"),
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.dispatchEvent(new Event("beforeunload", { cancelable: true }))),
+    )
+    .toBe(false);
+  await page.keyboard.press("Escape");
+  const confirm = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  expect(await file.evaluate((input: HTMLInputElement) => input.files?.[0]?.name)).toBe(
+    "synthetic.csv",
+  );
+  let release: (() => void) | undefined;
+  await page.route("**/api/product-documents/upload", async (route) => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await route.fulfill({ status: 403, json: { error: "SYNTHETIC denied" } });
+  });
+  await dialog.getByRole("button", { name: "保存到项目资料库", exact: true }).click();
+  await expect.poll(() => Boolean(release)).toBe(true);
+  await page.keyboard.press("Escape");
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(confirm).toHaveCount(0);
+  await expect(
+    dialog.getByText("正在上传并保存，请等待结果。关闭窗口不会取消已提交的保存。", { exact: true }),
+  ).toBeVisible();
+  release?.();
+  await expect(
+    dialog.getByText("文件上传失败，请检查文件与项目权限后重试。", { exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(open).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.dispatchEvent(new Event("beforeunload", { cancelable: true }))),
+    )
+    .toBe(true);
+  await open.click();
+  expect(await file.evaluate((input: HTMLInputElement) => input.files?.length)).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(confirm).toHaveCount(0);
+});
