@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2Icon, Clock3Icon, MessageSquareTextIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -106,6 +106,8 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
         defaultValue: localDateTime(entry.lead.next_follow_up_at),
       });
   }, [form, entry.lead.next_follow_up_at]);
+  const nextFollowUpInput = useRef<HTMLInputElement>(null);
+  const nextFollowUpField = form.register("nextFollowUpAt");
   const context = form.watch("context");
   const recommendation = nextFollowUp(context);
   const requiresDeliveryConfirmation = context === "asks_lead_time" || context === "asks_sample";
@@ -125,7 +127,20 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       router.refresh();
     }
   }, [form, router, planState]);
+  function clearValidFollowUpError() {
+    if (nextFollowUpInput.current?.validity.valid) form.clearErrors("nextFollowUpAt");
+  }
   function savePlan() {
+    if (nextFollowUpInput.current && !nextFollowUpInput.current.validity.valid) {
+      form.setError(
+        "nextFollowUpAt",
+        {
+          message: "请填写完整有效的跟进时间，或清空以取消提醒。",
+        },
+        { shouldFocus: true },
+      );
+      return;
+    }
     const value = form.getValues();
     const date = value.nextFollowUpAt ? new Date(value.nextFollowUpAt) : null;
     if (date && Number.isNaN(date.getTime())) {
@@ -297,10 +312,27 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                 <Input
                   id={`next-${entry.id}`}
                   type="datetime-local"
-                  {...form.register("nextFollowUpAt")}
+                  {...nextFollowUpField}
+                  ref={(input) => {
+                    nextFollowUpField.ref(input);
+                    nextFollowUpInput.current = input;
+                  }}
+                  onInput={clearValidFollowUpError}
+                  // Native date segments can change validity without emitting an input event.
+                  onKeyUp={clearValidFollowUpError}
+                  onBlur={(event) => {
+                    void nextFollowUpField.onBlur(event);
+                    clearValidFollowUpError();
+                  }}
+                  aria-describedby={
+                    form.formState.errors.nextFollowUpAt ? `next-error-${entry.id}` : undefined
+                  }
                   aria-invalid={!!form.formState.errors.nextFollowUpAt}
                 />
-                <FieldError errors={[form.formState.errors.nextFollowUpAt]} />
+                <FieldError
+                  id={`next-error-${entry.id}`}
+                  errors={[form.formState.errors.nextFollowUpAt]}
+                />
               </Field>
             </FieldGroup>
           </FieldSet>
