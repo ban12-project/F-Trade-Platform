@@ -120,6 +120,7 @@ export function ProductCatalogImport({
     [],
   );
   const [error, setError] = useState("");
+  const [progressError, setProgressError] = useState("");
   useEffect(() => {
     onBusyChange?.(pending);
     return () => onBusyChange?.(false);
@@ -178,6 +179,7 @@ export function ProductCatalogImport({
           setView(result.view);
           setRestoreFailed(false);
           setError("");
+          setProgressError("");
         } else {
           setRestoreFailed(true);
           setError(result.message);
@@ -205,11 +207,12 @@ export function ProductCatalogImport({
           if (cancelled) return;
           if (result.status === "success") {
             setView(result.view);
+            setProgressError("");
             if (!isWorking(result.view)) router.refresh();
-          } else setError(result.message);
+          } else setProgressError(result.message);
         })
         .catch(() => {
-          if (!cancelled) setError("进度读取失败，请点击刷新进度。");
+          if (!cancelled) setProgressError("进度读取失败，请点击刷新进度。");
         });
     }, 2_000);
     return () => {
@@ -232,6 +235,7 @@ export function ProductCatalogImport({
     }
     setView(result.view);
     setError("");
+    setProgressError("");
     return true;
   }
 
@@ -307,9 +311,18 @@ export function ProductCatalogImport({
     setPending(true);
     try {
       const input = { projectId, importId: view.id };
-      accept(await (retry ? retryProductCatalogAction(input) : getProductCatalogAction(input)));
+      const result = await (retry
+        ? retryProductCatalogAction(input)
+        : getProductCatalogAction(input));
+      if (retry) accept(result);
+      else if (result.status === "error") setProgressError(result.message);
+      else {
+        setView(result.view);
+        setProgressError("");
+      }
     } catch {
-      setError("无法更新目录任务，请重试。");
+      if (retry) setError("无法更新目录任务，请重试。");
+      else setProgressError("进度读取失败，请点击刷新进度。");
     } finally {
       setPending(false);
     }
@@ -377,6 +390,14 @@ export function ProductCatalogImport({
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {progressError && (
+          <Alert>
+            <AlertDescription>
+              <p>{progressError}</p>
+              <p>当前显示上次读取的目录进度，请刷新后再核对。</p>
+            </AlertDescription>
           </Alert>
         )}
         {restoreFailed && (
