@@ -421,6 +421,15 @@ function EditVideo({
   const editable = ["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(entry.state);
   const processing =
     entry.processingJob?.status === "queued" || entry.processingJob?.status === "running";
+  const aiUnavailableReason = pending
+    ? "正在保存或提交，请稍候。"
+    : processing
+      ? "后台正在处理视频，完成后才能生成 AI 初稿。"
+      : !marketingCreativeBriefSchema.safeParse(draft.creativeBrief).success
+        ? "请完整填写上方创意简报并保存，再生成 AI 初稿。"
+        : dirty
+          ? "请先保存当前修改，再生成 AI 初稿。"
+          : "";
   useEffect(() => {
     setDraftState(entry.draft);
     draftForm.reset({ draft: entry.draft });
@@ -621,15 +630,16 @@ function EditVideo({
                   由最后片段的 Direction 阶段显示；请确认实际可用的咨询入口。
                 </FieldDescription>
               </Field>
+              {aiUnavailableReason ? (
+                <p id={`video-ai-reason-${entry.id}`} className="text-sm text-muted-foreground">
+                  {aiUnavailableReason}
+                </p>
+              ) : null}
               <div className="grid gap-2 sm:grid-cols-3">
                 <Button
                   variant="outline"
-                  disabled={
-                    pending ||
-                    processing ||
-                    dirty ||
-                    !marketingCreativeBriefSchema.safeParse(draft.creativeBrief).success
-                  }
+                  disabled={Boolean(aiUnavailableReason)}
+                  aria-describedby={aiUnavailableReason ? `video-ai-reason-${entry.id}` : undefined}
                   onClick={() =>
                     run(() => generateMarketingVideoAiDraftAction(projectId, entry.id))
                   }
