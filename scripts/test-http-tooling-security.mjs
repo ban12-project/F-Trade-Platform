@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { request } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -46,6 +47,17 @@ test("installed Hono adapter keeps static authorization aligned with decoded pat
       );
     });
     const base = `http://127.0.0.1:${server.address().port}`;
+    // Fetch normalizes backslashes before transport, so send the raw target over HTTP.
+    const rawStatus = await new Promise((resolve, reject) => {
+      const req = request(base, { path: "/static/admin\\private.txt" }, (response) => {
+        response.resume();
+        response.on("end", () => resolve(response.statusCode));
+      });
+      req.on("error", reject);
+      req.setTimeout(5000, () => req.destroy(new Error("Synthetic HTTP timeout")));
+      req.end();
+    });
+    assert.equal(rawStatus, 400);
     const get = (path) => fetch(base + path, { signal: AbortSignal.timeout(5000) });
     const publicFile = await get("/static/public%20file.txt");
     assert.equal(publicFile.status, 200);
@@ -64,5 +76,24 @@ test("installed Hono adapter keeps static authorization aligned with decoded pat
       await new Promise((resolve) => server.close(resolve));
     }
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("installed Hono CSRF checks hyperlink auditing while preserving same-origin requests", async () => {
+  const { Hono } = sdk("hono");
+  const { csrf } = sdk("hono/csrf");
+  const app = new Hono();
+  app.use("*", csrf());
+  app.post("/synthetic-write", (c) => c.text("SYNTHETIC accepted"));
+  for (const [origin, site, expected] of [
+    ["https://foreign.example.invalid", "cross-site", 403],
+    ["https://app.example.invalid", "same-origin", 200],
+  ]) {
+    const response = await app.request("https://app.example.invalid/synthetic-write", {
+      method: "POST",
+      headers: { origin, "sec-fetch-site": site, "content-type": "text/ping" },
+      body: "PING",
+    });
+    assert.equal(response.status, expected);
   }
 });
