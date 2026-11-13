@@ -253,6 +253,7 @@ for (const outcome of ["transport", "permission"]) {
     });
     await page.goto("/testing/project-workflow?record=product");
     const source = page.getByLabel("产品资料", { exact: true });
+    await expect(source).toBeEnabled();
     await source.setInputFiles({
       name: "synthetic-preserved.csv",
       mimeType: "text/csv",

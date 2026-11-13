@@ -38,7 +38,9 @@ test("long customer excerpts stay within a narrow selector and support keyboard 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(path);
   const source = page.getByRole("combobox", { name: "来源客户会话（可选）" });
+  await expect(source).toBeEnabled();
   await source.focus();
+  await expect(source).toBeFocused();
   await source.press("ArrowDown");
   const option = page.getByRole("option", { name: /SYNTHETIC-SYNTHETIC.*00000611/ });
   await expect(option).toBeVisible();
