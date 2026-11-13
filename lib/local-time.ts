@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 /** Exact instants for a local minute: none for a gap, two for a clock rollback. */
-export function followUpTimeChoices(
+export function localTimeChoices(
   value: string | undefined,
   timeZone: string,
   savedInstant?: string,
