@@ -528,10 +528,20 @@ async function ProjectWorkflowFixture({
           <LeadPanel
             projectId={syntheticSalesProject.id}
             entries={[
-              state === "lead-fold-later"
+              ["lead-fold-later", "lead-fold-precision", "lead-time-precision"].includes(
+                state ?? "",
+              )
                 ? {
                     ...syntheticLead,
-                    lead: { ...syntheticLead.lead, next_follow_up_at: "2027-11-07T06:30:00.000Z" },
+                    lead: {
+                      ...syntheticLead.lead,
+                      next_follow_up_at:
+                        state === "lead-time-precision"
+                          ? "2027-11-06T06:30:45.123Z"
+                          : state === "lead-fold-precision"
+                            ? "2027-11-07T06:30:45.123Z"
+                            : "2027-11-07T06:30:00.000Z",
+                    },
                   }
                 : syntheticLead,
             ]}
