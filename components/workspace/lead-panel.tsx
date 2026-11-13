@@ -78,6 +78,16 @@ function localDateTime(value?: string) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
+// Date normalizes nonexistent local times across daylight-saving gaps.
+// Only convert a minute value when it round-trips without changing the user's input.
+function followUpInstant(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  const instant = date.toISOString();
+  return localDateTime(instant) === value ? instant : null;
+}
+
 function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntry }) {
   const timeZone = useBrowserTimeZone();
   const router = useRouter();
@@ -130,7 +140,23 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
     }
   }, [form, router, planState]);
   function clearValidFollowUpError() {
-    if (nextFollowUpInput.current?.validity.valid) form.clearErrors("nextFollowUpAt");
+    if (
+      nextFollowUpInput.current?.validity.valid &&
+      followUpInstant(nextFollowUpInput.current.value) !== null
+    )
+      form.clearErrors("nextFollowUpAt");
+  }
+  function readFollowUpInstant(value?: string) {
+    const instant = followUpInstant(value);
+    if (instant === null)
+      form.setError(
+        "nextFollowUpAt",
+        {
+          message: "此时间在当前设备时区中不存在或无效，请调整后再提交。",
+        },
+        { shouldFocus: true },
+      );
+    return instant;
   }
   function savePlan() {
     if (!form.formState.isReady || pending || planPending) return;
@@ -145,14 +171,11 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       return;
     }
     const value = form.getValues();
-    const date = value.nextFollowUpAt ? new Date(value.nextFollowUpAt) : null;
-    if (date && Number.isNaN(date.getTime())) {
-      form.setError("nextFollowUpAt", { message: "下次跟进时间无效。" });
-      return;
-    }
+    const instant = readFollowUpInstant(value.nextFollowUpAt);
+    if (instant === null) return;
     const parsed = followUpPlanFormSchema.safeParse({
       ...value,
-      nextFollowUpAt: date?.toISOString() ?? "",
+      nextFollowUpAt: instant,
     });
     if (!parsed.success) {
       for (const issue of parsed.error.issues)
@@ -169,11 +192,12 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
   }
   function submit(value: z.infer<typeof followUpFormSchema>) {
     if (!form.formState.isReady || pending || planPending) return;
+    const instant = readFollowUpInstant(value.nextFollowUpAt);
+    if (instant === null) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) {
       if (key === "triggeredRules") for (const rule of item as string[]) data.append(key, rule);
-      else if (key === "nextFollowUpAt" && item)
-        data.set(key, new Date(String(item)).toISOString());
+      else if (key === "nextFollowUpAt" && item) data.set(key, instant);
       else data.set(key, String(item));
     }
     startTransition(() => action(data));
