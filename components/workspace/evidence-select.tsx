@@ -119,7 +119,7 @@ export function EvidenceSelect({
           <SelectGroup>
             {options.map((option, index) => (
               <SelectItem key={option.id} value={option.id} data-evidence-id={option.id}>
-                {labels[index]}
+                <span className="min-w-0 whitespace-normal break-all">{labels[index]}</span>
               </SelectItem>
             ))}
             {!options.length ? (
@@ -130,11 +130,13 @@ export function EvidenceSelect({
           </SelectGroup>
         </SelectContent>
       </Select>
-      <FieldDescription id={descriptionId} aria-live="polite">
+      <FieldDescription id={descriptionId} aria-live="polite" className="break-all">
         {result?.error ||
           (result && !options.length
             ? "暂无可用资料，请上传文件后选择。"
-            : "请选择与本次操作对应的文件。")}
+            : selectedLabel
+              ? `已选择：${selectedLabel}。请核对是否与本次操作对应。`
+              : "请选择与本次操作对应的文件。")}
       </FieldDescription>
       <Button
         type="button"
