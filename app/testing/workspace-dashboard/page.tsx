@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { WorkspaceDashboard } from "@/components/workspace/workspace-dashboard";
@@ -162,7 +163,6 @@ const offlineSnapshot: WorkspaceTaskSnapshot = {
   publications: [],
   hasActiveChannel: false,
 };
-const offlineTasks = deriveWorkspaceTasks(offlineSnapshot, new Date("2026-09-04T00:00:00Z"));
 
 async function Content({
   searchParams,
@@ -171,6 +171,12 @@ async function Content({
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   const query = await searchParams;
+  const requestedTime = (await headers()).get("x-testing-dashboard-time");
+  const currentTime =
+    requestedTime && Number.isFinite(Date.parse(requestedTime))
+      ? Date.parse(requestedTime)
+      : new Date("2026-09-04T00:00:00Z").getTime();
+  const offlineTasks = deriveWorkspaceTasks(offlineSnapshot, new Date(currentTime));
   return (
     <WorkspaceShell projects={query.empty ? [] : projects}>
       <WorkspaceDashboard
@@ -186,7 +192,7 @@ async function Content({
         inbound={query.empty || query.offline ? [] : inbound}
         view={query.view}
         basePath="/testing/workspace-dashboard"
-        currentTime={new Date("2026-09-04T00:00:00Z").getTime()}
+        currentTime={currentTime}
       />
     </WorkspaceShell>
   );
