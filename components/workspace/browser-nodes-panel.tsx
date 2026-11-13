@@ -36,6 +36,7 @@ import {
 import { InteractiveSessionTimer } from "@/components/workspace/interactive-session-timer";
 import { PublicationPageInspectionPanel } from "@/components/workspace/publication-page-inspection-panel";
 import { SandboxStatus } from "@/components/workspace/sandbox-status";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { browserNodeCommandAction, browserNodesAction } from "@/lib/actions/browser-nodes";
 import {
   accountFormSchema,
@@ -84,6 +85,12 @@ const stateLabels: Record<string, string> = {
   result_unknown: "需要核对未知结果",
 };
 export function BrowserNodesPanel() {
+  const timeZone = useBrowserTimeZone();
+  const timestampFormat = new Intl.DateTimeFormat("zh-CN", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+    timeZone,
+  });
   const [nodes, setNodes] = useState<Nodes>([]);
   const [editingAccount, setEditingAccount] = useState("");
   const [message, setMessage] = useState("");
@@ -588,8 +595,15 @@ export function BrowserNodesPanel() {
               </Badge>
             </CardTitle>
             <CardDescription>
-              最近连接 {node.lastSeenAt ? new Date(node.lastSeenAt).toLocaleString() : "尚未连接"} ·
-              执行能力{" "}
+              最近连接{" "}
+              {node.lastSeenAt ? (
+                <time dateTime={new Date(node.lastSeenAt).toISOString()}>
+                  {timestampFormat.format(new Date(node.lastSeenAt))}（{timeZone}）
+                </time>
+              ) : (
+                "尚未连接"
+              )}{" "}
+              · 执行能力{" "}
               {node.capabilities
                 .map(
                   (capability) =>
@@ -649,9 +663,13 @@ export function BrowserNodesPanel() {
                 <p className="text-sm text-muted-foreground">
                   代理 {account.proxySaved ? "已保存" : "未配置"} · 登录凭据{" "}
                   {account.loginSaved ? "已保存" : "未配置"} · 最近收件箱检查{" "}
-                  {account.lastCheckedAt
-                    ? new Date(account.lastCheckedAt).toLocaleString()
-                    : "尚未执行"}
+                  {account.lastCheckedAt ? (
+                    <time dateTime={new Date(account.lastCheckedAt).toISOString()}>
+                      {timestampFormat.format(new Date(account.lastCheckedAt))}（{timeZone}）
+                    </time>
+                  ) : (
+                    "尚未执行"
+                  )}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
