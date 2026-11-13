@@ -24,7 +24,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -87,6 +87,7 @@ function DeliveryDecision({
       </CardHeader>
       <CardContent>
         <form
+          aria-busy={pending}
           id={`delivery-${entry.id}`}
           onSubmit={form.handleSubmit(submit, (errors) => {
             const first = (["decision", "leadTimeDays", "evidenceRef", "notes"] as const).find(
@@ -95,101 +96,105 @@ function DeliveryDecision({
             if (first) form.setFocus(first);
           })}
         >
-          <FieldGroup>
-            <Field data-invalid={!!form.formState.errors.decision}>
-              <FieldLabel htmlFor={`delivery-decision-${entry.id}-decision`}>决定</FieldLabel>
-              <Controller
-                control={form.control}
-                name="decision"
-                render={({ field }) => (
-                  <Select
-                    items={{ confirmed: "确认交期", rejected: "拒绝确认" }}
-                    value={field.value ?? null}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      ref={field.ref}
-                      onBlur={field.onBlur}
-                      aria-invalid={!!form.formState.errors.decision}
-                      aria-describedby={
-                        form.formState.errors.decision
-                          ? `closing-review-${entry.id}-decision-error`
-                          : undefined
-                      }
-                      id={`delivery-decision-${entry.id}-decision`}
-                      className="w-full"
+          <FieldSet disabled={pending} className="min-w-0">
+            <FieldGroup>
+              <Field data-invalid={!!form.formState.errors.decision}>
+                <FieldLabel htmlFor={`delivery-decision-${entry.id}-decision`}>决定</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="decision"
+                  render={({ field }) => (
+                    <Select
+                      items={{ confirmed: "确认交期", rejected: "拒绝确认" }}
+                      value={field.value ?? null}
+                      onValueChange={field.onChange}
                     >
-                      <SelectValue placeholder="请选择交期决定" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="confirmed">确认交期</SelectItem>
-                        <SelectItem value="rejected">拒绝确认</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError
-                id={`closing-review-${entry.id}-decision-error`}
-                errors={[form.formState.errors.decision]}
-              />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.leadTimeDays}>
-              <FieldLabel htmlFor={`confirmed-days-${entry.id}`}>确认交期（天）</FieldLabel>
-              <Input
-                id={`confirmed-days-${entry.id}`}
-                inputMode="numeric"
-                disabled={form.watch("decision") !== "confirmed"}
-                {...form.register("leadTimeDays")}
-                aria-invalid={!!form.formState.errors.leadTimeDays}
-                aria-describedby={
-                  form.formState.errors.leadTimeDays
-                    ? `closing-review-${entry.id}-leadTimeDays-error`
-                    : undefined
-                }
-              />
-              <FieldError
-                id={`closing-review-${entry.id}-leadTimeDays-error`}
-                errors={[form.formState.errors.leadTimeDays]}
-              />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.evidenceRef}>
-              <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核依据</FieldLabel>
-              <EvidenceSelectField
-                projectId={projectId}
-                control={form.control}
-                name="evidenceRef"
-                aria-describedby={
-                  form.formState.errors.evidenceRef
-                    ? `closing-review-${entry.id}-evidenceRef-error`
-                    : undefined
-                }
-                id={`delivery-decision-evidence-${entry.id}`}
-              />
-              <FieldError
-                id={`closing-review-${entry.id}-evidenceRef-error`}
-                errors={[form.formState.errors.evidenceRef]}
-              />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.notes}>
-              <FieldLabel htmlFor={`delivery-notes-${entry.id}`}>
-                备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
-              </FieldLabel>
-              <Textarea
-                id={`delivery-notes-${entry.id}`}
-                {...form.register("notes")}
-                aria-invalid={!!form.formState.errors.notes}
-                aria-describedby={
-                  form.formState.errors.notes ? `closing-review-${entry.id}-notes-error` : undefined
-                }
-              />
-              <FieldError
-                id={`closing-review-${entry.id}-notes-error`}
-                errors={[form.formState.errors.notes]}
-              />
-            </Field>
-          </FieldGroup>
+                      <SelectTrigger
+                        ref={field.ref}
+                        onBlur={field.onBlur}
+                        aria-invalid={!!form.formState.errors.decision}
+                        aria-describedby={
+                          form.formState.errors.decision
+                            ? `closing-review-${entry.id}-decision-error`
+                            : undefined
+                        }
+                        id={`delivery-decision-${entry.id}-decision`}
+                        className="w-full"
+                      >
+                        <SelectValue placeholder="请选择交期决定" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="confirmed">确认交期</SelectItem>
+                          <SelectItem value="rejected">拒绝确认</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-decision-error`}
+                  errors={[form.formState.errors.decision]}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.leadTimeDays}>
+                <FieldLabel htmlFor={`confirmed-days-${entry.id}`}>确认交期（天）</FieldLabel>
+                <Input
+                  id={`confirmed-days-${entry.id}`}
+                  inputMode="numeric"
+                  disabled={form.watch("decision") !== "confirmed"}
+                  {...form.register("leadTimeDays")}
+                  aria-invalid={!!form.formState.errors.leadTimeDays}
+                  aria-describedby={
+                    form.formState.errors.leadTimeDays
+                      ? `closing-review-${entry.id}-leadTimeDays-error`
+                      : undefined
+                  }
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-leadTimeDays-error`}
+                  errors={[form.formState.errors.leadTimeDays]}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核依据</FieldLabel>
+                <EvidenceSelectField
+                  projectId={projectId}
+                  control={form.control}
+                  name="evidenceRef"
+                  aria-describedby={
+                    form.formState.errors.evidenceRef
+                      ? `closing-review-${entry.id}-evidenceRef-error`
+                      : undefined
+                  }
+                  id={`delivery-decision-evidence-${entry.id}`}
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-evidenceRef-error`}
+                  errors={[form.formState.errors.evidenceRef]}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.notes}>
+                <FieldLabel htmlFor={`delivery-notes-${entry.id}`}>
+                  备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
+                </FieldLabel>
+                <Textarea
+                  id={`delivery-notes-${entry.id}`}
+                  {...form.register("notes")}
+                  aria-invalid={!!form.formState.errors.notes}
+                  aria-describedby={
+                    form.formState.errors.notes
+                      ? `closing-review-${entry.id}-notes-error`
+                      : undefined
+                  }
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-notes-error`}
+                  errors={[form.formState.errors.notes]}
+                />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
