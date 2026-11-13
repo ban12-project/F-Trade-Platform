@@ -1,6 +1,8 @@
 # 项目状态
 
-当前逐项结论以 [MVP1 验收状态](testing/mvp1-acceptance-status.md)为入口（2026-10-15）。Podman、无凭据 Sandbox 模板及原实例离线升级已有通过证据；真实账号遇到真人验证，用户已要求暂停该部分验收。MVP1 总验收保持 pending。
+当前逐项结论以 [MVP1 验收状态](testing/mvp1-acceptance-status.md)为入口（2026-11-14）。不依赖社媒账号的产品、内容审核、模拟销售与交互持续迭代；模拟 DM 至商机流程已有验收，真实渠道发布／入站按用户要求延后。MVP1 总验收保持 pending，最终 Go/No-Go 由人工决定。
+
+最新工程证据分别为 `033a5a5` 的 580 项 UI 回归，以及 [PR #992](https://github.com/ban12-project/F-Trade-Platform/pull/992) 的 187 项 PostgreSQL 浏览器回归；两组不是同一提交的合并测试结果。生产部署存在 [#982](https://github.com/ban12-project/F-Trade-Platform/issues/982) 的构建跳过配置待决事项，不能将已合并功能都视为已上线。完整版本、范围和未完成条件见验收入口。
 
 ## 阶段目标
 
@@ -25,15 +27,15 @@ M1 产品数据闭环
 | M0 | 仓库、契约、校验、Issue/PR 流程 | 免费方案范围内的基线已完成；服务端分支保护明确不作为 M0 验收目标，残余风险见 GitHub 治理范围决策 |
 | M1 | 产品导入、缺失识别、真实性门禁 | #268/#5 已按最终事实审核 v2 结项：A–D 共 20 槽位，10 Ready、10 正确阻断；来源、图片及当前审批回查通过。正确阻断不使产品就绪，未测自动识别效率不补造；GitHub 里程碑条目仍 open |
 | M2 | 三类内容、人工审核、单渠道发布适配 | 授权真实目录素材的生产编辑、合成、审核及私有下载已验收；应用保留与本地恢复门禁有证据。目标账号当前平台接受、自动回执及独立入站未完成；视频生成不属于 MVP1 |
-| M3 | 询盘澄清、RFQ Ready、人工报价交接 | 最新入站消息的来源绑定规则建议、人工 RFQ 补全、Product Ready 引用、人工报价、Gate 02 和发送凭据已实现；规则建议不是产品适配事实，真实客户试点仍待验收 |
+| M3 | 询盘澄清、RFQ Ready、人工报价交接 | 最新入站消息的来源绑定规则建议、人工 RFQ 补全、Product Ready 引用、人工报价、Gate 02 和发送凭据已实现；规则建议不是产品适配事实；11 月 1 日已按授权完成模拟 DM 销售流程，不再等待另交真实 RFQ |
 | M4 | 跟单策略、规则评分、交期门禁 | 跟进、可解释评分、交期人工 Gate 和商机人工认定在客户详情及显式关联的需求、报价、交期详情中处理 |
-| M5 | 端到端 Demo、验收报告和 Go/No-Go | 合成技术链路和报告已完成；reference 来源结合独立 mock 的 20 次领域闭环通过本次自动审核；生产渠道及真实客户业务验收待 #32 |
+| M5 | 端到端 Demo、验收报告和 Go/No-Go | 合成技术链路和报告已完成；reference 来源结合独立 mock 的 20 次领域闭环通过本次自动审核；模拟业务闭环已按 11 月 1 日授权完成；真实渠道及最终人工 Go/No-Go 仍待 #32 |
 
 GitHub Issues 和 Milestones 是状态的事实来源；本页只保留阶段说明，不复制实时业务数据。
 
 2026-10-06 的[实现核对与补缺](testing/reports/mvp1-implementation-audit-20261006.md)记录跨项目报价修订隔离、过期交期续申请、非空 Go 校验、生产询盘建议入口和安全补丁。技术回归与正式业务验收分别记录；本轮真实验收仍为 pending，剩余依赖风险见 [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498)。
 
-2026-10-07 的[Workflow 与图片安全补缺](testing/reports/workflow-security-patches-20261007.md)更新 devalue、两个 Workflow world 的 undici 和 sharp，并在解码前拒绝伪装图片。随后[nanoid 恢复兼容迁移](testing/reports/workflow-nanoid-replay-20261007.md)保留旧随机数消费顺序，实际旧状态恢复通过；不能继续把此前直接升级的失败当作当前未修复状态。2026-10-15 审计仍保留 1 high（braces），已安装副本的深度防护不覆盖独立 CLI 缓存，也不等于上游公告匹配消失。
+2026-10-07 的[Workflow 与图片安全补缺](testing/reports/workflow-security-patches-20261007.md)更新 devalue、两个 Workflow world 的 undici 和 sharp，并在解码前拒绝伪装图片。随后[nanoid 恢复兼容迁移](testing/reports/workflow-nanoid-replay-20261007.md)保留旧随机数消费顺序，实际旧状态恢复通过；不能继续把此前直接升级的失败当作当前未修复状态。2026-10-15 的 1 high（braces）为历史审计快照；[11 月 13 日核对](https://github.com/ban12-project/F-Trade-Platform/issues/498#issuecomment-6853250230)为 0 critical／0 high／1 moderate／1 low，minimatch 与 deepmerge 的局部防护通过 16 项回归。版本告警仍存在，#498 保持开放；工作区补丁不覆盖独立 CLI 缓存。
 
 同日[产品导入失败提示与隐私边界](testing/reports/product-intake-guidance-20261007.md)补齐文件失败的具体指导，并阻止非流式导入及手动证据 Action 返回未知异常原文。四种实际浏览器拒绝、私有回读清理和数据库重试/授权回归通过；不据此关闭历史文件恢复或间歇故障调查。
 
