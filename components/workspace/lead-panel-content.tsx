@@ -549,6 +549,8 @@ function LeadActions({
     resolver: zodResolver(opportunityDecisionFormSchema),
     defaultValues: { projectId, leadId: entry.id, evidenceRef: "" },
   });
+  const deliveryBusy = !deliveryForm.formState.isReady || deliveryPending;
+  const opportunityBusy = !opportunityForm.formState.isReady || opportunityPending;
   useWorkspaceDirty(`delivery-request-${entry.id}`, deliveryForm.formState.isDirty);
   useWorkspaceDirty(`opportunity-${entry.id}`, opportunityForm.formState.isDirty);
   useEffect(() => {
@@ -599,7 +601,9 @@ function LeadActions({
           ) : (
             <form
               className="space-y-4"
+              aria-busy={deliveryBusy}
               onSubmit={deliveryForm.handleSubmit((values) => {
+                if (deliveryBusy) return;
                 const data = new FormData();
                 for (const [key, value] of Object.entries(values)) data.set(key, value);
                 startTransition(() => deliveryAction(data));
@@ -617,13 +621,14 @@ function LeadActions({
                 <FieldLabel htmlFor={`delivery-evidence-${entry.id}`}>客户交期要求依据</FieldLabel>
                 <EvidenceSelectField
                   projectId={projectId}
+                  disabled={deliveryBusy}
                   control={deliveryForm.control}
                   name="evidenceRef"
                   id={`delivery-evidence-${entry.id}`}
                 />
                 <FieldError errors={[deliveryForm.formState.errors.evidenceRef]} />
               </Field>
-              <Button type="submit" variant="outline" disabled={deliveryPending}>
+              <Button type="submit" variant="outline" disabled={deliveryBusy}>
                 申请工厂确认交期
               </Button>
             </form>
@@ -650,7 +655,9 @@ function LeadActions({
           <CardContent>
             <form
               id={`opportunity-${entry.id}`}
+              aria-busy={opportunityBusy}
               onSubmit={opportunityForm.handleSubmit((values) => {
+                if (opportunityBusy) return;
                 const data = new FormData();
                 for (const [key, value] of Object.entries(values)) data.set(key, value);
                 startTransition(() => opportunityAction(data));
@@ -662,6 +669,7 @@ function LeadActions({
                 </FieldLabel>
                 <EvidenceSelectField
                   projectId={projectId}
+                  disabled={opportunityBusy}
                   control={opportunityForm.control}
                   name="evidenceRef"
                   id={`opportunity-evidence-${entry.id}`}
@@ -671,7 +679,7 @@ function LeadActions({
             </form>
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-3">
-            <Button type="submit" form={`opportunity-${entry.id}`} disabled={opportunityPending}>
+            <Button type="submit" form={`opportunity-${entry.id}`} disabled={opportunityBusy}>
               <CheckCircle2Icon />
               确认有效商机
             </Button>
