@@ -90,3 +90,60 @@ test("upload explains invalid files, retains failed files and allows retry", asy
     );
   }
 });
+
+for (const failure of ["denied", "transport"] as const) {
+  test(`selected evidence survives ${failure} refresh and retry without being replaced`, async ({
+    page,
+  }) => {
+    await page.goto("/testing/evidence-select");
+    const field = page.getByRole("combobox", { name: "素材使用授权证明", exact: true });
+    await field.click();
+    await page.getByRole("option", { name: /合成工厂授权书.pdf · 2026-10-02/ }).click();
+    let requests = 0;
+    await page.route("**/testing/evidence-select", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      requests++;
+      if (requests === 1 && failure === "transport") return route.abort("failed");
+      const result =
+        requests === 1
+          ? { options: [], error: "请重新登录并确认项目权限。" }
+          : {
+              options:
+                requests === 2
+                  ? [
+                      { id: "evidence-synthetic-other", label: "另一份合成资料.pdf" },
+                      { id: "evidence-synthetic-rights-761", label: "合成工厂授权书.pdf" },
+                    ]
+                  : [],
+              error: "",
+            };
+      await route.fulfill({
+        contentType: "text/x-component",
+        body: `0:{"a":"$@1","f":"","b":"synthetic"}\n1:${JSON.stringify(result)}\n`,
+      });
+    });
+    const refresh = page.getByRole("button", { name: "刷新资料列表", exact: true }).first();
+    await refresh.click();
+    await expect(field).toHaveAccessibleDescription(
+      failure === "denied" ? /请重新登录并确认项目权限/ : /资料加载失败，请重试/,
+    );
+    await expect(field).toContainText("请重新选择资料");
+    await field.click();
+    await expect(page.getByRole("option", { name: "暂时无法加载资料" })).toBeDisabled();
+    await expect(page.getByRole("option", { name: /合成工厂授权书/ })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await refresh.click();
+    await expect(field).toContainText("合成工厂授权书.pdf");
+    await expect(field).toHaveAccessibleDescription("请选择与本次操作对应的文件。");
+    await expect(page.getByLabel("提交结果")).toBeEmpty();
+    await page.getByRole("button", { name: "保存选择", exact: true }).click();
+    await expect(page.getByLabel("提交结果")).toHaveText("evidence-synthetic-rights-761");
+    expect(requests).toBe(2);
+    await refresh.click();
+    await expect(field).toContainText("请选择已保存的资料");
+    await expect(field).toHaveAccessibleDescription("暂无可用资料，请上传文件后选择。");
+    await page.getByRole("button", { name: "保存选择", exact: true }).click();
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(requests).toBe(3);
+  });
+}

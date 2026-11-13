@@ -90,7 +90,15 @@ export function EvidenceSelect({
       <Select
         value={value || null}
         disabled={disabled}
-        onValueChange={(next) => onValueChange(next ?? "")}
+        onValueChange={(next, details) => {
+          // A failed refresh is not evidence that the user's selected ID was removed.
+          // Base UI reconciles missing options by clearing the value; keep the draft on errors.
+          if (next === null && value && result?.error && details.reason === "none") {
+            details.cancel();
+            return;
+          }
+          onValueChange(next ?? "");
+        }}
         onOpenChange={(open) => {
           if (open && !result && !pending) refresh();
         }}
