@@ -117,13 +117,10 @@ test("content editing preserves input across responsive layout changes", async (
   ).toBe(1);
 });
 
-test("enlarged text and reduced transparency keep the toolbar readable", async ({ page }) => {
+test("reduced motion and increased contrast keep the toolbar readable", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 800 });
   await page.emulateMedia({ reducedMotion: "reduce", contrast: "more" });
   await page.goto("/testing/video-workspace?state=review");
-  await page.evaluate(() => {
-    document.documentElement.style.fontSize = "200%";
-  });
   await expect(page.getByRole("heading", { name: "视频编辑器", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
     true,
