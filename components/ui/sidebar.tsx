@@ -32,6 +32,7 @@ type SidebarContextProps = {
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
+  ready: boolean;
   toggleSidebar: () => void;
 };
 
@@ -60,6 +61,9 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void;
 }) {
   const isMobile = useIsMobile();
+  const [ready, setReady] = React.useState(false);
+  // Enable controls after useIsMobile has resolved the client viewport.
+  React.useEffect(() => setReady(true), []);
   const [openMobile, setOpenMobile] = React.useState(false);
 
   // This is the internal state of the sidebar.
@@ -106,11 +110,12 @@ function SidebarProvider({
       open,
       setOpen,
       isMobile,
+      ready,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, toggleSidebar],
+    [state, open, setOpen, isMobile, ready, openMobile, toggleSidebar],
   );
 
   return (
@@ -238,11 +243,17 @@ function Sidebar({
   );
 }
 
-function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+function SidebarTrigger({
+  className,
+  onClick,
+  disabled,
+  ...props
+}: React.ComponentProps<typeof Button>) {
+  const { toggleSidebar, ready } = useSidebar();
 
   return (
     <Button
+      disabled={disabled || !ready}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"

@@ -128,6 +128,35 @@ test("new-project validation connects the field, error and group name without a 
   expect(writes).toBe(0);
 });
 
+test("mobile navigation waits for hydration and opens on the first activation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let release = () => {};
+  const scriptsReady = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(/\/_next\/static\/.*\.js(?:\?|$)/, async (route) => {
+    await scriptsReady;
+    await route.continue();
+  });
+  const trigger = page.getByRole("button", { name: "打开导航" });
+  try {
+    await page.goto(navigationFixture, { waitUntil: "commit" });
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toBeDisabled();
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+  await expect(trigger).toBeEnabled();
+  await trigger.click();
+  const drawer = page.getByRole("dialog", { name: "工作区导航", exact: true });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(drawer).toBeHidden();
+});
+
 test("touch controls have two-dimensional targets and the drawer has an explicit close", async ({
   browser,
   baseURL,
