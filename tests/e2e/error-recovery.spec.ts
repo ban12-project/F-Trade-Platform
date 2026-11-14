@@ -15,6 +15,8 @@ for (const route of [root, `${root}/workspace`]) {
       await page.goto(route);
       const main = page.getByRole("main");
       await expect(main.getByRole("heading", { name: failureTitle, level: 1 })).toBeVisible();
+      await expect(page).toHaveTitle("暂时无法显示此页面 · F-Trade");
+      await expect(page.locator("title")).toHaveCount(1);
       await expect(main).not.toContainText("SYNTHETIC_PRIVATE_SERVER_DETAIL");
       await expect(main).toContainText("未保存的内容可能已丢失");
       await expect(main.getByRole("link", { name: "返回工作台" })).toHaveAttribute(
@@ -40,6 +42,8 @@ for (const route of [root, `${root}/workspace`]) {
     await page.getByRole("button", { name: "触发合成客户端异常" }).click();
     const main = page.getByRole("main");
     await expect(main.getByRole("heading", { name: failureTitle })).toBeVisible();
+    await expect(page).toHaveTitle("暂时无法显示此页面 · F-Trade");
+    await expect(page.locator("title")).toHaveCount(1);
     await expect(main).not.toContainText("SYNTHETIC_PRIVATE_CLIENT_DETAIL");
     await main.getByRole("button", { name: "重试加载" }).click();
     await expect(page.getByRole("heading", { name: "合成页面已加载" })).toBeVisible();

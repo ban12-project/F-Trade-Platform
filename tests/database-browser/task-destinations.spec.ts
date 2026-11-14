@@ -685,6 +685,23 @@ test("object libraries retain project scope, reference ownership and stable reco
   ).toBeVisible();
 });
 
+test("missing project offers a localized accessible return to the authenticated workspace", async ({
+  page,
+}) => {
+  await page.goto(`/workspace/${randomUUID()}`);
+  await expect(page).toHaveTitle("无法打开此项目 · F-Trade");
+  await expect(page.locator("title")).toHaveCount(1);
+  const main = page.getByRole("main");
+  await expect(main).toHaveCount(1);
+  await expect(main).toHaveAttribute("id", "main-content");
+  await expect(main.getByRole("heading", { level: 1, name: "无法打开此项目" })).toBeVisible();
+  await expect(main.getByText("该项目不可用，或你没有查看权限。")).toBeVisible();
+  await main.getByRole("link", { name: "返回工作台" }).click();
+  await expect(page).toHaveURL(/\/workspace$/);
+  await expect(page).not.toHaveTitle("无法打开此项目 · F-Trade");
+  await expect(page.getByRole("main")).toBeVisible();
+});
+
 test("malformed or contradictory object links never substitute a form or another record", async ({
   page,
 }) => {
@@ -701,6 +718,15 @@ test("malformed or contradictory object links never substitute a form or another
       page.getByText("这条记录已不可用", { exact: true }).filter({ visible: true }),
     ).toBeVisible();
     await expect(page.getByRole("region", { name: "业务记录" }).locator("form")).toHaveCount(0);
+    await expect(page.getByRole("main")).toHaveCount(1);
+    await expect(page.getByRole("heading", { level: 1, name: "记录已不可用" })).toBeVisible();
+    await page
+      .getByRole("link", { name: "返回清单", exact: true })
+      .filter({ visible: true })
+      .click();
+    const collection = path.includes("/new/content") ? "content" : "products";
+    await expect(page).toHaveURL(`/workspace/${collection}?project=${id}`);
+    await expect(page.getByRole("main")).toBeVisible();
   }
 });
 
