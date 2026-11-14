@@ -1,0 +1,237 @@
+{
+  "model": {
+    "provider": "openai-compatible",
+    "model": "gpt-6.1-terra",
+    "source": "database-snapshot",
+    "declaredRevision": null
+  },
+  "sourceSha256": "12bc1f7a883cb69e268580a9ede6f277979235c36a9105bd2d8cdaacb8a04a13",
+  "baseCommit": "e225225562a514cb65462a29fdec06a52b8cbdb9",
+  "reportSha256": "f637eca432c31da5e67ddf963e306dd741837ae12634c2b62c94f0a863fea288",
+  "totalRows": 1080,
+  "failures": 0,
+  "matrix": [
+    {
+      "operation": "login",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "inspection",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "text",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "image",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "video",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    },
+    {
+      "operation": "inbox",
+      "verdict": "limited-pass",
+      "reason": "Synthetic capability fixture; production DOM driver comparison and runtime parity remain unverified."
+    }
+  ],
+  "operations": [
+    {
+      "operation": "login",
+      "before": {
+        "passesByVariant": {
+          "normal": 3,
+          "moved": 1,
+          "renamed": 0,
+          "delayed": 1
+        },
+        "failures": 45,
+        "medianNormalMs": 13731,
+        "modelCalls": 287,
+        "inputTokens": 160712,
+        "outputTokens": 10857,
+        "normalHumanRequired": 35
+      },
+      "after": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 7162,
+        "modelCalls": 190,
+        "inputTokens": 124549,
+        "outputTokens": 5666,
+        "normalHumanRequired": 0
+      }
+    },
+    {
+      "operation": "inspection",
+      "before": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 8,
+          "renamed": 8,
+          "delayed": 9
+        },
+        "failures": 5,
+        "medianNormalMs": 4768,
+        "modelCalls": 98,
+        "inputTokens": 51786,
+        "outputTokens": 5298,
+        "normalHumanRequired": 5
+      },
+      "after": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 2231,
+        "modelCalls": 60,
+        "inputTokens": 36100,
+        "outputTokens": 1460,
+        "normalHumanRequired": 0
+      }
+    },
+    {
+      "operation": "text",
+      "before": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 5136,
+        "modelCalls": 161,
+        "inputTokens": 87901,
+        "outputTokens": 5394,
+        "normalHumanRequired": 0
+      },
+      "after": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 5144,
+        "modelCalls": 160,
+        "inputTokens": 100206,
+        "outputTokens": 4486,
+        "normalHumanRequired": 0
+      }
+    },
+    {
+      "operation": "image",
+      "before": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 7556,
+        "modelCalls": 270,
+        "inputTokens": 172233,
+        "outputTokens": 9212,
+        "normalHumanRequired": 0
+      },
+      "after": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 7968,
+        "modelCalls": 270,
+        "inputTokens": 173961,
+        "outputTokens": 8409,
+        "normalHumanRequired": 0
+      }
+    },
+    {
+      "operation": "video",
+      "before": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 7590,
+        "modelCalls": 270,
+        "inputTokens": 155417,
+        "outputTokens": 9075,
+        "normalHumanRequired": 0
+      },
+      "after": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 7512,
+        "modelCalls": 270,
+        "inputTokens": 173639,
+        "outputTokens": 8240,
+        "normalHumanRequired": 0
+      }
+    },
+    {
+      "operation": "inbox",
+      "before": {
+        "passesByVariant": {
+          "normal": 0,
+          "moved": 0,
+          "renamed": 0,
+          "delayed": 0
+        },
+        "failures": 50,
+        "medianNormalMs": 9577,
+        "modelCalls": 240,
+        "inputTokens": 132351,
+        "outputTokens": 7613,
+        "normalHumanRequired": 40
+      },
+      "after": {
+        "passesByVariant": {
+          "normal": 10,
+          "moved": 10,
+          "renamed": 10,
+          "delayed": 10
+        },
+        "failures": 0,
+        "medianNormalMs": 5452,
+        "modelCalls": 120,
+        "inputTokens": 78758,
+        "outputTokens": 3773,
+        "normalHumanRequired": 0
+      }
+    }
+  ],
+  "safetyRejectFailures": 0,
+  "maxSubmitClicks": 1,
+  "costUsd": null,
+  "limits": "Same tuning dataset; no ablation or unseen-site evaluation. Provider model name is not an immutable version guarantee."
+}

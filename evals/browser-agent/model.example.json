@@ -1,0 +1,7 @@
+{
+  "provider": "openai-compatible",
+  "model": "REPLACE_WITH_REVIEWED_MODEL_ID",
+  "revision": "REPLACE_WITH_PINNED_PROVIDER_REVISION",
+  "apiKeyEnv": "BROWSER_EVAL_API_KEY",
+  "baseUrlEnv": "BROWSER_EVAL_BASE_URL"
+}
