@@ -167,7 +167,7 @@ const offlineSnapshot: WorkspaceTaskSnapshot = {
 async function Content({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; empty?: string; offline?: string }>;
+  searchParams: Promise<{ view?: string; empty?: string; offline?: string; inboundOnly?: string }>;
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   const query = await searchParams;
@@ -181,7 +181,7 @@ async function Content({
     <WorkspaceShell projects={query.empty ? [] : projects}>
       <WorkspaceDashboard
         projects={query.empty ? [] : projects}
-        tasks={query.empty ? [] : query.offline ? offlineTasks : tasks}
+        tasks={query.empty || query.inboundOnly ? [] : query.offline ? offlineTasks : tasks}
         overview={
           query.empty
             ? []
@@ -199,7 +199,7 @@ async function Content({
 }
 
 export default function Page(props: {
-  searchParams: Promise<{ view?: string; empty?: string; offline?: string }>;
+  searchParams: Promise<{ view?: string; empty?: string; offline?: string; inboundOnly?: string }>;
 }) {
   return (
     <Suspense>

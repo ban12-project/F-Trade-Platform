@@ -135,3 +135,28 @@ test("task cards show customer, need, local deadline and overdue context", async
   await expect(task.locator("time")).toHaveAttribute("datetime", "2026-09-03T01:00:00.000Z");
   await context.close();
 });
+
+for (const width of [390, 1280]) {
+  test(`inbound-only tasks do not claim the dashboard is empty at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/testing/workspace-dashboard?inboundOnly=1");
+    await expect(
+      page.getByText("1 项可以继续处理，按优先级从上往下开始。", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("入站消息 A1B2C3D4", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "新建销售项目", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "关联现有项目", exact: true })).toBeVisible();
+    await expect(page.getByText("当前没有需要你处理的任务", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "录入第一份产品资料", exact: true })).toHaveCount(
+      0,
+    );
+    await page.goto("/testing/workspace-dashboard?inboundOnly=1&view=waiting");
+    await expect(page.getByText("当前没有这类事项", { exact: true })).toBeVisible();
+    await expect(page.getByText("入站消息 A1B2C3D4", { exact: true })).toHaveCount(0);
+    await page.goto("/testing/workspace-dashboard?empty=1");
+    await expect(page.getByText("当前没有需要你处理的任务", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "录入第一份产品资料", exact: true }),
+    ).toBeVisible();
+  });
+}
