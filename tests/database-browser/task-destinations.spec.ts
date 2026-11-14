@@ -831,3 +831,65 @@ test("channel settings owns old account and browser management entries", async (
     );
   }
 });
+
+for (const width of [390, 1280]) {
+  test(`multiple linked RFQs preserve their list context at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const id = await project();
+    const received = await lead(id, true);
+    const chosen = await record(
+      id,
+      "rfq",
+      "RFQ_COLLECTING",
+      {
+        ...rfq,
+        lead_ref: received,
+        commercial: { ...rfq.commercial, destination: "SYNTHETIC Port A" },
+      },
+      "sales_rfq",
+    );
+    const other = await record(
+      id,
+      "rfq",
+      "RFQ_COLLECTING",
+      {
+        ...rfq,
+        lead_ref: received,
+        commercial: { ...rfq.commercial, destination: "SYNTHETIC Port B" },
+      },
+      "sales_rfq",
+    );
+    const unrelated = await record(id, "rfq", "RFQ_COLLECTING", rfq, "sales_rfq");
+    const source = `/workspace/customers?project=${id}&type=rfq&state=RFQ_COLLECTING`;
+    const before = await db.select({ id: schema.aggregateRecord.id }).from(schema.aggregateRecord);
+    await page.goto(
+      `/workspace/${id}/new/rfq?lead=${received}&returnTo=${encodeURIComponent(source)}`,
+    );
+    const panel = page.getByRole("region", { name: "业务记录", exact: true });
+    const selected = panel.locator(`a[href^="/workspace/${id}/records/rfq/${chosen}"]`);
+    await expect(selected).toHaveAttribute(
+      "href",
+      `/workspace/${id}/records/rfq/${chosen}?returnTo=${encodeURIComponent(source)}`,
+    );
+    await expect(selected).toContainText("离合器套件");
+    await expect(selected).toContainText("SYNTHETIC Port A");
+    await expect(selected).toContainText(chosen.slice(0, 8));
+    await expect(panel.locator(`a[href*="${other}"]`)).toContainText("SYNTHETIC Port B");
+    await expect(panel.locator(`a[href*="${unrelated}"]`)).toHaveCount(0);
+    await expect(panel.getByRole("listitem")).toHaveCount(2);
+    await expect(panel.locator("#create-rfq")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    await selected.click();
+    await expect(panel.locator(`#revise-rfq-${chosen}`)).toBeVisible();
+    await expect(panel.locator(`#revise-rfq-${other}`)).toHaveCount(0);
+    await page.getByRole("main").getByRole("link", { name: "返回清单", exact: true }).click();
+    await expect(page).toHaveURL((url) => url.pathname + url.search === source);
+    await expect(page.getByLabel("记录类型")).toHaveValue("rfq");
+    await expect(page.getByLabel("状态", { exact: true })).toHaveValue("RFQ_COLLECTING");
+    expect(
+      await db.select({ id: schema.aggregateRecord.id }).from(schema.aggregateRecord),
+    ).toHaveLength(before.length);
+  });
+}
