@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
+import "@ui-sdk/core/web.css";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
