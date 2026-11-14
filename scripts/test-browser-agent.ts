@@ -73,6 +73,7 @@ test("model timeout returns and cannot execute a later decision", async () => {
     timeoutMs: 10,
   });
   assert.equal(result.reason, "cancelled");
+  assert.equal(result.usageComplete, false);
   await new Promise((r) => setTimeout(r, 80));
   assert.equal(effects, 0);
 });
@@ -151,4 +152,26 @@ test("feedback reports executed actions without leaking page content and is isol
       return { command: { action: "finish", target: "", valueRef: "" } };
     },
   });
+});
+
+test("provider failure preserves known usage but never reports complete cost evidence", async () => {
+  const p = port();
+  let calls = 0;
+  const result = await runBrowserAgent({
+    port: p,
+    signal: signal(),
+    decide: async () => {
+      if (calls++ > 0) throw new Error("synthetic provider failure");
+      return {
+        command: { action: "read", target: "", valueRef: "" },
+        inputTokens: 17,
+        outputTokens: 3,
+      };
+    },
+  });
+  assert.equal(result.reason, "execution_failed");
+  assert.equal(result.calls, 2);
+  assert.equal(result.inputTokens, 17);
+  assert.equal(result.outputTokens, 3);
+  assert.equal(result.usageComplete, false);
 });

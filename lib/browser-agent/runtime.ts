@@ -118,15 +118,22 @@ export async function runBrowserAgent(options: {
     while (result.calls < maximum) {
       signal.throwIfAborted();
       result.calls++;
-      const decision = await bounded(
-        () =>
-          options.decide(snapshot, signal, {
-            remainingCalls: maximum - result.calls,
-            unchangedObservations: unchanged,
-            recentActions: recentActions.map((entry) => ({ ...entry })),
-          }),
-        signal,
-      );
+      let decision: Decision;
+      try {
+        decision = await bounded(
+          () =>
+            options.decide(snapshot, signal, {
+              remainingCalls: maximum - result.calls,
+              unchangedObservations: unchanged,
+              recentActions: recentActions.map((entry) => ({ ...entry })),
+            }),
+          signal,
+        );
+      } catch (error) {
+        // A failed or timed-out provider call may still consume tokens.
+        result.usageComplete = false;
+        throw error;
+      }
       result.inputTokens += decision.inputTokens ?? 0;
       result.outputTokens += decision.outputTokens ?? 0;
       result.usageComplete &&=
