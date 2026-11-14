@@ -12,7 +12,12 @@ import type {
   ReadyVideoProductSource,
 } from "@/lib/video/store";
 import type { VideoWorkspaceSelection } from "@/lib/video/workspace-selection";
-import { workspaceCreateHref, workspaceRecordHref } from "@/lib/workspace/navigation";
+import {
+  workspaceCreateHref,
+  workspaceRecordHref,
+  workspaceReturnLabel,
+  workspaceReturnTo,
+} from "@/lib/workspace/navigation";
 import { useWorkspaceDirty, useWorkspaceDirtyState, WorkspaceDirtyProvider } from "./dirty-state";
 import { MarketingVideoPanel, videoStateLabel } from "./marketing-video-panel";
 import { WorkspaceLink } from "./workspace-link";
@@ -49,7 +54,7 @@ function VideoWorkspaceInner({
   const productId =
     active?.productId ?? (selection.mode === "create" ? selection.productId : undefined);
   const product = products.find((item) => item.id === productId);
-  const back = returnTo ?? `/workspace/content?project=${projectId}`;
+  const back = workspaceReturnTo(returnTo) ?? `/workspace/content?project=${projectId}`;
   return (
     <main id="main-content" className="workspace-page workspace-layout bg-muted/30 pb-24">
       <WorkspaceToolbar>
@@ -58,7 +63,7 @@ function VideoWorkspaceInner({
             <WorkspaceLink
               href={back}
               className={buttonVariants({ size: "icon", variant: "ghost" })}
-              aria-label="返回内容与发布"
+              aria-label={workspaceReturnLabel(back)}
             >
               <ArrowLeftIcon />
             </WorkspaceLink>
@@ -86,7 +91,7 @@ function VideoWorkspaceInner({
             来源产品：
             <WorkspaceLink
               className="underline underline-offset-4"
-              href={workspaceRecordHref(projectId, "product", product.id)}
+              href={workspaceRecordHref(projectId, "product", product.id, back)}
             >
               {product.productName}
             </WorkspaceLink>

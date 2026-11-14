@@ -170,3 +170,50 @@ test("AI draft explains missing brief fields and unsaved changes at the action",
   await expect(ai).toBeDisabled();
   await expect(ai).toHaveAccessibleDescription("请先保存当前修改，再生成 AI 初稿。");
 });
+
+for (const [returnTo, label] of [
+  ["/workspace?view=waiting", "返回今日任务"],
+  ["/workspace/products?type=product&q=SYN-001", "返回产品资料"],
+  ["/workspace/content?type=video&state=VIDEO_REVIEW_REQUIRED&q=synthetic", "返回内容与发布"],
+  ["/workspace/customers?type=rfq&q=synthetic", "返回客户与询盘"],
+  ["https://example.invalid/", "返回内容与发布"],
+  ["/workspace/content?next=https://example.invalid/", "返回内容与发布"],
+]) {
+  test(`video return context matches its destination: ${returnTo}`, async ({ page }) => {
+    await page.goto(`/testing/video-workspace?returnTo=${encodeURIComponent(returnTo)}`);
+    const fallback = "/workspace/content?project=00000000-0000-4000-8000-000000000721";
+    const expected = returnTo.includes("example.invalid") ? fallback : returnTo;
+    const back = page.getByRole("link", { name: label, exact: true });
+    await expect(back).toBeVisible();
+    await expect(back).toHaveAttribute("href", expected);
+    const source = page.getByRole("link", { name: "Verified clutch kit", exact: true });
+    const href = required(await source.getAttribute("href"));
+    const target = new URL(href, "http://localhost");
+    expect(target.pathname).toBe(
+      "/workspace/00000000-0000-4000-8000-000000000721/records/product/00000000-0000-4000-8000-000000000301",
+    );
+    expect(target.searchParams.get("returnTo")).toBe(expected);
+  });
+}
+
+test("returning to filtered tasks keeps the video draft until discard is confirmed", async ({
+  page,
+}) => {
+  await page.goto("/testing/video-workspace?returnTo=%2Fworkspace%3Fview%3Dwaiting");
+  await page.getByLabel("成片时长（秒）").first().fill("6");
+  const back = page.getByRole("link", { name: "返回今日任务", exact: true });
+  await back.click();
+  const alert = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await expect(alert).toBeVisible();
+  await alert.getByRole("button", { name: "继续编辑" }).click();
+  await expect(page.getByLabel("成片时长（秒）").first()).toHaveValue("6");
+  await expect(page).toHaveURL(/\/testing\/video-workspace/);
+  await back.click();
+  const destination = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).pathname === "/workspace" &&
+      new URL(request.url()).searchParams.get("view") === "waiting",
+  );
+  await alert.getByRole("button", { name: "放弃修改并离开" }).click();
+  await destination;
+});
