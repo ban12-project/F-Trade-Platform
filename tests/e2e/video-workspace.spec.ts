@@ -209,11 +209,11 @@ test("returning to filtered tasks keeps the video draft until discard is confirm
   await expect(page.getByLabel("成片时长（秒）").first()).toHaveValue("6");
   await expect(page).toHaveURL(/\/testing\/video-workspace/);
   await back.click();
-  const destination = page.waitForRequest(
-    (request) =>
-      new URL(request.url()).pathname === "/workspace" &&
-      new URL(request.url()).searchParams.get("view") === "waiting",
-  );
   await alert.getByRole("button", { name: "放弃修改并离开" }).click();
-  await destination;
+  // This synthetic fixture is signed out; assert the final destination rather than
+  // requiring another request when Next.js can reuse a prefetched redirect.
+  await expect(page).toHaveURL(
+    (url) => url.pathname === "/auth" && url.searchParams.get("next") === "/workspace?view=waiting",
+  );
+  await expect(page.getByRole("heading", { name: "登录工作台", exact: true })).toBeVisible();
 });
