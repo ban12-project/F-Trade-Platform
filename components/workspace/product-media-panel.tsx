@@ -163,7 +163,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
     setHasFile(false);
     setUploadProgress(0);
     router.refresh();
-  }, [form, router, state.status]);
+  }, [form, router, state]);
 
   async function submit(values: ProductMediaRegistrationFields) {
     if (!form.formState.isReady || uploading || pending) return;
