@@ -144,7 +144,13 @@ export function ContentDraftForm({
     // another refresh or reset a draft the user has started editing afterwards.
     if (saveState.status === "success") resetSavedDraft();
   }, [saveState]);
-  useCreatedRecord(projectId, "content", saveState.status, saveState.contentId, !revising);
+  const created = useCreatedRecord(
+    projectId,
+    "content",
+    saveState.status,
+    saveState.contentId,
+    !revising,
+  );
   function data(values: ContentValues) {
     const result = new FormData();
     result.set("projectId", projectId);
@@ -153,7 +159,7 @@ export function ContentDraftForm({
     return result;
   }
   function generate() {
-    if (!form.formState.isReady || generating || saving) return;
+    if (!form.formState.isReady || generating || saving || created) return;
     const values = form.getValues();
     const subset = contentAgentRequestSchema.safeParse({ ...values, projectId });
     if (!subset.success) {
@@ -232,14 +238,14 @@ export function ContentDraftForm({
       </CardHeader>
       <CardContent>
         <form
-          aria-busy={!form.formState.isReady || saving}
+          aria-busy={!form.formState.isReady || saving || created}
           id={revising ? "revise-content" : "create-content"}
           onSubmit={form.handleSubmit((values) => {
-            if (form.formState.isReady && !generating && !saving)
+            if (form.formState.isReady && !generating && !saving && !created)
               startTransition(() => saveAction(data(values)));
           })}
         >
-          <FieldSet disabled={!form.formState.isReady || saving} className="min-w-0">
+          <FieldSet disabled={!form.formState.isReady || saving || created} className="min-w-0">
             <div className="workspace-equal-columns">
               <FieldGroup>
                 <Field data-invalid={!!form.formState.errors.productId}>
@@ -411,7 +417,7 @@ export function ContentDraftForm({
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={!form.formState.isReady || generating || saving}
+                  disabled={!form.formState.isReady || generating || saving || created}
                   onClick={generate}
                 >
                   {generating ? (
@@ -505,7 +511,7 @@ export function ContentDraftForm({
         <Button
           form={revising ? "revise-content" : "create-content"}
           type="submit"
-          disabled={!form.formState.isReady || saving || generating}
+          disabled={!form.formState.isReady || saving || created || generating}
         >
           {saving ? (
             <Spinner data-icon="inline-start" />

@@ -123,8 +123,9 @@ function QuotationForm({
       router.refresh();
     }
   }, [form, router, state]);
-  useCreatedRecord(projectId, "quotation", state.status, state.id, !entry);
+  const created = useCreatedRecord(projectId, "quotation", state.status, state.id, !entry);
   function submit(value: QuoteValues) {
+    if (!form.formState.isReady || pending || created) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item ?? "");
     startTransition(() => action(data));
@@ -140,10 +141,10 @@ function QuotationForm({
       <CardContent>
         <form
           id={`quotation-${entry?.id ?? "new"}`}
-          aria-busy={!form.formState.isReady || pending}
+          aria-busy={!form.formState.isReady || pending || created}
           onSubmit={form.handleSubmit(submit)}
         >
-          <FieldSet disabled={!form.formState.isReady || pending} className="min-w-0">
+          <FieldSet disabled={!form.formState.isReady || pending || created} className="min-w-0">
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.rfqId}>
                 <FieldLabel htmlFor={`quotation-rfq-${entry?.id ?? "new"}`}>客户需求</FieldLabel>
@@ -499,7 +500,9 @@ function QuotationForm({
         <Button
           form={`quotation-${entry?.id ?? "new"}`}
           type="submit"
-          disabled={!form.formState.isReady || pending || !rfqs.length || !products.length}
+          disabled={
+            !form.formState.isReady || pending || created || !rfqs.length || !products.length
+          }
         >
           {pending ? (
             <Spinner data-icon="inline-start" />

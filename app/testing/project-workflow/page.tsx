@@ -748,6 +748,18 @@ async function ProjectWorkflowFixture({
       <ContentCreatePanel
         projectId={syntheticMarketingProject.id}
         products={state === "content-generation" ? syntheticGenerationProducts : [syntheticProduct]}
+        copyCandidates={
+          state === "content-copy"
+            ? [
+                {
+                  id: "00000000-0000-4000-8000-000000000999",
+                  projectTitle: "SYNTHETIC source project",
+                  productName: "SYNTHETIC product",
+                  hook: "SYNTHETIC copy source",
+                },
+              ]
+            : []
+        }
       />
     ),
     video: (

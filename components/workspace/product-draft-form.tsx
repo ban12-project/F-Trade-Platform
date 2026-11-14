@@ -93,7 +93,8 @@ export function ProductDraftForm({
     resolver: zodResolver(productCatalogFormSchema),
     defaultValues: detail ? productDraftValues(detail) : emptyProduct,
   });
-  const busy = !form.formState.isReady || !images.formState.isReady || pending;
+  const created = useCreatedRecord(projectId, "product", state.status, state.productId, !revising);
+  const busy = !form.formState.isReady || !images.formState.isReady || pending || created;
   useWorkspaceDirty(`${formId}-product-draft-${detail?.id ?? "new"}`, form.formState.isDirty);
   useWorkspaceDirty(`${formId}-product-images-${detail?.id ?? "new"}`, images.formState.isDirty);
   useEffect(() => {
@@ -104,7 +105,6 @@ export function ProductDraftForm({
       router.refresh();
     }
   }, [form, images, revising, router, state.status]);
-  useCreatedRecord(projectId, "product", state.status, state.productId, !revising);
   async function submit(values: ProductValues) {
     if (busy) return;
     if (!(await images.trigger())) return;

@@ -15,6 +15,7 @@ export function useCreatedRecord(
   id: string | undefined,
   enabled = true,
 ) {
+  const created = enabled && status === "success" && Boolean(id);
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = workspaceReturnTo(searchParams.get("returnTo"));
@@ -24,4 +25,6 @@ export function useCreatedRecord(
     opened.current = id;
     router.replace(workspaceRecordHref(projectId, kind, id, returnTo));
   }, [enabled, id, kind, projectId, returnTo, router, status]);
+  // The mutation is finished even if navigation is delayed. Do not create it again.
+  return created;
 }

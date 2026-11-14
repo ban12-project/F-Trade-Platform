@@ -161,7 +161,7 @@ export function MarketingVideoCreateForm({
     router.refresh();
   }, [form, router, state]);
 
-  useCreatedRecord(projectId, "video", state.status, state.videoId);
+  const created = useCreatedRecord(projectId, "video", state.status, state.videoId);
 
   function selectSourceMode(value: string[]) {
     const next = value[0] as CreateValues["sourceMode"] | undefined;
@@ -245,6 +245,7 @@ export function MarketingVideoCreateForm({
   }
 
   async function submit(values: CreateValues) {
+    if (pending || uploading || created) return;
     setUploadError("");
     const data = creationData(values);
     if (values.sourceMode === "product_media" || values.sourceMode === "internet_search") {
@@ -319,7 +320,7 @@ export function MarketingVideoCreateForm({
     );
   }
 
-  const busy = pending || uploading;
+  const busy = pending || uploading || created;
   return (
     <Card>
       <CardHeader>

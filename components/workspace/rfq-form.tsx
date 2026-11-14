@@ -109,7 +109,8 @@ export function RfqForm({
       ? { ...entry.formValues, evidenceRef: "" }
       : { ...emptyRfq, leadId: selectedLeadId ?? "" },
   });
-  const busy = !form.formState.isReady || pending;
+  const created = useCreatedRecord(projectId, "rfq", state.status, state.rfqId, !revising);
+  const busy = !form.formState.isReady || pending || created;
   function errorDescription(field: keyof RfqValues) {
     return form.formState.errors[field] ? `${errorPrefix}-${field}-error` : undefined;
   }
@@ -198,7 +199,6 @@ export function RfqForm({
       router.refresh();
     }
   }, [form, revising, router, state, selectedLeadId]);
-  useCreatedRecord(projectId, "rfq", state.status, state.rfqId, !revising);
   function submit(values: RfqValues) {
     if (busy || suggesting) return;
     const data = new FormData();
