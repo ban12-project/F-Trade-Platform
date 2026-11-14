@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { chromium } from "@playwright/test";
 
 const fixtureRoot = "app/testing";
 const dynamicFixturePaths = {
@@ -91,6 +92,19 @@ try {
     [],
     "Every private fixture must return an HTTP 404 before streaming",
   );
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(`${origin}/testing`);
+    await page.waitForLoadState("networkidle");
+    assert.equal(
+      await page.evaluate(() => typeof window.__fTradeFailRoot),
+      "undefined",
+      "Root-layout exception injection must not be mounted outside explicit testing mode",
+    );
+  } finally {
+    await browser.close();
+  }
   const baseline = await request("/testing");
   assert.equal(baseline.status, 200, "Public static navigation baseline remains available");
   assert.match(await baseline.text(), /Playwright 测试基线/);
@@ -101,7 +115,7 @@ try {
     assert.equal(new URL(response.headers.get("location"), origin).pathname, "/auth");
   }
   console.log(
-    `PASS production isolation for ${fixtureRoutes.length} fixture paths, public baseline and anonymous workspace authorization boundary`,
+    `PASS production isolation for ${fixtureRoutes.length} fixture paths, public baseline, disabled root exception probe and anonymous workspace authorization boundary`,
   );
 } finally {
   if (child.exitCode === null && !startupError) {

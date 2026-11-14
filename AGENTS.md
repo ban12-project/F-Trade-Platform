@@ -28,6 +28,7 @@ Apply these rules when your task affects marketing video content:
 
 - GitHub 只用于研发交付，不能用 Issues 记录真实业务流水。
 - 所有工作通过 Issue → 分支 → PR → CI → squash merge 完成。
+- 按完整功能或问题域分批组织 PR，将相关实现、测试与文档一起交付；小的文案、样式与测试修正随对应主题合并，不拆成零碎 PR。
 - 2026-10-31 用户明确要求临时暂停自动 CI 检查：完成适用的本地验证并在 PR 记录后可 squash merge，无需等待 CI；保留自动部署。最终 MVP1 验收前恢复，见 `docs/operations/temporary-ci-pause.md`。
 - 不提交密钥、真实客户数据、未经授权的原始资料或未标记的虚构产品事实。
 
