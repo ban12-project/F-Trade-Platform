@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { WorkspacePanelSkeleton } from "@/components/workspace/workspace-loading-skeleton";
 import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-settings-panel";
 import { requirePermission } from "@/lib/auth-guard";
 import { hasPermission } from "@/lib/authz";
 import { readWorkspaceModelSettings } from "@/lib/workspace/read-model";
+export const metadata: Metadata = { title: "工作区设置" };
+
 export const prefetch = "partial";
 async function Settings() {
   const session = await requirePermission("workspace:view");

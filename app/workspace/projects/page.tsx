@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,8 @@ import { WorkspaceLink } from "@/components/workspace/workspace-link";
 import { WorkspacePanelSkeleton } from "@/components/workspace/workspace-loading-skeleton";
 import { requirePermission } from "@/lib/auth-guard";
 import { readWorkspaceProjectOverview } from "@/lib/workspace/read-model";
+export const metadata: Metadata = { title: "项目管理" };
+
 export const prefetch = "partial";
 async function Projects() {
   await connection();

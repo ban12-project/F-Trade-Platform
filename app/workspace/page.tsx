@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { BusinessFunnelPanel } from "@/components/workspace/business-funnel";
@@ -24,6 +25,8 @@ async function BusinessFunnelContent({ actorId }: { actorId: string }) {
 }
 
 type Props = { searchParams: Promise<{ view?: string }> };
+export const metadata: Metadata = { title: "今日任务" };
+
 export const prefetch = "partial";
 async function WorkspaceContent({ searchParams }: Props) {
   await connection();

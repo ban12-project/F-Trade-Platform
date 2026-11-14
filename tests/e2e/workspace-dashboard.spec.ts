@@ -27,10 +27,15 @@ test("workspace prioritizes tasks and overview without a canvas", async ({ page 
   await expect(page.getByRole("heading", { name: "今日任务" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "主要导航" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "我可处理" })).toBeVisible();
+  const taskList = page.getByRole("region", { name: "任务清单" }).getByRole("list");
+  await expect(taskList).toHaveCount(1);
+  await expect(taskList.getByRole("listitem")).toHaveCount(3);
+  await expect(taskList.getByRole("listitem").getByRole("link")).toHaveCount(3);
   await expect(page.getByRole("heading", { name: "项目概况" })).toBeVisible();
   await expect(page.getByRole("link").filter({ hasText: "批准内容等待发布" })).toHaveCount(1);
   await page.getByRole("link", { name: /等待他人/ }).click();
-  await expect(page.getByRole("link").filter({ hasText: "等待审核者核实产品" })).toBeVisible();
+  await expect(taskList.getByRole("listitem")).toHaveCount(1);
+  await expect(taskList.getByRole("link").filter({ hasText: "等待审核者核实产品" })).toBeVisible();
   await expect(page.getByRole("link").filter({ hasText: "批准内容等待发布" })).toHaveCount(0);
   await page.goBack();
   const videoTask = page.getByRole("link").filter({ hasText: "营销视频等待成片审核" }).first();
