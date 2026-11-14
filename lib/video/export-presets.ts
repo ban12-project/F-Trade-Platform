@@ -148,7 +148,8 @@ export class VideoExportValidationError extends Error {
 
 export function validateVideoExport(media: z.infer<typeof mediaSchema>) {
   const value = mediaSchema.parse(media);
-  const preset = videoExportPresets.find((item) => item.platform === value.platform)!;
+  const preset = videoExportPresets.find((item) => item.platform === value.platform);
+  if (!preset) throw new Error(`${value.platform} 缺少项目导出预设。`);
   if (preset.availability !== "enabled") throw new Error(`${value.platform} 项目导出预设未启用。`);
   const violations: VideoExportViolation[] = [];
   for (const field of [

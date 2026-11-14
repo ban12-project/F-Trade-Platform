@@ -12,7 +12,12 @@ import {
   type SocialActorIdentity,
   SocialHumanAccessError,
 } from "../lib/social/human-write-access";
-import { seedInboundRoutingFixture } from "../tests/fixtures/inbound-routing";
+import { readInboundContext } from "../lib/social/inbound-context-store";
+import { encryptSocialMessageBody } from "../lib/social/message-crypto";
+import {
+  seedInboundRoutingContextFixture,
+  seedInboundRoutingFixture,
+} from "../tests/fixtures/inbound-routing";
 
 const connection = process.env.INBOUND_ROUTING_TEST_DATABASE_URL;
 if (
@@ -23,6 +28,7 @@ if (
   throw Error("Dedicated synthetic loopback database required");
 process.env.DATABASE_URL = connection;
 process.env.DATABASE_TRANSPORT = "postgres";
+process.env.SOCIAL_MESSAGE_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 globalThis.fetch = async () => {
   throw Error("External delivery forbidden in routing tests");
 };
@@ -45,19 +51,32 @@ mock.module(new URL("../lib/auth.ts", import.meta.url).href, {
 });
 const { routeInboundConversationAction: action } = await import("../lib/actions/closing");
 const { routeInboundConversation: domain } = await import("../lib/social/inbound-routing-store");
-type Fixture = Awaited<ReturnType<typeof seedInboundRoutingFixture>>;
+type Fixture = Awaited<ReturnType<typeof fixture>>;
 type Mode = "create" | "link";
 async function fixture(role = "user") {
-  const f = await seedInboundRoutingFixture(db, role);
+  const f = await seedInboundRoutingContextFixture(db, role);
   const [user] = await db.select().from(s.user).where(eq(s.user.id, f.actorId));
   const [session] = await db.select().from(s.session).where(eq(s.session.id, f.sessionId));
   current = { user, session };
-  return f;
+  const preview = await readInboundContext(
+    { conversationId: f.conversationId },
+    { actorId: f.actorId, sessionId: f.sessionId },
+    db,
+  );
+  assert.equal(preview.messages.length, 1);
+  return {
+    ...f,
+    reviewedMessageAt: preview.reviewedMessageAt,
+    reviewedContextDigest: preview.reviewedContextDigest,
+  };
 }
 function input(f: Fixture, mode: Mode) {
   return {
     conversationId: f.conversationId,
     mode,
+    confirmed: "yes",
+    reviewedMessageAt: f.reviewedMessageAt,
+    reviewedContextDigest: f.reviewedContextDigest,
     ...(mode === "link" && { projectId: f.projectId }),
   };
 }
@@ -115,6 +134,38 @@ try {
       assertCommitted(before, await snapshot(f), mode);
       assert.equal((await snapshot(f)).lead_id, result.id);
       if (mode === "link") assert.equal(result.projectId, f.projectId);
+      count++;
+    }
+    // A previously reviewed preview cannot authorize an account transfer or changed retention/content.
+    for (const change of ["owner", "binding", "deleted", "expired", "same-time-content"] as const) {
+      const f = await fixture(),
+        before = await snapshot(f);
+      if (change === "owner") {
+        const other = await seedInboundRoutingFixture(db);
+        await db.execute(
+          sql`UPDATE browser_fleet_node SET owner_id=${other.actorId} WHERE id=${f.nodeId}`,
+        );
+      }
+      if (change === "binding")
+        await db.execute(sql`DELETE FROM browser_fleet_binding WHERE id=${f.bindingId}`);
+      if (change === "deleted")
+        await db
+          .update(s.socialMessage)
+          .set({ deletedAt: new Date() })
+          .where(eq(s.socialMessage.id, f.messageId));
+      if (change === "expired")
+        await db
+          .update(s.socialMessage)
+          .set({ receivedAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1) })
+          .where(eq(s.socialMessage.id, f.messageId));
+      if (change === "same-time-content")
+        await db
+          .update(s.socialMessage)
+          .set({ bodyCiphertext: encryptSocialMessageBody("SYNTHETIC changed after review") })
+          .where(eq(s.socialMessage.id, f.messageId));
+      const result = await run(f, mode);
+      assert.equal(result.status, "error");
+      assert.deepEqual(await snapshot(f), before);
       count++;
     }
     for (const change of [
@@ -354,6 +405,42 @@ try {
       await db.execute(
         sql.raw(`DROP TRIGGER ${trigger} ON audit_event; DROP FUNCTION ${trigger}();`),
       );
+    }
+  }
+  for (const operation of ["preview", "create", "link"] as const) {
+    const f = await fixture();
+    const expiresAt = new Date(Date.now() + 2000);
+    await db.update(s.socialMessage).set({ expiresAt }).where(eq(s.socialMessage.id, f.messageId));
+    const identity = { actorId: f.actorId, sessionId: f.sessionId };
+    const preview = await readInboundContext({ conversationId: f.conversationId }, identity, db);
+    f.reviewedContextDigest = preview.reviewedContextDigest;
+    const before = await snapshot(f);
+    const held = await pool.connect();
+    await held.query("BEGIN");
+    const {
+      rows: [{ pid }],
+    } = await held.query("SELECT pg_backend_pid() AS pid");
+    await held.query("SELECT id FROM social_message WHERE id=$1 FOR UPDATE", [f.messageId]);
+    try {
+      const pending =
+        operation === "preview"
+          ? readInboundContext({ conversationId: f.conversationId }, identity, db)
+          : run(f, operation);
+      await observeWait(pid);
+      assert(
+        Date.now() < expiresAt.getTime(),
+        "Message must still be retained when lock wait begins",
+      );
+      await delay(Math.max(0, expiresAt.getTime() - Date.now() + 50));
+      await held.query("COMMIT");
+      const result = await pending;
+      if ("messages" in result) assert.equal(result.messages.length, 0);
+      else assert.equal(result.status, "error");
+      assert.deepEqual(await snapshot(f), before);
+      count++;
+    } finally {
+      await held.query("ROLLBACK");
+      held.release();
     }
   }
   const editor = await fixture();

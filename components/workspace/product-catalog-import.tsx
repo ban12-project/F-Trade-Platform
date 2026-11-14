@@ -104,8 +104,24 @@ export function ProductCatalogImport({
   const router = useRouter();
   const [view, setView] = useState<CatalogImportView | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const restoreFocus = useRef(false);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const [pending, setPending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const uploadAttempt = useRef<{ controller: AbortController; dispatched: boolean } | null>(null);
+  useEffect(
+    () => () => {
+      uploadAttempt.current?.controller.abort();
+      uploadAttempt.current = null;
+    },
+    [],
+  );
   const [error, setError] = useState("");
+  const [progressError, setProgressError] = useState("");
+  const [selectionNotice, setSelectionNotice] = useState("");
   useEffect(() => {
     onBusyChange?.(pending);
     return () => onBusyChange?.(false);
@@ -154,27 +170,53 @@ export function ProductCatalogImport({
   const working = Boolean(isWorking(view));
 
   useEffect(() => {
+    if (view?.status !== "ready") return;
+    const eligible = new Set(
+      view.candidates
+        .filter((candidate) => candidate.status === "available" || candidate.status === "failed")
+        .map((candidate) => candidate.id),
+    );
+    const current = selection.getValues("candidateIds");
+    const retained = current.filter((id) => eligible.has(id));
+    if (retained.length === current.length) return;
+    selection.setValue("candidateIds", retained, { shouldDirty: true });
+    setSelectionNotice(
+      `目录状态已更新，已从选择中移除 ${current.length - retained.length} 条当前不可生成的记录。`,
+    );
+  }, [view, selection]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: The retry counter intentionally restarts this cancellable read.
+  useEffect(() => {
     let cancelled = false;
+    setRestoring(true);
     void getLatestProductCatalogAction(projectId)
       .then((result) => {
         if (cancelled) return;
-        if (result.status === "success") setView(result.view);
-        else setError(result.message);
+        if (result.status === "success") {
+          setView(result.view);
+          setRestoreFailed(false);
+          setError("");
+          setProgressError("");
+        } else {
+          setRestoreFailed(true);
+          setError(result.message);
+        }
         setRestoring(false);
       })
       .catch(() => {
         if (!cancelled) {
-          setError("无法恢复目录任务，请刷新后重试。");
+          setRestoreFailed(true);
+          setError("无法恢复目录任务，请重试读取已有任务。");
           setRestoring(false);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, restoreAttempt]);
 
   useEffect(() => {
-    if (!view || !working) return;
+    if (!view || !working || pending) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       void getProductCatalogAction({ projectId, importId: view.id })
@@ -182,18 +224,26 @@ export function ProductCatalogImport({
           if (cancelled) return;
           if (result.status === "success") {
             setView(result.view);
+            setProgressError("");
             if (!isWorking(result.view)) router.refresh();
-          } else setError(result.message);
+          } else setProgressError(result.message);
         })
         .catch(() => {
-          if (!cancelled) setError("进度读取失败，请点击刷新进度。");
+          if (!cancelled) setProgressError("进度读取失败，请点击刷新进度。");
         });
     }, 2_000);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [view, working, projectId, router]);
+  }, [view, working, pending, projectId, router]);
+
+  useEffect(() => {
+    if (!restoreFocus.current || restoring || restoreFailed) return;
+    restoreFocus.current = false;
+    if (view) progressRef.current?.focus();
+    else uploadButtonRef.current?.focus();
+  }, [restoring, restoreFailed, view]);
 
   function accept(result: CatalogActionResult) {
     if (result.status === "error") {
@@ -202,29 +252,68 @@ export function ProductCatalogImport({
     }
     setView(result.view);
     setError("");
+    setProgressError("");
     return true;
   }
 
   async function upload(values: z.infer<typeof documentUploadFormSchema>) {
+    if (pending || restoring || restoreFailed || working || uploadAttempt.current) return;
+    const active = { controller: new AbortController(), dispatched: false };
+    uploadAttempt.current = active;
     setPending(true);
+    setSelectionNotice("");
+    setUploading(true);
     setError("");
     try {
-      const receiptId = await uploadProductDocument(values.document, projectId, "agent");
-      if (accept(await intakeProductCatalogAction({ projectId, receiptId }))) {
+      const receiptId = await uploadProductDocument(
+        values.document,
+        projectId,
+        "agent",
+        active.controller.signal,
+      );
+      active.controller.signal.throwIfAborted();
+      active.dispatched = true;
+      setUploading(false);
+      const result = await intakeProductCatalogAction({ projectId, receiptId });
+      if (uploadAttempt.current !== active) return;
+      if (accept(result)) {
         uploadForm.reset();
         source?.clear();
         selection.reset({ ...selection.getValues(), candidateIds: [] });
         if (fileRef.current) fileRef.current.value = "";
       }
     } catch {
-      setError("上传失败，请检查文件大小、网络及项目权限后重试。");
+      if (uploadAttempt.current === active) {
+        if (active.dispatched) {
+          setRestoreFailed(true);
+          setError("无法确认目录任务是否已提交。请先读取已有任务，再决定是否重新上传。");
+        } else {
+          setError("上传失败，请检查文件大小、网络及项目权限后重试。");
+        }
+      }
     } finally {
-      setPending(false);
+      if (uploadAttempt.current === active) {
+        uploadAttempt.current = null;
+        setUploading(false);
+        setPending(false);
+      }
     }
+  }
+
+  function stopUpload() {
+    const active = uploadAttempt.current;
+    if (!active || active.dispatched) return;
+    active.controller.abort();
+    // Credential retrieval in the Blob SDK may settle late; detach it immediately.
+    uploadAttempt.current = null;
+    setUploading(false);
+    setPending(false);
+    setError("已停止上传，未创建目录任务。文件选择已保留，可重新尝试。");
   }
 
   async function submit(values: CatalogSelection) {
     setPending(true);
+    setSelectionNotice("");
     setError("");
     try {
       if (accept(await selectProductCatalogAction(values)))
@@ -241,9 +330,18 @@ export function ProductCatalogImport({
     setPending(true);
     try {
       const input = { projectId, importId: view.id };
-      accept(await (retry ? retryProductCatalogAction(input) : getProductCatalogAction(input)));
+      const result = await (retry
+        ? retryProductCatalogAction(input)
+        : getProductCatalogAction(input));
+      if (retry) accept(result);
+      else if (result.status === "error") setProgressError(result.message);
+      else {
+        setView(result.view);
+        setProgressError("");
+      }
     } catch {
-      setError("无法更新目录任务，请重试。");
+      if (retry) setError("无法更新目录任务，请重试。");
+      else setProgressError("进度读取失败，请点击刷新进度。");
     } finally {
       setPending(false);
     }
@@ -262,7 +360,7 @@ export function ProductCatalogImport({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <form onSubmit={uploadForm.handleSubmit(upload)}>
+        <form aria-busy={pending} onSubmit={uploadForm.handleSubmit(upload)}>
           <FieldGroup>
             <Field data-invalid={Boolean(uploadForm.formState.errors.document)}>
               <FieldLabel htmlFor="catalog-document">产品目录文件</FieldLabel>
@@ -272,7 +370,7 @@ export function ProductCatalogImport({
                   ref={fileRef}
                   type="file"
                   accept=".pdf,.csv,.xls,.xlsx"
-                  disabled={pending || restoring || working}
+                  disabled={pending || restoring || restoreFailed || working}
                   aria-invalid={Boolean(uploadForm.formState.errors.document)}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -294,9 +392,18 @@ export function ProductCatalogImport({
               </FieldDescription>
               <FieldError errors={[uploadForm.formState.errors.document]} />
             </Field>
-            <Button type="submit" disabled={pending || restoring || working}>
+            <Button
+              ref={uploadButtonRef}
+              type="submit"
+              disabled={pending || restoring || restoreFailed || working}
+            >
               {pending ? "提交中…" : "上传并解析目录"}
             </Button>
+            {uploading && (
+              <Button type="button" variant="outline" onClick={stopUpload}>
+                停止上传
+              </Button>
+            )}
           </FieldGroup>
         </form>
         {error && (
@@ -304,10 +411,42 @@ export function ProductCatalogImport({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+        {progressError && (
+          <Alert>
+            <AlertDescription>
+              <p>{progressError}</p>
+              <p>当前显示上次读取的目录进度，请刷新后再核对。</p>
+            </AlertDescription>
+          </Alert>
+        )}
+        {restoreFailed && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted-foreground">
+              尚未确认是否有已提交的目录任务。请先恢复读取，避免重复上传；所选文件会保留。
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={restoring}
+              onClick={() => {
+                restoreFocus.current = true;
+                setRestoreAttempt((attempt) => attempt + 1);
+              }}
+            >
+              重试读取已有任务
+            </Button>
+          </div>
+        )}
         {restoring && <p role="status">正在恢复目录任务…</p>}
         {view && (
           <>
-            <div id="catalog-progress" className="flex flex-wrap items-center gap-2" role="status">
+            <div
+              ref={progressRef}
+              tabIndex={-1}
+              id="catalog-progress"
+              className="flex flex-wrap items-center gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+              role="status"
+            >
               <Badge variant="secondary">
                 {view.status === "ready"
                   ? `${view.candidates.length} 条候选`
@@ -410,6 +549,11 @@ export function ProductCatalogImport({
                       <FieldDescription>
                         相同编号的不同页记录须分别核对。失败项可再次选择，已完成草稿不会重复生成。
                       </FieldDescription>
+                      {selectionNotice && (
+                        <p role="status" className="text-sm text-muted-foreground">
+                          {selectionNotice}
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"

@@ -1,11 +1,17 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "next-cache-components-optimizer": {
       "source": "vercel/next.js",
       "sourceType": "github",
       "skillPath": "skills/next-cache-components-optimizer/SKILL.md",
-      "computedHash": "4b3ec1ad99551a98d2fefdaefdb398f88e1621e06fb250f7c06858d5371cb5aa"
+      "computedHash": "da3eff0a03060a35456c5269459db1d37174207405de6d941ca7ede55716ef5e"
+    },
+    "ui-sdk": {
+      "source": "vercel-labs/ui",
+      "sourceType": "github",
+      "skillPath": "packages/core/skills/ui-sdk/SKILL.md",
+      "computedHash": "eb97c7bee8d312d062ab419e621835c9e8293cb321e3087f3430ac1cdf634fc4"
     }
   }
 }

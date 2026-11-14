@@ -7,7 +7,7 @@ import {
   videoPlatformSchema,
 } from "./contracts";
 import { videoEncodingSchema } from "./encoding-contract";
-import { type ProbedVideo, validateProbedVideoExport } from "./media-probe";
+import { validateProbedVideoExport } from "./media-probe";
 import { videoResourceMeasurementsSchema } from "./resource-measurements";
 
 const privateAssetRef = z

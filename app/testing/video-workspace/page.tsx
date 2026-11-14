@@ -5,6 +5,7 @@ import { FacebookPublicationPrerequisitesNotice } from "@/components/workspace/r
 import { VideoWorkspace } from "@/components/workspace/video-workspace";
 import type { MarketingVideoEditorEntry, ReadyVideoProductSource } from "@/lib/video/store";
 import { resolveVideoSelection, type VideoSelectionQuery } from "@/lib/video/workspace-selection";
+import { workspaceReturnTo } from "@/lib/workspace/navigation";
 
 const projectId = "00000000-0000-4000-8000-000000000721";
 const videoId = "00000000-0000-4000-8000-000000000401";
@@ -28,8 +29,8 @@ function entry(state: "draft" | "review" | "approved"): MarketingVideoEditorEntr
           ? "VIDEO_REVIEW_REQUIRED"
           : "VIDEO_DRAFT",
     createdAt: new Date("2026-09-01T00:00:00.000Z"),
-    productId: products[0]!.id,
-    productName: products[0]!.productName,
+    productId: products[0].id,
+    productName: products[0].productName,
     objective: "Create a concise product inquiry video",
     targetAudience: "Overseas distributors",
     platforms: ["facebook"],
@@ -112,6 +113,7 @@ async function VideoWorkspaceFixture({
       entries={[current]}
       copyCandidates={[]}
       canReview
+      returnTo={workspaceReturnTo(query.returnTo)}
       publication={state === "approved" ? <FacebookPublicationPrerequisitesNotice /> : null}
       canWrite={query.viewer !== "1"}
       selection={resolveVideoSelection(

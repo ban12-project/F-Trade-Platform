@@ -188,3 +188,5 @@ assert(
   }).success,
 );
 console.log("PASS Sales clarification behavior");
+
+assert.throws(() => nextClarification({}), /assessment is required/);

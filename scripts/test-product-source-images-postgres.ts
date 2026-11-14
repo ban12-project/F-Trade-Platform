@@ -44,9 +44,9 @@ void (async () => {
     });
     const sessionIds = [randomUUID(), randomUUID()];
     const reviewIdentity = {
-      actorId: actors[0]!,
-      sessionId: sessionIds[0]!,
-      projectId: projects[0]!,
+      actorId: actors[0],
+      sessionId: sessionIds[0],
+      projectId: projects[0],
     };
     for (let index = 0; index < 2; index++) {
       await db.insert(schema.user).values({
@@ -118,29 +118,29 @@ void (async () => {
       productIds.push(id);
       const draft = reviewProductDraft({ ...fixture, record_id: id } as ProductDraft);
       return db.transaction((tx) =>
-        insertProductAgentDraft(tx, draft, actors[index]!, {}, projects[index], refs),
+        insertProductAgentDraft(tx, draft, actors[index], {}, projects[index], refs),
       );
     }
     await assert.rejects(makeDraft([image.evidenceId], 1));
     await assert.rejects(makeDraft([image.evidenceId, image.evidenceId]));
     const saved = await makeDraft([image.evidenceId]);
     assert.deepEqual(
-      (await readProductSourceImage(saved.id, image.evidenceId, actors[0]!, db, reader))?.bytes,
+      (await readProductSourceImage(saved.id, image.evidenceId, actors[0], db, reader))?.bytes,
       bytes,
     );
     assert.equal(
-      await readProductSourceImage(saved.id, image.evidenceId, actors[1]!, db, reader),
+      await readProductSourceImage(saved.id, image.evidenceId, actors[1], db, reader),
       null,
     );
     assert.equal(
-      await readProductSourceImage(randomUUID(), image.evidenceId, actors[0]!, db, reader),
+      await readProductSourceImage(randomUUID(), image.evidenceId, actors[0], db, reader),
       null,
     );
     await assert.rejects(async () => {
       const result = await readProductSourceImage(
         saved.id,
         image.evidenceId,
-        actors[0]!,
+        actors[0],
         db,
         alteredReader,
       );
@@ -151,14 +151,14 @@ void (async () => {
         .delete(schema.workspaceProjectMember)
         .where(
           and(
-            eq(schema.workspaceProjectMember.projectId, projects[0]!),
-            eq(schema.workspaceProjectMember.userId, actors[0]!),
+            eq(schema.workspaceProjectMember.projectId, projects[0]),
+            eq(schema.workspaceProjectMember.userId, actors[0]),
           ),
         );
       return reader(...args);
     }) as typeof get;
     assert.equal(
-      await readProductSourceImage(saved.id, image.evidenceId, actors[0]!, db, revokeReader),
+      await readProductSourceImage(saved.id, image.evidenceId, actors[0], db, revokeReader),
       null,
     );
     await db.insert(schema.workspaceProjectMember).values({

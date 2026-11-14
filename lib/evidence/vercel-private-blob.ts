@@ -33,7 +33,7 @@ export class VercelPrivateBlobEvidenceStore implements EvidenceStore {
       access: "private",
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-    if (!result || result.statusCode !== 200 || !result.stream) {
+    if (result?.statusCode !== 200 || !result.stream) {
       return null;
     }
     return {

@@ -192,11 +192,14 @@ async function main() {
       actor,
     );
     assert.ok(ticket.connection);
+    const connection = ticket.connection;
+    const claimedRun = claimed.run;
+    assert.ok(claimedRun);
     const admission = () =>
       handleBrowserNodeRequest(normal.key, {
         ...normal.identity,
         operation: "admit",
-        ticket: ticket.connection!.token,
+        ticket: connection.token,
       });
     const savedDocument = (
       await pool.query("SELECT document FROM browser_fleet_node WHERE id=$1", [normal.nodeId])
@@ -205,7 +208,7 @@ async function main() {
     // ticket. Restore only this disposable fixture between negative cases.
     for (const invalid of ["expired_ticket", "expired_lease", "missing_session"]) {
       const document = structuredClone(savedDocument);
-      const run = document.runs.find((entry: { id: string }) => entry.id === claimed.run!.id);
+      const run = document.runs.find((entry: { id: string }) => entry.id === claimedRun.id);
       assert.ok(run);
       if (invalid === "expired_ticket") run.connectBefore = 0;
       if (invalid === "expired_lease") run.leaseUntil = 0;
@@ -236,13 +239,13 @@ async function main() {
     await handleBrowserNodeRequest(normal.key, {
       ...normal.identity,
       operation: "admit",
-      ticket: ticket.connection.token,
+      ticket: connection.token,
     });
     await assert.rejects(
       handleBrowserNodeRequest(normal.key, {
         ...normal.identity,
         operation: "admit",
-        ticket: ticket.connection.token,
+        ticket: connection.token,
       }),
       /ticket_invalid/,
     );
@@ -318,9 +321,9 @@ async function main() {
     // Use the actual store with just FOR UPDATE removed, forcing all eight SELECTs
     // to finish before any UPDATE. Each trial gets an independent authorized node.
     const original = await readFile(join(root, "lib/browser-fleet/store.ts"), "utf8");
-    assert.equal(original.split("WHERE id = ${id} FOR UPDATE").length, 2);
+    assert.equal(original.split(`WHERE id = \${id} FOR UPDATE`).length, 2);
     const withoutLock = original
-      .replace("WHERE id = ${id} FOR UPDATE", "WHERE id = ${id}")
+      .replace(`WHERE id = \${id} FOR UPDATE`, `WHERE id = \${id}`)
       .replace(
         "type NodeRow = {",
         `let arrived = 0;

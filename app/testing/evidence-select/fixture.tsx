@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { EvidenceSelect, EvidenceSelectField } from "@/components/workspace/evidence-select";
 
 const schema = z.object({ evidenceRef: z.string().min(1, "请选择授权证明。") });
@@ -36,6 +37,11 @@ export function EvidenceSelectFixture() {
                 label: "合成工厂授权书.pdf",
                 detail: "2026-10-02",
               },
+              ...["2026-10-03", "2026-10-04"].map((detail, index) => ({
+                id: `evidence-synthetic-long-${index}`,
+                label: `synthetic-${"catalogue".repeat(24)}.pdf`,
+                detail,
+              })),
             ]}
           />
           <FieldError errors={[form.formState.errors.evidenceRef]} />
@@ -57,5 +63,24 @@ export function EvidenceSelectFixture() {
         />
       </Field>
     </FieldGroup>
+  );
+}
+
+export function AsyncEvidenceSelectFixture() {
+  const [value, setValue] = useState("");
+  return (
+    <WorkspaceDirtyProvider>
+      <main className="mx-auto w-80 max-w-full px-4 pt-[500px]">
+        <Field>
+          <FieldLabel htmlFor="async-evidence">审核依据</FieldLabel>
+          <EvidenceSelect
+            projectId={projectId}
+            id="async-evidence"
+            value={value}
+            onValueChange={setValue}
+          />
+        </Field>
+      </main>
+    </WorkspaceDirtyProvider>
   );
 }

@@ -8,7 +8,9 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool, type PoolClient } from "pg";
 import { closeDatabase, type Database } from "../../lib/db/client";
 import * as schema from "../../lib/db/schema";
+import { videoProjectSchema } from "../../lib/video/contracts";
 import { VIDEO_DRAFT_ACCESS_MESSAGE } from "../../lib/video/draft-write-access";
+import { assertMarketingCreativeReady } from "../../lib/video/edit-contracts";
 import { authSecret, databaseURL } from "../../playwright.database.config";
 import { seedVideoDraftFixture } from "../fixtures/video-draft";
 
@@ -121,9 +123,7 @@ for (const { op, role, change } of cases)
           ? `/workspace/${f.projectId}/records/video/${f.videoId}`
           : `/workspace/${f.targetProjectId}/new/video`,
       );
-      const cta = page
-        .getByLabel("结尾两秒的咨询引导文案", { exact: true })
-        .filter({ visible: true });
+      const cta = page.getByLabel("行动引导文案", { exact: true }).filter({ visible: true });
       if (op === "save") {
         await expect(cta).toBeVisible();
         await cta.click();
@@ -257,6 +257,35 @@ for (const op of ["create", "generate", "render"] as const) {
         op === "create"
           ? await seedVideoCreationFixture(db as unknown as Database, role)
           : await seedVideoDraftFixture(db as unknown as Database, role);
+      if (op === "generate" || op === "render") {
+        // Reach the authorization boundary with a saved, valid synthetic brief.
+        // Other cases retain the legacy draft without a brief.
+        const video = videoProjectSchema.parse({
+          ...f.video,
+          editDraft: {
+            ...f.draft,
+            clips: f.draft.clips.map((clip) => ({
+              ...clip,
+              caption: { kind: "creative", text: "SYNTHETIC product inquiry" },
+            })),
+            creativeBrief: {
+              objective: "action",
+              brandAssetRef: f.draft.clips[0].assetRef,
+              audience: "SYNTHETIC buyers",
+              buyerNeed: "SYNTHETIC product information request",
+              nextAction: "SYNTHETIC inquiry for human review",
+              platformAssumptions:
+                "SYNTHETIC muted viewing with captions; no platform acceptance claim",
+            },
+          },
+        });
+        if (!video.editDraft) throw new Error("Synthetic creative draft missing");
+        assertMarketingCreativeReady(video.editDraft);
+        await db
+          .update(schema.aggregateRecord)
+          .set({ payload: video })
+          .where(eq(schema.aggregateRecord.id, f.videoId));
+      }
       const signature = createHmac("sha256", authSecret).update(f.token).digest("base64");
       await context.addCookies([
         {
@@ -303,9 +332,7 @@ for (const op of ["create", "generate", "render"] as const) {
             ? `/workspace/${f.projectId}/new/video`
             : `/workspace/${f.projectId}/records/video/${f.videoId}`,
         );
-        const cta = page
-          .getByLabel("结尾两秒的咨询引导文案", { exact: true })
-          .filter({ visible: true });
+        const cta = page.getByLabel("行动引导文案", { exact: true }).filter({ visible: true });
         if (op === "create") {
           const objective = page.getByLabel("视频目标", { exact: true });
           await objective.click();

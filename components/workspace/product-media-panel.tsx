@@ -38,6 +38,7 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import {
   Select,
@@ -49,11 +50,13 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import {
   type ProductMediaActionState,
   registerProductMediaAction,
   reviewProductMediaAction,
 } from "@/lib/actions/product-media";
+import { localTimeChoices } from "@/lib/local-time";
 import {
   type ProductMediaRegistrationFields,
   type ProductMediaReviewForm,
@@ -116,6 +119,7 @@ function formatRightsExpiry(value: string) {
 }
 
 function RegistrationForm({ projectId, productId }: { projectId: string; productId: string }) {
+  const timeZone = useBrowserTimeZone();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [hasFile, setHasFile] = useState(false);
@@ -145,8 +149,11 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
       imageToVideoAllowed: false,
       referenceToVideoAllowed: false,
       rightsExpiresAt: "",
+      selectedRightsExpiryInstant: "",
     },
   });
+  const expiryField = form.register("rightsExpiresAt");
+  const expiryChoices = localTimeChoices(form.watch("rightsExpiresAt"), timeZone);
   useWorkspaceDirty(`product-media-${productId}`, form.formState.isDirty || hasFile || uploading);
 
   useEffect(() => {
@@ -156,9 +163,10 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
     setHasFile(false);
     setUploadProgress(0);
     router.refresh();
-  }, [form, router, state.status]);
+  }, [form, router, state]);
 
   async function submit(values: ProductMediaRegistrationFields) {
+    if (!form.formState.isReady || uploading || pending) return;
     const file = fileRef.current?.files?.[0];
     if (!file) {
       setUploadError("请选择一个产品图片或视频。");
@@ -197,7 +205,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
     }
   }
 
-  const busy = pending || uploading;
+  const busy = !form.formState.isReady || pending || uploading;
   return (
     <Card>
       <CardHeader>
@@ -207,296 +215,360 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form id={`register-product-media-${productId}`} onSubmit={form.handleSubmit(submit)}>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor={`product-media-file-${productId}`}>图片或视频</FieldLabel>
-              <Input
-                ref={fileRef}
-                id={`product-media-file-${productId}`}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
-                required
-                onChange={(event) => setHasFile(Boolean(event.target.files?.length))}
-              />
-              <FieldDescription>
-                支持 JPG、PNG、WebP、MP4、MOV。视频最长 120 秒，登记后仍需独立媒体审核。
-              </FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`media-origin-${productId}`}>素材来源</FieldLabel>
-              <Controller
-                control={form.control}
-                name="origin"
-                render={({ field }) => (
-                  <Select
-                    items={originLabels}
-                    value={field.value ?? null}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger id={`media-origin-${productId}`} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {Object.entries(originLabels).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
+        <form
+          id={`register-product-media-${productId}`}
+          aria-busy={busy}
+          onSubmit={form.handleSubmit(submit)}
+        >
+          <FieldSet disabled={busy}>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor={`product-media-file-${productId}`}>图片或视频</FieldLabel>
+                <Input
+                  ref={fileRef}
+                  id={`product-media-file-${productId}`}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
+                  required
+                  onChange={(event) => setHasFile(Boolean(event.target.files?.length))}
+                />
+                <FieldDescription>
+                  支持 JPG、PNG、WebP、MP4、MOV。视频最长 120 秒，登记后仍需独立媒体审核。
+                </FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`media-origin-${productId}`}>素材来源</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="origin"
+                  render={({ field }) => (
+                    <Select
+                      disabled={busy}
+                      items={originLabels}
+                      value={field.value ?? null}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger id={`media-origin-${productId}`} className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {Object.entries(originLabels).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`media-role-${productId}`}>素材角色</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <Select
+                      disabled={busy}
+                      items={roleLabels}
+                      value={field.value ?? null}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger id={`media-role-${productId}`} className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {Object.entries(roleLabels).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field data-invalid={Boolean(form.formState.errors.description)}>
+                <FieldLabel htmlFor={`product-media-description-${productId}`}>内容说明</FieldLabel>
+                <Textarea
+                  id={`product-media-description-${productId}`}
+                  rows={3}
+                  placeholder="只描述画面中可见内容，不补充工程结论。"
+                  {...form.register("description")}
+                />
+                <FieldError errors={[form.formState.errors.description]} />
+              </Field>
+              <Field data-invalid={Boolean(form.formState.errors.tags)}>
+                <FieldLabel htmlFor={`product-media-tags-${productId}`}>标签</FieldLabel>
+                <Input
+                  id={`product-media-tags-${productId}`}
+                  placeholder="front, product, packaging"
+                  {...form.register("tags")}
+                />
+                <FieldDescription>最多保留 20 个去重标签。</FieldDescription>
+                <FieldError errors={[form.formState.errors.tags]} />
+              </Field>
+              <FieldSet>
+                <FieldLegend>可见内容</FieldLegend>
+                <FieldGroup>
+                  <Field orientation="horizontal">
+                    <Controller
+                      control={form.control}
+                      name="productVisible"
+                      render={({ field }) => (
+                        <Checkbox
+                          disabled={busy}
+                          id={`media-product-visible-${productId}`}
+                          aria-labelledby={`media-product-visible-${productId}-label`}
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FieldLabel
+                      id={`media-product-visible-${productId}-label`}
+                      htmlFor={`media-product-visible-${productId}`}
+                    >
+                      产品清晰可见
+                    </FieldLabel>
+                  </Field>
+                  <Field orientation="horizontal">
+                    <Controller
+                      control={form.control}
+                      name="logoVisible"
+                      render={({ field }) => (
+                        <Checkbox
+                          disabled={busy}
+                          id={`media-logo-visible-${productId}`}
+                          aria-labelledby={`media-logo-visible-${productId}-label`}
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FieldLabel
+                      id={`media-logo-visible-${productId}-label`}
+                      htmlFor={`media-logo-visible-${productId}`}
+                    >
+                      包含 Logo
+                    </FieldLabel>
+                  </Field>
+                  <Field orientation="horizontal">
+                    <Controller
+                      control={form.control}
+                      name="textPresent"
+                      render={({ field }) => (
+                        <Checkbox
+                          disabled={busy}
+                          id={`media-text-present-${productId}`}
+                          aria-labelledby={`media-text-present-${productId}-label`}
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FieldLabel
+                      id={`media-text-present-${productId}-label`}
+                      htmlFor={`media-text-present-${productId}`}
+                    >
+                      画面包含文字
+                    </FieldLabel>
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
+              <FieldSet>
+                <FieldLegend>权利范围</FieldLegend>
+                <FieldDescription>
+                  这些选项只记录授权范围，不会自动启用生成模型或发布。
+                </FieldDescription>
+                <FieldGroup>
+                  <Field data-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}>
+                    <FieldLabel htmlFor={`media-rights-${productId}`}>素材使用授权证明</FieldLabel>
+                    <EvidenceSelectField
+                      disabled={busy}
+                      projectId={projectId}
+                      control={form.control}
+                      name="rightsEvidenceRef"
+                      id={`media-rights-${productId}`}
+                    />
+                    <FieldError errors={[form.formState.errors.rightsEvidenceRef]} />
+                  </Field>
+                  <Field orientation="horizontal">
+                    <Controller
+                      control={form.control}
+                      name="editingAllowed"
+                      render={({ field }) => (
+                        <Checkbox
+                          disabled={busy}
+                          id={`media-editing-${productId}`}
+                          aria-labelledby={`media-editing-${productId}-label`}
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FieldLabel
+                      id={`media-editing-${productId}-label`}
+                      htmlFor={`media-editing-${productId}`}
+                    >
+                      允许剪辑
+                    </FieldLabel>
+                  </Field>
+                  <Field orientation="horizontal">
+                    <Controller
+                      control={form.control}
+                      name="publicDistributionAllowed"
+                      render={({ field }) => (
+                        <Checkbox
+                          disabled={busy}
+                          id={`media-public-${productId}`}
+                          aria-labelledby={`media-public-${productId}-label`}
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FieldLabel
+                      id={`media-public-${productId}-label`}
+                      htmlFor={`media-public-${productId}`}
+                    >
+                      允许公开发布
+                    </FieldLabel>
+                  </Field>
+                  <Field orientation="horizontal">
+                    <Controller
+                      control={form.control}
+                      name="paidAdvertisingAllowed"
+                      render={({ field }) => (
+                        <Checkbox
+                          disabled={busy}
+                          id={`media-paid-${productId}`}
+                          aria-labelledby={`media-paid-${productId}-label`}
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FieldLabel
+                      id={`media-paid-${productId}-label`}
+                      htmlFor={`media-paid-${productId}`}
+                    >
+                      允许付费广告
+                    </FieldLabel>
+                  </Field>
+                  <Field orientation="horizontal">
+                    <Controller
+                      control={form.control}
+                      name="imageToVideoAllowed"
+                      render={({ field }) => (
+                        <Checkbox
+                          disabled={busy}
+                          id={`media-i2v-${productId}`}
+                          aria-labelledby={`media-i2v-${productId}-label`}
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FieldLabel
+                      id={`media-i2v-${productId}-label`}
+                      htmlFor={`media-i2v-${productId}`}
+                    >
+                      允许图生视频
+                    </FieldLabel>
+                  </Field>
+                  <Field orientation="horizontal">
+                    <Controller
+                      control={form.control}
+                      name="referenceToVideoAllowed"
+                      render={({ field }) => (
+                        <Checkbox
+                          disabled={busy}
+                          id={`media-r2v-${productId}`}
+                          aria-labelledby={`media-r2v-${productId}-label`}
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FieldLabel
+                      id={`media-r2v-${productId}-label`}
+                      htmlFor={`media-r2v-${productId}`}
+                    >
+                      允许作为视频参考素材
+                    </FieldLabel>
+                  </Field>
+                  <Field data-invalid={Boolean(form.formState.errors.rightsExpiresAt)}>
+                    <FieldLabel htmlFor={`media-expiry-${productId}`}>授权到期时间</FieldLabel>
+                    <Input
+                      id={`media-expiry-${productId}`}
+                      type="datetime-local"
+                      {...expiryField}
+                      onChange={(event) => {
+                        void expiryField.onChange(event);
+                        form.setValue("selectedRightsExpiryInstant", "", { shouldDirty: true });
+                        form.clearErrors(["rightsExpiresAt", "selectedRightsExpiryInstant"]);
+                      }}
+                      aria-invalid={Boolean(form.formState.errors.rightsExpiresAt)}
+                      aria-describedby={`media-expiry-help-${productId}${form.formState.errors.rightsExpiresAt ? ` media-expiry-error-${productId}` : ""}`}
+                    />
+                    <FieldDescription id={`media-expiry-help-${productId}`}>
+                      按当前设备时区（{timeZone}）填写；长期有效可留空。
+                    </FieldDescription>
+                    <FieldError
+                      id={`media-expiry-error-${productId}`}
+                      errors={[form.formState.errors.rightsExpiresAt]}
+                    />
+                  </Field>
+                  {expiryChoices.length > 1 ? (
+                    <Field
+                      data-invalid={Boolean(form.formState.errors.selectedRightsExpiryInstant)}
+                    >
+                      <FieldLabel htmlFor={`media-expiry-occurrence-${productId}`}>
+                        授权到期重复时间选择
+                      </FieldLabel>
+                      <NativeSelect
+                        id={`media-expiry-occurrence-${productId}`}
+                        {...form.register("selectedRightsExpiryInstant")}
+                        onChange={(event) => {
+                          form.setValue("selectedRightsExpiryInstant", event.target.value, {
+                            shouldDirty: true,
+                          });
+                          form.clearErrors("selectedRightsExpiryInstant");
+                        }}
+                        aria-invalid={Boolean(form.formState.errors.selectedRightsExpiryInstant)}
+                        aria-describedby={`media-occurrence-help-${productId}${form.formState.errors.selectedRightsExpiryInstant ? ` media-occurrence-error-${productId}` : ""}`}
+                      >
+                        <NativeSelectOption value="">请选择具体时刻</NativeSelectOption>
+                        {expiryChoices.map((choice, index) => (
+                          <NativeSelectOption key={choice.instant} value={choice.instant}>
+                            {index === 0 ? "第一次" : "第二次"}（UTC{choice.offset}）
+                          </NativeSelectOption>
                         ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`media-role-${productId}`}>素材角色</FieldLabel>
-              <Controller
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <Select
-                    items={roleLabels}
-                    value={field.value ?? null}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger id={`media-role-${productId}`} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {Object.entries(roleLabels).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
-            <Field data-invalid={Boolean(form.formState.errors.description)}>
-              <FieldLabel htmlFor={`product-media-description-${productId}`}>内容说明</FieldLabel>
-              <Textarea
-                id={`product-media-description-${productId}`}
-                rows={3}
-                placeholder="只描述画面中可见内容，不补充工程结论。"
-                {...form.register("description")}
-              />
-              <FieldError errors={[form.formState.errors.description]} />
-            </Field>
-            <Field data-invalid={Boolean(form.formState.errors.tags)}>
-              <FieldLabel htmlFor={`product-media-tags-${productId}`}>标签</FieldLabel>
-              <Input
-                id={`product-media-tags-${productId}`}
-                placeholder="front, product, packaging"
-                {...form.register("tags")}
-              />
-              <FieldDescription>最多保留 20 个去重标签。</FieldDescription>
-              <FieldError errors={[form.formState.errors.tags]} />
-            </Field>
-            <FieldSet>
-              <FieldLegend>可见内容</FieldLegend>
-              <FieldGroup>
-                <Field orientation="horizontal">
-                  <Controller
-                    control={form.control}
-                    name="productVisible"
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`media-product-visible-${productId}`}
-                        aria-labelledby={`media-product-visible-${productId}-label`}
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
+                      </NativeSelect>
+                      <FieldDescription id={`media-occurrence-help-${productId}`}>
+                        时钟回拨使此时间出现两次，请按授权证明选择具体时刻。
+                      </FieldDescription>
+                      <FieldError
+                        id={`media-occurrence-error-${productId}`}
+                        errors={[form.formState.errors.selectedRightsExpiryInstant]}
                       />
-                    )}
-                  />
-                  <FieldLabel
-                    id={`media-product-visible-${productId}-label`}
-                    htmlFor={`media-product-visible-${productId}`}
-                  >
-                    产品清晰可见
-                  </FieldLabel>
-                </Field>
-                <Field orientation="horizontal">
-                  <Controller
-                    control={form.control}
-                    name="logoVisible"
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`media-logo-visible-${productId}`}
-                        aria-labelledby={`media-logo-visible-${productId}-label`}
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                  <FieldLabel
-                    id={`media-logo-visible-${productId}-label`}
-                    htmlFor={`media-logo-visible-${productId}`}
-                  >
-                    包含 Logo
-                  </FieldLabel>
-                </Field>
-                <Field orientation="horizontal">
-                  <Controller
-                    control={form.control}
-                    name="textPresent"
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`media-text-present-${productId}`}
-                        aria-labelledby={`media-text-present-${productId}-label`}
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                  <FieldLabel
-                    id={`media-text-present-${productId}-label`}
-                    htmlFor={`media-text-present-${productId}`}
-                  >
-                    画面包含文字
-                  </FieldLabel>
-                </Field>
-              </FieldGroup>
-            </FieldSet>
-            <FieldSet>
-              <FieldLegend>权利范围</FieldLegend>
-              <FieldDescription>
-                这些选项只记录授权范围，不会自动启用生成模型或发布。
-              </FieldDescription>
-              <FieldGroup>
-                <Field data-invalid={Boolean(form.formState.errors.rightsEvidenceRef)}>
-                  <FieldLabel htmlFor={`media-rights-${productId}`}>素材使用授权证明</FieldLabel>
-                  <EvidenceSelectField
-                    projectId={projectId}
-                    control={form.control}
-                    name="rightsEvidenceRef"
-                    id={`media-rights-${productId}`}
-                  />
-                  <FieldError errors={[form.formState.errors.rightsEvidenceRef]} />
-                </Field>
-                <Field orientation="horizontal">
-                  <Controller
-                    control={form.control}
-                    name="editingAllowed"
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`media-editing-${productId}`}
-                        aria-labelledby={`media-editing-${productId}-label`}
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                  <FieldLabel
-                    id={`media-editing-${productId}-label`}
-                    htmlFor={`media-editing-${productId}`}
-                  >
-                    允许剪辑
-                  </FieldLabel>
-                </Field>
-                <Field orientation="horizontal">
-                  <Controller
-                    control={form.control}
-                    name="publicDistributionAllowed"
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`media-public-${productId}`}
-                        aria-labelledby={`media-public-${productId}-label`}
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                  <FieldLabel
-                    id={`media-public-${productId}-label`}
-                    htmlFor={`media-public-${productId}`}
-                  >
-                    允许公开发布
-                  </FieldLabel>
-                </Field>
-                <Field orientation="horizontal">
-                  <Controller
-                    control={form.control}
-                    name="paidAdvertisingAllowed"
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`media-paid-${productId}`}
-                        aria-labelledby={`media-paid-${productId}-label`}
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                  <FieldLabel
-                    id={`media-paid-${productId}-label`}
-                    htmlFor={`media-paid-${productId}`}
-                  >
-                    允许付费广告
-                  </FieldLabel>
-                </Field>
-                <Field orientation="horizontal">
-                  <Controller
-                    control={form.control}
-                    name="imageToVideoAllowed"
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`media-i2v-${productId}`}
-                        aria-labelledby={`media-i2v-${productId}-label`}
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                  <FieldLabel
-                    id={`media-i2v-${productId}-label`}
-                    htmlFor={`media-i2v-${productId}`}
-                  >
-                    允许图生视频
-                  </FieldLabel>
-                </Field>
-                <Field orientation="horizontal">
-                  <Controller
-                    control={form.control}
-                    name="referenceToVideoAllowed"
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`media-r2v-${productId}`}
-                        aria-labelledby={`media-r2v-${productId}-label`}
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                  <FieldLabel
-                    id={`media-r2v-${productId}-label`}
-                    htmlFor={`media-r2v-${productId}`}
-                  >
-                    允许作为视频参考素材
-                  </FieldLabel>
-                </Field>
-                <Field data-invalid={Boolean(form.formState.errors.rightsExpiresAt)}>
-                  <FieldLabel htmlFor={`media-expiry-${productId}`}>授权到期时间</FieldLabel>
-                  <Input
-                    id={`media-expiry-${productId}`}
-                    type="datetime-local"
-                    {...form.register("rightsExpiresAt")}
-                  />
-                  <FieldDescription>长期有效可留空。</FieldDescription>
-                  <FieldError errors={[form.formState.errors.rightsExpiresAt]} />
-                </Field>
-              </FieldGroup>
-            </FieldSet>
-            {uploading ? (
-              <Progress aria-label="产品媒体上传进度" value={uploadProgress}>
-                <ProgressLabel>上传私有素材</ProgressLabel>
-                <ProgressValue>{() => `${Math.round(uploadProgress)}%`}</ProgressValue>
-              </Progress>
-            ) : null}
-          </FieldGroup>
+                    </Field>
+                  ) : null}
+                </FieldGroup>
+              </FieldSet>
+              {uploading ? (
+                <Progress aria-label="产品媒体上传进度" value={uploadProgress}>
+                  <ProgressLabel>上传私有素材</ProgressLabel>
+                  <ProgressValue>{() => `${Math.round(uploadProgress)}%`}</ProgressValue>
+                </Progress>
+              ) : null}
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
@@ -506,7 +578,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
           disabled={busy || !hasFile}
         >
           {busy ? (
-            <Spinner data-icon="inline-start" />
+            <Spinner aria-hidden="true" data-icon="inline-start" />
           ) : (
             <UploadCloudIcon data-icon="inline-start" />
           )}
@@ -577,7 +649,7 @@ function ReviewForm({
       <FieldGroup>
         {!revoking ? (
           <Field data-invalid={Boolean(form.formState.errors.decision)}>
-            <FieldLabel>审核决定</FieldLabel>
+            <FieldLabel htmlFor={`media-review-decision-${asset.id}`}>审核决定</FieldLabel>
             <Controller
               control={form.control}
               name="decision"
@@ -588,6 +660,7 @@ function ReviewForm({
                   onValueChange={field.onChange}
                 >
                   <SelectTrigger
+                    id={`media-review-decision-${asset.id}`}
                     className="w-full"
                     aria-invalid={Boolean(form.formState.errors.decision)}
                   >
@@ -751,7 +824,12 @@ function AssetCard({
           </Alert>
         ) : null}
         {canReview && asset.review.status !== "rejected" ? (
-          <ReviewForm projectId={projectId} productId={productId} asset={asset} />
+          <ReviewForm
+            key={asset.review.status}
+            projectId={projectId}
+            productId={productId}
+            asset={asset}
+          />
         ) : null}
       </CardContent>
     </Card>
@@ -764,12 +842,14 @@ export function ProductMediaPanel({
   assets,
   assessment,
   canReview,
+  canWrite,
 }: {
   projectId: string;
   productId: string;
   assets: ProductMediaAsset[];
   assessment: VideoReadyAssessment;
   canReview: boolean;
+  canWrite: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -810,7 +890,7 @@ export function ProductMediaPanel({
           </CardContent>
         </Card>
       ) : null}
-      <RegistrationForm projectId={projectId} productId={productId} />
+      {canWrite ? <RegistrationForm projectId={projectId} productId={productId} /> : null}
       <div className="flex flex-col gap-3">
         {assets.length ? (
           assets.map((asset) => (
@@ -819,7 +899,7 @@ export function ProductMediaPanel({
               projectId={projectId}
               productId={productId}
               asset={asset}
-              canReview={canReview}
+              canReview={canWrite && canReview}
             />
           ))
         ) : (

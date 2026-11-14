@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { z } from "zod";
-
 import type { VideoProject } from "../lib/video/contracts";
 import {
   marketingVideoAiDraftSchema,
@@ -12,6 +11,7 @@ import {
   type MarketingShotCandidate,
 } from "../lib/video/shot-candidates";
 import { createMarketingEditTimeline } from "../lib/video/timeline";
+import { required } from "./test-required";
 
 const baseClip = {
   clipId: "clip-001",
@@ -47,8 +47,8 @@ assert.throws(
     marketingVideoDraftSchema.parse({
       ...exact,
       clips: [
-        { ...exact.clips[0]!, durationMs: 10_000 },
-        { ...exact.clips[1]!, durationMs: 5_001 },
+        { ...exact.clips[0], durationMs: 10_000 },
+        { ...exact.clips[1], durationMs: 5_001 },
       ],
     }),
   /15 秒/,
@@ -57,7 +57,7 @@ assert.throws(
   () =>
     marketingVideoDraftSchema.parse({
       ...exact,
-      clips: [{ ...exact.clips[0]!, durationMs: 10_001 }],
+      clips: [{ ...exact.clips[0], durationMs: 10_001 }],
     }),
   /10 秒/,
 );
@@ -65,7 +65,7 @@ assert.throws(
   () =>
     marketingVideoDraftSchema.parse({
       ...exact,
-      clips: [{ ...exact.clips[0]!, mediaType: "image", trimStartMs: 1 }],
+      clips: [{ ...exact.clips[0], mediaType: "image", trimStartMs: 1 }],
     }),
   /图片素材/,
 );
@@ -202,7 +202,7 @@ assert.throws(
     compileMarketingVideoAiDraft({
       suggestion: {
         ...aiSuggestion,
-        clips: [{ ...aiSuggestion.clips[0]!, shotCandidateId: "shot-999-999" }],
+        clips: [{ ...aiSuggestion.clips[0], shotCandidateId: "shot-999-999" }],
       },
       candidates: shotCandidates,
       platform: "facebook",
@@ -212,7 +212,7 @@ assert.throws(
 assert.throws(
   () =>
     compileMarketingVideoAiDraft({
-      suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0]!, durationMs: 3_001 }] },
+      suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0], durationMs: 3_001 }] },
       candidates: shotCandidates,
       platform: "facebook",
     }),
@@ -221,7 +221,7 @@ assert.throws(
 assert.throws(
   () =>
     compileMarketingVideoAiDraft({
-      suggestion: { ...aiSuggestion, clips: [aiSuggestion.clips[0]!, aiSuggestion.clips[0]!] },
+      suggestion: { ...aiSuggestion, clips: [aiSuggestion.clips[0], aiSuggestion.clips[0]] },
       candidates: shotCandidates,
       platform: "facebook",
     }),
@@ -230,10 +230,10 @@ assert.throws(
 assert.throws(
   () =>
     compileMarketingVideoAiDraft({
-      suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0]!, audioMode: "source" }] },
+      suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0], audioMode: "source" }] },
       candidates: [
         {
-          ...shotCandidates[0]!,
+          ...shotCandidates[0],
           mediaType: "image",
           trimStartMs: 0,
           maximumDurationMs: 10_000,
@@ -281,7 +281,7 @@ const project: VideoProject = {
 };
 
 void (async () => {
-  const timeline = createMarketingEditTimeline(project, project.editDraft!);
+  const timeline = createMarketingEditTimeline(project, required(project.editDraft));
   assert.equal(timeline.durationSeconds, 10);
   assert.equal(timeline.scenes[0]?.trimStartSeconds, 0);
   assert.equal(timeline.scenes[0]?.subtitles[0]?.text, "12345");
@@ -290,10 +290,10 @@ void (async () => {
   assert.throws(
     () =>
       createMarketingEditTimeline(project, {
-        ...project.editDraft!,
+        ...required(project.editDraft),
         clips: [
           {
-            ...project.editDraft!.clips[0]!,
+            ...required(project.editDraft).clips[0],
             caption: { kind: "verified_fact", claimRef: "specifications.diameter" },
           },
         ],
@@ -307,7 +307,7 @@ void (async () => {
           timeline: {
             ...timeline,
             durationSeconds: 16,
-            scenes: [{ ...timeline.scenes[0]!, durationSeconds: 16 }],
+            scenes: [{ ...timeline.scenes[0], durationSeconds: 16 }],
           },
           platform: "facebook",
           width: 1080,

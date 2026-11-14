@@ -20,12 +20,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state";
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+const subscribeToHydration = () => () => {};
+const clientHydrationSnapshot = () => true;
+const serverHydrationSnapshot = () => false;
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed";
@@ -34,6 +35,7 @@ type SidebarContextProps = {
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
+  ready: boolean;
   toggleSidebar: () => void;
 };
 
@@ -62,6 +64,9 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void;
 }) {
   const isMobile = useIsMobile();
+  const [ready, setReady] = React.useState(false);
+  // Enable controls after useIsMobile has resolved the client viewport.
+  React.useEffect(() => setReady(true), []);
   const [openMobile, setOpenMobile] = React.useState(false);
 
   // This is the internal state of the sidebar.
@@ -76,9 +81,6 @@ function SidebarProvider({
       } else {
         _setOpen(openState);
       }
-
-      // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
     [setOpenProp, open],
   );
@@ -111,11 +113,12 @@ function SidebarProvider({
       open,
       setOpen,
       isMobile,
+      ready,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, toggleSidebar],
+    [state, open, setOpen, isMobile, ready, openMobile, toggleSidebar],
   );
 
   return (
@@ -155,6 +158,13 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  // The provider can resolve the viewport before this Suspense boundary hydrates.
+  // Match this sidebar's server markup until its own hydration completes.
+  const hydrated = React.useSyncExternalStore(
+    subscribeToHydration,
+    clientHydrationSnapshot,
+    serverHydrationSnapshot,
+  );
 
   if (collapsible === "none") {
     return (
@@ -171,7 +181,7 @@ function Sidebar({
     );
   }
 
-  if (isMobile) {
+  if (isMobile && hydrated) {
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent
@@ -243,11 +253,17 @@ function Sidebar({
   );
 }
 
-function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+function SidebarTrigger({
+  className,
+  onClick,
+  disabled,
+  ...props
+}: React.ComponentProps<typeof Button>) {
+  const { toggleSidebar, ready } = useSidebar();
 
   return (
     <Button
+      disabled={disabled || !ready}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"

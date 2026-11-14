@@ -73,7 +73,7 @@ export function parseFrameDifferenceMetadata(output: string): MotionSample[] {
 function percentile(values: number[], proportion: number) {
   if (!values.length) return 0;
   const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * proportion))]!;
+  return sorted[Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * proportion))];
 }
 
 function actionScore(value: number) {
@@ -92,8 +92,8 @@ function splitBoundaries(durationMs: number, sceneCutsMs: number[]) {
     { timeMs: 0, kind: "source" },
   ];
   for (let index = 0; index < scenes.length - 1; index += 1) {
-    const startMs = scenes[index]!;
-    const endMs = scenes[index + 1]!;
+    const startMs = scenes[index];
+    const endMs = scenes[index + 1];
     const parts = Math.max(1, Math.ceil((endMs - startMs) / maximumDetectedShotIntervalMs));
     for (let part = 1; part <= parts; part += 1) {
       const timeMs =
@@ -118,7 +118,7 @@ export function detectShotIntervals(input: {
   const samples = parseFrameDifferenceMetadata(input.motionMetadata);
   const boundaries = splitBoundaries(input.durationMs, sceneCuts);
   return boundaries.slice(0, -1).flatMap((start, index) => {
-    const end = boundaries[index + 1]!;
+    const end = boundaries[index + 1];
     if (end.timeMs - start.timeMs < 1_000) return [];
     const inside = samples.filter(
       (sample) => sample.timeMs >= start.timeMs + 250 && sample.timeMs < end.timeMs - 250,

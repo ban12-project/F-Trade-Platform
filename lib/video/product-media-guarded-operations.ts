@@ -121,7 +121,7 @@ export async function completeGuardedMarketingVideoRender(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, videoId), eq(aggregateRecord.type, "video")))
       .for("update");
-    if (!record || record.state !== "VIDEO_RENDERING") {
+    if (record?.state !== "VIDEO_RENDERING") {
       throw new Error("视频合成状态已发生变化，请刷新后重试。");
     }
     const project = videoProjectSchema.parse(record.payload);
@@ -231,7 +231,7 @@ export async function decideGuardedVideoReview(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, value.videoId), eq(aggregateRecord.type, "video")))
       .for("update");
-    if (!aggregate || aggregate.state !== "VIDEO_REVIEW_REQUIRED") {
+    if (aggregate?.state !== "VIDEO_REVIEW_REQUIRED") {
       throw new Error("该视频计划当前不处于待确认状态。");
     }
     const [pendingApproval] = await tx

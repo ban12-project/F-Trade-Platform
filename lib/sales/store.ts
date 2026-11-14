@@ -9,7 +9,7 @@ import {
   workspaceProject,
   workspaceProjectItem,
 } from "@/lib/db/schema";
-import type { rfqFormSchema } from "@/lib/form-schemas";
+import { rfqFormSchema } from "@/lib/form-schemas";
 import { assessRfq, promoteRfqReady, updateRfqDraft } from "@/lib/rfq/completeness";
 import {
   readRfqCustomerRequirements,
@@ -66,7 +66,7 @@ function rfqFromInput(input: RfqFormInput, id: string, previous?: unknown) {
 }
 
 function entryFromRecord(row: typeof aggregateRecord.$inferSelect): RfqEntry | null {
-  const payload = row.payload as Record<string, any>;
+  const payload = row.payload as Record<string, unknown>;
   const customer = payload.customer as Record<string, unknown> | undefined;
   const product = payload.product as Record<string, unknown> | undefined;
   const commercial = payload.commercial as Record<string, unknown> | undefined;
@@ -113,7 +113,8 @@ const productTypes = new Set<RfqFormInput["productType"]>([
 ]);
 
 /** Creates a private RFQ aggregate. No price, lead time, or quotation field is accepted here. */
-export async function createRfq(input: RfqFormInput, actorId: string, projectId?: string) {
+export async function createRfq(rawInput: RfqFormInput, actorId: string, projectId?: string) {
+  const input = rfqFormSchema.parse(rawInput);
   const id = randomUUID();
   const now = new Date();
   const draft = rfqFromInput(input, id);
@@ -211,10 +212,11 @@ export async function listProjectRfqEntries(
 
 export async function reviseRfq(
   rfqId: string,
-  input: RfqFormInput,
+  rawInput: RfqFormInput,
   actorId: string,
   projectId?: string,
 ) {
+  const input = rfqFormSchema.parse(rawInput);
   const now = new Date();
   return getDatabase().transaction(async (tx) => {
     await assertAggregateWorkspaceWrite(rfqId, tx, actorId);

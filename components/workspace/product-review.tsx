@@ -17,7 +17,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -27,27 +34,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { initialProductActionState } from "@/lib/action-states";
 import { decideProductCatalogReviewAction } from "@/lib/actions/products";
 import { productReviewFormSchema } from "@/lib/form-schemas";
 import type { ProductEvidencePreview } from "@/lib/product/evidence-preview";
-import { productBlockerLabel, productFactLabels } from "@/lib/product/fact-labels";
+import { productBlockerLabel } from "@/lib/product/fact-labels";
+import { productReviewValue } from "@/lib/product/field-review";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
 import { recordStateLabels } from "@/lib/workspace/library-model";
 import { useWorkspaceDirty } from "./dirty-state";
 import { ProductDraftForm } from "./product-draft-form";
 import { EvidenceLibrary } from "./product-evidence-library";
-import { ProductEvidenceSources } from "./product-evidence-preview";
+import { ProductFieldReview } from "./product-field-review";
 
 type ReviewValues = z.infer<typeof productReviewFormSchema>;
 
@@ -55,20 +55,18 @@ function stateLabel(state: string) {
   return recordStateLabels[state] ?? "状态待核对";
 }
 
-function textValue(value: unknown) {
-  return typeof value === "string" || typeof value === "number" ? String(value) : "";
-}
-
 export function ProductReview({
   projectId,
   detail,
   canReview,
+  canWrite,
   evidenceOptions,
   sourceDocuments,
 }: {
   projectId: string;
   detail: ProductCatalogDetail;
   canReview: boolean;
+  canWrite: boolean;
   evidenceOptions: EvidenceOption[];
   sourceDocuments: ProductEvidencePreview[];
 }) {
@@ -81,6 +79,7 @@ export function ProductReview({
   );
   const form = useForm<ReviewValues>({
     resolver: zodResolver(productReviewFormSchema),
+    shouldFocusError: false,
     defaultValues: {
       productId: detail.id,
       reviewedVersion: String(detail.version),
@@ -89,6 +88,7 @@ export function ProductReview({
       notes: "",
     },
   });
+  const busy = !form.formState.isReady || pending;
   useWorkspaceDirty(`${idPrefix}-product-review-${detail.id}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
@@ -97,6 +97,7 @@ export function ProductReview({
     }
   }, [form, router, state.status]);
   function submit(values: ReviewValues) {
+    if (busy) return;
     const data = new FormData();
     data.set("projectId", projectId);
     for (const [key, value] of Object.entries(values))
@@ -106,12 +107,15 @@ export function ProductReview({
   const facts = (["product", "specifications", "commercial"] as const).flatMap((section) =>
     Object.entries(detail.draft[section] ?? {}).map(([field, value]) => ({
       path: `${section}.${field}`,
-      value: Array.isArray(value) ? value.join(", ") : textValue(value),
-      evidence: detail.draft.field_evidence[`${section}.${field}`] ?? "缺失",
+      value: productReviewValue(value),
+      evidence: detail.draft.field_evidence[`${section}.${field}`] ?? "",
     })),
   );
   const canDecide =
-    canReview && detail.state === "PRODUCT_REVIEW_REQUIRED" && detail.approvalStatus === "pending";
+    canWrite &&
+    canReview &&
+    detail.state === "PRODUCT_REVIEW_REQUIRED" &&
+    detail.approvalStatus === "pending";
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
@@ -136,7 +140,7 @@ export function ProductReview({
           </AlertDescription>
         </Alert>
       ) : null}
-      {detail.state === "PRODUCT_REVISION_REQUIRED" ? (
+      {canWrite && detail.state === "PRODUCT_REVISION_REQUIRED" ? (
         <div className="flex flex-col gap-4">
           <ProductDraftForm
             projectId={projectId}
@@ -146,49 +150,12 @@ export function ProductReview({
           <EvidenceLibrary projectId={projectId} evidenceOptions={evidenceOptions} />
         </div>
       ) : null}
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{detail.productName}</CardTitle>
-            <CardDescription>
-              逐项核对产品信息与来源资料；没有依据的信息请先补充资料。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>字段</TableHead>
-                  <TableHead>当前值</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {facts.map((fact) => (
-                  <TableRow key={fact.path}>
-                    <TableCell className="max-w-36 whitespace-normal break-words">
-                      <span>{productFactLabels[fact.path] ?? fact.path}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">
-                        {evidenceOptions.find((item) => item.id === fact.evidence)?.sourceLabel ??
-                          fact.evidence}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-48 whitespace-normal break-words">
-                      {fact.value || "未提供"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-          <CardFooter>
-            阻塞项：
-            {detail.blockingFields.length
-              ? detail.blockingFields.map(productBlockerLabel).join("、")
-              : "无自动阻塞项，仍需人工核对。"}
-          </CardFooter>
-        </Card>
-        <ProductEvidenceSources sources={sourceDocuments} />
-      </div>
+      <ProductFieldReview
+        key={`${detail.id}-${detail.version}`}
+        productName={detail.productName}
+        facts={facts}
+        sources={sourceDocuments}
+      />
       <Card>
         <CardHeader>
           <CardTitle>原始实物图片</CardTitle>
@@ -225,119 +192,161 @@ export function ProductReview({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form id={fieldId("product-review")} onSubmit={form.handleSubmit(submit)}>
-              <FieldGroup>
-                <Field data-invalid={!!form.formState.errors.decision}>
-                  <FieldLabel htmlFor={fieldId("product-review-decision")}>决定</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="decision"
-                    render={({ field }) => (
-                      <Select
-                        items={{ approved: "批准产品信息", rejected: "退回产品信息" }}
-                        value={field.value ?? null}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger
-                          id={fieldId("product-review-decision")}
-                          className="min-h-11 w-full"
-                          aria-invalid={!!form.formState.errors.decision}
-                        >
-                          <SelectValue placeholder="请选择审核决定" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="approved">批准产品信息</SelectItem>
-                            <SelectItem value="rejected">退回产品信息</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError errors={[form.formState.errors.decision]} />
-                </Field>
-                {detail.sourceImages.length ? (
-                  <Field>
-                    <FieldLabel htmlFor={fieldId("product-image-confirmation")}>
-                      图片一致性
-                    </FieldLabel>
+            <form
+              id={fieldId("product-review")}
+              aria-busy={busy}
+              onSubmit={form.handleSubmit(submit, (errors) => {
+                const first = (
+                  ["decision", "imageConsistencyConfirmed", "evidenceRef", "notes"] as const
+                ).find((name) => errors[name]);
+                if (first) form.setFocus(first);
+              })}
+            >
+              <FieldSet disabled={busy}>
+                <FieldGroup>
+                  <Field data-invalid={!!form.formState.errors.decision}>
+                    <FieldLabel htmlFor={fieldId("product-review-decision")}>决定</FieldLabel>
                     <Controller
                       control={form.control}
-                      name="imageConsistencyConfirmed"
+                      name="decision"
                       render={({ field }) => (
                         <Select
-                          value={field.value ?? "false"}
+                          disabled={busy}
+                          items={{ approved: "批准产品信息", rejected: "退回产品信息" }}
+                          value={field.value ?? null}
                           onValueChange={field.onChange}
-                          items={{
-                            false: "尚未确认或不一致",
-                            true: "已核对全部原始图片，与当前产品一致",
-                          }}
                         >
-                          <SelectTrigger id={fieldId("product-image-confirmation")}>
-                            <SelectValue />
+                          <SelectTrigger
+                            id={fieldId("product-review-decision")}
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                            className="min-h-11 w-full"
+                            aria-invalid={!!form.formState.errors.decision}
+                            aria-describedby={
+                              form.formState.errors.decision ? fieldId("decision-error") : undefined
+                            }
+                          >
+                            <SelectValue placeholder="请选择审核决定" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
-                              <SelectItem value="false">尚未确认或不一致</SelectItem>
-                              <SelectItem value="true">
-                                已核对全部原始图片，与当前产品一致
-                              </SelectItem>
+                              <SelectItem value="approved">批准产品信息</SelectItem>
+                              <SelectItem value="rejected">退回产品信息</SelectItem>
                             </SelectGroup>
                           </SelectContent>
                         </Select>
                       )}
                     />
-                    <FieldDescription>
-                      批准前必须确认；无法确认时请退回并说明原因。
-                    </FieldDescription>
+                    <FieldError
+                      id={fieldId("decision-error")}
+                      errors={[form.formState.errors.decision]}
+                    />
                   </Field>
-                ) : null}
-                <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                  <FieldLabel htmlFor={fieldId("product-review-evidence")}>审核依据</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="evidenceRef"
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={(value) => field.onChange(value ?? "")}
-                        disabled={!evidenceOptions.length}
-                      >
-                        <SelectTrigger
-                          id={fieldId("product-review-evidence")}
-                          className="min-h-11 w-full"
+                  {detail.sourceImages.length ? (
+                    <Field>
+                      <FieldLabel htmlFor={fieldId("product-image-confirmation")}>
+                        图片一致性
+                      </FieldLabel>
+                      <Controller
+                        control={form.control}
+                        name="imageConsistencyConfirmed"
+                        render={({ field }) => (
+                          <Select
+                            disabled={busy}
+                            value={field.value ?? "false"}
+                            onValueChange={field.onChange}
+                            items={{
+                              false: "尚未确认或不一致",
+                              true: "已核对全部原始图片，与当前产品一致",
+                            }}
+                          >
+                            <SelectTrigger
+                              id={fieldId("product-image-confirmation")}
+                              ref={field.ref}
+                              onBlur={field.onBlur}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectItem value="false">尚未确认或不一致</SelectItem>
+                                <SelectItem value="true">
+                                  已核对全部原始图片，与当前产品一致
+                                </SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      <FieldDescription>
+                        批准前必须确认；无法确认时请退回并说明原因。
+                      </FieldDescription>
+                    </Field>
+                  ) : null}
+                  <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                    <FieldLabel htmlFor={fieldId("product-review-evidence")}>审核依据</FieldLabel>
+                    <Controller
+                      control={form.control}
+                      name="evidenceRef"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={(value) => field.onChange(value ?? "")}
+                          disabled={busy || !evidenceOptions.length}
                         >
-                          <SelectValue>
-                            {evidenceOptions.find((option) => option.id === field.value)
-                              ?.sourceLabel ?? "选择已上传资料"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {evidenceOptions.map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                                {option.sourceLabel} · {option.id.slice(-8)}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError errors={[form.formState.errors.evidenceRef]} />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.notes}>
-                  <FieldLabel htmlFor={fieldId("product-review-notes")}>
-                    审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
-                  </FieldLabel>
-                  <Textarea
-                    id={fieldId("product-review-notes")}
-                    aria-invalid={!!form.formState.errors.notes}
-                    {...form.register("notes")}
-                  />
-                  <FieldError errors={[form.formState.errors.notes]} />
-                </Field>
-              </FieldGroup>
+                          <SelectTrigger
+                            id={fieldId("product-review-evidence")}
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                            aria-invalid={!!form.formState.errors.evidenceRef}
+                            aria-describedby={
+                              form.formState.errors.evidenceRef
+                                ? fieldId("evidence-error")
+                                : undefined
+                            }
+                            className="min-h-11 w-full"
+                          >
+                            <SelectValue>
+                              {evidenceOptions.find((option) => option.id === field.value)
+                                ?.sourceLabel ?? "选择已上传资料"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {evidenceOptions.map((option) => (
+                                <SelectItem key={option.id} value={option.id}>
+                                  {option.sourceLabel} · {option.id.slice(-8)}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <FieldError
+                      id={fieldId("evidence-error")}
+                      errors={[form.formState.errors.evidenceRef]}
+                    />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.notes}>
+                    <FieldLabel htmlFor={fieldId("product-review-notes")}>
+                      审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
+                    </FieldLabel>
+                    <Textarea
+                      id={fieldId("product-review-notes")}
+                      aria-invalid={!!form.formState.errors.notes}
+                      aria-describedby={
+                        form.formState.errors.notes ? fieldId("notes-error") : undefined
+                      }
+                      {...form.register("notes")}
+                    />
+                    <FieldError
+                      id={fieldId("notes-error")}
+                      errors={[form.formState.errors.notes]}
+                    />
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
             </form>
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-3">
@@ -345,7 +354,7 @@ export function ProductReview({
               form={fieldId("product-review")}
               type="submit"
               variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
-              disabled={pending || !form.watch("decision") || !evidenceOptions.length}
+              disabled={busy || !form.watch("decision") || !evidenceOptions.length}
             >
               {pending ? (
                 <Spinner data-icon="inline-start" />
@@ -370,9 +379,11 @@ export function ProductReview({
       ) : detail.state === "PRODUCT_REVIEW_REQUIRED" ? (
         <Alert>
           <ShieldCheckIcon />
-          <AlertTitle>{canReview ? "审核请求需要核对" : "等待审核者核实产品"}</AlertTitle>
+          <AlertTitle>
+            {canWrite && canReview ? "审核请求需要核对" : "等待审核者核实产品"}
+          </AlertTitle>
           <AlertDescription>
-            {canReview
+            {canWrite && canReview
               ? "当前记录没有有效的待审请求，请核对记录状态。"
               : "由有产品审核权限的项目编辑者核对当前版本。"}
           </AlertDescription>

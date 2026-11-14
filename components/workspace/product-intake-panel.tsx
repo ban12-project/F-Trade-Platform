@@ -82,6 +82,17 @@ export function ProductIntakePanel({
                   render={({ field }) => (
                     <Input
                       id="product-source-file"
+                      name={field.name}
+                      aria-invalid={!!intakeForm.formState.errors.document}
+                      aria-describedby={[
+                        "product-source-file-help",
+                        file ? "product-source-file-selection" : undefined,
+                        intakeForm.formState.errors.document
+                          ? "product-source-file-error"
+                          : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       disabled={importBusy || !intakeForm.formState.isReady}
                       type="file"
                       accept=".pdf,.csv,.xls,.xlsx"
@@ -91,16 +102,26 @@ export function ProductIntakePanel({
                       }}
                       onBlur={field.onBlur}
                       onChange={(event) => {
-                        field.onChange(event.target.files?.[0]);
-                        void intakeForm.trigger("document");
+                        const selected = event.target.files?.[0];
+                        field.onChange(selected);
+                        if (selected) void intakeForm.trigger("document");
+                        else intakeForm.clearErrors("document");
                       }}
                     />
                   )}
                 />
-                <FieldDescription>
-                  {file ? `已选择：${file.name}` : "支持 PDF、CSV 和 Excel，最大 25 MiB。"}
+                <FieldDescription id="product-source-file-help">
+                  支持 PDF、CSV 和 Excel，最大 25 MiB。
                 </FieldDescription>
-                <FieldError errors={[intakeForm.formState.errors.document]} />
+                {file ? (
+                  <FieldDescription id="product-source-file-selection" className="break-all">
+                    已选择：{file.name}
+                  </FieldDescription>
+                ) : null}
+                <FieldError
+                  id="product-source-file-error"
+                  errors={[intakeForm.formState.errors.document]}
+                />
               </Field>
             </FieldGroup>
           </CardContent>

@@ -1,8 +1,14 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { WorkspaceDashboard } from "@/components/workspace/workspace-dashboard";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
+import {
+  deriveWorkspaceProjectOverview,
+  deriveWorkspaceTasks,
+  type WorkspaceTaskSnapshot,
+} from "@/lib/workspace/task-model";
 import type {
   WorkspaceProjectOverview,
   WorkspaceProjectSummary,
@@ -59,6 +65,10 @@ const tasks: WorkspaceTaskSummary[] = [
     recordKind: "lead",
     destination: { type: "record", kind: "lead", id: "00000000-0000-4000-8000-000000000712" },
     title: "客户跟进到期",
+    customerLabel: "SYNTHETIC Company · SYNTHETIC Buyer",
+    needLabel: "离合器套件 · 数量 25",
+    nextAction: "了解目标预算，交由人工销售评估",
+    responsibleLabel: "项目编辑者",
     detail: "计划跟进已到期",
     priority: "complete",
     taskType: "follow_up",
@@ -93,7 +103,7 @@ for (const [id, state, title, detail] of [
 }
 const overview: WorkspaceProjectOverview[] = [
   {
-    ...projects[0]!,
+    ...projects[0],
     taskCount: 1,
     statusLabel: "已有发布成果",
     nextAction: "查看成果与入站转化",
@@ -103,7 +113,7 @@ const overview: WorkspaceProjectOverview[] = [
     opportunityCount: 0,
   },
   {
-    ...projects[1]!,
+    ...projects[1],
     taskCount: 1,
     statusLabel: "跟进",
     nextAction: "执行下一次人工跟进",
@@ -123,29 +133,74 @@ const inbound: InboundRoutingSummary[] = [
   },
 ];
 
+const offlineSnapshot: WorkspaceTaskSnapshot = {
+  projects: projects.map((project) => ({ ...project, memberRole: "editor", appRole: "admin" })),
+  records: [
+    {
+      id: "00000000-0000-4000-8000-000000000731",
+      type: "rfq",
+      state: "RFQ_COLLECTING",
+      payload: { missing_fields: ["quantity", "destination"] },
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000732",
+      type: "lead",
+      state: "FOLLOW_UP",
+      payload: {
+        next_action: "collect_sample_requirements_and_escalate",
+        next_follow_up_at: "2026-09-05T00:00:00Z",
+      },
+    },
+  ].map((record) => ({
+    ...record,
+    projectId: projects[1].id,
+    version: 1,
+    relation: "owned",
+    createdAt: new Date("2026-09-03T00:00:00Z"),
+    updatedAt: new Date("2026-09-03T00:00:00Z"),
+  })),
+  approvals: [],
+  publications: [],
+  hasActiveChannel: false,
+};
+
 async function Content({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; empty?: string }>;
+  searchParams: Promise<{ view?: string; empty?: string; offline?: string; inboundOnly?: string }>;
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   const query = await searchParams;
+  const requestedTime = (await headers()).get("x-testing-dashboard-time");
+  const currentTime =
+    requestedTime && Number.isFinite(Date.parse(requestedTime))
+      ? Date.parse(requestedTime)
+      : new Date("2026-09-04T00:00:00Z").getTime();
+  const offlineTasks = deriveWorkspaceTasks(offlineSnapshot, new Date(currentTime));
   return (
     <WorkspaceShell projects={query.empty ? [] : projects}>
       <WorkspaceDashboard
         projects={query.empty ? [] : projects}
-        tasks={query.empty ? [] : tasks}
-        overview={query.empty ? [] : overview}
-        inbound={query.empty ? [] : inbound}
+        tasks={query.empty || query.inboundOnly ? [] : query.offline ? offlineTasks : tasks}
+        overview={
+          query.empty
+            ? []
+            : query.offline
+              ? deriveWorkspaceProjectOverview(offlineSnapshot, offlineTasks)
+              : overview
+        }
+        inbound={query.empty || query.offline ? [] : inbound}
         view={query.view}
         basePath="/testing/workspace-dashboard"
-        currentTime={new Date("2026-09-04T00:00:00Z").getTime()}
+        currentTime={currentTime}
       />
     </WorkspaceShell>
   );
 }
 
-export default function Page(props: { searchParams: Promise<{ view?: string; empty?: string }> }) {
+export default function Page(props: {
+  searchParams: Promise<{ view?: string; empty?: string; offline?: string; inboundOnly?: string }>;
+}) {
   return (
     <Suspense>
       <Content {...props} />

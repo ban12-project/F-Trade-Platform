@@ -107,7 +107,7 @@ export function createCatalogPreflightReport(
       identifier,
       record_id,
       review_status,
-      evidence_ref: source.evidence_refs[0]!,
+      evidence_ref: source.evidence_refs[0],
     })),
     manual_review: {
       status: "review_required",
@@ -157,7 +157,7 @@ async function main() {
     identifier: candidate.identifier,
     record_id: candidate.record_id,
     review_status: candidate.review_status,
-    evidence_ref: candidate.source.evidence_refs[0]!,
+    evidence_ref: candidate.source.evidence_refs[0],
     status: "pending",
   }));
   let reportWrite = Promise.resolve();
@@ -199,7 +199,7 @@ async function main() {
     results,
     concurrency,
     async (index) => {
-      const candidate = candidates[index]!;
+      const candidate = candidates[index];
       const result = await agent.run({ model, source: candidate.source, timeout_ms: timeoutMs });
       return {
         draft: result.draft,
@@ -257,10 +257,10 @@ export async function completeCatalogBatch(
     while (nextIndex < results.length) {
       const index = nextIndex++;
       try {
-        results[index] = { ...results[index]!, ...(await extract(index)), status: "succeeded" };
+        results[index] = { ...results[index], ...(await extract(index)), status: "succeeded" };
       } catch (error) {
         results[index] = {
-          ...results[index]!,
+          ...results[index],
           status: "failed",
           error: error instanceof Error ? error.message : "unknown error",
         };

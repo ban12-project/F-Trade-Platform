@@ -24,7 +24,14 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -36,8 +43,10 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { initialClosingActionState } from "@/lib/action-states";
 import { decideDeliveryAction } from "@/lib/actions/closing";
+import { DELIVERY_CONFIRMATION_VALIDITY_DAYS } from "@/lib/delivery/validity";
 import { deliveryDecisionFormSchema } from "@/lib/form-schemas";
 import type { DeliveryConfirmationEntry } from "@/lib/sales/closing-store";
 import { useWorkspaceDirty } from "./dirty-state";
@@ -58,6 +67,7 @@ function DeliveryDecision({
   const [state, action, pending] = useActionState(decideDeliveryAction, initialClosingActionState);
   const form = useForm<z.infer<typeof deliveryDecisionFormSchema>>({
     resolver: zodResolver(deliveryDecisionFormSchema),
+    shouldFocusError: false,
     defaultValues: {
       projectId,
       confirmationId: entry.id,
@@ -66,6 +76,7 @@ function DeliveryDecision({
       notes: "",
     },
   });
+  const busy = !form.formState.isReady || pending;
   useWorkspaceDirty(`delivery-decision-${entry.id}`, form.formState.isDirty);
   useEffect(() => {
     if (state.status === "success") {
@@ -74,6 +85,7 @@ function DeliveryDecision({
     }
   }, [form, router, state]);
   function submit(value: z.infer<typeof deliveryDecisionFormSchema>) {
+    if (busy) return;
     const data = new FormData();
     for (const [key, item] of Object.entries(value)) data.set(key, item);
     startTransition(() => action(data));
@@ -82,73 +94,130 @@ function DeliveryDecision({
     <Card>
       <CardHeader>
         <CardTitle>确认交期</CardTitle>
-        <CardDescription>系统不会预选决定；批准时必须填写人工确认的交期天数。</CardDescription>
+        <CardDescription>
+          系统不会预选决定；批准时必须填写人工确认的交期天数。确认结果自提交成功起
+          {DELIVERY_CONFIRMATION_VALIDITY_DAYS} 天内可用于回复，过期需重新申请确认。
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form id={`delivery-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
-          <FieldGroup>
-            <Field data-invalid={!!form.formState.errors.decision}>
-              <FieldLabel htmlFor={`delivery-decision-${entry.id}-decision`}>决定</FieldLabel>
-              <Controller
-                control={form.control}
-                name="decision"
-                render={({ field }) => (
-                  <Select
-                    items={{ confirmed: "确认交期", rejected: "拒绝确认" }}
-                    value={field.value ?? null}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      aria-invalid={!!form.formState.errors.decision}
-                      id={`delivery-decision-${entry.id}-decision`}
-                      className="w-full"
+        <form
+          aria-busy={busy}
+          id={`delivery-${entry.id}`}
+          onSubmit={form.handleSubmit(submit, (errors) => {
+            const first = (["decision", "leadTimeDays", "evidenceRef", "notes"] as const).find(
+              (name) => errors[name],
+            );
+            if (first) form.setFocus(first);
+          })}
+        >
+          <FieldSet disabled={busy} className="min-w-0">
+            <FieldGroup>
+              <Field data-invalid={!!form.formState.errors.decision}>
+                <FieldLabel htmlFor={`delivery-decision-${entry.id}-decision`}>决定</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="decision"
+                  render={({ field }) => (
+                    <Select
+                      disabled={busy}
+                      items={{ confirmed: "确认交期", rejected: "拒绝确认" }}
+                      value={field.value ?? null}
+                      onValueChange={field.onChange}
                     >
-                      <SelectValue placeholder="请选择交期决定" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="confirmed">确认交期</SelectItem>
-                        <SelectItem value="rejected">拒绝确认</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError errors={[form.formState.errors.decision]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.leadTimeDays}>
-              <FieldLabel htmlFor={`confirmed-days-${entry.id}`}>确认交期（天）</FieldLabel>
-              <Input
-                id={`confirmed-days-${entry.id}`}
-                inputMode="numeric"
-                disabled={form.watch("decision") !== "confirmed"}
-                {...form.register("leadTimeDays")}
-                aria-invalid={!!form.formState.errors.leadTimeDays}
-              />
-              <FieldError errors={[form.formState.errors.leadTimeDays]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.evidenceRef}>
-              <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核依据</FieldLabel>
-              <EvidenceSelectField
-                projectId={projectId}
-                control={form.control}
-                name="evidenceRef"
-                id={`delivery-decision-evidence-${entry.id}`}
-              />
-              <FieldError errors={[form.formState.errors.evidenceRef]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.notes}>
-              <FieldLabel htmlFor={`delivery-notes-${entry.id}`}>
-                备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
-              </FieldLabel>
-              <Textarea
-                id={`delivery-notes-${entry.id}`}
-                {...form.register("notes")}
-                aria-invalid={!!form.formState.errors.notes}
-              />
-              <FieldError errors={[form.formState.errors.notes]} />
-            </Field>
-          </FieldGroup>
+                      <SelectTrigger
+                        ref={field.ref}
+                        onBlur={field.onBlur}
+                        aria-invalid={!!form.formState.errors.decision}
+                        aria-describedby={
+                          form.formState.errors.decision
+                            ? `closing-review-${entry.id}-decision-error`
+                            : undefined
+                        }
+                        id={`delivery-decision-${entry.id}-decision`}
+                        className="w-full"
+                      >
+                        <SelectValue placeholder="请选择交期决定" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="confirmed">确认交期</SelectItem>
+                          <SelectItem value="rejected">拒绝确认</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-decision-error`}
+                  errors={[form.formState.errors.decision]}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.leadTimeDays}>
+                <FieldLabel htmlFor={`confirmed-days-${entry.id}`}>确认交期（天）</FieldLabel>
+                <Input
+                  id={`confirmed-days-${entry.id}`}
+                  inputMode="numeric"
+                  disabled={form.watch("decision") !== "confirmed"}
+                  {...form.register("leadTimeDays")}
+                  aria-invalid={!!form.formState.errors.leadTimeDays}
+                  aria-describedby={[
+                    `confirmed-days-${entry.id}-help`,
+                    form.formState.errors.leadTimeDays
+                      ? `closing-review-${entry.id}-leadTimeDays-error`
+                      : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                />
+                <FieldDescription id={`confirmed-days-${entry.id}-help`}>
+                  填写工厂核实的交期天数；与确认结果的 {DELIVERY_CONFIRMATION_VALIDITY_DAYS}
+                  天有效期不同。
+                </FieldDescription>
+                <FieldError
+                  id={`closing-review-${entry.id}-leadTimeDays-error`}
+                  errors={[form.formState.errors.leadTimeDays]}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核依据</FieldLabel>
+                <EvidenceSelectField
+                  projectId={projectId}
+                  control={form.control}
+                  name="evidenceRef"
+                  disabled={busy}
+                  aria-describedby={
+                    form.formState.errors.evidenceRef
+                      ? `closing-review-${entry.id}-evidenceRef-error`
+                      : undefined
+                  }
+                  id={`delivery-decision-evidence-${entry.id}`}
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-evidenceRef-error`}
+                  errors={[form.formState.errors.evidenceRef]}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.notes}>
+                <FieldLabel htmlFor={`delivery-notes-${entry.id}`}>
+                  备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
+                </FieldLabel>
+                <Textarea
+                  id={`delivery-notes-${entry.id}`}
+                  {...form.register("notes")}
+                  aria-invalid={!!form.formState.errors.notes}
+                  aria-describedby={
+                    form.formState.errors.notes
+                      ? `closing-review-${entry.id}-notes-error`
+                      : undefined
+                  }
+                />
+                <FieldError
+                  id={`closing-review-${entry.id}-notes-error`}
+                  errors={[form.formState.errors.notes]}
+                />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
@@ -156,7 +225,7 @@ function DeliveryDecision({
           form={`delivery-${entry.id}`}
           type="submit"
           variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
-          disabled={pending || !form.watch("decision")}
+          disabled={busy || !form.watch("decision")}
         >
           {pending ? (
             <Spinner data-icon="inline-start" />
@@ -184,6 +253,7 @@ export function DeliveryPanel({
   entries: DeliveryConfirmationEntry[];
   canReview: boolean;
 }) {
+  const timeZone = useBrowserTimeZone();
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -209,9 +279,7 @@ export function DeliveryPanel({
                 工厂确认交期：{entry.confirmation.result?.confirmed_lead_time_days} 天 · 有效至{" "}
                 {entry.confirmation.result?.valid_until &&
                 Number.isFinite(Date.parse(entry.confirmation.result.valid_until))
-                  ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(
-                      new Date(entry.confirmation.result.valid_until),
-                    )
+                  ? `${new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(entry.confirmation.result.valid_until))}（${timeZone}）`
                   : "待核对"}
                 。是否可用于回复以当前有效性检查为准。
               </p>

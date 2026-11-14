@@ -143,7 +143,7 @@ async function verify() {
         id: "text",
         delta: truncated
           ? '"product.product_type"'
-          : JSON.stringify(nextProposal).slice('{"field":'.length) + "]}",
+          : `${JSON.stringify(nextProposal).slice('{"field":'.length)}]}`,
       });
       output.enqueue({ type: "text-end", id: "text" });
       output.enqueue(finish);
@@ -164,7 +164,7 @@ async function verify() {
       assert.equal(sentImages.length, withImage ? 1 : 0);
       if (withImage)
         assert.deepEqual(
-          Buffer.from((sentImages[0]!.data as { type: "data"; data: Uint8Array }).data),
+          Buffer.from((sentImages[0].data as { type: "data"; data: Uint8Array }).data),
           imageBytes,
         );
       assert.equal(model.doStreamCalls.length, 1);

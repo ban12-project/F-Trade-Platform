@@ -4,6 +4,7 @@ import { AiSdkStructuredGenerator } from "@/lib/ai/structured-generator";
 import {
   marketingCreativeBriefSchema,
   marketingVideoAiDraftSchema,
+  marketingVideoDraftSchema,
   safeAiCreativeCaptions,
   safeAiCtaTexts,
 } from "@/lib/video/edit-contracts";
@@ -79,7 +80,7 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
     const draft = compileMarketingVideoAiDraft({
       suggestion,
       candidates: sampling.candidates,
-      platform: project.editDraft!.platform,
+      platform: marketingVideoDraftSchema.parse(project.editDraft).platform,
     });
     await applyMarketingVideoAiDraft(
       input.videoId,
@@ -117,10 +118,11 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
     const project = await beginGuardedMarketingVideoRender(input.videoId, input.actorId);
     rendering = true;
     stage = "timeline";
-    const timeline = createMarketingEditTimeline(project, project.editDraft!);
+    const editDraft = marketingVideoDraftSchema.parse(project.editDraft);
+    const timeline = createMarketingEditTimeline(project, editDraft);
     const preset = videoExportPresets.find(
       (candidate) =>
-        candidate.platform === project.editDraft!.platform && candidate.availability === "enabled",
+        candidate.platform === editDraft.platform && candidate.availability === "enabled",
     );
     if (!preset) throw new Error("目标平台没有已启用的项目导出预设。");
     const request = {
@@ -131,9 +133,7 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
       fps: preset.fps,
     } as const;
     stage = "source_access";
-    const sources = await issueSandboxVideoSources(
-      project.editDraft!.clips.map((clip) => clip.assetRef),
-    );
+    const sources = await issueSandboxVideoSources(editDraft.clips.map((clip) => clip.assetRef));
     const useRemotion =
       process.env.VIDEO_COMPOSITOR === "remotion" &&
       preset.width === 1080 &&

@@ -1,26 +1,23 @@
-import { LinkButton } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import type { Metadata } from "next";
+import { PageUnavailable } from "@/components/page-unavailable";
+import { buttonVariants } from "@/components/ui/button";
+import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
+import { WorkspaceLink } from "@/components/workspace/workspace-link";
+
+export const metadata: Metadata = { title: { absolute: "无法打开此项目 · F-Trade" } };
 
 export default function ProjectNotFound() {
   return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyTitle role="heading" aria-level={1}>
-          无法打开此项目
-        </EmptyTitle>
-        <EmptyDescription>该项目不可用，或你没有查看权限。</EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <LinkButton href="/workspace" variant="outline">
-          返回工作台
-        </LinkButton>
-      </EmptyContent>
-    </Empty>
+    <WorkspaceDirtyProvider>
+      <PageUnavailable
+        title="无法打开此项目"
+        description="该项目不可用，或你没有查看权限。"
+        returnLink={
+          <WorkspaceLink href="/workspace" className={buttonVariants({ variant: "outline" })}>
+            返回工作台
+          </WorkspaceLink>
+        }
+      />
+    </WorkspaceDirtyProvider>
   );
 }

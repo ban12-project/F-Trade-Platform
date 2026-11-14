@@ -1,5 +1,7 @@
 import { hasPermission, type Permission } from "@/lib/authz";
+import { rfqMissingLabel, salesNextActionLabels } from "@/lib/sales/journey";
 import { workspaceCollection, workspaceTaskHref } from "./navigation";
+import { workspaceTaskContext } from "./task-context";
 import type {
   WorkspaceProjectOverview,
   WorkspaceProjectSummary,
@@ -179,6 +181,7 @@ export function deriveWorkspaceTasks(
       const responsibleLabel =
         values.responsibleLabel ??
         (permission.endsWith(":review") ? "有审核权限的项目编辑者" : "项目编辑者");
+      const context = workspaceTaskContext(record, records);
       tasks.push({
         id: record.id,
         projectId: project.id,
@@ -187,6 +190,11 @@ export function deriveWorkspaceTasks(
         priority: "complete",
         createdAt: record.createdAt,
         ...values,
+        ...context,
+        nextAction:
+          values.taskType === "opportunity"
+            ? values.actionLabel
+            : (context.nextAction ?? values.actionLabel),
         destination:
           values.destination ??
           (values.source
@@ -276,15 +284,23 @@ export function deriveWorkspaceTasks(
         }
       } else if (record.state === "RFQ_COLLECTING") {
         const missing = Array.isArray(record.payload.missing_fields)
-          ? record.payload.missing_fields.length
-          : 0;
+          ? [
+              ...new Set(
+                record.payload.missing_fields.filter(
+                  (field): field is string => typeof field === "string" && field.trim().length > 0,
+                ),
+              ),
+            ]
+          : [];
         add(
           record,
           {
             recordKind: "rfq",
             taskType: "rfq",
             actionLabel: "补齐询盘",
-            detail: missing ? `还缺 ${missing} 项资料。` : "核对需求后提交完整询盘。",
+            detail: missing.length
+              ? `还缺 ${missing.length} 项资料：${[...new Set(missing.map(rfqMissingLabel))].join("、")}。`
+              : "核对需求后提交完整询盘。",
           },
           "sales:write",
         );
@@ -344,6 +360,10 @@ export function deriveWorkspaceTasks(
         const dueAt =
           dueValue && Number.isFinite(Date.parse(dueValue)) ? new Date(dueValue) : undefined;
         const scheduled = !hot && dueAt && dueAt.getTime() > now.getTime();
+        const nextAction = text(record.payload.next_action);
+        const nextActionLabel = Object.hasOwn(salesNextActionLabels, nextAction)
+          ? salesNextActionLabels[nextAction]
+          : undefined;
         add(
           record,
           {
@@ -353,9 +373,11 @@ export function deriveWorkspaceTasks(
             actionLabel: hot ? "确认有效商机" : scheduled ? "查看跟进计划" : "继续跟进",
             detail: hot
               ? "规则评分达到 HOT，仍需人工认定。"
-              : dueAt
-                ? `计划跟进：${dueAt.toISOString()}`
-                : "尚未安排下次跟进，请核对客户上下文。",
+              : `${nextActionLabel ? `下一动作：${nextActionLabel}。` : ""}${
+                  dueAt
+                    ? "按计划时间跟进，先核对客户最新情况。"
+                    : "尚未安排下次跟进，请核对客户上下文。"
+                }`,
             state: scheduled ? "scheduled" : "actionable",
             priority: hot ? "review" : dueAt && !scheduled ? "overdue" : "complete",
             ...(dueAt ? { dueAt } : {}),

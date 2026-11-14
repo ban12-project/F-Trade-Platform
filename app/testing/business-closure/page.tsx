@@ -18,7 +18,6 @@ const labels = {
 
 async function BusinessClosureContent() {
   await connection();
-  if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   const report = await runSyntheticDemo();
   return (
     <main className="mx-auto min-h-screen max-w-5xl p-6">
@@ -69,6 +68,7 @@ async function BusinessClosureContent() {
 }
 
 export default function BusinessClosureTestingPage() {
+  if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (
     <Suspense fallback={<main className="p-6">正在执行合成闭环验收…</main>}>
       <BusinessClosureContent />

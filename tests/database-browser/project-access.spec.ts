@@ -128,6 +128,8 @@ test("unauthenticated project access still redirects to authentication", async (
 }) => {
   await context.clearCookies();
   await page.goto(`/workspace/${hiddenId}`);
-  await expect(page).toHaveURL(/\/auth$/);
+  await expect(page).toHaveURL(
+    (url) => url.pathname === "/auth" && url.searchParams.get("next") === `/workspace/${hiddenId}`,
+  );
   expect(await page.content()).not.toContain(hiddenTitle);
 });

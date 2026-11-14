@@ -81,9 +81,14 @@ test("follow-up shows the authorized timeline and explicit human send", async ({
 test("publication waits for explicit confirmation and platform receipt", async ({ page }) => {
   await page.goto("/testing/project-workflow?record=publication");
   const detail = page.getByRole("region", { name: "业务记录" });
-  await expect(detail.getByText("尚无可发布内容", { exact: true })).toBeVisible();
+  await expect(detail.getByRole("heading", { name: "暂无发布记录", exact: true })).toBeVisible();
   await expect(detail.getByText("平台回执前不会显示为已发布", { exact: false })).toBeVisible();
   await expect(detail.locator("#publication-confirmation")).toHaveCount(0);
+  await expect(detail.getByText(/这些工作无需连接社媒账号/)).toBeVisible();
+  await expect(detail.getByRole("link", { name: "查看项目内容", exact: true })).toHaveAttribute(
+    "href",
+    "/workspace/content?project=00000000-0000-4000-8000-000000000202",
+  );
 });
 
 test("editor uses the main document width and appears before related tasks", async ({ page }) => {
@@ -101,6 +106,10 @@ for (const outcome of [
   "zero accepted fields",
   "source format",
   "private failure",
+  "network failure",
+  "malformed data",
+  "failed stage only",
+  "interrupted stage only",
 ]) {
   test(`streamed product fields keep actionable feedback after ${outcome}`, async ({ page }) => {
     const zeroAccepted = outcome === "zero accepted fields";
@@ -109,6 +118,7 @@ for (const outcome of [
     const sourceBytes = Buffer.from("Product name,Synthetic streamed clutch");
     let receiptId = "";
     let uploaded = false;
+    let streamRequested = false;
     // This test exercises the browser transport and stream display with synthetic services.
     // Real signing, authorization and private readback have separate integration coverage.
     await page.route("**/api/product-documents/upload", async (route) => {
@@ -183,13 +193,37 @@ for (const outcome of [
           { type: "error", code: "run_failed", message: "生成已停止；已保存的字段仍需人工审核。" },
           { type: "stage", stage: "failed" },
         ];
+    if (outcome === "failed stage only" || outcome === "interrupted stage only") {
+      events.splice(events.length - 2, 1);
+      events[events.length - 1] = {
+        type: "stage",
+        stage: outcome === "failed stage only" ? "failed" : "interrupted",
+      };
+    }
     await page.route("**/api/product-agent/stream", (route) => {
+      streamRequested = true;
       expect(uploaded).toBe(true);
       expect(receiptId).not.toBe("");
       const body = route.request().postData() ?? "";
       expect(body).toContain(receiptId);
       expect(body).not.toContain("filename=");
       expect(body).not.toContain(sourceBytes.toString());
+      if (outcome === "network failure") return route.abort("failed");
+      if (outcome === "malformed data")
+        return route.fulfill({
+          contentType: "application/x-ndjson",
+          body: `${events
+            .slice(0, 3)
+            .map((event, index) =>
+              JSON.stringify({
+                protocol: "product-agent.v1",
+                runId,
+                sequence: index + 1,
+                ...event,
+              }),
+            )
+            .join("\n")}\n{"SYNTHETIC_PRIVATE_PARSE_DETAIL":`,
+        });
       if (outcome === "source format" || outcome === "private failure")
         return route.fulfill({
           status: 400,
@@ -201,27 +235,40 @@ for (const outcome of [
         });
       return route.fulfill({
         contentType: "application/x-ndjson",
-        body:
-          events
-            .map((event, index) =>
-              JSON.stringify({
-                protocol: "product-agent.v1",
-                runId,
-                sequence: index + 1,
-                ...event,
-              }),
-            )
-            .join("\n") + "\n",
+        body: `${events
+          .map((event, index) =>
+            JSON.stringify({
+              protocol: "product-agent.v1",
+              runId,
+              sequence: index + 1,
+              ...event,
+            }),
+          )
+          .join("\n")}\n`,
       });
     });
     await page.goto("/testing/project-workflow?record=product");
-    await page.waitForLoadState("networkidle");
-    await page.getByLabel("产品资料", { exact: true }).setInputFiles({
+    const sourceInput = page.getByLabel("产品资料", { exact: true });
+    await expect(sourceInput).toBeEnabled();
+    await sourceInput.setInputFiles({
       name: "synthetic.csv",
       mimeType: "text/csv",
       buffer: sourceBytes,
     });
     await page.getByRole("button", { name: "生成待审核草稿", exact: true }).click();
+    await expect.poll(() => receiptId, { message: "upload credentials requested" }).not.toBe("");
+    await expect.poll(() => uploaded, { message: "synthetic file upload received" }).toBe(true);
+    await expect.poll(() => streamRequested, { message: "generation stream requested" }).toBe(true);
+    if (outcome === "network failure") {
+      await expect(
+        page.getByText("生成连接未能完成，请检查网络；若已有草稿，可先查看已保存字段。", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(page.getByRole("link", { name: "打开已保存草稿（新窗口）" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "生成待审核草稿", exact: true })).toBeEnabled();
+      return;
+    }
     if (outcome === "source format" || outcome === "private failure") {
       await expect(
         page.getByText(
@@ -242,8 +289,10 @@ for (const outcome of [
     if (!zeroAccepted) {
       await expect(progress.getByText("Synthetic streamed clutch", { exact: true })).toBeVisible();
       await expect(progress.getByText("来源校验通过 · 待人工审核", { exact: true })).toBeVisible();
-      await expect(progress.getByText("待补资料", { exact: true })).toBeVisible();
-      await expect(progress.getByText("校验失败", { exact: true })).toBeVisible();
+      if (outcome !== "malformed data") {
+        await expect(progress.getByText("待补资料", { exact: true })).toBeVisible();
+        await expect(progress.getByText("校验失败", { exact: true })).toBeVisible();
+      }
     }
     await expect(page.getByRole("link", { name: "打开已保存草稿（新窗口）" })).toHaveAttribute(
       "href",
@@ -253,10 +302,18 @@ for (const outcome of [
       page.getByText(
         zeroAccepted
           ? "未提取到可由来源验证的字段，本次导入未成功。CSV 可使用 Product name、OE、Application。"
-          : "生成已停止；已保存的字段仍需人工审核。",
+          : outcome === "malformed data"
+            ? "生成数据格式异常；若已有草稿，请先核对已保存字段，再决定是否重新生成。"
+            : outcome === "failed stage only"
+              ? "生成未完成，请核对资料；若已有草稿，可先查看已保存字段。"
+              : outcome === "interrupted stage only"
+                ? "生成已中断，已保存字段仍可在草稿中查看。"
+                : "生成已停止；已保存的字段仍需人工审核。",
         { exact: true },
       ),
     ).toBeVisible();
+    await expect(page.getByText("SYNTHETIC_PRIVATE_PARSE_DETAIL", { exact: false })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "生成待审核草稿", exact: true })).toBeEnabled();
   });
 }
 
@@ -314,4 +371,40 @@ test("customer delivery is optional and an ineligible opportunity is explained",
   await expect(panel.getByText(/当前有效交期为 21 天/)).toBeVisible();
   await expect(panel.getByRole("button", { name: "确认有效商机", exact: true })).toHaveCount(0);
   await expect(panel.getByText(/采购意向尚待确认/)).toBeVisible();
+});
+
+test("product review validation focuses missing evidence then rejection notes without submitting", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/testing/project-workflow?record=product&state=product-review");
+  let writes = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"]) writes++;
+  });
+  const detail = page.getByRole("region", { name: "业务记录", exact: true });
+  const decision = detail.getByRole("combobox", { name: "决定", exact: true });
+  const evidence = detail.getByRole("combobox", { name: "审核依据", exact: true });
+  const notes = detail.getByRole("textbox", { name: "审核备注", exact: false });
+  await decision.click();
+  await page.getByRole("option", { name: "退回产品信息", exact: true }).click();
+  const submit = detail.getByRole("button", { name: "退回产品信息", exact: true });
+  await submit.click();
+  await expect(evidence).toBeFocused();
+  await expect(evidence).toHaveAttribute("aria-invalid", "true");
+  await expect(evidence).toHaveAccessibleDescription("请选择来源资料。");
+  await evidence.press("ArrowDown");
+  await page.getByRole("option", { name: /Synthetic review evidence/ }).click();
+  await submit.click();
+  await expect(notes).toBeFocused();
+  await expect(notes).toHaveAccessibleDescription("退回产品事实时必须填写原因。");
+  await expect(notes).toHaveAttribute("aria-invalid", "true");
+  await expect(evidence).toHaveAttribute("aria-invalid", "false");
+  await expect(evidence).not.toHaveAttribute("aria-describedby");
+  await notes.fill("Synthetic: please provide the original factory evidence.");
+  await expect(notes).toHaveAttribute("aria-invalid", "false");
+  await expect(notes).not.toHaveAttribute("aria-describedby");
+  await expect(decision).toContainText("退回产品信息");
+  await expect(evidence).toContainText("Synthetic review evidence");
+  expect(writes).toBe(0);
 });

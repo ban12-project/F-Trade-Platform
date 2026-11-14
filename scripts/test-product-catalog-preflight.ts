@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { discoverCatalogCandidates } from "../lib/product/catalog-candidates";
 import type { ProductAgentDocumentSource } from "../lib/product/document-source";
 import {
@@ -11,6 +10,7 @@ import {
   createCatalogPreflightReport,
   writeCatalogReportSnapshot,
 } from "./run-product-agent-catalog";
+import { required } from "./test-required";
 
 const document: ProductAgentDocumentSource = {
   source: {
@@ -117,7 +117,7 @@ async function verifyBatchFailures() {
     } else await run;
     assert.deepEqual(attempted.toSorted(), [0, 1, 2]);
     assert.ok(reports[0]?.every((record) => record.status === "pending"));
-    const final = reports.at(-1)!;
+    const final = required(reports.at(-1));
     assert.equal(final.filter((record) => record.status === "failed").length, failedIndices.size);
     assert.ok(final.every((record) => record.status !== "pending"));
     assert.ok(

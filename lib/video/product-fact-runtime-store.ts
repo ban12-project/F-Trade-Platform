@@ -18,7 +18,7 @@ export async function assertCurrentProductFactsForVideo(
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, project.productId), eq(aggregateRecord.type, "product")))
     .limit(1);
-  if (!product || product.state !== "PRODUCT_READY") {
+  if (product?.state !== "PRODUCT_READY") {
     throw new Error("视频引用的产品已不再处于 ProductReady，不能继续处理。");
   }
   const result = assertCurrentProductFacts(project, product.payload);

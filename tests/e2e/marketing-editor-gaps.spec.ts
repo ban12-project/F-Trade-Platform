@@ -165,6 +165,8 @@ test("mixed product source coverage exposes each field needing original review",
   await expect(
     source.getByText("MOCK source text: Verified clutch kit", { exact: true }),
   ).toBeVisible();
+  await page.getByRole("combobox", { name: "核对字段" }).click();
+  await page.getByRole("option", { name: "产品编号", exact: true }).click();
   const missingField = source.locator("div").filter({
     has: page.getByText("产品编号", { exact: true }),
   });

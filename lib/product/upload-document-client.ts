@@ -13,7 +13,9 @@ export async function uploadProductDocument(
   file: File,
   projectId: string,
   purpose: DocumentUploadPayload["purpose"],
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted();
   const payload = documentUploadPayloadSchema.parse({
     receiptId: crypto.randomUUID(),
     projectId,
@@ -27,9 +29,11 @@ export async function uploadProductDocument(
   });
   await uploadPresigned(documentUploadPath(payload), file, {
     access: "private",
+    abortSignal: signal,
     contentType: payload.contentType,
     handleUploadUrl: "/api/product-documents/upload",
     clientPayload: JSON.stringify(payload),
   });
+  signal?.throwIfAborted();
   return payload.receiptId;
 }

@@ -6,6 +6,7 @@ import {
   validateFacebookProfile,
 } from "../../ops/browser-node/facebook-driver.mjs";
 import { createPublicationExecutor } from "../../ops/browser-node/publication-executor.mjs";
+import { required } from "../../scripts/test-required";
 
 const profile = {
   version: 1,
@@ -515,7 +516,7 @@ for (const mode of [
         const input = page.locator(String(body.inputSelector));
         expect(await input.count()).toBe(1);
         await input.setInputFiles({
-          name: path.split("/").at(-1)!,
+          name: required(path.split("/").at(-1)),
           mimeType: format === "video" ? "video/mp4" : "image/png",
           buffer: mediaBytes,
         });

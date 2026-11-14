@@ -1026,7 +1026,7 @@ test("saved login profiles remain private, bounded and interactive-account scope
     const namedSpec = { body: { Env: [] } };
     configureLoginRuntime(namedSpec, namedRun, namedAutomatic.profile);
     assert.ok(namedSpec.body.Env.includes("FTRADE_ACCOUNT_REF=123456789"));
-    assert.ok(!namedSpec.body.Env.includes("FTRADE_ACCOUNT_REF=" + namedAutomatic.accountRef));
+    assert.ok(!namedSpec.body.Env.includes(`FTRADE_ACCOUNT_REF=${namedAutomatic.accountRef}`));
     await writeFile(path, JSON.stringify([expiredAutomatic]));
     assert.equal((await loadLoginProfiles(path)).size, 0);
     for (const invalid of [

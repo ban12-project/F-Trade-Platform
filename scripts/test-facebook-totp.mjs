@@ -14,7 +14,7 @@ for (const [time, expected] of [
   assert.equal(generateTotp(secret, time * 1000).code, expected);
 assert.equal(generateTotp(secret, 59999).expiresAt, 60000);
 assert.notEqual(generateTotp(secret, 59999).code, generateTotp(secret, 60000).code);
-for (const bad of ["", "not-a-secret", "A".repeat(17), "A".repeat(17) + "B"])
+for (const bad of ["", "not-a-secret", "A".repeat(17), `${"A".repeat(17)}B`])
   assert.throws(() => generateTotp(bad), /totp_input_invalid/);
 assert.throws(() => generateTotp(secret, -1), /totp_input_invalid/);
 console.log("PASS TOTP RFC vectors, step boundary, invalid Base32 and timestamp");

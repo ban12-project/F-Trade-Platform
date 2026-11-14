@@ -1,3 +1,4 @@
+import { StickyPanel } from "./sticky-panel";
 import "server-only";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -33,7 +34,7 @@ async function ProjectDetails({ params, searchParams }: ProjectPageProps) {
     (key) => query[key] !== undefined,
   );
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">{project.title}</h2>
@@ -71,24 +72,32 @@ async function ProjectDetails({ params, searchParams }: ProjectPageProps) {
           </WorkspaceLink>
         ))}
       </nav>
-      {project.memberRole === "owner" ? (
-        <>
-          <ProjectNameForm projectId={projectId} title={project.title} />
-          <ProjectStatusControl projectId={projectId} status={project.status} />
-        </>
-      ) : null}
-      <ProjectMembersPanel
-        projectId={projectId}
-        currentUserId={session.user.id}
-        members={await listWorkspaceProjectMembers(projectId, session.user.id)}
-      />
+      <div className="workspace-columns">
+        <div className="min-w-0">
+          <ProjectMembersPanel
+            projectId={projectId}
+            currentUserId={session.user.id}
+            members={await listWorkspaceProjectMembers(projectId, session.user.id)}
+          />
+        </div>
+        <StickyPanel>
+          <aside aria-label="项目设置" className="workspace-support">
+            {project.memberRole === "owner" ? (
+              <>
+                <ProjectNameForm projectId={projectId} title={project.title} />
+                <ProjectStatusControl projectId={projectId} status={project.status} />
+              </>
+            ) : null}
+          </aside>
+        </StickyPanel>
+      </div>
     </div>
   );
 }
 export function ProjectPage(props: ProjectPageProps) {
   return (
-    <main id="main-content" tabIndex={-1} className="workspace-page bg-muted/30">
-      <div className="mx-auto max-w-4xl space-y-6 px-4 py-5 sm:p-6">
+    <main id="main-content" tabIndex={-1} className="workspace-page workspace-layout bg-muted/30">
+      <div className="mx-auto max-w-7xl flex flex-col gap-6 px-4 py-5 sm:p-6">
         <header>
           <WorkspaceLink
             href="/workspace/projects"

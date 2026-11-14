@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
-
 import { expect, test } from "@playwright/test";
+import { NextRequest } from "next/server";
+import { workspaceSignInHref, workspaceSignInTarget } from "../../lib/auth-navigation";
+import { proxy } from "../../proxy";
 
 import { parseAdminSeedArgs } from "../../scripts/seed-admins";
 
@@ -38,10 +39,63 @@ test("rejects public email and password sign-up", async ({ request }) => {
 test("redirects an unauthenticated workspace request to sign-in", async ({ page }) => {
   await page.goto("/workspace");
 
-  await expect(page).toHaveURL(/\/auth$/);
+  await expect(page).toHaveURL(/\/auth\?next=%2Fworkspace$/);
 });
 
-test("sends a completed sign-in to the workspace", () => {
-  const authPanel = readFileSync("app/auth/panel.tsx", "utf8");
-  expect(authPanel).toContain('window.location.assign("/workspace")');
+test("preserves workspace paths and rejects unsafe return destinations", () => {
+  for (const target of [
+    "/workspace",
+    "/workspace/products?project=synthetic&type=product",
+    "/workspace/settings?section=channels&returnTo=%2Fworkspace%2Fcontent",
+  ]) {
+    expect(workspaceSignInTarget(target)).toBe(target);
+    expect(
+      new URL(workspaceSignInHref(target), "https://test.invalid").searchParams.get("next"),
+    ).toBe(target);
+  }
+  for (const target of [
+    null,
+    "",
+    "https://evil.invalid/workspace",
+    "//evil.invalid",
+    "/auth",
+    "/workspace-other",
+    "/workspace/../../auth",
+    "/workspace/%2e%2e/auth",
+    "/workspace/%5cevil",
+    "/workspace/%00",
+    "/workspace/%zz",
+  ]) {
+    expect(workspaceSignInTarget(target)).toBe("/workspace");
+  }
+});
+
+test("retains a deep link and its query when requesting sign-in", async ({ page }) => {
+  const target = "/workspace/settings?section=channels&returnTo=%2Fworkspace%2Fcontent";
+  await page.goto(target);
+  expect(new URL(page.url()).searchParams.get("next")).toBe(target);
+  await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
+});
+
+test("landing page has one workspace action", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "进入工作台" })).toHaveAttribute(
+    "href",
+    "/workspace",
+  );
+  await expect(page.getByRole("link", { name: "查看工作台" })).toHaveCount(0);
+});
+
+test("proxy replaces a supplied return header with the actual request path", async () => {
+  const response = await proxy(
+    new NextRequest("https://test.invalid/workspace/settings?section=account", {
+      headers: {
+        cookie: "better-auth.session_token=synthetic-stale-cookie",
+        "x-workspace-return-path": "https://evil.invalid",
+      },
+    }),
+  );
+  expect(response.headers.get("x-middleware-request-x-workspace-return-path")).toBe(
+    "/workspace/settings?section=account",
+  );
 });

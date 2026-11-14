@@ -105,7 +105,7 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       .from(workspaceProject)
       .where(eq(workspaceProject.id, value.projectId))
       .for("update");
-    if (!workspace || workspace.kind !== "marketing" || workspace.status !== "active") {
+    if (workspace?.kind !== "marketing" || workspace.status !== "active") {
       throw new Error("只能在进行中的产品营销项目中创建营销视频。");
     }
 
@@ -130,7 +130,7 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, value.productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (!productRow || productRow.state !== "PRODUCT_READY") {
+    if (productRow?.state !== "PRODUCT_READY") {
       throw new Error("只能从已通过 Gate 01 的产品创建营销视频。");
     }
     const ready = parseProductReady(productRow.payload);
@@ -159,17 +159,24 @@ export async function createMarketingVideoEditProjectFromProductMedia(
     const selectedFacts = ["product.product_name", value.factPath].filter(
       (path, index, paths) => paths.indexOf(path) === index && Boolean(ready.field_evidence[path]),
     );
-    const clips = selected.assets.map((asset, index) => ({
-      clipId: `clip-${String(index + 1).padStart(3, "0")}`,
-      assetRef: asset.evidenceRef,
-      mediaType: asset.mediaType,
-      trimStartMs: 0,
-      durationMs:
-        asset.mediaType === "image" ? 3_000 : Math.min(5_000, asset.technical.durationMs!),
-      fitMode: "contain" as const,
-      audioMode: "muted" as const,
-      caption: { kind: "none" as const },
-    }));
+    const clips = selected.assets.map((asset, index) => {
+      let durationMs = 3_000;
+      if (asset.mediaType === "video") {
+        const sourceDurationMs = asset.technical.durationMs;
+        if (sourceDurationMs === null) throw new Error("视频素材缺少已核实的时长。");
+        durationMs = Math.min(5_000, sourceDurationMs);
+      }
+      return {
+        clipId: `clip-${String(index + 1).padStart(3, "0")}`,
+        assetRef: asset.evidenceRef,
+        mediaType: asset.mediaType,
+        trimStartMs: 0,
+        durationMs,
+        fitMode: "contain" as const,
+        audioMode: "muted" as const,
+        caption: { kind: "none" as const },
+      };
+    });
     const editDraft = marketingVideoDraftSchema.parse({
       version: 2,
       platform: value.platform,

@@ -1,5 +1,8 @@
 import { type ProductStreamEvent, productStreamEventSchema } from "./stream-contract";
 
+// Only these deliberate user-facing messages cross the client transport boundary.
+export class ProductStreamError extends Error {}
+
 export async function consumeProductStream(
   body: ReadableStream<Uint8Array>,
   receive: (event: ProductStreamEvent) => void,
@@ -12,10 +15,23 @@ export async function consumeProductStream(
   let terminal = false;
   const line = (text: string) => {
     if (!text.trim()) return;
-    if (text.length > 128000) throw new Error("生成事件超过大小限制。");
-    const event = productStreamEventSchema.parse(JSON.parse(text));
+    if (text.length > 128000) throw new ProductStreamError("生成事件超过大小限制。");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new ProductStreamError(
+        "生成数据格式异常；若已有草稿，请先核对已保存字段，再决定是否重新生成。",
+      );
+    }
+    const result = productStreamEventSchema.safeParse(parsed);
+    if (!result.success)
+      throw new ProductStreamError(
+        "生成数据格式异常；若已有草稿，请先核对已保存字段，再决定是否重新生成。",
+      );
+    const event = result.data;
     if (terminal || event.sequence !== sequence + 1 || (runId && event.runId !== runId))
-      throw new Error("生成事件顺序无效。");
+      throw new ProductStreamError("生成事件顺序无效。");
     runId = event.runId;
     sequence = event.sequence;
     terminal =
@@ -31,11 +47,11 @@ export async function consumeProductStream(
         line(buffer.slice(0, newline));
         buffer = buffer.slice(newline + 1);
       }
-      if (buffer.length > 128000) throw new Error("生成事件超过大小限制。");
+      if (buffer.length > 128000) throw new ProductStreamError("生成事件超过大小限制。");
       if (done) break;
     }
     if (buffer.trim()) line(buffer);
-    if (!terminal) throw new Error("生成连接已中断，已保存字段仍可在草稿中查看。");
+    if (!terminal) throw new ProductStreamError("生成连接已中断，已保存字段仍可在草稿中查看。");
   } finally {
     await reader.cancel().catch(() => {});
     reader.releaseLock();

@@ -3,8 +3,8 @@ import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-
 import { auth } from "@/lib/auth";
+import { workspacePathHeader, workspaceSignInHref } from "@/lib/auth-navigation";
 import { hasPermission, type Permission } from "@/lib/authz";
 
 const getRequestSession = cache(async () => auth.api.getSession({ headers: await headers() }));
@@ -18,7 +18,7 @@ export async function requireRole(...allowedRoles: readonly string[]) {
     throw new Error("requireRole needs at least one allowed role");
   }
   const session = await getRequestSession();
-  if (!session) redirect("/auth");
+  if (!session) redirect(workspaceSignInHref((await headers()).get(workspacePathHeader)));
   if (!session.user.role || !allowedRoles.includes(session.user.role))
     redirect("/auth?error=access-denied");
   return session;
@@ -29,7 +29,7 @@ export async function requireRole(...allowedRoles: readonly string[]) {
  */
 export async function requirePermission(permission: Permission) {
   const session = await getRequestSession();
-  if (!session) redirect("/auth");
+  if (!session) redirect(workspaceSignInHref((await headers()).get(workspacePathHeader)));
   if (!hasPermission(session.user.role, permission)) redirect("/auth?error=access-denied");
   return session;
 }

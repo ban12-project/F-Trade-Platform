@@ -49,9 +49,9 @@ export function ContentCopy({
   useEffect(() => {
     if (state.status === "success") router.refresh();
   }, [router, state.status]);
-  useCreatedRecord(projectId, "content", state.status, state.contentId);
+  const created = useCreatedRecord(projectId, "content", state.status, state.contentId);
   function copy() {
-    if (!selected) return;
+    if (pending || created || !selected) return;
     const data = new FormData();
     data.set("projectId", projectId);
     data.set("sourceContentId", selected);
@@ -74,6 +74,7 @@ export function ContentCopy({
                   `${item.projectTitle} · ${item.productName} · ${item.hook}`,
                 ]),
               )}
+              disabled={pending || created}
               value={selected}
               onValueChange={(value) => value && setSelected(value)}
             >
@@ -96,7 +97,7 @@ export function ContentCopy({
         )}
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button disabled={pending || !selected} onClick={copy}>
+        <Button disabled={pending || created || !selected} onClick={copy}>
           <CopyIcon data-icon="inline-start" />
           复制为新草稿
         </Button>

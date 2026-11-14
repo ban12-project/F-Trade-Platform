@@ -110,7 +110,7 @@ try {
         const changed = structuredClone(original);
         if (state === "needs_login") changed.accounts[1].authState = "needs_login";
         if (state === "disabled") changed.accounts[1].enabled = false;
-        if (state === "private_worker") changed.publicationScopes![1].audience = "Friends";
+        if (state === "private_worker") changed.publicationScopes[1].audience = "Friends";
         await db.execute(
           sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(changed)}::jsonb WHERE id = ${f.nodeId}`,
         );
@@ -176,9 +176,9 @@ try {
         await db
           .update(s.socialBrowserJob)
           .set({ status: "claimed" })
-          .where(eq(s.socialBrowserJob.id, publication.browserJobId!));
+          .where(eq(s.socialBrowserJob.id, publication.browserJobId));
         if (index === 0) {
-          const account = original.accounts.find((a) => a.accountRef === target.accountRef)!;
+          const account = original.accounts.find((a) => a.accountRef === target.accountRef);
           const run = {
             id: randomUUID(),
             kind: "publish",
@@ -238,8 +238,27 @@ try {
         .where(eq(s.socialChannelControl.accountRef, extra.accountRef));
       assert.deepEqual(await submitPublicationBatch(input, f.identity, db), result[0]);
       assert.equal(await count(), 2);
+      const [currentSession] = await db
+        .select({ expiresAt: s.session.expiresAt })
+        .from(s.session)
+        .where(eq(s.session.id, f.identity.sessionId));
+      await db
+        .update(s.session)
+        .set({ expiresAt: new Date(0) })
+        .where(eq(s.session.id, f.identity.sessionId));
+      try {
+        await assert.rejects(submitPublicationBatch(input, f.identity, db), {
+          name: "SocialHumanAccessError",
+        });
+        assert.equal(await count(), 2);
+      } finally {
+        await db
+          .update(s.session)
+          .set({ expiresAt: currentSession.expiresAt })
+          .where(eq(s.session.id, f.identity.sessionId));
+      }
       console.log(
-        `${format}/${outcome}: receipt isolation, source version preservation, atomic target validation, state preservation, stale preview, concurrency, replay and refresh passed`,
+        `${format}/${outcome}: receipt isolation, source version preservation, atomic target validation, state preservation, stale preview, concurrency, authorized replay, expired replay denial and refresh passed`,
       );
     }
   const image = await seedPublicationAccessFixture(db, "image", true);

@@ -48,8 +48,8 @@ export function WorkspaceNavigation({
       <Sidebar>
         <SidebarHeader className="gap-4 p-4">
           <span className="text-lg font-semibold tracking-tight">F-Trade</span>
-          <div data-guide="new-work">
-            <NewWorkButton onOpen={() => setOpenMobile(false)} />
+          <div>
+            <NewWorkButton data-guide="new-work" onOpen={() => setOpenMobile(false)} />
           </div>
         </SidebarHeader>
         <SidebarContent>

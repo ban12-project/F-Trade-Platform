@@ -89,7 +89,7 @@ function factOptions(product: ProductReady) {
       .flatMap(([field]) => {
         const path = `${section}.${field}`;
         return product.field_evidence[path] &&
-          product.evidence_refs.includes(product.field_evidence[path]!)
+          product.evidence_refs.includes(product.field_evidence[path])
           ? [{ value: path, label: path }]
           : [];
       }),

@@ -175,7 +175,7 @@ export const readWorkspaceRecordTasks = cache(
       .from(user)
       .where(eq(user.id, actorId));
     const snapshot: WorkspaceTaskSnapshot = {
-      projects: [{ ...project, memberRole: project.memberRole!, appRole: actor?.role ?? null }],
+      projects: [{ ...project, memberRole: project.memberRole, appRole: actor?.role ?? null }],
       records: [
         ...neighbors,
         ...readyProducts.filter((item) => !neighbors.some((neighbor) => neighbor.id === item.id)),

@@ -1,7 +1,9 @@
 "use client";
 import { ArrowRightIcon, CheckCircle2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { type ReactNode, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Empty,
@@ -10,8 +12,11 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Spinner } from "@/components/ui/spinner";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { workspaceTaskHref } from "@/lib/workspace/navigation";
+import { formatTaskDeadline, isTaskOverdue } from "@/lib/workspace/task-context";
 import { isActionableTask, taskStateLabel } from "@/lib/workspace/task-model";
 import type {
   WorkspaceProjectOverview,
@@ -27,11 +32,14 @@ function TaskRows({
   tasks,
   empty,
   selectedReturnTo,
+  currentTime,
 }: {
   tasks: WorkspaceTaskSummary[];
   empty: string;
   selectedReturnTo: string;
+  currentTime: number;
 }) {
+  const timeZone = useBrowserTimeZone();
   if (!tasks.length)
     return (
       <Empty className="border-0 py-8">
@@ -40,45 +48,81 @@ function TaskRows({
             <CheckCircle2Icon />
           </EmptyMedia>
           <EmptyTitle>{empty}</EmptyTitle>
-          <EmptyDescription>新的事项出现后会自动汇总到这里。</EmptyDescription>
+          <EmptyDescription>刷新任务可查看最新事项。</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
   return (
-    <div className="divide-y">
+    // biome-ignore lint/a11y/noRedundantRoles: Tailwind resets list-style; Safari needs an explicit list role outside nav.
+    <ul role="list" className="divide-y">
       {tasks.map((task) => (
-        <Link
-          key={`${task.taskType}-${task.id}`}
-          href={workspaceTaskHref(task, selectedReturnTo)}
-          className="group flex min-h-16 items-center gap-3 px-1 py-3 outline-none transition-colors duration-[120ms] hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate text-sm font-medium">{task.title}</span>
-              <Badge variant={task.priority === "review" ? "default" : "secondary"}>
-                {task.actionLabel ?? (task.priority === "review" ? "审核" : "处理")}
-              </Badge>
-              {task.state ? <Badge variant="outline">{taskStateLabel(task)}</Badge> : null}
+        <li key={`${task.taskType}-${task.id}`}>
+          <Link
+            href={workspaceTaskHref(task, selectedReturnTo)}
+            className="group flex min-h-16 items-center gap-3 px-1 py-3 outline-none transition-colors duration-[120ms] hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-sm font-medium">{task.title}</span>
+                <Badge variant={task.priority === "review" ? "default" : "secondary"}>
+                  {task.actionLabel ?? (task.priority === "review" ? "审核" : "处理")}
+                </Badge>
+                {task.state ? <Badge variant="outline">{taskStateLabel(task)}</Badge> : null}
+                {isTaskOverdue(task.dueAt, currentTime) ? (
+                  <Badge variant="destructive">已逾期</Badge>
+                ) : null}
+              </div>
+              {task.customerLabel ||
+              ["lead", "rfq", "quotation", "delivery"].includes(task.recordKind) ? (
+                <p className="mt-2 break-words text-sm">
+                  客户 / 公司：{task.customerLabel ?? "尚未录入"}
+                </p>
+              ) : null}
+              {task.needLabel ||
+              ["lead", "rfq", "quotation", "delivery"].includes(task.recordKind) ? (
+                <p className="mt-1 break-words text-sm">
+                  产品 / 需求：{task.needLabel ?? "尚未录入"}
+                </p>
+              ) : null}
+              <p className="mt-1 break-words text-sm">
+                下一动作：{task.nextAction ?? task.actionLabel ?? "打开记录核对"}
+              </p>
+              <p className="mt-1 break-words text-sm text-muted-foreground">
+                {task.projectTitle} · {task.detail}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>
+                  {task.state === "waiting" ? "等待对象" : "处理角色"}：
+                  {task.responsibleLabel ?? "未指定"}
+                </span>
+                {task.dueAt ? (
+                  <time dateTime={task.dueAt.toISOString()}>
+                    截止：{formatTaskDeadline(task.dueAt, timeZone)}（{timeZone}）
+                  </time>
+                ) : (
+                  <span>截止：未安排</span>
+                )}
+              </div>
             </div>
-            <p className="mt-1 break-words text-sm text-muted-foreground">
-              {task.projectTitle} · {task.detail}
-            </p>
-          </div>
-          <ArrowRightIcon className="workspace-task-arrow size-4 shrink-0 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
-        </Link>
+            <ArrowRightIcon className="workspace-task-arrow size-4 shrink-0 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
+          </Link>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
 export function WorkspaceDashboard({
+  children,
   projects,
   tasks,
   overview,
   inbound = [],
+  currentTime,
   view = "actionable",
   basePath = "/workspace",
 }: {
+  children?: ReactNode;
   projects: WorkspaceProjectSummary[];
   tasks: WorkspaceTaskSummary[];
   overview: WorkspaceProjectOverview[];
@@ -87,6 +131,9 @@ export function WorkspaceDashboard({
   view?: string;
   basePath?: string;
 }) {
+  const router = useRouter();
+  const timeZone = useBrowserTimeZone();
+  const [refreshing, startRefresh] = useTransition();
   const groups = [
     { id: "actionable", label: "我可处理", rows: tasks.filter(isActionableTask) },
     { id: "waiting", label: "等待他人", rows: tasks.filter((task) => task.state === "waiting") },
@@ -97,12 +144,12 @@ export function WorkspaceDashboard({
     },
     { id: "scheduled", label: "已安排", rows: tasks.filter((task) => task.state === "scheduled") },
   ];
-  const selected = groups.find((group) => group.id === view) ?? groups[0]!;
+  const selected = groups.find((group) => group.id === view) ?? groups[0];
   const pendingCount = groups[0]?.rows.length + inbound.length;
   return (
     <WorkspaceDirtyProvider>
-      <main id="main-content" tabIndex={-1} className="workspace-page bg-muted/30">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-5 sm:p-6">
+      <main id="main-content" tabIndex={-1} className="workspace-page workspace-layout bg-muted/30">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 sm:p-6">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">今日任务</h1>
@@ -112,10 +159,30 @@ export function WorkspaceDashboard({
                   : "有新工作可直接开始；等待中的事项会随状态更新。"}
               </p>
             </div>
-            <NewWorkButton />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={refreshing}
+                aria-busy={refreshing}
+                data-guide="task-refresh"
+                onClick={() => startRefresh(() => router.refresh())}
+              >
+                {refreshing ? <Spinner aria-hidden="true" /> : null}
+                {refreshing ? "正在刷新任务…" : "刷新任务"}
+              </Button>
+              <NewWorkButton data-guide="new-work" />
+            </div>
+            <p className="w-full text-xs text-muted-foreground">
+              列表更新于{" "}
+              <time dateTime={new Date(currentTime).toISOString()}>
+                {formatTaskDeadline(new Date(currentTime), timeZone)}
+              </time>
+              。状态或跟进时间变化后，可刷新任务。
+            </p>
           </header>
           <section id="my-tasks" aria-label="任务清单" className="min-w-0">
-            <nav aria-label="任务状态" className="mb-3 flex flex-wrap gap-2">
+            <nav aria-label="任务状态" className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {groups.map((group) => (
                 <Link
                   key={group.id}
@@ -148,15 +215,18 @@ export function WorkspaceDashboard({
                 {selected.id === "actionable" ? (
                   <InboundRoutingList items={inbound} projects={projects} />
                 ) : null}
-                <TaskRows
-                  tasks={selected.rows}
-                  selectedReturnTo={
-                    selected.id === "actionable" ? "/workspace" : `/workspace?view=${selected.id}`
-                  }
-                  empty={
-                    selected.id === "actionable" ? "当前没有需要你处理的任务" : "当前没有这类事项"
-                  }
-                />
+                {selected.id !== "actionable" || selected.rows.length > 0 || !inbound.length ? (
+                  <TaskRows
+                    tasks={selected.rows}
+                    currentTime={currentTime}
+                    selectedReturnTo={
+                      selected.id === "actionable" ? "/workspace" : `/workspace?view=${selected.id}`
+                    }
+                    empty={
+                      selected.id === "actionable" ? "当前没有需要你处理的任务" : "当前没有这类事项"
+                    }
+                  />
+                ) : null}
                 {!tasks.length && !inbound.length ? (
                   <div className="flex flex-wrap justify-center gap-2 pb-4">
                     <NewWorkButton intent="product">录入第一份产品资料</NewWorkButton>
@@ -168,6 +238,7 @@ export function WorkspaceDashboard({
               </CardContent>
             </Card>
           </section>
+          {children}
           <section id="overview" className="flex flex-col gap-3" aria-label="项目概况">
             <div>
               <h2 className="text-base font-semibold">项目概况</h2>

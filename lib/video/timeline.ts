@@ -132,14 +132,13 @@ export function createMarketingEditTimeline(
       throw new Error(`片段 ${clip.clipId} 引用了未授权或类型不匹配的素材。`);
     const verifiedClaim =
       clip.caption.kind === "verified_fact" ? claimsByField.get(clip.caption.claimRef) : undefined;
-    if (clip.caption.kind === "verified_fact" && !verifiedClaim)
-      throw new Error(`片段 ${clip.clipId} 的字幕引用了未绑定证据的产品字段。`);
-    const caption =
-      clip.caption.kind === "none"
-        ? undefined
-        : clip.caption.kind === "creative"
-          ? { text: clip.caption.text, claimRefs: [] as string[] }
-          : { text: verifiedClaim!.value, claimRefs: [verifiedClaim!.field] };
+    let caption: { text: string; claimRefs: string[] } | undefined;
+    if (clip.caption.kind === "creative") {
+      caption = { text: clip.caption.text, claimRefs: [] };
+    } else if (clip.caption.kind === "verified_fact") {
+      if (!verifiedClaim) throw new Error(`片段 ${clip.clipId} 的字幕引用了未绑定证据的产品字段。`);
+      caption = { text: verifiedClaim.value, claimRefs: [verifiedClaim.field] };
+    }
     const durationSeconds = clip.durationMs / 1_000;
     const sceneStart = startSeconds;
     startSeconds += durationSeconds;

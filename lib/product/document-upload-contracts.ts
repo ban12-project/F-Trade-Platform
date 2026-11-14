@@ -27,7 +27,7 @@ export const documentFilenameSchema = z
 
 export const documentFileSchema = z
   .file()
-  .min(1)
+  .min(1, "文件为空，请选择包含资料内容的文件。")
   .max(maximumProductDocumentBytes, "文件不能超过 25 MiB。")
   .refine(
     (file) => documentFilenameSchema.safeParse(file.name).success,

@@ -1,6 +1,44 @@
 # MVP1 当前验收状态
 
-核对日期：2026-11-01。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#332](https://github.com/ban12-project/F-Trade-Platform/issues/332)。**MVP1 总验收未完成；用户要求推进剩余工程工作，但因缺少可发送私信的账号，延后当前账号发布与 DM 入站验收。** 新运行时交付、真实账号观察及未通过项见[本轮 DM 检查点](reports/dm-startup-diagnostics-20261031.md)。 本轮新业务资料仅使用 `docs/reference/`，旧合成项目归档并保留原审计；受控消息不计作真实客户询盘。新运行时、模板与生产部署的工程证据见[接管修复与交付报告](reports/sandbox-viewer-rollout-20261022.md)。下文标注的 2026-10-15 状态属于历史检查点，不能代替本轮实测。
+核对日期：2026-11-14。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#332](https://github.com/ban12-project/F-Trade-Platform/issues/332)。**MVP1 总验收未完成；用户要求推进剩余工程工作，但因缺少可发送私信的账号，延后当前账号发布与 DM 入站验收。** 10 月 31 日运行时交付、真实账号观察及未通过项见[历史 DM 检查点](reports/dm-startup-diagnostics-20261031.md)。 11 月 1 日业务演示仅使用 `docs/reference/`，旧合成项目归档并保留原审计；受控消息不计作真实客户询盘。10 月 22 日运行时、模板与生产部署的工程证据见[接管修复与交付报告](reports/sandbox-viewer-rollout-20261022.md)。下文标注的 2026-10-15 状态属于历史检查点，不能代替本轮实测。
+
+## 2026-11-14 不依赖社媒账号的工程检查点
+
+本节更新工程证据和交付边界，不将模拟验收改称真实渠道验收，也不替代最终人工决定。11 月 1 日的模拟销售授权、PITR 与浏览器缩放移出范围等决定继续有效。
+
+| 范围 | 已验证证据 | 边界／后续条件 |
+| --- | --- | --- |
+| 完整 UI 回归 | [#1069 完整运行记录](https://github.com/ban12-project/F-Trade-Platform/issues/1069)：640/640 通过，4 workers、0 retries、5.0 分钟；测试提交 `4b5070fe27c96c2473c64c0b684be1fb243a06e3`，代码检查 1194 文件与类型检查通过 | 新生产测试构建、合成 fixture 与拦截服务；覆盖截至 #1068 的应用实现，不是线上业务、实机或历史间歇故障的根因证明。下方数据库回归的测试提交不同，但应用实现完全相同；仅数据库用例更新了返回地址契约 |
+| 审核证据选择 | [PR #990](https://github.com/ban12-project/F-Trade-Platform/pull/990) 修复下滚箭头拦截可见选项；原未修改数据库用例修复前超时、修复后通过；29 项 UI 专项通过 | 新增简化场景在修复前也通过，只作额外覆盖；不把它作为根因复现。未使用强制点击或放宽原断言 |
+| 完整 PostgreSQL 浏览器回归 | [#1069](https://github.com/ban12-project/F-Trade-Platform/issues/1069)：191/191 通过，1 worker、0 retries、7.6 分钟；测试提交 `b74c203e2cb804ae27398959f3dc5501ff9143bf`，代码检查 1194 文件与类型检查通过；首轮 190/191 的旧视频链接断言失败与修正分别保留 | 新建本机 PostgreSQL 17.11 测试数据库、合成身份与业务资料、模拟外部服务；覆盖产品审核、RFQ→报价→交期→跟进→商机及授权拒绝，不证明真实社媒接受 |
+| 发布授权与重放 | #992 修复批量提交在来源等待前过早锁定身份记录；撤权、封禁、过期及角色变更拒绝保留零写入断言。`pnpm test:publication:database` 通过，含九种格式／结果组合的过期会话重放拒绝 | 使用当前账号复选 composer 和显式合成发布授权；真实发布／DM 继续延期，无需新增真实账号来执行这些回归 |
+| 时间与数据恢复 | [#996](https://github.com/ban12-project/F-Trade-Platform/pull/996) 拒绝不存在的本地素材权利到期时间，重复时间须显式选择；[#1004](https://github.com/ban12-project/F-Trade-Platform/pull/1004) 为节点时间标明设备时区；[#1006](https://github.com/ban12-project/F-Trade-Platform/pull/1006) 在列表读取恢复后清除旧错误，失败时标明旧数据并提供只读重试 | 已纳入上述 640 项 UI 回归；时区显示不延长授权，旧列表不代表当前节点状态，读取重试不执行节点命令 |
+| 表单编辑与人工操作 | [#998](https://github.com/ban12-project/F-Trade-Platform/pull/998)、[#1000](https://github.com/ban12-project/F-Trade-Platform/pull/1000)、[#1008](https://github.com/ban12-project/F-Trade-Platform/pull/1008) 保护素材、产品／RFQ／审核、报价／交期／发送凭证的首笔输入；[#1010](https://github.com/ban12-project/F-Trade-Platform/pull/1010) 在交期申请和商机确认提交期间独立锁定依据 | 初始化就绪后可编辑，提交失败保留输入；不替代服务端身份／权限校验，不预选人工审批或生成商业承诺 |
+| 表单反馈与上传恢复 | [#1016](https://github.com/ban12-project/F-Trade-Platform/pull/1016)、[#1018](https://github.com/ban12-project/F-Trade-Platform/pull/1018)、[#1020](https://github.com/ban12-project/F-Trade-Platform/pull/1020) 补齐交期／商机、报价与发送凭证校验反馈；[#1024](https://github.com/ban12-project/F-Trade-Platform/pull/1024)、[#1026](https://github.com/ban12-project/F-Trade-Platform/pull/1026) 支持产品／目录上传停止、保留文件重试与迟到响应隔离；均纳入 640 项回归 | 目录 intake 提交后不提供仅取消浏览器的停止入口；停止上传不删除已接收文件，也不证明历史上传停滞原因。表单 DOM／键盘检查不替代实际辅助技术验收 |
+| 目录与资料恢复 | [#1032](https://github.com/ban12-project/F-Trade-Platform/pull/1032) 在目录提交结果未知时先读取已有任务；[#1034](https://github.com/ban12-project/F-Trade-Platform/pull/1034)、[#1036](https://github.com/ban12-project/F-Trade-Platform/pull/1036)、[#1038](https://github.com/ban12-project/F-Trade-Platform/pull/1038) 分离读取／操作错误、暂停操作期间的轮询并同步候选选择；[#1046](https://github.com/ban12-project/F-Trade-Platform/pull/1046)、[#1048](https://github.com/ban12-project/F-Trade-Platform/pull/1048) 明示保留的资料选择、保护未保存文件与首笔输入；均纳入 640 项回归 | 不自动重放未知写入；失败时旧进度未重新核实。资料上传期间关闭弹窗不作为取消操作；保存成功解除对应未保存保护。外部存储和模型使用受控替身，不替代真实服务验收 |
+| 工作台与返回导航 | [#1052](https://github.com/ban12-project/F-Trade-Platform/pull/1052) 修复仅有待分流消息时的矛盾空状态；[#1055](https://github.com/ban12-project/F-Trade-Platform/pull/1055) 安装 ui-sdk 与全局样式；[#1056](https://github.com/ban12-project/F-Trade-Platform/pull/1056) 为 8 个主要入口区分标题并补齐任务列表语义；[#1058](https://github.com/ban12-project/F-Trade-Platform/pull/1058) 修正视频返回名称、保留来源产品链接的原列表筛选条件 | 主要栏目标题不等于每条动态记录均有独立标题。SDK 后续组件仍需核对与 Tailwind reset 的层叠表现；导航测试使用匿名合成夹具，不替代真实数据库授权验收 |
+| 记录导航与错误恢复 | [#1062](https://github.com/ban12-project/F-Trade-Platform/pull/1062)、[#1064](https://github.com/ban12-project/F-Trade-Platform/pull/1064) 保留多询盘选择的来源筛选并约束长文本；[#1066](https://github.com/ban12-project/F-Trade-Platform/pull/1066) 提供页面异常重试与返回入口；[#1068](https://github.com/ban12-project/F-Trade-Platform/pull/1068) 区分动态页面用途标题，将询盘入口标题统一为“整理客户询盘”；[#1071](https://github.com/ban12-project/F-Trade-Platform/issues/1071) 补齐中文 404、项目不可访问语义、根布局异常恢复及错误标题还原 | 错误边界不恢复已卸载表单的草稿；根布局客户端异常已实测，根布局服务端渲染异常未单独注入；仍存活的工作区草稿继续受导航保护。同类型记录仍共用用途标题，不复制客户姓名等业务资料 |
+| 无障碍补充 | [#975 交互扫描](https://github.com/ban12-project/F-Trade-Platform/issues/391#issuecomment-6856153106)及[12 组文字对比度核对](https://github.com/ban12-project/F-Trade-Platform/issues/391#issuecomment-6856252213)补充证据选项和上传错误的明暗主题状态 | 只证明已采样状态；实机、VoiceOver／NVDA、全页高对比度／降低透明度及适用的生产性能证据仍待 #391，不重开已删除的缩放检查 |
+| 依赖风险 | [11 月 13 日审计](https://github.com/ban12-project/F-Trade-Platform/issues/498#issuecomment-6853250230)：0 critical／0 high／1 moderate／1 low；minimatch/deepmerge 16 项已安装副本回归通过 | 带日期的审计快照，不是本页更新时重新扫描；局部补丁不消除版本告警或证明所有调用路径安全，#498 保持开放 |
+| 应用交付 | [#982](https://github.com/ban12-project/F-Trade-Platform/issues/982) 独立核对发现 `commandForIgnoringBuildStep: "exit 0"`，#981 的部署为 CANCELED；当时生产域名仍指向 #979 的 `efffb688aae326c24ea695811703ae538591d255` READY 部署 | 这是检查时的部署快照，不是持续状态保证。设置变更待用户决定；GitHub 绿色状态、VPS 的 `runtime_inputs_unchanged` 或 main 合并均不能证明应用已更新 |
+
+#1071 为上述完整检查点之后的一批失败状态专项变更，不将历史全量结果外推到新代码。生产 UI 专项 40/40（1.3 分钟，2 workers、0 retries），登录态 PostgreSQL 任务导航 19/19（2.0 分钟，1 worker、0 retries），开发模式非根布局异常 12/12（13.9 秒）通过；记录返回进一步收紧为精确目标 URL 后，复用相同构建专项 1/1（7.3 秒）通过。测试开关关闭后重新构建，30 条私有夹具路径返回 HTTP 404，根异常注入入口未挂载，匿名工作区仍跳转登录。Next 开发模式错误覆盖层会影响焦点，因此根布局重试／焦点／独立样式以生产构建为证据。基线失败、初次实现的重复标题和开发覆盖层影响均保留本机日志；最终实现更新既有标题，并只在新页面尚未改写标题时恢复旧值。此轮不影响营销视频内容，创意审查不适用。
+
+[#1073](https://github.com/ban12-project/F-Trade-Platform/issues/1073) 的团队管理批次修正连续邀请与成员移除的完成状态：每次 Action 响应分别处理；邀请只重置已注册邮箱字段，提交期间锁定输入，失败保留草稿；过去的成员保存成功不会关闭后续移除失败的确认框。4 项新增浏览器场景使用拦截的合成 Action 回执，不发送邮件、不写成员数据，也不替代服务端权限验收。开发模式 4/4（9.3 秒）；生产相关回归最终 48/48（45.1 秒，2 workers、0 retries）。生产首轮 44/48 的四项深色对比度失败保留：同一构建的动画前后样式诊断观察到 150–160ms 颜色过渡；等待有限动画结束后四页均无检测违规，因此测试改为等待真实动画完成，不关闭动画、不放宽对比度断言；相同应用构建复验 48/48。这证明所采样的稳定主题状态，不证明主题切换全过程或全站符合性。原始开发失败、逐步修正与生产失败 trace 位于本机 `tmp/repeated-save/`；#664 的历史草稿丢失仍未找到根因，其他表单的重复提交候选仍由 #1073 跟踪。此轮不改变营销视频内容，创意审查不适用。
+
+#1073 的配置／素材批次进一步修正了保存与刷新之间的草稿覆盖：模型配置仅用本次已校验提交的快照完成收尾，快照不保留 API key／Auth token，成功后清空凭据输入与清除标记，失败保留表单；普通 RSC 刷新不重置新草稿或切换后的选择，提交期间锁定输入和配置切换。新建后的下一次提交使用返回的配置 ID。素材登记按每次 Action 回执清空文件、说明和标签；拒绝后保留输入供重试，授权选择继续保留。新增 5 项配置与 1 项素材场景使用合成回执，并逐项核对实际 FormData；上传入口和外部 Blob PUT 均被拦截，不代表真实存储、模型服务或服务端权限验收。最终生产专项 55/55（1.1 分钟，2 workers、0 retries）；开发配置恢复 4/4（7.8 秒）、素材连续操作 1/1（4.3 秒）。最初 3 项配置覆盖失败和素材第二次成功未清空的失败轨迹保留在 `tmp/config-draft-recovery/`。刷新夹具初版触发随机值预渲染告警，已在现有 Suspense 内使用 `connection()` 明确请求时边界，最终构建与 MCP 均无此错误；曾按固定按钮名称定位而遗漏加载图标名称的测试失败也保留，最终定位同一表单提交按钮。其他导入、草稿与审核完成状态仍由 #1073 跟踪，#664 根因仍未知。此轮只调整表单完成状态，不改变视频内容、工程事实或授权范围，创意审查不适用。
+
+#1073 素材审核状态切换：原实现按素材 ID 保留审核表单，浏览器已复现批准成功并刷新后仍保留批准备注；代码同时保留旧 decision 和 evidenceRef。现在按审核状态重新挂载 ReviewForm，进入撤销阶段时初始化 rejected 并清空依据／原因，补齐决定控件与可见标签的关联。新增合成场景通过真实 RSC 刷新覆盖批准、撤销原因必填、拒绝保留草稿、重试实际提交 rejected、最终移除审核入口；开发 1/1（3.7 秒），相关生产专项 18/18（34.5 秒，2 workers、0 retries）。测试只拦截 Action 回执，以仅测试路由读取的合成 cookie 控制状态，不写业务数据；不替代服务端权限或真实授权验收。MCP 编译与运行错误为空，React 检查确认状态 key；pnpm check 和 typecheck 通过。证据保留于本机 `tmp/media-review-lifecycle/`。产品／内容审核已有版本 key，创建／导入候选仍在 #1073 核实；#664 历史根因未知。此轮不改视频内容、工程事实与授权边界，创意审查不适用。
+
+#1073 创建后导航：生产基线复现内容复制成功后，详情 RSC 请求保持等待期间复制按钮重新启用。`useCreatedRecord` 现在从 enabled、success 和返回 ID 推导已创建状态；8 个调用入口在该状态下锁住提交，报价及视频补充处理函数防重入，非流式产品导入也提供已保存草稿入口。修订沿用 enabled=false，不触发新建锁。新增内容复制／新建场景先验证拒绝后仍可重试、内容保留，再验证成功后等待导航期间提交禁用且打开记录的 href 正确。开发 2/2（14.4 秒）；生产构建相关回归 44/44（55.1 秒，2 workers、0 retries，含浏览器场景及内容契约测试）。pnpm check（1208 文件）、typecheck 通过，MCP 当前检查会话编译／运行错误为空，React 检查确认 ContentCopy 使用共享 hook。测试拦截 Action 回执与目标导航，不写业务数据；释放刻意中止的导航会产生预期 RSC fetch 告警，不宣称断网后的硬导航恢复已验收。恢复入口实际为带 href 的 button 语义，初版测试误按 link 角色定位，修正定位后仍验证精确目标 ID；基线及测试编写失败保留于本机 `tmp/created-record-navigation/`。这些保护不替代服务端幂等或跨标签页并发控制。此轮不改营销内容、工程事实或授权范围，创意审查不适用；#664 历史根因仍未知。
+
+回归失败与修正分别保留：`0bc98f0` 首轮 592/593 后，[#1002](https://github.com/ban12-project/F-Trade-Platform/pull/1002) 按 trace 修正素材文件赋值早于表单就绪的测试；`75dd9f7` 首轮 600/602 后，#1012 按 trace 修正目录文件赋值及 RFQ 键盘操作早于控件可用的测试。602/602 是当时修正后的完整运行；这些测试修正未提高超时、增加重试或删除业务断言；此前 `4b84616` 首次完整运行即为 612/612；此前 `fa8142f` 首次完整运行为 620/620；此前 `9f3d6f0` 首次完整运行为 629/629；本轮 `4b5070f` 首次完整 UI 运行即为 640/640，未更改 UI 测试，也不据此关闭 #936。该问题中的资料库键盘失败已由原始 trace 定位：移除关键词按钮在聚焦前后均为 disabled；[#937](https://github.com/ban12-project/F-Trade-Platform/pull/937) 已增加可用与实际聚焦断言，当前测试仍保留。原产品流式导入停滞及两项移动端失败的完整原因仍未确定；#937 的导航初始化修复和后续通过不替代对这三项原始失败的解释。
+
+完整 PostgreSQL 回归首轮在 `c8cf1a9` 为 187/188（6.3 分钟）：手工 RFQ 在补充资料后选择确认依据超时。trace 显示数据库已更新时，保存仍 pending，旧下拉选项仍在关闭并被下一次定位命中，随后不可见。#1043 增加旧列表关闭、保存恢复可用和确认按钮反映新资料的等待，保留原数据库与业务断言；销售专项 6/6 后，`963c04a` 完整 188/188 通过，未增加超时、重试或强制点击。原失败 trace 与日志保留；此修正仅同步测试与可观察页面状态，不作为其他历史间歇故障的根因解释。
+
+本轮 `4b5070f` 完整 PostgreSQL 首次运行为 190/191（8.3 分钟）：视频来源产品链接已按 #1058 携带 `returnTo`，旧测试仍期待无查询参数的地址；trace 中 14 次观察均为正确的完整链接。`b74c203` 仅修正该数据库测试，精确核对完整 href，并实际走通两种来源入口的“视频 → 产品 → 原内容列表”；专项 1/1（9.1 秒）后，使用重新创建的空数据库及标准配置重新构建，完整 191/191 通过。未改应用实现、增加重试、延长超时或放宽原业务断言。首轮失败归档保留，不能把最终结果写成首次全部通过，也不作为其他历史故障的根因解释。此前 #1043 的完整 188/188 仍是其当时提交的历史证据。
+
+本轮适用本地检查按 #711 记录，不能写成自动 CI 已通过。测试服务、数据库、构建产物及已完成分支已清理，保留本机失败轨迹与验收日志；它们不是生产业务流水。最终验收前仍须恢复 CI，核对实际部署，并补齐延期渠道、到期清除、实机／辅助技术与人工决定的各自证据。#348/#664/#674/#936 的历史间歇问题未因后续绿测自动关闭。
 
 ## 2026-11-01 剩余工作与执行边界
 
@@ -39,7 +77,7 @@ Production 部署 `7467769214` 与 VPS 部署 `7467763632` 均为同一提交且
 实际父依赖回归通过。deepmerge 的版本匹配告警仍存在，minimatch 按已观察调用方
 限定风险，#498 保持开放，见[最新依赖报告](reports/shadcn-zod4-security-20261101.md)。
 
-## 2026-10-31 工程交付与验收边界
+## 2026-10-31 工程交付与验收边界（历史检查点）
 
 本次只核对研发、部署和既有验收记录，没有执行真实客户、发布、DM、生产删除或设备验收。工程补缺不改变总验收仍未完成的结论。
 
@@ -47,7 +85,9 @@ Production 部署 `7467769214` 与 VPS 部署 `7467763632` 均为同一提交且
 - **工具依赖修复已交付**：[PR #713](https://github.com/ban12-project/F-Trade-Platform/pull/713) 合并为 `c663ed0fc4adc466e4895dc9be8fbf66b769d053`，生产部署 `7445247253` 的提交归属与 success 状态已独立读回。11 项输入边界、8 项工具兼容性、TypeScript 与冻结安装本地通过；#708 已关闭。最新审计为 0 critical／1 high／5 moderate／3 low，#498 继续开放；10 月 23 日计数是历史快照。见[验证报告](reports/systeminformation-security-20261031.md)。
 - **分轮补充品牌／型号已交付**：[PR #715](https://github.com/ban12-project/F-Trade-Platform/pull/715) 合并为 `f70088ce890dc2fa193dc905dc5057e7085c813d`，生产部署 `7445350631` 对应同一提交且状态 success。明确标签可在不同回复中补齐，并保留各字段来源；型号单独出现不会满足车辆完整度，冲突／否定／含糊值仍需人工核对。销售、RFQ、合成闭环与类型检查通过，见[验证报告](reports/inquiry-vehicle-labels-20261031.md)。这不证明新的真实询盘、页面／数据库验收或工厂适配事实。
 
-### 仍缺的完成证据
+### 当时仍缺的完成证据
+
+以下保留 10 月 31 日的观察；其中恢复 DM 与等待真实客户样本的执行条件，已由上方 11 月 1 日授权和范围修订取代。不得据此重新启动渠道或要求另交真实 RFQ。
 
 1. **当前渠道闭环**：#383／#322／#480 的当前账号发布回执、独立入站去重及 RFQ 关联仍未通过。本轮已恢复验收并升级运行时：一个账号获得零因素领取的空收件箱 ready 结果，另一个自动验证仍为 unknown。消息入库、去重、RFQ 关联及冷启动轮询均未通过；空收件箱不是 DM 证据。
 2. **真实业务与最终决定**：#26／#32 仍缺同批业务样本、实际人工报价／交期及商机认定、六项验收结果和具名人工 Go/No-Go。历史合成结果不能改成真实客户计数，也不能仅因实现存在而判 Go。
@@ -119,8 +159,8 @@ Production 部署 `7467769214` 与 VPS 部署 `7467763632` 均为同一提交且
 | M2 授权真实素材成片 | [真实目录成片验收](reports/m2-real-catalogue-video-acceptance-20261010.md)已完成生产编辑、合成、本次委托审核、私有播放及 MP4／清单一致性 | 目标 Profile 的当前规则适用性和实际平台接受仍待 #126/#318；项目预设 passed 不等于平台接受 |
 | 保留期与受控副本 | 90 天、具名责任与预算已决定；应用执行、来源／历史保护、[实际合成数据库备份恢复](reports/m2-retention-restore-20261015.md)均有证据；Neon 6 小时恢复窗口已盘点 | #122 的真实生产到期对象／Blob 删除、历史副本物理清除和其他未覆盖副本尚未证明；不改写真实时间制造样本，网关日志不重新作为前置 |
 | Sales／RFQ、报价与跟单商机 | 当前领域实现、数据库授权／事务回归和 reference／合成闭环已有证据，见[实现核对](reports/mvp1-implementation-audit-20261006.md)及[reference 汇总](reports/reference-acceptance-20260917.md) | 11 月 1 日已按用户授权完成现有 reference 产品加模拟 DM 的后续流程验收，见上方当前检查点；模拟值保留测试标记，真实渠道与最终 Go/No-Go 未代替 |
-| 设备与辅助技术 | 自动化 Chromium／WebKit、响应式与权限回归已有证据 | [#391](https://github.com/ban12-project/F-Trade-Platform/issues/391) 的实机、VoiceOver／NVDA、对比度及所声明性能证据尚未完成；仿真不替代实机 |
-| 依赖与历史故障 | 最新状态见本页 2026-10-31 检查点；以下为历史证据。2026-10-23 PR #657 将 shadcn 的 MCP SDK 定向升级到 1.32.0，最终完整 CI 通过并合并；同轮审计从 0 critical／3 high／2 moderate 降为 0 critical／1 high／0 moderate（braces），见[验证报告](reports/mcp-sdk-security-20261023.md)。已安装 braces 副本有深度防护；原 CSV 失败后已有冻结输入成功及诊断关联 | [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 的独立 CLI 未修补副本与上游发布风险、[#348](https://github.com/ban12-project/F-Trade-Platform/issues/348) 的原间歇原因仍未知；后续成功不改写原失败 |
+| 设备与辅助技术 | 自动化 Chromium／WebKit、响应式与权限回归已有证据 | [#391](https://github.com/ban12-project/F-Trade-Platform/issues/391) 的实机、VoiceOver／NVDA、未覆盖全页与系统设置的对比度及所声明性能证据尚未完成；近期局部扫描／对比度通过见上方检查点，仿真不替代实机 |
+| 依赖与历史故障 | 最新已记录审计见本页 2026-11-14 检查点；以下为历史证据。2026-10-23 PR #657 将 shadcn 的 MCP SDK 定向升级到 1.32.0，最终完整 CI 通过并合并；同轮审计从 0 critical／3 high／2 moderate 降为 0 critical／1 high／0 moderate（braces），见[验证报告](reports/mcp-sdk-security-20261023.md)。已安装 braces 副本有深度防护；原 CSV 失败后已有冻结输入成功及诊断关联 | [#498](https://github.com/ban12-project/F-Trade-Platform/issues/498) 的残余版本告警、工作区补丁覆盖边界与上游发布风险、[#348](https://github.com/ban12-project/F-Trade-Platform/issues/348) 的原间歇原因仍未知；后续成功不改写原失败 |
 | 集成验收与 Go/No-Go | [#26](https://github.com/ban12-project/F-Trade-Platform/issues/26)／[#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 保持 open；受控技术演示已有记录 | 本轮模拟销售流程已完成；延期的真实渠道及独立最终决定未完成，不能判 Go |
 
 ## 继续工作的条件

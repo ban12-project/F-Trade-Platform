@@ -144,8 +144,8 @@ export function parseMarkdownTables(sourceText: string): MarkdownTable[] {
   const lines = sourceText.split(/\r?\n/);
   const tables: MarkdownTable[] = [];
   for (let index = 0; index < lines.length - 1; index += 1) {
-    const headers = parseMarkdownRow(lines[index]!);
-    const separator = parseMarkdownRow(lines[index + 1]!);
+    const headers = parseMarkdownRow(lines[index]);
+    const separator = parseMarkdownRow(lines[index + 1]);
     if (
       !headers ||
       !separator ||
@@ -157,7 +157,7 @@ export function parseMarkdownTables(sourceText: string): MarkdownTable[] {
     const rows: string[][] = [];
     index += 2;
     while (index < lines.length) {
-      const row = parseMarkdownRow(lines[index]!);
+      const row = parseMarkdownRow(lines[index]);
       if (!row || row.length !== headers.length) break;
       rows.push(row);
       index += 1;
@@ -381,7 +381,7 @@ function extractExplicitOeNumbers(sourceText: string) {
   const labelledOeLine =
     /(?:^|\n)[ \t]*(?:[-*][ \t]*)?(?:(?:OEM|OE)[ \t]*NO\.?[ \t]*(?:[:：][ \t]*|[ \t]+(?![ \t:：]))|(?:OEM|OE)[ \t]*[:：][ \t]*)([^\r\n]+)/gi;
   for (const match of sourceText.matchAll(labelledOeLine)) {
-    const value = match[1]!.trim();
+    const value = match[1].trim();
     if (!value.includes(PRODUCT_SOURCE_UNREADABLE_CELL)) labelledValues.add(value);
   }
   // Explicit list delimiters separate identifiers; interior whitespace, case

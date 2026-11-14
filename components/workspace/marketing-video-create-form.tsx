@@ -11,6 +11,7 @@ import {
   UploadCloudIcon,
   VideoIcon,
 } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -160,7 +161,7 @@ export function MarketingVideoCreateForm({
     router.refresh();
   }, [form, router, state]);
 
-  useCreatedRecord(projectId, "video", state.status, state.videoId);
+  const created = useCreatedRecord(projectId, "video", state.status, state.videoId);
 
   function selectSourceMode(value: string[]) {
     const next = value[0] as CreateValues["sourceMode"] | undefined;
@@ -244,6 +245,7 @@ export function MarketingVideoCreateForm({
   }
 
   async function submit(values: CreateValues) {
+    if (pending || uploading || created) return;
     setUploadError("");
     const data = creationData(values);
     if (values.sourceMode === "product_media" || values.sourceMode === "internet_search") {
@@ -318,7 +320,7 @@ export function MarketingVideoCreateForm({
     );
   }
 
-  const busy = pending || uploading;
+  const busy = pending || uploading || created;
   return (
     <Card>
       <CardHeader>
@@ -644,9 +646,11 @@ export function MarketingVideoCreateForm({
                                     htmlFor={`video-internet-${result.id.replace(":", "-")}`}
                                   >
                                     <span className="flex items-start gap-3">
-                                      {/* eslint-disable-next-line @next/next/no-img-element -- remote search thumbnails are dynamic and never optimized or trusted as product facts. */}
-                                      <img
+                                      <Image
+                                        unoptimized
                                         src={result.thumbnailUrl}
+                                        width={112}
+                                        height={80}
                                         alt=""
                                         loading="lazy"
                                         decoding="async"

@@ -55,10 +55,12 @@ export async function runProductAgentAction(
           });
           if (!parsed.success)
             throw new Error(parsed.error.issues[0]?.message ?? "资料格式不正确。");
+          if (!parsed.data.sourceRef || !parsed.data.evidenceRef)
+            throw new Error("请选择资料来源和证据。");
           return {
             record_id: randomUUID(),
-            source_ref: parsed.data.sourceRef!,
-            evidence_refs: [parsed.data.evidenceRef!],
+            source_ref: parsed.data.sourceRef,
+            evidence_refs: [parsed.data.evidenceRef],
             source_text: parsed.data.sourceText,
             image_availability: "none" as const,
             image_refs: [],

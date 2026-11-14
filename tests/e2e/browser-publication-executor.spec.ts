@@ -7,6 +7,7 @@ import {
   publicationPreclickFailure,
 } from "../../ops/browser-node/publication-diagnostics.mjs";
 import { createPublicationExecutor } from "../../ops/browser-node/publication-executor.mjs";
+import { required } from "../../scripts/test-required";
 
 const accountRef = "synthetic-account";
 const channelRef = "synthetic-channel";
@@ -60,7 +61,7 @@ async function scenario(
       await page.getByLabel("Copy").fill(content.text);
       if (upload)
         await page.getByLabel("Attachment").setInputFiles({
-          name: upload.path.split("/").at(-1)!,
+          name: required(upload.path.split("/").at(-1)),
           mimeType: format === "image" ? "image/png" : "video/mp4",
           buffer: Buffer.from("SYNTHETIC file"),
         });

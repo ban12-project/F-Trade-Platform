@@ -12,7 +12,6 @@ import {
   authorizeOwnedVideoDraft,
   authorizeReadableVideoDraftSource,
   VIDEO_DRAFT_ACCESS_MESSAGE,
-  VideoDraftAccessError,
 } from "../lib/video/draft-write-access";
 import { seedVideoDraftFixture } from "../tests/fixtures/video-draft";
 

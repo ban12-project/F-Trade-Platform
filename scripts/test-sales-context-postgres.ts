@@ -16,6 +16,7 @@ import { readSalesJourney } from "../lib/sales/journey-store";
 import { createRfq, listProjectRfqEntries, reviseRfq } from "../lib/sales/store";
 import { createStoredSocialMessageRecord } from "../lib/social/message-record";
 import { readWorkspaceRecord } from "../lib/workspace/record-read-model";
+import { required } from "./test-required";
 
 const connection = process.env.SALES_CONTEXT_TEST_DATABASE_URL;
 if (
@@ -127,14 +128,27 @@ void (async () => {
     const entries = await listProjectLeads(project, actor, db, { timelineLeadId: leadB });
     assert.equal(entries.length, 3);
     for (const id of [leadA, leadC]) {
-      const entry = entries.find((item) => item.id === id)!;
+      const entry = required(entries.find((item) => item.id === id));
       assert.equal(entry.replyAvailable, false);
       assert.deepEqual(entry.timeline, []);
     }
-    const own = entries.find((entry) => entry.id === leadB)!;
+    const own = required(entries.find((entry) => entry.id === leadB));
     assert.equal(own.replyAvailable, true);
     assert.equal(own.timeline.length, 1);
     assert.equal(own.timeline[0].body, body);
+    const sourceContext = await readSalesJourney(project, actor, leadB, {
+      kind: "lead",
+      id: leadB,
+    });
+    assert.equal(
+      required(sourceContext.leads.find((entry) => entry.id === leadB)).timeline[0].body,
+      body,
+    );
+    assert(
+      sourceContext.leads
+        .filter((entry) => entry.id !== leadB)
+        .every((entry) => entry.timeline.length === 0),
+    );
   }
   for (const timelineLeadId of [leadA, leadC, foreignLead, randomUUID()]) {
     const entries = await listProjectLeads(project, owner, db, { timelineLeadId });
@@ -337,7 +351,8 @@ void (async () => {
   );
   const recent = (await listProjectLeads(project, owner, db, { timelineLeadId: leadB })).find(
     (entry) => entry.id === leadB,
-  )!;
+  );
+  assert.ok(recent);
   assert.equal(recent.timeline.length, 200);
   assert.equal(recent.timelineTruncated, true);
   assert.equal(recent.timeline[0].body, "MOCK 0:5");
@@ -402,7 +417,7 @@ void (async () => {
     createdById: owner,
   });
   const readDelivery = async () =>
-    (await listProjectLeads(project, owner, db)).find((entry) => entry.id === leadB)!
+    required((await listProjectLeads(project, owner, db)).find((entry) => entry.id === leadB))
       .confirmedDelivery;
   assert.equal(await readDelivery(), null, "Unowned delivery must not authorize a promise");
   await db.insert(schema.workspaceProjectItem).values({
@@ -455,7 +470,7 @@ void (async () => {
     kind: "lead",
     id: leadB,
   });
-  const conflictedContext = salesRelations(conflictedJourney.records, "lead", leadB)!;
+  const conflictedContext = required(salesRelations(conflictedJourney.records, "lead", leadB));
   assert(
     conflictedContext.missingContext,
     "Conflicting delivery relationship remains visible as an issue",
@@ -538,7 +553,7 @@ void (async () => {
     changedBy: owner,
     changedAt: new Date(),
     pauseReason: "synthetic paused channel",
-    channelRef: "synthetic-plan-" + project,
+    channelRef: `synthetic-plan-${project}`,
     accountRef: "synthetic-plan",
     enabled: false,
     circuitStatus: "paused",
@@ -547,7 +562,7 @@ void (async () => {
   await db.insert(schema.socialConversation).values({
     id: pausedConversation,
     lastMessageAt: new Date(),
-    channelRef: "synthetic-plan-" + project,
+    channelRef: `synthetic-plan-${project}`,
     accountRef: "synthetic-plan",
     externalConversationRef: randomUUID(),
     leadId: leadA,
@@ -616,7 +631,7 @@ void (async () => {
   const readyRequirements = promoteRfqReady(legacyRevision.draft);
   for (const { field, section, key } of rfqCustomerRequirements) {
     assert.equal((await readRequirements()).formValues[field], optionalInput[field]);
-    assert.equal(readyRequirements[section][key], optionalInput[field]);
+    assert.equal(required(readyRequirements[section])[key], optionalInput[field]);
   }
   await reviseRfq(
     createdRfq.id,

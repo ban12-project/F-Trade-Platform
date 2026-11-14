@@ -51,17 +51,17 @@ function candidateRecords(sourceText: string) {
     const text = block.join("\n").trim();
     const identifiers = block.flatMap((line) => {
       const match = /^\s*([^:：]+)[:：]\s*(.*?)\s*$/.exec(line);
-      const identifier = match && identifierValue(match[1]!, match[2]!);
+      const identifier = match && identifierValue(match[1], match[2]);
       return identifier ? [identifier] : [];
     });
     // Ambiguous multi-record blocks require manual segmentation, never first-match selection.
     if (identifiers.length === 1 && !NON_CLUTCH.test(text)) {
-      records.push({ identifier: identifiers[0]!, text, line: blockStart + 1, page });
+      records.push({ identifier: identifiers[0], text, line: blockStart + 1, page });
     }
     block = [];
   }
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]!;
+    const line = lines[index];
     const pageMatch = PAGE.exec(line.trim());
     if (pageMatch) {
       flush();
@@ -78,18 +78,18 @@ function candidateRecords(sourceText: string) {
     ) {
       flush();
       const headerLine = line;
-      const separatorLine = lines[++index]!;
+      const separatorLine = lines[++index];
       while (index + 1 < lines.length) {
-        const row = markdownRow(lines[index + 1]!);
+        const row = markdownRow(lines[index + 1]);
         if (!row || row.length !== header.length) break;
         index += 1;
-        const text = [headerLine, separatorLine, lines[index]!].join("\n");
+        const text = [headerLine, separatorLine, lines[index]].join("\n");
         const identifiers = header.flatMap((label, column) => {
-          const identifier = identifierValue(label, row[column]!);
+          const identifier = identifierValue(label, row[column]);
           return identifier ? [identifier] : [];
         });
         if (identifiers.length === 1 && !NON_CLUTCH.test(text)) {
-          records.push({ identifier: identifiers[0]!, text, line: index + 1, page });
+          records.push({ identifier: identifiers[0], text, line: index + 1, page });
         }
       }
     } else if (!line.trim()) {
@@ -119,7 +119,7 @@ export function discoverCatalogCandidates(source: ProductAgentSource): CatalogCa
       identifier,
       record_id: recordId,
       review_status:
-        counts.get(identifier)! > 1
+        (counts.get(identifier) ?? 0) > 1
           ? "duplicate_identifier_review_required"
           : "source_review_required",
       source: {

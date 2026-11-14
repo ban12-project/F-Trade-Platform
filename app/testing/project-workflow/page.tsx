@@ -11,10 +11,15 @@ import { ContentReview } from "@/components/workspace/content-review";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { EvidenceChoicesProvider } from "@/components/workspace/evidence-select";
 import { ProductIntakePanel } from "@/components/workspace/product-intake-panel";
+import { ProductReferencePanel } from "@/components/workspace/product-reference-panel";
 import { ProductReview } from "@/components/workspace/product-review";
+import { RecordAccessBoundary } from "@/components/workspace/record-access-boundary";
 import { RecordFrame } from "@/components/workspace/record-frame";
+import { RfqChooser } from "@/components/workspace/rfq-chooser";
 import { RfqDetail } from "@/components/workspace/rfq-detail";
+import { RfqForm } from "@/components/workspace/rfq-form";
 import { SalesContext } from "@/components/workspace/sales-context";
+import { WorkspaceGuide } from "@/components/workspace/workspace-guide";
 import { WorkspaceLink } from "@/components/workspace/workspace-link";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import type { ContentCatalogDetail } from "@/lib/content/store";
@@ -277,9 +282,9 @@ const syntheticProductDetail: ProductCatalogDetail = {
   draft: {
     record_id: syntheticProduct.id,
     source_ref: "source-product-001",
-    evidence_refs: ["evidence-product-001"],
+    evidence_refs: ["evidence-product-001", "evidence-loc-synthetic-name"],
     field_evidence: {
-      "product.product_name": "evidence-product-001",
+      "product.product_name": "evidence-loc-synthetic-name",
       "product.product_type": "evidence-product-001",
       "product.internal_sku": "evidence-product-001",
       "product.oe_numbers": "evidence-product-001",
@@ -332,10 +337,78 @@ const syntheticContentDetail: ContentCatalogDetail = {
 async function ProjectWorkflowFixture({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string; kind?: string; record?: string }>;
+  searchParams: Promise<{ state?: string; kind?: string; record?: string; readonly?: string }>;
 }) {
-  const { state, kind, record } = await searchParams;
+  const { state, kind, record, readonly } = await searchParams;
   if (kind === "sales") {
+    const rfqDetail: RfqEntry = {
+      ...syntheticRfq,
+      state: state === "rfq-collecting" || state === "rfq-missing" ? "RFQ_COLLECTING" : "RFQ_READY",
+      formValues: {
+        ...syntheticRfq.formValues,
+        vehicleBrand: "SYNTHETIC brand",
+        vehicleModel: "SYNTHETIC model",
+        packagingRequirement: "SYNTHETIC individual packaging",
+        expectedDelivery: "SYNTHETIC requested month",
+        ...(state === "rfq-long"
+          ? {
+              customerCompany: "SYNTHETIC-LONG-COMPANY-".repeat(10),
+              vehicleModel: "SYNTHETIC-LONG-MODEL-".repeat(10),
+            }
+          : {}),
+      },
+    };
+    if (state === "rfq-missing") {
+      rfqDetail.quantity = null;
+      rfqDetail.destination = null;
+      rfqDetail.completenessScore = 10;
+      rfqDetail.missingFields = ["vehicle_model_or_oe_number", "quantity", "destination"];
+      rfqDetail.formValues = {
+        leadId: "",
+        customerName: "",
+        customerCompany: "",
+        customerCountry: "",
+        productType: syntheticRfq.formValues.productType,
+        oeNumber: "",
+        vehicleBrand: "",
+        vehicleModel: "",
+        quantity: "",
+        destination: "",
+      };
+    }
+    const previewState =
+      state === "quote-approved" ||
+      state === "quote-dated" ||
+      state === "quote-approval-mismatch" ||
+      state === "quote-missing-context";
+    const previewQuote: QuotationEntry = {
+      ...syntheticQuote,
+      version: 4,
+      state: "QUOTE_APPROVED",
+      approvalStatus: "approved",
+      quotation: {
+        ...syntheticQuote.quotation,
+        ...(state === "quote-dated"
+          ? {
+              quote: {
+                ...syntheticQuote.quotation.quote,
+                validity_days: 3,
+                validity: {
+                  version: 1 as const,
+                  starts_on: "2026-03-07",
+                  expires_on: "2026-03-09",
+                  time_zone: "America/New_York",
+                },
+              },
+            }
+          : {}),
+        status: "approved",
+        approval_ref:
+          state === "quote-approval-mismatch"
+            ? "synthetic-stale-approval"
+            : (syntheticQuote.approvalId ?? undefined),
+      },
+    };
     const context = (recordKind: SalesRelationRecord["kind"], id: string) => (
       <SalesContext
         projectId={syntheticSalesProject.id}
@@ -346,12 +419,79 @@ async function ProjectWorkflowFixture({
       />
     );
     const panels = {
-      rfq: (
-        <RfqDetail
+      "rfq-choices": (
+        <RfqChooser
           projectId={syntheticSalesProject.id}
-          entry={syntheticRfq}
-          leads={[syntheticLead]}
-        >
+          returnTo={`/workspace/customers?project=${syntheticSalesProject.id}&type=rfq`}
+          entries={[
+            {
+              ...syntheticRfq,
+              destination: "SYNTHETIC".padEnd(240, "Y"),
+              formValues: {
+                ...syntheticRfq.formValues,
+                customerName: "SYNTHETIC".padEnd(240, "X"),
+                destination: "SYNTHETIC".padEnd(240, "Y"),
+              },
+            },
+            {
+              ...syntheticRfq,
+              id: "00000000-0000-4000-8000-000000000612",
+              state: "RFQ_COLLECTING",
+              quantity: null,
+              destination: null,
+              completenessScore: 10,
+              missingFields: ["quantity", "destination"],
+              formValues: {
+                ...syntheticRfq.formValues,
+                customerName: "",
+                quantity: "",
+                destination: "",
+              },
+            },
+          ]}
+        />
+      ),
+      "rfq-new": (
+        <RfqForm
+          projectId={syntheticSalesProject.id}
+          selectedLeadId={state === "rfq-source-locked" ? syntheticLead.id : undefined}
+          leads={[
+            ...["601", "611", "621"].map(
+              (suffix, index): LeadEntry => ({
+                ...syntheticLead,
+                id: `00000000-0000-4000-8000-000000000${suffix}`,
+                state: "LEAD_RECEIVED",
+                timeline:
+                  index === 2
+                    ? syntheticLead.timeline.filter((message) => message.direction === "outbound")
+                    : [
+                        {
+                          ...syntheticLead.timeline[0],
+                          body:
+                            index === 0
+                              ? "SYNTHETIC buyer requests 500 clutch kits"
+                              : "SYNTHETIC-".repeat(15),
+                          receivedAt: new Date("2026-09-05T08:00:00Z"),
+                        },
+                        {
+                          ...syntheticLead.timeline[0],
+                          body: "SYNTHETIC older customer message",
+                          receivedAt: new Date("2026-09-04T08:00:00Z"),
+                        },
+                        {
+                          ...syntheticLead.timeline[0],
+                          direction: "outbound",
+                          body: "SYNTHETIC seller reply must not label customer",
+                          receivedAt: new Date("2026-09-06T08:00:00Z"),
+                        },
+                      ],
+              }),
+            ),
+          ]}
+        />
+      ),
+      rfq: (
+        <RfqDetail projectId={syntheticSalesProject.id} entry={rfqDetail} leads={[syntheticLead]}>
           {context("rfq", syntheticRfq.id)}
         </RfqDetail>
       ),
@@ -360,21 +500,97 @@ async function ProjectWorkflowFixture({
           {state === "quote-revision" ? context("quotation", syntheticQuote.id) : null}
           <QuotationPanel
             projectId={syntheticSalesProject.id}
-            rfqs={[syntheticRfq]}
-            products={[{ ...syntheticProduct, id: syntheticProduct.id }]}
-            entries={state === "quote-revision" ? [syntheticQuote] : []}
-            showCreateForm={state !== "quote-revision"}
+            rfqs={
+              ["quote-missing-context", "quote-needs-both", "quote-needs-rfq"].includes(state ?? "")
+                ? []
+                : [syntheticRfq]
+            }
+            products={
+              [
+                "quote-missing-context",
+                "quote-needs-both",
+                "quote-needs-product",
+                "quote-product-candidate",
+              ].includes(state ?? "")
+                ? []
+                : [{ ...syntheticProduct, id: syntheticProduct.id }]
+            }
+            entries={
+              previewState
+                ? [previewQuote]
+                : state === "quote-review"
+                  ? [
+                      {
+                        ...syntheticQuote,
+                        state: "QUOTE_REVIEW_REQUIRED",
+                        approvalStatus: "pending",
+                        reviewNotes: null,
+                        quotation: { ...syntheticQuote.quotation, status: "review_required" },
+                      },
+                    ]
+                  : state === "quote-revision"
+                    ? [syntheticQuote]
+                    : []
+            }
+            showCreateForm={!previewState && state !== "quote-revision" && state !== "quote-review"}
             canReview
           />
+          {state?.startsWith("quote-needs-") ||
+          state === "quote-product-candidate" ||
+          state === "quote-products-linked" ? (
+            <ProductReferencePanel
+              projectId={syntheticSalesProject.id}
+              available={
+                state === "quote-product-candidate" || state === "quote-products-linked"
+                  ? [{ ...syntheticProduct, factOptions: [] }]
+                  : []
+              }
+              linked={
+                state === "quote-needs-rfq" || state === "quote-products-linked"
+                  ? [syntheticProduct]
+                  : []
+              }
+            />
+          ) : null}
         </div>
       ),
       lead: (
         <div className="space-y-6">
+          {state === "lead-guide" ? <WorkspaceGuide /> : null}
           {context("lead", syntheticLead.id)}
           <LeadPanel
             projectId={syntheticSalesProject.id}
-            entries={[syntheticLead]}
-            deliveries={[syntheticDelivery]}
+            entries={[
+              ["lead-fold-later", "lead-fold-precision", "lead-time-precision"].includes(
+                state ?? "",
+              )
+                ? {
+                    ...syntheticLead,
+                    lead: {
+                      ...syntheticLead.lead,
+                      next_follow_up_at:
+                        state === "lead-time-precision"
+                          ? "2027-11-06T06:30:45.123Z"
+                          : state === "lead-fold-precision"
+                            ? "2027-11-07T06:30:45.123Z"
+                            : "2027-11-07T06:30:00.000Z",
+                    },
+                  }
+                : state === "lead-actions"
+                  ? {
+                      ...syntheticLead,
+                      confirmedDelivery: null,
+                      lead: {
+                        ...syntheticLead.lead,
+                        follow_up_context: "asks_lead_time",
+                        score: 80,
+                        score_band: "HOT",
+                        delivery_confirmation_ref: undefined,
+                      },
+                    }
+                  : syntheticLead,
+            ]}
+            deliveries={state === "lead-actions" ? [] : [syntheticDelivery]}
           />
         </div>
       ),
@@ -383,7 +599,17 @@ async function ProjectWorkflowFixture({
           {context("delivery", syntheticDelivery.id)}
           <DeliveryPanel
             projectId={syntheticSalesProject.id}
-            entries={[syntheticDelivery]}
+            entries={[
+              state === "delivery-pending"
+                ? {
+                    ...syntheticDelivery,
+                    state: "DELIVERY_CONFIRMATION_PENDING",
+                    approvalId: "30000000-0000-4000-8000-000000000011",
+                    approvalStatus: "pending",
+                    confirmation: { ...syntheticDelivery.confirmation, result: undefined },
+                  }
+                : syntheticDelivery,
+            ]}
             canReview
           />
         </div>
@@ -402,8 +628,39 @@ async function ProjectWorkflowFixture({
     );
   }
   const productDetail =
-    state === "product-review" || state === "product-review-locations"
-      ? syntheticProductDetail
+    state === "product-review" ||
+    state === "product-review-locations" ||
+    state === "product-revision"
+      ? {
+          ...syntheticProductDetail,
+          state:
+            state === "product-revision"
+              ? "PRODUCT_REVISION_REQUIRED"
+              : syntheticProductDetail.state,
+          draft: {
+            ...syntheticProductDetail.draft,
+            commercial: { sample_available: false },
+            evidence_refs:
+              state === "product-review-locations"
+                ? [
+                    "evidence-product-001",
+                    "evidence-loc-mock-page-3-name",
+                    "evidence-paged-mock",
+                    "evidence-loc-mock-csv-name",
+                  ]
+                : syntheticProductDetail.draft.evidence_refs,
+            field_evidence: {
+              ...syntheticProductDetail.draft.field_evidence,
+              ...(state === "product-review-locations"
+                ? {
+                    "product.product_name": "evidence-loc-mock-page-3-name",
+                    "product.internal_sku": "evidence-paged-mock",
+                    "product.oe_numbers": "evidence-loc-mock-csv-name",
+                  }
+                : {}),
+            },
+          },
+        }
       : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
   const panels = {
@@ -411,6 +668,7 @@ async function ProjectWorkflowFixture({
       <ProductReview
         projectId={syntheticMarketingProject.id}
         detail={productDetail}
+        canWrite={readonly !== "1"}
         canReview
         evidenceOptions={[
           {
@@ -460,7 +718,7 @@ async function ProjectWorkflowFixture({
                   contentType: "text/csv",
                   fields: [
                     {
-                      path: "product.product_name",
+                      path: "product.oe_numbers",
                       reference: "evidence-loc-mock-csv-name",
                       excerpt: "MOCK CSV product",
                       location: { recordLine: 3 },
@@ -490,6 +748,18 @@ async function ProjectWorkflowFixture({
       <ContentCreatePanel
         projectId={syntheticMarketingProject.id}
         products={state === "content-generation" ? syntheticGenerationProducts : [syntheticProduct]}
+        copyCandidates={
+          state === "content-copy"
+            ? [
+                {
+                  id: "00000000-0000-4000-8000-000000000999",
+                  projectTitle: "SYNTHETIC source project",
+                  productName: "SYNTHETIC product",
+                  hook: "SYNTHETIC copy source",
+                },
+              ]
+            : []
+        }
       />
     ),
     video: (
@@ -529,7 +799,13 @@ async function ProjectWorkflowFixture({
       <RecordFrame
         header={<h1 className="text-2xl font-semibold">{syntheticMarketingProject.title}</h1>}
       >
-        {panels[active as keyof typeof panels]}
+        <RecordAccessBoundary
+          canWrite={readonly !== "1"}
+          kind={active === "product" ? "product" : "content"}
+          mode={active === "product" && !productDetail ? "create" : "record"}
+        >
+          {panels[active as keyof typeof panels]}
+        </RecordAccessBoundary>
       </RecordFrame>
     </WorkspaceDirtyProvider>
   );
@@ -539,7 +815,7 @@ async function ProjectWorkflowFixture({
 export default function ProjectWorkflowTestingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string; kind?: string; record?: string }>;
+  searchParams: Promise<{ state?: string; kind?: string; record?: string; readonly?: string }>;
 }) {
   if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
   return (

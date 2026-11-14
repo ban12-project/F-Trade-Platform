@@ -183,7 +183,7 @@ void (async () => {
             maxX = -1,
             maxY = -1;
           for (let offset = 0; offset < rgb.length; offset += 3) {
-            if (rgb[offset]! > 180 && rgb[offset + 1]! < 80 && rgb[offset + 2]! < 80) {
+            if (rgb[offset] > 180 && rgb[offset + 1] < 80 && rgb[offset + 2] < 80) {
               const pixel = offset / 3,
                 x = pixel % measured.width,
                 y = Math.floor(pixel / measured.width);
@@ -229,8 +229,8 @@ void (async () => {
               energy += stdout.readInt16LE(index) ** 2;
             rms.push(Math.sqrt(energy / (stdout.length / 2)));
           }
-          assert.ok(rms[0]! > 100, `${preset.platform}: source audio missing`);
-          assert.ok(rms[1]! < 10, `${preset.platform}: muted clip contains sound`);
+          assert.ok(rms[0] > 100, `${preset.platform}: source audio missing`);
+          assert.ok(rms[1] < 10, `${preset.platform}: muted clip contains sound`);
           const artifact = createReviewVideoExport({
             videoId: "00000000-0000-4000-8000-000000000602",
             sourceAssetRef: `asset-synthetic-${preset.platform}-001`,

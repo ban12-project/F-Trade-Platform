@@ -253,7 +253,7 @@ export async function listProjectPublicationData(
   const candidates: PublicationCandidate[] = records.flatMap(
     ({ record }): PublicationCandidate[] => {
       if (!approved.has(record.id)) return [];
-      const payload = record.payload as Record<string, any>;
+      const payload = record.payload as Record<string, unknown>;
       if (record.type === "content" && payload.status === "approved")
         return [
           {
@@ -480,6 +480,7 @@ export async function recordControlledPublicationResult(
     }
     if (job.status !== "claimed") throw new Error("发布任务尚未领取，不能记录执行回执。");
     if (value.outcome === "published") {
+      if (!value.externalPublicationRef) throw new Error("成功发布结果缺少平台发布凭证。");
       const { record } = await assertPublicationEligible(
         {
           projectId: publication.projectId,
@@ -499,7 +500,7 @@ export async function recordControlledPublicationResult(
           and(
             eq(socialPublication.channelRef, publication.channelRef),
             eq(socialPublication.accountRef, publication.accountRef),
-            eq(socialPublication.externalPublicationRef, value.externalPublicationRef!),
+            eq(socialPublication.externalPublicationRef, value.externalPublicationRef),
           ),
         )
         .limit(1);
@@ -529,7 +530,7 @@ export async function recordControlledPublicationResult(
           .update(aggregateRecord)
           .set({
             state: "CONTENT_PUBLISHED",
-            payload: publishContent(record.payload, "human", value.externalPublicationRef!),
+            payload: publishContent(record.payload, "human", value.externalPublicationRef),
             version: sql`${aggregateRecord.version} + 1`,
           })
           .where(eq(aggregateRecord.id, publication.contentRef));

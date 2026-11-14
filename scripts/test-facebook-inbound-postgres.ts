@@ -12,6 +12,7 @@ import {
 } from "../lib/db/schema";
 import { ingestFacebookInboundBatch } from "../lib/social/facebook-inbound-store";
 import type { SocialActorIdentity } from "../lib/social/human-write-access";
+import { readInboundContext } from "../lib/social/inbound-context-store";
 import {
   listUnassignedInboundConversations,
   routeInboundConversation,
@@ -69,30 +70,63 @@ export async function testFacebookInbound(database: Database, identity: SocialAc
       (item) => item.id === conversation.id,
     ),
   );
-  const routed = await routeInboundConversation(
-    { conversationId: conversation.id, mode: "create" },
-    identity,
-    database,
-  );
-  const [project] = await database
-    .select()
-    .from(workspaceProject)
-    .where(eq(workspaceProject.id, routed.projectId));
-  const [lead] = await database
-    .select()
-    .from(aggregateRecord)
-    .where(eq(aggregateRecord.id, routed.leadId));
-  assert.equal(project.kind, "sales");
-  assert.equal(lead.state, "LEAD_RECEIVED");
-  assert.equal(lead.payload.next_action, "collect_rfq");
-  await assert.rejects(
-    routeInboundConversation(
-      { conversationId: conversation.id, mode: "create" },
+  const previousLegacyScope = {
+    SOCIAL_FACEBOOK_OWNER_USER_ID: process.env.SOCIAL_FACEBOOK_OWNER_USER_ID,
+    SOCIAL_WORKER_CHANNEL_REF: process.env.SOCIAL_WORKER_CHANNEL_REF,
+    SOCIAL_WORKER_ACCOUNT_REF: process.env.SOCIAL_WORKER_ACCOUNT_REF,
+  };
+  process.env.SOCIAL_FACEBOOK_OWNER_USER_ID = actorId;
+  process.env.SOCIAL_WORKER_CHANNEL_REF = channelRef;
+  process.env.SOCIAL_WORKER_ACCOUNT_REF = accountRef;
+  let routed: Awaited<ReturnType<typeof routeInboundConversation>>;
+  try {
+    const preview = await readInboundContext(
+      { conversationId: conversation.id },
       identity,
       database,
-    ),
-    /已完成分流/,
-  );
+    );
+    routed = await routeInboundConversation(
+      {
+        conversationId: conversation.id,
+        mode: "create",
+        confirmed: "yes",
+        reviewedMessageAt: now.toISOString(),
+        reviewedContextDigest: preview.reviewedContextDigest,
+      },
+      identity,
+      database,
+    );
+    const [project] = await database
+      .select()
+      .from(workspaceProject)
+      .where(eq(workspaceProject.id, routed.projectId));
+    const [lead] = await database
+      .select()
+      .from(aggregateRecord)
+      .where(eq(aggregateRecord.id, routed.leadId));
+    assert.equal(project.kind, "sales");
+    assert.equal(lead.state, "LEAD_RECEIVED");
+    assert.equal(lead.payload.next_action, "collect_rfq");
+    await assert.rejects(
+      routeInboundConversation(
+        {
+          conversationId: conversation.id,
+          mode: "create",
+          confirmed: "yes",
+          reviewedMessageAt: now.toISOString(),
+          reviewedContextDigest: preview.reviewedContextDigest,
+        },
+        identity,
+        database,
+      ),
+      /已完成分流/,
+    );
+  } finally {
+    for (const [key, value] of Object.entries(previousLegacyScope)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 
   const [stored] = await database
     .select()
@@ -158,7 +192,10 @@ export async function testFacebookInbound(database: Database, identity: SocialAc
     { ...batch, accountRef: randomUUID() },
     { ...batch, observedAt: new Date(now.getTime() - 300001).toISOString() },
     { ...batch, messages: [{ ...message, direction: "outbound" }] },
-    { ...batch, messages: [{ ...message, receivedAt: new Date(now.getTime() + 1).toISOString() }] },
+    {
+      ...batch,
+      messages: [{ ...message, receivedAt: new Date(now.getTime() + 1).toISOString() }],
+    },
     {
       ...batch,
       messages: [{ ...message, receivedAt: new Date(now.getTime() - 30 * 86400000).toISOString() }],

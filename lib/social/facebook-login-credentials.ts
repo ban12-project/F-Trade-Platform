@@ -34,8 +34,8 @@ export function updateFacebookLoginCiphertext(
   // Never carry an old account's factors across a username replacement.
   const sameIdentity = !value.loginPassword || saved?.username === value.loginUsername;
   const next = {
-    username: value.loginPassword ? value.loginUsername : saved!.username,
-    password: value.loginPassword || saved!.password,
+    username: value.loginPassword ? value.loginUsername : saved?.username,
+    password: value.loginPassword || saved?.password,
     totpSecret: sameIdentity ? saved?.totpSecret : undefined,
     messengerPin: sameIdentity ? saved?.messengerPin : undefined,
   };

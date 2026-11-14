@@ -8,7 +8,7 @@
 
 现在只对 `@workflow/core@4.8.8` 将 nanoid 限定为 5.1.16，并由 pnpm 的可审核补丁替换 core 内的固定 token 回调：消耗原来的 34 次随机数，将末尾 21 字节交给新版库。包装函数只生成长度 21 的 token。没有改动 nanoid 包、回退其安全检查或开放调用方指定长度；其余原有 devalue/undici/esbuild/MCP 补丁保留。
 
-补丁位于 [`patches/@workflow__core@4.8.8.patch`](../../../patches/@workflow__core@4.8.8.patch)。这是项目维护的上游包补丁；以后升级 core 必须重新审查应用点。只有上游迁移通过冻结状态与原有兼容测试，才能移除回调补丁，不能仅依据新版本号删除。
+补丁位于 [`patches/@workflow__core@4.8.8.patch`](https://github.com/ban12-project/F-Trade-Platform/blob/8194706c7199e89dc4fa1684977d088dcd4c0c60/patches/%40workflow__core%404.8.8.patch)。这是项目维护的上游包补丁；以后升级 core 必须重新审查应用点。只有上游迁移通过冻结状态与原有兼容测试，才能移除回调补丁，不能仅依据新版本号删除。
 
 ## 实际 SDK 恢复证据
 

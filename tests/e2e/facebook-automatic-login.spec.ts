@@ -701,7 +701,7 @@ for (const mode of [
       reviewRef: "evidence-native-root-automatic",
       reviewedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 60000).toISOString(),
-      url: base + "/",
+      url: `${base}/`,
       form: "#login_form",
       username: '#login_form input[name="email"]',
       password: '#login_form input[name="pass"]',
@@ -715,10 +715,10 @@ for (const mode of [
             : mode === "revealed-toggle"
               ? '#login_form [role="button"][tabindex="0"][aria-label="Log In"]'
               : "#login_form button",
-        totp: { url: base + "/two_factor/", marker: "#totp", input: "#code", submit: "#verify" },
-        pin: { url: base + "/messages/", marker: "#pin", input: "#pin-code", submit: null },
+        totp: { url: `${base}/two_factor/`, marker: "#totp", input: "#code", submit: "#verify" },
+        pin: { url: `${base}/messages/`, marker: "#pin", input: "#pin-code", submit: null },
         ready: {
-          url: base + "/messages/",
+          url: `${base}/messages/`,
           marker: "#chats",
           empty: "#empty",
           emptyText: "No chats",
@@ -748,7 +748,7 @@ for (const mode of [
       requestId: "00000000-0000-4000-8000-000000000013",
       expiresAt: Date.now() + 30000,
     };
-    await page.goto(base + "/");
+    await page.goto(`${base}/`);
     if (!["continue-totp", "revealed-toggle"].includes(mode)) {
       const result = await runtime("submit", {
         ...packet,
@@ -759,7 +759,7 @@ for (const mode of [
       await expect(page.locator('[name="pass"]')).toHaveValue(
         mode === "ambiguous-toggle" ? "synthetic-secret" : "",
       );
-      await expect(page).toHaveURL(base + "/");
+      await expect(page).toHaveURL(`${base}/`);
       return;
     }
     let attention = 0;
@@ -775,7 +775,7 @@ for (const mode of [
       observe: () => runtime("observe", { ...packet }),
       onAttention: async () => {
         attention++;
-        await page.goto(base + "/two_factor/");
+        await page.goto(`${base}/two_factor/`);
       },
       submit: async (phase, values) => {
         phases.push(phase);

@@ -37,7 +37,7 @@ export async function assertCurrentProductMediaUsageForVideo(
     database.select().from(productMediaAsset).where(inArray(productMediaAsset.id, mediaIds)),
   ]);
   const product = productRows[0];
-  if (!product || product.state !== "PRODUCT_READY") {
+  if (product?.state !== "PRODUCT_READY") {
     throw new Error("视频引用的产品已不再处于 ProductReady，不能继续处理。");
   }
 

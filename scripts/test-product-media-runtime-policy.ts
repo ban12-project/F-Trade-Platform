@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-
 import { type VideoProject, videoProjectSchema } from "../lib/video/contracts";
 import {
   assertCurrentProductMediaUsage,
@@ -7,6 +6,7 @@ import {
   productMediaIdsForVideoProject,
   productMediaRuntimeRecordFromRow,
 } from "../lib/video/product-media-runtime-policy";
+import { required } from "./test-required";
 
 const evaluatedAt = new Date("2026-09-03T12:00:00.000Z");
 const productId = "00000000-0000-4000-8000-000000000951";
@@ -182,7 +182,7 @@ const uploadOnly = videoProjectSchema.parse({
     ...project.editDraft,
     clips: [
       {
-        ...project.editDraft!.clips[0],
+        ...required(project.editDraft).clips[0],
         assetRef: "evidence-one-off-upload-951",
       },
     ],
@@ -204,7 +204,7 @@ assert.throws(
       scenes: [{ ...project.scenes[0], assetRefs: ["asset-not-evidence-951"] }],
       editDraft: {
         ...project.editDraft,
-        clips: [{ ...project.editDraft!.clips[0], assetRef: "asset-not-evidence-951" }],
+        clips: [{ ...required(project.editDraft).clips[0], assetRef: "asset-not-evidence-951" }],
       },
     }),
   /ProductMedia 源文件/,

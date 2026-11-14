@@ -71,7 +71,7 @@ jobs:
       - name: Verify shipped Remotion CJS and ESM payload bounds
         run: node --test scripts/test-remotion-bundled-bounds.mjs
 
-      - name: Verify patched Workflow replay and serialization compatibility
+      - name: Verify Workflow v5 token and serialization compatibility
         run: node scripts/test-workflow-security-compatibility.mjs
 
       - name: Verify patched Undici TLS identity checks on actual SDK dependencies
@@ -83,7 +83,12 @@ jobs:
       - name: Verify installed systeminformation input boundaries
         run: node --test scripts/test-systeminformation-boundaries.mjs
 
-      - name: Resume frozen old-nanoid SDK state and check security boundaries
+      - name: Execute compiled Workflow v5 lifecycle and cross-version serde checks
+        run: |
+          node scripts/test-workflow-serde-compatibility.mjs
+          node --test scripts/test-workflow-v5-runtime.mjs
+
+      - name: Resume frozen old-nanoid state on its isolated v4 baseline
         run: node --test --test-reporter=tap scripts/test-workflow-nanoid-replay.mjs
 
       - name: Verify Workflow queue deadlines and transport boundaries

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mock } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import { closeDatabase, getDatabase } from "../lib/db/client";
@@ -24,6 +24,7 @@ import {
 } from "../lib/video/review-evidence-store";
 import { assertAndLinkProjectEvidence, listProjectEvidenceOptions } from "../lib/workspace/access";
 import { seedVideoReviewFixture } from "../tests/fixtures/video-review";
+import { required } from "./test-required";
 
 const connection = process.env.VIDEO_RETENTION_TEST_DATABASE_URL;
 if (
@@ -152,9 +153,9 @@ try {
       (r) => r.id === active.decisionRef,
     ),
   );
-  const [candidate] = (
-    await listVideoReviewEvidenceCopies([active.videoId], active.actorId, db)
-  ).get(active.videoId)!;
+  const [candidate] = required(
+    (await listVideoReviewEvidenceCopies([active.videoId], active.actorId, db)).get(active.videoId),
+  );
   assert(candidate.canRegister && !candidate.registered);
   const registered = await registerVideoReviewWorkingEvidence(input(active), identity(active), db);
   const after = await snapshot(active);

@@ -12,10 +12,16 @@ import type {
   ReadyVideoProductSource,
 } from "@/lib/video/store";
 import type { VideoWorkspaceSelection } from "@/lib/video/workspace-selection";
-import { workspaceCreateHref, workspaceRecordHref } from "@/lib/workspace/navigation";
+import {
+  workspaceCreateHref,
+  workspaceRecordHref,
+  workspaceReturnLabel,
+  workspaceReturnTo,
+} from "@/lib/workspace/navigation";
 import { useWorkspaceDirty, useWorkspaceDirtyState, WorkspaceDirtyProvider } from "./dirty-state";
 import { MarketingVideoPanel, videoStateLabel } from "./marketing-video-panel";
 import { WorkspaceLink } from "./workspace-link";
+import { WorkspaceToolbar } from "./workspace-toolbar";
 
 function VideoWorkspaceInner({
   projectId,
@@ -48,16 +54,16 @@ function VideoWorkspaceInner({
   const productId =
     active?.productId ?? (selection.mode === "create" ? selection.productId : undefined);
   const product = products.find((item) => item.id === productId);
-  const back = returnTo ?? `/workspace/content?project=${projectId}`;
+  const back = workspaceReturnTo(returnTo) ?? `/workspace/content?project=${projectId}`;
   return (
-    <main id="main-content" className="min-h-screen bg-muted/30 pb-24">
-      <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+    <main id="main-content" className="workspace-page workspace-layout bg-muted/30 pb-24">
+      <WorkspaceToolbar>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <WorkspaceLink
               href={back}
               className={buttonVariants({ size: "icon", variant: "ghost" })}
-              aria-label="返回内容与发布"
+              aria-label={workspaceReturnLabel(back)}
             >
               <ArrowLeftIcon />
             </WorkspaceLink>
@@ -74,8 +80,8 @@ function VideoWorkspaceInner({
           </div>
           <Badge variant="outline">{!canWrite ? "只读" : dirty ? "有未保存修改" : "已同步"}</Badge>
         </div>
-      </header>
-      <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6">
+      </WorkspaceToolbar>
+      <div className="mx-auto max-w-7xl flex flex-col gap-5 px-4 py-6 sm:px-6">
         <p className="text-sm text-muted-foreground">
           <FilmIcon className="mr-1 inline size-4" />
           视频是一种可选内容形式。图文内容可以独立制作与发布。
@@ -85,7 +91,7 @@ function VideoWorkspaceInner({
             来源产品：
             <WorkspaceLink
               className="underline underline-offset-4"
-              href={workspaceRecordHref(projectId, "product", product.id)}
+              href={workspaceRecordHref(projectId, "product", product.id, back)}
             >
               {product.productName}
             </WorkspaceLink>

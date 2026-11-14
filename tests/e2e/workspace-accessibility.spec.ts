@@ -52,6 +52,14 @@ for (const theme of ["light", "dark"] as const) {
       await page.evaluate(async (theme) => {
         document.documentElement.classList.toggle("dark", theme === "dark");
         await document.fonts.ready;
+        // Audit the selected theme after its finite color transitions settle.
+        // Infinite activity indicators must not block the page audit.
+        await Promise.all(
+          document
+            .getAnimations()
+            .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+            .map((animation) => animation.finished.catch(() => {})),
+        );
       }, theme);
       const result = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])

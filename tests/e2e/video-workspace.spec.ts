@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { required } from "../../scripts/test-required";
 
 test("review copies require an explicit declaration and preserve the original cutoff", async ({
   page,
@@ -82,7 +83,7 @@ test("approved video offers a private manifest download while review drafts do n
   await expect(manifest).toHaveAttribute("download", "");
   const href = await manifest.getAttribute("href");
   expect(href).toBe("/api/video-download/00000000-0000-4000-8000-000000000401/manifest");
-  const denied = await request.get(href!);
+  const denied = await request.get(required(href));
   expect(denied.status()).toBe(403);
   expect(denied.headers()["cache-control"]).toBe("no-store");
   await page.goto("/testing/video-workspace?state=review");
@@ -125,4 +126,94 @@ test("creative brief edits require saving before AI regeneration", async ({ page
   await page.getByLabel("目标受众", { exact: true }).fill("配件采购商");
   await expect(page.getByRole("button", { name: "AI 初稿", exact: true })).toBeDisabled();
   await expect(page.getByLabel("目标受众", { exact: true })).toHaveValue("配件采购商");
+});
+
+test("rendering an incomplete brief names the required input without technical errors", async ({
+  page,
+}) => {
+  await page.goto("/testing/video-workspace");
+  let submissions = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"]) submissions++;
+  });
+  const render = page.getByRole("button", { name: "合成预览", exact: true });
+  await render.click();
+  await expect(
+    page.getByText("请先填写上方 ABCD 创意简报，再合成预览。", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("目标受众", { exact: true }).fill("SYNTHETIC audience");
+  await render.click();
+  const errors = page.getByRole("alert").filter({ hasText: "剪辑结构需要修改" });
+  await expect(errors).toContainText("请选择含授权品牌标识的开场素材。");
+  await expect(errors).toContainText("请填写一个主要买家需求。");
+  await expect(errors).toContainText("请填写可用的下一步与承接入口。");
+  await expect(errors).toContainText("请填写平台与声音、字幕假设。");
+  await expect(errors).not.toContainText("Too small");
+  expect(submissions).toBe(0);
+});
+
+test("AI draft explains missing brief fields and unsaved changes at the action", async ({
+  page,
+}) => {
+  await page.goto("/testing/video-workspace");
+  const ai = page.getByRole("button", { name: "AI 初稿", exact: true });
+  await expect(ai).toBeDisabled();
+  const audience = page.getByLabel("目标受众", { exact: true });
+  await audience.fill("");
+  await expect(ai).toBeDisabled();
+  await expect(ai).toHaveAccessibleDescription("请完整填写上方创意简报并保存，再生成 AI 初稿。");
+  await audience.fill("SYNTHETIC revised audience");
+  await page.getByLabel("含授权品牌标识的开场素材").selectOption("evidence-video-001");
+  await page.getByLabel("一个主要买家需求").fill("SYNTHETIC workflow demonstration");
+  await page.getByLabel("可用的下一步与承接入口").fill("SYNTHETIC contact form");
+  await page.getByLabel("平台与声音、字幕假设").fill("SYNTHETIC muted preview");
+  await expect(ai).toBeDisabled();
+  await expect(ai).toHaveAccessibleDescription("请先保存当前修改，再生成 AI 初稿。");
+});
+
+for (const [returnTo, label] of [
+  ["/workspace?view=waiting", "返回今日任务"],
+  ["/workspace/products?type=product&q=SYN-001", "返回产品资料"],
+  ["/workspace/content?type=video&state=VIDEO_REVIEW_REQUIRED&q=synthetic", "返回内容与发布"],
+  ["/workspace/customers?type=rfq&q=synthetic", "返回客户与询盘"],
+  ["https://example.invalid/", "返回内容与发布"],
+  ["/workspace/content?next=https://example.invalid/", "返回内容与发布"],
+]) {
+  test(`video return context matches its destination: ${returnTo}`, async ({ page }) => {
+    await page.goto(`/testing/video-workspace?returnTo=${encodeURIComponent(returnTo)}`);
+    const fallback = "/workspace/content?project=00000000-0000-4000-8000-000000000721";
+    const expected = returnTo.includes("example.invalid") ? fallback : returnTo;
+    const back = page.getByRole("link", { name: label, exact: true });
+    await expect(back).toBeVisible();
+    await expect(back).toHaveAttribute("href", expected);
+    const source = page.getByRole("link", { name: "Verified clutch kit", exact: true });
+    const href = required(await source.getAttribute("href"));
+    const target = new URL(href, "http://localhost");
+    expect(target.pathname).toBe(
+      "/workspace/00000000-0000-4000-8000-000000000721/records/product/00000000-0000-4000-8000-000000000301",
+    );
+    expect(target.searchParams.get("returnTo")).toBe(expected);
+  });
+}
+
+test("returning to filtered tasks keeps the video draft until discard is confirmed", async ({
+  page,
+}) => {
+  await page.goto("/testing/video-workspace?returnTo=%2Fworkspace%3Fview%3Dwaiting");
+  await page.getByLabel("成片时长（秒）").first().fill("6");
+  const back = page.getByRole("link", { name: "返回今日任务", exact: true });
+  await back.click();
+  const alert = page.getByRole("alertdialog", { name: "放弃未保存的修改？" });
+  await expect(alert).toBeVisible();
+  await alert.getByRole("button", { name: "继续编辑" }).click();
+  await expect(page.getByLabel("成片时长（秒）").first()).toHaveValue("6");
+  await expect(page).toHaveURL(/\/testing\/video-workspace/);
+  await back.click();
+  await alert.getByRole("button", { name: "放弃修改并离开" }).click();
+  // This synthetic fixture is signed out; assert the final destination rather than
+  // requiring another request when Next.js can reuse a prefetched redirect.
+  await expect(page).toHaveURL(
+    (url) => url.pathname === "/auth" && url.searchParams.get("next") === "/workspace?view=waiting",
+  );
+  await expect(page.getByRole("heading", { name: "登录工作台", exact: true })).toBeVisible();
 });

@@ -10,6 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { publicationProgress } from "@/lib/social/publication-presentation";
 import type {
   PublicationCandidate,
@@ -34,6 +42,12 @@ export function PublicationPanel({
   publications: PublicationEntry[];
   mediaOptions?: PublicationMediaOptions;
 }) {
+  const timeZone = useBrowserTimeZone();
+  const timestampFormat = new Intl.DateTimeFormat("zh-CN", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+    timeZone,
+  });
   const router = useRouter();
   const waiting = publications.some((p) => ["submitted", "pending", "queued"].includes(p.status));
   useEffect(() => {
@@ -43,7 +57,30 @@ export function PublicationPanel({
   }, [waiting, router]);
   const current = candidates.find((c) => c.format === "text");
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
+      {!current && mediaOptions.length === 0 && publications.length === 0 ? (
+        <Empty role="region" aria-label="发布记录为空" className="border">
+          <EmptyHeader>
+            <EmptyTitle role="heading" aria-level={2}>
+              暂无发布记录
+            </EmptyTitle>
+            <EmptyDescription>
+              可先查看项目内容及其审核状态，或继续准备内容；这些工作无需连接社媒账号。
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <WorkspaceLink
+              href={`/workspace/content?project=${encodeURIComponent(projectId)}`}
+              className={buttonVariants({ variant: "outline", className: "min-h-11" })}
+            >
+              查看项目内容
+            </WorkspaceLink>
+            <p className="text-sm text-muted-foreground">
+              提交发布仍需人工确认，取得平台回执前不会显示为已发布。
+            </p>
+          </EmptyContent>
+        </Empty>
+      ) : null}
       {publications.map((item) => {
         const progress = publicationProgress(item.status, item.humanConfirmed, item.jobStatus);
         return (
@@ -59,10 +96,18 @@ export function PublicationPanel({
             <CardContent className="flex flex-col gap-2">
               <p className="text-sm">{progress.detail}</p>
               <p className="text-sm text-muted-foreground">
-                提交时间：{new Date(item.createdAt).toLocaleString()}
+                提交时间：
+                <time dateTime={new Date(item.createdAt).toISOString()}>
+                  {timestampFormat.format(new Date(item.createdAt))}（{timeZone}）
+                </time>
               </p>
               {item.publishedAt && (
-                <p className="text-sm">发布时间：{new Date(item.publishedAt).toLocaleString()}</p>
+                <p className="text-sm">
+                  发布时间：
+                  <time dateTime={new Date(item.publishedAt).toISOString()}>
+                    {timestampFormat.format(new Date(item.publishedAt))}（{timeZone}）
+                  </time>
+                </p>
               )}
               {item.failureLabel ? (
                 <details className="text-sm text-muted-foreground">

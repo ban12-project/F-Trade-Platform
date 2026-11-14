@@ -178,13 +178,17 @@ test("unauthenticated and invalid sessions cannot read project data", async ({
 }) => {
   await context.clearCookies();
   await page.goto(path);
-  await expect(page).toHaveURL(/\/auth$/);
+  await expect(page).toHaveURL(
+    (url) => url.pathname === "/auth" && url.searchParams.get("next") === path,
+  );
   await expect(page.getByRole("heading", { name: recordTitle })).toHaveCount(0);
   await context.addCookies([
     { name: "better-auth.session_token", value: "synthetic-invalid-session", url: baseURL },
   ]);
   await page.goto(path);
-  await expect(page).toHaveURL(/\/auth$/);
+  await expect(page).toHaveURL(
+    (url) => url.pathname === "/auth" && url.searchParams.get("next") === path,
+  );
   await expect(page.getByRole("heading", { name: recordTitle })).toHaveCount(0);
 });
 

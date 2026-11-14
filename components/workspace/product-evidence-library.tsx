@@ -3,8 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileUpIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, useId } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { startTransition, useActionState, useEffect, useId, useRef, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,17 +24,25 @@ import { documentUploadFormSchema } from "@/lib/product/document-upload-contract
 import { uploadProductDocument } from "@/lib/product/upload-document-client";
 import type { EvidenceOption } from "@/lib/workspace/access";
 
+import { useWorkspaceDirty } from "./dirty-state";
+
 export function EvidenceLibrary({
   projectId,
   evidenceOptions,
   onUploaded,
+  onDraftDirty,
+  onBusyChange,
 }: {
   projectId: string;
   evidenceOptions: EvidenceOption[];
   onUploaded?: () => void;
+  onDraftDirty?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
   const fileId = useId();
+  const uploadForm = useRef<HTMLFormElement>(null);
+  const [showResult, setShowResult] = useState(false);
   const [state, action, pending] = useActionState(
     async (previous: typeof initialProductEvidenceActionState, file: File) => {
       try {
@@ -54,9 +62,25 @@ export function EvidenceLibrary({
   const form = useForm<z.infer<typeof documentUploadFormSchema>>({
     resolver: zodResolver(documentUploadFormSchema),
   });
+  const document = useWatch({ control: form.control, name: "document" });
+  const dirty = Boolean(document) || pending;
+  const busy = !form.formState.isReady || pending;
+  useWorkspaceDirty("evidence-upload", dirty);
   useEffect(() => {
-    if (state.status === "success") router.refresh();
-  }, [router, state]);
+    onDraftDirty?.(dirty);
+    return () => onDraftDirty?.(false);
+  }, [dirty, onDraftDirty]);
+  useEffect(() => {
+    onBusyChange?.(pending);
+    return () => onBusyChange?.(false);
+  }, [pending, onBusyChange]);
+  useEffect(() => {
+    if (state.status === "success") {
+      form.reset();
+      uploadForm.current?.reset();
+      router.refresh();
+    }
+  }, [form, router, state]);
   return (
     <Card size="sm">
       <CardHeader>
@@ -67,11 +91,14 @@ export function EvidenceLibrary({
       </CardHeader>
       <CardContent>
         <form
+          ref={uploadForm}
           onSubmit={(event) => {
             event.stopPropagation();
-            void form.handleSubmit(({ document }) => startTransition(() => action(document)))(
-              event,
-            );
+            void form.handleSubmit(({ document }) => {
+              if (busy) return;
+              setShowResult(true);
+              startTransition(() => action(document));
+            })(event);
           }}
         >
           <FieldGroup>
@@ -89,26 +116,40 @@ export function EvidenceLibrary({
                     type="file"
                     accept=".pdf,.csv,.xls,.xlsx"
                     required
-                    disabled={pending}
+                    disabled={busy}
                     aria-invalid={Boolean(form.formState.errors.document)}
-                    onChange={(event) => field.onChange(event.target.files?.[0])}
+                    aria-describedby={[
+                      `${fileId}-help`,
+                      form.formState.errors.document ? `${fileId}-error` : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onChange={(event) => {
+                      setShowResult(false);
+                      field.onChange(event.target.files?.[0]);
+                    }}
                   />
                 )}
               />
-              <FieldDescription>
+              <FieldDescription id={`${fileId}-help`}>
                 支持 PDF、CSV、XLS、XLSX，最大 25 MiB；文件保存在私有存储。
               </FieldDescription>
-              <FieldError errors={[form.formState.errors.document]} />
+              <FieldError id={`${fileId}-error`} errors={[form.formState.errors.document]} />
             </Field>
-            <Button type="submit" variant="outline" className="min-h-11 w-full" disabled={pending}>
+            <Button type="submit" variant="outline" className="min-h-11 w-full" disabled={busy}>
               {pending ? (
                 <Spinner data-icon="inline-start" />
               ) : (
                 <FileUpIcon data-icon="inline-start" />
               )}
-              保存到项目资料库
+              {pending ? "正在上传并保存资料…" : "保存到项目资料库"}
             </Button>
-            {state.message ? (
+            {pending ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                正在上传并保存，请等待结果。关闭窗口不会取消已提交的保存。
+              </p>
+            ) : null}
+            {showResult && !pending && state.message ? (
               <p
                 aria-live="polite"
                 className={

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,8 @@ import { WorkspaceLink } from "@/components/workspace/workspace-link";
 import { WorkspacePanelSkeleton } from "@/components/workspace/workspace-loading-skeleton";
 import { requirePermission } from "@/lib/auth-guard";
 import { readWorkspaceProjectOverview } from "@/lib/workspace/read-model";
+export const metadata: Metadata = { title: "项目管理" };
+
 export const prefetch = "partial";
 async function Projects() {
   await connection();
@@ -39,7 +42,11 @@ async function Projects() {
 }
 export default function Page() {
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="workspace-layout mx-auto max-w-7xl space-y-6 p-4 sm:p-6"
+    >
       <header>
         <h1 className="text-2xl font-semibold">项目管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">

@@ -30,7 +30,7 @@ export function WorkspaceShell({
               <WorkspaceNavigation canManage={canManage} basePath={basePath} />
             </Suspense>
           )}
-          <div className="min-w-0 flex-1">
+          <div className="workspace-layout min-w-0 flex-1">
             <header className="flex h-12 items-center gap-2 border-b px-4">
               <SidebarTrigger
                 aria-label="打开导航"

@@ -28,6 +28,7 @@ Apply these rules when your task affects marketing video content:
 
 - GitHub 只用于研发交付，不能用 Issues 记录真实业务流水。
 - 所有工作通过 Issue → 分支 → PR → CI → squash merge 完成。
+- 按完整功能或问题域分批组织 PR，将相关实现、测试与文档一起交付；小的文案、样式与测试修正随对应主题合并，不拆成零碎 PR。
 - 2026-10-31 用户明确要求临时暂停自动 CI 检查：完成适用的本地验证并在 PR 记录后可 squash merge，无需等待 CI；保留自动部署。最终 MVP1 验收前恢复，见 `docs/operations/temporary-ci-pause.md`。
 - 不提交密钥、真实客户数据、未经授权的原始资料或未标记的虚构产品事实。
 
@@ -38,6 +39,11 @@ Apply these rules when your task affects marketing video content:
 - Next.js 保持 `cacheComponents: true`，并使用默认 Turbopack 构建。新路由应按 Cache Components 模型设计，以静态壳、靠近动态数据的 `Suspense` 边界和即时导航为默认目标。
 - 必须启用 `reactCompiler: true` 与实验性的 `experimental.turbopackRustReactCompiler: true`。若升级或构建暴露 React Compiler 兼容性问题，须记录风险并在 PR 中提供可观察证据，不能静默关闭。
 - TypeScript 保持 7.x；Next.js 默认的项目本地 TypeScript CLI 校验必须保留，不能设 `experimental.useTypeScriptCli: false`。TypeScript 7 已移除 `baseUrl`，路径别名只使用 `compilerOptions.paths`。
+
+## ui-sdk 使用约定
+
+- 使用 ui-sdk 前，若已安装 `ui-sdk` skill，先遵循该技能，并阅读 `node_modules/@ui-sdk/react/docs/llms.txt`。
+- 构建新组件前，额外按标题检索 `node_modules/@ui-sdk/react/docs/core.md`，并阅读同目录的 `rendering.md`。
 
 ## 数据交互与表单约定
 

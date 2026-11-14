@@ -31,7 +31,7 @@ const brief = {
   buyerNeed: "Identify relevant products",
   nextAction: "Submit requirements to sales",
   platformAssumptions: "Silent viewing assumed; captions required",
-  brandAssetRef: draft.clips[0]!.assetRef,
+  brandAssetRef: draft.clips[0].assetRef,
 };
 const ready = marketingVideoDraftSchema.parse({ ...draft, creativeBrief: brief });
 assert.equal(assertMarketingCreativeReady(ready).audience, brief.audience);

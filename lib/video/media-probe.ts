@@ -132,7 +132,9 @@ export function validateProbedVideoExport(platform: VideoPlatform, media: Probed
     if (!(error instanceof VideoExportValidationError)) throw error;
     violations.push(...error.violations);
     // The enabled preset is known after input validation; retain all field failures together.
-    preset = videoExportPresets.find((item) => item.platform === parsedPlatform)!;
+    const matchingPreset = videoExportPresets.find((item) => item.platform === parsedPlatform);
+    if (!matchingPreset) throw new Error("缺少项目导出预设。");
+    preset = matchingPreset;
   }
   const encoding = media.encoding;
   for (const field of [

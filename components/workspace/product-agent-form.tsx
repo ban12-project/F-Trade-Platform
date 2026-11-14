@@ -25,7 +25,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -80,10 +87,19 @@ export function ProductAgentForm({
     initialProductAgentActionState,
   );
   const stream = useProductStream();
+  const uploadController = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      uploadController.current?.abort();
+      uploadController.current = null;
+    },
+    [],
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const state = canStream ? stream.state : actionState;
-  const pending = uploading || (canStream ? stream.pending : actionPending);
+  const created = useCreatedRecord(projectId, "product", state.status, state.productId);
+  const pending = created || uploading || (canStream ? stream.pending : actionPending);
   useEffect(() => {
     onBusyChange?.(pending);
     return () => onBusyChange?.(false);
@@ -148,8 +164,10 @@ export function ProductAgentForm({
       router.refresh();
     }
   }, [emptyAgent, initialChoice, form, router, state.status]);
-  useCreatedRecord(projectId, "product", state.status, state.productId);
   async function submit(values: AgentValues) {
+    if (pending || uploadController.current) return;
+    const active = new AbortController();
+    uploadController.current = active;
     setUploadError("");
     setUploading(true);
     try {
@@ -162,16 +180,38 @@ export function ProductAgentForm({
       data.set("evidenceRef", values.evidenceRef ?? "");
       data.set("sourceText", values.sourceText);
       const file = source ? source.file : fileRef.current?.files?.[0];
-      if (file) data.set("receiptId", await uploadProductDocument(file, projectId, "agent"));
+      if (file)
+        data.set("receiptId", await uploadProductDocument(file, projectId, "agent", active.signal));
       for (const image of images)
-        data.append("imageReceiptId", await uploadProductDocument(image, projectId, "agent_image"));
+        data.append(
+          "imageReceiptId",
+          await uploadProductDocument(image, projectId, "agent_image", active.signal),
+        );
+      active.signal.throwIfAborted();
       if (canStream) void stream.start(data);
       else startTransition(() => action(data));
     } catch {
-      setUploadError("文件上传失败，请检查格式、大小与项目权限后重试。");
+      if (uploadController.current === active) {
+        setUploadError(
+          active.signal.aborted
+            ? "已停止上传，未开始生成。文件选择已保留，可重新尝试。"
+            : "文件上传失败，请检查格式、大小与项目权限后重试。",
+        );
+      }
     } finally {
-      setUploading(false);
+      if (uploadController.current === active) {
+        uploadController.current = null;
+        setUploading(false);
+      }
     }
+  }
+  function stopUpload() {
+    const active = uploadController.current;
+    if (!active) return;
+    active.abort();
+    uploadController.current = null;
+    setUploading(false);
+    setUploadError("已停止上传，未开始生成。文件选择已保留，可重新尝试。");
   }
   const choiceItems = Object.fromEntries(choices.map((choice) => [choice.value, choice.label]));
   return (
@@ -185,6 +225,7 @@ export function ProductAgentForm({
       <CardContent>
         <form
           id="product-agent-import"
+          aria-busy={pending}
           onSubmit={form.handleSubmit(submit, () => setTextSourceOpen(true))}
         >
           {uploadError ? (
@@ -192,173 +233,175 @@ export function ProductAgentForm({
               {uploadError}
             </p>
           ) : null}
-          <FieldGroup>
-            <Collapsible>
-              <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
-                高级设置：模型
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                {choices.length ? (
-                  <Field
-                    data-invalid={
-                      !!form.formState.errors.modelConfigId || !!form.formState.errors.model
-                    }
-                  >
-                    <FieldLabel>模型</FieldLabel>
-                    <Select
-                      items={choiceItems}
-                      open={modelPickerOpen}
-                      onOpenChange={setModelPickerOpen}
-                      value={selectedChoice}
-                      onValueChange={(value) => {
-                        const choice = choices.find((item) => item.value === value);
-                        if (!choice) return;
-                        setSelectedChoice(choice.value);
-                        form.setValue("modelConfigId", choice.configId, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                        form.setValue("model", choice.model, {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                      }}
+          <FieldSet disabled={pending}>
+            <FieldGroup>
+              <Collapsible>
+                <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
+                  高级设置：模型
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  {choices.length ? (
+                    <Field
+                      data-invalid={
+                        !!form.formState.errors.modelConfigId || !!form.formState.errors.model
+                      }
                     >
-                      <SelectTrigger
-                        className="min-h-11 w-full"
-                        aria-label="模型"
-                        aria-invalid={
-                          !!form.formState.errors.modelConfigId || !!form.formState.errors.model
-                        }
-                        onKeyDownCapture={(event) => {
-                          if (event.key !== "Enter" || modelPickerOpen) return;
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setModelPickerOpen(true);
+                      <FieldLabel>模型</FieldLabel>
+                      <Select
+                        items={choiceItems}
+                        open={modelPickerOpen}
+                        onOpenChange={setModelPickerOpen}
+                        value={selectedChoice}
+                        onValueChange={(value) => {
+                          const choice = choices.find((item) => item.value === value);
+                          if (!choice) return;
+                          setSelectedChoice(choice.value);
+                          form.setValue("modelConfigId", choice.configId, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                          form.setValue("model", choice.model, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
                         }}
                       >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {choices.map((choice) => (
-                            <SelectItem key={choice.value} value={choice.value}>
-                              {choice.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>本次运行只使用这里选择的模型。</FieldDescription>
-                    <FieldError
-                      errors={[form.formState.errors.modelConfigId, form.formState.errors.model]}
-                    />
-                  </Field>
-                ) : null}
-              </CollapsibleContent>
-            </Collapsible>
-            {!source ? (
-              <Field>
-                <FieldLabel htmlFor="agent-document">产品资料</FieldLabel>
+                        <SelectTrigger
+                          className="min-h-11 w-full"
+                          aria-label="模型"
+                          aria-invalid={
+                            !!form.formState.errors.modelConfigId || !!form.formState.errors.model
+                          }
+                          onKeyDownCapture={(event) => {
+                            if (event.key !== "Enter" || modelPickerOpen) return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setModelPickerOpen(true);
+                          }}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {choices.map((choice) => (
+                              <SelectItem key={choice.value} value={choice.value}>
+                                {choice.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <FieldDescription>本次运行只使用这里选择的模型。</FieldDescription>
+                      <FieldError
+                        errors={[form.formState.errors.modelConfigId, form.formState.errors.model]}
+                      />
+                    </Field>
+                  ) : null}
+                </CollapsibleContent>
+              </Collapsible>
+              {!source ? (
+                <Field>
+                  <FieldLabel htmlFor="agent-document">产品资料</FieldLabel>
+                  <Input
+                    ref={fileRef}
+                    id="agent-document"
+                    type="file"
+                    accept=".pdf,.csv,.xls,.xlsx"
+                    onChange={(event) =>
+                      form.setValue("hasUpload", Boolean(event.target.files?.length), {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                  <FieldDescription>资料会自动保存为私有来源，最大 25MB。</FieldDescription>
+                  <FieldError errors={[form.formState.errors.sourceText]} />
+                </Field>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {source.file
+                    ? `所选文件：${source.file.name}`
+                    : "请先在上方选择资料文件，或使用已有资料中的文本。"}
+                </p>
+              )}
+              <Field data-invalid={!!form.formState.errors.imageFiles}>
+                <FieldLabel htmlFor="agent-images">实物图片（可选）</FieldLabel>
                 <Input
-                  ref={fileRef}
-                  id="agent-document"
-                  type="file"
-                  accept=".pdf,.csv,.xls,.xlsx"
+                  ref={imageRef}
+                  id="agent-images"
+                  aria-invalid={!!form.formState.errors.imageFiles}
                   onChange={(event) =>
-                    form.setValue("hasUpload", Boolean(event.target.files?.length), {
-                      shouldDirty: true,
+                    form.setValue("imageFiles", Array.from(event.target.files ?? []), {
                       shouldValidate: true,
+                      shouldDirty: true,
                     })
                   }
+                  type="file"
+                  multiple
+                  accept=".png,.jpg,.jpeg"
+                  disabled={pending}
                 />
-                <FieldDescription>资料会自动保存为私有来源，最大 25MB。</FieldDescription>
-                <FieldError errors={[form.formState.errors.sourceText]} />
+                <FieldError errors={[form.formState.errors.imageFiles]} />
+                <FieldDescription>
+                  最多 4 张，每张 5
+                  MiB，仅用于当前单个产品的外观核验。图片不补全工程事实，也不代表营销授权；无图可继续。
+                </FieldDescription>
               </Field>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {source.file
-                  ? `所选文件：${source.file.name}`
-                  : "请先在上方选择资料文件，或使用已有资料中的文本。"}
-              </p>
-            )}
-            <Field data-invalid={!!form.formState.errors.imageFiles}>
-              <FieldLabel htmlFor="agent-images">实物图片（可选）</FieldLabel>
-              <Input
-                ref={imageRef}
-                id="agent-images"
-                aria-invalid={!!form.formState.errors.imageFiles}
-                onChange={(event) =>
-                  form.setValue("imageFiles", Array.from(event.target.files ?? []), {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  })
-                }
-                type="file"
-                multiple
-                accept=".png,.jpg,.jpeg"
-                disabled={pending}
-              />
-              <FieldError errors={[form.formState.errors.imageFiles]} />
-              <FieldDescription>
-                最多 4 张，每张 5
-                MiB，仅用于当前单个产品的外观核验。图片不补全工程事实，也不代表营销授权；无图可继续。
-              </FieldDescription>
-            </Field>
-            <Collapsible open={textSourceOpen} onOpenChange={setTextSourceOpen}>
-              <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
-                改用已有资料中的文本
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                <FieldGroup>
-                  <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                    <FieldLabel htmlFor="agent-evidence">信息来源</FieldLabel>
-                    <Controller
-                      control={form.control}
-                      name="evidenceRef"
-                      render={({ field }) => (
-                        <Select
-                          value={field.value ?? ""}
-                          onValueChange={(value) => {
-                            field.onChange(value ?? "");
-                            form.setValue("sourceRef", value ?? "", { shouldValidate: true });
-                          }}
-                          disabled={!textEvidenceOptions.length}
-                        >
-                          <SelectTrigger
-                            id="agent-evidence"
-                            className="min-h-11 w-full"
-                            aria-invalid={!!form.formState.errors.evidenceRef}
+              <Collapsible open={textSourceOpen} onOpenChange={setTextSourceOpen}>
+                <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
+                  改用已有资料中的文本
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  <FieldGroup>
+                    <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                      <FieldLabel htmlFor="agent-evidence">信息来源</FieldLabel>
+                      <Controller
+                        control={form.control}
+                        name="evidenceRef"
+                        render={({ field }) => (
+                          <Select
+                            value={field.value ?? ""}
+                            onValueChange={(value) => {
+                              field.onChange(value ?? "");
+                              form.setValue("sourceRef", value ?? "", { shouldValidate: true });
+                            }}
+                            disabled={!textEvidenceOptions.length}
                           >
-                            <SelectValue>
-                              {textEvidenceOptions.find((option) => option.id === field.value)
-                                ?.sourceLabel ?? "选择已上传资料"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {textEvidenceOptions.map((option) => (
-                                <SelectItem key={option.id} value={option.id}>
-                                  {option.sourceLabel} · {option.id.slice(-8)}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    <FieldDescription>上传新文件时可不选；粘贴文本时必须选择。</FieldDescription>
-                    <FieldError errors={[form.formState.errors.evidenceRef]} />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.sourceText}>
-                    <FieldLabel htmlFor="agent-text">已授权资料文本</FieldLabel>
-                    <Textarea id="agent-text" rows={8} {...form.register("sourceText")} />
-                    <FieldError errors={[form.formState.errors.sourceText]} />
-                  </Field>
-                </FieldGroup>
-              </CollapsibleContent>
-            </Collapsible>
-          </FieldGroup>
+                            <SelectTrigger
+                              id="agent-evidence"
+                              className="min-h-11 w-full"
+                              aria-invalid={!!form.formState.errors.evidenceRef}
+                            >
+                              <SelectValue>
+                                {textEvidenceOptions.find((option) => option.id === field.value)
+                                  ?.sourceLabel ?? "选择已上传资料"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {textEvidenceOptions.map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    {option.sourceLabel} · {option.id.slice(-8)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      <FieldDescription>上传新文件时可不选；粘贴文本时必须选择。</FieldDescription>
+                      <FieldError errors={[form.formState.errors.evidenceRef]} />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.sourceText}>
+                      <FieldLabel htmlFor="agent-text">已授权资料文本</FieldLabel>
+                      <Textarea id="agent-text" rows={8} {...form.register("sourceText")} />
+                      <FieldError errors={[form.formState.errors.sourceText]} />
+                    </Field>
+                  </FieldGroup>
+                </CollapsibleContent>
+              </Collapsible>
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
@@ -370,12 +413,17 @@ export function ProductAgentForm({
           {pending ? <Spinner data-icon="inline-start" /> : <BotIcon data-icon="inline-start" />}
           生成待审核草稿
         </Button>
-        {canStream && pending ? (
+        {uploading ? (
+          <Button type="button" variant="outline" onClick={stopUpload}>
+            停止上传
+          </Button>
+        ) : null}
+        {canStream && stream.pending ? (
           <Button variant="outline" onClick={stream.stop}>
             停止生成
           </Button>
         ) : null}
-        {canStream && state.productId ? (
+        {state.productId ? (
           <LinkButton
             variant="outline"
             href={workspaceRecordHref(projectId, "product", state.productId)}

@@ -71,12 +71,9 @@ for (const { op, role, change } of cases)
       );
       const form =
         op === "publish"
-          ? page.locator("#publication-confirmation:visible")
+          ? page.locator('form[data-publication-composer="true"]:visible')
           : page.getByRole("region", { name: "发布账号", exact: true }).locator("form");
-      if (op === "publish")
-        await page
-          .locator("#publication-channel")
-          .selectOption(JSON.stringify([f.channelRef, f.accountRef]));
+      if (op === "publish") await form.getByRole("checkbox", { name: /合成权限测试账号/ }).check();
       await expect(form).toBeVisible();
       const input = form.getByLabel("处理情况或操作原因", {
         exact: true,
@@ -91,10 +88,8 @@ for (const { op, role, change } of cases)
       if (op === "control") {
         await form.getByLabel("要执行的操作").selectOption("pause");
       }
-      const submit =
-        op === "publish"
-          ? page.locator('button[form="publication-confirmation"]:visible')
-          : form.locator('button[type="submit"]');
+      const submit = form.locator('button[type="submit"]');
+      if (op === "publish") await expect(submit).toHaveAccessibleName("确认公开发布到 1 个账号");
       await expect(submit).toBeEnabled();
       const response = page.waitForResponse(
         (r) => r.request().method() === "POST" && Boolean(r.request().headers()["next-action"]),
@@ -153,6 +148,7 @@ for (const { op, role, change } of cases)
       if (change !== "unchanged") {
         await expect(page.getByText(SOCIAL_HUMAN_ACCESS_MESSAGE, { exact: true })).toBeVisible();
         if (op === "control") await expect(input).toHaveValue(value);
+        else await expect(form.getByRole("checkbox", { name: /合成权限测试账号/ })).toBeChecked();
         await expect(submit).toBeEnabled();
         expect(await before()).toEqual(original);
       } else {
@@ -163,8 +159,12 @@ for (const { op, role, change } of cases)
           })
           .toBe(op === "publish" ? 1 : "paused");
         const saved = await before();
-        expect(saved.audits).toHaveLength(1);
+        expect(saved.audits).toHaveLength(op === "publish" ? 2 : 1);
         if (op === "publish") {
+          expect(saved.audits.map((audit) => audit.action).sort()).toEqual([
+            "social_publication.batch_submitted",
+            "social_publication.submitted",
+          ]);
           expect(saved.jobs).toHaveLength(1);
           expect(saved.publications[0].status).toBe("submitted");
           expect(saved.publications[0].textConfirmation?.contentVersion).toBe(1);
@@ -203,12 +203,11 @@ test("Approved video directs to the complete media path and never offers a manif
   await expect(
     page.getByRole("heading", { name: "视频编辑器", exact: true }).filter({ visible: true }),
   ).toHaveCount(1);
-  const mediaNotice = page
-    .getByText("视频请使用素材发布", { exact: true })
-    .filter({ visible: true });
-  await expect(mediaNotice).toHaveCount(1);
-  await expect(mediaNotice).toBeVisible();
-  await expect(page.locator("#publication-confirmation:visible")).toHaveCount(0);
+  await expect(page.getByText("私有预览", { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "发布记录为空", exact: true }).filter({ visible: true }),
+  ).toBeVisible();
+  await expect(page.locator('form[data-publication-composer="true"]:visible')).toHaveCount(0);
   expect(
     await db
       .select()

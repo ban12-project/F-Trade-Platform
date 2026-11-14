@@ -3,6 +3,47 @@ import { expect, test } from "@playwright/test";
 const root = "/testing/workspace-navigation";
 const projectId = "00000000-0000-4000-8000-000000000263";
 
+for (const route of ["/testing/workspace-library/customers", root]) {
+  test(`sidebar start-work hydrates independently and opens its dialog at ${route}`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+    let release = () => {};
+    const ready = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/_next\/static\/.*\.js(?:\?|$)/, async (request) => {
+      await ready;
+      await request.continue();
+    });
+    const start = page
+      .getByRole("complementary", { name: "工作区导航" })
+      .getByRole("button", { name: "开始新工作", exact: true });
+    try {
+      await page.goto(route, { waitUntil: "commit" });
+      await expect(start).toBeVisible();
+      await expect(start).toBeDisabled();
+    } finally {
+      release();
+      await page.unrouteAll({ behavior: "wait" });
+    }
+    await expect(start).toBeEnabled();
+    await start.click();
+    const dialog = page.getByRole("dialog", { name: "开始新工作", exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("button", { name: "在此项目开始录入产品" })).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(start).toHaveAttribute("aria-expanded", "false");
+    await expect(start).toBeEnabled();
+    expect(errors).toEqual([]);
+  });
+}
+
 test("shared navigation stays mounted and interactive while a child route streams", async ({
   page,
 }) => {
@@ -131,6 +172,8 @@ test("starting work from a dirty page asks once and cancelling keeps the origina
   await confirmation.getByRole("button", { name: "放弃修改并离开" }).click();
   await destination;
   // This fixture has no session: prove the exact create destination before the real auth guard redirects.
-  await expect(page).toHaveURL(/\/auth$/);
+  await expect(page).toHaveURL(
+    `/auth?next=${encodeURIComponent(`/workspace/${projectId}/new/product`)}`,
+  );
   await expect(confirmation).toHaveCount(0);
 });

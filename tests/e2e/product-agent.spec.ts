@@ -237,7 +237,7 @@ test("rejects facts copied from an adjacent catalog table row", () => {
       "| RYC251 | Synthetic Kit 251 | clutch_kit | OE-251 |",
       "| RYC302 | Synthetic Kit 302 | clutch_kit | OE-302 |",
     ].join("\n"),
-  })[0]!;
+  })[0];
   const draft = {
     ...safeDraft,
     record_id: candidate.source.record_id,

@@ -1,16 +1,21 @@
+import { execFileSync } from "node:child_process";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { expect, test } from "@playwright/test";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
+import { initialState } from "../../lib/browser-fleet/policy";
 import { decideContentReview } from "../../lib/content/store";
 import type { Database } from "../../lib/db/client";
+import {
+  facebookAccountRuntime,
+  facebookInteractiveSession,
+} from "../../lib/db/facebook-runtime-schema";
 import * as schema from "../../lib/db/schema";
 import { prepareProductAgentEvidenceSource } from "../../lib/product/evidence-locations";
 import { encryptStoredSecret } from "../../lib/security/encrypted-secret";
-import { recordControlledPublicationResult } from "../../lib/social/publication-store";
 import { authSecret, databaseURL, modelConfigKey } from "../../playwright.database.config";
 
 // Streaming may retain hidden previous trees; visible controls identify the current editor.
@@ -425,7 +430,7 @@ test("authenticated browser reviews a mock product and its content through real 
 
   await page.getByRole("button", { name: "制作图文内容", exact: true }).click();
   await expect(page).toHaveURL(
-    new RegExp("/workspace/" + projectId + "/new/content[?]product=" + created.id + "&returnTo="),
+    new RegExp(`/workspace/${projectId}/new/content[?]product=${created.id}&returnTo=`),
   );
   const contentForm = page.locator("form#create-content").filter({ visible: true });
   await contentForm.getByRole("combobox").nth(2).click();
@@ -632,17 +637,78 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.workspaceProjectItem.aggregateId, contentDraft.id));
   expect(contentLink).toMatchObject({ projectId, role: "marketing_content" });
 
-  // Continue from this exact content into confirmation and a synthetic platform result.
+  // Synthetic capability metadata only: no gateway, worker or real account is contacted.
+  const nodeId = randomUUID();
+  const bindingId = randomUUID();
+  const fleet = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
+  fleet.installationId = randomUUID();
+  fleet.bootId = randomUUID();
+  fleet.lastSeenAt = Date.now();
+  fleet.capabilities = ["publish"];
+  fleet.accounts = [
+    {
+      id: bindingId,
+      displayName: "SYNTHETIC journey account",
+      channelRef,
+      accountRef,
+      enabled: true,
+      authState: "ready",
+      expectedEgressIp: "203.0.113.10",
+      credentialVersion: 1,
+      loginCiphertext: null,
+      proxyCiphertext: "SYNTHETIC",
+      pollSeconds: 0,
+      nextPollAt: 0,
+      lastCheckedAt: null,
+    },
+  ];
+  fleet.publicationScopes = [
+    {
+      channelRef,
+      accountRef,
+      audience: "Public",
+      expiresAt: Date.now() + 3600000,
+      textOnly: false,
+    },
+  ];
+  await db.execute(
+    sql`INSERT INTO browser_fleet_node(id,owner_id,name,gateway_origin,key_hash,document) VALUES(${nodeId},${actorId},'SYNTHETIC journey capability','https://synthetic.example.invalid',${randomUUID()},${JSON.stringify(fleet)}::jsonb)`,
+  );
+  await db.execute(
+    sql`INSERT INTO browser_fleet_binding(id,node_id,account_ref,channel_ref) VALUES(${bindingId},${nodeId},${accountRef},${channelRef})`,
+  );
+  await db
+    .insert(facebookAccountRuntime)
+    .values({ accountRef, channelRef, authState: "ready", updatedBy: actorId });
+  await db.insert(facebookInteractiveSession).values({
+    id: randomUUID(),
+    workerId: "synthetic-worker",
+    channelRef,
+    accountRef,
+    userId: actorId,
+    authSessionId: sessionId,
+    status: "closed",
+    useSavedLogin: false,
+    browserVerified: true,
+    heartbeatAt: new Date(),
+    connectBefore: new Date(Date.now() + 60000),
+    expiresAt: new Date(Date.now() + 600000),
+  });
+  // Continue from this exact approved content through the current batch composer.
+  await page.reload();
   await page.setViewportSize({ width: 390, height: 844 });
-  const publicationForm = page.locator("#publication-confirmation").filter({ visible: true });
-  await expect(publicationForm).toBeVisible();
-  await expect(publicationForm.getByText(revisedBody, { exact: true })).toBeVisible();
-
-  await page.getByRole("button", { name: "确认并提交此条发布", exact: true }).click();
+  const publish = page.getByRole("button", { name: "确认公开发布到 1 个账号", exact: true });
+  await page.getByRole("checkbox", { name: /SYNTHETIC journey account/ }).check();
+  await expect(page.getByRole("alert").filter({ hasText: "本次发布预览" })).toContainText(
+    revisedBody,
+  );
+  await expect(publish).toBeEnabled();
+  await publish.click();
+  // Refresh replaces the composer with persisted progress; do not assert its transient button.
   await expect(
-    page.getByText("等待平台回执", { exact: true }).filter({ visible: true }),
+    page.getByText("发布任务已提交，等待服务执行。提交成功不代表已发布。", { exact: true }),
   ).toBeVisible();
-  await expect(publicationForm).toHaveCount(0);
+  await expect(publish).toHaveCount(0);
   await expect(page.getByText("已发布", { exact: true })).toHaveCount(0);
   const [submitted] = await db
     .select()
@@ -666,13 +732,17 @@ test("authenticated browser reviews a mock product and its content through real 
     )
     .returning({ id: schema.socialBrowserJob.id });
   expect(claimed).toEqual([{ id: submitted.browserJobId }]);
-  await recordControlledPublicationResult(
-    {
-      jobId: submitted.browserJobId,
-      outcome: "published",
-      externalPublicationRef: `synthetic-post-${contentDraft.id}`,
-    },
-    db as unknown as Database,
+  execFileSync(
+    process.execPath,
+    [
+      "--conditions=react-server",
+      "--import",
+      "tsx",
+      "scripts/record-synthetic-browser-publication.ts",
+      submitted.browserJobId,
+      `synthetic-post-${contentDraft.id}`,
+    ],
+    { env: { ...process.env, DATABASE_URL: databaseURL }, timeout: 15_000, encoding: "utf8" },
   );
   await page.reload();
   await expect(
@@ -685,8 +755,13 @@ test("authenticated browser reviews a mock product and its content through real 
       .getByRole("region", { name: "业务记录" })
       .getByText("已收到平台成功回执，可以查看发布凭证。", { exact: true }),
   ).toBeVisible();
-  await expect(publicationForm).toHaveCount(0);
-  expect((await contentQuery())[0].state).toBe("CONTENT_PUBLISHED");
+  // Per-target receipts must not mutate the shared, approved source for other accounts.
+  expect((await contentQuery())[0].state).toBe("CONTENT_APPROVED");
+  const delivered = await db
+    .select()
+    .from(schema.socialPublication)
+    .where(eq(schema.socialPublication.id, submitted.id));
+  expect(delivered[0].status).toBe("published");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

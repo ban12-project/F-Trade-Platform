@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { ProductMediaPanel } from "@/components/workspace/product-media-panel";
 import type { ProductMediaAsset, VideoReadyAssessment } from "@/lib/product/video-readiness";
@@ -64,19 +66,48 @@ const assessment: VideoReadyAssessment = {
 };
 
 /** Test-only ProductMedia fixture; production access remains permission protected. */
-export default function ProductMediaTestingPage() {
-  if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
+async function ProductMediaFixture({
+  searchParams,
+}: {
+  searchParams: Promise<{ readonly?: string }>;
+}) {
+  const { readonly } = await searchParams;
+  const requestedStatus = (await cookies()).get("synthetic-media-review")?.value;
+  const status =
+    requestedStatus === "pending" || requestedStatus === "rejected" ? requestedStatus : "approved";
+  const currentAsset: ProductMediaAsset = { ...asset, review: { ...asset.review, status } };
   return (
     <main className="mx-auto min-h-screen max-w-3xl p-6">
       <WorkspaceDirtyProvider>
         <ProductMediaPanel
           projectId={projectId}
           productId={productId}
-          assets={[asset]}
-          assessment={assessment}
+          assets={[currentAsset]}
+          assessment={
+            status === "approved"
+              ? assessment
+              : {
+                  ...assessment,
+                  status: "not_ready",
+                  editingEligibleAssetIds: [],
+                  generativeUse: { imageToVideoAssetIds: [], referenceToVideoAssetIds: [] },
+                }
+          }
+          canWrite={readonly !== "1"}
           canReview
         />
       </WorkspaceDirtyProvider>
     </main>
+  );
+}
+
+export default function ProductMediaTestingPage(props: {
+  searchParams: Promise<{ readonly?: string }>;
+}) {
+  if (process.env.NEXT_ENABLE_TESTING_API !== "1") notFound();
+  return (
+    <Suspense fallback={null}>
+      <ProductMediaFixture {...props} />
+    </Suspense>
   );
 }
