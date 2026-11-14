@@ -232,11 +232,21 @@ test("video collection, exact draft and sourced creation remain distinct with mu
       names[1],
     );
     await expect(page.getByRole("combobox", { name: "已核验产品", exact: true })).toBeDisabled();
-    await expect(page.getByRole("link", { name: names[1], exact: true })).toHaveAttribute(
-      "href",
-      `/workspace/${projectId}/records/product/${productIds[1]}`,
-    );
+    const returnTo = `/workspace/content?project=${projectId}`;
+    const productHref = `/workspace/${projectId}/records/product/${productIds[1]}?returnTo=${encodeURIComponent(returnTo)}`;
+    const sourceLink = page.getByRole("link", { name: names[1], exact: true });
+    await expect(sourceLink).toHaveAttribute("href", productHref);
     await expect(page.getByRole("button", { name: "复制为新剪辑稿" })).toHaveCount(0);
+    await sourceLink.click();
+    await expect(page).toHaveURL(productHref);
+    await expect(
+      page.getByRole("heading", { name: names[1], level: 1, exact: true }),
+    ).toBeVisible();
+    const back = page.getByRole("link", { name: "返回清单", exact: true });
+    await expect(back).toHaveAttribute("href", returnTo);
+    await back.click();
+    await expect(page).toHaveURL(returnTo);
+    await expect(page.getByRole("heading", { name: "内容与发布", exact: true })).toBeVisible();
   }
 });
 
