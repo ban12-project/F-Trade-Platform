@@ -64,6 +64,22 @@ export function workspaceReturnTo(value: unknown): string | undefined {
     return undefined;
   return url.pathname + url.search;
 }
+export function workspaceReturnLabel(value: unknown): string {
+  const path = workspaceReturnTo(value)?.split("?")[0];
+  switch (path) {
+    case "/workspace":
+      return "返回今日任务";
+    case "/workspace/products":
+      return "返回产品资料";
+    case "/workspace/content":
+      return "返回内容与发布";
+    case "/workspace/customers":
+      return "返回客户与询盘";
+    default:
+      return "返回清单";
+  }
+}
+
 export function withWorkspaceReturnTo(href: string, returnTo?: string) {
   const target = workspaceReturnTo(returnTo);
   return target
