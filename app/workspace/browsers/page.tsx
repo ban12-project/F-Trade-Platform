@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { buttonVariants } from "@/components/ui/button";
 import { WorkspaceLink } from "@/components/workspace/workspace-link";
+export const metadata: Metadata = { title: "浏览器管理入口已迁移" };
+
 export default function Page() {
   return (
     <main

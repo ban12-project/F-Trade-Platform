@@ -53,60 +53,62 @@ function TaskRows({
       </Empty>
     );
   return (
-    <div className="divide-y">
+    // biome-ignore lint/a11y/noRedundantRoles: Tailwind resets list-style; Safari needs an explicit list role outside nav.
+    <ul role="list" className="divide-y">
       {tasks.map((task) => (
-        <Link
-          key={`${task.taskType}-${task.id}`}
-          href={workspaceTaskHref(task, selectedReturnTo)}
-          className="group flex min-h-16 items-center gap-3 px-1 py-3 outline-none transition-colors duration-[120ms] hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate text-sm font-medium">{task.title}</span>
-              <Badge variant={task.priority === "review" ? "default" : "secondary"}>
-                {task.actionLabel ?? (task.priority === "review" ? "审核" : "处理")}
-              </Badge>
-              {task.state ? <Badge variant="outline">{taskStateLabel(task)}</Badge> : null}
-              {isTaskOverdue(task.dueAt, currentTime) ? (
-                <Badge variant="destructive">已逾期</Badge>
+        <li key={`${task.taskType}-${task.id}`}>
+          <Link
+            href={workspaceTaskHref(task, selectedReturnTo)}
+            className="group flex min-h-16 items-center gap-3 px-1 py-3 outline-none transition-colors duration-[120ms] hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-sm font-medium">{task.title}</span>
+                <Badge variant={task.priority === "review" ? "default" : "secondary"}>
+                  {task.actionLabel ?? (task.priority === "review" ? "审核" : "处理")}
+                </Badge>
+                {task.state ? <Badge variant="outline">{taskStateLabel(task)}</Badge> : null}
+                {isTaskOverdue(task.dueAt, currentTime) ? (
+                  <Badge variant="destructive">已逾期</Badge>
+                ) : null}
+              </div>
+              {task.customerLabel ||
+              ["lead", "rfq", "quotation", "delivery"].includes(task.recordKind) ? (
+                <p className="mt-2 break-words text-sm">
+                  客户 / 公司：{task.customerLabel ?? "尚未录入"}
+                </p>
               ) : null}
-            </div>
-            {task.customerLabel ||
-            ["lead", "rfq", "quotation", "delivery"].includes(task.recordKind) ? (
-              <p className="mt-2 break-words text-sm">
-                客户 / 公司：{task.customerLabel ?? "尚未录入"}
-              </p>
-            ) : null}
-            {task.needLabel ||
-            ["lead", "rfq", "quotation", "delivery"].includes(task.recordKind) ? (
+              {task.needLabel ||
+              ["lead", "rfq", "quotation", "delivery"].includes(task.recordKind) ? (
+                <p className="mt-1 break-words text-sm">
+                  产品 / 需求：{task.needLabel ?? "尚未录入"}
+                </p>
+              ) : null}
               <p className="mt-1 break-words text-sm">
-                产品 / 需求：{task.needLabel ?? "尚未录入"}
+                下一动作：{task.nextAction ?? task.actionLabel ?? "打开记录核对"}
               </p>
-            ) : null}
-            <p className="mt-1 break-words text-sm">
-              下一动作：{task.nextAction ?? task.actionLabel ?? "打开记录核对"}
-            </p>
-            <p className="mt-1 break-words text-sm text-muted-foreground">
-              {task.projectTitle} · {task.detail}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>
-                {task.state === "waiting" ? "等待对象" : "处理角色"}：
-                {task.responsibleLabel ?? "未指定"}
-              </span>
-              {task.dueAt ? (
-                <time dateTime={task.dueAt.toISOString()}>
-                  截止：{formatTaskDeadline(task.dueAt, timeZone)}（{timeZone}）
-                </time>
-              ) : (
-                <span>截止：未安排</span>
-              )}
+              <p className="mt-1 break-words text-sm text-muted-foreground">
+                {task.projectTitle} · {task.detail}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>
+                  {task.state === "waiting" ? "等待对象" : "处理角色"}：
+                  {task.responsibleLabel ?? "未指定"}
+                </span>
+                {task.dueAt ? (
+                  <time dateTime={task.dueAt.toISOString()}>
+                    截止：{formatTaskDeadline(task.dueAt, timeZone)}（{timeZone}）
+                  </time>
+                ) : (
+                  <span>截止：未安排</span>
+                )}
+              </div>
             </div>
-          </div>
-          <ArrowRightIcon className="workspace-task-arrow size-4 shrink-0 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
-        </Link>
+            <ArrowRightIcon className="workspace-task-arrow size-4 shrink-0 text-muted-foreground transition-transform duration-[120ms] group-hover:translate-x-0.5" />
+          </Link>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
