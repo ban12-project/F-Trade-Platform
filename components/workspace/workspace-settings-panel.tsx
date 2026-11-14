@@ -356,12 +356,15 @@ function TeamSettings() {
     resolver: zodResolver(invitationFormSchema),
     defaultValues: { email: "" },
   });
+  const busy = !form.formState.isReady || pending;
   useWorkspaceDirty("team-settings", form.formState.isDirty);
   useEffect(() => {
-    if (state.status === "success") form.reset();
-  }, [form, state.status]);
+    // Keep the mounted field registration intact for the next invitation.
+    if (state.status === "success") form.resetField("email", { defaultValue: "" });
+  }, [form, state]);
   function submit(values: z.infer<typeof invitationFormSchema>) {
     const data = new FormData();
+    if (busy) return;
     data.set("email", values.email);
     startTransition(() => action(data));
   }
@@ -372,11 +375,12 @@ function TeamSettings() {
         <CardDescription>单次、限时邀请；不开放公开注册。</CardDescription>
       </CardHeader>
       <CardContent>
-        <form id="invite-user" onSubmit={form.handleSubmit(submit)}>
+        <form id="invite-user" aria-busy={busy} onSubmit={form.handleSubmit(submit)}>
           <FieldGroup>
             <Field data-invalid={!!form.formState.errors.email}>
               <FieldLabel htmlFor="invite-email">受邀邮箱</FieldLabel>
               <Input
+                disabled={busy}
                 id="invite-email"
                 type="email"
                 autoComplete="email"
@@ -388,7 +392,7 @@ function TeamSettings() {
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button form="invite-user" type="submit" disabled={pending}>
+        <Button form="invite-user" type="submit" disabled={busy}>
           <MailPlusIcon data-icon="inline-start" />
           发送邀请
         </Button>

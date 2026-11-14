@@ -64,11 +64,14 @@ export function ProjectMembersPanel({
   );
   const [removalTarget, setRemovalTarget] = useState<WorkspaceMemberSummary | null>(null);
   useEffect(() => {
-    if (state.status === "success" || removalState.status === "success") {
+    if (state.status === "success") router.refresh();
+  }, [router, state]);
+  useEffect(() => {
+    if (removalState.status === "success") {
       setRemovalTarget(null);
       router.refresh();
     }
-  }, [removalState.status, router, state.status]);
+  }, [removalState, router]);
   return (
     <>
       <Sheet open={open} onOpenChange={setOpen} modal={false}>
