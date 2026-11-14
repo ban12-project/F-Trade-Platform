@@ -11,7 +11,7 @@ import {
   UserRoundIcon,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useActionState, useEffect, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -97,21 +105,34 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
     resolver: zodResolver(productAgentModelSettingsSchema),
     defaultValues: initial ? agentValues(initial) : { ...newAgentValues, isDefault: true },
   });
+  const submitted = useRef<AgentValues | null>(null);
+  const busy = !form.formState.isReady || pending;
   useWorkspaceDirty("agent-settings", form.formState.isDirty);
   useEffect(() => {
-    const saved = settings.find((item) => item.id === state.savedConfigId);
-    if (state.status === "success" && saved) {
-      setSelectedId(saved.id);
-      form.reset(agentValues(saved));
+    if (state.status === "idle") return;
+    // Complete only this submission; refreshed settings must not reset the next draft.
+    if (state.status === "success" && state.savedConfigId && submitted.current) {
+      setSelectedId(state.savedConfigId);
+      form.reset({ ...submitted.current, configId: state.savedConfigId });
     }
-  }, [form, settings, state.savedConfigId, state.status]);
+    submitted.current = null;
+  }, [form, state]);
   function selectConfiguration(value: string | null) {
+    if (busy) return;
     const nextId = value ?? "new";
     setSelectedId(nextId);
     const next = settings.find((item) => item.id === nextId);
     form.reset(next ? agentValues(next) : { ...newAgentValues, isDefault: settings.length === 0 });
   }
   function submit(values: AgentValues) {
+    if (busy) return;
+    submitted.current = {
+      ...values,
+      apiKey: "",
+      authToken: "",
+      clearApiKey: false,
+      clearAuthToken: false,
+    };
     const data = new FormData();
     for (const [key, value] of Object.entries(values)) data.set(key, String(value));
     startTransition(() => action(data));
@@ -130,210 +151,217 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form id="agent-settings" onSubmit={form.handleSubmit(submit)}>
-          <FieldGroup>
-            <Field>
-              <FieldLabel>模型配置</FieldLabel>
-              <Select
-                items={configurationItems}
-                value={selectedId}
-                onValueChange={selectConfiguration}
-              >
-                <SelectTrigger className="w-full" aria-label="模型配置">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="new">新建模型配置</SelectItem>
-                    {settings.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                        {item.isDefault ? "（默认）" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field data-invalid={!!form.formState.errors.name}>
-              <FieldLabel htmlFor="agent-config-name">配置名称</FieldLabel>
-              <Controller
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <Input
-                    id="agent-config-name"
-                    aria-invalid={!!form.formState.errors.name}
-                    placeholder="例如：日常产品导入"
-                    {...field}
-                  />
-                )}
-              />
-              <FieldError errors={[form.formState.errors.name]} />
-            </Field>
-            <Field orientation="horizontal">
-              <Controller
-                control={form.control}
-                name="isDefault"
-                render={({ field }) => (
-                  <Checkbox
-                    id="default-agent-model"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-              <FieldLabel htmlFor="default-agent-model">作为默认模型</FieldLabel>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="agent-provider">Provider</FieldLabel>
-              <Controller
-                control={form.control}
-                name="provider"
-                render={({ field }) => (
-                  <Select
-                    items={{
-                      openai: "OpenAI",
-                      anthropic: "Anthropic",
-                      google: "Google Gemini",
-                      "openai-compatible": "OpenAI-compatible",
-                    }}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger id="agent-provider" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="openai">OpenAI</SelectItem>
-                        <SelectItem value="anthropic">Anthropic</SelectItem>
-                        <SelectItem value="google">Google Gemini</SelectItem>
-                        <SelectItem value="openai-compatible">OpenAI-compatible</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.model}>
-              <FieldLabel htmlFor="agent-model">默认模型</FieldLabel>
-              <Controller
-                control={form.control}
-                name="model"
-                render={({ field }) => (
-                  <Input id="agent-model" aria-invalid={!!form.formState.errors.model} {...field} />
-                )}
-              />
-              {selected?.discoveredModels.length ? (
-                <FieldDescription>
-                  已发现 {selected.discoveredModels.length} 个模型，智能导入时可逐次选择。
-                </FieldDescription>
-              ) : null}
-              <FieldError errors={[form.formState.errors.model]} />
-            </Field>
-            <Field data-invalid={!!form.formState.errors.baseUrl}>
-              <FieldLabel htmlFor="agent-base-url">服务地址（Base URL）</FieldLabel>
-              <Controller
-                control={form.control}
-                name="baseUrl"
-                render={({ field }) => (
-                  <Input
-                    id="agent-base-url"
-                    inputMode="url"
-                    placeholder="官方端点可留空"
-                    aria-invalid={!!form.formState.errors.baseUrl}
-                    {...field}
-                  />
-                )}
-              />
-              <FieldError errors={[form.formState.errors.baseUrl]} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="agent-api-key">
-                API key {selected?.apiKeyConfigured ? "（已配置）" : ""}
-              </FieldLabel>
-              <Controller
-                control={form.control}
-                name="apiKey"
-                render={({ field }) => (
-                  <Input
-                    id="agent-api-key"
-                    type="password"
-                    autoComplete="new-password"
-                    {...field}
-                  />
-                )}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="agent-auth-token">
-                Auth token {selected?.authTokenConfigured ? "（已配置）" : ""}
-              </FieldLabel>
-              <Controller
-                control={form.control}
-                name="authToken"
-                render={({ field }) => (
-                  <Input
-                    id="agent-auth-token"
-                    type="password"
-                    autoComplete="new-password"
-                    {...field}
-                  />
-                )}
-              />
-            </Field>
-            <Field orientation="horizontal">
-              <Controller
-                control={form.control}
-                name="clearApiKey"
-                render={({ field }) => (
-                  <Checkbox
-                    id="clear-agent-key"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-              <FieldLabel htmlFor="clear-agent-key">清除已有 API key</FieldLabel>
-            </Field>
-            <Field orientation="horizontal">
-              <Controller
-                control={form.control}
-                name="clearAuthToken"
-                render={({ field }) => (
-                  <Checkbox
-                    id="clear-agent-token"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-              <FieldLabel htmlFor="clear-agent-token">清除已有 Auth token</FieldLabel>
-            </Field>
-            <Field data-invalid={!!form.formState.errors.headersJson}>
-              <FieldLabel htmlFor="agent-headers">自定义 Headers（JSON）</FieldLabel>
-              <Controller
-                control={form.control}
-                name="headersJson"
-                render={({ field }) => (
-                  <Textarea
-                    id="agent-headers"
-                    rows={4}
-                    spellCheck={false}
-                    aria-invalid={!!form.formState.errors.headersJson}
-                    {...field}
-                  />
-                )}
-              />
-              <FieldDescription>不能在这里保存认证 Header。</FieldDescription>
-              <FieldError errors={[form.formState.errors.headersJson]} />
-            </Field>
-          </FieldGroup>
+        <form id="agent-settings" aria-busy={busy} onSubmit={form.handleSubmit(submit)}>
+          <FieldSet disabled={busy}>
+            <FieldLegend className="sr-only">模型配置编辑</FieldLegend>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>模型配置</FieldLabel>
+                <Select
+                  items={configurationItems}
+                  value={selectedId}
+                  onValueChange={selectConfiguration}
+                >
+                  <SelectTrigger className="w-full" aria-label="模型配置">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="new">新建模型配置</SelectItem>
+                      {settings.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                          {item.isDefault ? "（默认）" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field data-invalid={!!form.formState.errors.name}>
+                <FieldLabel htmlFor="agent-config-name">配置名称</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <Input
+                      id="agent-config-name"
+                      aria-invalid={!!form.formState.errors.name}
+                      placeholder="例如：日常产品导入"
+                      {...field}
+                    />
+                  )}
+                />
+                <FieldError errors={[form.formState.errors.name]} />
+              </Field>
+              <Field orientation="horizontal">
+                <Controller
+                  control={form.control}
+                  name="isDefault"
+                  render={({ field }) => (
+                    <Checkbox
+                      id="default-agent-model"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+                <FieldLabel htmlFor="default-agent-model">作为默认模型</FieldLabel>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="agent-provider">Provider</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="provider"
+                  render={({ field }) => (
+                    <Select
+                      items={{
+                        openai: "OpenAI",
+                        anthropic: "Anthropic",
+                        google: "Google Gemini",
+                        "openai-compatible": "OpenAI-compatible",
+                      }}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger id="agent-provider" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="openai">OpenAI</SelectItem>
+                          <SelectItem value="anthropic">Anthropic</SelectItem>
+                          <SelectItem value="google">Google Gemini</SelectItem>
+                          <SelectItem value="openai-compatible">OpenAI-compatible</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.model}>
+                <FieldLabel htmlFor="agent-model">默认模型</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <Input
+                      id="agent-model"
+                      aria-invalid={!!form.formState.errors.model}
+                      {...field}
+                    />
+                  )}
+                />
+                {selected?.discoveredModels.length ? (
+                  <FieldDescription>
+                    已发现 {selected.discoveredModels.length} 个模型，智能导入时可逐次选择。
+                  </FieldDescription>
+                ) : null}
+                <FieldError errors={[form.formState.errors.model]} />
+              </Field>
+              <Field data-invalid={!!form.formState.errors.baseUrl}>
+                <FieldLabel htmlFor="agent-base-url">服务地址（Base URL）</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="baseUrl"
+                  render={({ field }) => (
+                    <Input
+                      id="agent-base-url"
+                      inputMode="url"
+                      placeholder="官方端点可留空"
+                      aria-invalid={!!form.formState.errors.baseUrl}
+                      {...field}
+                    />
+                  )}
+                />
+                <FieldError errors={[form.formState.errors.baseUrl]} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="agent-api-key">
+                  API key {selected?.apiKeyConfigured ? "（已配置）" : ""}
+                </FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="apiKey"
+                  render={({ field }) => (
+                    <Input
+                      id="agent-api-key"
+                      type="password"
+                      autoComplete="new-password"
+                      {...field}
+                    />
+                  )}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="agent-auth-token">
+                  Auth token {selected?.authTokenConfigured ? "（已配置）" : ""}
+                </FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="authToken"
+                  render={({ field }) => (
+                    <Input
+                      id="agent-auth-token"
+                      type="password"
+                      autoComplete="new-password"
+                      {...field}
+                    />
+                  )}
+                />
+              </Field>
+              <Field orientation="horizontal">
+                <Controller
+                  control={form.control}
+                  name="clearApiKey"
+                  render={({ field }) => (
+                    <Checkbox
+                      id="clear-agent-key"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+                <FieldLabel htmlFor="clear-agent-key">清除已有 API key</FieldLabel>
+              </Field>
+              <Field orientation="horizontal">
+                <Controller
+                  control={form.control}
+                  name="clearAuthToken"
+                  render={({ field }) => (
+                    <Checkbox
+                      id="clear-agent-token"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+                <FieldLabel htmlFor="clear-agent-token">清除已有 Auth token</FieldLabel>
+              </Field>
+              <Field data-invalid={!!form.formState.errors.headersJson}>
+                <FieldLabel htmlFor="agent-headers">自定义 Headers（JSON）</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="headersJson"
+                  render={({ field }) => (
+                    <Textarea
+                      id="agent-headers"
+                      rows={4}
+                      spellCheck={false}
+                      aria-invalid={!!form.formState.errors.headersJson}
+                      {...field}
+                    />
+                  )}
+                />
+                <FieldDescription>不能在这里保存认证 Header。</FieldDescription>
+                <FieldError errors={[form.formState.errors.headersJson]} />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button form="agent-settings" type="submit" disabled={pending}>
+        <Button form="agent-settings" type="submit" disabled={busy}>
           {pending ? <Spinner data-icon="inline-start" /> : <SaveIcon data-icon="inline-start" />}
           保存模型配置
         </Button>

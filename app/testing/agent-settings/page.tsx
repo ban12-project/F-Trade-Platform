@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
 import { WorkspaceSettingsPanel } from "@/components/workspace/workspace-settings-panel";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
+import { RefreshControls } from "./refresh-controls";
 
 // Synthetic UI data only. This fixture never reads saved settings or credentials.
 const syntheticSettings: ProductAgentModelSettings[] = [
@@ -43,10 +46,12 @@ const syntheticSettings: ProductAgentModelSettings[] = [
 type FixtureProps = { searchParams: Promise<{ empty?: string }> };
 
 async function AgentSettingsFixture({ searchParams }: FixtureProps) {
+  await connection();
   const { empty } = await searchParams;
   return (
     <main className="mx-auto max-w-md p-4">
       <WorkspaceDirtyProvider>
+        <RefreshControls revision={randomUUID()} />
         <WorkspaceSettingsPanel
           settings={empty === "1" ? [] : syntheticSettings}
           canManage
