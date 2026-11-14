@@ -199,6 +199,12 @@ importers:
       '@remotion/vercel':
         specifier: 4.0.520
         version: 4.0.520(@vercel/sandbox@3.2.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@ui-sdk/core':
+        specifier: 0.1.0-beta.1
+        version: 0.1.0-beta.1
+      '@ui-sdk/react':
+        specifier: 0.1.0-beta.1
+        version: 0.1.0-beta.1(@types/react@19.2.18)(@ui-sdk/core@0.1.0-beta.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@vercel/blob':
         specifier: 2.8.0
         version: 2.8.0
@@ -2662,6 +2668,20 @@ packages:
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
+
+  '@ui-sdk/core@0.1.0-beta.1':
+    resolution: {integrity: sha512-sWsZW8RN6Gviir7REQYuDIafm9hierHQE31OJ+2g+1Pp3lDVKp/dk0+0dxFvqOQRmBveRvlE9FiARgNlQ9dMFw==}
+
+  '@ui-sdk/react@0.1.0-beta.1':
+    resolution: {integrity: sha512-7wcUsZI+WoG2uo3N+PHrWntk97qI9ez2cUrHV9H507FiL118Pi4tuhWUCMDtWwEUCNQLybpBm1QRLkEXVOPAUg==}
+    peerDependencies:
+      '@types/react': '>=19.2.10'
+      '@ui-sdk/core': ^0.1.0-beta.1
+      react: '>=19'
+      react-dom: '>=19'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   '@vercel/blob@2.8.0':
     resolution: {integrity: sha512-Nu+HWKpkgovCh/ezlG7wCVwF7RErTzLzZMbGKFBdGBCbTKyK+s5VXPLl+0+TpNEQPH8AVaGzOpIsXUOtkqylCQ==}
@@ -7828,6 +7848,16 @@ snapshots:
 
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
+
+  '@ui-sdk/core@0.1.0-beta.1': {}
+
+  '@ui-sdk/react@0.1.0-beta.1(@types/react@19.2.18)(@ui-sdk/core@0.1.0-beta.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@ui-sdk/core': 0.1.0-beta.1
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+    optionalDependencies:
+      '@types/react': 19.2.18
 
   '@vercel/blob@2.8.0':
     dependencies:

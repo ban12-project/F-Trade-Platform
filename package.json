@@ -134,6 +134,8 @@
     "@remotion/renderer": "4.0.520",
     "@remotion/transitions": "4.0.520",
     "@remotion/vercel": "4.0.520",
+    "@ui-sdk/core": "0.1.0-beta.1",
+    "@ui-sdk/react": "0.1.0-beta.1",
     "@vercel/blob": "2.8.0",
     "@vercel/sandbox": "3.2.1",
     "ai": "7.0.77",

@@ -39,6 +39,11 @@ Apply these rules when your task affects marketing video content:
 - 必须启用 `reactCompiler: true` 与实验性的 `experimental.turbopackRustReactCompiler: true`。若升级或构建暴露 React Compiler 兼容性问题，须记录风险并在 PR 中提供可观察证据，不能静默关闭。
 - TypeScript 保持 7.x；Next.js 默认的项目本地 TypeScript CLI 校验必须保留，不能设 `experimental.useTypeScriptCli: false`。TypeScript 7 已移除 `baseUrl`，路径别名只使用 `compilerOptions.paths`。
 
+## ui-sdk 使用约定
+
+- 使用 ui-sdk 前，若已安装 `ui-sdk` skill，先遵循该技能，并阅读 `node_modules/@ui-sdk/react/docs/llms.txt`。
+- 构建新组件前，额外按标题检索 `node_modules/@ui-sdk/react/docs/core.md`，并阅读同目录的 `rendering.md`。
+
 ## 数据交互与表单约定
 
 - 由 UI 发起的数据交互优先使用 Server Action；Route Handler 只用于外部 webhook、第三方集成或无法通过 Action 表达的 HTTP 契约。
