@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
@@ -18,6 +19,8 @@ import { resolveVideoSelection, type VideoSelectionQuery } from "@/lib/video/wor
 import { workspaceReturnTo } from "@/lib/workspace/navigation";
 import { readWorkspaceRecord } from "@/lib/workspace/record-read-model";
 import { getWorkspaceProject } from "@/lib/workspace/store";
+
+export const metadata: Metadata = { title: "营销视频工作区" };
 
 async function VideoContent({
   params,

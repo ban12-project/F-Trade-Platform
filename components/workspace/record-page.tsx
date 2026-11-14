@@ -19,6 +19,7 @@ import {
   workspaceReturnTo,
   workspaceTaskHref,
 } from "@/lib/workspace/navigation";
+import { workspaceRecordTitle } from "@/lib/workspace/page-title";
 import { readWorkspaceProject } from "@/lib/workspace/read-model";
 import { readWorkspaceRecord, readWorkspaceRecordTasks } from "@/lib/workspace/record-read-model";
 import { RecordAccessBoundary } from "./record-access-boundary";
@@ -181,7 +182,7 @@ async function RecordHeader(props: RecordPageProps & { mode: "record" | "create"
             {unavailable
               ? "记录已不可用"
               : context.mode === "create"
-                ? `新建${recordKindLabels[kind]}`
+                ? workspaceRecordTitle(kind, "create")
                 : title}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

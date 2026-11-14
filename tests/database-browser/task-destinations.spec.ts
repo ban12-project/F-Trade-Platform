@@ -866,6 +866,8 @@ for (const width of [390, 1280]) {
       `/workspace/${id}/new/rfq?lead=${received}&returnTo=${encodeURIComponent(source)}`,
     );
     const panel = page.getByRole("region", { name: "业务记录", exact: true });
+    await expect(page).toHaveTitle("整理客户询盘 · F-Trade");
+    await expect(page.getByRole("heading", { name: "整理客户询盘", level: 1 })).toBeVisible();
     const selected = panel.locator(`a[href^="/workspace/${id}/records/rfq/${chosen}"]`);
     await expect(selected).toHaveAttribute(
       "href",
@@ -893,3 +895,63 @@ for (const width of [390, 1280]) {
     ).toHaveLength(before.length);
   });
 }
+
+test("dynamic workspace titles identify the task without including business text", async ({
+  page,
+}) => {
+  const marketing = await project("marketing");
+  const sales = await project();
+  const product = await record(
+    marketing,
+    "product",
+    "PRODUCT_READY",
+    productReady,
+    "product_source",
+  );
+  const request = await record(sales, "rfq", "RFQ_READY", rfq, "sales_rfq");
+  await page.goto(`/workspace/${marketing}`);
+  await expect(page).toHaveTitle("项目详情 · F-Trade");
+  for (const [kind, title] of [
+    ["product", "产品资料详情"],
+    ["content", "营销内容详情"],
+    ["publication", "发布记录详情"],
+    ["lead", "客户线索详情"],
+    ["rfq", "客户询盘详情"],
+    ["quotation", "人工报价详情"],
+    ["delivery", "交期确认详情"],
+  ]) {
+    const projectId = ["product", "content", "publication"].includes(kind) ? marketing : sales;
+    const recordId = kind === "product" ? product : kind === "rfq" ? request : randomUUID();
+    await page.goto(`/workspace/${projectId}/records/${kind}/${recordId}`);
+    await expect(page).toHaveTitle(`${title} · F-Trade`);
+    await expect(page.getByRole("region", { name: "业务记录" })).toBeVisible();
+  }
+  for (const [kind, title] of [
+    ["product", "新建产品资料"],
+    ["content", "新建营销内容"],
+    ["rfq", "整理客户询盘"],
+    ["quotation", "新建人工报价"],
+  ]) {
+    const projectId = ["product", "content"].includes(kind) ? marketing : sales;
+    await page.goto(`/workspace/${projectId}/new/${kind}`);
+    await expect(page).toHaveTitle(`${title} · F-Trade`);
+  }
+  await page.goto(`/workspace/${marketing}/video?new=1`);
+  await expect(page).toHaveTitle("营销视频工作区 · F-Trade");
+  await page.goto(`/workspace/products?project=${marketing}`);
+  await expect(page).toHaveTitle("产品资料 · F-Trade");
+  await page
+    .locator(`a[href^="/workspace/${marketing}/records/product/${product}"]`)
+    .filter({ visible: true })
+    .click();
+  await expect(page).toHaveTitle("产品资料详情 · F-Trade");
+  await page.reload();
+  await expect(page).toHaveTitle("产品资料详情 · F-Trade");
+  await page.goBack();
+  await expect(page).toHaveTitle("产品资料 · F-Trade");
+  await page.goForward();
+  await expect(page).toHaveTitle("产品资料详情 · F-Trade");
+  await page.goto(`/workspace/${marketing}/records/SYNTHETIC_UNTRUSTED_KIND/${randomUUID()}`);
+  await expect(page.getByRole("heading", { name: "无法打开此项目" })).toBeVisible();
+  expect(await page.title()).not.toContain("SYNTHETIC_UNTRUSTED_KIND");
+});
