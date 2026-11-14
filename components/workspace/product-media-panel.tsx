@@ -649,7 +649,7 @@ function ReviewForm({
       <FieldGroup>
         {!revoking ? (
           <Field data-invalid={Boolean(form.formState.errors.decision)}>
-            <FieldLabel>审核决定</FieldLabel>
+            <FieldLabel htmlFor={`media-review-decision-${asset.id}`}>审核决定</FieldLabel>
             <Controller
               control={form.control}
               name="decision"
@@ -660,6 +660,7 @@ function ReviewForm({
                   onValueChange={field.onChange}
                 >
                   <SelectTrigger
+                    id={`media-review-decision-${asset.id}`}
                     className="w-full"
                     aria-invalid={Boolean(form.formState.errors.decision)}
                   >
@@ -823,7 +824,12 @@ function AssetCard({
           </Alert>
         ) : null}
         {canReview && asset.review.status !== "rejected" ? (
-          <ReviewForm projectId={projectId} productId={productId} asset={asset} />
+          <ReviewForm
+            key={asset.review.status}
+            projectId={projectId}
+            productId={productId}
+            asset={asset}
+          />
         ) : null}
       </CardContent>
     </Card>

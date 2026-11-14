@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { WorkspaceDirtyProvider } from "@/components/workspace/dirty-state";
@@ -71,14 +72,27 @@ async function ProductMediaFixture({
   searchParams: Promise<{ readonly?: string }>;
 }) {
   const { readonly } = await searchParams;
+  const requestedStatus = (await cookies()).get("synthetic-media-review")?.value;
+  const status =
+    requestedStatus === "pending" || requestedStatus === "rejected" ? requestedStatus : "approved";
+  const currentAsset: ProductMediaAsset = { ...asset, review: { ...asset.review, status } };
   return (
     <main className="mx-auto min-h-screen max-w-3xl p-6">
       <WorkspaceDirtyProvider>
         <ProductMediaPanel
           projectId={projectId}
           productId={productId}
-          assets={[asset]}
-          assessment={assessment}
+          assets={[currentAsset]}
+          assessment={
+            status === "approved"
+              ? assessment
+              : {
+                  ...assessment,
+                  status: "not_ready",
+                  editingEligibleAssetIds: [],
+                  generativeUse: { imageToVideoAssetIds: [], referenceToVideoAssetIds: [] },
+                }
+          }
           canWrite={readonly !== "1"}
           canReview
         />
