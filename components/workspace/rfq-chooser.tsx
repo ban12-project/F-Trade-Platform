@@ -34,7 +34,7 @@ export function RfqChooser({
                 className={buttonVariants({
                   variant: "outline",
                   className:
-                    "h-auto w-full flex-col items-start gap-1 whitespace-normal break-words py-3 text-left",
+                    "h-auto w-full flex-col items-start gap-1 whitespace-normal wrap-anywhere py-3 text-left",
                 })}
               >
                 <span className="font-medium">

@@ -15,6 +15,7 @@ import { ProductReferencePanel } from "@/components/workspace/product-reference-
 import { ProductReview } from "@/components/workspace/product-review";
 import { RecordAccessBoundary } from "@/components/workspace/record-access-boundary";
 import { RecordFrame } from "@/components/workspace/record-frame";
+import { RfqChooser } from "@/components/workspace/rfq-chooser";
 import { RfqDetail } from "@/components/workspace/rfq-detail";
 import { RfqForm } from "@/components/workspace/rfq-form";
 import { SalesContext } from "@/components/workspace/sales-context";
@@ -418,6 +419,38 @@ async function ProjectWorkflowFixture({
       />
     );
     const panels = {
+      "rfq-choices": (
+        <RfqChooser
+          projectId={syntheticSalesProject.id}
+          returnTo={`/workspace/customers?project=${syntheticSalesProject.id}&type=rfq`}
+          entries={[
+            {
+              ...syntheticRfq,
+              destination: "SYNTHETIC".padEnd(240, "Y"),
+              formValues: {
+                ...syntheticRfq.formValues,
+                customerName: "SYNTHETIC".padEnd(240, "X"),
+                destination: "SYNTHETIC".padEnd(240, "Y"),
+              },
+            },
+            {
+              ...syntheticRfq,
+              id: "00000000-0000-4000-8000-000000000612",
+              state: "RFQ_COLLECTING",
+              quantity: null,
+              destination: null,
+              completenessScore: 10,
+              missingFields: ["quantity", "destination"],
+              formValues: {
+                ...syntheticRfq.formValues,
+                customerName: "",
+                quantity: "",
+                destination: "",
+              },
+            },
+          ]}
+        />
+      ),
       "rfq-new": (
         <RfqForm
           projectId={syntheticSalesProject.id}
