@@ -98,7 +98,8 @@ export function ProductAgentForm({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const state = canStream ? stream.state : actionState;
-  const pending = uploading || (canStream ? stream.pending : actionPending);
+  const created = useCreatedRecord(projectId, "product", state.status, state.productId);
+  const pending = created || uploading || (canStream ? stream.pending : actionPending);
   useEffect(() => {
     onBusyChange?.(pending);
     return () => onBusyChange?.(false);
@@ -163,7 +164,6 @@ export function ProductAgentForm({
       router.refresh();
     }
   }, [emptyAgent, initialChoice, form, router, state.status]);
-  useCreatedRecord(projectId, "product", state.status, state.productId);
   async function submit(values: AgentValues) {
     if (pending || uploadController.current) return;
     const active = new AbortController();
@@ -423,7 +423,7 @@ export function ProductAgentForm({
             停止生成
           </Button>
         ) : null}
-        {canStream && state.productId ? (
+        {state.productId ? (
           <LinkButton
             variant="outline"
             href={workspaceRecordHref(projectId, "product", state.productId)}
