@@ -146,7 +146,7 @@ export async function SalesCreate({ context }: { context: RecordContext }) {
     )
       notFound();
     return linked.length > 1 ? (
-      <RfqChooser projectId={projectId} entries={linked} />
+      <RfqChooser projectId={projectId} entries={linked} returnTo={returnTo} />
     ) : (
       <RfqForm
         key={`${projectId}:${sourceId ?? "manual"}`}
