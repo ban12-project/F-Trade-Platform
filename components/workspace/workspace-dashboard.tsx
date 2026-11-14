@@ -213,16 +213,18 @@ export function WorkspaceDashboard({
                 {selected.id === "actionable" ? (
                   <InboundRoutingList items={inbound} projects={projects} />
                 ) : null}
-                <TaskRows
-                  tasks={selected.rows}
-                  currentTime={currentTime}
-                  selectedReturnTo={
-                    selected.id === "actionable" ? "/workspace" : `/workspace?view=${selected.id}`
-                  }
-                  empty={
-                    selected.id === "actionable" ? "当前没有需要你处理的任务" : "当前没有这类事项"
-                  }
-                />
+                {selected.id !== "actionable" || selected.rows.length > 0 || !inbound.length ? (
+                  <TaskRows
+                    tasks={selected.rows}
+                    currentTime={currentTime}
+                    selectedReturnTo={
+                      selected.id === "actionable" ? "/workspace" : `/workspace?view=${selected.id}`
+                    }
+                    empty={
+                      selected.id === "actionable" ? "当前没有需要你处理的任务" : "当前没有这类事项"
+                    }
+                  />
+                ) : null}
                 {!tasks.length && !inbound.length ? (
                   <div className="flex flex-wrap justify-center gap-2 pb-4">
                     <NewWorkButton intent="product">录入第一份产品资料</NewWorkButton>
