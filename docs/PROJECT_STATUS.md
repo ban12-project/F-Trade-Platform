@@ -2,7 +2,7 @@
 
 当前逐项结论以 [MVP1 验收状态](testing/mvp1-acceptance-status.md)为入口（2026-11-14）。不依赖社媒账号的产品、内容审核、模拟销售与交互持续迭代；模拟 DM 至商机流程已有验收，真实渠道发布／入站按用户要求延后。MVP1 总验收保持 pending，最终 Go/No-Go 由人工决定。
 
-最新完整 UI 回归为 [#1059 检查点](https://github.com/ban12-project/F-Trade-Platform/issues/1059) 的 629/629 通过，测试提交 `9f3d6f0cc5a8ab25cc53ce4125de436bae33dd06`，4 workers、0 retries、5.1 分钟；覆盖截至 #1058 的目录与资料恢复、ui-sdk 全局样式、任务列表语义和视频返回上下文。最新完整 PostgreSQL 浏览器回归为 [#1043](https://github.com/ban12-project/F-Trade-Platform/issues/1043) 的 188/188，测试提交 `963c04aa1e7b971cc84fd5899ba69449fafd28d5`，1 worker、0 retries、6.0 分钟；首轮 187/188 的 RFQ 选择器失败与测试就绪修正分别保留。两组来自不同提交，不能写成当前版本同时通过两套完整回归。生产部署存在 [#982](https://github.com/ban12-project/F-Trade-Platform/issues/982) 的构建跳过配置待决事项，不能将已合并功能都视为已上线。完整版本、范围和未完成条件见验收入口。
+最新完整回归见 [#1069 检查点](https://github.com/ban12-project/F-Trade-Platform/issues/1069)：UI 640/640 通过，测试提交 `4b5070fe27c96c2473c64c0b684be1fb243a06e3`，4 workers、0 retries、5.0 分钟；PostgreSQL 浏览器 191/191 通过，测试提交 `b74c203e2cb804ae27398959f3dc5501ff9143bf`，1 worker、0 retries、7.6 分钟。两提交的应用实现完全相同，仅数据库测试同步了 #1058 的来源产品返回地址契约，并新增实际往返检查；数据库首轮 190/191 的失败日志与 trace 保留。覆盖截至 #1068 的目录恢复、ui-sdk 样式、询盘选择、错误恢复和用途标题，但不等于真实渠道或最终验收通过。生产部署存在 [#982](https://github.com/ban12-project/F-Trade-Platform/issues/982) 的构建跳过配置待决事项，不能将已合并功能都视为已上线。完整版本、范围和未完成条件见验收入口。
 
 ## 阶段目标
 
