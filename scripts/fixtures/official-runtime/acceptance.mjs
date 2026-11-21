@@ -103,7 +103,7 @@ try {
       await context.route(`${origin}/**`, (route) =>
         route.fulfill({
           contentType: "text/html",
-          body: `<!doctype html><title>synthetic runtime</title><input id="remote-input" autofocus><button id="click-proof" onclick="this.textContent='clicked'">click</button><div contenteditable="true" id="text"></div><input type="file" id="file">`,
+          body: `<!doctype html><title>synthetic runtime</title><textarea id="remote-input" autofocus></textarea><button id="click-proof" onclick="this.textContent='clicked'">click</button><div contenteditable="true" id="text"></div><input type="file" id="file">`,
         }),
       );
       return context;
@@ -253,8 +253,7 @@ try {
     writeFileSync("/tmp/official-fixture-ready", "ready");
     console.log("PASS synthetic service ready for outer watchdog expiry");
   } else {
-    // Real noVNC module, RFB transport and the unchanged ticket gateway. This
-    // local HTTP fixture does not replace the deployed HTTPS viewer UI gate.
+    // Production viewer, ticket gateway, noVNC module and isolated remote desktop.
     const slot = {
       run: { id: runId },
       ready: true,
@@ -275,19 +274,6 @@ try {
       },
     });
     if (!gateway.server.listening) await once(gateway.server, "listening");
-    const response = await fetch(`${slot.gatewayOrigin}/admit`, {
-      method: "POST",
-      headers: { origin: slot.gatewayOrigin, "content-type": "application/json" },
-      body: JSON.stringify({ ticket: "synthetic-ticket" }),
-    });
-    assert.equal(response.status, 200);
-    const admission = await response.json();
-    const replay = await fetch(`${slot.gatewayOrigin}/admit`, {
-      method: "POST",
-      headers: { origin: slot.gatewayOrigin, "content-type": "application/json" },
-      body: JSON.stringify({ ticket: "synthetic-ticket" }),
-    });
-    assert.equal(replay.status, 403);
     const viewOptions = await launchOptions({
       os: "linux",
       headless: true,
@@ -295,34 +281,63 @@ try {
       exclude_addons: ["UBO"],
     });
     viewerBrowser = await Camoufox({ from_options: viewOptions });
-    const viewer = await viewerBrowser.newPage();
-    await viewer.route(`${slot.gatewayOrigin}/fixture`, (route) =>
+    const hostPage = await viewerBrowser.newPage();
+    const standalone = mode === "read";
+    // Substitute only the headless operator's OS clipboard at the browser boundary.
+    // The viewer module, RFB implementation and remote X11 clipboard are real.
+    await hostPage.context().route(`${slot.gatewayOrigin}/viewer.js`, async (route) => {
+      const response = await route.fetch();
+      const setup = `Object.defineProperty(navigator, "clipboard", { value: {
+        readText: async () => "中文 😀\\nline 2",
+        write: async () => { throw new Error("synthetic_denial"); },
+        writeText: async () => { throw new Error("synthetic_denial"); },
+      }});`;
+      await route.fulfill({ response, body: `${setup}\n${await response.text()}` });
+    });
+    await hostPage.route(`${slot.gatewayOrigin}/fixture`, (route) =>
       route.fulfill({
         contentType: "text/html",
-        body: '<div id="screen" style="width:1440px;height:900px"></div>',
+        body: `${standalone ? '<button id="open">Open</button>' : '<iframe title="remote" src="/viewer" style="width:98vw;height:96vh"></iframe>'}
+<script>
+const nonce = crypto.randomUUID();
+let remote, probe;
+document.querySelector('#open')?.addEventListener('click', () => {
+  remote = open('/viewer#'+nonce);
+  probe = setInterval(() => remote.postMessage({type:'ftrade-browser-probe', nonce}, location.origin), 100);
+});
+addEventListener('message', event => {
+  if (event.origin !== location.origin || event.data.type !== 'ftrade-browser-ready') return;
+  if (remote && (event.source !== remote || event.data.nonce !== nonce)) return;
+  clearInterval(probe);
+  event.source.postMessage({type:'ftrade-browser-ticket', token:'synthetic-ticket', nonce}, location.origin);
+});
+</script>`,
       }),
     );
-    await viewer.goto(`${slot.gatewayOrigin}/fixture`);
-    await viewer.addScriptTag({
-      type: "module",
-      content: `
-      import RFB from ${JSON.stringify(admission.module)};
-      const a=${JSON.stringify(admission)};
-      const rfb=new RFB(document.querySelector('#screen'),'ws://'+location.host+a.websocket,{credentials:{password:a.password}});
-      rfb.addEventListener('connect',()=>document.documentElement.dataset.connected='yes');
-      rfb.addEventListener('disconnect',()=>document.documentElement.dataset.disconnected='yes');
-    `,
+    const admitted = hostPage
+      .context()
+      .waitForEvent("response", (response) => response.url().endsWith("/admit"));
+    await hostPage.goto(`${slot.gatewayOrigin}/fixture`);
+    let viewer = hostPage;
+    if (standalone) {
+      const popup = hostPage.waitForEvent("popup");
+      await hostPage.locator("#open").click();
+      viewer = await popup;
+    }
+    const admission = await (await admitted).json();
+    const replay = await fetch(`${slot.gatewayOrigin}/admit`, {
+      method: "POST",
+      headers: { origin: slot.gatewayOrigin, "content-type": "application/json" },
+      body: JSON.stringify({ ticket: "synthetic-ticket" }),
     });
-    await viewer.waitForFunction(
-      () => document.documentElement.dataset.connected === "yes",
-      undefined,
-      { timeout: 15000 },
-    );
+    assert.equal(replay.status, 403);
+    const frame = standalone ? viewer : viewer.frameLocator("iframe");
+    await frame.locator("#tools").waitFor({ state: "visible", timeout: 15000 });
     const remote = context.pages().at(-1);
     await remote.bringToFront();
     const input = await remote.locator("#remote-input").boundingBox();
     const offset = await remote.evaluate(() => ({ x: mozInnerScreenX, y: mozInnerScreenY }));
-    const canvas = await viewer.locator("canvas").boundingBox();
+    const canvas = await frame.locator("canvas").boundingBox();
     assert.ok(input && canvas);
     // Click and type in the actual noVNC canvas. Playwright never types in the
     // remote input itself; only the RFB/X11 path can change its value.
@@ -352,6 +367,58 @@ try {
       );
       throw error;
     }
+    await frame.locator("summary").click();
+    await remote.evaluate(() => {
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "F8") {
+          document.documentElement.dataset.functionKey = String(event.shiftKey);
+          event.preventDefault();
+        }
+      });
+    });
+    await frame.getByLabel("Shift", { exact: true }).check();
+    await frame.locator("#key").fill("F8");
+    await frame.locator("#key-list option[value=F8]").waitFor({ state: "attached" });
+    await frame.locator("#send").click();
+    await remote.waitForFunction(() => document.documentElement.dataset.functionKey === "true");
+    await frame.getByLabel("Shift", { exact: true }).uncheck();
+    await frame.getByLabel("Ctrl", { exact: true }).check();
+    await frame.locator("#key").fill("a");
+    await frame.locator("#key-list option[value=Tab]").waitFor({ state: "attached" });
+    await frame.locator("#send").click();
+    const sample = "中文 😀\nline 2";
+    await frame.locator("#clip").fill(sample);
+    await frame.locator("#paste").click();
+    await remote.waitForFunction(
+      (text) => document.querySelector("#remote-input").value === text,
+      sample,
+    );
+    await frame.locator("#send").click();
+    const selectedText = await remote
+      .locator("#remote-input")
+      .evaluate((field) => field.value.slice(field.selectionStart, field.selectionEnd));
+    assert.equal(selectedText, sample);
+    await frame.locator("#copy").click();
+    const manualCopy = frame.locator("#clip:focus");
+    try {
+      await manualCopy.waitFor({ timeout: 5000 });
+    } catch (error) {
+      console.error("Remote copy result:", await frame.locator("#feedback").textContent());
+      throw error;
+    }
+    assert.equal(await manualCopy.inputValue(), sample);
+    const canvasElement = frame.locator("canvas");
+    await canvasElement.focus();
+    await viewer.keyboard.press("Control+x");
+    await remote.waitForFunction(() => document.querySelector("#remote-input").value === "");
+    await manualCopy.waitFor({ timeout: 5000 });
+    assert.equal(await manualCopy.inputValue(), sample);
+    await canvasElement.focus();
+    await viewer.keyboard.press("Meta+v");
+    await remote.waitForFunction(
+      (text) => document.querySelector("#remote-input").value === text,
+      sample,
+    );
     const processStatus = readFileSync("/proc/self/status", "utf8");
     assert.match(processStatus, /^CapEff:\s+0+$/m);
     assert.match(processStatus, /^CapBnd:\s+0+$/m);
@@ -383,11 +450,7 @@ try {
       }),
     );
     slot.expiresAt = Date.now() - 1;
-    await viewer.waitForFunction(
-      () => document.documentElement.dataset.disconnected === "yes",
-      undefined,
-      { timeout: 5000 },
-    );
+    await frame.locator("#tools").waitFor({ state: "hidden", timeout: 5000 });
     const asset = await fetch(`${slot.gatewayOrigin}${admission.module}`);
     assert.equal(asset.status, 403);
     writeFileSync("/tmp/ftrade-lease", String(Date.now() - 1));

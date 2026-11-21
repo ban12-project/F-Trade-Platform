@@ -13,7 +13,8 @@ docker run --rm --network none --entrypoint node "$agent" ops/browser-node/smoke
 test "$(docker image inspect --format '{{index .Config.Labels "io.ftrade.lease-watchdog"}}' "$browser")" = 1
 docker run --rm --network none --entrypoint sh "$browser" -ec '
   command -v Xvfb
-  command -v x11vnc
+  command -v X0tigervnc
+  command -v tigervncpasswd
   command -v websockify
   test -f /usr/share/novnc/core/rfb.js
   test -x /root/.cache/camoufox/browsers/official/158.0.1-beta.41/camoufox-bin

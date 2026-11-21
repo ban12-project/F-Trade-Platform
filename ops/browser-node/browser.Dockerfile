@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgtk-3-0 libdbus-glib-1-2 libxt6 libasound2 libx11-xcb1 \
     libxcomposite1 libxcursor1 libxdamage1 libxfixes3 libxi6 libxrandr2 \
     libxrender1 libxss1 libxtst6 libegl1 libgl1-mesa-dri libgbm1 libavcodec61 \
-    xvfb x11vnc x11-utils websockify novnc \
+    xvfb tigervnc-scraping-server tigervnc-tools x11-utils websockify novnc \
     fonts-liberation fonts-noto-color-emoji fontconfig ca-certificates curl unzip \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/official-runtime

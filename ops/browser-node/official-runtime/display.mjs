@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { access, writeFile } from "node:fs/promises";
 import net from "node:net";
@@ -21,7 +21,7 @@ async function portReady(port) {
 }
 
 /** The desktop is private to one container. Only the Agent's ticket gateway
- * exposes it; x11vnc itself only listens on the container loopback interface.
+ * exposes it; the VNC server only listens on the container loopback interface.
  */
 export async function startDisplay({ environment = process.env, onFailure = () => {} } = {}) {
   const resolution = environment.VNC_RESOLUTION ?? "1440x900";
@@ -88,22 +88,26 @@ export async function startDisplay({ environment = process.env, onFailure = () =
         if (viewerStarted || closing || failed) throw new Error("viewer_state_invalid");
         viewerStarted = true;
         // The password is never passed in argv, a URL or process output.
-        await writeFile("/tmp/ftrade-vnc-password", environment.VNC_PASSWORD, {
-          mode: 0o600,
-          flag: "wx",
+        const password = spawnSync("tigervncpasswd", ["-f"], {
+          input: `${environment.VNC_PASSWORD}\n`,
+          timeout: 3000,
         });
-        start("x11vnc", [
+        if (password.status !== 0 || password.stdout?.length !== 8)
+          throw new Error("viewer_password_failed");
+        await writeFile("/tmp/ftrade-vnc-password", password.stdout, { mode: 0o600, flag: "wx" });
+        start("X0tigervnc", [
           "-display",
           display,
-          "-listen",
+          "-interface",
           "127.0.0.1",
           "-rfbport",
           "5900",
-          "-forever",
-          "-shared",
-          "-noxdamage",
-          "-passwdfile",
+          "-SecurityTypes",
+          "VncAuth",
+          "-PasswordFile",
           "/tmp/ftrade-vnc-password",
+          "-SendPrimary=0",
+          "-SetPrimary=0",
         ]);
         start("websockify", ["--web", "/usr/share/novnc", "0.0.0.0:6080", "127.0.0.1:5900"]);
         for (let i = 0; i < 50 && !failed; i++) {
