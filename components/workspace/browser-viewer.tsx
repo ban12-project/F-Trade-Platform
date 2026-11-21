@@ -56,6 +56,7 @@ export function BrowserViewer({ origin, token }: { origin: string; token: string
         src={`${origin}/viewer`}
         title="账号登录与两步验证"
         referrerPolicy="no-referrer"
+        allow="clipboard-read 'src'; clipboard-write 'src'"
         sandbox="allow-scripts allow-same-origin"
         loading="eager"
         onLoad={deliverTicket}

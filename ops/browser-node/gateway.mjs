@@ -79,9 +79,23 @@ export function createGateway({
     try {
       if (request.method === "GET" && request.url === "/viewer") {
         response.setHeader("Content-Type", "text/html; charset=utf-8");
-        response.end(
-          '<!doctype html><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"><title>F-Trade browser</title><body style="margin:0"><div id="status">正在授权连接…</div><div id="screen" style="height:90vh"></div><script type="module" src="/viewer.js"></script>',
-        );
+        response.end(`<!doctype html><html lang="zh-CN"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>F-Trade 远程浏览器</title>
+<style>body{margin:0;height:100dvh;display:flex;flex-direction:column;font:14px system-ui}
+header{padding:.35rem .6rem}details{padding:.25rem 0}fieldset{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem;border:0;padding:.4rem 0}textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
+<header><div id="status">正在授权连接…</div><details id="tools" hidden><summary>远程按键与剪贴板</summary>
+<fieldset><legend>发送组合键</legend>
+<label><input type="checkbox" value="Control_L">Ctrl</label>
+<label><input type="checkbox" value="Alt_L">Alt</label>
+<label><input type="checkbox" value="Shift_L">Shift</label>
+<label><input type="checkbox" value="Super_L">Super</label>
+<label><input type="checkbox" value="ISO_Level3_Shift">AltGr</label>
+<label>按键 <input id="key" list="key-list" value="Tab" spellcheck="false"></label>
+<datalist id="key-list"></datalist><button id="send">发送按键</button></fieldset>
+<label>剪贴板文本 <textarea id="clip" rows="2" autocomplete="off" spellcheck="false"></textarea></label>
+<button id="paste">粘贴文本到远端</button><button id="copy">复制远端选区到本机</button></details>
+<span id="feedback" role="status"></span></header><div id="screen"></div>
+<script type="module" src="/viewer.js"></script></html>`);
         return;
       }
       if (request.method === "GET" && request.url === "/viewer.js") {

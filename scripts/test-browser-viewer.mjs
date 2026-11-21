@@ -18,7 +18,7 @@ function fixture({
     requests = [],
     instances = [];
   let id = 0;
-  const status = { textContent: "" };
+  const status = Object.assign(new EventTarget(), { textContent: "" });
   const parent = { postMessage: (data, origin) => messages.push({ data, origin }) };
   class RFB {
     events = new Map();
@@ -42,8 +42,10 @@ function fixture({
   runInNewContext(source, {
     window,
     document: { getElementById: () => status },
-    location: { host: "gateway.example", hash },
+    URL,
+    location: { href: "https://gateway.example/viewer", host: "gateway.example", hash },
     AbortSignal,
+    AbortController,
     setInterval: (fn, ms) => {
       timers.set(++id, { fn, ms, repeat: true });
       return id;
