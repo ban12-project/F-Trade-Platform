@@ -96,18 +96,44 @@ class ReleaseTest(unittest.TestCase):
             file.write_text('COPY ["a", "/app/"]\n')
             with self.assertRaises(RuntimeError):r.copied_inputs(file,root)
 
+    def test_native_compose_keeps_identity_mounts_literal_environment_and_listener(self):
+        config={'image':'sha256:'+'1'*64,'ports':['127.0.0.1:9400:9400'],'restart':'unless-stopped',
+                'volumes':['/verified/key:/run/secrets/node-key:ro','/verified/state:/var/lib/browser-node'],
+                'environment':{'VALUE':'a${KEEP}b'},'advanced':{'resources':{'memoryMb':512,'cpuCores':0.5},
+                'healthcheck':{'test':['CMD','true']}}}
+        svc=r.native_compose(config)['services']['agent']
+        self.assertEqual(svc['ports'],config['ports'])
+        self.assertEqual(svc['environment']['VALUE'],'a$${KEEP}b')
+        self.assertEqual([m['read_only'] for m in svc['volumes']],[True,False])
+        self.assertTrue(all(m['bind']=={'create_host_path':False} for m in svc['volumes']))
+        self.assertEqual(svc['pull_policy'],'never')
+        self.assertEqual(svc['healthcheck'],config['advanced']['healthcheck'])
+        with self.assertRaisesRegex(RuntimeError,'listener'):
+            r.native_compose({**config,'ports':['9400:9400']})
+
+    def test_first_cutover_rollback_reuses_exact_previous_container(self):
+        config={'image':'old'}
+        journal={'previousState':{},'previous':{'browser':config},'previousContainerId':'prior','backup':'/backup'}
+        cfg={'targets':{'browser':{'container':'legacy','service':'agent'}},'browserHealth':'https://example.test'}
+        with patch.object(r,'docker',return_value='[{"Id":"prior","Image":"old"}]') as docker,patch.object(r,'compose_file',return_value=['compose']),patch.object(r,'run') as run,patch.object(r,'monitor_restore'),patch.object(r,'healthy'),patch.object(r,'check_browser_edge'),patch.object(r,'save'):
+            r.restore_native_release(cfg,journal)
+            self.assertEqual(run.call_args_list[0].args[0],['compose','down','--timeout','60'])
+            self.assertEqual(docker.call_args_list[-1].args,('start','prior'))
+            with self.assertRaisesRegex(RuntimeError,'controller_changed'):
+                r.restore_native_release(cfg,{**journal,'previousContainerId':'other'})
+
     def test_failed_promotion_restores_previous_bundle_and_retains_no_journal(self):
-        with tempfile.TemporaryDirectory() as t,patch.object(r,'ROOT',pathlib.Path(t)),patch.object(r.shutil,'copy2'),patch.object(r,'run'),patch.object(r,'cli'),patch.object(r,'apply',return_value='new-deployment'),patch.object(r,'healthy',side_effect=RuntimeError('injected unhealthy image')),patch.object(r,'rollback') as rollback:
+        with tempfile.TemporaryDirectory() as t,patch.object(r,'ROOT',pathlib.Path(t)),patch.object(r.shutil,'copy2'),patch.object(r,'run'),patch.object(r,'cli'),patch.object(r,'verify_browser_config'),patch.object(r,'docker',side_effect=lambda *args:'[{"Id":"old-id","Image":"old"}]' if args[0]=='inspect' else ''),patch.object(r,'compose_file',return_value=['docker','compose']),patch.object(r,'start_native'),patch.object(r,'healthy',side_effect=RuntimeError('injected unhealthy image')),patch.object(r,'rollback') as rollback:
             root=pathlib.Path(t);previous={'browser':{'image':'old'}};r.save(root/'state.json',{'revision':'old','configs':previous,'fingerprints':{}})
-            with self.assertRaises(RuntimeError):r.promote({'targets':{'browser':{'service':'agent','project':'qa'}}},previous,{'browser':{'image':'new'}},root,'a'*40)
+            with self.assertRaises(RuntimeError):r.promote({'targets':{'browser':{'service':'agent','project':'qa','container':'qa-agent'}}},previous,{'browser':{'image':'new'}},root,'a'*40)
             self.assertEqual(rollback.call_args.args[1]['previous'],previous)
             self.assertFalse((root/'journal.json').exists())
             self.assertEqual(json.loads((root/'receipts'/('a'*40+'.json')).read_text())['state'],'rolled_back')
 
     def test_failed_rollback_keeps_journal_for_recovery(self):
-        with tempfile.TemporaryDirectory() as t,patch.object(r,'ROOT',pathlib.Path(t)),patch.object(r.shutil,'copy2'),patch.object(r,'run'),patch.object(r,'cli'),patch.object(r,'apply',side_effect=RuntimeError('new failed')),patch.object(r,'rollback',side_effect=RuntimeError('restore failed')):
+        with tempfile.TemporaryDirectory() as t,patch.object(r,'ROOT',pathlib.Path(t)),patch.object(r.shutil,'copy2'),patch.object(r,'run'),patch.object(r,'cli'),patch.object(r,'verify_browser_config'),patch.object(r,'docker',side_effect=lambda *args:'[{"Id":"old-id","Image":"old"}]' if args[0]=='inspect' else ''),patch.object(r,'compose_file',return_value=['docker','compose']),patch.object(r,'start_native',side_effect=RuntimeError('new failed')),patch.object(r,'rollback',side_effect=RuntimeError('restore failed')):
             root=pathlib.Path(t);r.save(root/'state.json',{'revision':'old'})
-            with self.assertRaises(RuntimeError):r.promote({'targets':{'browser':{'service':'agent','project':'qa'}}},{'browser':{'image':'old'}},{'browser':{'image':'new'}},root,'b'*40)
+            with self.assertRaises(RuntimeError):r.promote({'targets':{'browser':{'service':'agent','project':'qa','container':'qa-agent'}}},{'browser':{'image':'old'}},{'browser':{'image':'new'}},root,'b'*40)
             self.assertTrue((root/'journal.json').exists())
             self.assertEqual(json.loads((root/'receipts'/('b'*40+'.json')).read_text())['state'],'rollback_failed')
 
