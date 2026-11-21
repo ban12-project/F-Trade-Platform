@@ -122,10 +122,12 @@ function enableInput(desktop, modulePath) {
   const options = { signal: listeners.signal };
   let symbols;
   let pendingCopy;
+  let pasteTimeout;
   let revision = 0;
   tools.hidden = false;
   function invalidate() {
     revision++;
+    clearTimeout(pasteTimeout);
     pendingCopy?.(null);
   }
   const heldModifiers = new Map();
@@ -154,6 +156,7 @@ function enableInput(desktop, modulePath) {
   screen.addEventListener(
     "focusout",
     () => {
+      invalidate();
       replayModifiers("keyup");
       heldModifiers.clear();
     },
@@ -246,10 +249,20 @@ function enableInput(desktop, modulePath) {
       feedback.textContent = "请分段粘贴纯文本，每段小于 256 KiB 且不含空字符。";
       return;
     }
-    desktop.clipboardPasteFrom(text);
-    chord([0xffe3], 0x76);
-    clip.value = "";
-    feedback.textContent = "";
+    desktop.focus();
+    const current = revision;
+    pasteTimeout = setTimeout(() => {
+      if (revision !== current) return;
+      invalidate();
+      feedback.textContent = "剪贴板传输超时，请重新粘贴。";
+    }, 5000);
+    desktop.clipboardPasteFrom(text, () => {
+      if (current !== revision || !screen.contains(document.activeElement)) return;
+      clearTimeout(pasteTimeout);
+      chord([0xffe3], 0x76);
+      clip.value = "";
+      feedback.textContent = "";
+    });
   }
   async function pasteLocal() {
     invalidate();
