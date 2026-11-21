@@ -388,11 +388,28 @@ addEventListener('message', event => {
     await frame.locator("#send").click();
     const sample = "中文 😀\nline 2";
     await frame.locator("#clip").fill(sample);
+    assert.equal(await frame.locator("#clip").inputValue(), sample);
+    const inputState = () =>
+      remote.locator("#remote-input").evaluate((field) => ({
+        value: field.value,
+        selected: field.value.slice(field.selectionStart, field.selectionEnd),
+        focused: field === document.activeElement,
+      }));
+    const beforePaste = await inputState();
     await frame.locator("#paste").click();
-    await remote.waitForFunction(
-      (text) => document.querySelector("#remote-input").value === text,
-      sample,
-    );
+    try {
+      await remote.waitForFunction(
+        (text) => document.querySelector("#remote-input").value === text,
+        sample,
+      );
+    } catch (error) {
+      console.error("Synthetic paste diagnostics", {
+        beforePaste,
+        afterPaste: await inputState(),
+        feedback: await frame.locator("#feedback").textContent(),
+      });
+      throw error;
+    }
     await frame.locator("#send").click();
     const selectedText = await remote
       .locator("#remote-input")
