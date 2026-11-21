@@ -142,12 +142,13 @@ export async function ensureAccountVolume(docker, nodeId, accountId, name) {
   identifier(nodeId);
   identifier(accountId);
   if (name !== `ftbrowser-${nodeId}-${accountId}`) throw new Error("native_profile_volume_invalid");
-  const volume = await docker("POST", "/volumes/create", {
+  await docker("POST", "/volumes/create", {
     Name: name,
     Labels: { "io.ftrade.node": nodeId, "io.ftrade.account": accountId },
   });
-  // Docker returns the existing volume unchanged. Never trust request labels as
-  // proof that an already present volume belongs to this account.
+  // After daemon restore, create can return a cached driver volume without
+  // labels. Inspect reads persisted metadata for new and existing volumes.
+  const volume = await docker("GET", `/volumes/${name}`);
   if (
     volume?.Name !== name ||
     volume.Labels?.["io.ftrade.node"] !== nodeId ||
