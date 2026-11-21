@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Fixed SSH entrypoint: only request/status for the current public main SHA."""
+"""Fixed SSH entrypoint for request/status of the current main SHA."""
 import fcntl
 import json
 import os
@@ -10,7 +10,7 @@ import sys
 import time
 
 ROOT = pathlib.Path('/opt/ftrade-vps/release')
-REPO = 'https://github.com/ban12-project/F-Trade-Platform.git'
+REPO = 'git@github.com:ban12-project/F-Trade-Platform.git'
 SHA = re.compile(r'^[a-f0-9]{40}$')
 
 
@@ -79,6 +79,10 @@ def dispatch(command):
 
 
 if __name__ == '__main__':
+    os.environ['GIT_SSH_COMMAND'] = (
+        f'ssh -F /dev/null -i {ROOT}/github-readonly-key -o IdentitiesOnly=yes '
+        f'-o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile={ROOT}/github-known-hosts'
+    )
     if len(sys.argv) == 3 and sys.argv[1] == 'execute' and SHA.fullmatch(sys.argv[2]):
         execute(sys.argv[2])
     elif len(sys.argv) == 1:
