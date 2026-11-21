@@ -7,13 +7,21 @@ its direct deployment path would bypass this transaction. Vercel deployment is
 independent; application/service API changes must remain backward compatible.
 
 The host accepts only `release <40-hex-SHA>` and `status <40-hex-SHA>`. It checks
-public main before fetching and again before promotion. A superseded revision
+the remote main revision before fetching and again before promotion. A superseded revision
 cannot replace a newer release. Private service configs, receipts, logs and
 rollback journals live under `/opt/ftrade-vps/release` (0700), outside Git.
 The GitHub `vps-production` environment permits only main and holds the dedicated
 SSH secret and pinned host-key variables. This key cannot open a shell, upload
 files or forward ports. The fixed host bootstrap is provisioned separately;
 changes to bootstrap.py require a deliberate host update.
+
+For the private repository, provision `github-readonly-key` under
+`/opt/ftrade-vps/release` as a root-owned 0600 SSH key. Register its public
+key as a read-only deploy key on this repository. Place GitHub's verified SSH
+host key in `github-known-hosts` in the same directory. When upgrading an
+existing checkout, verify its origin is the previous HTTPS repository URL
+and change it to `git@github.com:ban12-project/F-Trade-Platform.git` before
+installing the matching bootstrap. The Actions-to-VPS key remains separate.
 
 ## Release behavior
 
