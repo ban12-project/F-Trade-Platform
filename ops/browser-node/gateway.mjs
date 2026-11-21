@@ -82,7 +82,12 @@ export function createGateway({
         response.end(`<!doctype html><html lang="zh-CN"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>F-Trade 远程浏览器</title>
 <style>body{margin:0;height:100dvh;display:flex;flex-direction:column;font:14px system-ui}
-header{padding:.35rem .6rem}details{padding:.25rem 0}fieldset{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem;border:0;padding:.4rem 0}textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
+header{display:flow-root;padding:.35rem .6rem}
+#status{float:inline-end;text-align:end;overflow-wrap:anywhere}
+header:has(details:not([hidden])) #status{max-inline-size:calc(100% - 10em);margin-inline-start:.75rem}
+summary{cursor:pointer}
+fieldset{clear:both;display:flex;align-items:center;flex-wrap:wrap;gap:.4rem;border:0;padding:.4rem 0}
+textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
 <header><div id="status">正在授权连接…</div><details id="tools" hidden><summary>远程按键与剪贴板</summary>
 <fieldset><legend>发送组合键</legend>
 <label><input type="checkbox" value="Control_L">Ctrl</label>
