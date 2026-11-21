@@ -32,6 +32,7 @@ COPY native-profile.mjs ./ftrade-native-profile.mjs
 COPY login-plugin ./login-plugin
 COPY diagnostics-plugin ./diagnostics-plugin
 COPY official-runtime/*.mjs ./official-runtime/
+RUN node ./official-runtime/patch-novnc-clipboard.mjs
 COPY official-runtime/entry.mjs ./server.js
 COPY watchdog.mjs /opt/ftrade/watchdog.mjs
 LABEL io.ftrade.lease-watchdog="1" io.ftrade.login-fill="1" io.ftrade.native-profile="1" io.ftrade.official-camoufox="1"

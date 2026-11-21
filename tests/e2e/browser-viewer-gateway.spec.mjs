@@ -27,7 +27,11 @@ test("embedded viewer loads the actual gateway document and CSP before one-use a
       }
       focus() { this.input.focus(); }
       blur() { this.input.blur(); }
-      clipboardPasteFrom(text) { this.transfer = text; }
+      clipboardPasteFrom(text, provided) {
+        const deliver = () => { this.transfer = text; provided?.(); };
+        if (window.holdTransfer) window.deliverTransfer = deliver;
+        else setTimeout(deliver, 30);
+      }
       sendKey(key, code, down) {
         window.sentKeys.push([key, down ?? null]);
         if (down !== undefined) return;
@@ -127,6 +131,16 @@ test("embedded viewer loads the actual gateway document and CSP before one-use a
     await remote.press("Control+x");
     await expect(manual).toHaveValue("手动中转");
     await expect(manual).toBeFocused();
+    // A late Provide must not send Ctrl+V into a newly focused field.
+    await remote.evaluate(() => {
+      window.holdTransfer = true;
+    });
+    await manual.fill("延迟传输");
+    await frame.locator("#paste").click();
+    await frame.locator("#key").click();
+    await remote.evaluate(() => window.deliverTransfer());
+    await expect(remote).toHaveValue("手动中转");
+    await expect(frame.locator("#key")).toBeFocused();
     expect(admissions).toBe(1);
     const replay = await page.request.post(`${slot.gatewayOrigin}/admit`, {
       headers: { Origin: slot.gatewayOrigin },
