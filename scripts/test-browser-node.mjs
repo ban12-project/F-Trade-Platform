@@ -243,7 +243,22 @@ test("existing account volumes require returned ownership, not requested labels"
     Name: name,
     Labels: { "io.ftrade.node": nodeId, "io.ftrade.account": accountId },
   };
-  await ensureAccountVolume(async () => valid, nodeId, accountId, name);
+  const inspectPath = `/volumes/${name}`;
+  const calls = [];
+  await ensureAccountVolume(
+    async (method, path, body) => {
+      calls.push({ method, path, body });
+      // Moby can return an existing local volume without its labels after restart.
+      return method === "POST" ? { Name: name } : valid;
+    },
+    nodeId,
+    accountId,
+    name,
+  );
+  assert.deepEqual(calls, [
+    { method: "POST", path: "/volumes/create", body: valid },
+    { method: "GET", path: inspectPath, body: undefined },
+  ]);
   for (const invalid of [
     null,
     { Name: name },
@@ -252,7 +267,12 @@ test("existing account volumes require returned ownership, not requested labels"
     { ...valid, Labels: { ...valid.Labels, "io.ftrade.node": randomUUID() } },
   ]) {
     await assert.rejects(
-      ensureAccountVolume(async () => invalid, nodeId, accountId, name),
+      ensureAccountVolume(
+        async (method) => (method === "POST" ? valid : invalid),
+        nodeId,
+        accountId,
+        name,
+      ),
       (error) => {
         assert.equal(
           describeBrowserLaunchFailure("volume", error).code,
@@ -262,6 +282,19 @@ test("existing account volumes require returned ownership, not requested labels"
       },
     );
   }
+  const inspectError = new Error("docker_http_404");
+  await assert.rejects(
+    ensureAccountVolume(
+      async (method) => {
+        if (method === "GET") throw inspectError;
+        return valid;
+      },
+      nodeId,
+      accountId,
+      name,
+    ),
+    inspectError,
+  );
 });
 test("browser runtime cannot access the host Docker socket or choose a mount", () => {
   const { body } = containerSpec(nodeId, run, "sha256:reviewed", Date.now() + 60_000);
