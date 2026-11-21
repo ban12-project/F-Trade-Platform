@@ -1,10 +1,19 @@
-# Main-to-OpenShip releases
+# Browser node releases
 
 `vps-release.yml` validates each main push, then requests that exact SHA through a
-restricted SSH key. The host builds images, drains workers, updates the browser
-OpenShip service and checks their health. OpenShip `autoDeploy` stays false:
+restricted SSH key. The host builds images, drains workers, updates the dedicated host Compose project and checks controller and edge health. OpenShip `autoDeploy` stays false:
 its direct deployment path would bypass this transaction. Vercel deployment is
 independent; application/service API changes must remain backward compatible.
+
+The browser controller runs in the host Compose project `ftrade-browser-release`.
+OpenShip owns the public edge. Its instance-wide host-bind restriction stays
+enabled. The first cutover stops the inspected legacy container inside the
+existing drain and retains it for rollback. A failed cutover removes the
+candidate project and starts the exact original container. Subsequent releases
+and rollbacks use the native project. The private Compose document preserves
+the reviewed bind sources, permissions, resource limits, health check and
+loopback port. Missing source directories abort startup. Keep the legacy
+project's automatic deployment disabled and leave its old controller stopped.
 
 The host accepts only `release <40-hex-SHA>` and `status <40-hex-SHA>`. It checks
 the remote main revision before fetching and again before promotion. A superseded revision
@@ -45,7 +54,7 @@ installing the matching bootstrap. The Actions-to-VPS key remains separate.
 - The one-time upgrade from pre-drain controllers stops telemetry and waits for
   its existing fail-closed freshness guard. Later releases use the drain marker
   directly. The monitor resumes even if the first drain times out.
-- Acceptance requires OpenShip's deployment to be ready, the exact immutable
+- Acceptance requires the exact immutable
   image to be running and healthy, fresh host telemetry, and the public browser
   gateway to reject an unauthenticated request with 403 (with valid TLS). Failed promotion restores both previous service
   configs/images and monitor files. Failed rollback retains the journal and drain

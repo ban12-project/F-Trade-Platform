@@ -182,6 +182,87 @@ def build(source, sha, previous, fp, configs):
     return updated
 
 
+NATIVE_PROJECT = 'ftrade-browser-release'
+NATIVE_CONTAINER = 'ftrade-browser-release-agent'
+
+
+def controller_target(target, state):
+    if state.get('controller') == 'host-compose':
+        return {**target, 'container': NATIVE_CONTAINER}
+    if 'controller' in state:
+        raise RuntimeError('unknown_browser_controller')
+    return target
+
+
+def verify_browser_config(actual,config):
+    if actual['Image']!=config['image']:raise RuntimeError('service_drift_requires_reconciliation')
+    resources=config['advanced']['resources']
+    if actual['HostConfig']['Memory']!=resources['memoryMb']*1048576 or actual['HostConfig']['NanoCpus']!=int(resources['cpuCores']*1e9):raise RuntimeError('service_resource_drift')
+    expected={}
+    for entry in config['volumes']:
+        parts=entry.split(':');expected[parts[1]]={'Source':parts[0],'RW':len(parts)<3 or parts[2]!='ro'}
+    mounted={m['Destination']:{'Source':m['Source'],'RW':m['RW']} for m in actual['Mounts']}
+    if mounted!=expected:raise RuntimeError('service_mount_drift')
+    ports={}
+    for entry in config['ports']:
+        address,port,inside=entry.split(':');ports[inside+'/tcp']=[{'HostIp':address,'HostPort':port}]
+    if actual['HostConfig']['PortBindings']!=ports:raise RuntimeError('service_port_drift')
+    env=dict(v.split('=',1) for v in actual['Config']['Env'])
+    if any(env.get(k)!=v for k,v in config['environment'].items()):raise RuntimeError('service_environment_drift')
+
+
+def native_compose(config):
+    if not re.fullmatch(r'sha256:[0-9a-f]{64}', config['image']):
+        raise RuntimeError('immutable_browser_controller_required')
+    if config['ports'] != ['127.0.0.1:9400:9400'] or config['restart'] != 'unless-stopped':
+        raise RuntimeError('unexpected_browser_listener_or_restart')
+    mounts = []
+    for entry in config['volumes']:
+        source, target, *mode = entry.split(':')
+        if not source.startswith('/') or not target.startswith('/') or mode not in ([], ['ro'], ['rw']):
+            raise RuntimeError('unexpected_browser_bind')
+        mounts.append({'type': 'bind', 'source': source, 'target': target,
+                       'read_only': mode == ['ro'], 'bind': {'create_host_path': False}})
+    resources = config['advanced']['resources']
+    service = {'image': config['image'], 'container_name': NATIVE_CONTAINER, 'pull_policy': 'never',
+               'restart': config['restart'], 'stop_grace_period': '60s', 'ports': config['ports'],
+               'environment': {k: v.replace('$', '$$') for k, v in config['environment'].items()},
+               'volumes': mounts, 'mem_limit': f"{resources['memoryMb']}m", 'cpus': resources['cpuCores'],
+               'healthcheck': config['advanced']['healthcheck']}
+    return {'services': {'agent': service}}
+
+
+def compose_file(config, path):
+    save(path, native_compose(config))
+    return ['docker', 'compose', '--project-name', NATIVE_PROJECT, '--file', str(path)]
+
+
+def start_native(config, path):
+    run(compose_file(config, path) + ['up', '-d', '--no-build', '--pull', 'never', 'agent'], 180)
+
+
+def restore_native_release(cfg, journal):
+    previous = journal['previousState']
+    target = controller_target(cfg['targets']['browser'], previous)
+    config = journal['previous']['browser']
+    path = ROOT / 'rollback-configs/browser-compose.json'
+    if previous.get('controller') == 'host-compose':
+        start_native(config, path)
+    else:
+        # Only stop the candidate in our Compose project. The original container
+        # and its immutable configuration survive the first handover.
+        run(compose_file(config, path) + ['down', '--timeout', '60'], 120)
+        original = json.loads(docker('inspect', target['container']))[0]
+        if original['Id'] != journal['previousContainerId'] or original['Image'] != config['image']:
+            raise RuntimeError('previous_browser_controller_changed')
+        docker('start', original['Id'])
+    monitor_restore(pathlib.Path(journal['backup']))
+    run(['systemctl', 'restart', MONITOR])
+    healthy(target, config['image'])
+    check_browser_edge(cfg['browserHealth'])
+    save(ROOT / 'state.json', previous)
+
+
 def apply(target, config, path):
     save(path,config)
     cli('service','update',target['service'],str(path),'-p',target['project'])
@@ -209,6 +290,8 @@ def monitor_restore(backup):
 
 
 def rollback(cfg, journal):
+    if journal.get('controller') == 'host-compose':
+        return restore_native_release(cfg, journal)
     for dep in journal.get('deployments', []):
         state=cli('deployment','get',dep)['status']
         if state not in ['ready','error','failed','cancelled','canceled']:
@@ -320,15 +403,25 @@ def promote(cfg, previous, updated, source, sha):
     shutil.copy2(CAPACITY/'monitor.py',backup/'monitor.py')
     shutil.copy2(pathlib.Path('/etc/systemd/system')/MONITOR,backup/'monitor.service')
     profile_backup=backup_profiles_for_official_cutover(previous,updated,source,backup,sha)
-    journal={'revision':sha,'profileBackup':profile_backup,'previous':previous,'backup':str(backup),'startedAt':time.time(),'previousState':json.loads((ROOT/'state.json').read_text()),'deployments':[]}
+    state=json.loads((ROOT/'state.json').read_text())
+    current=controller_target(cfg['targets']['browser'],state)
+    original=json.loads(docker('inspect',current['container']))[0]
+    verify_browser_config(original,previous['browser'])
+    if current['container'] != NATIVE_CONTAINER and docker('ps','-aq','--filter','name=^/'+NATIVE_CONTAINER+'$').strip():
+        raise RuntimeError('native_container_already_exists')
+    path=ROOT/'candidate-configs/browser-compose.json'
+    command=compose_file(updated['browser'],path)
+    run(command+['config','--quiet'])
+    journal={'revision':sha,'profileBackup':profile_backup,'previous':previous,'backup':str(backup),
+             'startedAt':time.time(),'previousState':state,'previousContainerId':original['Id'],'controller':'host-compose'}
     save(ROOT/'journal.json',journal)
     try:
-        for target in cfg['targets'].values():cli('service','stop',target['service'],'-p',target['project'])
+        docker('stop','--time','60',original['Id'])
         run(['sh',str(source/'ops/host-capacity/install-monitor.sh')])
-        for name,target in cfg['targets'].items():
-            dep=apply(target,updated[name],ROOT/'candidate-configs'/(name+'.json'))
-            journal['deployments'].append(dep);save(ROOT/'journal.json',journal)
-            healthy(target,updated[name]['image'],deployment=dep)
+        start_native(updated['browser'],path)
+        healthy({**current,'container':NATIVE_CONTAINER},updated['browser']['image'])
+        candidate=json.loads(docker('inspect',NATIVE_CONTAINER))[0]
+        verify_browser_config(candidate,updated['browser'])
         snapshot=json.loads((CAPACITY/'telemetry.json').read_text())
         if not snapshot['healthy'] or time.time()-snapshot['observedAt']>8:raise RuntimeError('monitor_not_healthy')
         # Public edge is intentionally separate from OpenShip-managed services.
@@ -364,7 +457,7 @@ def main(sha):
     elif (CAPACITY/'drain.json').exists():
         orphan=json.loads((CAPACITY/'drain.json').read_text())
         # No journal means no promotion began, or a completed commit was made.
-        for name,target in cfg['targets'].items():healthy(target,state['configs'][name]['image'])
+        for name,target in cfg['targets'].items():healthy(controller_target(target,state),state['configs'][name]['image'])
         run(['systemctl','start',MONITOR]);clear_drain(orphan['revision'])
         status(orphan['revision'],'ready' if state['revision']==orphan['revision'] else 'failed','interrupted_drain_recovered')
     fp=fingerprints(source)
@@ -376,21 +469,8 @@ def main(sha):
     if disk.free < (12 if worker_build else 4)*1024**3:raise RuntimeError('insufficient_build_disk_headroom')
     # Refuse to overwrite edits made independently in OpenShip/the host.
     for name,target in cfg['targets'].items():
-        actual=json.loads(docker('inspect',target['container']))[0]
-        if actual['Image']!=configs[name]['image']:raise RuntimeError('service_drift_requires_reconciliation')
-        resources=configs[name]['advanced']['resources']
-        if actual['HostConfig']['Memory']!=resources['memoryMb']*1048576 or actual['HostConfig']['NanoCpus']!=int(resources['cpuCores']*1e9):raise RuntimeError('service_resource_drift')
-        expected={}
-        for entry in configs[name]['volumes']:
-            parts=entry.split(':');expected[parts[1]]={'Source':parts[0],'RW':len(parts)<3 or parts[2]!='ro'}
-        mounted={m['Destination']:{'Source':m['Source'],'RW':m['RW']} for m in actual['Mounts']}
-        if mounted!=expected:raise RuntimeError('service_mount_drift')
-        ports={}
-        for entry in configs[name]['ports']:
-            address,port,inside=entry.split(':');ports[inside+'/tcp']=[{'HostIp':address,'HostPort':port}]
-        if actual['HostConfig']['PortBindings']!=ports:raise RuntimeError('service_port_drift')
-        env=dict(v.split('=',1) for v in actual['Config']['Env'])
-        if any(env.get(k)!=v for k,v in configs[name]['environment'].items()):raise RuntimeError('service_environment_drift')
+        actual=json.loads(docker('inspect',controller_target(target,state)['container']))[0]
+        verify_browser_config(actual,configs[name])
     reservation=None;draining=False;legacy=False
     try:
         status(sha,'waiting_for_build_capacity')
@@ -402,14 +482,14 @@ def main(sha):
         head=run(['git','ls-remote','origin','refs/heads/main'],cwd=source).split()[0]
         if head!=sha:status(sha,'superseded');return
         status(sha,'draining');set_drain(sha);draining=True
-        legacy=any(json.loads(docker('inspect',t['container']))[0]['Config'].get('Labels',{}).get('io.ftrade.release-drain')!='1' for t in cfg['targets'].values())
+        legacy=any(json.loads(docker('inspect',controller_target(t,state)['container']))[0]['Config'].get('Labels',{}).get('io.ftrade.release-drain')!='1' for t in cfg['targets'].values())
         if legacy:
             # One-time bootstrap: existing adaptive controllers fail closed on
             # stale telemetry, while their running tasks keep executing.
             run(['systemctl','stop',MONITOR]);time.sleep(10)
         wait_drained()
         status(sha,'promoting');promote(cfg,configs,updated,source,sha)
-        save(ROOT/'state.json',{'revision':sha,'configs':updated,'fingerprints':fp})
+        save(ROOT/'state.json',{'revision':sha,'configs':updated,'fingerprints':fp,'controller':'host-compose'})
         (ROOT/'journal.json').unlink()
         clear_drain(sha);draining=False
         status(sha,'ready')
