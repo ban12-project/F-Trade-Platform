@@ -16,6 +16,27 @@ export function safeAssetPath(value) {
     throw new Error("invalid_asset_path");
   return path;
 }
+const UUID_TICKET_PREFIX = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\./i;
+function ticketRunId(ticket) {
+  return UUID_TICKET_PREFIX.exec(ticket)?.[1] ?? null;
+}
+function ticketScope(ticket) {
+  const runId = ticketRunId(ticket);
+  if (!runId) return "viewer";
+  const suffix = ticket.slice(runId.length + 1);
+  if (suffix.startsWith("setup.")) return "publication-setup";
+  if (suffix.startsWith("inspect.")) return "publication-inspection";
+  return "viewer";
+}
+function slotAdmittable(slot, { interactiveOnly = false, origin } = {}) {
+  return Boolean(
+    slot?.ready &&
+      !slot.stopping &&
+      slot.expiresAt > Date.now() &&
+      (!interactiveOnly || slot.run.kind === "interactive") &&
+      (!origin || origin === slot.gatewayOrigin),
+  );
+}
 async function readBody(request) {
   const parts = [];
   let bytes = 0;
@@ -121,15 +142,13 @@ textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
           (input.operation === "activate" && !/^[a-f0-9]{64}$/.test(input.candidateHash))
         )
           return fail();
+        if (ticketScope(input.ticket) === "publication-inspection") return fail();
+        const pendingRunId = ticketRunId(input.ticket);
+        if (pendingRunId && !slotAdmittable(slots.get(pendingRunId), { interactiveOnly: true }))
+          return fail();
         const admission = await nodeCall("admit", { ticket: input.ticket });
         const slot = slots.get(admission.runId);
-        if (
-          !slot?.ready ||
-          slot.stopping ||
-          slot.run.kind !== "interactive" ||
-          slot.expiresAt <= Date.now()
-        )
-          return fail();
+        if (!slotAdmittable(slot, { interactiveOnly: true })) return fail();
         const result = await setupPublication(slot, input);
         if (slots.get(admission.runId) !== slot || slot.stopping || slot.expiresAt <= Date.now())
           return fail();
@@ -141,15 +160,13 @@ textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
         if (request.headers.origin !== appOrigin || !inspectPublicationPage) return fail();
         const input = await readBody(request);
         if (typeof input.ticket !== "string" || Object.keys(input).length !== 1) return fail();
+        if (ticketScope(input.ticket) === "publication-setup") return fail();
+        const pendingRunId = ticketRunId(input.ticket);
+        if (pendingRunId && !slotAdmittable(slots.get(pendingRunId), { interactiveOnly: true }))
+          return fail();
         const admission = await nodeCall("admit", { ticket: input.ticket });
         const slot = slots.get(admission.runId);
-        if (
-          !slot?.ready ||
-          slot.stopping ||
-          slot.run.kind !== "interactive" ||
-          slot.expiresAt <= Date.now()
-        )
-          return fail();
+        if (!slotAdmittable(slot, { interactiveOnly: true })) return fail();
         let result;
         try {
           result = await inspectPublicationPage(slot);
@@ -186,15 +203,12 @@ textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
         if (!origin || ![...slots.values()].some((s) => s.gatewayOrigin === origin)) return fail();
         const input = await readBody(request);
         if (typeof input.ticket !== "string" || Object.keys(input).length !== 1) return fail();
+        if (ticketScope(input.ticket) !== "viewer") return fail();
+        const pendingRunId = ticketRunId(input.ticket);
+        if (pendingRunId && !slotAdmittable(slots.get(pendingRunId), { origin })) return fail();
         const admission = await nodeCall("admit", { ticket: input.ticket });
         const slot = slots.get(admission.runId);
-        if (
-          !slot?.ready ||
-          slot.stopping ||
-          slot.expiresAt <= Date.now() ||
-          origin !== slot.gatewayOrigin
-        )
-          return fail();
+        if (!slotAdmittable(slot, { origin })) return fail();
         // Fresh broker authorization replaces older capabilities, including
         // pending handshakes. Late close events must not affect the replacement.
         for (const [key, entry] of views) {

@@ -11,6 +11,34 @@ function conservativeDeadline(result, expiresAt, maximumTtl) {
   if (!Number.isFinite(ttl) || ttl <= 0) throw new Error("lease_response_expired");
   return Date.now() + ttl;
 }
+/** Advance launch through watchdog extension and readiness so a slot admits requests before running. */
+export async function activateReadySlot(slot, { heartbeat, renewWatchdog, now = Date.now }) {
+  slot.launchStage = "heartbeat";
+  const leased = await heartbeat(false);
+  if (!leased?.active || slot.stopping) throw new Error("lease_revoked");
+  slot.expiresAt = localDeadline(leased, leased.leaseUntil);
+  slot.launchStage = "watchdog";
+  await renewWatchdog(slot.expiresAt);
+  if (slot.stopping) throw new Error("lease_revoked");
+  slot.ready = true;
+  slot.readyAt = now();
+  slot.launchStage = "heartbeat";
+  let advertised;
+  try {
+    advertised = await heartbeat(true);
+  } catch (error) {
+    slot.ready = false;
+    slot.readyAt = undefined;
+    throw error;
+  }
+  if (!advertised?.active || slot.stopping) {
+    slot.ready = false;
+    slot.readyAt = undefined;
+    throw new Error("lease_revoked");
+  }
+  slot.expiresAt = localDeadline(advertised, advertised.leaseUntil);
+  return advertised;
+}
 /** Only call before any Docker create/start. A rejected claim still reserved a
  * server slot, so explicitly release it. A lost acknowledgement must propagate:
  * the caller keeps its request id and safely reconciles the same claim again.

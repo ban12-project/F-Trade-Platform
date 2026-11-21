@@ -36,6 +36,12 @@ export type Account = {
   nextPollAt: number;
   lastCheckedAt: number | null;
 };
+export type ControlTicketPurpose = "publication-setup" | "publication-inspection";
+export type ControlTicket = {
+  purpose: ControlTicketPurpose;
+  hash: string;
+  expiresAt: number;
+};
 export type Run = {
   id: string;
   accountId: string;
@@ -79,6 +85,7 @@ export type Run = {
   stopRequested: boolean;
   failure: string | null;
   ticketHash: string | null;
+  controlTickets?: ControlTicket[];
   connectBefore: number;
   ticketUsed: boolean;
 };
@@ -195,6 +202,11 @@ export function enqueueRun(
 }
 export function sweep(state: FleetState, now: number) {
   for (const run of state.runs) {
+    if (run.controlTickets?.length) {
+      const activeTickets = run.controlTickets.filter((ticket) => ticket.expiresAt > now);
+      if (activeTickets.length) run.controlTickets = activeTickets;
+      else delete run.controlTickets;
+    }
     if (run.status === "queued" && run.kind === "interactive" && now - run.createdAt >= 900_000) {
       run.status = "failed";
       run.failure = "interactive_queue_expired";
@@ -204,6 +216,7 @@ export function sweep(state: FleetState, now: number) {
       run.status = "quarantined";
       run.stopRequested = true;
       run.ticketHash = null;
+      delete run.controlTickets;
       run.failure = "lease_expired_stop_unconfirmed";
     }
   }
@@ -374,6 +387,7 @@ export function renewRun(
 export function requestStop(_state: FleetState, run: Run) {
   run.stopRequested = true;
   run.ticketHash = null;
+  delete run.controlTickets;
   if (run.status === "queued") {
     run.status = "failed";
     run.failure = "cancelled";
@@ -402,6 +416,7 @@ export function finishRun(
   }
   const a = state.accounts.find((a) => a.id === run.accountId);
   run.ticketHash = null;
+  delete run.controlTickets;
   // Only a persisted, lease-bound business receipt establishes success.
   // Browser shutdown by itself remains unknown.
   const completed = outcome === "completed" && (run.kind !== "inbox" || !!run.inboxCompletion);
@@ -472,7 +487,16 @@ export function publicState(state: FleetState, now = Date.now()) {
       proxySaved: !!proxyCiphertext,
     })),
     runs: state.runs.map((run) => {
-      const { ticketHash, authSessionId, leaseId, claimId, inboxReceipts, savedLogin, ...r } = run;
+      const {
+        ticketHash,
+        controlTickets,
+        authSessionId,
+        leaseId,
+        claimId,
+        inboxReceipts,
+        savedLogin,
+        ...r
+      } = run;
       return {
         ...r,
         savedLoginAutomatic: savedLogin ? savedLogin.automatic === true : null,

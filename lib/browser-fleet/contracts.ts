@@ -94,6 +94,14 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
     })
     .strict(),
 ]);
+export const controlTicketCommandSchema = z
+  .object({
+    nodeId: id,
+    runId: id,
+    purpose: z.enum(["publication-setup", "publication-inspection"]),
+  })
+  .strict();
+export type ControlTicketCommand = z.infer<typeof controlTicketCommandSchema>;
 
 const common = { installationId: id, bootId: id };
 export const nodeRequestSchema = z.discriminatedUnion("operation", [

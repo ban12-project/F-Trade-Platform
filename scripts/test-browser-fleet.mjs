@@ -256,16 +256,47 @@ test("control-plane DTO never exposes vault ciphertext or connection secrets", (
   const s = fixture();
   const r = enqueue(s);
   r.ticketHash = "ticket-private";
+  r.controlTickets = [{ purpose: "publication-setup", hash: "control-private", expiresAt: 5000 }];
   r.leaseId = "lease-private";
   const out = JSON.stringify(publicState(s));
   for (const secret of [
     "encrypted-login",
     "encrypted-proxy",
     "ticket-private",
+    "control-private",
     "lease-private",
     "authSessionId",
   ])
     assert.equal(out.includes(secret), false);
+});
+test("expired, stopped, and finished runs clear control tickets", () => {
+  for (const mode of ["sweep-ticket-ttl", "sweep-quarantine", "stop", "finish"]) {
+    const s = fixture();
+    const r = enqueue(s, "a", "interactive", 1000);
+    claim(s, 1001);
+    renewRun(s, r.id, r.leaseId, true, 1002);
+    r.controlTickets = [
+      { purpose: "publication-setup", hash: "setup-hash", expiresAt: 2000 },
+      { purpose: "publication-inspection", hash: "inspect-hash", expiresAt: 5000 },
+    ];
+    if (mode === "sweep-ticket-ttl") {
+      sweep(s, 2000);
+      assert.deepEqual(r.controlTickets, [
+        { purpose: "publication-inspection", hash: "inspect-hash", expiresAt: 5000 },
+      ]);
+      sweep(s, 5000);
+      assert.equal(r.controlTickets, undefined);
+    } else if (mode === "sweep-quarantine") {
+      sweep(s, r.leaseUntil);
+      assert.equal(r.controlTickets, undefined);
+    } else if (mode === "stop") {
+      requestStop(s, r);
+      assert.equal(r.controlTickets, undefined);
+    } else {
+      finishRun(s, r.id, "completed", true, 2000);
+      assert.equal(r.controlTickets, undefined);
+    }
+  }
 });
 test("expired queued interactive requests do not wake a browser", () => {
   const s = fixture();

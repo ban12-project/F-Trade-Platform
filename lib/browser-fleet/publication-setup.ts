@@ -8,7 +8,7 @@ import {
   publicationSetupResultSchema,
 } from "./publication-setup-contract";
 import { secureOrigin } from "./security";
-import { ownerBrowserCommand } from "./store";
+import { issueInteractiveControlTicket } from "./store";
 export async function setupOwnedPublication(
   input: unknown,
   actor: { id: string; sessionId: string },
@@ -17,8 +17,8 @@ export async function setupOwnedPublication(
     db = getDatabase();
   const before = await currentInspectionAccess(value, actor, db);
   const origin = await publicationInspectionRuntimeOrigin(value.nodeId, before, Sandbox);
-  const ticket = await ownerBrowserCommand(
-    { operation: "ticket", nodeId: value.nodeId, runId: value.runId },
+  const ticket = await issueInteractiveControlTicket(
+    { nodeId: value.nodeId, runId: value.runId, purpose: "publication-setup" },
     actor,
   );
   const current = await currentInspectionAccess(value, actor, db);

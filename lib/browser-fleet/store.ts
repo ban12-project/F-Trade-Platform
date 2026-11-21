@@ -21,6 +21,7 @@ import {
 } from "@/lib/social/facebook-vault-crypto";
 import { digestSocialWorkerPayload } from "@/lib/social/worker-protocol";
 import {
+  controlTicketCommandSchema,
   type NodeRequest,
   nodeRequestSchema,
   type OwnerCommand,
@@ -30,6 +31,7 @@ import { acceptInboxPacket, inboxSigningKey } from "./inbox";
 import {
   AUTOMATIC_LOGIN_MS,
   bindInstallation,
+  type ControlTicketPurpose,
   claimRun,
   enqueueRun,
   extendInteractiveRun,
@@ -205,6 +207,63 @@ export type OwnerResult = {
   deadline?: number;
   connection?: { token: string; origin: string; expiresAt: number };
 };
+function requireConnectableInteractiveRun(
+  row: NodeRow,
+  run: Run | undefined,
+  actor: Actor,
+  now: number,
+): { run: Run; origin: string } {
+  if (!run || (run.kind === "interactive" && run.requestedBy !== actor.id))
+    throw new Error("run_forbidden");
+  if (
+    row.status !== "active" ||
+    !row.gateway_origin ||
+    run.kind !== "interactive" ||
+    run.status !== "running" ||
+    run.stopRequested ||
+    run.leaseUntil <= now + 10_000 ||
+    run.deadline <= now ||
+    (run.authSessionId !== null && run.authSessionId !== actor.sessionId)
+  )
+    throw new Error("browser_not_connectable");
+  return { run, origin: row.gateway_origin };
+}
+/** Issue a purpose-scoped control ticket without disturbing viewer ticket state. */
+export async function issueInteractiveControlTicket(
+  input: unknown,
+  actor: Actor,
+): Promise<{ connection: { token: string; origin: string; expiresAt: number } }> {
+  const command = controlTicketCommandSchema.parse(input);
+  return getDatabase().transaction(async (tx) => {
+    const now = Date.now();
+    if (!(await validSession(tx, actor.id, actor.sessionId, now)))
+      throw new Error("owner_session_expired");
+    const row = await lockNode(tx, command.nodeId);
+    if (row.owner_id !== actor.id) throw new Error("browser_node_forbidden");
+    const state = row.document;
+    const { run, origin } = requireConnectableInteractiveRun(
+      row,
+      state.runs.find((r) => r.id === command.runId),
+      actor,
+      now,
+    );
+    const scope = command.purpose === "publication-setup" ? "setup" : "inspect";
+    const token = `${run.id}.${scope}.${randomBytes(32).toString("base64url")}`;
+    const expiresAt = Math.min(now + 60_000, run.deadline, run.leaseUntil);
+    run.controlTickets = [
+      ...(run.controlTickets ?? []).filter(
+        (entry) => entry.purpose !== command.purpose && entry.expiresAt > now,
+      ),
+      { purpose: command.purpose, hash: digest(token), expiresAt },
+    ];
+    run.authSessionId = actor.sessionId;
+    sweep(state, now);
+    await reconcilePublications(tx, row.id, state, now);
+    await save(tx, row);
+    await audit(tx, actor.id, `browser_node.${command.purpose}_ticket`, row.id, { run_id: run.id });
+    return { connection: { token, origin, expiresAt } };
+  });
+}
 export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise<OwnerResult> {
   const command = ownerCommandSchema.parse(input);
   return getDatabase().transaction(async (tx) => {
@@ -339,17 +398,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
           claimedAt: null,
         };
       } else {
-        if (
-          row.status !== "active" ||
-          !row.gateway_origin ||
-          run.kind !== "interactive" ||
-          run.status !== "running" ||
-          run.stopRequested ||
-          run.leaseUntil <= now + 10_000 ||
-          run.deadline <= now ||
-          (run.authSessionId !== null && run.authSessionId !== actor.sessionId)
-        )
-          throw new Error("browser_not_connectable");
+        const { origin } = requireConnectableInteractiveRun(row, run, actor, now);
         const token = `${run.id}.${randomBytes(32).toString("base64url")}`;
         // Reauthorization rotates the capability under the node row lock. The
         // consumed token remains invalid; ticketUsed records prior admission,
@@ -358,7 +407,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
         run.connectBefore = Math.min(now + 60_000, run.deadline, run.leaseUntil);
         run.authSessionId = actor.sessionId;
         result = {
-          connection: { token, origin: row.gateway_origin, expiresAt: run.connectBefore },
+          connection: { token, origin, expiresAt: run.connectBefore },
         };
       }
     }
@@ -655,10 +704,42 @@ async function nodeOperation(
       run?.kind !== "interactive" ||
       run.status !== "running" ||
       run.stopRequested ||
+      run.leaseUntil <= now ||
+      run.deadline <= now
+    )
+      throw new Error("interactive_ticket_invalid");
+    const suffix = request.ticket.slice(run.id.length + 1);
+    const controlPurpose: ControlTicketPurpose | null = suffix.startsWith("setup.")
+      ? "publication-setup"
+      : suffix.startsWith("inspect.")
+        ? "publication-inspection"
+        : null;
+    if (controlPurpose) {
+      const tickets = run.controlTickets ?? [];
+      const index = tickets.findIndex(
+        (entry) =>
+          entry.purpose === controlPurpose &&
+          entry.expiresAt > now &&
+          matches(request.ticket, entry.hash),
+      );
+      if (index === -1 || !(await validSession(tx, run.requestedBy, run.authSessionId, now)))
+        throw new Error("interactive_ticket_invalid");
+      const remaining = tickets.filter(
+        (entry, itemIndex) => itemIndex !== index && entry.expiresAt > now,
+      );
+      if (remaining.length) run.controlTickets = remaining;
+      else delete run.controlTickets;
+      await audit(
+        tx,
+        run.requestedBy,
+        `browser_${controlPurpose.replaceAll("-", "_")}.admitted`,
+        run.id,
+      );
+      return { runId: run.id, expiresAt: run.deadline };
+    }
+    if (
       !run.ticketHash ||
       run.connectBefore <= now ||
-      run.leaseUntil <= now ||
-      run.deadline <= now ||
       !matches(request.ticket, run.ticketHash) ||
       !(await validSession(tx, run.requestedBy, run.authSessionId, now))
     )

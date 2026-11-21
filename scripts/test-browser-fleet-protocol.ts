@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import {
   accountFormSchema,
+  controlTicketCommandSchema,
   nodeFormSchema,
   nodeRequestSchema,
   ownerCommandSchema,
@@ -94,4 +95,22 @@ test("account grants require an explicit expected IP, never a host or auto-detec
   assert.equal(accountFormSchema.safeParse(value).success, true);
   for (const expectedEgressIp of [undefined, "", "auto", "proxy.example", "999.1.1.1"])
     assert.equal(accountFormSchema.safeParse({ ...value, expectedEgressIp }).success, false);
+});
+
+test("control ticket schema admits only publication control purposes", () => {
+  const base = { nodeId: randomUUID(), runId: randomUUID() };
+  assert.equal(
+    controlTicketCommandSchema.safeParse({ ...base, purpose: "publication-setup" }).success,
+    true,
+  );
+  assert.equal(
+    controlTicketCommandSchema.safeParse({ ...base, purpose: "publication-inspection" }).success,
+    true,
+  );
+  for (const bad of [
+    { ...base, purpose: "viewer" },
+    { ...base, purpose: "other" },
+    { ...base, purpose: "publication-setup", extra: true },
+  ])
+    assert.equal(controlTicketCommandSchema.safeParse(bad).success, false);
 });
