@@ -283,6 +283,17 @@ try {
     viewerBrowser = await Camoufox({ from_options: viewOptions });
     const hostPage = await viewerBrowser.newPage();
     const standalone = mode === "read";
+    // Substitute only the headless operator's OS clipboard at the browser boundary.
+    // The viewer module, RFB implementation and remote X11 clipboard are real.
+    await hostPage.context().route(`${slot.gatewayOrigin}/viewer.js`, async (route) => {
+      const response = await route.fetch();
+      const setup = `Object.defineProperty(navigator, "clipboard", { value: {
+        readText: async () => "中文 😀\\nline 2",
+        write: async () => { throw new Error("synthetic_denial"); },
+        writeText: async () => { throw new Error("synthetic_denial"); },
+      }});`;
+      await route.fulfill({ response, body: `${setup}\n${await response.text()}` });
+    });
     await hostPage.route(`${slot.gatewayOrigin}/fixture`, (route) =>
       route.fulfill({
         contentType: "text/html",
@@ -383,19 +394,19 @@ addEventListener('message', event => {
       sample,
     );
     await frame.locator("#send").click();
-    // Force the manual-copy path so the assertion observes actual remote clipboard data.
-    await frame.locator("#copy").evaluate((button) => {
-      Object.defineProperty(button.ownerDocument.defaultView.navigator, "clipboard", { value: {} });
-    });
+    const selectedText = await remote
+      .locator("#remote-input")
+      .evaluate((field) => field.value.slice(field.selectionStart, field.selectionEnd));
+    assert.equal(selectedText, sample);
     await frame.locator("#copy").click();
     const manualCopy = frame.locator("#clip:focus");
-    await manualCopy.waitFor({ timeout: 5000 });
+    try {
+      await manualCopy.waitFor({ timeout: 5000 });
+    } catch (error) {
+      console.error("Remote copy result:", await frame.locator("#feedback").textContent());
+      throw error;
+    }
     assert.equal(await manualCopy.inputValue(), sample);
-    // Test the physical shortcut path across RFB. Only the headless operator's
-    // OS clipboard is substituted; remote text and selection are observed in X11.
-    await frame.locator("#clip").evaluate((field, text) => {
-      field.ownerDocument.defaultView.navigator.clipboard.readText = async () => text;
-    }, sample);
     const canvasElement = frame.locator("canvas");
     await canvasElement.focus();
     await viewer.keyboard.press("Control+x");
