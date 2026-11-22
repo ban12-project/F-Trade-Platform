@@ -409,7 +409,9 @@ export async function submitFacebookMediaPublication(
       () => new Date(),
     );
     await sourceFor(value, tx, new Date(), true);
-    const idempotencyKey = `facebook-media:${scope.channelRef}:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}:${value.previewDigest}`;
+    const idempotencyKey = `facebook-media:${scope.channelRef}:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}`;
+    const legacyDigestPrefix = `${idempotencyKey}:`;
+    const legacyKey = `facebook-media:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}`;
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 0))`);
     const [existing] = await tx
       .select({
@@ -425,10 +427,8 @@ export async function submitFacebookMediaPublication(
           eq(socialBrowserJob.accountRef, scope.accountRef),
           or(
             eq(socialBrowserJob.idempotencyKey, idempotencyKey),
-            eq(
-              socialBrowserJob.idempotencyKey,
-              `facebook-media:${scope.accountRef}:${value.contentRef}:${selected.content.version}:${media.sha256}`,
-            ),
+            sql`left(${socialBrowserJob.idempotencyKey}, ${legacyDigestPrefix.length}) = ${legacyDigestPrefix}`,
+            eq(socialBrowserJob.idempotencyKey, legacyKey),
           ),
         ),
       )

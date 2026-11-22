@@ -103,6 +103,10 @@ mock.module(url("../lib/social/facebook-account-store.ts"), {
     readFacebookAccountStatus: async () => null,
   },
 });
+mock.module(url("../lib/db/client.ts"), { exports: { getDatabase: () => ({}) } });
+mock.module(url("../lib/social/publishing-account-store.ts"), {
+  exports: { assertPublicPublishingAccountReady: async () => {} },
+});
 const { confirmPublicationAction } = await import("../lib/actions/closing");
 const { submitFacebookMediaAction } = await import("../lib/actions/facebook-media");
 const { saveSocialChannelControlAction } = await import("../lib/actions/social-controls");
@@ -132,9 +136,20 @@ const observation = {
   evidenceRef: "evidence-synthetic-observation",
   confirmed: true,
 };
+const mediaSubmit = {
+  projectId,
+  contentRef,
+  format: "image" as const,
+  mediaId: "media-synthetic",
+  contentVersion: 1,
+  previewDigest: "a".repeat(64),
+  channelRef: "synthetic-channel",
+  accountRef: "synthetic-account",
+  confirm: true as const,
+};
 const calls = [
   () => confirmPublicationAction(idle, form(submit)),
-  () => submitFacebookMediaAction({ projectId }),
+  () => submitFacebookMediaAction(mediaSubmit),
   () => reconcilePublicationAction(observation),
   () =>
     reconcileVideoPublicationAction({

@@ -70,6 +70,21 @@ const edited = (f: Fixture) => ({
   ctaText: "SYNTHETIC changed CTA",
   clips: f.draft.clips.map((clip) => ({ ...clip, durationMs: 4000 })),
 });
+const renderEdited = (f: Fixture) => ({
+  ...edited(f),
+  clips: edited(f).clips.map((clip) => ({
+    ...clip,
+    caption: { kind: "creative" as const, text: "SYNTHETIC product inquiry" },
+  })),
+  creativeBrief: {
+    objective: "action" as const,
+    brandAssetRef: f.draft.clips[0].assetRef,
+    audience: "SYNTHETIC buyers",
+    buyerNeed: "SYNTHETIC product information request",
+    nextAction: "SYNTHETIC inquiry for human review",
+    platformAssumptions: "SYNTHETIC muted viewing with captions; no platform acceptance claim",
+  },
+});
 const run = (f: Fixture, op: Operation) =>
   op === "save"
     ? saveMarketingVideoDraftAction(f.projectId, f.videoId, edited(f))
@@ -354,7 +369,7 @@ try {
       const {
         rows: [backend],
       } = await blocker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-      pending = renderMarketingVideoDraftAction(f.projectId, f.videoId, edited(f));
+      pending = renderMarketingVideoDraftAction(f.projectId, f.videoId, renderEdited(f));
       await observeWait(backend.pid);
       await mutate(f, "save", change);
       const before = await snapshot(f);

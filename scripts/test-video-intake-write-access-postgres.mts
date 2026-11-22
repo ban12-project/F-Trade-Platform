@@ -131,7 +131,22 @@ const identity = (f: Fixture) => ({
   sessionId: f.sessionId,
   projectId: f.projectId,
 });
-const draft = (f: Fixture) => ({ ...f.draft, ctaText: "SYNTHETIC changed CTA" });
+const draft = (f: Fixture) => ({
+  ...f.draft,
+  ctaText: "SYNTHETIC changed CTA",
+  clips: f.draft.clips.map((clip) => ({
+    ...clip,
+    caption: { kind: "creative" as const, text: "SYNTHETIC product inquiry" },
+  })),
+  creativeBrief: {
+    objective: "action" as const,
+    brandAssetRef: f.draft.clips[0].assetRef,
+    audience: "SYNTHETIC buyers",
+    buyerNeed: "SYNTHETIC product information request",
+    nextAction: "SYNTHETIC inquiry for human review",
+    platformAssumptions: "SYNTHETIC muted viewing with captions; no platform acceptance claim",
+  },
+});
 const form = (
   f: Fixture,
   mode: "product_media" | "upload" | "internet_search",

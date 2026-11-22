@@ -512,9 +512,7 @@ for (const change of ["unchanged", "revoked", "demoted", "banned"] as const)
       }
       expect((await response).status()).toBe(200);
       if (change === "unchanged") {
-        await expect(
-          page.getByText("产品媒体已批准，可按其授权范围进入营销视频。", { exact: true }),
-        ).toBeVisible();
+        await expect(page.getByRole("button", { name: "撤销素材授权", exact: true })).toBeVisible();
         const after = await snapshot();
         expect(after.media[0].reviewStatus).toBe("approved");
         expect(after.media[0].version).toBe(2);

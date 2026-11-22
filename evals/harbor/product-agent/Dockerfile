@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN npm install -g pnpm@12.3.4 && pnpm install --frozen-lockfile
 COPY contracts ./contracts
 COPY lib ./lib
 COPY scripts ./scripts

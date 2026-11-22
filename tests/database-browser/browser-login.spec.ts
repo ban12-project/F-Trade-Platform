@@ -165,7 +165,7 @@ test("saved password fill uses the actual owner action and never returns credent
     { width: 1280, height: 720 },
   ]) {
     await page.setViewportSize(viewport);
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await connect.scrollIntoViewIfNeeded();
     await expect
       .poll(async () => {
         const target = await connect.boundingBox();

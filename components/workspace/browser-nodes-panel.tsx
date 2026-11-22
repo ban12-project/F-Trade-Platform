@@ -429,7 +429,7 @@ export function BrowserNodesPanel() {
               </SelectContent>
             </Select>
           </Field>
-          {!nodes.length && (
+          {listState === "ready" && !nodes.length && (
             <p className="mb-4 text-sm">
               尚未连接发布服务，请先展开上方“高级：连接节点与容量”，由管理员完成连接。
             </p>

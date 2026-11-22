@@ -1,6 +1,11 @@
-# Temporary automatic CI pause
+# Temporary automatic CI pause (restored 2026-11-22)
 
-Effective 2026-10-31 at the user's request, tracked by #711. Restore before final MVP1 acceptance. This is an explicit temporary exception to the repository's normal Issue → branch → PR → CI → squash workflow.
+Effective 2026-10-31 at the user's request, tracked by #711. Restored on 2026-11-22 at the user's request prior to final MVP1 acceptance.
+
+## Restoration status (2026-11-22)
+
+- Restored `pull_request` / `push` automatic workflow triggers in `.github/workflows/{browser-images,browser-node,document-sandbox,facebook-worker,playwright,pr-review,production-build,repository-validate}.yml` while preserving newer inputs, paths, jobs, steps, and `workflow_dispatch` manual triggers.
+- Note on branch protection: per [the GitHub governance scope decision](../decisions/github-branch-protection.md), private repository server-side branch protection (`branches/main/protection`) is unavailable under the current GitHub plan (`HTTP 404`), so enforcing the 5 checks listed in [required-status-checks.json](../../.github/required-status-checks.json) remains a team PR/merge gate rather than a GitHub server-side rule.
 
 PRs and squash merge remain required. Run appropriate local checks and record their exact results and limitations in each PR; absence of CI is not evidence of correctness. Do not describe unexecuted checks as passed. Business Human Gates and the paused DM acceptance scope remain unchanged.
 
