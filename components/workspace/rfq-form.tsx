@@ -193,7 +193,10 @@ export function RfqForm({
     });
   }
   useWorkspaceDirty(`rfq-${entry?.id ?? "new"}`, form.formState.isDirty);
+  const handledState = useRef(state);
   useEffect(() => {
+    if (state === handledState.current) return;
+    handledState.current = state;
     if (state.status === "success") {
       form.reset(revising ? form.getValues() : { ...emptyRfq, leadId: selectedLeadId ?? "" });
       router.refresh();

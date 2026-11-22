@@ -97,14 +97,17 @@ export function ProductDraftForm({
   const busy = !form.formState.isReady || !images.formState.isReady || pending || created;
   useWorkspaceDirty(`${formId}-product-draft-${detail?.id ?? "new"}`, form.formState.isDirty);
   useWorkspaceDirty(`${formId}-product-images-${detail?.id ?? "new"}`, images.formState.isDirty);
+  const handledState = useRef(state);
   useEffect(() => {
+    if (state === handledState.current) return;
+    handledState.current = state;
     if (state.status === "success") {
       form.reset(revising ? form.getValues() : emptyProduct);
       images.reset({ imageFiles: [] });
       if (imageRef.current) imageRef.current.value = "";
       router.refresh();
     }
-  }, [form, images, revising, router, state.status]);
+  }, [form, images, revising, router, state]);
   async function submit(values: ProductValues) {
     if (busy) return;
     if (!(await images.trigger())) return;

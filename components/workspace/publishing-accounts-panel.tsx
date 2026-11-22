@@ -1,9 +1,9 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "next/navigation";
-import { startTransition, useActionState, useCallback, useEffect, useState } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import type { z } from "zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -17,7 +17,15 @@ import { socialControlChangeSchema } from "@/lib/social/control-record";
 import { type PublishingAccount, publishingBlockers } from "@/lib/social/publishing-account-policy";
 import { WorkspaceLink } from "./workspace-link";
 
-const schema = socialControlChangeSchema.omit({ actorId: true, actorType: true });
+const schema = socialControlChangeSchema.omit({ actorId: true, actorType: true, action: true });
+const formSchema = schema
+  .extend({
+    action: z
+      .union([socialControlChangeSchema.shape.action, z.literal("")])
+      .refine((value) => value !== "", "请选择要执行的操作。")
+      .pipe(socialControlChangeSchema.shape.action),
+  })
+  .strict();
 function AccountControls({
   account,
   refresh,
@@ -29,21 +37,32 @@ function AccountControls({
     status: "idle",
     message: "",
   } as const);
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
+  const form = useForm<z.input<typeof formSchema>, unknown, z.output<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       channelRef: account.channelRef,
       accountRef: account.accountRef,
+      action: "",
       evidenceRef: "",
     },
   });
+  const busy = !form.formState.isReady || pending;
+  const handledState = useRef(state);
   useEffect(() => {
-    if (state.status === "success") refresh();
-  }, [state, refresh]);
+    if (state === handledState.current) return;
+    handledState.current = state;
+    if (state.status === "success") {
+      form.resetField("action", { defaultValue: "" });
+      form.resetField("evidenceRef", { defaultValue: "" });
+      refresh();
+    }
+  }, [form, refresh, state]);
   return (
     <form
       className="space-y-3"
+      aria-busy={busy}
       onSubmit={form.handleSubmit((values) => {
+        if (busy) return;
         const data = new FormData();
         for (const [key, value] of Object.entries(values)) data.set(key, value);
         startTransition(() => action(data));
@@ -51,12 +70,7 @@ function AccountControls({
     >
       <Field>
         <FieldLabel htmlFor={`operation-${account.id}`}>要执行的操作</FieldLabel>
-        <NativeSelect
-          id={`operation-${account.id}`}
-          defaultValue=""
-          {...form.register("action")}
-          disabled={pending}
-        >
+        <NativeSelect id={`operation-${account.id}`} {...form.register("action")} disabled={busy}>
           <NativeSelectOption value="" disabled>
             请选择操作（不会自动保存）
           </NativeSelectOption>
@@ -73,11 +87,12 @@ function AccountControls({
         <Input
           id={`reason-${account.id}`}
           {...form.register("evidenceRef")}
+          disabled={busy}
           placeholder="说明已核实的情况，操作将留存记录"
         />
         <FieldError errors={[form.formState.errors.evidenceRef]} />
       </Field>
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" disabled={busy}>
         {pending ? "正在保存…" : "确认操作"}
       </Button>
       {state.message && (
