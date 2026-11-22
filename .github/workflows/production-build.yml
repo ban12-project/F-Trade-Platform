@@ -32,6 +32,8 @@ jobs:
         with:
           cache: true
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for production route boundary check
+        run: pnpm exec playwright install --with-deps chromium
       - name: Build application with testing APIs disabled
         run: pnpm build:remotion && pnpm exec next build
       - name: Verify synthetic fixtures stay private to test builds
