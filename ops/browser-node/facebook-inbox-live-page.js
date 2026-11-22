@@ -150,6 +150,11 @@ function readLiveFacebookInbox(profile, mode, expectedConversation) {
       const log = logs[0];
       const main = log.closest('[role="main"]') ?? log;
       let rows = all(log, 'div[data-scope="messages_table"][data-message-id]');
+      const inLog = rows.length;
+      const inMain =
+        main !== log
+          ? all(main, 'div[data-scope="messages_table"][data-message-id]').length
+          : inLog;
       if (!rows.length && main !== log) {
         rows = all(main, 'div[data-scope="messages_table"][data-message-id]');
       }
@@ -159,6 +164,7 @@ function readLiveFacebookInbox(profile, mode, expectedConversation) {
       if (rows.length > 100) throw new Error("inbox_thread_incomplete");
       const seenIds = new Set();
       const messages = [];
+      let outbound = 0;
       let skippedNonText = 0;
       let totalSize = 0;
       for (const el of rows) {
@@ -178,7 +184,10 @@ function readLiveFacebookInbox(profile, mode, expectedConversation) {
         const isOutbound = h4Out || labelOut;
         const isInbound = h4In || labelIn;
         if (isOutbound === isInbound) throw new Error("inbox_direction_ambiguous");
-        if (isOutbound) continue;
+        if (isOutbound) {
+          outbound++;
+          continue;
+        }
 
         let timestampMs = NaN;
         const snowflake = /@msgr\.(\d{15,22})$/.exec(messageRef);
@@ -241,6 +250,18 @@ function readLiveFacebookInbox(profile, mode, expectedConversation) {
         messages,
         skippedNonText,
         rowCount: rows.length,
+        stats: {
+          rows: rows.length,
+          inLog,
+          inMain,
+          inDocMsgId: document.querySelectorAll("[data-message-id]").length,
+          inDocVisibleMsgId: all(document, "[data-message-id]").length,
+          dialogs: all(document, '[role="dialog"]').length,
+          progressbars: all(document, '[role="progressbar"], [aria-busy="true"]').length,
+          inbound: messages.length,
+          outbound,
+          skippedNonText,
+        },
       };
     }
 

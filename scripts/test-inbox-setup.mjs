@@ -358,6 +358,7 @@ test("live inbox agent retries thread evaluation when rowCount is 0 and stopCont
     { action: "finish", target: "", valueRef: "" },
   ];
   const reported = [];
+  const threadStats = [];
   const execute = createFacebookLiveInboxAgent(baseProfile, browserRequest, async () => ({
     command: commands[decisionStep++],
   }));
@@ -368,6 +369,7 @@ test("live inbox agent retries thread evaluation when rowCount is 0 and stopCont
       reported.push({ messages, completion });
       return { accepted: messages.length, duplicates: 0 };
     },
+    onInboxThreadStats: (stats) => threadStats.push(stats),
   });
 
   assert.equal(outcome, "completed");
@@ -376,6 +378,18 @@ test("live inbox agent retries thread evaluation when rowCount is 0 and stopCont
   assert.equal(reported[0].messages.length, 1);
   assert.equal(reported[0].messages[0].body, "Hi, test reply 1122-B2A");
   assert.equal(reported[1].completion?.messageCount, 1);
+  assert.equal(threadStats.length, 1);
+  assert.equal(threadStats[0].attempts, 3);
+  assert.equal(threadStats[0].rows, 1);
+  assert.equal(threadStats[0].inbound, 1);
+  assert(Object.values(threadStats[0]).every((value) => typeof value === "number"));
+
+  const agentSource = await readFile(
+    new URL("../ops/browser-node/agent.mjs", import.meta.url),
+    "utf8",
+  );
+  assert(agentSource.includes("GwPriority: -1"));
+  assert(agentSource.includes('Connection: "close"'));
 
   const dockerCalls = [];
   await stopContainer(async (method, path) => {
