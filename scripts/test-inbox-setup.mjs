@@ -3,6 +3,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { nodeRequestSchema } from "../lib/browser-fleet/contracts.ts";
+import { createFacebookLiveInboxAgent } from "../ops/browser-node/facebook-inbox-agent.mjs";
 import { createInboxSetup } from "../ops/browser-node/inbox-setup.mjs";
 
 const verifiedObservation = {
@@ -170,3 +172,102 @@ test("platform activation failure leaves reviewed.json unwritten and scopes empt
     await reloaded.initialize();
     assert.deepEqual(reloaded.scopes(), []);
   }));
+
+test("live inbox agent classifies failure enums without leaking raw errors and nodeRequestSchema validates inboxFailure", async () => {
+  const baseProfile = {
+    version: 2,
+    mode: "facebook-live-agent",
+    channelRef: "facebook-personal",
+    accountRef: "61589008383902",
+    expectedAccountRef: "61589008383902",
+    reviewRef: "evidence-test-123",
+    reviewedAt: new Date(Date.now() - 60_000).toISOString(),
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    url: "https://www.facebook.com/messages/",
+  };
+  const baseRun = {
+    kind: "inbox",
+    id: "00000000-0000-4000-8000-000000000001",
+    accountId: "00000000-0000-4000-8000-000000000002",
+    channelRef: "facebook-personal",
+    accountRef: "61589008383902",
+  };
+  const makeBrowserRequest = () => async (path) => {
+    if (path === "/tabs") return Response.json({ ok: true, tabId: "tab-1", url: baseProfile.url });
+    if (path.endsWith("/evaluate")) {
+      return Response.json({
+        ok: true,
+        result: {
+          mode: "list",
+          empty: false,
+          threads: [
+            {
+              conversationRef: "1618185166252064",
+              url: "https://www.facebook.com/messages/e2ee/t/1618185166252064/",
+            },
+          ],
+        },
+      });
+    }
+    if (path.includes("/snapshot"))
+      return Response.json({ ok: true, snapshot: '- grid "Chats"\n  - link "Thread"' });
+    return Response.json({ ok: true });
+  };
+
+  const cases = [
+    {
+      name: "unverified finish",
+      decide: async () => ({ command: { action: "finish", target: "", valueRef: "" } }),
+      expected: "inbox_agent_unverified_finish",
+    },
+    {
+      name: "invalid action",
+      decide: async () => ({ command: { action: "click", target: "thread-0", valueRef: "" } }),
+      expected: "inbox_agent_invalid_action",
+    },
+    {
+      name: "raw non-allowlisted error",
+      decide: async () => {
+        throw new Error("raw sensitive DOM body should never leak");
+      },
+      expected: "inbox_unclassified",
+    },
+  ];
+
+  for (const item of cases) {
+    const failures = [];
+    const execute = createFacebookLiveInboxAgent(baseProfile, makeBrowserRequest(), item.decide);
+    const outcome = await execute({
+      run: baseRun,
+      signal: new AbortController().signal,
+      reportInbound: async () => ({ accepted: 0, duplicates: 0 }),
+      onInboxFailure: (code) => failures.push(code),
+    });
+    assert.equal(outcome, "failed", item.name);
+    assert.deepEqual(failures, [item.expected], item.name);
+  }
+
+  const valid = nodeRequestSchema.safeParse({
+    operation: "finish",
+    installationId: "00000000-0000-4000-8000-000000000010",
+    bootId: "00000000-0000-4000-8000-000000000011",
+    runId: baseRun.id,
+    leaseId: "00000000-0000-4000-8000-000000000012",
+    stopped: true,
+    outcome: "failed",
+    inboxFailure: "inbox_agent_invalid_action",
+  });
+  assert.equal(valid.success, true);
+
+  const invalid = nodeRequestSchema.safeParse({
+    operation: "finish",
+    installationId: "00000000-0000-4000-8000-000000000010",
+    bootId: "00000000-0000-4000-8000-000000000011",
+    runId: baseRun.id,
+    leaseId: "00000000-0000-4000-8000-000000000012",
+    stopped: true,
+    outcome: "failed",
+    inboxFailure: "raw message: leak!",
+  });
+  assert.equal(invalid.success, false);
+});

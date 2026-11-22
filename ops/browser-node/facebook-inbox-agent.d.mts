@@ -19,6 +19,7 @@ export function createFacebookLiveInboxAgent(
     observedAt: string,
     completion?: Record<string, unknown>,
   ): Promise<unknown>;
+  onInboxFailure?: (code: string) => void;
 }) => Promise<
   "completed" | "failed" | "needs_login" | "needs_2fa" | "checkpoint" | "page_contract_failed"
 >;

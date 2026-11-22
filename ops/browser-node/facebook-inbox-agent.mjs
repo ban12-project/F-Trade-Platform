@@ -90,13 +90,61 @@ function validateAgentCommand(command) {
   );
 }
 
+const SAFE_INBOX_FAILURE_CODES = new Set([
+  "inbox_cancelled",
+  "inbox_browser_response_invalid",
+  "inbox_response_limit",
+  "inbox_navigation_invalid",
+  "inbox_snapshot_invalid",
+  "inbox_read_failed",
+  "inbox_loading_timeout",
+  "inbox_scope_invalid",
+  "inbox_list_changed",
+  "inbox_agent_invalid_action",
+  "inbox_agent_unverified_finish",
+  "inbox_agent_no_progress",
+  "inbox_agent_incomplete",
+  "inbox_scan_size_limit",
+  "inbox_profile_expired",
+  "inbox_profile_invalid",
+  "inbox_profile_origin_invalid",
+  "inbox_messages_invalid",
+  "inbox_receipt_invalid",
+  "inbox_reporter_unavailable",
+  "inbox_run_invalid",
+  "inbox_messages_limit",
+  "browser_request_failed",
+  "browser_request_stopped",
+  "browser_request_queue_full",
+  "local_lease_expired",
+  "publication_lease_inactive",
+  "egress_ip_invalid",
+  "egress_tab_invalid",
+  "egress_response_missing",
+  "egress_response_limit",
+  "egress_navigation_invalid",
+  "egress_observation_invalid",
+  "egress_ip_mismatch",
+]);
+
+function classifyInboxFailure(error) {
+  if (["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"].includes(error?.attention))
+    return error.attention;
+  const message = error?.message;
+  if (typeof message === "string") {
+    if (SAFE_INBOX_FAILURE_CODES.has(message) || /^platform_http_[45][0-9]{2}$/.test(message))
+      return message;
+  }
+  return "inbox_unclassified";
+}
+
 // Route A Browser Agent Inbox Driver:
 // The Browser Agent (ariaSnapshot + capability handles) drives navigation across
 // discovered threads; deterministic host verification remains sole authority for
 // identity, message IDs, direction, timestamps, and signed completion receipts.
 export function createFacebookLiveInboxAgent(input, browserRequest, decideInboxAction) {
   const profile = validateLiveInboxProfile(input);
-  return async ({ run, signal, reportInbound }) => {
+  return async ({ run, signal, reportInbound, onInboxFailure }) => {
     const scanStartedAt = new Date().toISOString();
     const active = () => {
       validateLiveInboxProfile(profile);
@@ -339,6 +387,7 @@ export function createFacebookLiveInboxAgent(input, browserRequest, decideInboxA
       });
       return "completed";
     } catch (error) {
+      onInboxFailure?.(classifyInboxFailure(error));
       if (
         ["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"].includes(
           error?.attention,

@@ -601,6 +601,21 @@ export async function handleBrowserNodeRequest(
       response.inboxAgentRequest as Parameters<typeof decideInboxBrowserAction>[0],
       AbortSignal.timeout(25_000),
     );
+    const command = decision.command as
+      | { action?: unknown; target?: unknown; valueRef?: unknown }
+      | null
+      | undefined;
+    const rawTarget = typeof command?.target === "string" ? command.target : "";
+    const safeTarget = /^(|inbox-home|thread-[0-9]{1,3})$/.test(rawTarget) ? rawTarget : "other";
+    console.info(
+      JSON.stringify({
+        event: "browser_node.inbox_agent_decision",
+        action: typeof command?.action === "string" ? command.action : "invalid",
+        target: safeTarget,
+        hasValueRef: typeof command?.valueRef === "string" && command.valueRef.length > 0,
+        modelId: decision.modelId ?? null,
+      }),
+    );
     return { decision, serverNow: response.serverNow };
   }
   return response;
@@ -973,7 +988,18 @@ async function nodeOperation(
     };
   }
   if (request.operation === "inbox-messages") {
-    return { receipt: await acceptInboxPacket(tx, row.id, state, run, request.envelope, now) };
+    const receipt = await acceptInboxPacket(tx, row.id, state, run, request.envelope, now);
+    console.info(
+      JSON.stringify({
+        event: "browser_node.inbox_messages",
+        accepted: receipt.accepted,
+        duplicates: receipt.duplicates,
+        completion: Boolean(
+          (request.envelope as { packet?: { completion?: unknown } })?.packet?.completion,
+        ),
+      }),
+    );
+    return { receipt };
   }
   if (request.operation === "inbox-agent-decide") {
     const account = state.accounts.find((item) => item.id === run.accountId);
@@ -1036,6 +1062,19 @@ async function nodeOperation(
     finishRun(state, run.id, request.outcome, request.stopped, now);
     if (run.kind === "publish" && request.outcome === "failed" && request.publicationFailure)
       run.publicationFailure = request.publicationFailure;
+    if (run.kind === "inbox" && run.status !== "completed" && request.inboxFailure)
+      run.failure = request.inboxFailure;
+    if (run.kind === "inbox") {
+      console.info(
+        JSON.stringify({
+          event: "browser_node.inbox_finish",
+          outcome: request.outcome,
+          failure: run.failure,
+          calls: run.inboxAgentCalls ?? 0,
+          hasCompletion: Boolean(run.inboxCompletion),
+        }),
+      );
+    }
     await audit(tx, row.id, "browser_lease.stopped", run.id);
     return { active: false };
   }
