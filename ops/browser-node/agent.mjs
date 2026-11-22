@@ -398,8 +398,8 @@ async function heartbeat(slot) {
     return;
   }
   if (slot.expiresAt <= Date.now()) {
-    slot.outcome = "unknown";
-    await stop(slot, "unknown");
+    slot.outcome ??= "unknown";
+    await stop(slot, slot.outcome);
     return;
   }
   if (slot.ready && Date.now() - slot.egressCheckedAt >= 30_000) {
@@ -525,7 +525,8 @@ async function tick() {
         try {
           await heartbeat(slot);
         } catch {
-          if (slot.expiresAt <= Date.now()) await stop(slot, "unknown").catch(() => {});
+          if (slot.expiresAt <= Date.now())
+            await stop(slot, slot.outcome ?? "unknown").catch(() => {});
         }
       }),
     );
@@ -765,14 +766,20 @@ async function tick() {
         } catch {
           slot.outcome = "unknown";
         }
-        await stop(slot, slot.outcome);
+        await stop(slot, slot.outcome).catch((error) => {
+          const code =
+            error?.message && /^[a-z0-9_]{2,64}$/.test(error.message)
+              ? error.message
+              : "unclassified";
+          console.error(`browser_stop_retry:${code}`);
+        });
       })
       .catch((error) => {
         if (!slot.ready)
           console.error(JSON.stringify(describeBrowserLaunchFailure(slot.launchStage, error)));
         if (slot.launchStage === "egress")
           console.error(JSON.stringify(describeEgressFailure(error)));
-        slot.outcome = error.message?.startsWith("egress_") ? "egress_mismatch" : "failed";
+        slot.outcome ??= error.message?.startsWith("egress_") ? "egress_mismatch" : "failed";
         void stop(slot, slot.outcome).catch(() => {});
       });
   } catch (error) {

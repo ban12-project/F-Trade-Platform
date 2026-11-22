@@ -148,7 +148,14 @@ function readLiveFacebookInbox(profile, mode, expectedConversation) {
       if (!logs.length) return { retry: "loading" };
       if (logs.length > 1) throw new Error("inbox_control_ambiguous");
       const log = logs[0];
-      const rows = all(log, 'div[data-scope="messages_table"][data-message-id]');
+      const main = log.closest('[role="main"]') ?? log;
+      let rows = all(log, 'div[data-scope="messages_table"][data-message-id]');
+      if (!rows.length && main !== log) {
+        rows = all(main, 'div[data-scope="messages_table"][data-message-id]');
+      }
+      if (!rows.length && all(main, '[role="progressbar"], [aria-busy="true"]').length > 0) {
+        return { retry: "loading" };
+      }
       if (rows.length > 100) throw new Error("inbox_thread_incomplete");
       const seenIds = new Set();
       const messages = [];
@@ -233,6 +240,7 @@ function readLiveFacebookInbox(profile, mode, expectedConversation) {
         conversationRef: expectedConversation,
         messages,
         skippedNonText,
+        rowCount: rows.length,
       };
     }
 
