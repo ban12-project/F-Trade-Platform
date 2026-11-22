@@ -560,7 +560,7 @@ test("observe-only stops on a confirmed recovery page without claiming factors",
 test("30-minute interactive default is separate from short lease and other run deadlines", () => {
   for (const [kind, duration] of [
     ["interactive", 1800000],
-    ["inbox", 120000],
+    ["inbox", 300000],
     ["publish", 900000],
   ]) {
     const s = fixture();
@@ -609,4 +609,19 @@ test("manual extension is bounded, compare-and-set and cannot revive expired or 
   const renewed = renewRun(s, r.id, r.leaseId, true, now + 1000);
   assert.equal(renewed.deadline, old + 1800000);
   assert.equal(renewed.leaseUntil, now + 91000);
+});
+
+test("publicState projects active inboxScopes while stripping internal agent call telemetry", () => {
+  const s = fixture();
+  s.inboxScopes = [
+    { channelRef: "facebook", accountRef: "a", expiresAt: 50_000 },
+    { channelRef: "facebook", accountRef: "b", expiresAt: 10_000 },
+  ];
+  const r = enqueue(s, "a", "inbox", 1000);
+  r.inboxAgentCalls = 7;
+  const projected = publicState(s, 1000);
+  assert.deepEqual(projected.inboxScopes, [
+    { channelRef: "facebook", accountRef: "a", expiresAt: 50_000 },
+  ]);
+  assert.equal(projected.runs[0].inboxAgentCalls, undefined);
 });

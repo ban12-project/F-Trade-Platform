@@ -1285,6 +1285,7 @@ test("gateway fails fast when slot is unready and enforces ticket scopes with ro
       return { runId };
     },
     setupPublication: async (_s, input) => ({ ok: true, operation: input.operation }),
+    setupInbox: async (_s, input) => ({ ok: true, operation: input.operation }),
     inspectPublicationPage: async () => ({ version: 1 }),
   });
   await once(gateway.server, "listening");
@@ -1294,6 +1295,7 @@ test("gateway fails fast when slot is unready and enforces ticket scopes with ro
     const viewerTicket = `${runId}.${"a".repeat(43)}`;
     const setupTicket = `${runId}.setup.${"b".repeat(43)}`;
     const inspectTicket = `${runId}.inspect.${"c".repeat(43)}`;
+    const inboxSetupTicket = `${runId}.inbox-setup.${"e".repeat(43)}`;
     assert.equal(
       (
         await fetch(`${base}/admit`, {
@@ -1314,18 +1316,38 @@ test("gateway fails fast when slot is unready and enforces ticket scopes with ro
       ).status,
       403,
     );
+    assert.equal(
+      (
+        await fetch(`${base}/inbox-setup`, {
+          method: "POST",
+          headers: { Origin: "https://app.example", "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket: inboxSetupTicket, operation: "prepare" }),
+        })
+      ).status,
+      403,
+    );
     assert.equal(admitted.length, 0, "unready slot must reject before consuming broker tickets");
 
     slot.ready = true;
     for (const [path, origin, body] of [
       ["/admit", slot.gatewayOrigin, { ticket: setupTicket }],
       ["/admit", slot.gatewayOrigin, { ticket: inspectTicket }],
+      ["/admit", slot.gatewayOrigin, { ticket: inboxSetupTicket }],
       [
         "/publication-setup",
         "https://app.example",
         { ticket: inspectTicket, operation: "prepare" },
       ],
+      [
+        "/publication-setup",
+        "https://app.example",
+        { ticket: inboxSetupTicket, operation: "prepare" },
+      ],
       ["/publication-inspection", "https://app.example", { ticket: setupTicket }],
+      ["/publication-inspection", "https://app.example", { ticket: inboxSetupTicket }],
+      ["/inbox-setup", "https://app.example", { ticket: setupTicket, operation: "prepare" }],
+      ["/inbox-setup", "https://app.example", { ticket: inspectTicket, operation: "prepare" }],
+      ["/inbox-setup", "https://app.example", { ticket: viewerTicket, operation: "prepare" }],
     ]) {
       const response = await fetch(`${base}${path}`, {
         method: "POST",
@@ -1348,7 +1370,13 @@ test("gateway fails fast when slot is unready and enforces ticket scopes with ro
       body: JSON.stringify({ ticket: `${runId}.${"d".repeat(43)}` }),
     });
     assert.equal(inspectRes.status, 200);
-    assert.equal(admitted.length, 2);
+    const inboxSetupRes = await fetch(`${base}/inbox-setup`, {
+      method: "POST",
+      headers: { Origin: "https://app.example", "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket: inboxSetupTicket, operation: "prepare" }),
+    });
+    assert.equal(inboxSetupRes.status, 200);
+    assert.equal(admitted.length, 3);
   } finally {
     gateway.close();
     gateway.server.closeAllConnections();

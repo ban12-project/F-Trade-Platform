@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { hasPermission } from "@/lib/authz";
 import { type DatabaseTransaction, getDatabase } from "@/lib/db/client";
-import { auditEvent, session, user } from "@/lib/db/schema";
+import { auditEvent, session, socialChannelControl, user } from "@/lib/db/schema";
 import {
   facebookLoginSecretSchema,
   facebookProxySecretSchema,
@@ -28,6 +28,7 @@ import {
   ownerCommandSchema,
 } from "./contracts";
 import { acceptInboxPacket, inboxSigningKey } from "./inbox";
+import { decideInboxBrowserAction } from "./inbox-agent";
 import {
   AUTOMATIC_LOGIN_MS,
   bindInstallation,
@@ -37,6 +38,7 @@ import {
   extendInteractiveRun,
   type FleetState,
   finishRun,
+  inboxScopeActive,
   initialState,
   isLive,
   publicState,
@@ -247,7 +249,12 @@ export async function issueInteractiveControlTicket(
       actor,
       now,
     );
-    const scope = command.purpose === "publication-setup" ? "setup" : "inspect";
+    const scope =
+      command.purpose === "inbox-setup"
+        ? "inbox-setup"
+        : command.purpose === "publication-setup"
+          ? "setup"
+          : "inspect";
     const token = `${run.id}.${scope}.${randomBytes(32).toString("base64url")}`;
     const expiresAt = Math.min(now + 60_000, run.deadline, run.leaseUntil);
     run.controlTickets = [
@@ -321,7 +328,8 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
     } else if (
       command.operation === "account" ||
       command.operation === "confirm-login" ||
-      command.operation === "open"
+      command.operation === "open" ||
+      command.operation === "poll-inbox"
     ) {
       const account = state.accounts.find((a) => a.id === command.accountId);
       if (!account || row.status !== "active") throw new Error("account_unavailable");
@@ -343,7 +351,7 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
         if (!account.proxyCiphertext) throw new Error("proxy_required");
         if (!account.expectedEgressIp) throw new Error("expected_egress_required");
         account.authState = "ready";
-      } else {
+      } else if (command.operation === "open") {
         if (!account.expectedEgressIp) throw new Error("expected_egress_required");
         const run = enqueueRun(
           state,
@@ -351,6 +359,44 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
             id: randomUUID(),
             accountId: account.id,
             kind: "interactive",
+            jobRef: null,
+            requestedBy: actor.id,
+            authSessionId: actor.sessionId,
+          },
+          now,
+        );
+        result = { runId: run.id };
+      } else {
+        if (
+          !account.enabled ||
+          account.authState !== "ready" ||
+          !account.proxyCiphertext ||
+          !account.expectedEgressIp ||
+          !state.capabilities.includes("inbox") ||
+          !inboxScopeActive(state, account, now)
+        )
+          throw new Error("inbox_poll_unavailable");
+        const [channelControl] = await tx
+          .select({
+            enabled: socialChannelControl.enabled,
+            circuitStatus: socialChannelControl.circuitStatus,
+          })
+          .from(socialChannelControl)
+          .where(
+            and(
+              eq(socialChannelControl.channelRef, account.channelRef),
+              eq(socialChannelControl.accountRef, account.accountRef),
+            ),
+          )
+          .for("share");
+        if (!channelControl?.enabled || channelControl.circuitStatus !== "active")
+          throw new Error("inbound_channel_inactive");
+        const run = enqueueRun(
+          state,
+          {
+            id: randomUUID(),
+            accountId: account.id,
+            kind: "inbox",
             jobRef: null,
             requestedBy: actor.id,
             authSessionId: actor.sessionId,
@@ -499,6 +545,7 @@ export async function handleBrowserNodeRequest(
   accessKey: string,
   input: unknown,
   openMedia: typeof openFacebookMediaSource = openFacebookMediaSource,
+  decideInbox: typeof decideInboxBrowserAction = decideInboxBrowserAction,
 ): Promise<Record<string, unknown>> {
   const nodeId = accessKeyNodeId(accessKey);
   const request = nodeRequestSchema.parse(input);
@@ -547,6 +594,15 @@ export async function handleBrowserNodeRequest(
     // receives bytes and confirmed media metadata, never the internal blob path.
     return openMedia(response.mediaSource as FacebookMediaSource);
   }
+  if (response.inboxAgentRequest) {
+    // Model I/O runs after releasing the node lock so slow LLM calls never hold
+    // database row locks, while preserving strict lease & call-count bounds.
+    const decision = await decideInbox(
+      response.inboxAgentRequest as Parameters<typeof decideInboxBrowserAction>[0],
+      AbortSignal.timeout(25_000),
+    );
+    return { decision, serverNow: response.serverNow };
+  }
   return response;
 }
 async function nodeOperation(
@@ -556,6 +612,68 @@ async function nodeOperation(
   now: number,
 ): Promise<Record<string, unknown>> {
   const state = row.document;
+  if (request.operation === "inbox-setup") {
+    const run = state.runs.find((r) => r.id === request.runId);
+    const account = run && state.accounts.find((a) => a.id === run.accountId);
+    if (
+      !run ||
+      run.leaseId !== request.leaseId ||
+      run.kind !== "interactive" ||
+      run.status !== "running" ||
+      run.stopRequested ||
+      run.leaseUntil <= now ||
+      run.deadline <= now ||
+      !account?.enabled ||
+      run.requestedBy !== row.owner_id ||
+      !run.authSessionId ||
+      request.expiresAt <= now ||
+      request.expiresAt > now + 7 * 86400000 ||
+      state.runs.some(
+        (r) =>
+          r.kind === "inbox" &&
+          r.accountId === account.id &&
+          ["queued", "starting", "running"].includes(r.status),
+      )
+    )
+      throw new Error("inbox_setup_inactive");
+    const [ownerSession] = await tx
+      .select({ id: session.id })
+      .from(session)
+      .where(
+        and(
+          eq(session.id, run.authSessionId),
+          eq(session.userId, row.owner_id),
+          gt(session.expiresAt, new Date(now)),
+        ),
+      );
+    if (!ownerSession) throw new Error("inbox_setup_session_expired");
+    state.capabilities = [...new Set([...state.capabilities, "inbox" as const])];
+    state.inboxScopes = [
+      ...(state.inboxScopes ?? []).filter(
+        (s) => s.accountRef !== account.accountRef || s.channelRef !== account.channelRef,
+      ),
+      {
+        channelRef: account.channelRef,
+        accountRef: account.accountRef,
+        expiresAt: request.expiresAt,
+      },
+    ];
+    await tx.insert(auditEvent).values({
+      id: randomUUID(),
+      action: "browser_inbox_setup.activated",
+      actorType: "human",
+      actorId: row.owner_id,
+      subjectType: "browser_node",
+      subjectId: row.id,
+      metadata: {
+        account_id: account.id,
+        candidate_hash: request.candidateHash,
+        expires_at: request.expiresAt,
+      },
+      occurredAt: new Date(now),
+    });
+    return { active: true };
+  }
   if (request.operation === "publication-setup") {
     const run = state.runs.find((r) => r.id === request.runId);
     const account = run && state.accounts.find((a) => a.id === run.accountId);
@@ -709,11 +827,13 @@ async function nodeOperation(
     )
       throw new Error("interactive_ticket_invalid");
     const suffix = request.ticket.slice(run.id.length + 1);
-    const controlPurpose: ControlTicketPurpose | null = suffix.startsWith("setup.")
-      ? "publication-setup"
-      : suffix.startsWith("inspect.")
-        ? "publication-inspection"
-        : null;
+    const controlPurpose: ControlTicketPurpose | null = suffix.startsWith("inbox-setup.")
+      ? "inbox-setup"
+      : suffix.startsWith("setup.")
+        ? "publication-setup"
+        : suffix.startsWith("inspect.")
+          ? "publication-inspection"
+          : null;
     if (controlPurpose) {
       const tickets = run.controlTickets ?? [];
       const index = tickets.findIndex(
@@ -854,6 +974,27 @@ async function nodeOperation(
   }
   if (request.operation === "inbox-messages") {
     return { receipt: await acceptInboxPacket(tx, row.id, state, run, request.envelope, now) };
+  }
+  if (request.operation === "inbox-agent-decide") {
+    const account = state.accounts.find((item) => item.id === run.accountId);
+    if (
+      run.kind !== "inbox" ||
+      run.status !== "running" ||
+      run.stopRequested ||
+      run.leaseUntil <= now ||
+      run.deadline <= now ||
+      !account?.enabled ||
+      !inboxScopeActive(state, account, now) ||
+      account.authState !== "ready" ||
+      account.credentialVersion !== run.credentialVersion ||
+      !account.expectedEgressIp ||
+      !state.capabilities.includes("inbox")
+    )
+      throw new Error("inbox_lease_inactive");
+    const calls = run.inboxAgentCalls ?? 0;
+    if (calls >= 40) throw new Error("inbox_agent_call_limit");
+    run.inboxAgentCalls = calls + 1;
+    return { inboxAgentRequest: { snapshot: request.snapshot, context: request.context } };
   }
   if (request.operation === "publication-media") {
     return {

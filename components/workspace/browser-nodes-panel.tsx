@@ -34,6 +34,7 @@ import {
   type ViewerWindow,
   viewerWindowIsOpen,
 } from "@/components/workspace/browser-viewer-window";
+import { InboxSetupPanel } from "@/components/workspace/inbox-setup-panel";
 import { InteractiveSessionTimer } from "@/components/workspace/interactive-session-timer";
 import { PublicationPageInspectionPanel } from "@/components/workspace/publication-page-inspection-panel";
 import { SandboxStatus } from "@/components/workspace/sandbox-status";
@@ -685,72 +686,103 @@ export function BrowserNodesPanel() {
                 </div>
               </CollapsibleContent>
             </Collapsible>
-            {node.accounts.map((account) => (
-              <div
-                id={`publishing-account-${account.id}`}
-                key={account.id}
-                className="scroll-mt-20 space-y-2 rounded-lg border p-3"
-              >
-                <p className="font-medium">
-                  {account.displayName || account.accountRef}{" "}
-                  <Badge variant="outline">
-                    {stateLabels[account.authState] ?? account.authState}
-                  </Badge>
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  代理 {account.proxySaved ? "已保存" : "未配置"} · 登录凭据{" "}
-                  {account.loginSaved ? "已保存" : "未配置"} · 最近收件箱检查{" "}
-                  {account.lastCheckedAt ? (
-                    <time dateTime={new Date(account.lastCheckedAt).toISOString()}>
-                      {timestampFormat.format(new Date(account.lastCheckedAt))}（{timeZone}）
-                    </time>
-                  ) : (
-                    "尚未执行"
-                  )}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    disabled={busy || !account.enabled || node.status !== "active"}
-                    onClick={() => {
-                      void send({ operation: "open", nodeId: node.id, accountId: account.id });
-                    }}
-                  >
-                    完成登录 / 处理异常
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => {
-                      void send({
-                        operation: "account",
-                        nodeId: node.id,
-                        accountId: account.id,
-                        enabled: !account.enabled,
-                      });
-                    }}
-                  >
-                    {account.enabled ? "停用账号授权" : "启用账号授权"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => {
-                      void send({
-                        operation: "confirm-login",
-                        nodeId: node.id,
-                        accountId: account.id,
-                        confirmed: true,
-                      });
-                    }}
-                  >
-                    已核对账号及代理，确认登录有效
-                  </Button>
+            {node.accounts.map((account) => {
+              const hasInboxScope =
+                node.capabilities.includes("inbox") &&
+                (node.inboxScopes ?? []).some(
+                  (scope) =>
+                    scope.channelRef === account.channelRef &&
+                    scope.accountRef === account.accountRef &&
+                    scope.expiresAt > node.serverNow,
+                );
+              return (
+                <div
+                  id={`publishing-account-${account.id}`}
+                  key={account.id}
+                  className="scroll-mt-20 space-y-2 rounded-lg border p-3"
+                >
+                  <p className="font-medium">
+                    {account.displayName || account.accountRef}{" "}
+                    <Badge variant="outline">
+                      {stateLabels[account.authState] ?? account.authState}
+                    </Badge>
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    代理 {account.proxySaved ? "已保存" : "未配置"} · 登录凭据{" "}
+                    {account.loginSaved ? "已保存" : "未配置"} · 收件箱同步{" "}
+                    {hasInboxScope ? "已启用" : "未启用"} · 最近收件箱检查{" "}
+                    {account.lastCheckedAt ? (
+                      <time dateTime={new Date(account.lastCheckedAt).toISOString()}>
+                        {timestampFormat.format(new Date(account.lastCheckedAt))}（{timeZone}）
+                      </time>
+                    ) : (
+                      "尚未执行"
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      disabled={busy || !account.enabled || node.status !== "active"}
+                      onClick={() => {
+                        void send({ operation: "open", nodeId: node.id, accountId: account.id });
+                      }}
+                    >
+                      完成登录 / 处理异常
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={
+                        busy ||
+                        !account.enabled ||
+                        node.status !== "active" ||
+                        account.authState !== "ready" ||
+                        !hasInboxScope
+                      }
+                      onClick={() => {
+                        void send({
+                          operation: "poll-inbox",
+                          nodeId: node.id,
+                          accountId: account.id,
+                        });
+                      }}
+                    >
+                      立即同步收件箱
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => {
+                        void send({
+                          operation: "account",
+                          nodeId: node.id,
+                          accountId: account.id,
+                          enabled: !account.enabled,
+                        });
+                      }}
+                    >
+                      {account.enabled ? "停用账号授权" : "启用账号授权"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => {
+                        void send({
+                          operation: "confirm-login",
+                          nodeId: node.id,
+                          accountId: account.id,
+                          confirmed: true,
+                        });
+                      }}
+                    >
+                      已核对账号及代理，确认登录有效
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <Collapsible>
               <CollapsibleTrigger render={<Button variant="ghost" />}>
                 高级：执行队列
@@ -890,7 +922,18 @@ export function BrowserNodesPanel() {
                       </Button>
                     )}
                     {run.status === "running" && !run.stopRequested && (
-                      <PublicationPageInspectionPanel nodeId={node.id} runId={run.id} />
+                      <div className="flex w-full flex-col gap-3">
+                        <PublicationPageInspectionPanel nodeId={node.id} runId={run.id} />
+                        <InboxSetupPanel
+                          nodeId={node.id}
+                          runId={run.id}
+                          onActivated={async () => {
+                            const rows = await browserNodesAction();
+                            setNodes(rows);
+                            setListState("ready");
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
                 ))}

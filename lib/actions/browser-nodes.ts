@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import { ownerCommandSchema } from "@/lib/browser-fleet/contracts";
+import { setupOwnedInbox } from "@/lib/browser-fleet/inbox-setup";
+import { inboxSetupInputSchema } from "@/lib/browser-fleet/inbox-setup-contract";
 import { inspectOwnedPublicationPage } from "@/lib/browser-fleet/publication-page-inspection";
 import { publicationPageInspectionInputSchema } from "@/lib/browser-fleet/publication-page-inspection-contract";
 import { setupOwnedPublication } from "@/lib/browser-fleet/publication-setup";
@@ -70,6 +72,20 @@ export async function browserNodeCommandAction(input: unknown) {
       ok: false as const,
       message:
         "操作未完成。请检查节点归属、代理配置、数据库迁移及运行中的任务；账号不可同时绑定多个节点。",
+    };
+  }
+}
+
+export async function setupInboxAction(input: unknown) {
+  try {
+    const current = await actor();
+    const value = inboxSetupInputSchema.parse(input);
+    return { ok: true as const, result: await setupOwnedInbox(value, current) };
+  } catch {
+    return {
+      ok: false as const,
+      message:
+        "收件箱同步配置未生效。请确认接管页面已登录 Facebook Messenger 并重新核对；有待执行收件箱同步任务时需先等待完成。服务刚更新时请稍后重试。",
     };
   }
 }
