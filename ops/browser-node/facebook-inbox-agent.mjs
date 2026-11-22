@@ -144,7 +144,7 @@ function classifyInboxFailure(error) {
 // identity, message IDs, direction, timestamps, and signed completion receipts.
 export function createFacebookLiveInboxAgent(input, browserRequest, decideInboxAction) {
   const profile = validateLiveInboxProfile(input);
-  return async ({ run, signal, reportInbound, onInboxFailure }) => {
+  return async ({ run, signal, reportInbound, onInboxFailure, onInboxThreadStats }) => {
     const scanStartedAt = new Date().toISOString();
     const active = () => {
       validateLiveInboxProfile(profile);
@@ -220,7 +220,7 @@ export function createFacebookLiveInboxAgent(input, browserRequest, decideInboxA
           await delay(500, undefined, { signal });
           continue;
         }
-        return result.result;
+        return { ...result.result, attempts: attempt + 1 };
       }
       throw new Error("inbox_loading_timeout");
     };
@@ -258,6 +258,20 @@ export function createFacebookLiveInboxAgent(input, browserRequest, decideInboxA
           async execute() {
             await navigateTo(thread.url);
             const result = await evaluateLive("thread", thread.conversationRef);
+            const rawStats = result.stats && typeof result.stats === "object" ? result.stats : {};
+            onInboxThreadStats?.({
+              rows: Number(rawStats.rows ?? result.rowCount ?? 0),
+              inLog: Number(rawStats.inLog ?? 0),
+              inMain: Number(rawStats.inMain ?? 0),
+              inDocMsgId: Number(rawStats.inDocMsgId ?? 0),
+              inDocVisibleMsgId: Number(rawStats.inDocVisibleMsgId ?? 0),
+              dialogs: Number(rawStats.dialogs ?? 0),
+              progressbars: Number(rawStats.progressbars ?? 0),
+              inbound: Number(rawStats.inbound ?? result.messages?.length ?? 0),
+              outbound: Number(rawStats.outbound ?? 0),
+              skippedNonText: Number(rawStats.skippedNonText ?? result.skippedNonText ?? 0),
+              attempts: Number(result.attempts ?? 1),
+            });
             currentView = thread.handle;
             currentAria = await readAriaSnapshot();
             visitedMessages.set(thread.handle, result.messages);

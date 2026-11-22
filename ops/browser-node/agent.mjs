@@ -184,7 +184,11 @@ async function nodeCall(operation, fields = {}) {
     method: "POST",
     redirect: "error",
     signal: AbortSignal.timeout(10_000),
-    headers: { Authorization: `Bearer ${accessKey}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${accessKey}`,
+      "Content-Type": "application/json",
+      Connection: "close",
+    },
     body: JSON.stringify({ operation, installationId, bootId, ...fields }),
   });
   if (!response.ok) {
@@ -343,7 +347,10 @@ async function launch(slot) {
   });
   if (slot.stopping) return;
   if (agentContainerId) {
-    await docker("POST", `/networks/${spec.name}/connect`, { Container: agentContainerId });
+    await docker("POST", `/networks/${spec.name}/connect`, {
+      Container: agentContainerId,
+      EndpointConfig: { GwPriority: -1 },
+    });
     if (slot.stopping) return;
   }
   slot.launchStage = "container-create";
@@ -698,6 +705,7 @@ async function tick() {
                 headers: {
                   Authorization: `Bearer ${accessKey}`,
                   "Content-Type": "application/json",
+                  Connection: "close",
                 },
                 body: JSON.stringify({
                   operation: "inbox-agent-decide",
@@ -747,6 +755,10 @@ async function tick() {
               // Fixed executor enum only; never log raw page or message text.
               console.error(`browser_inbox_failed:${code}`);
               slot.inboxFailure = code;
+            },
+            onInboxThreadStats(stats) {
+              // Strictly numeric structural counts only; never log page or message text.
+              console.info(`browser_inbox_thread_stats:${JSON.stringify(stats)}`);
             },
             readPublicationMedia: readAssignedMedia,
             signal: slot.abort.signal,
