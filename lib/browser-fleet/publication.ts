@@ -131,6 +131,24 @@ export async function schedulePublications(
   }
 }
 
+const knownPreflightCodes = new Set([
+  "publication_scope_invalid",
+  "publication_changed",
+  "publication_format_invalid",
+  "text_confirmation_stale_or_missing",
+  "media_manifest_missing",
+  "media_manifest_stale",
+  "invalid_facebook_media",
+  "media_content_missing",
+  "video_not_approved",
+  "video_asset_invalid",
+  "video_caption_not_approved",
+  "image_caption_source_invalid",
+  "image_content_not_approved",
+  "image_rights_invalid",
+  "image_product_invalid",
+]);
+
 export async function claimPublication(
   tx: DatabaseTransaction,
   nodeId: string,
@@ -181,7 +199,17 @@ export async function claimPublication(
       sql`UPDATE browser_fleet_publication SET payload = ${JSON.stringify(payload)}::jsonb WHERE job_id = ${job.id}`,
     );
     return payload;
-  } catch {
+  } catch (error) {
+    const rawCode = error instanceof Error ? error.message : "";
+    const reason = knownPreflightCodes.has(rawCode) ? rawCode : "unclassified";
+    console.error(
+      JSON.stringify({
+        event: "browser_node.publication_preflight_rejected",
+        format: publication?.format ?? "unknown",
+        claimed: job.status === "claimed",
+        reason,
+      }),
+    );
     // Once a payload has been disclosed, a later rejection cannot prove that no
     // external effect occurred. Reconciliation must conservatively mark unknown.
     if (job.status === "claimed") return null;
