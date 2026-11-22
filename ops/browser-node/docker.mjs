@@ -325,7 +325,11 @@ export async function renewWatchdog(docker, containerId, deadline) {
 export async function stopContainer(docker, id) {
   try {
     const current = await docker("GET", `/containers/${id}/json`);
-    if (current.State.Running) await docker("POST", `/containers/${id}/stop?t=20`);
+    if (current.State.Running) {
+      await docker("POST", `/containers/${id}/stop?t=20`).catch((error) => {
+        if (error.status !== 304 && error.status !== 404) throw error;
+      });
+    }
     const stopped = await docker("GET", `/containers/${id}/json`);
     if (stopped.State.Running) throw new Error("browser_stop_unconfirmed");
     await docker("DELETE", `/containers/${id}?v=false`);

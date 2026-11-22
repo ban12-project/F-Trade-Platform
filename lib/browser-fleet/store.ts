@@ -989,14 +989,23 @@ async function nodeOperation(
   }
   if (request.operation === "inbox-messages") {
     const receipt = await acceptInboxPacket(tx, row.id, state, run, request.envelope, now);
+    const completion = (
+      request.envelope as {
+        packet?: { completion?: { conversationCount?: number; messageCount?: number } };
+      }
+    )?.packet?.completion;
     console.info(
       JSON.stringify({
         event: "browser_node.inbox_messages",
         accepted: receipt.accepted,
         duplicates: receipt.duplicates,
-        completion: Boolean(
-          (request.envelope as { packet?: { completion?: unknown } })?.packet?.completion,
-        ),
+        completion: Boolean(completion),
+        ...(completion
+          ? {
+              conversationCount: completion.conversationCount ?? null,
+              messageCount: completion.messageCount ?? null,
+            }
+          : {}),
       }),
     );
     return { receipt };

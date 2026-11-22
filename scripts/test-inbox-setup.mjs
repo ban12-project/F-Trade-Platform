@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { nodeRequestSchema } from "../lib/browser-fleet/contracts.ts";
+import { stopContainer } from "../ops/browser-node/docker.mjs";
 import { createFacebookLiveInboxAgent } from "../ops/browser-node/facebook-inbox-agent.mjs";
 import { createInboxSetup } from "../ops/browser-node/inbox-setup.mjs";
 
@@ -270,4 +271,125 @@ test("live inbox agent classifies failure enums without leaking raw errors and n
     inboxFailure: "raw message: leak!",
   });
   assert.equal(invalid.success, false);
+});
+
+test("live inbox agent retries thread evaluation when rowCount is 0 and stopContainer tolerates Docker 304", async () => {
+  const baseProfile = {
+    version: 2,
+    mode: "facebook-live-agent",
+    channelRef: "facebook-personal",
+    accountRef: "61589008383902",
+    expectedAccountRef: "61589008383902",
+    reviewRef: "evidence-test-456",
+    reviewedAt: new Date(Date.now() - 60_000).toISOString(),
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    url: "https://www.facebook.com/messages/",
+  };
+  const baseRun = {
+    kind: "inbox",
+    id: "00000000-0000-4000-8000-000000000021",
+    accountId: "00000000-0000-4000-8000-000000000022",
+    channelRef: "facebook-personal",
+    accountRef: "61589008383902",
+  };
+  const threadUrl = "https://www.facebook.com/messages/e2ee/t/1618185166252064/";
+  let currentUrl = baseProfile.url;
+  let threadEvals = 0;
+
+  const browserRequest = async (path, body) => {
+    if (path === "/tabs" || path.endsWith("/navigate")) {
+      currentUrl = body.url;
+      return Response.json({ ok: true, tabId: "tab-1", url: currentUrl });
+    }
+    if (path.endsWith("/evaluate")) {
+      if (currentUrl === baseProfile.url) {
+        return Response.json({
+          ok: true,
+          result: {
+            mode: "list",
+            empty: false,
+            threads: [{ conversationRef: "1618185166252064", url: threadUrl }],
+          },
+        });
+      }
+      threadEvals++;
+      if (threadEvals < 3) {
+        return Response.json({
+          ok: true,
+          result: {
+            mode: "thread",
+            conversationRef: "1618185166252064",
+            messages: [],
+            skippedNonText: 0,
+            rowCount: 0,
+          },
+        });
+      }
+      return Response.json({
+        ok: true,
+        result: {
+          mode: "thread",
+          conversationRef: "1618185166252064",
+          messages: [
+            {
+              conversationRef: "1618185166252064",
+              messageRef: "61588876867341@msgr.7530124870827423183",
+              direction: "inbound",
+              identityQuality: "dom_id",
+              body: "Hi, test reply 1122-B2A",
+              receivedAt: new Date(Date.now() - 10_000).toISOString(),
+            },
+          ],
+          skippedNonText: 0,
+          rowCount: 1,
+        },
+      });
+    }
+    if (path.includes("/snapshot")) {
+      return Response.json({ ok: true, snapshot: `- document: "${currentUrl}"` });
+    }
+    return Response.json({ ok: true });
+  };
+
+  let decisionStep = 0;
+  const commands = [
+    { action: "navigate", target: "thread-0", valueRef: "" },
+    { action: "navigate", target: "inbox-home", valueRef: "" },
+    { action: "finish", target: "", valueRef: "" },
+  ];
+  const reported = [];
+  const execute = createFacebookLiveInboxAgent(baseProfile, browserRequest, async () => ({
+    command: commands[decisionStep++],
+  }));
+  const outcome = await execute({
+    run: baseRun,
+    signal: new AbortController().signal,
+    reportInbound: async (messages, _observedAt, completion) => {
+      reported.push({ messages, completion });
+      return { accepted: messages.length, duplicates: 0 };
+    },
+  });
+
+  assert.equal(outcome, "completed");
+  assert.equal(threadEvals, 3);
+  assert.equal(reported.length, 2);
+  assert.equal(reported[0].messages.length, 1);
+  assert.equal(reported[0].messages[0].body, "Hi, test reply 1122-B2A");
+  assert.equal(reported[1].completion?.messageCount, 1);
+
+  const dockerCalls = [];
+  await stopContainer(async (method, path) => {
+    dockerCalls.push(`${method} ${path}`);
+    if (method === "GET" && dockerCalls.length === 1) return { State: { Running: true } };
+    if (method === "POST" && path.endsWith("/stop?t=20"))
+      throw Object.assign(new Error("docker_http_304"), { status: 304 });
+    if (method === "GET") return { State: { Running: false } };
+    return null;
+  }, "c-1");
+  assert.deepEqual(dockerCalls, [
+    "GET /containers/c-1/json",
+    "POST /containers/c-1/stop?t=20",
+    "GET /containers/c-1/json",
+    "DELETE /containers/c-1?v=false",
+  ]);
 });

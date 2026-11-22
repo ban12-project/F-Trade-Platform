@@ -216,6 +216,10 @@ export function createFacebookLiveInboxAgent(input, browserRequest, decideInboxA
           error.attention = result.result.attention;
           throw error;
         }
+        if (mode === "thread" && result.result.rowCount === 0 && attempt < 10) {
+          await delay(500, undefined, { signal });
+          continue;
+        }
         return result.result;
       }
       throw new Error("inbox_loading_timeout");
