@@ -24,6 +24,7 @@ function ticketScope(ticket) {
   const runId = ticketRunId(ticket);
   if (!runId) return "viewer";
   const suffix = ticket.slice(runId.length + 1);
+  if (suffix.startsWith("inbox-setup.")) return "inbox-setup";
   if (suffix.startsWith("setup.")) return "publication-setup";
   if (suffix.startsWith("inspect.")) return "publication-inspection";
   return "viewer";
@@ -53,6 +54,7 @@ export function createGateway({
   slots,
   inspectPublicationPage,
   setupPublication,
+  setupInbox,
   inspectionFailureStage,
   port = 9400,
   host = "127.0.0.1",
@@ -129,6 +131,33 @@ textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
         response.end(source.replace('"__APP_ORIGIN__"', JSON.stringify(appOrigin)));
         return;
       }
+      if (request.method === "POST" && request.url === "/inbox-setup") {
+        if (request.headers.origin !== appOrigin || !setupInbox) return fail();
+        const input = await readBody(request);
+        if (
+          typeof input.ticket !== "string" ||
+          !["inspect", "prepare", "activate"].includes(input.operation) ||
+          Object.keys(input).sort().join(",") !==
+            (input.operation === "activate"
+              ? "candidateHash,operation,ticket"
+              : "operation,ticket") ||
+          (input.operation === "activate" && !/^[a-f0-9]{64}$/.test(input.candidateHash))
+        )
+          return fail();
+        if (ticketScope(input.ticket) !== "inbox-setup") return fail();
+        const pendingRunId = ticketRunId(input.ticket);
+        if (pendingRunId && !slotAdmittable(slots.get(pendingRunId), { interactiveOnly: true }))
+          return fail();
+        const admission = await nodeCall("admit", { ticket: input.ticket });
+        const slot = slots.get(admission.runId);
+        if (!slotAdmittable(slot, { interactiveOnly: true })) return fail();
+        const result = await setupInbox(slot, input);
+        if (slots.get(admission.runId) !== slot || slot.stopping || slot.expiresAt <= Date.now())
+          return fail();
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify(result));
+        return;
+      }
       if (request.method === "POST" && request.url === "/publication-setup") {
         if (request.headers.origin !== appOrigin || !setupPublication) return fail();
         const input = await readBody(request);
@@ -142,7 +171,8 @@ textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
           (input.operation === "activate" && !/^[a-f0-9]{64}$/.test(input.candidateHash))
         )
           return fail();
-        if (ticketScope(input.ticket) === "publication-inspection") return fail();
+        if (["publication-inspection", "inbox-setup"].includes(ticketScope(input.ticket)))
+          return fail();
         const pendingRunId = ticketRunId(input.ticket);
         if (pendingRunId && !slotAdmittable(slots.get(pendingRunId), { interactiveOnly: true }))
           return fail();
@@ -160,7 +190,7 @@ textarea{vertical-align:middle}#screen{flex:1;min-height:0}</style>
         if (request.headers.origin !== appOrigin || !inspectPublicationPage) return fail();
         const input = await readBody(request);
         if (typeof input.ticket !== "string" || Object.keys(input).length !== 1) return fail();
-        if (ticketScope(input.ticket) === "publication-setup") return fail();
+        if (["publication-setup", "inbox-setup"].includes(ticketScope(input.ticket))) return fail();
         const pendingRunId = ticketRunId(input.ticket);
         if (pendingRunId && !slotAdmittable(slots.get(pendingRunId), { interactiveOnly: true }))
           return fail();

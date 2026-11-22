@@ -7,6 +7,7 @@ export default defineConfig({
     "browser-publication-executor.spec.ts",
     "facebook-driver.spec.ts",
     "facebook-inbox.spec.ts",
+    "facebook-inbox-live-agent.spec.ts",
     "facebook-login-executor.spec.ts",
     "facebook-login-fill.spec.ts",
   ],

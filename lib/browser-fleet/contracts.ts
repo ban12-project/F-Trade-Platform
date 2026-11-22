@@ -5,6 +5,7 @@ import {
   publicationPreclickStages,
 } from "../../ops/browser-node/publication-diagnostics.mjs";
 
+import { inboxAgentContextSchema, inboxAgentSnapshotSchema } from "./inbox-agent-schema";
 import { inboxEnvelopeSchema } from "./inbox-schema";
 
 const id = z.uuid();
@@ -83,6 +84,7 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
     })
     .strict(),
   z.object({ operation: z.literal("open"), nodeId: id, accountId: id }).strict(),
+  z.object({ operation: z.literal("poll-inbox"), nodeId: id, accountId: id }).strict(),
   z.object({ operation: z.literal("stop"), nodeId: id, runId: id }).strict(),
   z.object({ operation: z.literal("ticket"), nodeId: id, runId: id }).strict(),
   z
@@ -98,7 +100,7 @@ export const controlTicketCommandSchema = z
   .object({
     nodeId: id,
     runId: id,
-    purpose: z.enum(["publication-setup", "publication-inspection"]),
+    purpose: z.enum(["publication-setup", "publication-inspection", "inbox-setup"]),
   })
   .strict();
 export type ControlTicketCommand = z.infer<typeof controlTicketCommandSchema>;
@@ -148,6 +150,26 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       runId: id,
       leaseId: id,
       envelope: inboxEnvelopeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...common,
+      operation: z.literal("inbox-agent-decide"),
+      runId: id,
+      leaseId: id,
+      snapshot: inboxAgentSnapshotSchema,
+      context: inboxAgentContextSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...common,
+      operation: z.literal("inbox-setup"),
+      runId: id,
+      leaseId: id,
+      candidateHash: z.string().regex(/^[a-f0-9]{64}$/),
+      expiresAt: z.number().int().positive(),
     })
     .strict(),
   z

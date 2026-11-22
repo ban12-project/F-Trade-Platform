@@ -5,7 +5,10 @@ import { initialState } from "../../lib/browser-fleet/policy.ts";
 import { accessKeyNodeId, createAccessKey } from "../../lib/browser-fleet/security.ts";
 import { createFacebookDriver } from "./facebook-driver.mjs";
 import { createFacebookInbox } from "./facebook-inbox.mjs";
+import { createFacebookLiveInboxAgent } from "./facebook-inbox-agent.mjs";
 import { createInboxReporter } from "./inbox.mjs";
+import { withInboxSetup } from "./inbox-adapter.mjs";
+import { createInboxSetup } from "./inbox-setup.mjs";
 import { register as registerLogin } from "./login-plugin/index.js";
 import pagePrograms from "./page-programs.cjs";
 import { createPublicationExecutor } from "./publication-executor.mjs";
@@ -45,7 +48,10 @@ assert.equal(accessKeyNodeId(createAccessKey(id)), id);
 for (const value of [
   createFacebookDriver,
   createFacebookInbox,
+  createFacebookLiveInboxAgent,
   createInboxReporter,
+  createInboxSetup,
+  withInboxSetup,
   createPublicationExecutor,
 ])
   assert.equal(typeof value, "function");
@@ -62,12 +68,18 @@ const syntax = spawnSync(
   { encoding: "utf8" },
 );
 assert.equal(syntax.status, 0, "Agent entrypoint syntax must be valid in the image runtime");
-const inspectionSyntax = spawnSync(
-  process.execPath,
-  ["--check", new URL("./publication-inspection-page.js", import.meta.url).pathname],
-  { encoding: "utf8" },
-);
-assert.equal(inspectionSyntax.status, 0, "The read-only inspection page asset must parse offline");
+for (const pageAsset of [
+  "./publication-inspection-page.js",
+  "./inbox-setup-page.js",
+  "./facebook-inbox-live-page.js",
+]) {
+  const assetSyntax = spawnSync(
+    process.execPath,
+    ["--check", new URL(pageAsset, import.meta.url).pathname],
+    { encoding: "utf8" },
+  );
+  assert.equal(assetSyntax.status, 0, `The read-only page asset ${pageAsset} must parse offline`);
+}
 // No profiles are supplied. The explicit adapter must fail for this exact reason,
 // rather than loading successfully or failing because a packaged dependency is missing.
 delete process.env.FACEBOOK_DOM_PROFILES_FILE;

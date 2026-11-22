@@ -36,7 +36,7 @@ export type Account = {
   nextPollAt: number;
   lastCheckedAt: number | null;
 };
-export type ControlTicketPurpose = "publication-setup" | "publication-inspection";
+export type ControlTicketPurpose = "publication-setup" | "publication-inspection" | "inbox-setup";
 export type ControlTicket = {
   purpose: ControlTicketPurpose;
   hash: string;
@@ -47,6 +47,7 @@ export type Run = {
   accountId: string;
   kind: RunKind;
   jobRef: string | null;
+  inboxAgentCalls?: number;
   inboxCompletion?: {
     observedAt: number;
     reviewRef: string;
@@ -325,7 +326,7 @@ export function claimRun(
   run.claimId = input.requestId;
   run.leaseId = input.leaseId;
   run.credentialVersion = account.credentialVersion;
-  run.deadline = now + { interactive: 1_800_000, inbox: 120_000, publish: 900_000 }[run.kind];
+  run.deadline = now + { interactive: 1_800_000, inbox: 300_000, publish: 900_000 }[run.kind];
   run.leaseUntil = Math.min(now + LEASE_MS, run.deadline);
   return run;
 }
@@ -480,6 +481,7 @@ export function publicState(state: FleetState, now = Date.now()) {
     limits: state.limits,
     lastSeenAt: state.lastSeenAt,
     capabilities: state.capabilities,
+    inboxScopes: (state.inboxScopes ?? []).filter((scope) => scope.expiresAt > now + 10000),
     loginFillScopes: (state.loginFillScopes ?? []).filter((scope) => scope.expiresAt > now + 10000),
     accounts: state.accounts.map(({ loginCiphertext, proxyCiphertext, ...a }) => ({
       ...a,
@@ -493,6 +495,7 @@ export function publicState(state: FleetState, now = Date.now()) {
         authSessionId,
         leaseId,
         claimId,
+        inboxAgentCalls,
         inboxReceipts,
         savedLogin,
         ...r

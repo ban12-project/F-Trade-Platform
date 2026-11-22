@@ -22,6 +22,8 @@ import {
 import { createGateway } from "./gateway.mjs";
 import { createIdleExitPolicy, viewerGraceExpired } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
+import { withInboxSetup } from "./inbox-adapter.mjs";
+import { createInboxSetup } from "./inbox-setup.mjs";
 import { describeBrowserLaunchFailure } from "./launch-diagnostics.mjs";
 import { activateReadySlot, localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import {
@@ -151,6 +153,27 @@ if (publicationSetup) {
   await publicationSetup.initialize();
   adapter = withPublicationSetup(baseAdapter, publicationSetup);
 }
+const inboxSetup = process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR
+  ? createInboxSetup({
+      stateDir,
+      managedDirectory: process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR,
+      browserRequest,
+      assertActive: assertSetupActive,
+      async activate(slot, profile, candidateHash) {
+        const result = await nodeCall("inbox-setup", {
+          runId: slot.run.id,
+          leaseId: slot.run.leaseId,
+          candidateHash,
+          expiresAt: Date.parse(profile.expiresAt),
+        });
+        if (result.active !== true) throw new Error("setup_activation_unconfirmed");
+      },
+    })
+  : null;
+if (inboxSetup) {
+  await inboxSetup.initialize();
+  adapter = withInboxSetup(adapter, inboxSetup);
+}
 const slots = new Map();
 let gatewayOrigin = "";
 let stopping = false;
@@ -237,6 +260,7 @@ const gateway = createGateway({
   nodeCall,
   slots,
   setupPublication: publicationSetup?.handle,
+  setupInbox: inboxSetup?.handle,
   inspectionFailureStage: publicationInspectionFailureStage,
   inspectPublicationPage: createPublicationPageInspector({
     directory: process.env.BROWSER_MANAGED_FACEBOOK_CONFIG_DIR,
@@ -663,6 +687,34 @@ async function tick() {
           delete adapterRun.inboxSigningKey;
           const outcome = await adapter.execute({
             run: adapterRun,
+            decideInboxAction: async ({ snapshot, context }) => {
+              assertPublicationActive();
+              const response = await fetch(`${appOrigin}/api/browser-nodes`, {
+                method: "POST",
+                redirect: "error",
+                signal: AbortSignal.any([slot.abort.signal, AbortSignal.timeout(30_000)]),
+                headers: {
+                  Authorization: `Bearer ${accessKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  operation: "inbox-agent-decide",
+                  installationId,
+                  bootId,
+                  runId: slot.run.id,
+                  leaseId: slot.run.leaseId,
+                  snapshot,
+                  context,
+                }),
+              });
+              if (!response.ok) {
+                await response.body?.cancel();
+                throw new Error(`platform_http_${response.status}`);
+              }
+              const data = await response.json();
+              assertPublicationActive();
+              return data.decision;
+            },
             reportInbound: createInboxReporter({
               run: slot.run,
               request: nodeCall,
