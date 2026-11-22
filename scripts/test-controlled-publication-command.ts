@@ -3,6 +3,7 @@ import {
   assertFacebookMediaPreview,
   facebookMediaPreviewDigest,
 } from "../lib/social/facebook-media-confirmation";
+import { parseFacebookMediaPayload } from "../lib/social/facebook-media-contract";
 import { createControlledPublicationCommand } from "../lib/social/publication-command";
 
 const policy = {
@@ -75,3 +76,44 @@ for (const changed of [
   );
 }
 console.log("PASS media preview confirmation rejects changed versions, captions and assets");
+
+const validMedia = {
+  version: 2,
+  channelRef: "facebook-personal",
+  accountRef: "61588876867341 欧洲",
+  publicationId: "publication-001",
+  format: "video",
+  text: "",
+  media: {
+    assetRef: "asset-video-001",
+    contentType: "video/mp4",
+    sizeBytes: 1234,
+    sha256: "a".repeat(64),
+  },
+};
+assert.equal(parseFacebookMediaPayload(validMedia).accountRef, "61588876867341 欧洲");
+for (const invalidScope of ["", " leading", "trailing ", "bad\nline", "bad\u007fchar"]) {
+  assert.throws(
+    () => parseFacebookMediaPayload({ ...validMedia, accountRef: invalidScope }),
+    /invalid_facebook_media/,
+  );
+  assert.throws(
+    () => parseFacebookMediaPayload({ ...validMedia, channelRef: invalidScope }),
+    /invalid_facebook_media/,
+  );
+}
+assert.throws(
+  () =>
+    parseFacebookMediaPayload({
+      ...validMedia,
+      media: { ...validMedia.media, assetRef: "bad asset" },
+    }),
+  /invalid_facebook_media/,
+);
+assert.throws(
+  () => parseFacebookMediaPayload({ ...validMedia, publicationId: "bad id" }),
+  /invalid_facebook_media/,
+);
+console.log(
+  "PASS media payload accepts workspace account remarks while keeping strict media/publication refs",
+);

@@ -34,6 +34,21 @@ function reference(value: unknown): string {
   if (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(value)) fail();
   return value;
 }
+function scopeReference(value: unknown): string {
+  if (typeof value !== "string") fail();
+  const trimmed = value.trim();
+  if (
+    !trimmed ||
+    trimmed.length > 200 ||
+    trimmed !== value ||
+    [...value].some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    })
+  )
+    fail();
+  return value;
+}
 export function parseFacebookMedia(input: unknown): FacebookMedia {
   const v = object(input);
   keys(v, ["assetRef", "contentType", "sizeBytes", "sha256"]);
@@ -59,8 +74,8 @@ export function parseFacebookMediaPayload(input: unknown): FacebookMediaPayload 
   if ((v.format === "video") !== (media.contentType === "video/mp4")) fail();
   return {
     version: 2,
-    channelRef: reference(v.channelRef),
-    accountRef: reference(v.accountRef),
+    channelRef: scopeReference(v.channelRef),
+    accountRef: scopeReference(v.accountRef),
     publicationId: reference(v.publicationId),
     format: v.format as "image" | "video",
     text: v.text,
