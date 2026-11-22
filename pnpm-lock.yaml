@@ -174,7 +174,7 @@ importers:
         version: 1.7.0(@types/react@19.2.18)(date-fns@4.1.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@better-auth/passkey':
         specifier: 1.7.14
-        version: 1.7.14(@better-auth/core@1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2))(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-auth@1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(better-call@1.4.4(zod@4.6.7))(nanostores@1.5.2)
+        version: 1.7.14(@better-auth/core@1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2))(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-auth@1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(better-call@1.4.4(zod@4.6.7))(nanostores@1.5.2)
       '@hookform/resolvers':
         specifier: ^5.9.1
         version: 5.9.1(@standard-schema/spec@1.1.0)(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.87.0(react@19.2.8))(zod@4.6.7)
@@ -222,7 +222,7 @@ importers:
         version: 3.0.1(ajv@8.20.0)
       better-auth:
         specifier: 1.7.14
-        version: 1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -239,8 +239,8 @@ importers:
         specifier: ^1.33.0
         version: 1.38.0(react@19.2.8)
       next:
-        specifier: 16.4.3
-        version: 16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: 16.4.6
+        version: 16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -273,7 +273,7 @@ importers:
         version: 7.30.1
       workflow:
         specifier: 5.3.0
-        version: 5.3.0(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)(supports-color@8.1.1))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(typescript@7.0.2)(ws@8.21.0)
+        version: 5.3.0(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)(supports-color@8.1.1))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(typescript@7.0.2)(ws@8.21.0)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -285,8 +285,8 @@ importers:
         specifier: 2.5.12
         version: 2.5.12
       '@next/playwright':
-        specifier: 16.4.3
-        version: 16.4.3(@playwright/test@1.62.1)
+        specifier: 16.4.6
+        version: 16.4.6(@playwright/test@1.62.1)
       '@playwright/test':
         specifier: 1.62.1
         version: 1.62.1
@@ -1802,65 +1802,65 @@ packages:
       '@nestjs/websockets':
         optional: true
 
-  '@next/env@16.4.3':
-    resolution: {integrity: sha512-a7tz1QCcWWkwC/rPJcPMJk/UNRu9CFhDd3OHYE5hddbJrs8BqRTalxI6GlKCWEGzRLHN+S/B7a4PAHCtm25aBQ==}
+  '@next/env@16.4.6':
+    resolution: {integrity: sha512-SunBjJ6t+oBtecS3dTjdVuMhUogP5wD/vrGL5EVuQYM1iS4O5ilL51HkiJ3sPjMzRHiCChvr4dbaSJbR7F3lxA==}
 
-  '@next/playwright@16.4.3':
-    resolution: {integrity: sha512-UH0bkck8lDFE0EJLX8NMoxSBi/2LZ0z8nNZnCy+qsZgL+PrR6NgCe+mzT/VcnA/75gxCjNPwpHVDiDz6GtkUVw==}
+  '@next/playwright@16.4.6':
+    resolution: {integrity: sha512-/sQA8B4quvmh3O6Uopi09u2wYnnUPXQwR2QoH1YkguoyylypwFzOTt5QxIOKuU/WHA5MFrwBHFo2Ge4CucMvvw==}
     peerDependencies:
       '@playwright/test': '>=1.0.0'
     peerDependenciesMeta:
       '@playwright/test':
         optional: true
 
-  '@next/swc-darwin-arm64@16.4.3':
-    resolution: {integrity: sha512-4yq5EXBt+VDtAZwTyfijaFp5D2C5oz3Ikw5a2kiX2K9nw72vrZX2q5UuAlkPtUMO1tQz6JTKpaKWjS7OOefTDQ==}
+  '@next/swc-darwin-arm64@16.4.6':
+    resolution: {integrity: sha512-kJ4VVZkley17xKaJx72QN2IBqjrj7zenCQZaUF0l9ShS/1Mt2kW4+Z5KGG6vgr3L/J562xTOizVyM1iA/u5nlg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  '@next/swc-darwin-x64@16.4.3':
-    resolution: {integrity: sha512-1Rvkn/LUhnEF8WxnRkOrqGhbwXui1bkWFxONKIbN+r7C+9KHDSZ+iUoj4CzymVMWUyZIyx9szcb9+kbKhD500A==}
+  '@next/swc-darwin-x64@16.4.6':
+    resolution: {integrity: sha512-eIPGZIqC+8JKaeZmvnCANJQF4xWkkHqSnAAajtFxgwDMAOnCgxNvP52SeWZ41PyVwoe+Le/NQuZSaQ8j7YshSA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  '@next/swc-linux-arm64-gnu@16.4.3':
-    resolution: {integrity: sha512-dCKpXErGg3abUM6t5JTJV/ottVBTStJB5lRJTbgdUdQaQ+jNHiK56Hsc0YAEg/rinSh42hYG3HWiYmEMdilnxg==}
+  '@next/swc-linux-arm64-gnu@16.4.6':
+    resolution: {integrity: sha512-9nI6O8vvczH2D9ZNdMGqb/3NuT15T9ksOZnAmx9/gjF2cOi74+xxyf1Hk96uIMfm14c9y6wHeBq6SH8g6udvcA==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@next/swc-linux-arm64-musl@16.4.3':
-    resolution: {integrity: sha512-WwYbhWkhYBvBtib1K4W0kL8MW2snBD2A5b3SN4vPpqalZbZs5+bQ1yzAdepVoOqrFfEW3dmREy4Zs1MrWcrFbw==}
+  '@next/swc-linux-arm64-musl@16.4.6':
+    resolution: {integrity: sha512-7/qPhTxDp2ScluOJOhLuhWmlA17o1yZ0SIgpISBCpBxXgtnK4+KGywBpFkfLPiU1rnSM1faFGzYkH6i7JdTrqA==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@next/swc-linux-x64-gnu@16.4.3':
-    resolution: {integrity: sha512-QymWvfUwDEC5/lpJOsxX5VAbyoR2D13+2Jsjz4be7gT4LPqEgdpkeLIR/HFfCLgKzoMhpJbp6I/JnogyNZHcaA==}
+  '@next/swc-linux-x64-gnu@16.4.6':
+    resolution: {integrity: sha512-oOpbNa8XOW1qCGd9VvzC4fbkkRxEls7/WI6tz+YHC0xRA7KpV1U7DrAnCPjzVyOk/karzWEepCOcTIDmwK8FwQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@next/swc-linux-x64-musl@16.4.3':
-    resolution: {integrity: sha512-Vmjd9D7DpA4Vv3cUlr82QWgJD/BQZmns801vtC5VWHg6jCIA4a5vMKpQnfrM2pyCrp2eV0ENdUg4PlN3bAc2Yw==}
+  '@next/swc-linux-x64-musl@16.4.6':
+    resolution: {integrity: sha512-aM8CZ+OR2EwXaAYw7KGkW2GDmNDsLBIRe1MMRZCJPTdw/xhTD0IMUVO4sf3KqrzuRouGzwwLZn34+gFeVXiUQA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@next/swc-win32-arm64-msvc@16.4.3':
-    resolution: {integrity: sha512-lG1pPdPLk7gTyGb00n5JIMLdBJgjb+UEhSdZvFbhUMg0DyC6z4B7RnpSKF9VCd4imkLObVbXOFA0kFCpw7yFow==}
+  '@next/swc-win32-arm64-msvc@16.4.6':
+    resolution: {integrity: sha512-U0p7/tEtqvHX2crhd841CDwKtp5CFkKXVjOhmfccR3Pvp64sj8KBwRqsvltqLOwVBbj0NtkxwXSDpEHYGbxeXQ==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  '@next/swc-win32-x64-msvc@16.4.3':
-    resolution: {integrity: sha512-NmQC9RkJdnPXRaMxtkCzobB3teVjqF33oSOnwDfi+XYGWWYpt+xlGK3mtktSKLbdjwaWbJu2OkkMiRFGUUncKg==}
+  '@next/swc-win32-x64-msvc@16.4.6':
+    resolution: {integrity: sha512-3ZG15/5WIdlTQsIEvc9sPTTSL5XFrlLklIKmfF4fwsDnoAhu6NcBDXsk3mbGxNyo6aVLEGex+fHCv2MahY7a9g==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
@@ -4579,8 +4579,8 @@ packages:
   neo-async@2.6.2:
     resolution: {integrity: sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw==}
 
-  next@16.4.3:
-    resolution: {integrity: sha512-OqxKTGi9u80FydydsMNYNjnuje9Au+kvHlt2GZ//ftdpDHm1dxKqAaENoOOTX5wKzn+9vaKUNIfZeyZUuLhCnA==}
+  next@16.4.6:
+    resolution: {integrity: sha512-QZJiYhaZLJMo2KpkQGQIwvmd79WVsAWeYIU554a8d7zArS3si/IRy3lBNV/rtYhE70oLwdLYhPAXLPx8HwcwtA==}
     engines: {node: '>=20.9.0'}
     hasBin: true
     peerDependencies:
@@ -6157,14 +6157,14 @@ snapshots:
       '@better-auth/core': 1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2)
       '@better-auth/utils': 0.5.1
 
-  '@better-auth/passkey@1.7.14(@better-auth/core@1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2))(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-auth@1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(better-call@1.4.4(zod@4.6.7))(nanostores@1.5.2)':
+  '@better-auth/passkey@1.7.14(@better-auth/core@1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2))(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-auth@1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(better-call@1.4.4(zod@4.6.7))(nanostores@1.5.2)':
     dependencies:
       '@better-auth/core': 1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2)
       '@better-auth/utils': 0.5.1
       '@better-fetch/fetch': 1.3.3
       '@simplewebauthn/browser': 13.3.0
       '@simplewebauthn/server': 13.3.3
-      better-auth: 1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      better-auth: 1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       better-call: 1.4.4(zod@4.6.7)
       nanostores: 1.5.2
       zod: 4.6.7
@@ -6861,34 +6861,34 @@ snapshots:
       tslib: 2.8.1
       uid: 2.0.2
 
-  '@next/env@16.4.3': {}
+  '@next/env@16.4.6': {}
 
-  '@next/playwright@16.4.3(@playwright/test@1.62.1)':
+  '@next/playwright@16.4.6(@playwright/test@1.62.1)':
     optionalDependencies:
       '@playwright/test': 1.62.1
 
-  '@next/swc-darwin-arm64@16.4.3':
+  '@next/swc-darwin-arm64@16.4.6':
     optional: true
 
-  '@next/swc-darwin-x64@16.4.3':
+  '@next/swc-darwin-x64@16.4.6':
     optional: true
 
-  '@next/swc-linux-arm64-gnu@16.4.3':
+  '@next/swc-linux-arm64-gnu@16.4.6':
     optional: true
 
-  '@next/swc-linux-arm64-musl@16.4.3':
+  '@next/swc-linux-arm64-musl@16.4.6':
     optional: true
 
-  '@next/swc-linux-x64-gnu@16.4.3':
+  '@next/swc-linux-x64-gnu@16.4.6':
     optional: true
 
-  '@next/swc-linux-x64-musl@16.4.3':
+  '@next/swc-linux-x64-musl@16.4.6':
     optional: true
 
-  '@next/swc-win32-arm64-msvc@16.4.3':
+  '@next/swc-win32-arm64-msvc@16.4.6':
     optional: true
 
-  '@next/swc-win32-x64-msvc@16.4.3':
+  '@next/swc-win32-x64-msvc@16.4.6':
     optional: true
 
   '@noble/ciphers@2.4.0': {}
@@ -8135,7 +8135,7 @@ snapshots:
       - utf-8-validate
       - ws
 
-  '@workflow/next@5.0.7(@swc/helpers@0.5.23)(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(supports-color@8.1.1)(ws@8.21.0)':
+  '@workflow/next@5.0.7(@swc/helpers@0.5.23)(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(supports-color@8.1.1)(ws@8.21.0)':
     dependencies:
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
       '@workflow/builders': 5.0.7(@swc/helpers@0.5.23)(supports-color@8.1.1)(ws@8.21.0)
@@ -8145,7 +8145,7 @@ snapshots:
       semver: 7.7.4
       watchpack: 2.5.1
     optionalDependencies:
-      next: 16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      next: 16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     transitivePeerDependencies:
       - '@opentelemetry/api'
       - '@swc/helpers'
@@ -8505,7 +8505,7 @@ snapshots:
 
   baseline-browser-mapping@2.11.34: {}
 
-  better-auth@1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  better-auth@1.7.14(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       '@better-auth/core': 1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2)
       '@better-auth/drizzle-adapter': 1.7.14(@better-auth/core@1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2))(@better-auth/utils@0.5.1)(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))
@@ -8527,7 +8527,7 @@ snapshots:
     optionalDependencies:
       drizzle-kit: 0.31.10
       drizzle-orm: 0.45.2(@neondatabase/serverless@1.1.0)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0)
-      next: 16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      next: 16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       pg: 8.23.0
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -9832,25 +9832,25 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      '@next/env': 16.4.3
+      '@next/env': 16.4.6
       '@swc/helpers': 0.5.23
-      baseline-browser-mapping: 2.11.20
-      caniuse-lite: 1.0.30001810
+      baseline-browser-mapping: 2.11.34
+      caniuse-lite: 1.0.30001820
       postcss: 8.5.23
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       styled-jsx: 5.1.6(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.8)
     optionalDependencies:
-      '@next/swc-darwin-arm64': 16.4.3
-      '@next/swc-darwin-x64': 16.4.3
-      '@next/swc-linux-arm64-gnu': 16.4.3
-      '@next/swc-linux-arm64-musl': 16.4.3
-      '@next/swc-linux-x64-gnu': 16.4.3
-      '@next/swc-linux-x64-musl': 16.4.3
-      '@next/swc-win32-arm64-msvc': 16.4.3
-      '@next/swc-win32-x64-msvc': 16.4.3
+      '@next/swc-darwin-arm64': 16.4.6
+      '@next/swc-darwin-x64': 16.4.6
+      '@next/swc-linux-arm64-gnu': 16.4.6
+      '@next/swc-linux-arm64-musl': 16.4.6
+      '@next/swc-linux-x64-gnu': 16.4.6
+      '@next/swc-linux-x64-musl': 16.4.6
+      '@next/swc-win32-arm64-msvc': 16.4.6
+      '@next/swc-win32-x64-msvc': 16.4.6
       '@playwright/test': 1.62.1
       sharp: 0.35.5(@types/node@26.2.0)
     transitivePeerDependencies:
@@ -10902,14 +10902,14 @@ snapshots:
 
   wordwrap@1.0.0: {}
 
-  workflow@5.3.0(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)(supports-color@8.1.1))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(typescript@7.0.2)(ws@8.21.0):
+  workflow@5.3.0(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)(supports-color@8.1.1))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)(typescript@7.0.2)(ws@8.21.0):
     dependencies:
       '@workflow/astro': 5.0.7(@swc/helpers@0.5.23)(supports-color@8.1.1)(ws@8.21.0)
       '@workflow/cli': 5.0.7(@aws-sdk/credential-provider-web-identity@3.972.49)(@swc/helpers@0.5.23)(react@19.2.8)(supports-color@8.1.1)(ws@8.21.0)
       '@workflow/core': 5.3.0(supports-color@8.1.1)(ws@8.21.0)
       '@workflow/errors': 5.1.0
       '@workflow/nest': 5.1.5(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0)(supports-color@8.1.1))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(supports-color@8.1.1)(ws@8.21.0)
-      '@workflow/next': 5.0.7(@swc/helpers@0.5.23)(next@16.4.3(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(supports-color@8.1.1)(ws@8.21.0)
+      '@workflow/next': 5.0.7(@swc/helpers@0.5.23)(next@16.4.6(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(supports-color@8.1.1)(ws@8.21.0)
       '@workflow/nitro': 5.0.7(@swc/helpers@0.5.23)(react@19.2.8)(supports-color@8.1.1)(ws@8.21.0)
       '@workflow/nuxt': 5.0.7(@swc/helpers@0.5.23)(react@19.2.8)(supports-color@8.1.1)(ws@8.21.0)
       '@workflow/rollup': 5.0.7(@swc/helpers@0.5.23)(supports-color@8.1.1)(ws@8.21.0)
