@@ -365,7 +365,7 @@ try {
     ["full", sources.gateway, 0],
     [
       "without_admitted_run_origin",
-      replaceOnce(sources.gateway, "origin !== slot.gatewayOrigin", "false"),
+      replaceOnce(sources.gateway, "(!origin || origin === slot.gatewayOrigin)", "true"),
       1,
     ],
     [
