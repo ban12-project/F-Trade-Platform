@@ -407,3 +407,48 @@ test("live inbox agent retries thread evaluation when rowCount is 0 and stopCont
     "DELETE /containers/c-1?v=false",
   ]);
 });
+
+test("live inbox agent surfaces sanitized page_contract_failed reason via onInboxFailure", async () => {
+  const baseProfile = {
+    version: 2,
+    mode: "facebook-live-agent",
+    channelRef: "facebook-personal",
+    accountRef: "61589008383902",
+    expectedAccountRef: "61589008383902",
+    reviewRef: "evidence-test-789",
+    reviewedAt: new Date(Date.now() - 60_000).toISOString(),
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    url: "https://www.facebook.com/messages/",
+  };
+  const baseRun = {
+    kind: "inbox",
+    id: "00000000-0000-4000-8000-000000000031",
+    accountId: "00000000-0000-4000-8000-000000000032",
+    channelRef: "facebook-personal",
+    accountRef: "61589008383902",
+  };
+  const failures = [];
+  const execute = createFacebookLiveInboxAgent(
+    baseProfile,
+    async (path) => {
+      if (path === "/tabs")
+        return Response.json({ ok: true, tabId: "tab-1", url: baseProfile.url });
+      if (path.endsWith("/evaluate")) {
+        return Response.json({
+          ok: true,
+          result: { attention: "page_contract_failed", reason: "inbox_direction_ambiguous" },
+        });
+      }
+      return Response.json({ ok: true });
+    },
+    async () => ({ command: { action: "finish", target: "", valueRef: "" } }),
+  );
+  const outcome = await execute({
+    run: baseRun,
+    signal: new AbortController().signal,
+    reportInbound: async () => ({ accepted: 0, duplicates: 0 }),
+    onInboxFailure: (code) => failures.push(code),
+  });
+  assert.equal(outcome, "page_contract_failed");
+  assert.deepEqual(failures, ["inbox_direction_ambiguous"]);
+});

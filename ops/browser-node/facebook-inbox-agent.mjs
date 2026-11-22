@@ -128,6 +128,12 @@ const SAFE_INBOX_FAILURE_CODES = new Set([
 ]);
 
 function classifyInboxFailure(error) {
+  if (
+    error?.attention === "page_contract_failed" &&
+    typeof error?.reason === "string" &&
+    /^inbox_[a-z0-9_]{1,60}$/.test(error.reason)
+  )
+    return error.reason;
   if (["needs_login", "needs_2fa", "checkpoint", "page_contract_failed"].includes(error?.attention))
     return error.attention;
   const message = error?.message;
@@ -214,9 +220,10 @@ export function createFacebookLiveInboxAgent(input, browserRequest, decideInboxA
         ) {
           const error = new Error("inbox_operator_attention");
           error.attention = result.result.attention;
+          error.reason = result.result.reason;
           throw error;
         }
-        if (mode === "thread" && result.result.rowCount === 0 && attempt < 10) {
+        if (mode === "thread" && result.result.rowCount === 0 && attempt < 16) {
           await delay(500, undefined, { signal });
           continue;
         }
