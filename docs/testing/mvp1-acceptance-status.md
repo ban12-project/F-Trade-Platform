@@ -1,6 +1,16 @@
 # MVP1 当前验收状态
 
-核对日期：2026-11-14。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#332](https://github.com/ban12-project/F-Trade-Platform/issues/332)。**MVP1 总验收未完成；用户要求推进剩余工程工作，但因缺少可发送私信的账号，延后当前账号发布与 DM 入站验收。** 10 月 31 日运行时交付、真实账号观察及未通过项见[历史 DM 检查点](reports/dm-startup-diagnostics-20261031.md)。 11 月 1 日业务演示仅使用 `docs/reference/`，旧合成项目归档并保留原审计；受控消息不计作真实客户询盘。10 月 22 日运行时、模板与生产部署的工程证据见[接管修复与交付报告](reports/sandbox-viewer-rollout-20261022.md)。下文标注的 2026-10-15 状态属于历史检查点，不能代替本轮实测。
+核对日期：2026-11-22。关联 [#32](https://github.com/ban12-project/F-Trade-Platform/issues/32) 和 [#156](https://github.com/ban12-project/F-Trade-Platform/issues/156)。**MVP1 总验收未完成；被动 Facebook DM 线上验收已于 2026-11-22 完成（`e8b73e95`），真实渠道发布及最终人工 Go/No-Go 仍待确认。** 11 月 14 日与 11 月 1 日历史记录保留于下文作为对应时间的检查点；历史报告中标记的待办以本节当前状态为准。
+
+## 2026-11-22 工程与收尾核对
+
+| 范围 | 已验证证据 | 边界／后续条件 |
+| --- | --- | --- |
+| 应用交付（#982） | 读取 Vercel 项目配置 `commandForIgnoringBuildStep` 为 `'if [ "$VERCEL_ENV" == "production" ]; then exit 1; else exit 0; fi'`（仅跳过非生产预览构建）；`main` `e8b73e95` 部署 `dpl_Es83QxYenffsREYyvNKFL8tmZDhW` 状态为 `Ready` 并绑定 `https://ftp.ban12.com`；公开探针 `/` 返回 200、`/workspace` 返回 307 重定向至 `/auth` | 需在每次发布后继续核对目标提交部署与公开边界；自动 CI 仍按 #711 暂停，最终验收前须恢复 |
+| 被动入站 DM 线上验收（#322/#414） | 2026-11-22 于 `https://ftp.ban12.com` + 托管 VPS 节点验证 `e8b73e95`（PR `#1098`–`#1102`）：持久 Camoufox/Firefox 原生档案保留 E2EE 密钥、`inbox-setup` 启用、首轮 `gpt-6.1-terra` 抓取 2 会话 3 条消息入库、重复轮询 `accepted: 0 / duplicates: 3` 幂等去重、人工分流弹窗正常解密测试消息且零自动回复／报价；`pnpm check`、`pnpm typecheck`、92 项节点／车队测试、12 项 live-agent Playwright 与 `CI=1 pnpm build` 通过 | 仅验证被动 DM 采集与已启用账号；`欧洲` 仅作合成发件方且未启用收件箱同步；自动登录/2FA/PIN（#423）、真实发布回执（#383）与 Meta 规则适用性（#318）独立跟踪 |
+| 依赖审计（#498） | [#1095](https://github.com/ban12-project/F-Trade-Platform/pull/1095) 将 Next.js 与 `@next/playwright` 升级至 `16.4.6` 消除 7 项 Next.js 中危告警；GitHub 顾问库已于 2026-11-16 撤回 `deepmerge` 公告（`GHSA-gcqx-w48m-w2h4`）；2026-11-22 `pnpm audit --prod --json` 为 **0 critical / 0 high / 1 moderate / 0 low**，唯一残余匹配为 `minimatch`（`GHSA-g3hv-75wg-m249`，工作区已通过 `patches/minimatch@9.0.9.patch` 与 `patches/minimatch@10.2.6.patch` 本地防护并经 16 项回归验证） | 上游 `@vercel/queue`（`0.11.0`）、`@swc/cli`（`0.8.2`）等尚未支持 `minimatch >= 11.0.1`，工作区补丁不覆盖外部独立 CLI 缓存，#498 保持开放 |
+| 表单重复保存（#1073） | 在 PR `#1074`–`#1077` 基础上补齐 `AccountControls` 连续保存重置与提交锁定、`RfqForm` / `ProductDraftForm` `handledState` 生命周期防护，以及 `repeated-save.spec.ts` 频道控制连续保存／拒绝重试／轮询刷新不覆盖草稿回归 | 合成响应拦截验证客户端表单生命周期，不替代服务端权限或真实账号控制写入 |
+| 剩余未关闭项 | `#32`（总验收与 Go/No-Go 及恢复 CI）、`#122`（90 天真实到期删除与副本清除）、`#156`（Facebook 发布与入站汇总 Epic）、`#318`（Meta 目标路径规则与平台接受度）、`#383`（生产发布与持久回执验收）、`#391`（实机与辅助技术／对比度验收）、`#423`（加密自动登录与 2FA/PIN 恢复）、`#498`（残余 `minimatch` 依赖风险）、`#667`（三方账号凭据交接安全风险） | 原 #11、#49、#126、#322、#348、#414、#623、#664、#674、#821、#936、#982、#1073 已依据当前实现、线上证据或范围决策结项 |
 
 ## 2026-11-14 不依赖社媒账号的工程检查点
 
