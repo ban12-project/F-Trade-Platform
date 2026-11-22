@@ -172,12 +172,37 @@ function readLiveFacebookInbox(profile, mode, expectedConversation) {
         if (!messageRef || messageRef.length > 200 || seenIds.has(messageRef))
           throw new Error("inbox_message_id_invalid");
         seenIds.add(messageRef);
+        const label = el.getAttribute("aria-label") ?? "";
+        const candidates = all(el, 'div[dir="auto"]').filter(
+          (node) =>
+            !node.closest(
+              'h4, [role="toolbar"], [role="button"][aria-label^="Enter, Message sent"]',
+            ),
+        );
+        const outermost = candidates.filter(
+          (node) => !candidates.some((other) => other !== node && other.contains(node)),
+        );
+        const body = outermost
+          .map((node) => node.innerText.trim())
+          .filter(Boolean)
+          .join("\n");
+        if (!body) {
+          const hasMedia =
+            el.querySelector("img, video, audio, svg") !== null ||
+            /\b(photo|image|video|sticker|gif|audio|voice|file|attachment|sent a)\b/i.test(label);
+          if (hasMedia) {
+            skippedNonText++;
+            continue;
+          }
+          throw new Error("inbox_message_body_invalid");
+        }
         const headings = all(el, "h4")
           .map((node) => node.innerText.trim())
           .filter(Boolean);
-        const h4Out = headings.some((text) => text === "You sent");
-        const h4In = headings.some((text) => text !== "You sent");
-        const label = el.getAttribute("aria-label") ?? "";
+        const isYouHeading = (text) =>
+          text === "You sent" || /^You (?:sent|replied|forwarded|unsent|reacted)\b/i.test(text);
+        const h4Out = headings.some(isYouHeading);
+        const h4In = headings.some((text) => !isYouHeading(text));
         const labelSender = /^At\s+[^,]+,\s*([^:]+):/.exec(label)?.[1]?.trim() ?? "";
         const labelOut = labelSender === "You" || /\bby You:/.test(label);
         const labelIn = labelSender.length > 0 && labelSender !== "You";
@@ -209,29 +234,6 @@ function readLiveFacebookInbox(profile, mode, expectedConversation) {
         const clampedTime = Math.min(timestampMs, Date.now());
         if (Date.now() - clampedTime >= 30 * 86400000) continue;
 
-        const candidates = all(el, 'div[dir="auto"]').filter(
-          (node) =>
-            !node.closest(
-              'h4, [role="toolbar"], [role="button"][aria-label^="Enter, Message sent"]',
-            ),
-        );
-        const outermost = candidates.filter(
-          (node) => !candidates.some((other) => other !== node && other.contains(node)),
-        );
-        const body = outermost
-          .map((node) => node.innerText.trim())
-          .filter(Boolean)
-          .join("\n");
-        if (!body) {
-          const hasMedia =
-            el.querySelector("img, video, audio, svg") !== null ||
-            /\b(photo|image|video|sticker|gif|audio|voice|file|attachment|sent a)\b/i.test(label);
-          if (hasMedia) {
-            skippedNonText++;
-            continue;
-          }
-          throw new Error("inbox_message_body_invalid");
-        }
         if (body.length > 20000) throw new Error("inbox_message_body_invalid");
         totalSize += body.length;
         if (totalSize > 200000) throw new Error("inbox_thread_size_limit");
