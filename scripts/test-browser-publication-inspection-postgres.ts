@@ -7,7 +7,7 @@ import { Pool } from "pg";
 import { claimRun, enqueueRun, initialState } from "../lib/browser-fleet/policy";
 import { inspectOwnedPublicationPage } from "../lib/browser-fleet/publication-page-inspection";
 import type { BrowserSandboxProvider } from "../lib/browser-fleet/sandbox-provider";
-import { ownerBrowserCommand } from "../lib/browser-fleet/store";
+import { issueInteractiveControlTicket } from "../lib/browser-fleet/store";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import { auditEvent, session, user } from "../lib/db/schema";
 
@@ -150,7 +150,7 @@ function dependencies(
       actor: { id: string; sessionId: string },
     ) {
       calls.ticket++;
-      return ownerBrowserCommand({ operation: "ticket", ...input }, actor);
+      return issueInteractiveControlTicket({ ...input, purpose: "publication-inspection" }, actor);
     },
     async request(input: string | URL | Request, init?: RequestInit) {
       calls.request++;
@@ -160,7 +160,7 @@ function dependencies(
       assert.equal(new Headers(init.headers).get("Origin"), "https://synthetic-app.example");
       const body = JSON.parse(String(init.body));
       assert.deepEqual(Object.keys(body), ["ticket"]);
-      assert(body.ticket.startsWith(`${f.runId}.`));
+      assert(body.ticket.startsWith(`${f.runId}.inspect.`));
       if (change) await change();
       if (badResponse === "oversized") return new Response("x".repeat(8193));
       if (badResponse.startsWith("classified"))

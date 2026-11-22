@@ -21,7 +21,11 @@ import { awaitVideoPreview } from "../ops/browser-node/facebook-driver.mjs";
 import { createGateway, safeAssetPath } from "../ops/browser-node/gateway.mjs";
 import { viewerGraceExpired } from "../ops/browser-node/idle.mjs";
 import { describeBrowserLaunchFailure } from "../ops/browser-node/launch-diagnostics.mjs";
-import { localDeadline, localLoginAuthorizationDeadline } from "../ops/browser-node/lease.mjs";
+import {
+  activateReadySlot,
+  localDeadline,
+  localLoginAuthorizationDeadline,
+} from "../ops/browser-node/lease.mjs";
 import {
   configureLoginRuntime,
   loadLoginProfiles,
@@ -1220,4 +1224,133 @@ test("disconnect grace is two minutes, resets on reconnect and does not use init
     false,
   );
   assert.equal(viewerGraceExpired({ ...base, disconnectedAt: null }, 60002), true);
+});
+
+test("activateReadySlot sets local readiness after watchdog renewal and before ready=true heartbeat", async () => {
+  const events = [];
+  const slot = { ready: false, stopping: false, expiresAt: 0 };
+  await activateReadySlot(slot, {
+    now: () => 55_000,
+    async heartbeat(ready) {
+      events.push(["heartbeat", ready, slot.ready]);
+      return { active: true, serverNow: 100_000, roundTripMs: 10, leaseUntil: 190_000 };
+    },
+    async renewWatchdog(expiresAt) {
+      assert.equal(slot.ready, false);
+      assert.ok(expiresAt > Date.now());
+      events.push(["watchdog", slot.ready]);
+    },
+  });
+  assert.deepEqual(events, [
+    ["heartbeat", false, false],
+    ["watchdog", false],
+    ["heartbeat", true, true],
+  ]);
+  assert.equal(slot.ready, true);
+  assert.equal(slot.readyAt, 55_000);
+
+  const failingSlot = { ready: false, stopping: false, expiresAt: 0 };
+  await assert.rejects(
+    activateReadySlot(failingSlot, {
+      async heartbeat(ready) {
+        if (ready) throw new Error("heartbeat_lost");
+        return { active: true, serverNow: 100_000, roundTripMs: 10, leaseUntil: 190_000 };
+      },
+      async renewWatchdog() {},
+    }),
+    /heartbeat_lost/,
+  );
+  assert.equal(failingSlot.ready, false);
+  assert.equal(failingSlot.readyAt, undefined);
+});
+
+test("gateway fails fast when slot is unready and enforces ticket scopes with rolling-deploy compatibility", async () => {
+  const runId = randomUUID();
+  const admitted = [];
+  const slot = {
+    run: { id: runId, kind: "interactive" },
+    ready: false,
+    stopping: false,
+    expiresAt: Date.now() + 60_000,
+    gatewayOrigin: "https://browser.example",
+    vncPassword: "synthetic",
+    vncPort: 5900,
+  };
+  const gateway = createGateway({
+    appOrigin: "https://app.example",
+    slots: new Map([[runId, slot]]),
+    port: 0,
+    nodeCall: async (op, { ticket }) => {
+      admitted.push([op, ticket]);
+      return { runId };
+    },
+    setupPublication: async (_s, input) => ({ ok: true, operation: input.operation }),
+    inspectPublicationPage: async () => ({ version: 1 }),
+  });
+  await once(gateway.server, "listening");
+  const port = gateway.server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    const viewerTicket = `${runId}.${"a".repeat(43)}`;
+    const setupTicket = `${runId}.setup.${"b".repeat(43)}`;
+    const inspectTicket = `${runId}.inspect.${"c".repeat(43)}`;
+    assert.equal(
+      (
+        await fetch(`${base}/admit`, {
+          method: "POST",
+          headers: { Origin: slot.gatewayOrigin, "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket: viewerTicket }),
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await fetch(`${base}/publication-setup`, {
+          method: "POST",
+          headers: { Origin: "https://app.example", "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket: setupTicket, operation: "prepare" }),
+        })
+      ).status,
+      403,
+    );
+    assert.equal(admitted.length, 0, "unready slot must reject before consuming broker tickets");
+
+    slot.ready = true;
+    for (const [path, origin, body] of [
+      ["/admit", slot.gatewayOrigin, { ticket: setupTicket }],
+      ["/admit", slot.gatewayOrigin, { ticket: inspectTicket }],
+      [
+        "/publication-setup",
+        "https://app.example",
+        { ticket: inspectTicket, operation: "prepare" },
+      ],
+      ["/publication-inspection", "https://app.example", { ticket: setupTicket }],
+    ]) {
+      const response = await fetch(`${base}${path}`, {
+        method: "POST",
+        headers: { Origin: origin, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      assert.equal(response.status, 403);
+    }
+    assert.equal(admitted.length, 0, "wrong ticket scope must reject before calling nodeCall");
+
+    const setupRes = await fetch(`${base}/publication-setup`, {
+      method: "POST",
+      headers: { Origin: "https://app.example", "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket: viewerTicket, operation: "prepare" }),
+    });
+    assert.equal(setupRes.status, 200);
+    const inspectRes = await fetch(`${base}/publication-inspection`, {
+      method: "POST",
+      headers: { Origin: "https://app.example", "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket: `${runId}.${"d".repeat(43)}` }),
+    });
+    assert.equal(inspectRes.status, 200);
+    assert.equal(admitted.length, 2);
+  } finally {
+    gateway.close();
+    gateway.server.closeAllConnections();
+  }
 });

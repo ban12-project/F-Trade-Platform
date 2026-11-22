@@ -15,7 +15,7 @@ import {
 } from "./publication-page-inspection-contract";
 import type { BrowserSandboxProvider } from "./sandbox-provider";
 import { secureOrigin } from "./security";
-import { ownerBrowserCommand } from "./store";
+import { issueInteractiveControlTicket } from "./store";
 
 type Actor = { id: string; sessionId: string };
 type Request = { nodeId: string; runId: string };
@@ -105,7 +105,7 @@ export async function currentInspectionAccess(
 const defaultDependencies = {
   provider: Sandbox as Pick<BrowserSandboxProvider, "get">,
   ticket: (input: Request, actor: Actor) =>
-    ownerBrowserCommand({ operation: "ticket", ...input }, actor),
+    issueInteractiveControlTicket({ ...input, purpose: "publication-inspection" }, actor),
   request: fetch,
   appOrigin: () => secureOrigin(process.env.BROWSER_SANDBOX_PLATFORM_ORIGIN ?? ""),
 };

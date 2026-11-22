@@ -23,7 +23,7 @@ import { createGateway } from "./gateway.mjs";
 import { createIdleExitPolicy, viewerGraceExpired } from "./idle.mjs";
 import { createInboxReporter } from "./inbox.mjs";
 import { describeBrowserLaunchFailure } from "./launch-diagnostics.mjs";
-import { localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
+import { activateReadySlot, localDeadline, prepareClaimBeforeStart } from "./lease.mjs";
 import {
   configureLoginRuntime,
   createSavedLoginExecutor,
@@ -358,18 +358,11 @@ async function launch(slot) {
     if (i === 29) throw new Error("vnc_not_ready");
     await sleep(1000, undefined, { signal: slot.abort.signal });
   }
-  slot.launchStage = "heartbeat";
-  const renewed = await nodeCall("heartbeat", {
-    runId: slot.run.id,
-    leaseId: slot.run.leaseId,
-    ready: true,
+  await activateReadySlot(slot, {
+    heartbeat: (ready) =>
+      nodeCall("heartbeat", { runId: slot.run.id, leaseId: slot.run.leaseId, ready }),
+    renewWatchdog: (expiresAt) => renewWatchdog(docker, slot.containerId, expiresAt),
   });
-  if (!renewed.active || slot.stopping) throw new Error("lease_revoked");
-  slot.expiresAt = localDeadline(renewed, renewed.leaseUntil);
-  slot.launchStage = "watchdog";
-  await renewWatchdog(docker, slot.containerId, slot.expiresAt);
-  slot.ready = true;
-  slot.readyAt = Date.now();
   // Secrets already live in this isolated runtime. Drop the claim's copy.
   delete slot.run.proxy;
   delete slot.spec;
