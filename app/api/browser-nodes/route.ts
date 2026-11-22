@@ -46,7 +46,12 @@ export async function POST(request: Request) {
       });
     }
     return response(result);
-  } catch {
+  } catch (error) {
+    const code =
+      error instanceof Error && /^[a-z0-9_]{2,64}$/.test(error.message)
+        ? error.message
+        : "unclassified";
+    console.warn(JSON.stringify({ event: "browser_node.request_denied", code }));
     return response({ error: "node_request_denied" }, 403);
   } finally {
     reader.releaseLock();

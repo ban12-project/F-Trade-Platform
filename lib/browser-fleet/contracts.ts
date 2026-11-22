@@ -305,6 +305,10 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
         })
         .strict()
         .optional(),
+      inboxFailure: z
+        .string()
+        .regex(/^[a-z0-9_]{3,64}$/)
+        .optional(),
       outcome: z.enum([
         "completed",
         "failed",

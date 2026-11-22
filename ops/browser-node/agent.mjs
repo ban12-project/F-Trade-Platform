@@ -320,6 +320,7 @@ async function stop(slot, outcome = "failed") {
       stopped: true,
       outcome,
       ...(slot.publicationFailure ? { publicationFailure: slot.publicationFailure } : {}),
+      ...(slot.inboxFailure ? { inboxFailure: slot.inboxFailure } : {}),
     });
     slots.delete(slot.run.id);
     await checkpoint();
@@ -740,6 +741,11 @@ async function tick() {
               // Both fields come from fixed executor enums; never log raw page text.
               console.error(`browser_publication_preclick_failed:${stage}:${code}`);
               slot.publicationFailure = { stage, code };
+            },
+            onInboxFailure(code) {
+              // Fixed executor enum only; never log raw page or message text.
+              console.error(`browser_inbox_failed:${code}`);
+              slot.inboxFailure = code;
             },
             readPublicationMedia: readAssignedMedia,
             signal: slot.abort.signal,
