@@ -32,5 +32,6 @@ export async function GET(request: Request, context: { params: Promise<{ videoId
 
 export async function HEAD(request: Request, context: { params: Promise<{ videoId: string }> }) {
   const response = await GET(request, context);
+  await response.body?.cancel();
   return new Response(null, { status: response.status, headers: response.headers });
 }
