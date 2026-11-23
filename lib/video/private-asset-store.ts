@@ -43,6 +43,58 @@ export type PrivateGeneratedVideoRead = {
   etag: string;
 };
 
+/**
+ * Wraps an upstream `@vercel/blob` (undici) ReadableStream in a fresh Web
+ * ReadableStream so passing it to the global `new Response(body)` never throws
+ * `TypeError: Response body object should not be disturbed or locked` when
+ * undici has already buffered or marked the underlying small byte-range stream.
+ */
+export function wrapPrivateVideoBodyStream(
+  source: ReadableStream<Uint8Array>,
+): ReadableStream<Uint8Array> {
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        reader ??= source.getReader();
+        const { done, value } = await reader.read();
+        if (done) {
+          reader.releaseLock();
+          reader = null;
+          controller.close();
+          return;
+        }
+        controller.enqueue(value);
+      } catch (error) {
+        try {
+          reader?.releaseLock();
+        } catch {
+          /* ignore release errors on errored stream */
+        }
+        reader = null;
+        controller.error(error);
+      }
+    },
+    async cancel(reason) {
+      const activeReader = reader;
+      reader = null;
+      if (activeReader) {
+        try {
+          await activeReader.cancel(reason);
+        } finally {
+          try {
+            activeReader.releaseLock();
+          } catch {
+            /* ignore */
+          }
+        }
+        return;
+      }
+      await source.cancel(reason);
+    },
+  });
+}
+
 /** Materializes a private stream only for a callback and deletes it afterwards. */
 export async function withTemporaryPrivateVideoFile<T>(
   asset: Pick<PrivateGeneratedVideoRead, "body" | "contentType"> &
@@ -233,7 +285,7 @@ export class VercelPrivateVideoAssetStore implements PrivateVideoAssetStore {
     const contentRange = result.headers.get("content-range");
     const responseSizeBytes = Number(result.headers.get("content-length") ?? asset.sizeBytes);
     return {
-      body: result.stream,
+      body: wrapPrivateVideoBodyStream(result.stream as ReadableStream<Uint8Array>),
       contentType: result.blob.contentType,
       sizeBytes: asset.sizeBytes,
       responseSizeBytes,
