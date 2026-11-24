@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -32,17 +33,56 @@ export function ProductFieldReview({
     facts.findIndex((fact) => fact.path === selectedPath),
   );
   const fact = facts[index];
+  const verifiedCount = facts.filter((item) => Boolean(item.evidence)).length;
+  const missingCount = facts.length - verifiedCount;
   return (
     <Card className="min-w-0">
       <CardHeader>
         <CardTitle>{productName}</CardTitle>
         <CardDescription>
-          逐项核对产品信息与来源资料；选择字段即可查看当前值和对应来源。切换字段不代表完成核实。
+          逐项核对产品信息与来源资料；点击总览中的任意字段即可查看当前值和对应来源。
         </CardDescription>
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-4">
         {fact ? (
           <>
+            <section aria-label="产品字段总览" className="flex min-w-0 flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium">
+                  共 {facts.length} 项字段 · 已关联来源 {verifiedCount} 项
+                </p>
+                <Badge variant={missingCount > 0 ? "destructive" : "secondary"}>
+                  {missingCount > 0 ? `缺来源 ${missingCount} 项` : "来源完整"}
+                </Badge>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {facts.map((item) => {
+                  const selected = item.path === fact.path;
+                  const label = productFactLabels[item.path] ?? item.path;
+                  return (
+                    <button
+                      key={item.path}
+                      type="button"
+                      aria-current={selected ? "true" : undefined}
+                      onClick={() => setSelectedPath(item.path)}
+                      className={`flex min-w-0 flex-col gap-1 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        selected ? "border-primary bg-muted/40" : "bg-background"
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-center justify-between gap-2">
+                        <span className="truncate text-sm font-medium">{label}</span>
+                        <Badge variant={item.evidence ? "outline" : "destructive"}>
+                          {item.evidence ? "有来源" : "缺来源"}
+                        </Badge>
+                      </div>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {item.value || "未提供"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
             <Field>
               <FieldLabel htmlFor={id}>核对字段</FieldLabel>
               <Select

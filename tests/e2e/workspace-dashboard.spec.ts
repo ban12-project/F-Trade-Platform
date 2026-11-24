@@ -160,8 +160,30 @@ for (const width of [390, 1280]) {
     await expect(page.getByText("入站消息 A1B2C3D4", { exact: true })).toHaveCount(0);
     await page.goto("/testing/workspace-dashboard?empty=1");
     await expect(page.getByText("当前没有需要你处理的任务", { exact: true })).toBeVisible();
+    await expect(page.getByRole("list", { name: "新手入门流程" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "录入第一份产品资料", exact: true }),
     ).toBeVisible();
   });
 }
+
+test("new work dialog offers one-click selection when only one matching project exists", async ({
+  page,
+}) => {
+  await page.goto("/testing/workspace-dashboard");
+  await page
+    .locator("#main-content")
+    .getByRole("button", { name: "开始新工作", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "开始新工作", exact: true });
+  const quickSelect = dialog.getByRole("button", {
+    name: "一键选中唯一可用项目：Synthetic launch",
+    exact: true,
+  });
+  await expect(quickSelect).toBeVisible();
+  await quickSelect.click();
+  await expect(dialog.getByLabel("归属项目")).toHaveValue("00000000-0000-4000-8000-000000000701");
+  await expect(
+    dialog.getByRole("button", { name: "在此项目开始录入产品", exact: true }),
+  ).toBeEnabled();
+});

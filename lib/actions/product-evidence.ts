@@ -14,7 +14,7 @@ export async function uploadProductEvidenceAction(
     const session = await authorizedActionSession("product:write");
     if (!session) return { status: "error", message: "无权上传资料。" };
     const projectId = z.uuid("项目标识无效。").parse(formData.get("projectId"));
-    await claimDocumentUpload(
+    const claimed = await claimDocumentUpload(
       { receiptId: formData.get("receiptId"), projectId, purpose: "evidence" },
       { actorId: session.user.id, sessionId: session.session.id, projectId },
     );
@@ -23,7 +23,11 @@ export async function uploadProductEvidenceAction(
     } catch {
       /* The evidence transaction already committed. */
     }
-    return { status: "success", message: "资料已保存，可在来源资料列表中选择。" };
+    return {
+      status: "success",
+      message: "资料已保存，已自动刷新来源列表。",
+      evidenceId: claimed.evidenceId,
+    };
   } catch (error) {
     return {
       status: "error",

@@ -29,16 +29,16 @@ export default function HomePage() {
         <section className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.08fr_0.92fr] lg:gap-20 lg:py-20">
           <div className="motion-landing-enter flex flex-col gap-7">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">离合器外贸工作流</Badge>
-              <Badge variant="outline">离合器试点版</Badge>
+              <Badge variant="secondary">外贸 AI 工作流</Badge>
+              <Badge variant="outline">汽车离合器试点</Badge>
             </div>
             <div className="flex flex-col gap-5">
               <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
-                核对产品事实，再推进下一步。
+                让工厂资料高效转化为海外询盘。
               </h1>
               <p className="max-w-2xl text-base leading-7 text-muted-foreground text-pretty sm:text-lg">
                 F-Trade
-                在同一工作流中整理工厂资料、产品字段和内容草稿。先核实每项产品事实，再将其用于获客内容。
+                面向外贸与制造企业，在同一工作台打通产品资料结构化、社媒获客内容、客户询盘与人工报价，确保每项产品参数有据可查。
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -68,9 +68,9 @@ export default function HomePage() {
               </CardHeader>
               <CardContent className="flex flex-col gap-5 p-6">
                 {[
-                  [BoxesIcon, "产品资料", "为每个字段保留来源", "PRODUCT_REVIEW_REQUIRED"],
-                  [ShieldCheckIcon, "人工核验", "逐项确认工程事实", "HUMAN GATE"],
-                  [FileCheck2Icon, "内容草稿", "使用已核实的产品信息", "REVIEW REQUIRED"],
+                  [BoxesIcon, "产品资料", "为每个字段保留来源", "待核对"],
+                  [ShieldCheckIcon, "人工核验", "逐项确认工程事实", "人工把关"],
+                  [FileCheck2Icon, "内容草稿", "使用已核实的产品信息", "待审发布"],
                 ].map(([Icon, title, description, status]) => {
                   const WorkflowIcon = Icon as typeof BoxesIcon;
                   return (
@@ -105,12 +105,14 @@ export default function HomePage() {
         <footer className="flex flex-col gap-3 border-t py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>© 2026 F-Trade Platform</span>
           <div className="flex items-center gap-4">
-            <Link
-              href="/testing"
-              className="underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              查看测试页面
-            </Link>
+            {process.env.NEXT_ENABLE_TESTING_API === "1" ? (
+              <Link
+                href="/testing"
+                className="underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                查看测试页面
+              </Link>
+            ) : null}
             <span>资料有依据 · 报价有人审</span>
           </div>
         </footer>

@@ -25,7 +25,7 @@ const intakeMessages: Record<ProductIntakeErrorCode, string> = {
     "上传文件当前不可用。请重新选择文件并上传；若仍失败，请联系管理员检查文件存储。",
   upload_type_mismatch: "文件内容与声明的类型不一致。请确认实际格式后重新上传，不要只修改扩展名。",
   upload_size_mismatch:
-    "文件大小与上传记录不一致或超出限制。请重新上传，资料不超过 25 MiB、图片不超过 5 MiB。",
+    "文件大小与上传记录不一致或超出限制。请重新上传，资料不超过 25 MB、图片不超过 5 MB。",
   upload_image_invalid:
     "图片无法完整解码。请选择未损坏的 PNG 或 JPEG 图片，每张不超过 2500 万像素。",
   upload_image_animated: "产品图片不能包含多帧或动画。请选择单帧 PNG 或 JPEG 图片后重新上传。",

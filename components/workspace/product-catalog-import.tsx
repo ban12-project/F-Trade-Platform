@@ -388,7 +388,7 @@ export function ProductCatalogImport({
                 </p>
               )}
               <FieldDescription>
-                支持 PDF、CSV 和 Excel，最大 25 MiB。解析进度可在刷新后恢复。
+                支持 PDF、CSV 和 Excel，最大 25 MB。解析进度可在刷新后恢复。
               </FieldDescription>
               <FieldError errors={[uploadForm.formState.errors.document]} />
             </Field>

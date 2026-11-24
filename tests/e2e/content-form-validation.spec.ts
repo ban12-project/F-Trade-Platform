@@ -93,3 +93,24 @@ for (const revision of [false, true]) {
     await expect(submit).toBeEnabled();
   });
 }
+
+test("quick scenario presets populate fields and live post preview updates", async ({ page }) => {
+  await page.goto("/testing/project-workflow?record=content");
+  await expect(page.getByRole("region", { name: "贴文内容预览" })).toHaveCount(0);
+  await page.getByRole("button", { name: "展示工厂实力", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "内容类型", exact: true })).toContainText(
+    "工厂能力",
+  );
+  await expect(page.getByLabel("营销目标", { exact: true })).toHaveValue(
+    "建立工厂直供与品控信任，引导客户了解合作",
+  );
+  await expect(page.getByLabel("目标客户", { exact: true })).toHaveValue(
+    "寻求稳定中国供应商的海外贸易商与品牌商",
+  );
+  await page.getByLabel("开场句", { exact: true }).fill("SYNTHETIC hook line");
+  await page.getByLabel("正文", { exact: true }).fill("SYNTHETIC body paragraph");
+  const preview = page.getByRole("region", { name: "贴文内容预览" });
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText("SYNTHETIC hook line");
+  await expect(preview).toContainText("SYNTHETIC body paragraph");
+});

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     default: "F-Trade 工作台",
     template: "%s · F-Trade",
   },
-  description: "管理离合器产品资料、营销内容、客户询盘与报价。",
+  description: "面向外贸企业的工作流平台，统一管理产品资料、营销内容、客户询盘与人工报价。",
 };
 
 export const viewport: Viewport = {

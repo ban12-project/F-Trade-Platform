@@ -111,7 +111,7 @@ export function ProductIntakePanel({
                   )}
                 />
                 <FieldDescription id="product-source-file-help">
-                  支持 PDF、CSV 和 Excel，最大 25 MiB。
+                  支持 PDF、CSV 和 Excel，最大 25 MB。
                 </FieldDescription>
                 {file ? (
                   <FieldDescription id="product-source-file-selection" className="break-all">

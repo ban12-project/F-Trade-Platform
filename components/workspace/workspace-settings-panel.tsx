@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  ChevronDownIcon,
   KeyRoundIcon,
   LogOutIcon,
   MailPlusIcon,
@@ -25,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Field,
   FieldDescription,
@@ -93,6 +95,15 @@ function agentValues(settings: ProductAgentModelSettings): AgentValues {
   };
 }
 
+function hasAdvancedOptions(settings?: ProductAgentModelSettings) {
+  return Boolean(
+    settings &&
+      (settings.baseUrl ||
+        settings.authTokenConfigured ||
+        (settings.headersJson && settings.headersJson !== "{}")),
+  );
+}
+
 function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) {
   const [state, action, pending] = useActionState(
     saveProductAgentModelSettingsAction,
@@ -100,6 +111,7 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
   );
   const initial = settings.find((item) => item.isDefault) ?? settings[0];
   const [selectedId, setSelectedId] = useState(initial?.id ?? "new");
+  const [advancedOpen, setAdvancedOpen] = useState(() => hasAdvancedOptions(initial));
   const selected = settings.find((item) => item.id === selectedId);
   const form = useForm<AgentValues>({
     resolver: zodResolver(productAgentModelSettingsSchema),
@@ -122,6 +134,7 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
     const nextId = value ?? "new";
     setSelectedId(nextId);
     const next = settings.find((item) => item.id === nextId);
+    setAdvancedOpen(hasAdvancedOptions(next));
     form.reset(next ? agentValues(next) : { ...newAgentValues, isDefault: settings.length === 0 });
   }
   function submit(values: AgentValues) {
@@ -144,14 +157,19 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Product Agent</CardTitle>
+        <CardTitle>AI 模型设置</CardTitle>
         <CardDescription>
-          可保存多个 Provider 配置，并在智能导入时从其已发现模型中选择；默认模型供无人值守的 AI
-          流程使用。
+          配置用于产品解析与内容生成的 AI 模型；默认配置供日常工作流使用。
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form id="agent-settings" aria-busy={busy} onSubmit={form.handleSubmit(submit)}>
+        <form
+          id="agent-settings"
+          aria-busy={busy}
+          onSubmit={form.handleSubmit(submit, (errors) => {
+            if (errors.baseUrl || errors.headersJson) setAdvancedOpen(true);
+          })}
+        >
           <FieldSet disabled={busy}>
             <FieldLegend className="sr-only">模型配置编辑</FieldLegend>
             <FieldGroup>
@@ -259,23 +277,6 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                 ) : null}
                 <FieldError errors={[form.formState.errors.model]} />
               </Field>
-              <Field data-invalid={!!form.formState.errors.baseUrl}>
-                <FieldLabel htmlFor="agent-base-url">服务地址（Base URL）</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="baseUrl"
-                  render={({ field }) => (
-                    <Input
-                      id="agent-base-url"
-                      inputMode="url"
-                      placeholder="官方端点可留空"
-                      aria-invalid={!!form.formState.errors.baseUrl}
-                      {...field}
-                    />
-                  )}
-                />
-                <FieldError errors={[form.formState.errors.baseUrl]} />
-              </Field>
               <Field>
                 <FieldLabel htmlFor="agent-api-key">
                   API key {selected?.apiKeyConfigured ? "（已配置）" : ""}
@@ -286,23 +287,6 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                   render={({ field }) => (
                     <Input
                       id="agent-api-key"
-                      type="password"
-                      autoComplete="new-password"
-                      {...field}
-                    />
-                  )}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="agent-auth-token">
-                  Auth token {selected?.authTokenConfigured ? "（已配置）" : ""}
-                </FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="authToken"
-                  render={({ field }) => (
-                    <Input
-                      id="agent-auth-token"
                       type="password"
                       autoComplete="new-password"
                       {...field}
@@ -324,38 +308,91 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                 />
                 <FieldLabel htmlFor="clear-agent-key">清除已有 API key</FieldLabel>
               </Field>
-              <Field orientation="horizontal">
-                <Controller
-                  control={form.control}
-                  name="clearAuthToken"
-                  render={({ field }) => (
-                    <Checkbox
-                      id="clear-agent-token"
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  )}
-                />
-                <FieldLabel htmlFor="clear-agent-token">清除已有 Auth token</FieldLabel>
-              </Field>
-              <Field data-invalid={!!form.formState.errors.headersJson}>
-                <FieldLabel htmlFor="agent-headers">自定义 Headers（JSON）</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="headersJson"
-                  render={({ field }) => (
-                    <Textarea
-                      id="agent-headers"
-                      rows={4}
-                      spellCheck={false}
-                      aria-invalid={!!form.formState.errors.headersJson}
-                      {...field}
-                    />
-                  )}
-                />
-                <FieldDescription>不能在这里保存认证 Header。</FieldDescription>
-                <FieldError errors={[form.formState.errors.headersJson]} />
-              </Field>
+              <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                <CollapsibleTrigger
+                  render={
+                    <Button type="button" variant="outline" className="w-full justify-between" />
+                  }
+                >
+                  高级连接选项（代理地址、Auth Token、自定义请求头）
+                  <ChevronDownIcon
+                    data-icon="inline-end"
+                    className={
+                      advancedOpen ? "rotate-180 transition-transform" : "transition-transform"
+                    }
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  <FieldGroup>
+                    <Field data-invalid={!!form.formState.errors.baseUrl}>
+                      <FieldLabel htmlFor="agent-base-url">服务地址（Base URL）</FieldLabel>
+                      <Controller
+                        control={form.control}
+                        name="baseUrl"
+                        render={({ field }) => (
+                          <Input
+                            id="agent-base-url"
+                            inputMode="url"
+                            placeholder="官方端点可留空"
+                            aria-invalid={!!form.formState.errors.baseUrl}
+                            {...field}
+                          />
+                        )}
+                      />
+                      <FieldError errors={[form.formState.errors.baseUrl]} />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="agent-auth-token">
+                        Auth token {selected?.authTokenConfigured ? "（已配置）" : ""}
+                      </FieldLabel>
+                      <Controller
+                        control={form.control}
+                        name="authToken"
+                        render={({ field }) => (
+                          <Input
+                            id="agent-auth-token"
+                            type="password"
+                            autoComplete="new-password"
+                            {...field}
+                          />
+                        )}
+                      />
+                    </Field>
+                    <Field orientation="horizontal">
+                      <Controller
+                        control={form.control}
+                        name="clearAuthToken"
+                        render={({ field }) => (
+                          <Checkbox
+                            id="clear-agent-token"
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        )}
+                      />
+                      <FieldLabel htmlFor="clear-agent-token">清除已有 Auth token</FieldLabel>
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.headersJson}>
+                      <FieldLabel htmlFor="agent-headers">自定义 Headers（JSON）</FieldLabel>
+                      <Controller
+                        control={form.control}
+                        name="headersJson"
+                        render={({ field }) => (
+                          <Textarea
+                            id="agent-headers"
+                            rows={4}
+                            spellCheck={false}
+                            aria-invalid={!!form.formState.errors.headersJson}
+                            {...field}
+                          />
+                        )}
+                      />
+                      <FieldDescription>不能在这里保存认证 Header。</FieldDescription>
+                      <FieldError errors={[form.formState.errors.headersJson]} />
+                    </Field>
+                  </FieldGroup>
+                </CollapsibleContent>
+              </Collapsible>
             </FieldGroup>
           </FieldSet>
         </form>

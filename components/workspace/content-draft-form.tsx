@@ -11,7 +11,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +67,32 @@ const contentTypes = [
   ["factory_capability", "工厂能力"],
   ["industry_knowledge", "行业知识"],
 ] as const;
+const contentPresets = [
+  {
+    label: "开发海外代理商",
+    contentType: "product" as const,
+    objective: "吸引海外汽配批发商与区域代理询盘",
+    targetCustomer: "海外汽车配件批发商与经销商",
+  },
+  {
+    label: "主推热销型号",
+    contentType: "product" as const,
+    objective: "突出已核验 OE 适配信息，促成样品或批量询价",
+    targetCustomer: "海外汽配进口商与连锁维修采购",
+  },
+  {
+    label: "展示工厂实力",
+    contentType: "factory_capability" as const,
+    objective: "建立工厂直供与品控信任，引导客户了解合作",
+    targetCustomer: "寻求稳定中国供应商的海外贸易商与品牌商",
+  },
+  {
+    label: "行业选型科普",
+    contentType: "industry_knowledge" as const,
+    objective: "分享专业选型与售后知识，吸引精准汽配买家关注",
+    targetCustomer: "海外汽配经销商与维修渠道采购负责人",
+  },
+] as const;
 type ContentValues = z.infer<typeof contentDraftFormSchema>;
 
 function defaultValues(products: ReadyProductContentSource[]): ContentValues {
@@ -74,8 +100,8 @@ function defaultValues(products: ReadyProductContentSource[]): ContentValues {
     productId: products[0]?.id ?? "",
     contentType: "product",
     factPath: products[0]?.factOptions[0]?.path ?? "",
-    objective: "Generate qualified distributor inquiries",
-    targetCustomer: "Overseas automotive parts distributors",
+    objective: "获取海外汽配经销商询盘",
+    targetCustomer: "海外汽车配件批发商与经销商",
     hook: "",
     body: "",
     callToAction: "",
@@ -134,7 +160,15 @@ export function ContentDraftForm({
     defaultValues: detail ? valuesFromDetail(detail) : defaultValues(products),
   });
   useWorkspaceDirty(`content-draft-${detail?.id ?? "new"}`, form.formState.isDirty);
-  const productId = form.watch("productId");
+  const ready = form.formState.isReady;
+  const productId = useWatch({ control: form.control, name: "productId" });
+  const [previewHook, previewBody, previewCta, previewHashtags] = useWatch({
+    control: form.control,
+    name: ["hook", "body", "callToAction", "hashtags"],
+  });
+  const hasPreview = Boolean(
+    previewHook?.trim() || previewBody?.trim() || previewCta?.trim() || previewHashtags?.trim(),
+  );
   const product = products.find((item) => item.id === productId);
   const resetSavedDraft = useEffectEvent(() => {
     form.reset(revising ? form.getValues() : defaultValues(products));
@@ -151,6 +185,7 @@ export function ContentDraftForm({
     saveState.contentId,
     !revising,
   );
+  const presetDisabled = !ready || generating || saving || created;
   function data(values: ContentValues) {
     const result = new FormData();
     result.set("projectId", projectId);
@@ -384,6 +419,39 @@ export function ContentDraftForm({
                     errors={[form.formState.errors.factPath]}
                   />
                 </Field>
+                <Field>
+                  <FieldLabel>快捷场景预设</FieldLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {contentPresets.map((preset) => (
+                      <Button
+                        key={preset.label}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={presetDisabled}
+                        onClick={() => {
+                          form.setValue("contentType", preset.contentType, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.setValue("objective", preset.objective, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.setValue("targetCustomer", preset.targetCustomer, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                  <FieldDescription>
+                    选择外贸常见获客场景，自动填入内容类型、营销目标与目标客户。
+                  </FieldDescription>
+                </Field>
                 <Field data-invalid={!!form.formState.errors.objective}>
                   <FieldLabel htmlFor="content-objective">营销目标</FieldLabel>
                   <Input
@@ -504,6 +572,22 @@ export function ContentDraftForm({
                 </Field>
               </FieldGroup>
             </div>
+            {hasPreview ? (
+              <section
+                aria-label="贴文内容预览"
+                className="mt-5 space-y-2 rounded-xl border bg-muted/30 p-4"
+              >
+                <p className="text-xs font-medium text-muted-foreground">贴文内容预览</p>
+                {previewHook?.trim() ? <p className="text-sm font-medium">{previewHook}</p> : null}
+                {previewBody?.trim() ? (
+                  <p className="whitespace-pre-wrap break-words text-sm">{previewBody}</p>
+                ) : null}
+                {previewCta?.trim() ? <p className="text-sm font-medium">{previewCta}</p> : null}
+                {previewHashtags?.trim() ? (
+                  <p className="break-words text-xs text-muted-foreground">{previewHashtags}</p>
+                ) : null}
+              </section>
+            ) : null}
           </FieldSet>
         </form>
       </CardContent>

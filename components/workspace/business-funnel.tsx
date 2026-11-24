@@ -9,7 +9,7 @@ export function BusinessFunnelPanel({ funnel }: { funnel: BusinessFunnel | null 
       <div>
         <h2 className="text-base font-semibold">业务漏斗</h2>
         <p className="text-sm text-muted-foreground">
-          当前可见、未归档项目的独立阶段计数，不是同一批客户的转化链，不计算转化率。仅计归属记录，不把跨项目引用拼成转化关系。
+          统计当前进行中项目在各阶段的独立数量（各阶段分开计数，不计算转化率）。
         </p>
       </div>
       {!funnel ? (

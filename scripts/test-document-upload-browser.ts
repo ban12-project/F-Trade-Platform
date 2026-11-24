@@ -126,7 +126,7 @@ void (async () => {
         buffer: Buffer.alloc(26214401, 65),
       });
     await page.getByRole("button", { name: "保存到项目证据库" }).click();
-    await expect(page.getByText("文件不能超过 25 MiB。")).toBeVisible();
+    await expect(page.getByText("文件不能超过 25 MB。")).toBeVisible();
     assert.equal(
       (
         await db

@@ -25,6 +25,7 @@ export const initialClosingActionState: ClosingActionState = { status: "idle", m
 export type ProductEvidenceActionState = {
   status: "idle" | "success" | "error";
   message: string;
+  evidenceId?: string;
 };
 
 export const initialProductEvidenceActionState: ProductEvidenceActionState = {

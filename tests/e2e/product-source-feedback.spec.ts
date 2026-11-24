@@ -13,7 +13,7 @@ test("product source explains invalid files and recovers after replacement and c
     buffer: Buffer.alloc(0),
   });
   await expect(file).toHaveAttribute("aria-invalid", "true");
-  await expect(file).toHaveAccessibleDescription(/支持 PDF.*25 MiB.*文件为空/);
+  await expect(file).toHaveAccessibleDescription(/支持 PDF.*25 MB.*文件为空/);
   await file.setInputFiles({
     name: "synthetic.txt",
     mimeType: "text/plain",
@@ -27,11 +27,11 @@ test("product source explains invalid files and recovers after replacement and c
     buffer: Buffer.from("name\nsynthetic"),
   });
   await expect(file).toHaveAttribute("aria-invalid", "false");
-  await expect(file).toHaveAccessibleDescription(/支持 PDF.*25 MiB/);
+  await expect(file).toHaveAccessibleDescription(/支持 PDF.*25 MB/);
   await expect(page.getByText(`已选择：${filename}`, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await file.setInputFiles([]);
   await expect(file).toHaveAttribute("aria-invalid", "false");
   await expect(page.locator('[data-slot="field-error"]')).toHaveCount(0);
-  await expect(file).toHaveAccessibleDescription(/支持 PDF.*25 MiB/);
+  await expect(file).toHaveAccessibleDescription(/支持 PDF.*25 MB/);
 });

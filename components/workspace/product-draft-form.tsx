@@ -159,7 +159,7 @@ export function ProductDraftForm({
                 <FieldDescription>
                   {revising
                     ? `已有 ${detail.sourceImages.length} 张，新增后共最多 4 张。`
-                    : "最多 4 张 PNG / JPEG，每张不超过 5 MiB。"}
+                    : "最多 4 张 PNG / JPEG，每张不超过 5 MB。"}
                   图片随草稿私有保存，须核对与当前产品一致，不能证明尺寸、OE 或材料。
                 </FieldDescription>
                 <FieldError errors={[images.formState.errors.imageFiles]} />
