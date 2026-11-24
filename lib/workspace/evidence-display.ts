@@ -16,6 +16,7 @@ export type EvidenceDisplayItem = {
   dateLabel: string;
   detailText: string;
   displayText: string;
+  hasDuplicate: boolean;
   group: "current" | "other";
   keywords: string[];
 };
@@ -117,6 +118,7 @@ export function buildEvidenceDisplayItems(choices: EvidenceChoice[]): EvidenceDi
       dateLabel,
       detailText,
       displayText,
+      hasDuplicate,
       group: choice.inCurrentProject ? "current" : "other",
       keywords: [
         choice.label,

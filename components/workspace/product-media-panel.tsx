@@ -165,7 +165,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
     if (fileRef.current) fileRef.current.value = "";
     setSelectedFiles([]);
     setUploadProgress(0);
-    toast.success(state.message || "产品图片/视频已上传并提交审核。");
+    toast.success("媒体素材已登记，可在列表中核对状态。");
     router.refresh();
   }, [form, router, state]);
 

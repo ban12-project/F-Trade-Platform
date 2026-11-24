@@ -75,7 +75,7 @@ import { WorkspaceLink as Link } from "./workspace-link";
 const failures: Record<CatalogFailureCode, string> = {
   SOURCE_UNAVAILABLE: "无法读取或核验原件，请重新上传。",
   PREPROCESS_FAILED: "目录解析失败，可重试或更换可提取文字的文件。",
-  MODEL_FAILED: "抽取未通过，请检查或切换模型配置后重试。",
+  MODEL_FAILED: "抽取未通过，请检查模型配置后重试。",
   MODEL_CONFIG_UNAVAILABLE: "模型配置不可用，请在工作区设置中检查配置。",
   MODEL_OUTPUT_REJECTED: "模型输出未通过格式或来源校验，未保存草稿。可以重试或更换模型。",
   ACCESS_REVOKED: "登录或项目权限已失效，请恢复权限后重试。",
@@ -512,9 +512,7 @@ export function ProductCatalogImport({
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {sourceFile
-                    ? `已就绪目录文件：${sourceFile.name}`
-                    : "请先在上方选择产品目录文件。"}
+                  {sourceFile ? `所选文件：${sourceFile.name}` : "请先在上方选择产品目录文件。"}
                 </p>
               )}
               <FieldDescription>

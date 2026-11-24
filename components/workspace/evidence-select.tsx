@@ -212,6 +212,7 @@ export function StaticEvidenceCombobox({
   onBlur,
   inputRef,
   id,
+  "aria-describedby": describedBy,
   invalid,
   required,
   disabled,
@@ -224,6 +225,7 @@ export function StaticEvidenceCombobox({
   onBlur?: () => void;
   inputRef?: React.Ref<HTMLButtonElement>;
   id: string;
+  "aria-describedby"?: string;
   invalid?: boolean;
   required?: boolean;
   disabled?: boolean;
@@ -232,8 +234,13 @@ export function StaticEvidenceCombobox({
   const choices = useMemo(() => options.map(evidenceChoiceFromOption), [options]);
   const displayItems = useMemo(() => buildEvidenceDisplayItems(choices), [choices]);
   const selectedItem = displayItems.find((item) => item.id === value);
-  const selectedLabel =
-    selectedItem?.displayText ?? (value && value === retainedRef ? "保留原来源资料" : undefined);
+  const selectedLabel = selectedItem
+    ? selectedItem.hasDuplicate
+      ? selectedItem.displayText
+      : selectedItem.primaryLabel
+    : value && value === retainedRef
+      ? "保留原来源资料"
+      : undefined;
 
   return (
     <Select
@@ -252,12 +259,18 @@ export function StaticEvidenceCombobox({
       <SelectTrigger
         id={id}
         ref={inputRef}
+        data-slot="select-trigger"
         onBlur={onBlur}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
         aria-required={required || undefined}
         className={triggerClassName}
       >
-        <SelectValue placeholder={placeholder} className="min-w-0 flex-1 truncate">
+        <SelectValue
+          data-slot="select-value"
+          placeholder={placeholder}
+          className="min-w-0 flex-1 truncate"
+        >
           {selectedLabel ?? placeholder}
         </SelectValue>
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -363,12 +376,17 @@ export function EvidenceSelect({
         <SelectTrigger
           id={id}
           ref={inputRef}
+          data-slot="select-trigger"
           onBlur={onBlur}
           aria-invalid={invalid}
           aria-describedby={[descriptionId, describedBy].filter(Boolean).join(" ")}
           className={triggerClassName}
         >
-          <SelectValue placeholder="请选择已保存的资料" className="min-w-0 flex-1 truncate">
+          <SelectValue
+            data-slot="select-value"
+            placeholder="请选择已保存的资料"
+            className="min-w-0 flex-1 truncate"
+          >
             {selectedLabel ??
               (selectionUnverified
                 ? "已保留选择，暂时无法核对"
@@ -395,7 +413,7 @@ export function EvidenceSelect({
             ? "暂无可用资料，请上传文件后选择。"
             : selectedLabel
               ? `已选择：${selectedLabel}。请核对是否与本次操作对应。`
-              : "支持按文件名、类型或日期搜索，优先展示当前项目资料。"}
+              : "请选择与本次操作对应的文件。"}
       </FieldDescription>
       <div className="flex flex-wrap gap-2">
         <Button

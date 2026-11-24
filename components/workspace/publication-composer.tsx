@@ -181,7 +181,6 @@ export function PublicationComposer({
                 router.refresh();
               } else {
                 setMessage(result.message);
-                toast.error(result.message);
               }
             } catch {
               setMessage(

@@ -134,11 +134,17 @@ void (async () => {
       "contentType",
       "createdAt",
       "id",
+      "inCurrentProject",
       "sourceLabel",
     ]);
+    assert.equal(options[0].inCurrentProject, true);
     await assert.rejects(listProjectEvidenceOptions(projects[0], actors[1], db), /不是该项目成员/);
     const ownedOptions = await listProjectEvidenceOptions(projects[1], actors[0], db);
     assert.ok(ownedOptions.some((item) => item.id === results[0].evidenceId));
+    assert.equal(
+      ownedOptions.find((item) => item.id === results[0].evidenceId)?.inCurrentProject,
+      false,
+    );
     assert.equal(
       ownedOptions.find((item) => item.id === secondClaim.evidenceId)?.sourceLabel,
       "SYNTHETIC 第二份目录.csv",

@@ -193,7 +193,7 @@ export function ProductAgentForm({
           kind: "product-stream",
           status: "success",
           title: "单个产品 AI 抽取完成",
-          description: state.message || "草稿已生成，请人工核实字段来源。",
+          description: "草稿已生成，请人工核实字段来源。",
           href: state.productId
             ? workspaceRecordHref(projectId, "product", state.productId)
             : undefined,
@@ -206,7 +206,7 @@ export function ProductAgentForm({
         kind: "product-stream",
         status: "error",
         title: "单个产品 AI 抽取未完成",
-        description: state.message || "请核对资料或模型配置。",
+        description: "请查看页面内的详细原因并重试。",
         href: state.productId
           ? workspaceRecordHref(projectId, "product", state.productId)
           : undefined,
@@ -220,7 +220,6 @@ export function ProductAgentForm({
     initialChoice,
     projectId,
     router,
-    state.message,
     state.productId,
     state.status,
   ]);
@@ -348,9 +347,14 @@ export function ProductAgentForm({
           <FieldSet disabled={pending}>
             <FieldGroup>
               <Collapsible>
-                <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
-                  高级设置：模型（当前 {activeModelLabel}）
-                </CollapsibleTrigger>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
+                    高级设置：模型
+                  </CollapsibleTrigger>
+                  <span className="text-xs text-muted-foreground">
+                    当前模型：{activeModelLabel}
+                  </span>
+                </div>
                 <CollapsibleContent className="pt-4">
                   {choices.length ? (
                     <Field
@@ -436,7 +440,7 @@ export function ProductAgentForm({
               ) : (
                 <p className="text-sm text-muted-foreground">
                   {source.file
-                    ? `已就绪文件：${source.file.name}`
+                    ? `所选文件：${source.file.name}`
                     : "请先在上方选择资料文件，或展开下方使用已有资料中的文本。"}
                 </p>
               )}

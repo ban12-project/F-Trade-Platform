@@ -296,6 +296,11 @@ export function ProductReview({
                           value={field.value ?? ""}
                           disabled={busy}
                           invalid={!!form.formState.errors.evidenceRef}
+                          aria-describedby={
+                            form.formState.errors.evidenceRef
+                              ? fieldId("evidence-error")
+                              : undefined
+                          }
                           placeholder="搜索或选择审核依据"
                           onBlur={field.onBlur}
                           inputRef={field.ref}

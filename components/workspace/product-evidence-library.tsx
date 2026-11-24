@@ -52,7 +52,7 @@ export function EvidenceLibrary({
         data.set("receiptId", receiptId);
         const result = await uploadProductEvidenceAction(previous, data);
         if (result.status === "success") {
-          toast.success(result.message || "资料已保存到项目资料库。");
+          toast.success("资料已入库，可在来源列表中选择。");
           onUploaded?.(result.evidenceId);
         }
         return result;

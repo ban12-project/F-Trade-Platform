@@ -362,7 +362,7 @@ export function ProductFields({
           </Alert>
         ) : null}
         <FieldSet className="rounded-xl border bg-muted/20 p-4">
-          <FieldLegend>快速设置默认来源资料（推荐）</FieldLegend>
+          <FieldLegend>为多项信息选择同一份资料</FieldLegend>
           <FieldDescription>
             选定一份主要来源资料后，可一键关联全部已填写字段及产品主要来源，也可针对个别字段在下方单独微调。
           </FieldDescription>
@@ -426,7 +426,7 @@ export function ProductFields({
               disabled={!batchEvidence || !batchTargets.size}
               onClick={applyBatchEvidence}
             >
-              仅应用到所选 {batchTargets.size} 个目标字段
+              应用到 {batchTargets.size} 个目标字段
             </Button>
           </FieldGroup>
         </FieldSet>

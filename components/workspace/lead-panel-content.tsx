@@ -712,7 +712,7 @@ function LeadActions({
             <ProgressValue>{() => `${entry.lead.score} / 61 分`}</ProgressValue>
           </Progress>
           <p className="text-sm text-muted-foreground">
-            还差 {Math.max(1, 61 - entry.lead.score)}{" "}
+            采购意向尚待确认，还差 {Math.max(1, 61 - entry.lead.score)}{" "}
             分达到高意向（HOT）。请按实际沟通继续勾选上方客户意向行为并点击「保存跟进计划」，满足条件后即可确认有效商机。
           </p>
         </div>
