@@ -460,9 +460,12 @@ test("stale displayed preview cannot create a publication; refreshed preview con
       .where(eq(schema.socialPublication.contentRef, contentRef)),
   ).toHaveLength(0);
   await page.reload();
-  await page.getByRole("checkbox", { name: /合成出口账号/ }).check();
+  const accountCheckbox = page.getByRole("checkbox", { name: /合成出口账号/ });
+  await expect(accountCheckbox).toBeEnabled();
+  await expect(accountCheckbox).toBeChecked();
   await expect(confirmation).toHaveCount(1);
   await expect(confirmation.getByText("SYNTHETIC preview two", { exact: true })).toBeVisible();
+  await expect(submit).toBeEnabled();
 
   await saveFleet();
   await submit.dblclick();

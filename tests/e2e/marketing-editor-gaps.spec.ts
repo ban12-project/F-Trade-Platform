@@ -62,6 +62,7 @@ test("unchanged marketing form applies all generated fields", async ({ page }) =
     );
   }
   await expect(page.getByText("MOCK draft generated", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "贴文内容预览" })).toBeVisible();
 });
 
 for (const [label] of draftInputs) {
