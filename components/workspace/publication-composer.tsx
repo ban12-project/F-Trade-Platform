@@ -208,7 +208,7 @@ export function PublicationComposer({
               </NativeSelect>
               <FieldError errors={[form.formState.errors.choice]} />
               <p className="text-sm text-muted-foreground">
-                当前执行器每帖支持一张图片或一个视频。多图、混合素材和多个视频暂不能无损发布，系统不会自动拆帖。
+                每条帖子支持配 1 张图片或 1 个视频，暂不支持多图或混排发布。
               </p>
             </Field>
             <Field>

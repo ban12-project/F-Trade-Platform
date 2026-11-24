@@ -18,7 +18,7 @@ export const productImageFilesSchema = z
     z
       .file()
       .min(1)
-      .max(maximumProductImageBytes, "每张图片不能超过 5 MiB。")
+      .max(maximumProductImageBytes, "每张图片不能超过 5 MB。")
       .refine(
         (file) => productImageFilenameSchema.safeParse(file.name).success,
         "产品图片只支持 PNG 和 JPEG。",

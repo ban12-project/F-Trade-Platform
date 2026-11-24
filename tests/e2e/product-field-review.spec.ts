@@ -84,3 +84,27 @@ test("read-only content still disables mutation controls outside product browsin
   expect(await inputs.count()).toBeGreaterThan(0);
   for (const input of await inputs.all()) await expect(input).toBeDisabled();
 });
+
+test("field overview summarizes evidence coverage and jumps directly to any field", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(path);
+  const overview = page.getByRole("region", { name: "产品字段总览" });
+  const focus = page.getByRole("region", { name: "当前字段核对" });
+  await expect(overview.getByText(/缺来源 \d+ 项/)).toBeVisible();
+  await overview.getByRole("button", { name: /样品可用性/ }).click();
+  await expect(overview.getByRole("button", { name: /样品可用性/ })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(focus.getByText("否", { exact: true })).toBeVisible();
+  await expect(focus.getByText(/此字段尚未关联证据/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  const accessibility = await new AxeBuilder({ page })
+    .include('section[aria-label="产品字段总览"]')
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+});

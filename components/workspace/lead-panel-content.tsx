@@ -231,8 +231,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       <CardHeader>
         <CardTitle>人工跟进</CardTitle>
         <CardDescription>
-          可单独保存场景、评分和跟进时间，留空时间可取消提醒。发送时系统会重新检查成员权限、渠道状态和
-          60 分钟回复窗口；正文只加密保存在受限消息时间线中。
+          可单独保存跟进场景、意向评分和提醒时间（留空即取消提醒）。发送前会自动核对账号状态与回复时效，沟通内容加密留档。
         </CardDescription>
       </CardHeader>
       <CardContent>

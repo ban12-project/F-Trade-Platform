@@ -81,10 +81,17 @@ export function EvidenceSelect({
   );
   const selectedLabel = labels[options.findIndex((option) => option.id === value)];
   const selectionUnverified = Boolean(value && result?.error);
-  function refresh() {
+  function refresh(selectEvidenceId?: string) {
     startTransition(async () => {
       try {
-        setResult(await listEvidenceOptionsAction({ projectId, ...(videoId ? { videoId } : {}) }));
+        const next = await listEvidenceOptionsAction({
+          projectId,
+          ...(videoId ? { videoId } : {}),
+        });
+        setResult(next);
+        if (selectEvidenceId && next.options.some((option) => option.id === selectEvidenceId)) {
+          onValueChange(selectEvidenceId);
+        }
       } catch {
         setResult({ options: [], error: "资料加载失败，请重试。" });
       }
@@ -154,7 +161,7 @@ export function EvidenceSelect({
         variant="ghost"
         size="sm"
         disabled={disabled || pending}
-        onClick={refresh}
+        onClick={() => refresh()}
       >
         {pending ? "正在加载…" : "刷新资料列表"}
       </Button>
@@ -183,9 +190,9 @@ export function EvidenceSelect({
               evidenceOptions={[]}
               onDraftDirty={setUploadDirty}
               onBusyChange={setUploadBusy}
-              onUploaded={() => {
+              onUploaded={(evidenceId) => {
                 setUploadOpen(false);
-                refresh();
+                refresh(evidenceId);
               }}
             />
           ) : null}

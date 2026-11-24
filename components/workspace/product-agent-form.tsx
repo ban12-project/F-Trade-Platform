@@ -344,7 +344,7 @@ export function ProductAgentForm({
                 <FieldError errors={[form.formState.errors.imageFiles]} />
                 <FieldDescription>
                   最多 4 张，每张 5
-                  MiB，仅用于当前单个产品的外观核验。图片不补全工程事实，也不代表营销授权；无图可继续。
+                  MB，仅用于当前单个产品的外观核验。图片不补全工程事实，也不代表营销授权；无图可继续。
                 </FieldDescription>
               </Field>
               <Collapsible open={textSourceOpen} onOpenChange={setTextSourceOpen}>

@@ -35,7 +35,7 @@ export function EvidenceLibrary({
 }: {
   projectId: string;
   evidenceOptions: EvidenceOption[];
-  onUploaded?: () => void;
+  onUploaded?: (evidenceId?: string) => void;
   onDraftDirty?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
@@ -51,7 +51,7 @@ export function EvidenceLibrary({
         data.set("projectId", projectId);
         data.set("receiptId", receiptId);
         const result = await uploadProductEvidenceAction(previous, data);
-        if (result.status === "success") onUploaded?.();
+        if (result.status === "success") onUploaded?.(result.evidenceId);
         return result;
       } catch {
         return { status: "error" as const, message: "文件上传失败，请检查文件与项目权限后重试。" };
@@ -132,7 +132,7 @@ export function EvidenceLibrary({
                 )}
               />
               <FieldDescription id={`${fileId}-help`}>
-                支持 PDF、CSV、XLS、XLSX，最大 25 MiB；文件保存在私有存储。
+                支持 PDF、CSV、XLS、XLSX，最大 25 MB；文件保存在私有存储。
               </FieldDescription>
               <FieldError id={`${fileId}-error`} errors={[form.formState.errors.document]} />
             </Field>

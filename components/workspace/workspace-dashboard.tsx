@@ -228,11 +228,30 @@ export function WorkspaceDashboard({
                   />
                 ) : null}
                 {!tasks.length && !inbound.length ? (
-                  <div className="flex flex-wrap justify-center gap-2 pb-4">
-                    <NewWorkButton intent="product">录入第一份产品资料</NewWorkButton>
-                    <NewWorkButton intent="rfq" variant="outline">
-                      记录客户询盘
-                    </NewWorkButton>
+                  <div className="flex flex-col items-center gap-4 pb-4">
+                    <ol
+                      aria-label="新手入门流程"
+                      className="grid w-full gap-2 rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4"
+                    >
+                      <li className="rounded-lg bg-background p-2.5 font-medium text-foreground">
+                        1. 导入工厂资料
+                      </li>
+                      <li className="rounded-lg bg-background p-2.5 font-medium text-foreground">
+                        2. 人工核对产品
+                      </li>
+                      <li className="rounded-lg bg-background p-2.5 font-medium text-foreground">
+                        3. 制作并审核内容
+                      </li>
+                      <li className="rounded-lg bg-background p-2.5 font-medium text-foreground">
+                        4. 记录询盘与报价
+                      </li>
+                    </ol>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <NewWorkButton intent="product">录入第一份产品资料</NewWorkButton>
+                      <NewWorkButton intent="rfq" variant="outline">
+                        记录客户询盘
+                      </NewWorkButton>
+                    </div>
                   </div>
                 ) : null}
               </CardContent>

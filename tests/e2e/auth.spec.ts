@@ -77,13 +77,20 @@ test("retains a deep link and its query when requesting sign-in", async ({ page 
   await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
 });
 
-test("landing page has one workspace action", async ({ page }) => {
+test("landing page has one workspace action and readable Chinese workflow labels", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page.getByRole("link", { name: "进入工作台" })).toHaveAttribute(
     "href",
     "/workspace",
   );
   await expect(page.getByRole("link", { name: "查看工作台" })).toHaveCount(0);
+  await expect(page.getByText("待核对", { exact: true })).toBeVisible();
+  await expect(page.getByText("人工把关", { exact: true })).toBeVisible();
+  await expect(page.getByText("待审发布", { exact: true })).toBeVisible();
+  await expect(page.getByText("PRODUCT_REVIEW_REQUIRED")).toHaveCount(0);
+  await expect(page.getByText("HUMAN GATE")).toHaveCount(0);
 });
 
 test("proxy replaces a supplied return header with the actual request path", async () => {

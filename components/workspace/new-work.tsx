@@ -241,6 +241,17 @@ function NewWorkDialog({
                 ? "可以继续使用已有项目，无需每次新建。"
                 : "目前没有可编辑的同类项目，先创建一个归属范围。"}
             </FieldDescription>
+            {available.length === 1 && !selected ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={creating}
+                onClick={() => changeSelection(() => setProjectId(available[0].id))}
+              >
+                一键选中唯一可用项目：{available[0].title}
+              </Button>
+            ) : null}
           </Field>
           {selected === "new" ? (
             <NewProjectForm

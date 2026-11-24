@@ -161,7 +161,7 @@ export function AuthPanel() {
             <div className="flex flex-col gap-2">
               <h1 className="text-2xl font-semibold tracking-tight">登录工作台</h1>
               <p className="text-sm leading-6 text-muted-foreground">
-                使用受邀邮箱验证码或设备密钥（Passkey）登录。平台不启用密码登录，也不开放公开注册。
+                输入受邀邮箱获取验证码，或使用已绑定的设备密钥（Passkey）登录。如需开通账号，请联系管理员。
               </p>
             </div>
           </header>
@@ -239,7 +239,7 @@ export function AuthPanel() {
               使用 Passkey 登录
             </Button>
             <p className="text-xs leading-5 text-muted-foreground">
-              新的 Passkey 需要登录后在“工作区设置”中添加。
+              新设备可在登录后进入“账号与安全”添加指纹、面容等快捷登录方式。
             </p>
           </div>
           <p className="min-h-5 text-sm text-muted-foreground" aria-live="polite">

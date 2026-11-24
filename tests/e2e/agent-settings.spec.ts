@@ -128,10 +128,14 @@ test("new configuration clears edits and credentials before returning", async ({
   await expect(input(page, "配置名称")).toHaveValue("");
   await expect(input(page, "默认模型")).toHaveValue("gpt-5-mini");
   await expect(selectedValue(page, 1)).toHaveText("OpenAI");
-  await expect(input(page, "服务地址（Base URL）")).toHaveValue("");
-  await expect(input(page, "自定义 Headers（JSON）")).toHaveValue("{}");
   await expect(checkbox(page, "作为默认模型")).not.toBeChecked();
   await expect(page.locator('label[for="agent-api-key"]')).toHaveText("API key");
+  await expect(input(page, "服务地址（Base URL）")).toBeHidden();
+  await page
+    .getByRole("button", { name: "高级连接选项（代理地址、Auth Token、自定义请求头）" })
+    .click();
+  await expect(input(page, "服务地址（Base URL）")).toHaveValue("");
+  await expect(input(page, "自定义 Headers（JSON）")).toHaveValue("{}");
   await expect(page.locator('label[for="agent-auth-token"]')).toHaveText("Auth token");
   await expectClearedCredentials(page);
   await editAllFields(page);
@@ -171,6 +175,10 @@ test("the first configuration has new defaults and an empty id", async ({ page }
   await expect(input(page, "配置名称")).toHaveValue("");
   await expect(input(page, "默认模型")).toHaveValue("gpt-5-mini");
   await expect(checkbox(page, "作为默认模型")).toBeChecked();
+  await expect(input(page, "服务地址（Base URL）")).toBeHidden();
+  await page
+    .getByRole("button", { name: "高级连接选项（代理地址、Auth Token、自定义请求头）" })
+    .click();
   await expectClearedCredentials(page);
   await input(page, "配置名称").fill("Synthetic first configuration");
   const values = await captureSubmission(page);

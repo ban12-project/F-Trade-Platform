@@ -294,8 +294,7 @@ export function BrowserNodesPanel() {
           <CardHeader>
             <CardTitle>节点 Access Key，仅本次显示</CardTitle>
             <CardDescription>
-              一台 VPS 使用一个 Key，自动同步该节点被授权的全部账号。不要共享给其他 VPS，不要填入
-              NEXT_PUBLIC_*。
+              每台发布服务器单独使用一个 Key，请仅保存在服务端环境变量中，切勿公开或写入前端代码。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -315,7 +314,7 @@ export function BrowserNodesPanel() {
             <CardHeader>
               <CardTitle>连接自管服务器</CardTitle>
               <CardDescription>
-                设置这台 VPS 的容量。平台不按账号数量启动浏览器，只有排队任务获得租约后才启动。
+                按需启动发布任务，仅在有待发布或收件箱同步任务时才占用服务器资源。
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -340,8 +339,8 @@ export function BrowserNodesPanel() {
                 {(
                   [
                     ["maxBrowsers", "最大同时运行数"],
-                    ["memoryBudgetMb", "浏览器总内存预算（MiB）"],
-                    ["browserMemoryMb", "单浏览器内存上限（MiB）"],
+                    ["memoryBudgetMb", "服务器可用内存上限（MB）"],
+                    ["browserMemoryMb", "单任务内存上限（MB）"],
                   ] as const
                 ).map(([name, label]) => (
                   <Field key={name}>
@@ -528,7 +527,7 @@ export function BrowserNodesPanel() {
               [
                 ["loginUsername", "Facebook 登录名（可选）"],
                 ["loginPassword", "Facebook 密码（可选，加密保存）"],
-                ["totpSecret", "2FA Base32 密钥（可选，加密保存）"],
+                ["totpSecret", "两步验证密钥 / 2FA Secret（可选，加密保存）"],
                 ["messengerPin", "Messenger PIN（可选，加密保存）"],
               ] as const
             ).map(([name, label]) => (

@@ -28,7 +28,7 @@ export const documentFilenameSchema = z
 export const documentFileSchema = z
   .file()
   .min(1, "文件为空，请选择包含资料内容的文件。")
-  .max(maximumProductDocumentBytes, "文件不能超过 25 MiB。")
+  .max(maximumProductDocumentBytes, "文件不能超过 25 MB。")
   .refine(
     (file) => documentFilenameSchema.safeParse(file.name).success,
     "只支持 PDF、CSV、XLS 和 XLSX 文件。",
@@ -49,7 +49,7 @@ export const documentUploadPayloadSchema = z
     purpose: z.enum(["evidence", "agent", "agent_image"]),
     originalFilename: z.union([documentFilenameSchema, productImageFilenameSchema]),
     contentType: z.enum([...Object.values(documentUploadTypes), "image/png", "image/jpeg"]),
-    sizeBytes: z.number().int().min(1).max(maximumProductDocumentBytes, "文件不能超过 25 MiB。"),
+    sizeBytes: z.number().int().min(1).max(maximumProductDocumentBytes, "文件不能超过 25 MB。"),
   })
   .strict()
   .refine(

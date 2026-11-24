@@ -73,7 +73,7 @@ test("upload explains invalid files, retains failed files and allows retry", asy
   });
   await expect(file).toHaveAttribute("aria-invalid", "false");
   await expect(file).toHaveAccessibleDescription(
-    "支持 PDF、CSV、XLS、XLSX，最大 25 MiB；文件保存在私有存储。",
+    "支持 PDF、CSV、XLS、XLSX，最大 25 MB；文件保存在私有存储。",
   );
   for (let attempt = 1; attempt <= 2; attempt++) {
     await save.click();
@@ -275,4 +275,74 @@ test("upload dialog protects selected files and stays open while saving", async 
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(confirm).toHaveCount(0);
+});
+
+test("uploading new evidence automatically selects it after server refresh", async ({ page }) => {
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname === "/api/product-documents/upload") {
+      return route.fulfill({
+        json: {
+          presignedUrlPayload: {
+            delegationToken: `${Buffer.from(JSON.stringify({ storeId: "synthetic" })).toString("base64url")}.synthetic`,
+            signature: "synthetic",
+            params: {},
+          },
+        },
+      });
+    }
+    if (url.hostname === "vercel.com" && url.pathname.startsWith("/api/blob")) {
+      return route.fulfill({
+        headers: { "access-control-allow-origin": "*" },
+        json: {
+          url: "https://synthetic.invalid/new-evidence.csv",
+          downloadUrl: "https://synthetic.invalid/new-evidence.csv",
+          pathname: url.searchParams.get("pathname"),
+          contentType: "text/csv",
+          contentDisposition: "attachment",
+          etag: "synthetic",
+        },
+      });
+    }
+    if (!["127.0.0.1", "localhost"].includes(url.hostname)) return route.abort();
+    if (request.headers()["next-action"]) {
+      const response = await route.fetch();
+      const body = await response.text();
+      if (body.includes('"无权上传资料。"')) {
+        return route.fulfill({
+          response,
+          body: body.replace(
+            '"status":"error","message":"无权上传资料。"',
+            '"status":"success","message":"资料已保存，已自动刷新来源列表。","evidenceId":"evidence-synthetic-uploaded"',
+          ),
+        });
+      }
+      return route.fulfill({
+        contentType: "text/x-component",
+        body: `0:{"a":"$@1","f":"","b":"synthetic"}\n1:${JSON.stringify({
+          options: [
+            { id: "evidence-synthetic-rights-761", label: "合成工厂授权书.pdf" },
+            { id: "evidence-synthetic-uploaded", label: "新上传参数表.csv" },
+          ],
+          error: "",
+        })}\n`,
+      });
+    }
+    return route.continue();
+  });
+  await page.goto("/testing/evidence-select");
+  const field = page.getByRole("combobox", { name: "素材使用授权证明", exact: true });
+  await page.getByRole("button", { name: "上传资料", exact: true }).first().click();
+  const dialog = page.getByRole("dialog", { name: "添加来源资料" });
+  await dialog.getByLabel("资料文件", { exact: true }).setInputFiles({
+    name: "new-evidence.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("SYNTHETIC,value\nexample,1"),
+  });
+  await dialog.getByRole("button", { name: "保存到项目资料库", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(field).toContainText("新上传参数表.csv");
+  await page.getByRole("button", { name: "保存选择", exact: true }).click();
+  await expect(page.getByLabel("提交结果")).toHaveText("evidence-synthetic-uploaded");
 });

@@ -154,7 +154,8 @@ claimFailure = undefined;
 cacheFailure = true;
 assert.deepEqual(await run(), {
   status: "success",
-  message: "资料已保存，可在来源资料列表中选择。",
+  message: "资料已保存，已自动刷新来源列表。",
+  evidenceId: "SYNTHETIC evidence",
 });
 count++;
 cacheFailure = false;
