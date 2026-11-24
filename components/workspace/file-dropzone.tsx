@@ -83,7 +83,8 @@ export function FileDropzone({
     syncNativeFileInput(nativeRef.current, files);
   }, [files]);
 
-  function handleWidgetChange(nextFiles: File[]) {
+  function handleWidgetChange(nextFiles: File[], details?: { reason?: string }) {
+    if (details?.reason === "reset") return;
     setRejectNotice("");
     const capped =
       maxFiles && nextFiles.length > maxFiles ? nextFiles.slice(0, maxFiles) : nextFiles;

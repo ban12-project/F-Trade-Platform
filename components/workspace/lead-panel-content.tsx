@@ -322,7 +322,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                   只勾选客户在本轮沟通中明确表达或实际发生的行为。
                 </FieldDescription>
                 <FieldGroup>
-                  {scoringRules.map(([id, label]) => (
+                  {scoringRules.map(([id, label, points]) => (
                     <Field key={id} orientation="horizontal">
                       <Controller
                         control={form.control}
@@ -343,6 +343,9 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                         )}
                       />
                       <FieldLabel htmlFor={`${entry.id}-${id}`}>{label}</FieldLabel>
+                      <span className="text-xs text-muted-foreground" aria-hidden="true">
+                        {points}
+                      </span>
                       <FieldError errors={[form.formState.errors.triggeredRules]} />
                     </Field>
                   ))}
@@ -805,12 +808,12 @@ const contexts = [
   ["asks_lead_time", "询问交期"],
 ] as const;
 const scoringRules = [
-  ["active_inquiry", "主动询盘（+20）"],
-  ["provides_oe_number", "提供 OE（+15）"],
-  ["explicit_quantity", "明确数量（+15）"],
-  ["target_quantity_range", "目标数量区间（+10）"],
-  ["asks_sample", "询问样品（+10）"],
-  ["asks_lead_time", "询问交期（+10）"],
-  ["asks_payment_terms", "询问付款条件（+15）"],
-  ["replies_again", "再次回复（+15）"],
+  ["active_inquiry", "主动询盘", "+20"],
+  ["provides_oe_number", "提供 OE", "+15"],
+  ["explicit_quantity", "明确数量", "+15"],
+  ["target_quantity_range", "目标数量区间", "+10"],
+  ["asks_sample", "询问样品", "+10"],
+  ["asks_lead_time", "询问交期", "+10"],
+  ["asks_payment_terms", "询问付款条件", "+15"],
+  ["replies_again", "再次回复", "+15"],
 ] as const;
