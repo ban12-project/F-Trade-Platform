@@ -16,6 +16,7 @@ import {
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,7 @@ import {
 } from "@/lib/video/upload-contracts";
 import { useWorkspaceDirty } from "./dirty-state";
 import { EvidenceSelectField } from "./evidence-select";
+import { FileDropzone } from "./file-dropzone";
 
 const initialProductMediaActionState: ProductMediaActionState = {
   status: "idle",
@@ -122,7 +124,8 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
   const timeZone = useBrowserTimeZone();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [hasFile, setHasFile] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const hasFile = selectedFiles.length > 0;
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState("");
@@ -160,14 +163,15 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
     if (state.status !== "success") return;
     form.reset({ ...form.getValues(), description: "", tags: "" });
     if (fileRef.current) fileRef.current.value = "";
-    setHasFile(false);
+    setSelectedFiles([]);
     setUploadProgress(0);
+    toast.success(state.message || "产品图片/视频已上传并提交审核。");
     router.refresh();
   }, [form, router, state]);
 
   async function submit(values: ProductMediaRegistrationFields) {
     if (!form.formState.isReady || uploading || pending) return;
-    const file = fileRef.current?.files?.[0];
+    const file = selectedFiles[0] ?? fileRef.current?.files?.[0];
     if (!file) {
       setUploadError("请选择一个产品图片或视频。");
       return;
@@ -224,13 +228,19 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor={`product-media-file-${productId}`}>图片或视频</FieldLabel>
-                <Input
-                  ref={fileRef}
+                <FileDropzone
+                  inputRef={fileRef}
                   id={`product-media-file-${productId}`}
-                  type="file"
                   accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
                   required
-                  onChange={(event) => setHasFile(Boolean(event.target.files?.length))}
+                  disabled={busy}
+                  files={selectedFiles}
+                  emptyTitle="拖拽产品图片或视频到这里，或点击选择"
+                  emptyDescription="支持 JPG、PNG、WebP、MP4、MOV；视频最长 120 秒"
+                  onFilesChange={(files) => {
+                    setSelectedFiles(files);
+                    setUploadError("");
+                  }}
                 />
                 <FieldDescription>
                   支持 JPG、PNG、WebP、MP4、MOV。视频最长 120 秒，登记后仍需独立媒体审核。

@@ -127,3 +127,27 @@ test("reduced motion and increased contrast keep the toolbar readable", async ({
   );
   await expect(page.locator(".workspace-toolbar")).toHaveCSS("backdrop-filter", "none");
 });
+
+test("record toolbar spans main width with inner padding on desktop and mobile", async ({
+  page,
+}) => {
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/testing/project-workflow?record=content");
+    const main = page.getByTestId("record-frame");
+    const toolbar = page.locator(".workspace-toolbar");
+    const heading = toolbar.locator("h1");
+    await expect(heading).toBeVisible();
+    const [mainBox, toolbarBox, headingBox] = await Promise.all([
+      main.boundingBox(),
+      toolbar.boundingBox(),
+      heading.boundingBox(),
+    ]);
+    if (!mainBox || !toolbarBox || !headingBox) {
+      throw new Error("Expected visible main, toolbar, and heading");
+    }
+    expect(Math.abs(toolbarBox.width - mainBox.width)).toBeLessThanOrEqual(2);
+    expect(headingBox.x - toolbarBox.x).toBeGreaterThanOrEqual(16);
+    expect(headingBox.y - toolbarBox.y).toBeGreaterThanOrEqual(12);
+  }
+});

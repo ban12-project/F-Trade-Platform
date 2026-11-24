@@ -213,7 +213,18 @@ export function WorkspaceDashboard({
               </CardHeader>
               <CardContent>
                 {selected.id === "actionable" ? (
-                  <InboundRoutingList items={inbound} projects={projects} />
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                      <span>已授权的 Facebook 账号会按设置频率自动定时同步入站 DM。</span>
+                      <Link
+                        href={`${basePath}/settings?section=channels`}
+                        className="font-medium text-foreground underline underline-offset-4"
+                      >
+                        管理定时同步频率 / 立即同步
+                      </Link>
+                    </div>
+                    <InboundRoutingList items={inbound} projects={projects} />
+                  </div>
                 ) : null}
                 {selected.id !== "actionable" || selected.rows.length > 0 || !inbound.length ? (
                   <TaskRows

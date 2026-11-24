@@ -38,6 +38,7 @@ import { productFormFactStatusLabels, productFormReadiness } from "@/lib/product
 import { isProductEvidenceLocationRef } from "@/lib/product/retained-evidence";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
+import { StaticEvidenceCombobox } from "./evidence-select";
 
 export type ProductValues = ProductCatalogForm;
 type EvidenceFieldName = Extract<keyof ProductValues, `${string}EvidenceRef`>;
@@ -222,42 +223,17 @@ function EvidenceInput({
         control={form.control}
         name={name}
         render={({ field }) => (
-          <Select
-            value={field.value}
-            onValueChange={(value) => field.onChange(value ?? "")}
-            disabled={disabled || (!options.length && !retainedRef)}
-          >
-            <SelectTrigger
-              id={id}
-              className="min-h-11 w-full"
-              aria-invalid={Boolean(error)}
-              aria-required={required}
-            >
-              <SelectValue>
-                {options.find((option) => option.id === field.value)
-                  ? `${options.find((option) => option.id === field.value)?.sourceLabel} · ${field.value.slice(-8)}`
-                  : field.value === retainedRef && retainedRef
-                    ? "保留原来源资料"
-                    : "选择已上传资料"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {retainedRef ? <SelectItem value={retainedRef}>保留原来源资料</SelectItem> : null}
-                {options.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.sourceLabel} ·{" "}
-                    {
-                      { internal: "内部资料", confidential: "保密资料", restricted: "受限资料" }[
-                        option.classification
-                      ]
-                    }{" "}
-                    · {option.id.slice(-8)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <StaticEvidenceCombobox
+            id={id}
+            options={options}
+            retainedRef={retainedRef}
+            value={field.value ?? ""}
+            disabled={disabled}
+            invalid={Boolean(error)}
+            required={required}
+            placeholder="搜索或选择已上传资料"
+            onValueChange={(value) => field.onChange(value)}
+          />
         )}
       />
       {!options.length && !retainedRef ? (
@@ -326,6 +302,15 @@ export function ProductFields({
       form.setValue(name, batchEvidence, { shouldDirty: true, shouldValidate: true });
     setBatchTargets(new Set());
   }
+  function applyDefaultEvidence(mode: "all-filled" | "unlinked-filled") {
+    if (!batchEvidence) return;
+    form.setValue("sourceRef", batchEvidence, { shouldDirty: true, shouldValidate: true });
+    for (const [, evidenceName] of eligibleBatchTargets) {
+      if (mode === "unlinked-filled" && values[evidenceName]) continue;
+      form.setValue(evidenceName, batchEvidence, { shouldDirty: true, shouldValidate: true });
+    }
+    setBatchTargets(new Set());
+  }
   return (
     <EvidenceOptionsContext.Provider value={evidenceOptions}>
       <div ref={rootRef} className="flex flex-col gap-5">
@@ -376,55 +361,72 @@ export function ProductFields({
             </AlertDescription>
           </Alert>
         ) : null}
-        <FieldSet>
-          <FieldLegend>为多项信息选择同一份资料</FieldLegend>
-          <FieldDescription>选择来源资料，再勾选需要使用这份资料的产品信息。</FieldDescription>
+        <FieldSet className="rounded-xl border bg-muted/20 p-4">
+          <FieldLegend>快速设置默认来源资料（推荐）</FieldLegend>
+          <FieldDescription>
+            选定一份主要来源资料后，可一键关联全部已填写字段及产品主要来源，也可针对个别字段在下方单独微调。
+          </FieldDescription>
           <FieldGroup>
             <Field>
-              <FieldLabel>来源资料</FieldLabel>
-              <Select
+              <FieldLabel htmlFor={fieldId("batch-evidence-select")}>默认来源资料</FieldLabel>
+              <StaticEvidenceCombobox
+                id={fieldId("batch-evidence-select")}
+                options={evidenceOptions}
                 value={batchEvidence}
-                onValueChange={(value) => setBatchEvidence(value ?? "")}
-              >
-                <SelectTrigger className="min-h-11 w-full">
-                  <SelectValue placeholder="选择已上传资料" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {evidenceOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.sourceLabel} · {option.id.slice(-8)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                disabled={disabled}
+                placeholder="搜索或选择默认来源资料"
+                onValueChange={(value) => setBatchEvidence(value)}
+              />
             </Field>
-            <FieldSet>
-              <FieldLegend>目标字段</FieldLegend>
-              <FieldGroup>
-                {eligibleBatchTargets.map(([, evidenceName, label]) => (
-                  <Field key={evidenceName} orientation="horizontal">
-                    <Checkbox
-                      disabled={disabled}
-                      id={fieldId(`batch-${evidenceName}`)}
-                      checked={batchTargets.has(evidenceName)}
-                      onCheckedChange={(checked) =>
-                        toggleBatchTarget(evidenceName, checked === true)
-                      }
-                    />
-                    <FieldLabel htmlFor={fieldId(`batch-${evidenceName}`)}>{label}</FieldLabel>
-                  </Field>
-                ))}
-              </FieldGroup>
-            </FieldSet>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                disabled={disabled || !batchEvidence || !eligibleBatchTargets.length}
+                onClick={() => applyDefaultEvidence("unlinked-filled")}
+              >
+                填充未关联来源的已填字段
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={disabled || !batchEvidence || !eligibleBatchTargets.length}
+                onClick={() => applyDefaultEvidence("all-filled")}
+              >
+                覆盖全部 {eligibleBatchTargets.length} 个已填字段及主来源
+              </Button>
+            </div>
+            {eligibleBatchTargets.length ? (
+              <FieldSet>
+                <FieldLegend className="text-xs text-muted-foreground">
+                  或仅勾选部分目标字段
+                </FieldLegend>
+                <FieldGroup>
+                  {eligibleBatchTargets.map(([, evidenceName, label]) => (
+                    <Field key={evidenceName} orientation="horizontal">
+                      <Checkbox
+                        disabled={disabled}
+                        id={fieldId(`batch-${evidenceName}`)}
+                        checked={batchTargets.has(evidenceName)}
+                        onCheckedChange={(checked) =>
+                          toggleBatchTarget(evidenceName, checked === true)
+                        }
+                      />
+                      <FieldLabel htmlFor={fieldId(`batch-${evidenceName}`)}>{label}</FieldLabel>
+                    </Field>
+                  ))}
+                </FieldGroup>
+              </FieldSet>
+            ) : null}
             <Button
               type="button"
               variant="outline"
               disabled={!batchEvidence || !batchTargets.size}
               onClick={applyBatchEvidence}
             >
-              应用到 {batchTargets.size} 个目标字段
+              仅应用到所选 {batchTargets.size} 个目标字段
             </Button>
           </FieldGroup>
         </FieldSet>

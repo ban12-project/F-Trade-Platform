@@ -85,6 +85,14 @@ export const ownerCommandSchema = z.discriminatedUnion("operation", [
     .strict(),
   z.object({ operation: z.literal("open"), nodeId: id, accountId: id }).strict(),
   z.object({ operation: z.literal("poll-inbox"), nodeId: id, accountId: id }).strict(),
+  z
+    .object({
+      operation: z.literal("set-poll-interval"),
+      nodeId: id,
+      accountId: id,
+      pollSeconds: accountFormSchema.shape.pollSeconds,
+    })
+    .strict(),
   z.object({ operation: z.literal("stop"), nodeId: id, runId: id }).strict(),
   z.object({ operation: z.literal("ticket"), nodeId: id, runId: id }).strict(),
   z

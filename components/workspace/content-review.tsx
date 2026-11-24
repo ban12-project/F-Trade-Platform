@@ -44,6 +44,7 @@ import { productFactLabels } from "@/lib/product/fact-labels";
 import { recordStateLabels } from "@/lib/workspace/library-model";
 import { useWorkspaceDirty } from "./dirty-state";
 import { EvidenceSelectField } from "./evidence-select";
+import { MarkdownContent } from "./markdown-content";
 
 const contentTypes = [
   ["product", "产品推广"],
@@ -136,7 +137,7 @@ export function ContentReview({
             <CardDescription>{detail.productName}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <p className="whitespace-pre-wrap text-sm leading-6">{detail.content.body}</p>
+            <MarkdownContent className="leading-6">{detail.content.body}</MarkdownContent>
             <p className="text-sm">
               <span className="font-medium">咨询引导：</span>
               {detail.content.call_to_action}

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -174,8 +175,14 @@ export function PublicationComposer({
               if (result.ok) {
                 setResults(result.results);
                 setMessage("发布任务已提交，正在等待各账号的平台回执。");
+                toast.success("发布任务已提交到托管浏览器节点，可离开当前页面。", {
+                  description: `共提交 ${targetValues.length} 个账号，稍后可在记录详情查看回执。`,
+                });
                 router.refresh();
-              } else setMessage(result.message);
+              } else {
+                setMessage(result.message);
+                toast.error(result.message);
+              }
             } catch {
               setMessage(
                 "网络未返回提交结果。可再次点击确认查询同一批次，系统不会重复创建发布任务。",

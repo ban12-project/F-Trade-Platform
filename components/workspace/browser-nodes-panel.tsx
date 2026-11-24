@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
 import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   Select,
   SelectContent,
@@ -45,6 +47,7 @@ import {
   nodeFormSchema,
   ownerCommandSchema,
 } from "@/lib/browser-fleet/contracts";
+import { useBackgroundTasks } from "./background-tasks";
 import { useWorkspaceDirty } from "./dirty-state";
 
 type Nodes = Awaited<ReturnType<typeof browserNodesAction>>;
@@ -88,6 +91,7 @@ const stateLabels: Record<string, string> = {
 };
 export function BrowserNodesPanel() {
   const timeZone = useBrowserTimeZone();
+  const { startTask } = useBackgroundTasks();
   const timestampFormat = new Intl.DateTimeFormat("zh-CN", {
     dateStyle: "medium",
     timeStyle: "medium",
@@ -718,6 +722,57 @@ export function BrowserNodesPanel() {
                       "尚未执行"
                     )}
                   </p>
+                  {hasInboxScope ? (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span>
+                        {account.pollSeconds > 0
+                          ? `自动定时同步：每 ${Math.round(account.pollSeconds / 60)} 分钟${
+                              account.nextPollAt && account.nextPollAt > 0
+                                ? `（下次预计 ${new Intl.DateTimeFormat("zh-CN", {
+                                    timeStyle: "short",
+                                    timeZone,
+                                  }).format(new Date(account.nextPollAt))}）`
+                                : ""
+                            }`
+                          : "自动定时同步：已停用"}
+                      </span>
+                      {account.enabled && node.status === "active" ? (
+                        <NativeSelect
+                          aria-label={`设置 ${account.displayName || account.accountRef} 的收件箱定时同步频率`}
+                          value={String(account.pollSeconds)}
+                          disabled={busy}
+                          onChange={async (event) => {
+                            const pollSeconds = Number(event.target.value);
+                            const result = await send({
+                              operation: "set-poll-interval",
+                              nodeId: node.id,
+                              accountId: account.id,
+                              pollSeconds,
+                            });
+                            if (result) {
+                              toast.success(
+                                pollSeconds === 0
+                                  ? `${account.displayName || account.accountRef} 已停用定时同步`
+                                  : `${account.displayName || account.accountRef} 已设为每 ${Math.round(pollSeconds / 60)} 分钟自动同步`,
+                              );
+                            }
+                          }}
+                          className="h-8 w-auto text-xs"
+                        >
+                          <NativeSelectOption value="0">停用自动同步</NativeSelectOption>
+                          <NativeSelectOption value="300">每 5 分钟</NativeSelectOption>
+                          <NativeSelectOption value="900">每 15 分钟</NativeSelectOption>
+                          <NativeSelectOption value="1800">每 30 分钟</NativeSelectOption>
+                          <NativeSelectOption value="3600">每 60 分钟</NativeSelectOption>
+                          {![0, 300, 900, 1800, 3600].includes(account.pollSeconds) ? (
+                            <NativeSelectOption value={String(account.pollSeconds)}>
+                              每 {Math.round(account.pollSeconds / 60)} 分钟
+                            </NativeSelectOption>
+                          ) : null}
+                        </NativeSelect>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -738,12 +793,53 @@ export function BrowserNodesPanel() {
                         account.authState !== "ready" ||
                         !hasInboxScope
                       }
-                      onClick={() => {
-                        void send({
+                      onClick={async () => {
+                        const accountLabel = account.displayName || account.accountRef;
+                        const result = await send({
                           operation: "poll-inbox",
                           nodeId: node.id,
                           accountId: account.id,
                         });
+                        if (result?.runId) {
+                          const targetRunId = result.runId;
+                          startTask({
+                            id: `inbox-sync-${targetRunId}`,
+                            kind: "inbox-sync",
+                            title: `正在同步 ${accountLabel} 收件箱`,
+                            description: "可离开当前页面，完成后会自动通知新私信。",
+                            href: "/workspace",
+                            intervalMs: 4000,
+                            poller: async () => {
+                              const currentNodes = await browserNodesAction();
+                              const matchedNode = currentNodes.find((n) => n.id === node.id);
+                              const matchedRun = matchedNode?.runs.find(
+                                (r) => r.id === targetRunId,
+                              );
+                              if (!matchedRun) return { done: false };
+                              if (matchedRun.status === "completed") {
+                                return {
+                                  done: true,
+                                  status: "success",
+                                  title: `${accountLabel} 收件箱同步完成`,
+                                  description: "如有新私信将显示在「今日任务」待分流列表中。",
+                                  href: "/workspace",
+                                };
+                              }
+                              if (matchedRun.status === "failed") {
+                                return {
+                                  done: true,
+                                  status: "error",
+                                  title: `${accountLabel} 收件箱同步未完成`,
+                                  description: matchedRun.failure
+                                    ? `原因：${matchedRun.failure}，可稍后重试。`
+                                    : "请检查渠道设置与登录状态。",
+                                  href: "/workspace/settings?section=channels",
+                                };
+                              }
+                              return { done: false };
+                            },
+                          });
+                        }
                       }}
                     >
                       立即同步收件箱

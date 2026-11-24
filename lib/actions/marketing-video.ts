@@ -44,6 +44,7 @@ import {
   assertMarketingVideoProjectLink,
   copyMarketingVideoDraftToProject,
   createMarketingVideoEditProject,
+  listProjectMarketingVideoEntries,
   saveMarketingVideoRenderRequest,
   updateMarketingVideoEditDraft,
 } from "@/lib/video/store";
@@ -388,6 +389,32 @@ export async function renderMarketingVideoDraftAction(
     return { status: "success", message: "私有预览已进入后台合成队列。", videoId };
   } catch (error) {
     return { status: "error", message: videoDraftFailureMessage(error, "render") };
+  }
+}
+
+export async function getMarketingVideoProcessingStatusAction(projectId: string, videoId: string) {
+  const session = await authorizedActionSession("workspace:view");
+  if (!session) return { ok: false as const };
+  try {
+    z.uuid().parse(projectId);
+    z.uuid().parse(videoId);
+    await assertWorkspaceAggregateLink(projectId, videoId, "marketing", "video", session.user.id);
+    const [entry] = await listProjectMarketingVideoEntries(
+      projectId,
+      getDatabase(),
+      videoId,
+      session.user.id,
+    );
+    if (!entry) return { ok: false as const };
+    return {
+      ok: true as const,
+      state: entry.state,
+      processingStatus: entry.processingJob?.status ?? null,
+      processingKind: entry.processingJob?.kind ?? null,
+      failureMessage: entry.processingJob?.failureMessage ?? null,
+    };
+  } catch {
+    return { ok: false as const };
   }
 }
 

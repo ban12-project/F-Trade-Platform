@@ -3,6 +3,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/cjk/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -361,8 +363,8 @@ html {
   position: relative;
   top: 0;
   z-index: 20;
-  padding-block: 0.75rem;
   background: var(--background);
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 75%, transparent);
   box-shadow: 0 0.5rem 1rem -1rem var(--foreground);
 }
 

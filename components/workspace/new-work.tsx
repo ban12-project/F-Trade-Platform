@@ -51,6 +51,9 @@ const NewWorkContext = createContext<{
   dialogId: string;
   open: boolean;
 } | null>(null);
+export function useNewWork() {
+  return useContext(NewWorkContext);
+}
 const ProjectDataContext = createContext<((projects: WorkspaceProjectSummary[]) => void) | null>(
   null,
 );

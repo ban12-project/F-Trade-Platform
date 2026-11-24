@@ -73,6 +73,7 @@ import {
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
 import { EvidenceSelectField } from "./evidence-select";
+import { FileDropzone } from "./file-dropzone";
 import { useCreatedRecord } from "./use-created-record";
 import { WorkspaceLink } from "./workspace-link";
 
@@ -109,7 +110,8 @@ export function MarketingVideoCreateForm({
   const router = useRouter();
   const filesRef = useRef<HTMLInputElement>(null);
   const uploadProgressRef = useRef<number[]>([]);
-  const [hasFiles, setHasFiles] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const hasFiles = uploadFiles.length > 0;
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -156,7 +158,7 @@ export function MarketingVideoCreateForm({
     if (state.status !== "success") return;
     form.reset(form.getValues());
     if (filesRef.current) filesRef.current.value = "";
-    setHasFiles(false);
+    setUploadFiles([]);
     setUploadProgress(0);
     router.refresh();
   }, [form, router, state]);
@@ -176,13 +178,13 @@ export function MarketingVideoCreateForm({
       });
       form.setValue("internetMediaIds", [], { shouldDirty: true, shouldValidate: true });
       if (filesRef.current) filesRef.current.value = "";
-      setHasFiles(false);
+      setUploadFiles([]);
     } else {
       form.setValue("productMediaIds", [], { shouldDirty: true, shouldValidate: true });
       if (next === "internet_search") {
         form.setValue("rightsEvidenceRef", "", { shouldDirty: true, shouldValidate: true });
         if (filesRef.current) filesRef.current.value = "";
-        setHasFiles(false);
+        setUploadFiles([]);
       } else {
         form.setValue("internetMediaIds", [], { shouldDirty: true, shouldValidate: true });
       }
@@ -253,7 +255,7 @@ export function MarketingVideoCreateForm({
       return;
     }
 
-    const files = [...(filesRef.current?.files ?? [])];
+    const files = uploadFiles.length ? uploadFiles : [...(filesRef.current?.files ?? [])];
     if (files.length < 1 || files.length > 3) {
       setUploadError("请选择 1–3 个营销素材。");
       return;
@@ -538,17 +540,21 @@ export function MarketingVideoCreateForm({
               <>
                 <Field>
                   <FieldLabel htmlFor="video-assets">素材（1–3 个）</FieldLabel>
-                  <Input
-                    ref={filesRef}
+                  <FileDropzone
+                    inputRef={filesRef}
                     id="video-assets"
                     name="assets"
-                    type="file"
                     accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
                     multiple
+                    maxFiles={3}
                     required
                     disabled={busy}
-                    onChange={(event) => {
-                      setHasFiles(Boolean(event.target.files?.length));
+                    files={uploadFiles}
+                    emptyTitle="拖拽 1–3 个图片或视频素材到这里"
+                    emptyDescription="支持 JPG、PNG、WebP、MP4、MOV；总大小小于 3GB"
+                    buttonLabel={uploadFiles.length ? "继续添加素材" : "选择素材"}
+                    onFilesChange={(files) => {
+                      setUploadFiles(files);
                       setUploadError("");
                     }}
                   />

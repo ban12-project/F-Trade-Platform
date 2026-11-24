@@ -3,6 +3,7 @@ import { LinkButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProductEvidencePreview } from "@/lib/product/evidence-preview";
 import { productFactLabels } from "@/lib/product/fact-labels";
+import { MarkdownContent } from "./markdown-content";
 
 export function ProductEvidenceSources({ sources }: { sources: ProductEvidencePreview[] }) {
   return (
@@ -61,9 +62,9 @@ export function ProductEvidenceSources({ sources }: { sources: ProductEvidencePr
                     </LinkButton>
                   ) : null}
                   {field.excerpt ? (
-                    <blockquote className="whitespace-pre-wrap break-words border-l-2 pl-3 text-sm">
-                      {field.excerpt}
-                    </blockquote>
+                    <div className="rounded-lg border-l-2 border-border bg-muted/20 px-3 py-2">
+                      <MarkdownContent>{field.excerpt}</MarkdownContent>
+                    </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       未保留可直接展示的原文片段，请对照上方原件。

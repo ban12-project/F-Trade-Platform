@@ -1,8 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { EyeIcon, SearchIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +19,14 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Field,
@@ -57,13 +66,16 @@ import {
 import { documentUploadFormSchema } from "@/lib/product/document-upload-contracts";
 import { uploadProductDocument } from "@/lib/product/upload-document-client";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
+import { useBackgroundTasks } from "./background-tasks";
 import { useWorkspaceDirty } from "./dirty-state";
+import { FileDropzone } from "./file-dropzone";
+import { MarkdownContent } from "./markdown-content";
 import { WorkspaceLink as Link } from "./workspace-link";
 
 const failures: Record<CatalogFailureCode, string> = {
   SOURCE_UNAVAILABLE: "无法读取或核验原件，请重新上传。",
   PREPROCESS_FAILED: "目录解析失败，可重试或更换可提取文字的文件。",
-  MODEL_FAILED: "抽取未通过，请检查模型配置后重试。",
+  MODEL_FAILED: "抽取未通过，请检查或切换模型配置后重试。",
   MODEL_CONFIG_UNAVAILABLE: "模型配置不可用，请在工作区设置中检查配置。",
   MODEL_OUTPUT_REJECTED: "模型输出未通过格式或来源校验，未保存草稿。可以重试或更换模型。",
   ACCESS_REVOKED: "登录或项目权限已失效，请恢复权限后重试。",
@@ -102,6 +114,7 @@ export function ProductCatalogImport({
   onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
+  const { startTask } = useBackgroundTasks();
   const [view, setView] = useState<CatalogImportView | null>(null);
   const [restoring, setRestoring] = useState(true);
   const [restoreFailed, setRestoreFailed] = useState(false);
@@ -111,6 +124,9 @@ export function ProductCatalogImport({
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const [pending, setPending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [standaloneFiles, setStandaloneFiles] = useState<File[]>([]);
+  const [candidateQuery, setCandidateQuery] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
   const uploadAttempt = useRef<{ controller: AbortController; dispatched: boolean } | null>(null);
   useEffect(
     () => () => {
@@ -168,6 +184,55 @@ export function ProductCatalogImport({
   const modelConfigId = useWatch({ control: selection.control, name: "modelConfigId" });
   const model = useWatch({ control: selection.control, name: "model" });
   const working = Boolean(isWorking(view));
+
+  function trackCatalogBackgroundTask(importId: string, mode: "parse" | "extract") {
+    const returnHref = `/workspace/products?project=${projectId}&method=catalog`;
+    startTask({
+      id: `catalog-${importId}`,
+      kind: "catalog",
+      title: mode === "parse" ? "目录正在后台解析" : "AI 正在批量抽取目录产品",
+      description: "可以离开当前页面，完成后会自动通知。",
+      href: returnHref,
+      intervalMs: 3000,
+      poller: async () => {
+        const res = await getProductCatalogAction({ projectId, importId });
+        if (res.status === "error") {
+          return { done: false };
+        }
+        const nextView = res.view;
+        if (isWorking(nextView)) {
+          const doneCount = nextView.candidates.filter((c) => c.status === "completed").length;
+          return {
+            done: false,
+            description:
+              nextView.status === "parsing" || nextView.status === "queued"
+                ? "正在扫描目录页与表格结构…"
+                : `已完成 ${doneCount} / ${nextView.candidates.length} 条记录处理`,
+          };
+        }
+        if (nextView.status === "failed") {
+          return {
+            done: true,
+            status: "error",
+            title: "目录任务未能完成",
+            description: nextView.failureCode ? failures[nextView.failureCode] : "请进入查看详情。",
+            href: returnHref,
+          };
+        }
+        const draftCount = nextView.candidates.filter((c) => c.status === "completed").length;
+        return {
+          done: true,
+          status: "success",
+          title: mode === "parse" ? "目录解析完成" : "目录产品抽取完成",
+          description:
+            mode === "parse"
+              ? `已识别 ${nextView.candidates.length} 条可选择的产品记录`
+              : `已生成 ${draftCount} 条待人工审核草稿`,
+          href: returnHref,
+        };
+      },
+    });
+  }
 
   useEffect(() => {
     if (view?.status !== "ready") return;
@@ -279,8 +344,12 @@ export function ProductCatalogImport({
       if (accept(result)) {
         uploadForm.reset();
         source?.clear();
+        setStandaloneFiles([]);
         selection.reset({ ...selection.getValues(), candidateIds: [] });
         if (fileRef.current) fileRef.current.value = "";
+        if (result.status === "success" && result.view && isWorking(result.view)) {
+          trackCatalogBackgroundTask(result.view.id, "parse");
+        }
       }
     } catch {
       if (uploadAttempt.current === active) {
@@ -304,7 +373,6 @@ export function ProductCatalogImport({
     const active = uploadAttempt.current;
     if (!active || active.dispatched) return;
     active.controller.abort();
-    // Credential retrieval in the Blob SDK may settle late; detach it immediately.
     uploadAttempt.current = null;
     setUploading(false);
     setPending(false);
@@ -316,8 +384,13 @@ export function ProductCatalogImport({
     setSelectionNotice("");
     setError("");
     try {
-      if (accept(await selectProductCatalogAction(values)))
+      const result = await selectProductCatalogAction(values);
+      if (accept(result)) {
         selection.reset({ ...values, candidateIds: [] });
+        if (result.status === "success" && result.view && isWorking(result.view)) {
+          trackCatalogBackgroundTask(result.view.id, "extract");
+        }
+      }
     } catch {
       setError("无法提交抽取任务，请重试。");
     } finally {
@@ -333,8 +406,16 @@ export function ProductCatalogImport({
       const result = await (retry
         ? retryProductCatalogAction(input)
         : getProductCatalogAction(input));
-      if (retry) accept(result);
-      else if (result.status === "error") setProgressError(result.message);
+      if (retry) {
+        if (
+          accept(result) &&
+          result.status === "success" &&
+          result.view &&
+          isWorking(result.view)
+        ) {
+          trackCatalogBackgroundTask(result.view.id, "parse");
+        }
+      } else if (result.status === "error") setProgressError(result.message);
       else {
         setView(result.view);
         setProgressError("");
@@ -351,12 +432,56 @@ export function ProductCatalogImport({
     view?.candidates.filter(
       (candidate) => candidate.status === "available" || candidate.status === "failed",
     ) ?? [];
+
+  const filteredCandidates = useMemo(() => {
+    const candidates = view?.candidates ?? [];
+    const query = candidateQuery.trim().toLowerCase();
+    if (!query) return candidates;
+    return candidates.filter((candidate) => {
+      const location = `${candidate.physicalPage ? `第 ${candidate.physicalPage} 页` : ""} 第 ${candidate.recordLine} 行`;
+      const statusText = candidateLabels[candidate.status];
+      return `${candidate.identifier} ${location} ${statusText}`.toLowerCase().includes(query);
+    });
+  }, [candidateQuery, view?.candidates]);
+
+  const catalogMarkdown = useMemo(() => {
+    if (!view) return "";
+    const completedCount = view.candidates.filter((c) => c.status === "completed").length;
+    const runningCount = view.candidates.filter(
+      (c) => c.status === "queued" || c.status === "running",
+    ).length;
+    const failedCount = view.candidates.filter((c) => c.status === "failed").length;
+    const lines = [
+      "## 目录处理实时详情",
+      "",
+      `- **任务状态**：${view.status === "ready" ? "候选目录就绪" : view.status === "failed" ? "解析失败" : "正在解析目录"}`,
+      `- **识别候选**：${view.candidates.length} 条（已完成草稿 **${completedCount}** · 处理中 **${runningCount}** · 失败 **${failedCount}**）`,
+      ...(view.failureCode ? [`- **错误原因**：${failures[view.failureCode]}`] : []),
+      "",
+      "| 目录编号 | 来源位置 | 状态 | 备注 |",
+      "| --- | --- | --- | --- |",
+      ...view.candidates.slice(0, 60).map((candidate) => {
+        const location = `${candidate.physicalPage ? `第 ${candidate.physicalPage} 页 · ` : ""}第 ${candidate.recordLine} 行`;
+        const note = candidate.failureCode
+          ? failures[candidate.failureCode]
+          : candidate.productId
+            ? "草稿已生成，点击表格「查看草稿」进入核实"
+            : "—";
+        return `| \`${candidate.identifier.replace(/\|/g, "\\|")}\` | ${location} | ${candidateLabels[candidate.status]} | ${note} |`;
+      }),
+      ...(view.candidates.length > 60
+        ? ["", `> 仅展示前 60 条详情（共 ${view.candidates.length} 条），可用表格筛选框搜索。`]
+        : []),
+    ];
+    return lines.join("\n");
+  }, [view]);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>目录批量导入</CardTitle>
         <CardDescription>
-          上传目录后选择记录，每批最多 20 条。每条草稿独立保留来源位置，须经人工审核。
+          上传目录后搜索并选择记录，每批最多 20 条。后台抽取时可自由切换页面，完成后将自动通知。
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
@@ -365,15 +490,18 @@ export function ProductCatalogImport({
             <Field data-invalid={Boolean(uploadForm.formState.errors.document)}>
               <FieldLabel htmlFor="catalog-document">产品目录文件</FieldLabel>
               {!source ? (
-                <Input
+                <FileDropzone
                   id="catalog-document"
-                  ref={fileRef}
-                  type="file"
+                  inputRef={fileRef}
                   accept=".pdf,.csv,.xls,.xlsx"
                   disabled={pending || restoring || restoreFailed || working}
-                  aria-invalid={Boolean(uploadForm.formState.errors.document)}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
+                  invalid={Boolean(uploadForm.formState.errors.document)}
+                  files={standaloneFiles}
+                  emptyTitle="拖拽产品目录（PDF / CSV / Excel）到这里"
+                  emptyDescription="最多 25 MB，解析进度在刷新或切换页面后自动恢复"
+                  onFilesChange={(files) => {
+                    setStandaloneFiles(files);
+                    const file = files[0];
                     if (file)
                       uploadForm.setValue("document", file, {
                         shouldValidate: true,
@@ -384,11 +512,13 @@ export function ProductCatalogImport({
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {sourceFile ? `所选文件：${sourceFile.name}` : "请先在上方选择产品目录文件。"}
+                  {sourceFile
+                    ? `已就绪目录文件：${sourceFile.name}`
+                    : "请先在上方选择产品目录文件。"}
                 </p>
               )}
               <FieldDescription>
-                支持 PDF、CSV 和 Excel，最大 25 MB。解析进度可在刷新后恢复。
+                支持 PDF、CSV 和 Excel，最大 25 MB。解析进度可在刷新或切换页面后恢复。
               </FieldDescription>
               <FieldError errors={[uploadForm.formState.errors.document]} />
             </Field>
@@ -466,6 +596,23 @@ export function ProductCatalogImport({
               >
                 刷新进度
               </Button>
+              <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+                <DialogTrigger render={<Button type="button" variant="outline" size="sm" />}>
+                  <EyeIcon data-icon="inline-start" />
+                  查看 AI 处理详情
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle>目录 AI 处理实时详情</DialogTitle>
+                    <DialogDescription>
+                      使用 Streamdown 实时渲染目录解析进度与每条候选记录的来源校验结果。
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="max-h-[65dvh] overflow-y-auto rounded-lg border bg-background p-4">
+                    <MarkdownContent isAnimating={working}>{catalogMarkdown}</MarkdownContent>
+                  </div>
+                </DialogContent>
+              </Dialog>
               {view.status === "failed" && (
                 <Button size="sm" disabled={pending} onClick={() => void update(true)}>
                   重试解析
@@ -474,7 +621,16 @@ export function ProductCatalogImport({
             </div>
             {view.failureCode && (
               <Alert>
-                <AlertDescription>{failures[view.failureCode]}</AlertDescription>
+                <AlertDescription className="flex flex-wrap items-center gap-2">
+                  <span>{failures[view.failureCode]}</span>
+                  {(view.failureCode === "MODEL_FAILED" ||
+                    view.failureCode === "MODEL_CONFIG_UNAVAILABLE" ||
+                    view.failureCode === "MODEL_OUTPUT_REJECTED") && (
+                    <Link href="/workspace/settings?section=agent" className="underline">
+                      去切换默认模型
+                    </Link>
+                  )}
+                </AlertDescription>
               </Alert>
             )}
             {view.status === "ready" &&
@@ -554,7 +710,21 @@ export function ProductCatalogImport({
                           {selectionNotice}
                         </p>
                       )}
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-52 flex-1">
+                          <SearchIcon
+                            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <Input
+                            type="search"
+                            aria-label="筛选目录候选记录"
+                            placeholder="按编号、页码或状态筛选…"
+                            value={candidateQuery}
+                            onChange={(event) => setCandidateQuery(event.target.value)}
+                            className="pl-8"
+                          />
+                        </div>
                         <Button
                           type="button"
                           variant="outline"
@@ -618,7 +788,7 @@ export function ProductCatalogImport({
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {view.candidates.map((candidate) => (
+                          {filteredCandidates.map((candidate) => (
                             <TableRow key={candidate.id}>
                               <TableCell>
                                 <Checkbox
@@ -682,6 +852,16 @@ export function ProductCatalogImport({
                               </TableCell>
                             </TableRow>
                           ))}
+                          {!filteredCandidates.length ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={5}
+                                className="py-6 text-center text-sm text-muted-foreground"
+                              >
+                                没有符合「{candidateQuery}」的目录记录。
+                              </TableCell>
+                            </TableRow>
+                          ) : null}
                         </TableBody>
                       </Table>
                       <FieldError errors={[selection.formState.errors.candidateIds]} />

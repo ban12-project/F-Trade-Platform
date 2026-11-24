@@ -59,6 +59,7 @@ import type { ContentCatalogDetail, ReadyProductContentSource } from "@/lib/cont
 import { contentAgentRequestSchema, contentDraftFormSchema } from "@/lib/form-schemas";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
+import { MarkdownContent } from "./markdown-content";
 import { useCreatedRecord } from "./use-created-record";
 import { WorkspaceLink as Link } from "./workspace-link";
 
@@ -580,7 +581,7 @@ export function ContentDraftForm({
                 <p className="text-xs font-medium text-muted-foreground">贴文内容预览</p>
                 {previewHook?.trim() ? <p className="text-sm font-medium">{previewHook}</p> : null}
                 {previewBody?.trim() ? (
-                  <p className="whitespace-pre-wrap break-words text-sm">{previewBody}</p>
+                  <MarkdownContent className="text-sm">{previewBody}</MarkdownContent>
                 ) : null}
                 {previewCta?.trim() ? <p className="text-sm font-medium">{previewCta}</p> : null}
                 {previewHashtags?.trim() ? (

@@ -28,10 +28,12 @@ export async function listEvidenceOptionsAction(input: unknown) {
       parsed.data.videoId,
     );
     return {
-      options: options.map(({ id, sourceLabel, contentType, createdAt }) => ({
+      options: options.map(({ id, sourceLabel, contentType, createdAt, inCurrentProject }) => ({
         id,
         label: sourceLabel,
         detail: `${contentType} · ${createdAt.toISOString().slice(0, 10)}`,
+        contentType,
+        inCurrentProject: inCurrentProject ?? false,
       })),
       error: "",
     };

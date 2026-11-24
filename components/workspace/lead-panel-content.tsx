@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -702,9 +703,19 @@ function LeadActions({
           </CardFooter>
         </Card>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          采购意向尚待确认。请继续记录客户的询价、样品和采购计划，满足条件后再确认商机。
-        </p>
+        <div className="flex flex-col gap-2 rounded-xl border bg-muted/20 p-4">
+          <Progress
+            aria-label="高意向商机评分进度"
+            value={Math.min(100, Math.round((entry.lead.score / 61) * 100))}
+          >
+            <ProgressLabel>高意向（HOT）门槛进度</ProgressLabel>
+            <ProgressValue>{() => `${entry.lead.score} / 61 分`}</ProgressValue>
+          </Progress>
+          <p className="text-sm text-muted-foreground">
+            还差 {Math.max(1, 61 - entry.lead.score)}{" "}
+            分达到高意向（HOT）。请按实际沟通继续勾选上方客户意向行为并点击「保存跟进计划」，满足条件后即可确认有效商机。
+          </p>
+        </div>
       )}
     </div>
   );
@@ -794,12 +805,12 @@ const contexts = [
   ["asks_lead_time", "询问交期"],
 ] as const;
 const scoringRules = [
-  ["active_inquiry", "主动询盘"],
-  ["provides_oe_number", "提供 OE"],
-  ["explicit_quantity", "明确数量"],
-  ["target_quantity_range", "目标数量区间"],
-  ["asks_sample", "询问样品"],
-  ["asks_lead_time", "询问交期"],
-  ["asks_payment_terms", "询问付款条件"],
-  ["replies_again", "再次回复"],
+  ["active_inquiry", "主动询盘（+20）"],
+  ["provides_oe_number", "提供 OE（+15）"],
+  ["explicit_quantity", "明确数量（+15）"],
+  ["target_quantity_range", "目标数量区间（+10）"],
+  ["asks_sample", "询问样品（+10）"],
+  ["asks_lead_time", "询问交期（+10）"],
+  ["asks_payment_terms", "询问付款条件（+15）"],
+  ["replies_again", "再次回复（+15）"],
 ] as const;
