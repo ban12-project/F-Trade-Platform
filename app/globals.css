@@ -343,6 +343,12 @@ html {
   min-width: 0;
 }
 
+/* Avoid Chromium container-query grid items collapsing to 0px when sibling form sections mount. */
+.workspace-columns > [data-slot="field-group"],
+.workspace-equal-columns > [data-slot="field-group"] {
+  container-type: normal;
+}
+
 .workspace-support,
 .workspace-sticky-panel {
   display: flex;
