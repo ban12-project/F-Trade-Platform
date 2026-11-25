@@ -245,6 +245,94 @@ assert.throws(
   /图片候选镜头/,
 );
 
+// Video candidates without an audio track are safely forced to muted even if AI suggests source audio.
+const mutedFallback = compileMarketingVideoAiDraft({
+  suggestion: { ...aiSuggestion, clips: [{ ...aiSuggestion.clips[0], audioMode: "source" }] },
+  candidates: [{ ...shotCandidates[0], hasAudio: false }],
+  platform: "instagram",
+});
+assert.equal(mutedFallback.clips[0]?.audioMode, "muted");
+
+// Shorts organic brief compiles cleanly when opening on Connection and closing with Branding + Direction.
+const shortsCompiled = compileMarketingVideoAiDraft({
+  suggestion: {
+    clips: [
+      {
+        shotCandidateId: "shot-001-001",
+        durationMs: 2_500,
+        fitMode: "cover",
+        audioMode: "muted",
+        caption: { kind: "creative", text: "See the product in detail", claimRef: "" },
+        abcdRoles: ["connection", "attention"],
+        motionPreset: "punch_in",
+      },
+      {
+        shotCandidateId: "shot-001-002",
+        durationMs: 2_500,
+        fitMode: "contain",
+        audioMode: "muted",
+        caption: { kind: "none", text: "", claimRef: "" },
+        abcdRoles: ["branding", "direction"],
+        motionPreset: "cta_hold",
+      },
+    ],
+    ctaText: "Request product details",
+  },
+  candidates: [
+    shotCandidates[0],
+    {
+      id: "shot-001-002",
+      assetRef: "evidence-brand-002",
+      mediaType: "image",
+      trimStartMs: 0,
+      maximumDurationMs: 10_000,
+      hasAudio: false,
+    },
+  ],
+  platform: "tiktok",
+  creativeBrief: {
+    brandAssetRef: "evidence-brand-002",
+    objective: "action",
+    pacingMode: "shorts_organic",
+    audience: "Aftermarket buyers",
+    buyerNeed: "Verify replacement kit visual fit",
+    nextAction: "Submit requirements for human review",
+    platformAssumptions: "Muted short vertical feed; captions required",
+  },
+});
+assert.equal(shortsCompiled.creativeBrief?.pacingMode, "shorts_organic");
+
+// Anti-competing-elements checks limit long creative captions on Direction or sub-2s clips.
+assert.throws(
+  () =>
+    marketingVideoDraftSchema.parse({
+      ...exact,
+      clips: [
+        exact.clips[0],
+        {
+          ...exact.clips[1],
+          caption: { kind: "creative", text: "A".repeat(73) },
+        },
+      ],
+    }),
+  /72 字以内/,
+);
+assert.throws(
+  () =>
+    marketingVideoDraftSchema.parse({
+      ...exact,
+      clips: [
+        {
+          ...exact.clips[0],
+          durationMs: 1_500,
+          caption: { kind: "creative", text: "B".repeat(51) },
+        },
+        exact.clips[1],
+      ],
+    }),
+  /50 字以内/,
+);
+
 const project: VideoProject = {
   id: "00000000-0000-4000-8000-000000000501",
   productId: "00000000-0000-4000-8000-000000000502",

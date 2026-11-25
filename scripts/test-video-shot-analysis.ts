@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 
 import {
   detectShotIntervals,
+  legacyShotAnalysisVersion,
   parseFrameDifferenceMetadata,
   parseSceneCutMetadata,
+  parseVisualSignalMetadata,
   selectDiverseActionIntervals,
+  shotAnalysisVersion,
+  shotSourceAnalysisSchema,
 } from "../lib/video/shot-analysis";
 
 const sceneMetadata = [
@@ -73,4 +77,61 @@ assert.throws(
   /不足 1 秒/,
 );
 
-console.log("PASS shot intervals use scene boundaries and bounded visual-motion scores");
+const visualMetadata = [
+  "frame:1 pts:0 pts_time:0.5",
+  "lavfi.signalstats.YMIN=10",
+  "lavfi.signalstats.YLOW=15",
+  "lavfi.signalstats.YAVG=30",
+  "lavfi.signalstats.YHIGH=35",
+  "lavfi.signalstats.YMAX=45",
+  "lavfi.scd.time=4.0",
+  "frame:2 pts:0 pts_time:5.0",
+  "lavfi.signalstats.YMIN=25",
+  "lavfi.signalstats.YLOW=45",
+  "lavfi.signalstats.YAVG=180",
+  "lavfi.signalstats.YHIGH=205",
+  "lavfi.signalstats.YMAX=240",
+  "frame:bad pts_time:nope",
+  "lavfi.signalstats.YAVG=bad",
+].join("\n");
+const parsedVisual = parseVisualSignalMetadata(visualMetadata);
+assert.deepEqual(parsedVisual, [
+  { timeMs: 500, luma: 30, contrast: 20 },
+  { timeMs: 5_000, luma: 180, contrast: 160 },
+]);
+
+const scoredIntervals = detectShotIntervals({
+  durationMs: 10_000,
+  sceneMetadata: visualMetadata,
+  motionMetadata: [
+    "frame:1 pts:0 pts_time:1.0",
+    "lavfi.signalstats.YAVG=16",
+    "frame:2 pts:0 pts_time:6.0",
+    "lavfi.signalstats.YAVG=16",
+  ].join("\n"),
+});
+assert.equal(scoredIntervals.length, 2);
+assert.equal(scoredIntervals[0]?.version, shotAnalysisVersion);
+assert.equal(scoredIntervals[0]?.brightnessLevel, "low");
+assert.equal(scoredIntervals[0]?.contrastLevel, "low");
+assert.equal(scoredIntervals[1]?.brightnessLevel, "high");
+assert.equal(scoredIntervals[1]?.contrastLevel, "high");
+const preferredBright = selectDiverseActionIntervals(scoredIntervals, 1);
+assert.equal(preferredBright.length, 1);
+assert.equal(preferredBright[0]?.intervalStartMs, 4_000);
+
+const legacyParsed = shotSourceAnalysisSchema.parse({
+  version: legacyShotAnalysisVersion,
+  intervalStartMs: 0,
+  intervalEndMs: 4_000,
+  representativeMs: 2_000,
+  actionScore: 40,
+  actionLevel: "medium",
+  startBoundary: "source",
+  endBoundary: "source",
+});
+assert.equal(legacyParsed.version, legacyShotAnalysisVersion);
+
+console.log(
+  "PASS shot intervals use scene boundaries, signalstats brightness/contrast, and bounded visual-motion scores",
+);

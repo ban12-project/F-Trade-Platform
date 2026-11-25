@@ -50,6 +50,35 @@ assert.throws(
     }),
   /未绑定证据/,
 );
+assert.throws(
+  () =>
+    videoProjectSchema.parse({
+      ...project,
+      creativeObjective: "consideration",
+      scenes: [
+        {
+          ...project.scenes[0],
+          abcdRoles: ["attention", "branding", "connection"],
+          claimRefs: [],
+        },
+      ],
+    }),
+  /缺少 direction|必须包含 direction/,
+);
+assert.throws(
+  () =>
+    videoProjectSchema.parse({
+      ...project,
+      creativeObjective: "full_funnel",
+      scenes: [
+        {
+          ...project.scenes[0],
+          abcdRoles: ["attention", "branding", "connection", "direction"],
+        },
+      ],
+    }),
+  /至少需要 2 个镜头/,
+);
 
 const event: WorkflowEventInput = {
   eventId: "event-01",

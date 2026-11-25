@@ -4,6 +4,7 @@ import {
   downloadComputeSource,
 } from "../compute/runtime";
 
+import { buildMarketingAssDocument } from "./ass-subtitles";
 import type { VideoProject } from "./contracts";
 import { videoProbeEntries } from "./encoding-contract";
 import { parseFfprobeOutput } from "./media-probe";
@@ -66,33 +67,6 @@ async function downloadSources(
   return remote;
 }
 
-function assTime(seconds: number) {
-  const value = Math.max(0, Math.round(seconds * 100));
-  return `${Math.floor(value / 360000)}:${String(Math.floor((value % 360000) / 6000)).padStart(2, "0")}:${String(Math.floor((value % 6000) / 100)).padStart(2, "0")}.${String(value % 100).padStart(2, "0")}`;
-}
-
-function assText(value: string) {
-  return value
-    .replaceAll("\\", "\\\\")
-    .replaceAll("{", "\\{")
-    .replaceAll("}", "\\}")
-    .replaceAll("\n", "\\N");
-}
-
-function assDocument(request: VideoRenderRequest) {
-  const lines = request.timeline.scenes.flatMap((scene) =>
-    scene.subtitles.map(
-      (item) =>
-        `Dialogue: 0,${assTime(item.startSeconds)},${assTime(item.endSeconds)},Caption,,0,0,0,,${assText(item.text)}`,
-    ),
-  );
-  if (request.timeline.cta)
-    lines.push(
-      `Dialogue: 1,${assTime(request.timeline.cta.startSeconds)},${assTime(request.timeline.cta.endSeconds)},CTA,,0,0,0,,${assText(request.timeline.cta.text)}`,
-    );
-  return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${request.width}\nPlayResY: ${request.height}\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,Noto Sans,${Math.max(32, Math.round(request.height * 0.04))},&H00FFFFFF,&H000000FF,&H00111111,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,60,60,${Math.max(54, Math.round(request.height * 0.07))},1\nStyle: CTA,Noto Sans,${Math.max(42, Math.round(request.height * 0.055))},&H00FFFFFF,&H000000FF,&H00111111,&H90000000,-1,0,0,0,100,100,0,0,3,2,0,5,80,80,80,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${lines.join("\n")}\n`;
-}
-
 export async function extractMarketingVisualSamplesInSandbox(
   sourceAssets: VideoProject["sourceAssets"],
   sources: SignedSources,
@@ -122,28 +96,32 @@ export async function extractMarketingVisualSamplesInSandbox(
           assetRef: source.assetRef,
           mediaType: "image",
           trimStartMs: 0,
+          hasAudio: false,
         });
         candidates.push(candidate);
         samples.push({
-          label: `${candidate.id} · image · max ${candidate.maximumDurationMs}ms`,
+          label: `${candidate.id} · image · max ${candidate.maximumDurationMs}ms · audio none`,
           data: new Uint8Array(await sandbox.fs.readFile(input)),
           mediaType: signedSource.contentType,
         });
         continue;
       }
-      const rawDuration = await command(sandbox, "ffprobe", [
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        input,
-      ]);
-      const duration = Number(rawDuration.trim());
+      const probe = JSON.parse(
+        await command(sandbox, "ffprobe", [
+          "-v",
+          "error",
+          "-show_entries",
+          "format=duration:stream=codec_type",
+          "-of",
+          "json",
+          input,
+        ]),
+      ) as { format?: { duration?: string }; streams?: Array<{ codec_type?: string }> };
+      const duration = Number(probe.format?.duration);
       if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取上传视频的时长。");
       if (duration > maximumMarketingSourceDurationSeconds)
         throw new Error(`源视频不能超过 ${maximumMarketingSourceDurationSeconds} 秒。`);
+      const hasAudio = probe.streams?.some((stream) => stream.codec_type === "audio") ?? false;
       const durationMs = Math.round(duration * 1_000);
       const sceneMetadata = await command(sandbox, "ffmpeg", [
         "-hide_banner",
@@ -177,6 +155,7 @@ export async function extractMarketingVisualSamplesInSandbox(
         assetRef: source.assetRef,
         sourceDurationMs: durationMs,
         maximumCandidates: candidatesPerSource,
+        hasAudio,
         intervals,
       });
       for (const [frameIndex, candidate] of sourceCandidates.entries()) {
@@ -200,8 +179,12 @@ export async function extractMarketingVisualSamplesInSandbox(
         ]);
         candidates.push(candidate);
         const analysis = candidate.sourceAnalysis;
+        const visualSummary =
+          analysis && "brightnessScore" in analysis
+            ? ` · brightness ${analysis.brightnessScore}/100 · contrast ${analysis.contrastScore}/100`
+            : "";
         samples.push({
-          label: `${candidate.id} · video · interval ${analysis?.intervalStartMs ?? candidate.trimStartMs}-${analysis?.intervalEndMs ?? candidate.trimStartMs + candidate.maximumDurationMs}ms · action ${analysis?.actionScore ?? 0}/100 · max ${candidate.maximumDurationMs}ms`,
+          label: `${candidate.id} · video · interval ${analysis?.intervalStartMs ?? candidate.trimStartMs}-${analysis?.intervalEndMs ?? candidate.trimStartMs + candidate.maximumDurationMs}ms · action ${analysis?.actionScore ?? 0}/100${visualSummary} · audio ${hasAudio ? "present" : "none"} · max ${candidate.maximumDurationMs}ms`,
           data: new Uint8Array(await sandbox.fs.readFile(output)),
           mediaType: "image/jpeg",
         });
@@ -329,7 +312,7 @@ export async function renderMarketingTimelineInSandbox(
     const output = "/vercel/sandbox/work/output.mp4";
     if (request.timeline.scenes.some((scene) => scene.subtitles.length) || request.timeline.cta) {
       const captions = "/vercel/sandbox/work/captions.ass";
-      await sandbox.fs.writeFile(captions, assDocument(request));
+      await sandbox.fs.writeFile(captions, buildMarketingAssDocument(request));
       await command(sandbox, "ffmpeg", [
         "-hide_banner",
         "-loglevel",

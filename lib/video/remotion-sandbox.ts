@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import type { AbcdPacingMode } from "@/remotion/abcd-types";
 import { type ComputeRuntime, createComputeRuntime } from "../compute/runtime";
 import { videoProbeEntries } from "./encoding-contract";
 import { parseFfprobeOutput } from "./media-probe";
@@ -22,11 +23,12 @@ export async function renderMarketingTimelineWithRemotion(
   request: VideoRenderRequest,
   sources: SignedSources,
   productName: string,
+  pacingMode?: AbcdPacingMode,
 ) {
   const bundleDir = resolve(process.cwd(), ".remotion");
   if (!existsSync(bundleDir))
     throw new Error("Remotion 合成包不存在；部署前必须运行 build:remotion。");
-  const inputProps = createRemotionCompositionProps(request, sources, productName);
+  const inputProps = createRemotionCompositionProps(request, sources, productName, pacingMode);
   return renderRemotionOnCompute(bundleDir, inputProps, sources);
 }
 

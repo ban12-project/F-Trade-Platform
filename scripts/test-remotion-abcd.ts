@@ -135,6 +135,38 @@ assert.deepEqual(resolveAbcdBeatState(firstClip, 200), {
   direction: true,
   phaseStartFrame: 160,
 });
+assert.deepEqual(resolveAbcdBeatState(firstClip, 0, "shorts_organic"), {
+  attention: false,
+  branding: true,
+  connection: true,
+  direction: false,
+  phaseStartFrame: 0,
+});
+assert.deepEqual(resolveAbcdBeatState(firstClip, 100, "shorts_organic"), {
+  attention: true,
+  branding: true,
+  connection: false,
+  direction: false,
+  phaseStartFrame: 80,
+});
+const shortsProps = createRemotionCompositionProps(
+  { timeline, platform: "tiktok", width: 1080, height: 1920, fps: 30 },
+  new Map([
+    [
+      "evidence-source-001",
+      {
+        assetRef: "evidence-source-001",
+        contentType: "video/mp4",
+        extension: ".mp4",
+        hostname: "private.example",
+        signedGetUrl: "https://private.example/source.mp4?token=short-lived",
+      },
+    ],
+  ]),
+  "RYC302 Clutch Kit",
+  "shorts_organic",
+);
+assert.equal(shortsProps.pacingMode, "shorts_organic");
 assert.equal(JSON.stringify(project).includes("private.example"), false);
 assert.throws(
   () =>

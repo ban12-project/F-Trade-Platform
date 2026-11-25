@@ -21,19 +21,26 @@ export type MarketingVisualSampling = {
   visualSamples: MarketingVisualSample[];
 };
 
-async function videoDuration(filePath: string, ffprobeBin: string) {
+async function videoProbe(filePath: string, ffprobeBin: string) {
   const { stdout } = await execFileAsync(ffprobeBin, [
     "-v",
     "error",
     "-show_entries",
-    "format=duration",
+    "format=duration:stream=codec_type",
     "-of",
-    "default=noprint_wrappers=1:nokey=1",
+    "json",
     filePath,
   ]);
-  const duration = Number(stdout.trim());
+  const parsed = JSON.parse(stdout) as {
+    format?: { duration?: string };
+    streams?: Array<{ codec_type?: string }>;
+  };
+  const duration = Number(parsed.format?.duration);
   if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取上传视频的时长。");
-  return duration;
+  return {
+    duration,
+    hasAudio: parsed.streams?.some((stream) => stream.codec_type === "audio") ?? false,
+  };
 }
 
 async function analyzeVideo(filePath: string, durationMs: number, ffmpegBin: string) {
@@ -91,17 +98,18 @@ export async function extractMarketingVisualSamples(
           assetRef: source.assetRef,
           mediaType: "image",
           trimStartMs: 0,
+          hasAudio: false,
         });
         candidates.push(candidate);
         samples.push({
-          label: `${candidate.id} · image · max ${candidate.maximumDurationMs}ms`,
+          label: `${candidate.id} · image · max ${candidate.maximumDurationMs}ms · audio none`,
           data: new Uint8Array(await readFile(filePath)),
           mediaType,
         });
         continue;
       }
       if (source.mediaType !== "video") continue;
-      const duration = await videoDuration(filePath, ffprobeBin);
+      const { duration, hasAudio } = await videoProbe(filePath, ffprobeBin);
       const durationMs = Math.round(duration * 1_000);
       const intervals = await analyzeVideo(filePath, durationMs, ffmpegBin);
       const sourceCandidates = createScoredVideoShotCandidates({
@@ -109,6 +117,7 @@ export async function extractMarketingVisualSamples(
         assetRef: source.assetRef,
         sourceDurationMs: durationMs,
         maximumCandidates: candidatesPerSource,
+        hasAudio,
         intervals,
       });
       for (const [candidateIndex, candidate] of sourceCandidates.entries()) {
@@ -135,8 +144,12 @@ export async function extractMarketingVisualSamples(
         ]);
         candidates.push(candidate);
         const analysis = candidate.sourceAnalysis;
+        const visualSummary =
+          analysis && "brightnessScore" in analysis
+            ? ` · brightness ${analysis.brightnessScore}/100 · contrast ${analysis.contrastScore}/100`
+            : "";
         samples.push({
-          label: `${candidate.id} · video · interval ${analysis?.intervalStartMs ?? candidate.trimStartMs}-${analysis?.intervalEndMs ?? candidate.trimStartMs + candidate.maximumDurationMs}ms · action ${analysis?.actionScore ?? 0}/100 · max ${candidate.maximumDurationMs}ms`,
+          label: `${candidate.id} · video · interval ${analysis?.intervalStartMs ?? candidate.trimStartMs}-${analysis?.intervalEndMs ?? candidate.trimStartMs + candidate.maximumDurationMs}ms · action ${analysis?.actionScore ?? 0}/100${visualSummary} · audio ${hasAudio ? "present" : "none"} · max ${candidate.maximumDurationMs}ms`,
           data: new Uint8Array(await readFile(output)),
           mediaType: "image/jpeg",
         });

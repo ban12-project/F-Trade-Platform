@@ -226,6 +226,14 @@ export const safeAiCtaTexts = [
   "Start a distributor inquiry",
 ] as const;
 
+export const marketingCreativeObjectives = [
+  "awareness",
+  "consideration",
+  "action",
+  "full_funnel",
+] as const;
+export const marketingCreativePacingModes = ["core_abcd", "shorts_organic"] as const;
+
 export const marketingVideoAbcdRoles = [
   "attention",
   "branding",
@@ -375,14 +383,38 @@ export const marketingVideoClipSchema = z
         message: "片段必须位于检测到的镜头区间内。",
       });
     }
+    if (
+      clip.abcdRoles.includes("direction") &&
+      clip.caption.kind === "creative" &&
+      clip.caption.text.length > 72
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["caption"],
+        message:
+          "引导行动（Direction）片段同时展示 CTA 按钮，同屏创意字幕请控制在 72 字以内以避免视觉元素竞争。",
+      });
+    }
+    if (
+      clip.durationMs < 2_000 &&
+      clip.caption.kind === "creative" &&
+      clip.caption.text.length > 50
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["caption"],
+        message: "短于 2 秒的片段创意字幕请控制在 50 字以内，确保买家可读并聚焦单一信息。",
+      });
+    }
   });
 
 export const marketingCreativeBriefSchema = z
   .object({
     brandAssetRef: z.string().trim().min(1, "请选择含授权品牌标识的开场素材。").max(500),
-    objective: z.enum(["awareness", "consideration", "action"], {
+    objective: z.enum(marketingCreativeObjectives, {
       error: "请选择主要营销目标。",
     }),
+    pacingMode: z.enum(marketingCreativePacingModes).optional(),
     audience: z.string().trim().min(1, "请填写目标受众。").max(200, "目标受众不能超过 200 字。"),
     buyerNeed: z
       .string()
@@ -401,6 +433,8 @@ export const marketingCreativeBriefSchema = z
       .max(300, "平台与声音、字幕假设不能超过 300 字。"),
   })
   .strict();
+
+export type MarketingCreativeBrief = z.infer<typeof marketingCreativeBriefSchema>;
 
 const marketingVideoDraftV3Schema = z
   .object({
@@ -443,18 +477,38 @@ const marketingVideoDraftV3Schema = z
           message: `ABCD 创意结构缺少 ${role} 节拍。`,
         });
     }
-    if (!draft.clips[0]?.abcdRoles.includes("attention"))
-      context.addIssue({
-        code: "custom",
-        path: ["clips", 0, "abcdRoles"],
-        message: "Attention 必须从第一个片段开始。",
-      });
-    if (!draft.clips[0]?.abcdRoles.includes("branding"))
-      context.addIssue({
-        code: "custom",
-        path: ["clips", 0, "abcdRoles"],
-        message: "Branding 必须在第一个片段出现。",
-      });
+    if (draft.creativeBrief?.pacingMode === "shorts_organic") {
+      if (draft.platform === "x") {
+        context.addIssue({
+          code: "custom",
+          path: ["platform"],
+          message: "竖屏短片叙事模式仅适用于支持竖屏短片的平台；X 横屏请使用标准 ABCD 顺序。",
+        });
+      }
+      if (
+        !draft.clips[0]?.abcdRoles.includes("connection") &&
+        !draft.clips[0]?.abcdRoles.includes("attention")
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["clips", 0, "abcdRoles"],
+          message: "竖屏短片叙事必须从第一个片段建立 Connection 或 Attention。",
+        });
+      }
+    } else {
+      if (!draft.clips[0]?.abcdRoles.includes("attention"))
+        context.addIssue({
+          code: "custom",
+          path: ["clips", 0, "abcdRoles"],
+          message: "Attention 必须从第一个片段开始。",
+        });
+      if (!draft.clips[0]?.abcdRoles.includes("branding"))
+        context.addIssue({
+          code: "custom",
+          path: ["clips", 0, "abcdRoles"],
+          message: "Branding 必须在第一个片段出现。",
+        });
+    }
     if (!draft.clips.at(-1)?.abcdRoles.includes("direction"))
       context.addIssue({
         code: "custom",
@@ -613,13 +667,13 @@ export const marketingVideoAiDraftSchema = z
         });
     }
     if (
-      !draft.clips[0]?.abcdRoles.includes("attention") ||
-      !draft.clips[0]?.abcdRoles.includes("branding")
+      !draft.clips[0]?.abcdRoles.includes("attention") &&
+      !draft.clips[0]?.abcdRoles.includes("connection")
     ) {
       context.addIssue({
         code: "custom",
         path: ["clips", 0, "abcdRoles"],
-        message: "AI 初稿必须在第一个片段完成 Attention 和早期 Branding。",
+        message: "AI 初稿必须在第一个片段建立 Attention 或 Connection。",
       });
     }
     if (!draft.clips.at(-1)?.abcdRoles.includes("direction"))
@@ -644,8 +698,17 @@ export function assertMarketingCreativeReady(draft: MarketingVideoDraft) {
   if (!draft.creativeBrief) throw new Error("请先填写上方 ABCD 创意简报，再合成预览。");
   const brief = marketingCreativeBriefSchema.parse(draft.creativeBrief);
   const first = draft.clips[0];
-  if (!first || first.assetRef !== brief.brandAssetRef)
+  if (brief.pacingMode === "shorts_organic") {
+    if (
+      !draft.clips.some(
+        (clip) => clip.abcdRoles.includes("branding") && clip.assetRef === brief.brandAssetRef,
+      )
+    ) {
+      throw new Error("呈现品牌（Branding）的片段必须使用所选的授权品牌素材。");
+    }
+  } else if (!first || first.assetRef !== brief.brandAssetRef) {
     throw new Error("开场必须使用所选的授权品牌素材。");
+  }
   if (
     !draft.clips.some(
       (clip) => clip.abcdRoles.includes("connection") && clip.caption.kind !== "none",
@@ -659,5 +722,28 @@ export function assertMarketingCreativeReady(draft: MarketingVideoDraft) {
     )
   )
     throw new Error("考虑目标需要在 Connection 片段展示已核实产品细节。");
+  if (brief.objective === "action" && draft.clips.length > 1) {
+    const firstDirectionIndex = draft.clips.findIndex((clip) =>
+      clip.abcdRoles.includes("direction"),
+    );
+    const firstConnectionIndex = draft.clips.findIndex((clip) =>
+      clip.abcdRoles.includes("connection"),
+    );
+    if (
+      firstDirectionIndex !== -1 &&
+      firstConnectionIndex !== -1 &&
+      firstDirectionIndex < firstConnectionIndex
+    ) {
+      throw new Error("行动目标需先建立产品与需求上下文，再呈现行动引导（Direction）。");
+    }
+  }
+  if (brief.objective === "full_funnel") {
+    if (draft.clips.length < 2) {
+      throw new Error("全漏斗目标至少需要 2 个片段，以串联品牌引入、核实事实连接与收尾行动引导。");
+    }
+    if (!draft.clips.some((clip) => clip.caption.kind === "verified_fact")) {
+      throw new Error("全漏斗目标至少需要一个片段展示已核实产品信息。");
+    }
+  }
   return brief;
 }

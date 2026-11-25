@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { submitVideoGeneration, type VideoGenerationAdapter } from "../lib/video/execution";
+import {
+  executionPrompt,
+  submitVideoGeneration,
+  type VideoGenerationAdapter,
+} from "../lib/video/execution";
 
 const project = {
   id: "00000000-0000-4000-8000-000000000301",
@@ -109,6 +113,23 @@ async function main() {
       ),
     /适配器/,
   );
+  const structuredPrompt = executionPrompt({
+    ...project,
+    creativeObjective: "consideration",
+    pacingMode: "shorts_organic",
+    scenes: [
+      {
+        ...project.scenes[0],
+        abcdRoles: ["connection", "attention", "branding", "direction"],
+        framing: "tight",
+        visualContrast: "high_contrast_bright",
+      },
+    ],
+  });
+  assert.ok(structuredPrompt.includes("answer/14783551"));
+  assert.ok(structuredPrompt.includes("framing=tight"));
+  assert.ok(structuredPrompt.includes("visual=high_contrast_bright"));
+  assert.ok(structuredPrompt.includes("product.product_name=Synthetic clutch"));
   console.log(
     "PASS video execution rejects unsafe configuration and submits a private-asset result",
   );
