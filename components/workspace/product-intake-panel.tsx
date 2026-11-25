@@ -1,9 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import dynamic from "next/dynamic";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Controller, useForm, useFormState, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -14,9 +15,16 @@ import type { EvidenceOption } from "@/lib/workspace/access";
 import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
 import { FileDropzone } from "./file-dropzone";
 import { ProductAgentForm } from "./product-agent-form";
-import { ProductCatalogImport } from "./product-catalog-import";
 import { ProductDraftForm } from "./product-draft-form";
 import { EvidenceLibrary } from "./product-evidence-library";
+import { WorkspacePanelSkeleton } from "./workspace-loading-skeleton";
+
+const ProductCatalogImport = dynamic(
+  () => import("./product-catalog-import").then((module) => module.ProductCatalogImport),
+  { loading: () => <WorkspacePanelSkeleton label="正在加载目录导入" /> },
+);
+
+const EMPTY_FILES: File[] = [];
 
 export function ProductIntakePanel({
   projectId,
@@ -35,7 +43,11 @@ export function ProductIntakePanel({
   const intakeForm = useForm<z.infer<typeof documentUploadFormSchema>>({
     resolver: zodResolver(documentUploadFormSchema),
   });
-  const file = intakeForm.watch("document");
+  const file = useWatch({ control: intakeForm.control, name: "document" });
+  const intakeReady = intakeForm.formState.isReady;
+  const { errors: intakeErrors } = useFormState({
+    control: intakeForm.control,
+  });
   const intakeFileRef = useRef<HTMLInputElement | null>(null);
   const clearFile = useCallback(() => {
     intakeForm.reset();
@@ -43,6 +55,8 @@ export function ProductIntakePanel({
   }, [intakeForm]);
   const [draftDirty, setDraftDirty] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
+  const dropzoneFiles = useMemo(() => (file ? [file] : EMPTY_FILES), [file]);
+  const sharedSource = useMemo(() => ({ file, clear: clearFile }), [file, clearFile]);
   useWorkspaceDirty("product-intake-file", !!file);
   const requestedMethod = searchParams.get("method");
   const tab =
@@ -60,7 +74,7 @@ export function ProductIntakePanel({
   const describedBy = [
     "product-source-file-help",
     file ? "product-source-file-selection" : undefined,
-    intakeForm.formState.errors.document ? "product-source-file-error" : undefined,
+    intakeErrors.document ? "product-source-file-error" : undefined,
   ]
     .filter(Boolean)
     .join(" ");
@@ -84,7 +98,7 @@ export function ProductIntakePanel({
           </CardHeader>
           <CardContent>
             <FieldGroup>
-              <Field data-invalid={!!intakeForm.formState.errors.document}>
+              <Field data-invalid={!!intakeErrors.document}>
                 <FieldLabel htmlFor="product-source-file">产品资料</FieldLabel>
                 <Controller
                   control={intakeForm.control}
@@ -99,10 +113,10 @@ export function ProductIntakePanel({
                       }}
                       onBlur={field.onBlur}
                       accept=".pdf,.csv,.xls,.xlsx"
-                      disabled={importBusy || !intakeForm.formState.isReady}
-                      invalid={!!intakeForm.formState.errors.document}
+                      disabled={importBusy || !intakeReady}
+                      invalid={!!intakeErrors.document}
                       describedBy={describedBy}
-                      files={file ? [file] : []}
+                      files={dropzoneFiles}
                       emptyTitle="拖拽工厂 PDF / CSV / Excel 到这里，或点击选择"
                       emptyDescription="同一份文件可直接用于下方的单个产品或产品目录导入"
                       onFilesChange={(files) => {
@@ -122,10 +136,7 @@ export function ProductIntakePanel({
                     已选择：{file.name}
                   </FieldDescription>
                 ) : null}
-                <FieldError
-                  id="product-source-file-error"
-                  errors={[intakeForm.formState.errors.document]}
-                />
+                <FieldError id="product-source-file-error" errors={[intakeErrors.document]} />
               </Field>
             </FieldGroup>
           </CardContent>
@@ -145,7 +156,7 @@ export function ProductIntakePanel({
         </TabsList>
         <TabsContent value="agent">
           <ProductAgentForm
-            source={{ file, clear: clearFile }}
+            source={sharedSource}
             onDraftDirty={setDraftDirty}
             onBusyChange={setImportBusy}
             canStream={canReview}
@@ -160,7 +171,7 @@ export function ProductIntakePanel({
         </TabsContent>
         <TabsContent value="catalog">
           <ProductCatalogImport
-            source={{ file, clear: clearFile }}
+            source={sharedSource}
             onDraftDirty={setDraftDirty}
             onBusyChange={setImportBusy}
             key={projectId}

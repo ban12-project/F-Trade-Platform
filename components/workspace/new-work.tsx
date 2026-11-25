@@ -153,13 +153,12 @@ function NewWorkDialog({
   onStart,
   dialogId,
 }: {
-  intent: NewWorkIntent;
+  intent: NewWorkIntent | null;
   dialogId: string;
   projects: WorkspaceProjectSummary[];
   onClose: () => void;
   onStart: (projectId: string, intent: NewWorkIntent) => void;
 }) {
-  const id = useId();
   const { requestNavigation } = useWorkspaceDirtyState();
   const [creating, setCreating] = useState(false);
   const [ownDirty, setOwnDirty] = useState(false);
@@ -167,19 +166,17 @@ function NewWorkDialog({
     if (ownDirty) requestNavigation(action);
     else action();
   }
-  const [selectedIntent, setIntent] = useState(intent);
-  const kind = selectedIntent === "rfq" ? "sales" : "marketing";
-  const available = projects.filter(
-    (project) => !workspaceCreationRestriction(project, selectedIntent),
-  );
-  const [projectId, setProjectId] = useState("");
-  const selected =
-    projectId === "new" || available.some((project) => project.id === projectId) ? projectId : "";
   return (
     <Dialog
-      open
+      open={Boolean(intent)}
       onOpenChange={(open) => {
-        if (!open && !creating) changeSelection(onClose);
+        if (!open && !creating) {
+          changeSelection(() => {
+            setOwnDirty(false);
+            setCreating(false);
+            onClose();
+          });
+        }
       }}
     >
       <DialogContent
@@ -191,88 +188,135 @@ function NewWorkDialog({
           <DialogTitle>开始新工作</DialogTitle>
           <DialogDescription>先选要做的事，再确认资料属于哪个项目。</DialogDescription>
         </DialogHeader>
-        <FieldGroup>
-          <Field>
-            <FieldLabel id={`${id}-intent`}>这次要做什么</FieldLabel>
-            <ToggleGroup
-              disabled={creating}
-              aria-labelledby={`${id}-intent`}
-              variant="outline"
-              spacing={1}
-              value={[selectedIntent]}
-              onValueChange={(values) => {
-                if (values[0]) {
-                  const nextIntent = values[0] as NewWorkIntent;
-                  changeSelection(() => {
-                    setIntent(nextIntent);
-                    setProjectId("");
-                  });
-                }
-              }}
-            >
-              {intents.map((item) => (
-                <ToggleGroupItem key={item.id} value={item.id}>
-                  {item.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor={`${id}-project`}>归属项目</FieldLabel>
-            <NativeSelect
-              id={`${id}-project`}
-              className="w-full"
-              value={selected}
-              disabled={creating}
-              onChange={(event) => {
-                const nextProject = event.target.value;
-                changeSelection(() => setProjectId(nextProject));
-              }}
-            >
-              <NativeSelectOption value="">请选择归属项目</NativeSelectOption>
-              {available.map((project) => (
-                <NativeSelectOption key={project.id} value={project.id}>
-                  {project.title}
-                </NativeSelectOption>
-              ))}
-              <NativeSelectOption value="new">
-                创建新的{kind === "marketing" ? "营销" : "销售"}项目
-              </NativeSelectOption>
-            </NativeSelect>
-            <FieldDescription>
-              {available.length
-                ? "可以继续使用已有项目，无需每次新建。"
-                : "目前没有可编辑的同类项目，先创建一个归属范围。"}
-            </FieldDescription>
-            {available.length === 1 && !selected ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={creating}
-                onClick={() => changeSelection(() => setProjectId(available[0].id))}
-              >
-                一键选中唯一可用项目：{available[0].title}
-              </Button>
-            ) : null}
-          </Field>
-          {selected === "new" ? (
-            <NewProjectForm
-              key={kind}
-              kind={kind}
-              onPending={setCreating}
-              onDirty={setOwnDirty}
-              onCreated={(id) => onStart(id, selectedIntent)}
-            />
-          ) : (
-            <Button disabled={!selected} onClick={() => onStart(selected, selectedIntent)}>
-              在此项目开始
-              {intents.find((item) => item.id === selectedIntent)?.label}
-            </Button>
-          )}
-        </FieldGroup>
+        {intent ? (
+          <NewWorkDialogBody
+            intent={intent}
+            projects={projects}
+            creating={creating}
+            changeSelection={changeSelection}
+            onPending={setCreating}
+            onDirty={setOwnDirty}
+            onStart={onStart}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function NewWorkDialogBody({
+  intent,
+  projects,
+  creating,
+  changeSelection,
+  onPending,
+  onDirty,
+  onStart,
+}: {
+  intent: NewWorkIntent;
+  projects: WorkspaceProjectSummary[];
+  creating: boolean;
+  changeSelection: (action: () => void) => void;
+  onPending: (pending: boolean) => void;
+  onDirty: (dirty: boolean) => void;
+  onStart: (projectId: string, intent: NewWorkIntent) => void;
+}) {
+  const id = useId();
+  const [selectedIntent, setIntent] = useState(intent);
+  const kind = selectedIntent === "rfq" ? "sales" : "marketing";
+  const available = projects.filter(
+    (project) => !workspaceCreationRestriction(project, selectedIntent),
+  );
+  const [projectId, setProjectId] = useState("");
+  const selected =
+    projectId === "new" || available.some((project) => project.id === projectId) ? projectId : "";
+  useEffect(() => {
+    return () => {
+      onDirty(false);
+      onPending(false);
+    };
+  }, [onDirty, onPending]);
+  return (
+    <FieldGroup>
+      <Field>
+        <FieldLabel id={`${id}-intent`}>这次要做什么</FieldLabel>
+        <ToggleGroup
+          disabled={creating}
+          aria-labelledby={`${id}-intent`}
+          variant="outline"
+          spacing={1}
+          value={[selectedIntent]}
+          onValueChange={(values) => {
+            if (values[0]) {
+              const nextIntent = values[0] as NewWorkIntent;
+              changeSelection(() => {
+                setIntent(nextIntent);
+                setProjectId("");
+              });
+            }
+          }}
+        >
+          {intents.map((item) => (
+            <ToggleGroupItem key={item.id} value={item.id}>
+              {item.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor={`${id}-project`}>归属项目</FieldLabel>
+        <NativeSelect
+          id={`${id}-project`}
+          className="w-full"
+          value={selected}
+          disabled={creating}
+          onChange={(event) => {
+            const nextProject = event.target.value;
+            changeSelection(() => setProjectId(nextProject));
+          }}
+        >
+          <NativeSelectOption value="">请选择归属项目</NativeSelectOption>
+          {available.map((project) => (
+            <NativeSelectOption key={project.id} value={project.id}>
+              {project.title}
+            </NativeSelectOption>
+          ))}
+          <NativeSelectOption value="new">
+            创建新的{kind === "marketing" ? "营销" : "销售"}项目
+          </NativeSelectOption>
+        </NativeSelect>
+        <FieldDescription>
+          {available.length
+            ? "可以继续使用已有项目，无需每次新建。"
+            : "目前没有可编辑的同类项目，先创建一个归属范围。"}
+        </FieldDescription>
+        {available.length === 1 && !selected ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={creating}
+            onClick={() => changeSelection(() => setProjectId(available[0].id))}
+          >
+            一键选中唯一可用项目：{available[0].title}
+          </Button>
+        ) : null}
+      </Field>
+      {selected === "new" ? (
+        <NewProjectForm
+          key={kind}
+          kind={kind}
+          onPending={onPending}
+          onDirty={onDirty}
+          onCreated={(id) => onStart(id, selectedIntent)}
+        />
+      ) : (
+        <Button disabled={!selected} onClick={() => onStart(selected, selectedIntent)}>
+          在此项目开始
+          {intents.find((item) => item.id === selectedIntent)?.label}
+        </Button>
+      )}
+    </FieldGroup>
   );
 }
 export function NewWorkProvider({
@@ -323,18 +367,16 @@ export function NewWorkProvider({
           <NewWorkRouteReset />
         </Suspense>
         {children}
-        {intent ? (
-          <NewWorkDialog
-            intent={intent}
-            dialogId={dialogId}
-            projects={loadedProjects ?? []}
-            onClose={() => setIntent(null)}
-            onStart={(projectId, intent) => {
-              setIntent(null);
-              setDestination(workspaceCreateHref(projectId, intent, undefined, returnTo));
-            }}
-          />
-        ) : null}
+        <NewWorkDialog
+          intent={intent}
+          dialogId={dialogId}
+          projects={loadedProjects ?? []}
+          onClose={() => setIntent(null)}
+          onStart={(projectId, nextIntent) => {
+            setIntent(null);
+            setDestination(workspaceCreateHref(projectId, nextIntent, undefined, returnTo));
+          }}
+        />
       </NewWorkContext>
     </ProjectDataContext>
   );

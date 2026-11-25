@@ -7,6 +7,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@ui-sdk/react/popover";
+import { toast } from "@ui-sdk/react/toast";
 import { BellIcon, CheckCircle2Icon, ExternalLinkIcon, XCircleIcon, XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -19,7 +20,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -194,7 +194,7 @@ export function BackgroundTasksProvider({ children }: { children: ReactNode }) {
         id: `bg-task-${id}`,
         description: result.description,
         duration: 8000,
-        action: actionHref ? { label: "查看", onClick: () => openHref(actionHref) } : undefined,
+        action: actionHref ? { label: "查看", onAction: () => openHref(actionHref) } : undefined,
       });
       if (result.status === "success") router.refresh();
     },
@@ -219,7 +219,7 @@ export function BackgroundTasksProvider({ children }: { children: ReactNode }) {
         description: input.description ?? "可离开当前页面，完成后会自动提醒。",
         duration: Number.POSITIVE_INFINITY,
         action: input.href
-          ? { label: "打开", onClick: () => openHref(input.href as string) }
+          ? { label: "打开", onAction: () => openHref(input.href as string) }
           : undefined,
       });
 
@@ -308,7 +308,7 @@ export function BackgroundTasksIndicator() {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="z-50 w-80 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg"
+        className="z-50 m-0 w-80 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg"
       >
         <div className="flex items-center justify-between gap-2 pb-2">
           <PopoverTitle className="text-sm font-semibold">异步任务状态</PopoverTitle>

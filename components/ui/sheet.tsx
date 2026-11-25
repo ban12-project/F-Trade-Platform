@@ -1,34 +1,64 @@
 "use client";
 
-import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
+import {
+  DialogBackdrop as SheetBackdropPrimitive,
+  DialogClose as SheetClosePrimitive,
+  DialogContent as SheetContentPrimitive,
+  DialogDescription as SheetDescriptionPrimitive,
+  Dialog as SheetPrimitive,
+  DialogTitle as SheetTitlePrimitive,
+  DialogTrigger as SheetTriggerPrimitive,
+} from "@ui-sdk/react/dialog";
 import { XIcon } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-function Sheet({ ...props }: SheetPrimitive.Root.Props) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />;
+const emptySubscribe = () => () => {};
+const getBodyContainer = () => document.body;
+const getServerContainer = () => undefined;
+
+function useBodyPortalContainer() {
+  return React.useSyncExternalStore(emptySubscribe, getBodyContainer, getServerContainer);
 }
 
-function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
-}
-
-function SheetClose({ ...props }: SheetPrimitive.Close.Props) {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
-}
-
-function SheetPortal({ ...props }: SheetPrimitive.Portal.Props) {
-  return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
-}
-
-function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
+function Sheet({
+  container,
+  closeOnOutsidePress = true,
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive>) {
+  const defaultContainer = useBodyPortalContainer();
   return (
-    <SheetPrimitive.Backdrop
-      data-slot="sheet-overlay"
+    <SheetPrimitive
+      container={container ?? defaultContainer}
+      closeOnOutsidePress={closeOnOutsidePress}
+      {...props}
+    />
+  );
+}
+
+function SheetTrigger({ ...props }: React.ComponentProps<typeof SheetTriggerPrimitive>) {
+  return <SheetTriggerPrimitive {...props} />;
+}
+
+function SheetClose({ ...props }: React.ComponentProps<typeof SheetClosePrimitive>) {
+  return <SheetClosePrimitive {...props} />;
+}
+
+function SheetPortal({ children }: { children?: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+function SheetOverlay({
+  className,
+  ...props
+}: React.ComponentProps<typeof SheetBackdropPrimitive>) {
+  return (
+    <SheetBackdropPrimitive
+      data-sheet-overlay="true"
       className={cn(
-        "fixed inset-0 z-50 bg-black/10 transition-opacity duration-200 ease-[var(--ease-out)] data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs",
-        className,
+        "fixed inset-0 z-50 m-0 border-0 bg-black/10 p-0 data-open:transition-opacity data-open:duration-200 data-open:ease-[var(--ease-out)] data-closed:pointer-events-none data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs",
+        typeof className === "string" ? className : undefined,
       )}
       {...props}
     />
@@ -42,7 +72,8 @@ function SheetContent({
   showCloseButton = true,
   showOverlay = true,
   ...props
-}: SheetPrimitive.Popup.Props & {
+}: Omit<React.ComponentProps<typeof SheetContentPrimitive>, "children"> & {
+  children?: React.ReactNode;
   side?: "top" | "right" | "bottom" | "left";
   showCloseButton?: boolean;
   showOverlay?: boolean;
@@ -50,26 +81,25 @@ function SheetContent({
   return (
     <SheetPortal>
       {showOverlay ? <SheetOverlay /> : null}
-      <SheetPrimitive.Popup
-        data-slot="sheet-content"
+      <SheetContentPrimitive
+        data-sheet="true"
         data-side={side}
         className={cn(
-          "fixed z-50 flex overscroll-contain flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition-[transform,opacity] duration-300 ease-[var(--ease-drawer)] data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-full data-[side=bottom]:data-starting-style:translate-y-full data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:-translate-x-full data-[side=left]:data-starting-style:-translate-x-full data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-full data-[side=right]:data-starting-style:translate-x-full data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:-translate-y-full data-[side=top]:data-starting-style:-translate-y-full data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
-          className,
+          "fixed inset-auto z-50 m-0 flex overscroll-contain flex-col gap-4 border-0 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg data-open:transition-[transform,opacity] data-open:duration-200 data-open:ease-[var(--ease-drawer)] outline-none data-closed:pointer-events-none data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-4 data-[side=bottom]:data-starting-style:translate-y-4 data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:-translate-x-4 data-[side=left]:data-starting-style:-translate-x-4 data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-4 data-[side=right]:data-starting-style:translate-x-4 data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:-translate-y-4 data-[side=top]:data-starting-style:-translate-y-4 data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
+          typeof className === "string" ? className : undefined,
         )}
         {...props}
       >
         {children}
         {showCloseButton && (
-          <SheetPrimitive.Close
-            data-slot="sheet-close"
+          <SheetClosePrimitive
             render={<Button variant="ghost" className="absolute top-3 right-3" size="icon-sm" />}
           >
-            <XIcon />
+            <XIcon aria-hidden="true" />
             <span className="sr-only">关闭</span>
-          </SheetPrimitive.Close>
+          </SheetClosePrimitive>
         )}
-      </SheetPrimitive.Popup>
+      </SheetContentPrimitive>
     </SheetPortal>
   );
 }
@@ -94,20 +124,21 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
+function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetTitlePrimitive>) {
   return (
-    <SheetPrimitive.Title
-      data-slot="sheet-title"
+    <SheetTitlePrimitive
       className={cn("font-heading text-base font-medium text-foreground", className)}
       {...props}
     />
   );
 }
 
-function SheetDescription({ className, ...props }: SheetPrimitive.Description.Props) {
+function SheetDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof SheetDescriptionPrimitive>) {
   return (
-    <SheetPrimitive.Description
-      data-slot="sheet-description"
+    <SheetDescriptionPrimitive
       className={cn("text-sm text-muted-foreground", className)}
       {...props}
     />

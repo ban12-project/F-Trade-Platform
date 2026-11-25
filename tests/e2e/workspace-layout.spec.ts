@@ -41,7 +41,8 @@ for (const target of [
   "/workspace/settings?section=channels",
   "https://evil.invalid",
 ]) {
-  test(`OTP completion returns safely: ${target}`, async ({ page }) => {
+  test(`OTP completion returns safely: ${target}`, async ({ page, baseURL }) => {
+    const origin = baseURL ?? "http://127.0.0.1:3000";
     await page.route("**/api/auth/sign-in/email-otp", (route) =>
       route.fulfill({
         json: { token: "synthetic", user: { id: "synthetic", email: "synthetic@example.invalid" } },
@@ -58,12 +59,13 @@ for (const target of [
     await page.getByLabel("邮箱验证码", { exact: true }).fill("123456");
     await page.getByRole("button", { name: "验证并登录", exact: true }).click();
     await expect(page).toHaveURL(
-      `http://127.0.0.1:3000${target.startsWith("/workspace") ? target : "/workspace"}`,
+      `${origin}${target.startsWith("/workspace") ? target : "/workspace"}`,
     );
   });
 }
 
-test("Passkey completion returns to the requested workspace page", async ({ page }) => {
+test("Passkey completion returns to the requested workspace page", async ({ page, baseURL }) => {
+  const origin = baseURL ?? "http://127.0.0.1:3000";
   await page.addInitScript(() => {
     Object.defineProperty(navigator.credentials, "get", {
       value: async () => ({
@@ -98,7 +100,7 @@ test("Passkey completion returns to the requested workspace page", async ({ page
   );
   await page.goto("/auth?next=%2Fworkspace%2Fsettings%3Fsection%3Daccount");
   await page.getByRole("button", { name: "使用 Passkey 登录", exact: true }).click();
-  await expect(page).toHaveURL("http://127.0.0.1:3000/workspace/settings?section=account");
+  await expect(page).toHaveURL(`${origin}/workspace/settings?section=account`);
 });
 
 test("content editing preserves input across responsive layout changes", async ({ page }) => {

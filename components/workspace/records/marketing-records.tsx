@@ -2,7 +2,7 @@ import { listFacebookMediaOptions } from "@/lib/social/facebook-media-store";
 import "server-only";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { hasPermission } from "@/lib/authz";
 import {
   getProjectContentCatalogDetail,
@@ -80,36 +80,28 @@ export async function ProductRecord({ context }: { context: RecordContext }) {
       />
       {detail.state === "PRODUCT_READY" && canWrite ? (
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            render={
-              <WorkspaceLink
-                href={workspaceCreateHref(
-                  projectId,
-                  "content",
-                  { kind: "product", id: detail.id },
-                  returnTo,
-                )}
-              />
-            }
+          <WorkspaceLink
+            href={workspaceCreateHref(
+              projectId,
+              "content",
+              { kind: "product", id: detail.id },
+              returnTo,
+            )}
+            className={buttonVariants({ variant: "outline" })}
           >
             制作图文内容
-          </Button>
-          <Button
-            variant="outline"
-            render={
-              <WorkspaceLink
-                href={workspaceCreateHref(
-                  projectId,
-                  "video",
-                  { kind: "product", id: detail.id },
-                  returnTo,
-                )}
-              />
-            }
+          </WorkspaceLink>
+          <WorkspaceLink
+            href={workspaceCreateHref(
+              projectId,
+              "video",
+              { kind: "product", id: detail.id },
+              returnTo,
+            )}
+            className={buttonVariants({ variant: "outline" })}
           >
             按需制作视频
-          </Button>
+          </WorkspaceLink>
         </div>
       ) : null}
       {detail.state === "PRODUCT_READY" ? (
@@ -186,21 +178,12 @@ export async function ContentRecord({ context }: { context: RecordContext }) {
         product={products.find((product) => product.id === detail.productId)}
         canReview={context.canWrite && hasPermission(context.session.user.role, "content:review")}
       />
-      <Button
-        variant="outline"
-        render={
-          <WorkspaceLink
-            href={workspaceRecordHref(
-              context.projectId,
-              "product",
-              detail.productId,
-              context.returnTo,
-            )}
-          />
-        }
+      <WorkspaceLink
+        href={workspaceRecordHref(context.projectId, "product", detail.productId, context.returnTo)}
+        className={buttonVariants({ variant: "outline" })}
       >
         查看来源产品
-      </Button>
+      </WorkspaceLink>
       {["CONTENT_APPROVED", "CONTENT_PUBLISHED"].includes(detail.state) ? (
         <Suspense fallback={<WorkspacePanelSkeleton label="正在加载发布与回执" />}>
           <ContentPublication context={context} contentId={detail.id} />

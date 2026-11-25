@@ -12,7 +12,7 @@
 
 ## 修复
 
-[`patches/braces@3.0.3.patch`](../../../patches/braces@3.0.3.patch)通过 pnpm `patchedDependencies` 应用于项目安装的 braces，不改包版本或屏蔽审计：
+`patches/braces@3.0.3.patch`（原用于 `shadcn` 依赖链，已随 `shadcn` 移除而清理）曾通过 pnpm `patchedDependencies` 应用于项目安装的 braces，不改包版本或屏蔽审计：
 
 - parser 在分配第 129 个花括号或圆括号容器之前，抛出带 `BRACES_DEPTH_LIMIT` 的 `RangeError`；限制合计嵌套，不可用调用方选项关闭，避免异常未闭合模式先进入清理阶段。
 - compile / expand / stringify 的直接 AST 入口先以迭代方式检查 `.nodes` 深度，再进入原递归处理；不沿 parent / prev 引用检查。
@@ -22,9 +22,9 @@
 
 ## 验证
 
-修改前从实际未修改包冻结 [`braces-compatibility.synthetic.json`](../../../data/fixtures/braces-compatibility.synthetic.json)：17 个模式的 compile / expand / stringify / 默认返回值，包括范围、嵌套、引号、转义、字面字符和 128 层边界；另外冻结五个实际 fast-glob 合成文件匹配结果。修改后逐值对比通过，未重写预期结果。
+修改前从实际未修改包冻结 `data/fixtures/braces-compatibility.synthetic.json`（已随 `shadcn` 移除而清理）：17 个模式的 compile / expand / stringify / 默认返回值，包括范围、嵌套、引号、转义、字面字符和 128 层边界；另外冻结五个实际 fast-glob 合成文件匹配结果。修改后逐值对比通过，未重写预期结果。
 
-[`test-braces-depth-guard.mjs`](../../../scripts/test-braces-depth-guard.mjs)的六项原生测试加入 CI：冻结输出与同步/异步文件匹配、129 层拒绝、引号/转义/原有长度与范围边界、深与循环 `.nodes` AST 拒绝及拒绝前不写 queue、64 MiB / 5 秒硬期限下的 18 次实际依赖边界拒绝。异常后继续检查正常表达式可处理。
+`scripts/test-braces-depth-guard.mjs`（已随 `shadcn` 移除而清理）的六项原生测试加入 CI：冻结输出与同步/异步文件匹配、129 层拒绝、引号/转义/原有长度与范围边界、深与循环 `.nodes` AST 拒绝及拒绝前不写 queue、64 MiB / 5 秒硬期限下的 18 次实际依赖边界拒绝。异常后继续检查正常表达式可处理。
 
 初次新增测试误假设 fast-glob 对纯圆括号模式也调用 braces，因“未抛出预期错误”失败。已按实际父调用边界改正：纯圆括号只证明 braces API；两个包含花括号的异常模式才验证 fast-glob 的任务生成、同步和异步入口。未修改防护或正常输出断言来掩盖此范围差异。补丁编辑目录的直接探测也曾因该目录尚无依赖、且选中了默认 Node 26 而失败；有效测试均在安装后的实际 Node 24 依赖链执行。
 

@@ -16,12 +16,18 @@ import { authClient } from "@/lib/auth-client";
 import { workspaceSignInTarget } from "@/lib/auth-navigation";
 import { authFormSchema } from "@/lib/form-schemas";
 
+type AuthAction = "sendOtp" | "verifyOtp" | "passkey";
+
 export function AuthPanel() {
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<AuthAction | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [invitationProvisioned, setInvitationProvisioned] = useState(false);
   const [provisioning, startProvisioning] = useTransition();
+  const isBusy = pendingAction !== null || provisioning;
+  const sendingOtp = pendingAction === "sendOtp" || provisioning;
+  const verifyingOtp = pendingAction === "verifyOtp";
+  const signingInPasskey = pendingAction === "passkey";
   const form = useForm<z.infer<typeof authFormSchema>>({
     resolver: zodResolver(authFormSchema),
     defaultValues: { email: "", otp: "" },
@@ -44,10 +50,11 @@ export function AuthPanel() {
   }
 
   async function run(
+    kind: AuthAction,
     action: () => Promise<{ error?: { message?: string } | null }>,
     success: string,
   ) {
-    setBusy(true);
+    setPendingAction(kind);
     try {
       const { error } = await action();
       if (error) {
@@ -60,7 +67,7 @@ export function AuthPanel() {
       setMessage("请求未完成，请检查网络和认证配置后重试。");
       return false;
     } finally {
-      setBusy(false);
+      setPendingAction(null);
     }
   }
 
@@ -78,6 +85,7 @@ export function AuthPanel() {
         url.searchParams.delete("invite");
         window.history.replaceState({}, "", url.pathname + url.search);
         await run(
+          "sendOtp",
           () => authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" }),
           "验证码已发送。验证后即可激活账户。",
         );
@@ -85,6 +93,7 @@ export function AuthPanel() {
       return;
     }
     await run(
+      "sendOtp",
       () => authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" }),
       "验证码已发送。验证后即可激活账户。",
     );
@@ -92,6 +101,7 @@ export function AuthPanel() {
 
   async function verifyOtp(values: z.infer<typeof authFormSchema>) {
     const signedIn = await run(
+      "verifyOtp",
       () =>
         authClient.signIn.emailOtp({
           email: values.email,
@@ -104,7 +114,7 @@ export function AuthPanel() {
   }
 
   async function signInPasskey() {
-    const signedIn = await run(() => authClient.signIn.passkey(), "Passkey 登录成功。");
+    const signedIn = await run("passkey", () => authClient.signIn.passkey(), "Passkey 登录成功。");
     if (signedIn) enterWorkspace();
   }
 
@@ -181,13 +191,8 @@ export function AuthPanel() {
                 />
                 <FieldError errors={[form.formState.errors.email]} />
               </Field>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy || provisioning}
-                onClick={sendOtp}
-              >
-                {busy || provisioning ? (
+              <Button type="button" variant="outline" disabled={isBusy} onClick={sendOtp}>
+                {sendingOtp ? (
                   <Spinner aria-hidden="true" data-icon="inline-start" />
                 ) : (
                   <MailCheckIcon data-icon="inline-start" />
@@ -208,8 +213,8 @@ export function AuthPanel() {
                 />
                 <FieldError errors={[form.formState.errors.otp]} />
               </Field>
-              <Button type="submit" disabled={busy || provisioning}>
-                {busy || provisioning ? (
+              <Button type="submit" disabled={isBusy}>
+                {verifyingOtp ? (
                   <Spinner aria-hidden="true" data-icon="inline-start" />
                 ) : (
                   <KeyRoundIcon data-icon="inline-start" />
@@ -225,13 +230,8 @@ export function AuthPanel() {
             <Separator className="flex-1" />
           </div>
           <div className="flex flex-col gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy || provisioning}
-              onClick={signInPasskey}
-            >
-              {busy || provisioning ? (
+            <Button type="button" variant="outline" disabled={isBusy} onClick={signInPasskey}>
+              {signingInPasskey ? (
                 <Spinner aria-hidden="true" data-icon="inline-start" />
               ) : (
                 <KeyRoundIcon data-icon="inline-start" />

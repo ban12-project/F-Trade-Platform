@@ -101,7 +101,6 @@ function WorkspaceDirtyRoot({ children }: { children: ReactNode }) {
   );
   return (
     <DirtyStateContext value={value}>
-      {children}
       <AlertDialog
         open={confirmOpen}
         onOpenChange={(open) => {
@@ -124,6 +123,7 @@ function WorkspaceDirtyRoot({ children }: { children: ReactNode }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {children}
     </DirtyStateContext>
   );
 }

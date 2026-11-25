@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
 
-import "@ui-sdk/core/web.css";
 import "./globals.css";
 import { Geist } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 import { TestingRootFailure } from "./testing/error-recovery/root-failure";
@@ -40,10 +38,8 @@ export default function RootLayout({
         >
           跳到主要内容
         </a>
-        <TooltipProvider>
-          {children}
-          <Toaster position="bottom-right" richColors closeButton />
-        </TooltipProvider>
+        {children}
+        <Toaster />
       </body>
     </html>
   );

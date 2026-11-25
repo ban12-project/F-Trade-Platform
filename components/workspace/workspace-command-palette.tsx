@@ -86,9 +86,12 @@ export function WorkspaceCommandPalette({ basePath = "/workspace" }: { basePath?
         <span className="sm:hidden">命令</span>
         <DialogShortcut className="hidden rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground sm:inline" />
       </DialogTrigger>
-      <DialogBackdrop className="fixed inset-0 z-50 bg-foreground/20 backdrop-blur-[1px]" />
-      <DialogContent className="fixed top-[18%] left-1/2 z-50 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+      <DialogBackdrop className="fixed inset-0 z-50 m-0 border-0 bg-foreground/20 p-0 backdrop-blur-[1px]" />
+      <DialogContent
+        data-command-palette="true"
+        className="fixed inset-auto top-[10dvh] sm:top-[14dvh] left-1/2 z-50 m-0 flex max-h-[min(32rem,calc(100dvh-2rem-10dvh))] sm:max-h-[min(32rem,calc(100dvh-2rem-14dvh))] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-2xl outline-none"
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
           <DialogTitle className="text-xs font-medium text-muted-foreground">
             全局命令面板
           </DialogTitle>
@@ -100,8 +103,8 @@ export function WorkspaceCommandPalette({ basePath = "/workspace" }: { basePath?
             <XIcon className="size-4" aria-hidden="true" />
           </DialogClose>
         </div>
-        <Command onAction={runCommand} className="flex flex-col">
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+        <Command onAction={runCommand} className="flex min-h-0 w-full flex-1 flex-col">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
             <SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <CommandInput
               autoFocus
@@ -110,10 +113,10 @@ export function WorkspaceCommandPalette({ basePath = "/workspace" }: { basePath?
               className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
             />
           </div>
-          <CommandEmpty className="px-4 py-8 text-center text-sm text-muted-foreground">
+          <CommandEmpty className="empty:hidden px-4 py-8 text-center text-sm text-muted-foreground">
             未找到匹配命令或项目，请换个关键词。
           </CommandEmpty>
-          <CommandList className="max-h-80 overflow-y-auto p-1.5">
+          <CommandList className="min-h-0 flex-1 overflow-y-auto p-1.5">
             <CommandGroup>
               <CommandGroupLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                 快速开始工作

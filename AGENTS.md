@@ -34,8 +34,8 @@ Apply these rules when your task affects marketing video content:
 
 ## UI 与 Next.js 约定
 
-- 新 UI 必须先采用 shadcn/ui 的组件与组合方式；仅在库中没有合适组件时才写自定义基础控件。
-- Tailwind CSS 与 shadcn/ui 必须按 shadcn 官方 Next.js CLI 流程初始化和添加组件：`pnpm dlx shadcn@latest init`、`pnpm dlx shadcn@latest add <component>`。添加前先检查已有组件，避免手写或重复复制组件源码。
+- 新 UI 必须优先复用 `components/ui/*`（基于 `@ui-sdk/react`、`@ui-sdk/core` 与 Tailwind CSS）的组件与组合方式；仅在 `@ui-sdk/react` 与现有组件中均无合适控件时才封装自定义基础控件，禁止重新引入 `shadcn` 或 `@base-ui/react`。
+- 新增 `@ui-sdk/react/*` 原语或以 `@ui-sdk/core` + `createParts` 扩展组件时，须遵循 `ui-sdk` skill 与 `node_modules/@ui-sdk/react/docs/llms.txt` 约定，并保持 `app/globals.css` 顶部的 `@layer ui-sdk;` 与设计 Token 一致。
 - Next.js 保持 `cacheComponents: true`，并使用默认 Turbopack 构建。新路由应按 Cache Components 模型设计，以静态壳、靠近动态数据的 `Suspense` 边界和即时导航为默认目标。
 - 必须启用 `reactCompiler: true` 与实验性的 `experimental.turbopackRustReactCompiler: true`。若升级或构建暴露 React Compiler 兼容性问题，须记录风险并在 PR 中提供可观察证据，不能静默关闭。
 - TypeScript 保持 7.x；Next.js 默认的项目本地 TypeScript CLI 校验必须保留，不能设 `experimental.useTypeScriptCli: false`。TypeScript 7 已移除 `baseUrl`，路径别名只使用 `compilerOptions.paths`。
@@ -51,7 +51,7 @@ Apply these rules when your task affects marketing video content:
 - Server Action 统一置于 `lib/actions/*`。每个 Action 都必须在服务端重新进行身份认证、授权和输入校验；Proxy 和页面渲染保护都不是安全边界。
 - 数据库及领域写入逻辑置于 `lib/*`，Action 只负责请求边界、授权、校验和返回给 UI 的最小结果，不能把原始数据库记录返回给客户端。
 - Zod 是应用层输入校验的统一 schema 库。客户端与 Server Action 必须复用同一份 schema；客户端校验仅改善交互，Server Action 仍必须以 `safeParse`／`parse` 独立拒绝不可信输入。
-- 客户端表单统一使用 `react-hook-form`、Zod 与现有 shadcn/ui `Field` 组件显示校验状态。需要浏览器能力的 Better Auth Passkey／OTP 调用可保留在客户端，但其业务写入仍优先经 Server Action。
+- 客户端表单统一使用 `react-hook-form`、Zod 与现有 `components/ui/field` 组件显示校验状态。需要浏览器能力的 Better Auth Passkey／OTP 调用可保留在客户端，但其业务写入仍优先经 Server Action。
 
 <!-- BEGIN:nextjs-agent-rules -->
 
