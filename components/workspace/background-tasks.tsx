@@ -196,7 +196,7 @@ export function BackgroundTasksProvider({ children }: { children: ReactNode }) {
         duration: 8000,
         action: actionHref ? { label: "查看", onClick: () => openHref(actionHref) } : undefined,
       });
-      router.refresh();
+      if (result.status === "success") router.refresh();
     },
     [openHref, router, stopPoller],
   );
