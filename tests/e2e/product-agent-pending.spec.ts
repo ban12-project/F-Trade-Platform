@@ -44,6 +44,7 @@ for (const phase of ["upload failure", "stream failure", "stream cancellation"] 
     await page.goto("/testing/project-workflow?record=product");
     await page.waitForLoadState("networkidle");
     const file = page.getByLabel("产品资料", { exact: true });
+    await expect(file).toBeEnabled();
     await file.setInputFiles({
       name: "synthetic.csv",
       mimeType: "text/csv",

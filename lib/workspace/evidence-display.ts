@@ -87,14 +87,16 @@ export function buildEvidenceDisplayItems(choices: EvidenceChoice[]): EvidenceDi
   const primaryLabels = choices.map((choice) =>
     formatEvidenceSourceLabel(choice.label, choice.contentType ?? choice.detail?.split("·")[0]),
   );
+  const labelCounts = new Map<string, number>();
+  for (const label of primaryLabels) {
+    labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+  }
 
   return choices.map((choice, index) => {
     const primaryLabel = primaryLabels[index];
     const typeBadge = extractTypeFromDetail(choice.detail, choice.contentType);
     const dateLabel = extractDateFromDetail(choice.detail);
-    const hasDuplicate = choices.some(
-      (other, otherIndex) => other.id !== choice.id && primaryLabels[otherIndex] === primaryLabel,
-    );
+    const hasDuplicate = (labelCounts.get(primaryLabel) ?? 0) > 1;
 
     const extraDetail =
       !dateLabel && choice.detail && !choice.detail.includes("/") ? choice.detail.trim() : "";

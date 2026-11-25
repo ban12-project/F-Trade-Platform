@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "@ui-sdk/react/toast";
 import { uploadPresigned } from "@vercel/blob/client";
 import {
   CheckCircle2Icon,
@@ -16,7 +17,6 @@ import {
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -587,7 +587,7 @@ function RegistrationForm({ projectId, productId }: { projectId: string; product
           type="submit"
           disabled={busy || !hasFile}
         >
-          {busy ? (
+          {uploading || pending ? (
             <Spinner aria-hidden="true" data-icon="inline-start" />
           ) : (
             <UploadCloudIcon data-icon="inline-start" />

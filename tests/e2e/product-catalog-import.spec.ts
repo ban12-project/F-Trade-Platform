@@ -123,16 +123,16 @@ test("catalog browser selects 20 independent records, restores progress and retr
   await page.getByRole("button", { name: "选择前 20 条可用记录" }).click();
   await expect(page.getByRole("checkbox").last()).toBeDisabled();
   await page.getByRole("button", { name: "生成 20 条待审核草稿" }).click();
-  await expect(page.getByRole("button", { name: "查看草稿" })).toHaveCount(19);
+  await expect(page.getByRole("link", { name: "查看草稿" })).toHaveCount(19);
   await expect(page.getByText("抽取未通过，请检查模型配置后重试。", { exact: true })).toBeVisible();
   await page.reload();
   await page.waitForLoadState("networkidle");
   await page.getByRole("tab", { name: "产品目录" }).click();
-  await expect(page.getByRole("button", { name: "查看草稿" })).toHaveCount(19);
+  await expect(page.getByRole("link", { name: "查看草稿" })).toHaveCount(19);
   await page.getByRole("button", { name: "选择失败记录", exact: true }).click();
   await page.getByRole("button", { name: "生成 1 条待审核草稿" }).click();
-  await expect(page.getByRole("button", { name: "查看草稿" })).toHaveCount(20);
-  await expect(page.getByRole("button", { name: "查看草稿" }).first()).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "查看草稿" })).toHaveCount(20);
+  await expect(page.getByRole("link", { name: "查看草稿" }).first()).toHaveAttribute(
     "href",
     `/workspace/${projectId}/records/product/${candidates[0]?.id}`,
   );
@@ -283,7 +283,7 @@ for (const outcome of ["transport", "permission"]) {
         .getByText("所选文件：synthetic-preserved.csv", { exact: true }),
     ).toBeVisible();
     if (view)
-      await expect(page.getByRole("button", { name: "查看草稿" })).toHaveAttribute(
+      await expect(page.getByRole("link", { name: "查看草稿" })).toHaveAttribute(
         "href",
         `/workspace/${projectId}/records/product/${productId}`,
       );

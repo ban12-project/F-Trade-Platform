@@ -34,6 +34,7 @@ import type { EvidenceOption } from "@/lib/workspace/access";
 import {
   buildEvidenceDisplayItems,
   type EvidenceChoice,
+  type EvidenceDisplayItem,
   evidenceChoiceFromOption,
 } from "@/lib/workspace/evidence-display";
 import { useWorkspaceDirtyState } from "./dirty-state";
@@ -59,7 +60,7 @@ const triggerClassName = cn(
 );
 
 const contentClassName = cn(
-  "z-50 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg",
+  "z-50 m-0 w-[min(var(--anchor-width),calc(100vw-2rem))] min-w-[min(18rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-lg outline-none",
 );
 
 const inputWrapperClassName = "flex items-center gap-2 border-b border-border px-3 py-2";
@@ -76,33 +77,38 @@ const itemClassName = cn(
 function filterEvidenceItem(
   item: { value?: unknown; label?: string },
   query: string,
-  displayItems: ReturnType<typeof buildEvidenceDisplayItems>,
+  displayItemById: ReadonlyMap<string, EvidenceDisplayItem>,
 ): boolean {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return true;
   const tokens = normalized.split(/\s+/);
-  const entry = displayItems.find((candidate) => candidate.id === item.value);
+  const entry = typeof item.value === "string" ? displayItemById.get(item.value) : undefined;
   const haystack = [item.label ?? "", ...(entry?.keywords ?? [])].join(" ").toLowerCase();
   return tokens.every((token) => haystack.includes(token));
 }
 
 function EvidenceDropdownBody({
-  options,
+  displayItems,
   retainedRef,
   emptyMessage,
   emptyDisabled = false,
 }: {
-  options: EvidenceChoice[];
+  displayItems: EvidenceDisplayItem[];
   retainedRef?: string;
   emptyMessage?: string;
   emptyDisabled?: boolean;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
-  const displayItems = useMemo(() => buildEvidenceDisplayItems(options), [options]);
-  const currentItems = displayItems.filter((item) => item.group === "current");
-  const otherItems = displayItems.filter((item) => item.group === "other");
+  const currentItems = useMemo(
+    () => displayItems.filter((item) => item.group === "current"),
+    [displayItems],
+  );
+  const otherItems = useMemo(
+    () => displayItems.filter((item) => item.group === "other"),
+    [displayItems],
+  );
 
-  function renderGroup(label: string, items: typeof displayItems) {
+  function renderGroup(label: string, items: EvidenceDisplayItem[]) {
     if (!items.length) return null;
     return (
       <SelectGroup>
@@ -167,11 +173,11 @@ function EvidenceDropdownBody({
           className={searchInputClassName}
         />
       </div>
-      <SelectEmpty className="px-3 py-6 text-center text-sm text-muted-foreground">
+      <SelectEmpty className="empty:hidden px-3 py-6 text-center text-sm text-muted-foreground">
         没有匹配的资料，请尝试其他关键词或上传新文件。
       </SelectEmpty>
       <SelectList ref={listRef} className={listClassName}>
-        {retainedRef && !options.some((item) => item.id === retainedRef) ? (
+        {retainedRef && !displayItems.some((item) => item.id === retainedRef) ? (
           <SelectGroup>
             <SelectGroupLabel className={groupLabelClassName}>原有引用</SelectGroupLabel>
             <SelectItem value={retainedRef} label="保留原来源资料" className={itemClassName}>
@@ -206,6 +212,8 @@ function EvidenceDropdownBody({
 
 export function StaticEvidenceCombobox({
   options,
+  displayItems: precomputedDisplayItems,
+  displayItemById: precomputedDisplayItemById,
   retainedRef,
   value,
   onValueChange,
@@ -219,6 +227,8 @@ export function StaticEvidenceCombobox({
   placeholder = "选择或搜索已上传资料",
 }: {
   options: EvidenceOption[];
+  displayItems?: EvidenceDisplayItem[];
+  displayItemById?: ReadonlyMap<string, EvidenceDisplayItem>;
   retainedRef?: string;
   value: string;
   onValueChange: (value: string) => void;
@@ -231,9 +241,17 @@ export function StaticEvidenceCombobox({
   disabled?: boolean;
   placeholder?: string;
 }) {
-  const choices = useMemo(() => options.map(evidenceChoiceFromOption), [options]);
-  const displayItems = useMemo(() => buildEvidenceDisplayItems(choices), [choices]);
-  const selectedItem = displayItems.find((item) => item.id === value);
+  const computedDisplayItems = useMemo(
+    () =>
+      precomputedDisplayItems ?? buildEvidenceDisplayItems(options.map(evidenceChoiceFromOption)),
+    [options, precomputedDisplayItems],
+  );
+  const computedDisplayItemById = useMemo(
+    () =>
+      precomputedDisplayItemById ?? new Map(computedDisplayItems.map((item) => [item.id, item])),
+    [computedDisplayItems, precomputedDisplayItemById],
+  );
+  const selectedItem = value ? computedDisplayItemById.get(value) : undefined;
   const selectedLabel = selectedItem
     ? selectedItem.hasDuplicate
       ? selectedItem.displayText
@@ -245,10 +263,10 @@ export function StaticEvidenceCombobox({
   return (
     <Select
       value={value || null}
-      disabled={disabled || (!choices.length && !retainedRef)}
-      filter={(item, query) => filterEvidenceItem(item, query, displayItems)}
+      disabled={disabled || (!computedDisplayItems.length && !retainedRef)}
+      filter={(item, query) => filterEvidenceItem(item, query, computedDisplayItemById)}
       itemToLabel={(val) =>
-        displayItems.find((item) => item.id === val)?.displayText ??
+        computedDisplayItemById.get(val)?.displayText ??
         (val === retainedRef ? "保留原来源资料" : String(val))
       }
       onValueChange={(next) => {
@@ -277,7 +295,7 @@ export function StaticEvidenceCombobox({
       </SelectTrigger>
       <SelectContent alignItemWithTrigger={false} className={contentClassName}>
         <EvidenceDropdownBody
-          options={choices}
+          displayItems={computedDisplayItems}
           retainedRef={retainedRef}
           emptyMessage="暂无可选资料"
           emptyDisabled
@@ -326,7 +344,11 @@ export function EvidenceSelect({
   const [pending, startTransition] = useTransition();
   const options = result?.options ?? [];
   const displayItems = useMemo(() => buildEvidenceDisplayItems(options), [options]);
-  const selectedItem = displayItems.find((item) => item.id === value);
+  const displayItemById = useMemo(
+    () => new Map(displayItems.map((item) => [item.id, item])),
+    [displayItems],
+  );
+  const selectedItem = value ? displayItemById.get(value) : undefined;
   const selectedLabel = selectedItem?.displayText;
   const selectionUnverified = Boolean(value && result?.error);
 
@@ -354,10 +376,8 @@ export function EvidenceSelect({
       <Select
         value={value || null}
         disabled={disabled}
-        filter={(item, query) => filterEvidenceItem(item, query, displayItems)}
-        itemToLabel={(val) =>
-          displayItems.find((item) => item.id === val)?.displayText ?? String(val)
-        }
+        filter={(item, query) => filterEvidenceItem(item, query, displayItemById)}
+        itemToLabel={(val) => displayItemById.get(val)?.displayText ?? String(val)}
         onValueChange={(next, details) => {
           if (next === "__empty") {
             details.cancel();
@@ -398,7 +418,7 @@ export function EvidenceSelect({
         </SelectTrigger>
         <SelectContent alignItemWithTrigger={false} className={contentClassName}>
           <EvidenceDropdownBody
-            options={options}
+            displayItems={displayItems}
             emptyMessage={
               pending ? "正在加载资料…" : result?.error ? "暂时无法加载资料" : "暂无可选资料"
             }

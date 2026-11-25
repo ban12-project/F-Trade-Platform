@@ -69,6 +69,7 @@ export function ProjectMembersPanel({
   useEffect(() => {
     if (removalState.status === "success") {
       setRemovalTarget(null);
+      setOpen(false);
       router.refresh();
     }
   }, [removalState, router]);

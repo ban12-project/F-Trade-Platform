@@ -14,12 +14,15 @@ type MockChannelResult = {
   reason?: "synthetic_downstream_failure";
 };
 
+type MockChannelAction = "reset" | "deliver" | "duplicate" | "fail" | "retry";
+
 export function MockChannelClient() {
   const [result, setResult] = useState<MockChannelResult | null>(null);
-  const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<MockChannelAction | null>(null);
+  const pending = pendingAction !== null;
 
-  async function invoke(action: "reset" | "deliver" | "duplicate" | "fail" | "retry") {
-    setPending(true);
+  async function invoke(action: MockChannelAction) {
+    setPendingAction(action);
     try {
       const response = await fetch("/api/testing/mock-channel", {
         method: "POST",
@@ -28,7 +31,7 @@ export function MockChannelClient() {
       });
       setResult((await response.json()) as MockChannelResult);
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -58,11 +61,13 @@ export function MockChannelClient() {
               onClick={() => void invoke("reset")}
               disabled={pending}
             >
-              {pending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+              {pendingAction === "reset" && <Spinner aria-hidden="true" data-icon="inline-start" />}
               重置 mock 场景
             </Button>
             <Button type="button" onClick={() => void invoke("deliver")} disabled={pending}>
-              {pending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+              {pendingAction === "deliver" && (
+                <Spinner aria-hidden="true" data-icon="inline-start" />
+              )}
               投递 synthetic webhook
             </Button>
             <Button
@@ -71,6 +76,9 @@ export function MockChannelClient() {
               onClick={() => void invoke("duplicate")}
               disabled={pending}
             >
+              {pendingAction === "duplicate" && (
+                <Spinner aria-hidden="true" data-icon="inline-start" />
+              )}
               重发相同 webhook
             </Button>
             <Button
@@ -79,6 +87,7 @@ export function MockChannelClient() {
               onClick={() => void invoke("fail")}
               disabled={pending}
             >
+              {pendingAction === "fail" && <Spinner aria-hidden="true" data-icon="inline-start" />}
               模拟下游失败
             </Button>
             <Button
@@ -87,6 +96,7 @@ export function MockChannelClient() {
               onClick={() => void invoke("retry")}
               disabled={pending}
             >
+              {pendingAction === "retry" && <Spinner aria-hidden="true" data-icon="inline-start" />}
               重试失败 webhook
             </Button>
           </div>

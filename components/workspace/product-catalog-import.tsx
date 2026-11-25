@@ -2,8 +2,9 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EyeIcon, SearchIcon } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -69,8 +70,14 @@ import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useBackgroundTasks } from "./background-tasks";
 import { useWorkspaceDirty } from "./dirty-state";
 import { FileDropzone } from "./file-dropzone";
-import { MarkdownContent } from "./markdown-content";
 import { WorkspaceLink as Link } from "./workspace-link";
+
+const MarkdownContent = dynamic(
+  () => import("./markdown-content").then((module) => module.MarkdownContent),
+  { ssr: false },
+);
+
+const INITIAL_VISIBLE_CANDIDATES = 50;
 
 const failures: Record<CatalogFailureCode, string> = {
   SOURCE_UNAVAILABLE: "无法读取或核验原件，请重新上传。",
@@ -126,6 +133,8 @@ export function ProductCatalogImport({
   const [uploading, setUploading] = useState(false);
   const [standaloneFiles, setStandaloneFiles] = useState<File[]>([]);
   const [candidateQuery, setCandidateQuery] = useState("");
+  const deferredCandidateQuery = useDeferredValue(candidateQuery);
+  const [visibleLimit, setVisibleLimit] = useState(INITIAL_VISIBLE_CANDIDATES);
   const [detailOpen, setDetailOpen] = useState(false);
   const uploadAttempt = useRef<{ controller: AbortController; dispatched: boolean } | null>(null);
   useEffect(
@@ -428,24 +437,34 @@ export function ProductCatalogImport({
     }
   }
 
-  const available =
-    view?.candidates.filter(
-      (candidate) => candidate.status === "available" || candidate.status === "failed",
-    ) ?? [];
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+
+  const available = useMemo(
+    () =>
+      view?.candidates.filter(
+        (candidate) => candidate.status === "available" || candidate.status === "failed",
+      ) ?? [],
+    [view?.candidates],
+  );
 
   const filteredCandidates = useMemo(() => {
     const candidates = view?.candidates ?? [];
-    const query = candidateQuery.trim().toLowerCase();
+    const query = deferredCandidateQuery.trim().toLowerCase();
     if (!query) return candidates;
     return candidates.filter((candidate) => {
       const location = `${candidate.physicalPage ? `第 ${candidate.physicalPage} 页` : ""} 第 ${candidate.recordLine} 行`;
       const statusText = candidateLabels[candidate.status];
       return `${candidate.identifier} ${location} ${statusText}`.toLowerCase().includes(query);
     });
-  }, [candidateQuery, view?.candidates]);
+  }, [deferredCandidateQuery, view?.candidates]);
+
+  const visibleCandidates = useMemo(
+    () => filteredCandidates.slice(0, visibleLimit),
+    [filteredCandidates, visibleLimit],
+  );
 
   const catalogMarkdown = useMemo(() => {
-    if (!view) return "";
+    if (!view || !detailOpen) return "";
     const completedCount = view.candidates.filter((c) => c.status === "completed").length;
     const runningCount = view.candidates.filter(
       (c) => c.status === "queued" || c.status === "running",
@@ -474,7 +493,7 @@ export function ProductCatalogImport({
         : []),
     ];
     return lines.join("\n");
-  }, [view]);
+  }, [detailOpen, view]);
 
   return (
     <Card>
@@ -607,7 +626,9 @@ export function ProductCatalogImport({
                     </DialogDescription>
                   </DialogHeader>
                   <div className="max-h-[65dvh] overflow-y-auto rounded-lg border bg-background p-4">
-                    <MarkdownContent isAnimating={working}>{catalogMarkdown}</MarkdownContent>
+                    {detailOpen ? (
+                      <MarkdownContent isAnimating={working}>{catalogMarkdown}</MarkdownContent>
+                    ) : null}
                   </div>
                 </DialogContent>
               </Dialog>
@@ -719,7 +740,10 @@ export function ProductCatalogImport({
                             aria-label="筛选目录候选记录"
                             placeholder="按编号、页码或状态筛选…"
                             value={candidateQuery}
-                            onChange={(event) => setCandidateQuery(event.target.value)}
+                            onChange={(event) => {
+                              setCandidateQuery(event.target.value);
+                              setVisibleLimit(INITIAL_VISIBLE_CANDIDATES);
+                            }}
                             className="pl-8"
                           />
                         </div>
@@ -786,17 +810,17 @@ export function ProductCatalogImport({
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredCandidates.map((candidate) => (
+                          {visibleCandidates.map((candidate) => (
                             <TableRow key={candidate.id}>
                               <TableCell>
                                 <Checkbox
                                   aria-label={`选择 ${candidate.identifier}，${candidate.physicalPage ? `第 ${candidate.physicalPage} 页` : `第 ${candidate.recordLine} 行`}`}
                                   aria-invalid={Boolean(selection.formState.errors.candidateIds)}
-                                  checked={selected.includes(candidate.id)}
+                                  checked={selectedSet.has(candidate.id)}
                                   disabled={
                                     pending ||
                                     !["available", "failed"].includes(candidate.status) ||
-                                    (!selected.includes(candidate.id) &&
+                                    (!selectedSet.has(candidate.id) &&
                                       selected.length >= maximumCatalogBatchRecords)
                                   }
                                   onCheckedChange={(checked) =>
@@ -862,6 +886,33 @@ export function ProductCatalogImport({
                           ) : null}
                         </TableBody>
                       </Table>
+                      {filteredCandidates.length > visibleCandidates.length ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>
+                            已显示 {visibleCandidates.length} / {filteredCandidates.length} 条记录
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setVisibleLimit((current) => current + INITIAL_VISIBLE_CANDIDATES)
+                              }
+                            >
+                              显示更多
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setVisibleLimit(filteredCandidates.length)}
+                            >
+                              显示全部
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
                       <FieldError errors={[selection.formState.errors.candidateIds]} />
                     </FieldSet>
                     <Button type="submit" disabled={pending || !selected.length || !choices.length}>

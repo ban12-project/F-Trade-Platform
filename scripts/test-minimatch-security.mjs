@@ -17,7 +17,12 @@ function dependency(chain) {
   return entry;
 }
 const entries = {
-  10: dependency(["shadcn/mcp", "ts-morph", "@ts-morph/common", "minimatch"]),
+  10: dependency([
+    "workflow",
+    "@workflow/cli/package.json",
+    "@oclif/core/package.json",
+    "minimatch",
+  ]),
   9: dependency(["workflow", "@workflow/nest", "@swc/cli", "minimatch"]),
 };
 const cases = [
@@ -97,21 +102,6 @@ for (const [version, commonjs] of Object.entries(entries)) {
     }
   }
 }
-
-test("installed ts-morph source filtering retains inclusion and exclusion", () => {
-  const require = createRequire(import.meta.url);
-  const { Project } = require(dependency(["shadcn/mcp", "ts-morph"]));
-  const project = new Project({ useInMemoryFileSystem: true });
-  for (const name of ["a.ts", "a.test.ts", "nested/b.ts", "other.js"])
-    project.createSourceFile(`/src/${name}`, "export const synthetic = true;");
-  assert.deepEqual(
-    project
-      .getSourceFiles(["/src/**/*.ts", "!/src/**/*.test.ts"])
-      .map((file) => file.getFilePath())
-      .sort(),
-    ["/src/a.ts", "/src/nested/b.ts"],
-  );
-});
 
 test("installed SWC source collector preserves glob inclusion", async () => {
   const require = createRequire(import.meta.url);

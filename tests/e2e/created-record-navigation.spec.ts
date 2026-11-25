@@ -55,7 +55,7 @@ for (const operation of ["copy", "create"] as const)
       await expect.poll(() => navigating).toBe(true);
       await expect(submit).toBeDisabled();
       expect(posts).toBe(2);
-      const recovery = page.getByRole("button", {
+      const recovery = page.getByRole("link", {
         name: operation === "copy" ? "打开复制的内容草稿" : "打开内容草稿",
         exact: true,
       });

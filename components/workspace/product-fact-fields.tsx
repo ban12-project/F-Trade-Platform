@@ -2,6 +2,7 @@ import {
   createContext,
   type ReactNode,
   useContext,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -38,11 +39,25 @@ import { productFormFactStatusLabels, productFormReadiness } from "@/lib/product
 import { isProductEvidenceLocationRef } from "@/lib/product/retained-evidence";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
+import {
+  buildEvidenceDisplayItems,
+  type EvidenceDisplayItem,
+  evidenceChoiceFromOption,
+} from "@/lib/workspace/evidence-display";
 import { StaticEvidenceCombobox } from "./evidence-select";
 
 export type ProductValues = ProductCatalogForm;
 type EvidenceFieldName = Extract<keyof ProductValues, `${string}EvidenceRef`>;
-const EvidenceOptionsContext = createContext<EvidenceOption[]>([]);
+type EvidenceOptionsContextValue = {
+  options: EvidenceOption[];
+  displayItems: EvidenceDisplayItem[];
+  displayItemById: ReadonlyMap<string, EvidenceDisplayItem>;
+};
+const EvidenceOptionsContext = createContext<EvidenceOptionsContextValue>({
+  options: [],
+  displayItems: [],
+  displayItemById: new Map(),
+});
 
 const productEvidenceBindings = [
   ["productName", "productNameEvidenceRef", "产品名称"],
@@ -210,7 +225,7 @@ function EvidenceInput({
   disabled?: boolean;
 }) {
   const error = form.formState.errors[name];
-  const options = useContext(EvidenceOptionsContext);
+  const { options, displayItems, displayItemById } = useContext(EvidenceOptionsContext);
   const originalRef = form.formState.defaultValues?.[name];
   const retainedRef =
     isProductEvidenceLocationRef(originalRef) || (name === "sourceRef" && originalRef)
@@ -226,6 +241,8 @@ function EvidenceInput({
           <StaticEvidenceCombobox
             id={id}
             options={options}
+            displayItems={displayItems}
+            displayItemById={displayItemById}
             retainedRef={retainedRef}
             value={field.value ?? ""}
             disabled={disabled}
@@ -250,41 +267,79 @@ function FactPair({ children }: { children: ReactNode }) {
   return <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">{children}</div>;
 }
 
-export function ProductFields({
+function ProductReadinessCard({
   form,
-  evidenceOptions,
-  disabled = false,
+  evidenceIds,
+  titleId,
 }: {
   form: UseFormReturn<ProductValues>;
-  evidenceOptions: EvidenceOption[];
-  disabled?: boolean;
+  evidenceIds: readonly string[];
+  titleId: string;
 }) {
-  const idPrefix = useId();
-  const fieldId = (name: string) => `${idPrefix}-${name}`;
-  const rootRef = useRef<HTMLDivElement>(null);
-  const { errors, submitCount } = useFormState({ control: form.control });
+  const watchedValues = useWatch({ control: form.control });
+  const values = useDeferredValue(watchedValues);
+  const readiness = useMemo(
+    () => productFormReadiness(values, evidenceIds, form.formState.defaultValues),
+    [evidenceIds, form.formState.defaultValues, values],
+  );
+  return (
+    <Card aria-labelledby={titleId}>
+      <CardHeader>
+        <CardTitle id={titleId}>关键资料准备</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        <dl className="grid gap-2">
+          {readiness.core.map((fact) => (
+            <div key={fact.name} className="flex flex-wrap justify-between gap-2">
+              <dt>{fact.label}</dt>
+              <dd>{productFormFactStatusLabels[fact.status]}</dd>
+            </div>
+          ))}
+        </dl>
+        <p>{readiness.identity}</p>
+        <p>{readiness.sourceStatus}</p>
+        <p role="status" aria-atomic="true">
+          来源覆盖：{readiness.linked} / {readiness.filled} 项已填写信息已关联当前可选资料
+          {readiness.retained ? `；${readiness.retained} 项保留原来源，待确认访问` : ""}
+        </p>
+        {readiness.needsAttention.length ? (
+          <p>
+            待处理：
+            {readiness.needsAttention
+              .map((fact) => `${fact.label}（${productFormFactStatusLabels[fact.status]}）`)
+              .join("、")}
+          </p>
+        ) : null}
+        {readiness.orphaned.length ? (
+          <p>
+            仅有来源而未填写值：{readiness.orphaned.map((fact) => fact.label).join("、")}
+            。请核对或清除对应来源。
+          </p>
+        ) : null}
+        <p className="text-muted-foreground">
+          未知的可选规格和商业信息可留空，不影响来源覆盖。关联资料不代表事实已核实， 也不代表
+          Product Ready；所有已填写事实仍须核对来源，正式报价和交期须由人工确认。
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BatchEvidencePanel({
+  form,
+  disabled,
+  fieldId,
+  visibleBindings,
+}: {
+  form: UseFormReturn<ProductValues>;
+  disabled: boolean;
+  fieldId: (name: string) => string;
+  visibleBindings: ReadonlyArray<readonly [keyof ProductValues, EvidenceFieldName, string]>;
+}) {
+  const { options, displayItems, displayItemById } = useContext(EvidenceOptionsContext);
   const [batchEvidence, setBatchEvidence] = useState("");
   const [batchTargets, setBatchTargets] = useState<Set<EvidenceFieldName>>(() => new Set());
   const values = useWatch({ control: form.control });
-  const productType = values.productType;
-  const kitDisabled = productType !== "clutch_kit";
-  const visibleBindings = useMemo(
-    () =>
-      productEvidenceBindings.filter(([valueName]) => valueName !== "kitContents" || !kitDisabled),
-    [kitDisabled],
-  );
-  const readiness = productFormReadiness(
-    values,
-    evidenceOptions.map((option) => option.id),
-    form.formState.defaultValues,
-  );
-  const errorEntries = Object.entries(errors).filter(([, error]) => Boolean(error));
-  useEffect(() => {
-    if (!submitCount || !errorEntries.length) return;
-    requestAnimationFrame(() =>
-      rootRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus(),
-    );
-  }, [errorEntries.length, submitCount]);
   const eligibleBatchTargets = visibleBindings.filter(([valueName]) =>
     String(values[valueName] ?? "").trim(),
   );
@@ -312,47 +367,122 @@ export function ProductFields({
     setBatchTargets(new Set());
   }
   return (
-    <EvidenceOptionsContext.Provider value={evidenceOptions}>
-      <div ref={rootRef} className="flex flex-col gap-5">
-        <Card aria-labelledby={fieldId("readiness-title")}>
-          <CardHeader>
-            <CardTitle id={fieldId("readiness-title")}>关键资料准备</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-sm">
-            <dl className="grid gap-2">
-              {readiness.core.map((fact) => (
-                <div key={fact.name} className="flex flex-wrap justify-between gap-2">
-                  <dt>{fact.label}</dt>
-                  <dd>{productFormFactStatusLabels[fact.status]}</dd>
-                </div>
+    <FieldSet className="rounded-xl border bg-muted/20 p-4">
+      <FieldLegend>为多项信息选择同一份资料</FieldLegend>
+      <FieldDescription>
+        选定一份主要来源资料后，可一键关联全部已填写字段及产品主要来源，也可针对个别字段在下方单独微调。
+      </FieldDescription>
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor={fieldId("batch-evidence-select")}>默认来源资料</FieldLabel>
+          <StaticEvidenceCombobox
+            id={fieldId("batch-evidence-select")}
+            options={options}
+            displayItems={displayItems}
+            displayItemById={displayItemById}
+            value={batchEvidence}
+            disabled={disabled}
+            placeholder="搜索或选择默认来源资料"
+            onValueChange={(value) => setBatchEvidence(value)}
+          />
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            disabled={disabled || !batchEvidence || !eligibleBatchTargets.length}
+            onClick={() => applyDefaultEvidence("unlinked-filled")}
+          >
+            填充未关联来源的已填字段
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled || !batchEvidence || !eligibleBatchTargets.length}
+            onClick={() => applyDefaultEvidence("all-filled")}
+          >
+            覆盖全部 {eligibleBatchTargets.length} 个已填字段及主来源
+          </Button>
+        </div>
+        {eligibleBatchTargets.length ? (
+          <FieldSet>
+            <FieldLegend className="text-xs text-muted-foreground">
+              或仅勾选部分目标字段
+            </FieldLegend>
+            <FieldGroup>
+              {eligibleBatchTargets.map(([, evidenceName, label]) => (
+                <Field key={evidenceName} orientation="horizontal">
+                  <Checkbox
+                    disabled={disabled}
+                    id={fieldId(`batch-${evidenceName}`)}
+                    checked={batchTargets.has(evidenceName)}
+                    onCheckedChange={(checked) => toggleBatchTarget(evidenceName, checked === true)}
+                  />
+                  <FieldLabel htmlFor={fieldId(`batch-${evidenceName}`)}>{label}</FieldLabel>
+                </Field>
               ))}
-            </dl>
-            <p>{readiness.identity}</p>
-            <p>{readiness.sourceStatus}</p>
-            <p role="status" aria-atomic="true">
-              来源覆盖：{readiness.linked} / {readiness.filled} 项已填写信息已关联当前可选资料
-              {readiness.retained ? `；${readiness.retained} 项保留原来源，待确认访问` : ""}
-            </p>
-            {readiness.needsAttention.length ? (
-              <p>
-                待处理：
-                {readiness.needsAttention
-                  .map((fact) => `${fact.label}（${productFormFactStatusLabels[fact.status]}）`)
-                  .join("、")}
-              </p>
-            ) : null}
-            {readiness.orphaned.length ? (
-              <p>
-                仅有来源而未填写值：{readiness.orphaned.map((fact) => fact.label).join("、")}
-                。请核对或清除对应来源。
-              </p>
-            ) : null}
-            <p className="text-muted-foreground">
-              未知的可选规格和商业信息可留空，不影响来源覆盖。关联资料不代表事实已核实， 也不代表
-              Product Ready；所有已填写事实仍须核对来源，正式报价和交期须由人工确认。
-            </p>
-          </CardContent>
-        </Card>
+            </FieldGroup>
+          </FieldSet>
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!batchEvidence || !batchTargets.size}
+          onClick={applyBatchEvidence}
+        >
+          应用到 {batchTargets.size} 个目标字段
+        </Button>
+      </FieldGroup>
+    </FieldSet>
+  );
+}
+
+export function ProductFields({
+  form,
+  evidenceOptions,
+  disabled = false,
+}: {
+  form: UseFormReturn<ProductValues>;
+  evidenceOptions: EvidenceOption[];
+  disabled?: boolean;
+}) {
+  const idPrefix = useId();
+  const fieldId = (name: string) => `${idPrefix}-${name}`;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { errors, submitCount } = useFormState({ control: form.control });
+  const productType = useWatch({ control: form.control, name: "productType" });
+  const kitDisabled = productType !== "clutch_kit";
+  const visibleBindings = useMemo(
+    () =>
+      productEvidenceBindings.filter(([valueName]) => valueName !== "kitContents" || !kitDisabled),
+    [kitDisabled],
+  );
+  const evidenceIds = useMemo(() => evidenceOptions.map((option) => option.id), [evidenceOptions]);
+  const evidenceContextValue = useMemo<EvidenceOptionsContextValue>(() => {
+    const displayItems = buildEvidenceDisplayItems(evidenceOptions.map(evidenceChoiceFromOption));
+    return {
+      options: evidenceOptions,
+      displayItems,
+      displayItemById: new Map(displayItems.map((item) => [item.id, item])),
+    };
+  }, [evidenceOptions]);
+  const errorEntries = Object.entries(errors).filter(([, error]) => Boolean(error));
+  useEffect(() => {
+    if (!submitCount || !errorEntries.length) return;
+    requestAnimationFrame(() =>
+      rootRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus(),
+    );
+  }, [errorEntries.length, submitCount]);
+  return (
+    <EvidenceOptionsContext.Provider value={evidenceContextValue}>
+      <div ref={rootRef} className="flex flex-col gap-5">
+        <ProductReadinessCard
+          form={form}
+          evidenceIds={evidenceIds}
+          titleId={fieldId("readiness-title")}
+        />
         {submitCount > 0 && errorEntries.length ? (
           <Alert variant="destructive" role="alert">
             <AlertTitle>还有 {errorEntries.length} 项需要处理</AlertTitle>
@@ -361,75 +491,12 @@ export function ProductFields({
             </AlertDescription>
           </Alert>
         ) : null}
-        <FieldSet className="rounded-xl border bg-muted/20 p-4">
-          <FieldLegend>为多项信息选择同一份资料</FieldLegend>
-          <FieldDescription>
-            选定一份主要来源资料后，可一键关联全部已填写字段及产品主要来源，也可针对个别字段在下方单独微调。
-          </FieldDescription>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor={fieldId("batch-evidence-select")}>默认来源资料</FieldLabel>
-              <StaticEvidenceCombobox
-                id={fieldId("batch-evidence-select")}
-                options={evidenceOptions}
-                value={batchEvidence}
-                disabled={disabled}
-                placeholder="搜索或选择默认来源资料"
-                onValueChange={(value) => setBatchEvidence(value)}
-              />
-            </Field>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="default"
-                size="sm"
-                disabled={disabled || !batchEvidence || !eligibleBatchTargets.length}
-                onClick={() => applyDefaultEvidence("unlinked-filled")}
-              >
-                填充未关联来源的已填字段
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={disabled || !batchEvidence || !eligibleBatchTargets.length}
-                onClick={() => applyDefaultEvidence("all-filled")}
-              >
-                覆盖全部 {eligibleBatchTargets.length} 个已填字段及主来源
-              </Button>
-            </div>
-            {eligibleBatchTargets.length ? (
-              <FieldSet>
-                <FieldLegend className="text-xs text-muted-foreground">
-                  或仅勾选部分目标字段
-                </FieldLegend>
-                <FieldGroup>
-                  {eligibleBatchTargets.map(([, evidenceName, label]) => (
-                    <Field key={evidenceName} orientation="horizontal">
-                      <Checkbox
-                        disabled={disabled}
-                        id={fieldId(`batch-${evidenceName}`)}
-                        checked={batchTargets.has(evidenceName)}
-                        onCheckedChange={(checked) =>
-                          toggleBatchTarget(evidenceName, checked === true)
-                        }
-                      />
-                      <FieldLabel htmlFor={fieldId(`batch-${evidenceName}`)}>{label}</FieldLabel>
-                    </Field>
-                  ))}
-                </FieldGroup>
-              </FieldSet>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!batchEvidence || !batchTargets.size}
-              onClick={applyBatchEvidence}
-            >
-              应用到 {batchTargets.size} 个目标字段
-            </Button>
-          </FieldGroup>
-        </FieldSet>
+        <BatchEvidencePanel
+          form={form}
+          disabled={disabled}
+          fieldId={fieldId}
+          visibleBindings={visibleBindings}
+        />
         <FieldGroup>
           <FieldSet>
             <FieldLegend>核心产品身份</FieldLegend>

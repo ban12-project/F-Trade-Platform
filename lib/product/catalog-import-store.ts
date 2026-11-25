@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, gt, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
 import { hasPermission } from "../authz";
 import { type Database, type DatabaseTransaction, getDatabase } from "../db/client";
 import {
@@ -65,11 +65,11 @@ async function authorize(
   if (!actor || !hasPermission(actor.role, "product:write"))
     throw new CatalogAccessError("产品导入会话或权限已失效。");
   // Project membership mutations take this same lock; check access after acquiring it.
-  const [project] = await tx
+  const projectQuery = tx
     .select()
     .from(workspaceProject)
-    .where(eq(workspaceProject.id, identity.projectId))
-    .for("update");
+    .where(eq(workspaceProject.id, identity.projectId));
+  const [project] = await (access === "write" ? projectQuery.for("update") : projectQuery);
   if (project?.kind !== "marketing" || (access === "write" && project.status !== "active"))
     throw new CatalogAccessError("目录导入需要进行中的营销项目。");
   try {
@@ -86,7 +86,7 @@ async function ownImport(
   access: "view" | "write" = "write",
 ) {
   await authorize(tx, identity, access);
-  const [row] = await tx
+  const importQuery = tx
     .select()
     .from(imports)
     .where(
@@ -95,8 +95,8 @@ async function ownImport(
         eq(imports.projectId, identity.projectId),
         eq(imports.actorId, identity.actorId),
       ),
-    )
-    .for("update");
+    );
+  const [row] = await (access === "write" ? importQuery.for("update") : importQuery);
   if (!row) throw new Error("目录任务不存在或无权访问。");
   return row;
 }
@@ -258,6 +258,67 @@ export async function selectCatalogRecords(
   });
 }
 
+async function readCatalogImportView(
+  tx: DatabaseTransaction,
+  row: ImportRow,
+): Promise<CatalogImportView> {
+  const records = await tx
+    .select({
+      id: candidates.id,
+      identifier: candidates.identifier,
+      physicalPage: candidates.physicalPage,
+      recordLine: candidates.recordLine,
+      reviewStatus: candidates.reviewStatus,
+      status: candidates.status,
+      activeAttemptId: candidates.activeAttemptId,
+      failureCode: candidates.failureCode,
+      productId: candidates.productId,
+    })
+    .from(candidates)
+    .where(eq(candidates.importId, row.id))
+    .orderBy(asc(candidates.ordinal));
+  const history = await tx
+    .select({
+      id: attempts.id,
+      candidateId: attempts.candidateId,
+      status: attempts.status,
+      leaseExpiresAt: attempts.leaseExpiresAt,
+    })
+    .from(attempts)
+    .where(eq(attempts.importId, row.id));
+  const byId = new Map(history.map((attempt) => [attempt.id, attempt]));
+  const attemptCounts = new Map<string, number>();
+  for (const attempt of history) {
+    if (!attempt.candidateId) continue;
+    attemptCounts.set(attempt.candidateId, (attemptCounts.get(attempt.candidateId) ?? 0) + 1);
+  }
+  const expired = (id: string | null) => {
+    if (!id) return false;
+    const attempt = byId.get(id);
+    return (
+      Boolean(attempt) &&
+      ["queued", "running"].includes(attempt?.status ?? "") &&
+      (attempt?.leaseExpiresAt.getTime() ?? 0) <= Date.now()
+    );
+  };
+  return {
+    id: row.id,
+    status: expired(row.activeAttemptId) ? "failed" : row.status,
+    failureCode: expired(row.activeAttemptId) ? "ATTEMPT_EXPIRED" : row.failureCode,
+    candidates: records.map((record) => ({
+      id: record.id,
+      identifier: record.identifier,
+      physicalPage: record.physicalPage,
+      recordLine: record.recordLine,
+      duplicateIdentifier: record.reviewStatus === "duplicate_identifier_review_required",
+      status: expired(record.activeAttemptId) ? "failed" : record.status,
+      attempts: attemptCounts.get(record.id) ?? 0,
+      failureCode: expired(record.activeAttemptId) ? "ATTEMPT_EXPIRED" : record.failureCode,
+      productId: record.productId,
+    })),
+  };
+}
+
 export async function catalogImportView(
   input: unknown,
   identity: CatalogIdentity,
@@ -265,34 +326,9 @@ export async function catalogImportView(
 ): Promise<CatalogImportView> {
   const parsed = catalogLookupSchema.parse(input);
   if (parsed.projectId !== identity.projectId) throw new Error("目录项目不匹配。");
-  return database.transaction(async (tx) => {
-    const row = await ownImport(tx, parsed.importId, identity, "view");
-    const records = await tx
-      .select()
-      .from(candidates)
-      .where(eq(candidates.importId, row.id))
-      .orderBy(asc(candidates.ordinal));
-    const history = await tx.select().from(attempts).where(eq(attempts.importId, row.id));
-    const byId = new Map(history.map((attempt) => [attempt.id, attempt]));
-    const expired = (id: string | null) =>
-      id && ["queued", "running"].includes(byId.get(id)?.status ?? "") && !live(byId.get(id));
-    return {
-      id: row.id,
-      status: expired(row.activeAttemptId) ? "failed" : row.status,
-      failureCode: expired(row.activeAttemptId) ? "ATTEMPT_EXPIRED" : row.failureCode,
-      candidates: records.map((record) => ({
-        id: record.id,
-        identifier: record.identifier,
-        physicalPage: record.physicalPage,
-        recordLine: record.recordLine,
-        duplicateIdentifier: record.reviewStatus === "duplicate_identifier_review_required",
-        status: expired(record.activeAttemptId) ? "failed" : record.status,
-        attempts: history.filter((attempt) => attempt.candidateId === record.id).length,
-        failureCode: expired(record.activeAttemptId) ? "ATTEMPT_EXPIRED" : record.failureCode,
-        productId: record.productId,
-      })),
-    };
-  });
+  return database.transaction(async (tx) =>
+    readCatalogImportView(tx, await ownImport(tx, parsed.importId, identity, "view")),
+  );
 }
 
 export async function latestCatalogImport(
@@ -301,16 +337,16 @@ export async function latestCatalogImport(
   database: Database = getDatabase(),
 ): Promise<CatalogImportView | null> {
   if (projectId !== identity.projectId) throw new Error("目录项目不匹配。");
-  const id = await database.transaction(async (tx) => {
+  return database.transaction(async (tx) => {
     await authorize(tx, identity, "view");
-    const rows = await tx
-      .select({ id: imports.id })
+    const [row] = await tx
+      .select()
       .from(imports)
       .where(and(eq(imports.projectId, projectId), eq(imports.actorId, identity.actorId)))
-      .orderBy(asc(imports.createdAt));
-    return rows.at(-1)?.id;
+      .orderBy(desc(imports.createdAt))
+      .limit(1);
+    return row ? readCatalogImportView(tx, row) : null;
   });
-  return id ? catalogImportView({ projectId, importId: id }, identity, database) : null;
 }
 
 async function attemptContext(tx: DatabaseTransaction, attemptId: string) {

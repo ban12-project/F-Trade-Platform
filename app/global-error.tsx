@@ -1,7 +1,6 @@
 "use client";
 
 // This boundary replaces the root layout, including its stylesheet imports.
-import "@ui-sdk/core/web.css";
 import "./globals.css";
 import { PageError } from "@/components/page-error";
 import { buttonVariants } from "@/components/ui/button";

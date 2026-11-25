@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { BotIcon, EyeIcon } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   startTransition,
@@ -14,6 +15,12 @@ import {
 } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
 import {
@@ -66,9 +73,13 @@ import { useBackgroundTasks } from "./background-tasks";
 import { useWorkspaceDirty } from "./dirty-state";
 import { StaticEvidenceCombobox } from "./evidence-select";
 import { FileDropzone } from "./file-dropzone";
-import { MarkdownContent } from "./markdown-content";
 import { useCreatedRecord } from "./use-created-record";
 import { WorkspaceLink } from "./workspace-link";
+
+const MarkdownContent = dynamic(
+  () => import("./markdown-content").then((module) => module.MarkdownContent),
+  { ssr: false },
+);
 
 type AgentValues = z.infer<typeof productAgentRunFormSchema>;
 
@@ -98,8 +109,9 @@ export function ProductAgentForm({
 }) {
   const router = useRouter();
   const { startTask, finishTask } = useBackgroundTasks();
-  const textEvidenceOptions = evidenceOptions.filter(
-    (option) => !option.contentType.startsWith("image/"),
+  const textEvidenceOptions = useMemo(
+    () => evidenceOptions.filter((option) => !option.contentType.startsWith("image/")),
+    [evidenceOptions],
   );
   const fileRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
@@ -128,8 +140,9 @@ export function ProductAgentForm({
     onBusyChange?.(pending);
     return () => onBusyChange?.(false);
   }, [pending, onBusyChange]);
-  const usableConfigs = modelConfigs.filter(
-    (item) => item.apiKeyConfigured || item.authTokenConfigured,
+  const usableConfigs = useMemo(
+    () => modelConfigs.filter((item) => item.apiKeyConfigured || item.authTokenConfigured),
+    [modelConfigs],
   );
   const defaultConfig = usableConfigs.find((item) => item.isDefault) ?? usableConfigs[0];
   const emptyAgent = useMemo(
@@ -160,17 +173,21 @@ export function ProductAgentForm({
     return () => onDraftDirty?.(false);
   }, [form.formState.isDirty, onDraftDirty]);
   const clearSource = useEffectEvent(() => source?.clear());
-  const choices = usableConfigs.flatMap((config) =>
-    Array.from(
-      new Set(
-        [config.model, ...config.discoveredModels].map((model) => model.trim()).filter(Boolean),
+  const choices = useMemo(
+    () =>
+      usableConfigs.flatMap((config) =>
+        Array.from(
+          new Set(
+            [config.model, ...config.discoveredModels].map((model) => model.trim()).filter(Boolean),
+          ),
+        ).map((model) => ({
+          value: JSON.stringify([config.id, model]),
+          configId: config.id,
+          model,
+          label: `${config.name} · ${model}`,
+        })),
       ),
-    ).map((model) => ({
-      value: JSON.stringify([config.id, model]),
-      configId: config.id,
-      model,
-      label: `${config.name} · ${model}`,
-    })),
+    [usableConfigs],
   );
   const initialChoice =
     choices.find(
@@ -283,7 +300,10 @@ export function ProductAgentForm({
     setUploading(false);
     setUploadError("已停止上传，未开始生成。文件选择已保留，可重新尝试。");
   }
-  const choiceItems = Object.fromEntries(choices.map((choice) => [choice.value, choice.label]));
+  const choiceItems = useMemo(
+    () => Object.fromEntries(choices.map((choice) => [choice.value, choice.label])),
+    [choices],
+  );
   const streamFieldsList = Object.values(stream.fields);
   const completedFieldCount = streamFieldsList.filter((item) => item.status !== "waiting").length;
   const validatedFieldCount = streamFieldsList.filter(
@@ -293,6 +313,7 @@ export function ProductAgentForm({
     choices.find((item) => item.value === selectedChoice)?.label ?? "默认模型";
 
   const streamMarkdown = useMemo(() => {
+    if (!detailOpen) return "";
     const lines = [
       `## 产品字段 AI 实时抽取详情`,
       "",
@@ -319,6 +340,7 @@ export function ProductAgentForm({
   }, [
     activeModelLabel,
     completedFieldCount,
+    detailOpen,
     state.message,
     stream.pending,
     streamFieldsList,
@@ -470,43 +492,49 @@ export function ProductAgentForm({
                   仅用于当前单个产品的外观核验。图片不补全工程事实，也不代表营销授权；无图可继续。
                 </FieldDescription>
               </Field>
-              <Collapsible open={textSourceOpen} onOpenChange={setTextSourceOpen}>
-                <CollapsibleTrigger render={<Button type="button" variant="outline" />}>
-                  改用已有资料中的文本
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-4">
-                  <FieldGroup>
-                    <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                      <FieldLabel htmlFor="agent-evidence">信息来源</FieldLabel>
-                      <Controller
-                        control={form.control}
-                        name="evidenceRef"
-                        render={({ field }) => (
-                          <StaticEvidenceCombobox
-                            id="agent-evidence"
-                            options={textEvidenceOptions}
-                            value={field.value ?? ""}
-                            disabled={pending}
-                            invalid={!!form.formState.errors.evidenceRef}
-                            placeholder="搜索或选择已上传资料"
-                            onValueChange={(value) => {
-                              field.onChange(value);
-                              form.setValue("sourceRef", value, { shouldValidate: true });
-                            }}
-                          />
-                        )}
-                      />
-                      <FieldDescription>上传新文件时可不选；粘贴文本时必须选择。</FieldDescription>
-                      <FieldError errors={[form.formState.errors.evidenceRef]} />
-                    </Field>
-                    <Field data-invalid={!!form.formState.errors.sourceText}>
-                      <FieldLabel htmlFor="agent-text">已授权资料文本</FieldLabel>
-                      <Textarea id="agent-text" rows={8} {...form.register("sourceText")} />
-                      <FieldError errors={[form.formState.errors.sourceText]} />
-                    </Field>
-                  </FieldGroup>
-                </CollapsibleContent>
-              </Collapsible>
+              <Accordion
+                value={textSourceOpen ? ["existing-text"] : []}
+                onValueChange={(next) => setTextSourceOpen(next.includes("existing-text"))}
+                className="rounded-lg border px-3"
+              >
+                <AccordionItem value="existing-text">
+                  <AccordionTrigger type="button">改用已有资料中的文本</AccordionTrigger>
+                  <AccordionContent className="pt-2 pb-4">
+                    <FieldGroup>
+                      <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                        <FieldLabel htmlFor="agent-evidence">信息来源</FieldLabel>
+                        <Controller
+                          control={form.control}
+                          name="evidenceRef"
+                          render={({ field }) => (
+                            <StaticEvidenceCombobox
+                              id="agent-evidence"
+                              options={textEvidenceOptions}
+                              value={field.value ?? ""}
+                              disabled={pending}
+                              invalid={!!form.formState.errors.evidenceRef}
+                              placeholder="搜索或选择已上传资料"
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                form.setValue("sourceRef", value, { shouldValidate: true });
+                              }}
+                            />
+                          )}
+                        />
+                        <FieldDescription>
+                          上传新文件时可不选；粘贴文本时必须选择。
+                        </FieldDescription>
+                        <FieldError errors={[form.formState.errors.evidenceRef]} />
+                      </Field>
+                      <Field data-invalid={!!form.formState.errors.sourceText}>
+                        <FieldLabel htmlFor="agent-text">已授权资料文本</FieldLabel>
+                        <Textarea id="agent-text" rows={8} {...form.register("sourceText")} />
+                        <FieldError errors={[form.formState.errors.sourceText]} />
+                      </Field>
+                    </FieldGroup>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </FieldGroup>
           </FieldSet>
         </form>
@@ -574,7 +602,11 @@ export function ProductAgentForm({
                     </DialogDescription>
                   </DialogHeader>
                   <div className="max-h-[65dvh] overflow-y-auto rounded-lg border bg-background p-4">
-                    <MarkdownContent isAnimating={stream.pending}>{streamMarkdown}</MarkdownContent>
+                    {detailOpen ? (
+                      <MarkdownContent isAnimating={stream.pending}>
+                        {streamMarkdown}
+                      </MarkdownContent>
+                    ) : null}
                   </div>
                 </DialogContent>
               </Dialog>
