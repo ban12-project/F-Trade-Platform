@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 
+import { buildMarketingAssDocument } from "./ass-subtitles";
 import type { VideoRenderer, VideoRenderRequest } from "./rendering";
 
 const execFileAsync = promisify(execFile);
@@ -15,14 +16,6 @@ export type FfmpegRendererDependencies = {
   ffprobeBin?: string;
 };
 
-function assTimestamp(seconds: number) {
-  const centiseconds = Math.max(0, Math.round(seconds * 100));
-  const hours = Math.floor(centiseconds / 360_000);
-  const minutes = Math.floor((centiseconds % 360_000) / 6_000);
-  const secs = Math.floor((centiseconds % 6_000) / 100);
-  return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}.${String(centiseconds % 100).padStart(2, "0")}`;
-}
-
 function concatPathLine(filePath: string) {
   return `file '${filePath.replaceAll("'", "'\\\\''")}'`;
 }
@@ -30,29 +23,6 @@ function concatPathLine(filePath: string) {
 function subtitleFilter(filePath: string) {
   const escaped = filePath.replaceAll("\\", "\\\\").replaceAll(":", "\\:").replaceAll("'", "\\'");
   return `subtitles=filename='${escaped}'`;
-}
-
-function assText(value: string) {
-  return value
-    .replaceAll("\\", "\\\\")
-    .replaceAll("{", "\\{")
-    .replaceAll("}", "\\}")
-    .replaceAll("\n", "\\N");
-}
-
-function assDocument(request: VideoRenderRequest) {
-  const captions = request.timeline.scenes
-    .flatMap((scene) => scene.subtitles)
-    .map(
-      (subtitle) =>
-        `Dialogue: 0,${assTimestamp(subtitle.startSeconds)},${assTimestamp(subtitle.endSeconds)},Caption,,0,0,0,,${assText(subtitle.text)}`,
-    );
-  const cta = request.timeline.cta
-    ? [
-        `Dialogue: 1,${assTimestamp(request.timeline.cta.startSeconds)},${assTimestamp(request.timeline.cta.endSeconds)},CTA,,0,0,0,,${assText(request.timeline.cta.text)}`,
-      ]
-    : [];
-  return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${request.width}\nPlayResY: ${request.height}\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,Noto Sans,${Math.max(32, Math.round(request.height * 0.04))},&H00FFFFFF,&H000000FF,&H00111111,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,60,60,${Math.max(54, Math.round(request.height * 0.07))},1\nStyle: CTA,Noto Sans,${Math.max(42, Math.round(request.height * 0.055))},&H00FFFFFF,&H000000FF,&H00111111,&H90000000,-1,0,0,0,100,100,0,0,3,2,0,5,80,80,80,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${[...captions, ...cta].join("\n")}\n`;
 }
 
 async function probeSource(filePath: string, ffprobeBin: string) {
@@ -181,7 +151,7 @@ export function createFfmpegTimelineRenderer(
               "当前 FFmpeg 未验证字幕烧录能力；必须部署带 libass subtitles 滤镜的构建。 ",
             );
           const subtitleFile = join(workspace, "captions.ass");
-          await writeFile(subtitleFile, assDocument(request), "utf8");
+          await writeFile(subtitleFile, buildMarketingAssDocument(request), "utf8");
           await execFileAsync(ffmpegBin, [
             "-hide_banner",
             "-loglevel",

@@ -13,11 +13,17 @@ import {
   useVideoConfig,
 } from "remotion";
 
-import type { AbcdMarketingVideoProps, MotionPreset } from "./abcd-types";
+import type { AbcdMarketingVideoProps, AbcdPacingMode, MotionPreset } from "./abcd-types";
 import { resolveAbcdBeatState, transitionFrames } from "./abcd-types";
 
 const accent = "#f97316";
 const ink = "#fafafa";
+
+function captionFontSize(length: number) {
+  if (length > 70) return 38;
+  if (length > 40) return 46;
+  return 52;
+}
 
 function motionTransform(
   preset: MotionPreset,
@@ -63,17 +69,20 @@ function Beat({
   clip,
   productName,
   ctaText,
+  pacingMode,
 }: {
   clip: AbcdMarketingVideoProps["clips"][number];
   productName: string;
   ctaText: string;
+  pacingMode?: AbcdPacingMode;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const enter = spring({ frame, fps, config: { damping: 20, stiffness: 130 } });
-  const beat = resolveAbcdBeatState(clip, frame);
+  const beat = resolveAbcdBeatState(clip, frame, pacingMode);
   const phaseFrame = frame - beat.phaseStartFrame;
   const phaseEnter = spring({ frame: phaseFrame, fps, config: { damping: 20, stiffness: 130 } });
+  const isCover = clip.fitMode === "cover";
 
   return (
     <AbsoluteFill
@@ -84,50 +93,47 @@ function Beat({
           '"Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Noto Sans CJK KR", "Noto Color Emoji", sans-serif',
       }}
     >
-      <AbsoluteFill style={{ filter: "blur(42px)", opacity: 0.5, transform: "scale(1.12)" }}>
-        <MediaLayer clip={clip} />
-      </AbsoluteFill>
+      {!isCover ? (
+        <AbsoluteFill style={{ filter: "blur(36px)", opacity: 0.42, transform: "scale(1.12)" }}>
+          <MediaLayer clip={clip} />
+        </AbsoluteFill>
+      ) : null}
       <AbsoluteFill
         style={{
-          background:
-            "linear-gradient(180deg, rgba(9,9,11,.2) 0%, rgba(9,9,11,.05) 42%, rgba(9,9,11,.88) 100%)",
-        }}
-      />
-      <AbsoluteFill
-        style={{
-          inset: 42,
-          borderRadius: 44,
+          inset: isCover ? 0 : 24,
+          borderRadius: isCover ? 0 : 32,
           overflow: "hidden",
-          boxShadow: "0 28px 90px rgba(0,0,0,.42)",
+          boxShadow: isCover ? undefined : "0 24px 72px rgba(0,0,0,.38)",
         }}
       >
         <MediaLayer clip={clip} />
       </AbsoluteFill>
+      {/* Keep the central 18%-66% product region bright and unobstructed while preserving caption contrast. */}
       <AbsoluteFill
         style={{
           background:
-            "linear-gradient(180deg, rgba(9,9,11,.82), transparent 25%, transparent 48%, rgba(9,9,11,.94))",
+            "linear-gradient(180deg, rgba(9,9,11,.68) 0%, transparent 18%, transparent 66%, rgba(9,9,11,.84) 100%)",
         }}
       />
 
       <div
         style={{
           position: "absolute",
-          left: 74,
-          right: 74,
-          top: 72,
+          left: 64,
+          right: 64,
+          top: 64,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          opacity: beat.branding ? enter : 0.88,
+          opacity: beat.branding ? enter : 0.72,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div style={{ width: 14, height: 48, borderRadius: 8, backgroundColor: accent }} />
+          <div style={{ width: 12, height: 42, borderRadius: 6, backgroundColor: accent }} />
           <div
             style={{
               color: ink,
-              fontSize: 32,
+              fontSize: 30,
               fontWeight: 800,
               overflowWrap: "anywhere",
               unicodeBidi: "plaintext",
@@ -141,10 +147,10 @@ function Beat({
       <div
         style={{
           position: "absolute",
-          left: 74,
-          right: 74,
-          bottom: beat.direction ? 360 : 240,
-          transform: `translateY(${(1 - phaseEnter) * 42}px)`,
+          left: 64,
+          right: 64,
+          bottom: beat.direction ? 316 : 210,
+          transform: `translateY(${(1 - phaseEnter) * 32}px)`,
           opacity: phaseEnter,
         }}
       >
@@ -152,13 +158,13 @@ function Beat({
           <div
             style={{
               color: ink,
-              fontSize: (clip.caption?.length ?? 0) > 70 ? 42 : 56,
-              lineHeight: 1.3,
+              fontSize: captionFontSize(clip.caption.length),
+              lineHeight: 1.28,
               overflowWrap: "anywhere",
               unicodeBidi: "plaintext",
               fontWeight: 850,
               letterSpacing: 0,
-              textShadow: "0 3px 24px rgba(0,0,0,.55)",
+              textShadow: "0 3px 20px rgba(0,0,0,.65)",
             }}
           >
             {clip.caption}
@@ -170,26 +176,26 @@ function Beat({
         <div
           style={{
             position: "absolute",
-            left: 74,
-            right: 74,
-            bottom: 180,
-            minHeight: 104,
-            padding: "20px 28px",
+            left: 64,
+            right: 64,
+            bottom: 168,
+            minHeight: 96,
+            padding: "18px 26px",
             textAlign: "center",
             overflowWrap: "anywhere",
             unicodeBidi: "plaintext",
-            borderRadius: 28,
+            borderRadius: 24,
             backgroundColor: accent,
             color: "#18181b",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 36,
+            fontSize: 34,
             fontWeight: 900,
-            letterSpacing: -0.8,
-            transform: `scale(${0.94 + phaseEnter * 0.06})`,
+            letterSpacing: -0.6,
+            transform: `scale(${0.95 + phaseEnter * 0.05})`,
             opacity: phaseEnter,
-            boxShadow: "0 16px 48px rgba(249,115,22,.36)",
+            boxShadow: "0 14px 40px rgba(249,115,22,.34)",
           }}
         >
           {ctaText}
@@ -199,7 +205,12 @@ function Beat({
   );
 }
 
-export function AbcdMarketingVideo({ clips, productName, ctaText }: AbcdMarketingVideoProps) {
+export function AbcdMarketingVideo({
+  clips,
+  productName,
+  ctaText,
+  pacingMode,
+}: AbcdMarketingVideoProps) {
   return (
     <TransitionSeries>
       {clips.flatMap((clip, index) => {
@@ -223,7 +234,12 @@ export function AbcdMarketingVideo({ clips, productName, ctaText }: AbcdMarketin
               frame={clip.durationInFrames - 1}
               active={(frame) => frame >= clip.durationInFrames}
             >
-              <Beat clip={clip} productName={productName} ctaText={ctaText} />
+              <Beat
+                clip={clip}
+                productName={productName}
+                ctaText={ctaText}
+                pacingMode={pacingMode}
+              />
             </Freeze>
           </TransitionSeries.Sequence>
         );

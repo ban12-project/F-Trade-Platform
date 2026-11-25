@@ -1,10 +1,12 @@
 export type AbcdRole = "attention" | "branding" | "connection" | "direction";
 export type MotionPreset = "punch_in" | "hero_reveal" | "slow_pan" | "cta_hold";
+export type AbcdPacingMode = "core_abcd" | "shorts_organic";
 
 export type AbcdMarketingVideoProps = {
   productName: string;
   ctaText: string;
   fps: number;
+  pacingMode?: AbcdPacingMode;
   clips: Array<{
     id: string;
     src: string;
@@ -32,10 +34,13 @@ export function compositionDurationInFrames(props: AbcdMarketingVideoProps) {
 export function resolveAbcdBeatState(
   clip: AbcdMarketingVideoProps["clips"][number],
   frame: number,
+  pacingMode: AbcdPacingMode = "core_abcd",
 ) {
-  const temporalRoles = (["attention", "connection", "direction"] as const).filter((role) =>
-    clip.abcdRoles.includes(role),
-  );
+  const roleOrder =
+    pacingMode === "shorts_organic"
+      ? (["connection", "attention", "direction"] as const)
+      : (["attention", "connection", "direction"] as const);
+  const temporalRoles = roleOrder.filter((role) => clip.abcdRoles.includes(role));
   const safeFrame = Math.max(0, Math.min(clip.durationInFrames - 1, Math.floor(frame)));
   const phaseIndex =
     temporalRoles.length <= 1

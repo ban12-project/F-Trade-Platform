@@ -77,8 +77,35 @@ export type VideoExecutionDependencies = {
   resolveCredential: (credentialRef: string) => Promise<string>;
 };
 
-function executionPrompt(project: VideoProject) {
-  return project.scenes.map((scene) => scene.prompt).join("\n\n");
+export function executionPrompt(projectInput: VideoProject) {
+  const project = videoProjectSchema.parse(projectInput);
+  const structured =
+    project.creativeObjective !== undefined ||
+    project.scenes.some((scene) => scene.abcdRoles !== undefined);
+  if (!structured) {
+    return project.scenes.map((scene) => scene.prompt).join("\n\n");
+  }
+  const claimsByField = new Map(project.factualClaims.map((claim) => [claim.field, claim.value]));
+  const lines = [
+    `Objective: ${project.creativeObjective ?? "action"} (${project.objective})`,
+    `Target audience: ${project.targetAudience}`,
+    `Pacing: ${project.pacingMode ?? "core_abcd"}`,
+    "Guidelines: Apply Google Ads ABCD principles (answer/14783551). Keep visuals bright and high-contrast, use tight framing, avoid competing onscreen elements, and never invent unverified product specs, brands, discounts, or delivery promises.",
+    ...project.scenes.map((scene) => {
+      const facts = scene.claimRefs
+        .map((field) => `${field}=${claimsByField.get(field) ?? ""}`)
+        .filter((entry) => !entry.endsWith("="));
+      return [
+        `${scene.sceneId} (${scene.durationSeconds}s)`,
+        `roles=${(scene.abcdRoles ?? []).join(",") || "unspecified"}`,
+        `framing=${scene.framing ?? "tight"}`,
+        `visual=${scene.visualContrast ?? "high_contrast_bright"}`,
+        `facts=${facts.length ? facts.join("; ") : "none"}`,
+        `prompt=${scene.prompt}`,
+      ].join(" | ");
+    }),
+  ];
+  return lines.join("\n");
 }
 
 /**

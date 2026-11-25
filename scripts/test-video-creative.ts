@@ -96,4 +96,80 @@ assert.throws(
     ),
   /缺少有效证据/,
 );
+
+const structuredCreative = buildVideoCreative(
+  {
+    productId: id,
+    objective: "Full funnel structured generation plan",
+    targetAudience: "Synthetic distributor",
+    creativeObjective: "full_funnel",
+    pacingMode: "shorts_organic",
+    factPaths: ["product.product_name"],
+    sourceAssets: [
+      {
+        assetRef: "asset-product-101",
+        mediaType: "image",
+        rightsEvidenceRef: "evidence-rights-101",
+      },
+    ],
+    platforms: ["youtube", "tiktok"],
+    scenes: [
+      {
+        prompt: "Tight framing showing realistic clutch assembly inspection.",
+        durationSeconds: 4,
+        claimRefs: ["product.product_name"],
+        assetRefs: ["asset-product-101"],
+        abcdRoles: ["connection", "attention"],
+        framing: "tight",
+        visualContrast: "high_contrast_bright",
+      },
+      {
+        prompt: "Organic brand mark followed by distributor inquiry ask.",
+        durationSeconds: 4,
+        claimRefs: [],
+        assetRefs: ["asset-product-101"],
+        abcdRoles: ["branding", "direction"],
+        framing: "medium",
+        visualContrast: "high_contrast_bright",
+      },
+    ],
+  },
+  product,
+  "00000000-0000-4000-8000-000000000103",
+);
+assert.equal(structuredCreative.creativeObjective, "full_funnel");
+assert.equal(structuredCreative.pacingMode, "shorts_organic");
+assert.equal("creativeObjective" in creative, false);
+assert.throws(
+  () =>
+    buildVideoCreative(
+      {
+        productId: id,
+        objective: "Reject leaked engineering specs without claimRefs",
+        targetAudience: "Synthetic distributor",
+        creativeObjective: "action",
+        factPaths: ["product.product_name"],
+        sourceAssets: [
+          {
+            assetRef: "asset-product-101",
+            mediaType: "image",
+            rightsEvidenceRef: "evidence-rights-101",
+          },
+        ],
+        platforms: ["youtube"],
+        scenes: [
+          {
+            prompt: "Show OE 12345 spline 24 dimensions clearly.",
+            durationSeconds: 5,
+            claimRefs: [],
+            assetRefs: ["asset-product-101"],
+            abcdRoles: ["attention", "branding", "connection", "direction"],
+          },
+        ],
+      },
+      product,
+    ),
+  /未绑定核验事实引用/,
+);
+
 console.log("PASS evidence-bound video creative ready for generation");

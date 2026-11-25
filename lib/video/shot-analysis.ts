@@ -1,21 +1,43 @@
 import { z } from "zod";
 
-export const shotAnalysisVersion = "ffmpeg-scdet-frame-diff-v1";
+export const shotAnalysisVersion = "ffmpeg-scdet-signalstats-v2";
+export const legacyShotAnalysisVersion = "ffmpeg-scdet-frame-diff-v1";
 export const shotDetectionFramesPerSecond = 4;
 export const maximumDetectedShotIntervalMs = 12_000;
 
-export const shotSourceAnalysisSchema = z
+const baseShotSourceAnalysisShape = {
+  intervalStartMs: z.number().int().min(0),
+  intervalEndMs: z.number().int().min(1_000),
+  representativeMs: z.number().int().min(0),
+  actionScore: z.number().int().min(0).max(100),
+  actionLevel: z.enum(["low", "medium", "high"]),
+  startBoundary: z.enum(["source", "scene", "window"]),
+  endBoundary: z.enum(["scene", "window", "source"]),
+} as const;
+
+const legacyShotSourceAnalysisSchema = z
+  .object({
+    version: z.literal(legacyShotAnalysisVersion),
+    ...baseShotSourceAnalysisShape,
+  })
+  .strict();
+
+export const signalStatsShotSourceAnalysisSchema = z
   .object({
     version: z.literal(shotAnalysisVersion),
-    intervalStartMs: z.number().int().min(0),
-    intervalEndMs: z.number().int().min(1_000),
-    representativeMs: z.number().int().min(0),
-    actionScore: z.number().int().min(0).max(100),
-    actionLevel: z.enum(["low", "medium", "high"]),
-    startBoundary: z.enum(["source", "scene", "window"]),
-    endBoundary: z.enum(["scene", "window", "source"]),
+    ...baseShotSourceAnalysisShape,
+    brightnessScore: z.number().int().min(0).max(100),
+    brightnessLevel: z.enum(["low", "medium", "high"]),
+    contrastScore: z.number().int().min(0).max(100),
+    contrastLevel: z.enum(["low", "medium", "high"]),
   })
-  .strict()
+  .strict();
+
+export const shotSourceAnalysisSchema = z
+  .discriminatedUnion("version", [
+    signalStatsShotSourceAnalysisSchema,
+    legacyShotSourceAnalysisSchema,
+  ])
   .superRefine((value, context) => {
     if (value.intervalEndMs - value.intervalStartMs < 1_000) {
       context.addIssue({
@@ -38,10 +60,15 @@ export const shotSourceAnalysisSchema = z
 
 export type ShotSourceAnalysis = z.infer<typeof shotSourceAnalysisSchema>;
 type MotionSample = { timeMs: number; difference: number };
+export type VisualSignalSample = { timeMs: number; luma: number; contrast: number };
 
 function finiteNumber(value: string | undefined) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function clampScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 export function parseSceneCutMetadata(output: string, durationMs: number) {
@@ -70,6 +97,57 @@ export function parseFrameDifferenceMetadata(output: string): MotionSample[] {
   return samples.sort((left, right) => left.timeMs - right.timeMs);
 }
 
+export function parseVisualSignalMetadata(output: string): VisualSignalSample[] {
+  const samples: VisualSignalSample[] = [];
+  let currentTimeSeconds: number | null = null;
+  let frameStats: {
+    yavg?: number;
+    ylow?: number;
+    yhigh?: number;
+    ymin?: number;
+    ymax?: number;
+  } = {};
+
+  function flushFrame() {
+    if (currentTimeSeconds === null || currentTimeSeconds < 0 || frameStats.yavg === undefined) {
+      frameStats = {};
+      return;
+    }
+    const contrast =
+      frameStats.yhigh !== undefined && frameStats.ylow !== undefined
+        ? Math.max(0, frameStats.yhigh - frameStats.ylow)
+        : frameStats.ymax !== undefined && frameStats.ymin !== undefined
+          ? Math.max(0, frameStats.ymax - frameStats.ymin)
+          : 0;
+    samples.push({
+      timeMs: Math.round(currentTimeSeconds * 1_000),
+      luma: frameStats.yavg,
+      contrast,
+    });
+    frameStats = {};
+  }
+
+  for (const line of output.split(/\r?\n/)) {
+    const time = line.match(/pts_time:([^\s]+)/);
+    if (time) {
+      flushFrame();
+      currentTimeSeconds = finiteNumber(time[1]);
+      continue;
+    }
+    const match = line.match(/^lavfi\.signalstats\.(YAVG|YLOW|YHIGH|YMIN|YMAX)=([^\s]+)/);
+    if (!match || currentTimeSeconds === null) continue;
+    const parsed = finiteNumber(match[2]);
+    if (parsed === null || parsed < 0) continue;
+    if (match[1] === "YAVG") frameStats.yavg = parsed;
+    else if (match[1] === "YLOW") frameStats.ylow = parsed;
+    else if (match[1] === "YHIGH") frameStats.yhigh = parsed;
+    else if (match[1] === "YMIN") frameStats.ymin = parsed;
+    else if (match[1] === "YMAX") frameStats.ymax = parsed;
+  }
+  flushFrame();
+  return samples.sort((left, right) => left.timeMs - right.timeMs);
+}
+
 function percentile(values: number[], proportion: number) {
   if (!values.length) return 0;
   const sorted = [...values].sort((left, right) => left - right);
@@ -77,12 +155,24 @@ function percentile(values: number[], proportion: number) {
 }
 
 function actionScore(value: number) {
-  return Math.max(0, Math.min(100, Math.round((value / 32) * 100)));
+  return clampScore((value / 32) * 100);
 }
 
 function actionLevel(score: number): ShotSourceAnalysis["actionLevel"] {
   if (score < 25) return "low";
   if (score < 55) return "medium";
+  return "high";
+}
+
+function brightnessLevel(score: number): "low" | "medium" | "high" {
+  if (score < 32) return "low";
+  if (score < 60) return "medium";
+  return "high";
+}
+
+function contrastLevel(score: number): "low" | "medium" | "high" {
+  if (score < 28) return "low";
+  if (score < 60) return "medium";
   return "high";
 }
 
@@ -111,11 +201,13 @@ export function detectShotIntervals(input: {
   durationMs: number;
   sceneMetadata: string;
   motionMetadata: string;
+  visualMetadata?: string;
 }) {
   if (!Number.isInteger(input.durationMs) || input.durationMs < 1_000)
     throw new Error("源视频不足 1 秒，不能检测镜头区间。");
   const sceneCuts = parseSceneCutMetadata(input.sceneMetadata, input.durationMs);
   const samples = parseFrameDifferenceMetadata(input.motionMetadata);
+  const visualSamples = parseVisualSignalMetadata(input.visualMetadata ?? input.sceneMetadata);
   const boundaries = splitBoundaries(input.durationMs, sceneCuts);
   return boundaries.slice(0, -1).flatMap((start, index) => {
     const end = boundaries[index + 1];
@@ -142,19 +234,59 @@ export function detectShotIntervals(input: {
         ? sample
         : best;
     }, null);
-    return [
-      shotSourceAnalysisSchema.parse({
-        version: shotAnalysisVersion,
-        intervalStartMs: start.timeMs,
-        intervalEndMs: end.timeMs,
-        representativeMs: representative?.timeMs ?? Math.floor((start.timeMs + end.timeMs) / 2),
-        actionScore: score,
-        actionLevel: actionLevel(score),
-        startBoundary: start.kind,
-        endBoundary: end.kind,
-      }),
-    ];
+    const visualInside = visualSamples.filter(
+      (sample) => sample.timeMs >= start.timeMs && sample.timeMs < end.timeMs,
+    );
+    const brightnessScore = visualInside.length
+      ? clampScore(
+          (percentile(
+            visualInside.map((sample) => sample.luma),
+            0.5,
+          ) /
+            255) *
+            100,
+        )
+      : 50;
+    const contrastScore = visualInside.length
+      ? clampScore(
+          (percentile(
+            visualInside.map((sample) => sample.contrast),
+            0.5,
+          ) /
+            140) *
+            100,
+        )
+      : 50;
+    const parsed = shotSourceAnalysisSchema.parse({
+      version: shotAnalysisVersion,
+      intervalStartMs: start.timeMs,
+      intervalEndMs: end.timeMs,
+      representativeMs: representative?.timeMs ?? Math.floor((start.timeMs + end.timeMs) / 2),
+      actionScore: score,
+      actionLevel: actionLevel(score),
+      brightnessScore,
+      brightnessLevel: brightnessLevel(brightnessScore),
+      contrastScore,
+      contrastLevel: contrastLevel(contrastScore),
+      startBoundary: start.kind,
+      endBoundary: end.kind,
+    });
+    return [signalStatsShotSourceAnalysisSchema.parse(parsed)];
   });
+}
+
+function intervalSelectionScore(interval: ShotSourceAnalysis) {
+  const brightness = "brightnessScore" in interval ? interval.brightnessScore : 50;
+  const contrast = "contrastScore" in interval ? interval.contrastScore : 50;
+  const bLevel = "brightnessLevel" in interval ? interval.brightnessLevel : "medium";
+  const cLevel = "contrastLevel" in interval ? interval.contrastLevel : "medium";
+  return (
+    interval.actionScore * 0.55 +
+    brightness * 0.22 +
+    contrast * 0.23 -
+    (bLevel === "low" ? 20 : 0) -
+    (cLevel === "low" ? 20 : 0)
+  );
 }
 
 export function selectDiverseActionIntervals(
@@ -166,7 +298,9 @@ export function selectDiverseActionIntervals(
   if (intervals.length <= maximumIntervals) return [...intervals];
   const ordered = [...intervals].sort(
     (left, right) =>
-      right.actionScore - left.actionScore || left.intervalStartMs - right.intervalStartMs,
+      intervalSelectionScore(right) - intervalSelectionScore(left) ||
+      right.actionScore - left.actionScore ||
+      left.intervalStartMs - right.intervalStartMs,
   );
   const totalDurationMs = Math.max(...intervals.map((interval) => interval.intervalEndMs));
   const minimumSeparationMs = Math.max(2_000, Math.floor(totalDurationMs / (maximumIntervals * 2)));
@@ -189,7 +323,7 @@ export function selectDiverseActionIntervals(
 }
 
 export function sceneDetectionFilter() {
-  return `scale=320:-2,fps=${shotDetectionFramesPerSecond},scdet=t=8,metadata=print:key=lavfi.scd.time:file=-`;
+  return `scale=320:-2,fps=${shotDetectionFramesPerSecond},signalstats,scdet=t=8,metadata=print:file=-`;
 }
 
 export function frameDifferenceFilter() {

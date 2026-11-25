@@ -1,7 +1,16 @@
 import { z } from "zod";
-import { marketingVideoDraftSchema } from "./edit-contracts";
+import {
+  marketingCreativeObjectives,
+  marketingCreativePacingModes,
+  marketingVideoAbcdRoleSchema,
+  marketingVideoAbcdRoles,
+  marketingVideoDraftSchema,
+} from "./edit-contracts";
 import { videoEncodingSchema } from "./encoding-contract";
 import { videoResourceMeasurementsSchema } from "./resource-measurements";
+
+const unverifiedGenerationFactPattern =
+  /\boe[m]?\b|\b(?:diameter|dimension|spline|certif(?:ied|ication)|lifetime|moq|lead[ -]?time|price|usd|eur|rmb|mm|kg)\b|尺寸|直径|花键|认证|寿命|起订|交期|价格/i;
 
 const privateRef = z
   .string()
@@ -115,6 +124,9 @@ export const videoSceneSchema = z
     durationSeconds: z.number().int().min(1).max(30),
     claimRefs: z.array(z.string().trim().min(1)).max(24),
     assetRefs: z.array(privateRef).max(16),
+    abcdRoles: z.array(marketingVideoAbcdRoleSchema).min(1).max(4).optional(),
+    framing: z.enum(["tight", "medium", "wide"]).optional(),
+    visualContrast: z.enum(["high_contrast_bright", "natural"]).optional(),
   })
   .strict();
 
@@ -133,6 +145,8 @@ export const videoProjectSchema = z
     ]),
     objective: z.string().trim().min(1).max(2_000),
     targetAudience: z.string().trim().min(1).max(240),
+    creativeObjective: z.enum(marketingCreativeObjectives).optional(),
+    pacingMode: z.enum(marketingCreativePacingModes).optional(),
     platforms: z.array(videoPlatformSchema).min(1).max(5),
     factualClaims: z.array(videoFactClaimSchema).min(1).max(24),
     sourceAssets: z.array(videoAssetSchema).max(16),
@@ -197,6 +211,103 @@ export const videoProjectSchema = z
             path: ["scenes", sceneIndex, "assetRefs"],
             message: `镜头引用了未授权素材：${assetRef}`,
           });
+      }
+    }
+    if (
+      project.creativeObjective !== undefined ||
+      project.scenes.some((scene) => scene.abcdRoles !== undefined)
+    ) {
+      for (const [sceneIndex, scene] of project.scenes.entries()) {
+        if (!scene.abcdRoles?.length) {
+          context.addIssue({
+            code: "custom",
+            path: ["scenes", sceneIndex, "abcdRoles"],
+            message: "启用结构化 ABCD 生成治理时，每个镜头必须声明 abcdRoles。",
+          });
+        } else if (new Set(scene.abcdRoles).size !== scene.abcdRoles.length) {
+          context.addIssue({
+            code: "custom",
+            path: ["scenes", sceneIndex, "abcdRoles"],
+            message: "同一镜头的 ABCD 节拍不能重复。",
+          });
+        }
+        if (scene.claimRefs.length === 0 && unverifiedGenerationFactPattern.test(scene.prompt)) {
+          context.addIssue({
+            code: "custom",
+            path: ["scenes", sceneIndex, "prompt"],
+            message: "未绑定核验事实引用（claimRefs）的生成镜头提示词不能包含工程或商业参数。",
+          });
+        }
+      }
+      const coveredRoles = new Set(project.scenes.flatMap((scene) => scene.abcdRoles ?? []));
+      for (const role of marketingVideoAbcdRoles) {
+        if (!coveredRoles.has(role)) {
+          context.addIssue({
+            code: "custom",
+            path: ["scenes"],
+            message: `视频生成计划缺少 ${role} 节拍。`,
+          });
+        }
+      }
+      const firstRoles = project.scenes[0]?.abcdRoles ?? [];
+      if (project.pacingMode === "shorts_organic") {
+        if (project.platforms.every((platform) => platform === "x")) {
+          context.addIssue({
+            code: "custom",
+            path: ["platforms"],
+            message: "竖屏短片叙事模式不能仅面向横屏平台 X。",
+          });
+        }
+        if (!firstRoles.includes("connection") && !firstRoles.includes("attention")) {
+          context.addIssue({
+            code: "custom",
+            path: ["scenes", 0, "abcdRoles"],
+            message: "竖屏短片生成计划首个镜头必须承担 connection 或 attention。",
+          });
+        }
+      } else {
+        if (!firstRoles.includes("attention") || !firstRoles.includes("branding")) {
+          context.addIssue({
+            code: "custom",
+            path: ["scenes", 0, "abcdRoles"],
+            message: "生成计划首个镜头必须同时承担 attention 与 branding。",
+          });
+        }
+      }
+      if (!project.scenes.at(-1)?.abcdRoles?.includes("direction")) {
+        context.addIssue({
+          code: "custom",
+          path: ["scenes"],
+          message: "生成计划最后一个镜头必须包含 direction。",
+        });
+      }
+      if (
+        project.creativeObjective === "consideration" &&
+        !project.scenes.some(
+          (scene) => scene.abcdRoles?.includes("connection") && scene.claimRefs.length > 0,
+        )
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["scenes"],
+          message: "考虑目标生成计划必须在 connection 镜头绑定已核验产品事实。",
+        });
+      }
+      if (project.creativeObjective === "full_funnel") {
+        if (project.scenes.length < 2) {
+          context.addIssue({
+            code: "custom",
+            path: ["scenes"],
+            message: "全漏斗生成计划至少需要 2 个镜头。",
+          });
+        }
+        if (!project.scenes.some((scene) => scene.claimRefs.length > 0)) {
+          context.addIssue({
+            code: "custom",
+            path: ["scenes"],
+            message: "全漏斗生成计划至少需要在一个镜头绑定已核验产品事实。",
+          });
+        }
       }
     }
   });

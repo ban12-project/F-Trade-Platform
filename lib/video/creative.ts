@@ -8,11 +8,14 @@ export type VideoCreativeInput = {
   productId: string;
   objective: string;
   targetAudience: string;
+  creativeObjective?: VideoProject["creativeObjective"];
+  pacingMode?: VideoProject["pacingMode"];
   factPaths: string[];
   sourceAssets: VideoProject["sourceAssets"];
   platforms: VideoProject["platforms"];
   scenes: Array<
-    Pick<VideoProject["scenes"][number], "prompt" | "durationSeconds" | "claimRefs" | "assetRefs">
+    Pick<VideoProject["scenes"][number], "prompt" | "durationSeconds" | "claimRefs" | "assetRefs"> &
+      Partial<Pick<VideoProject["scenes"][number], "abcdRoles" | "framing" | "visualContrast">>
   >;
 };
 
@@ -33,11 +36,19 @@ export function buildVideoCreative(
     status: "ready_for_generation",
     objective: input.objective,
     targetAudience: input.targetAudience,
+    ...(input.creativeObjective ? { creativeObjective: input.creativeObjective } : {}),
+    ...(input.pacingMode ? { pacingMode: input.pacingMode } : {}),
     platforms: input.platforms,
     factualClaims,
     sourceAssets: input.sourceAssets,
     scenes: input.scenes.map((scene, index) => ({
-      ...scene,
+      prompt: scene.prompt,
+      durationSeconds: scene.durationSeconds,
+      claimRefs: scene.claimRefs,
+      assetRefs: scene.assetRefs,
+      ...(scene.abcdRoles ? { abcdRoles: scene.abcdRoles } : {}),
+      ...(scene.framing ? { framing: scene.framing } : {}),
+      ...(scene.visualContrast ? { visualContrast: scene.visualContrast } : {}),
       sceneId: `scene-${String(index + 1).padStart(3, "0")}`,
     })),
     approvalRefs: [],

@@ -1,4 +1,4 @@
-import type { AbcdMarketingVideoProps } from "@/remotion/abcd-types";
+import type { AbcdMarketingVideoProps, AbcdPacingMode } from "@/remotion/abcd-types";
 
 import type { VideoRenderRequest } from "./rendering";
 import type { SandboxVideoSource } from "./sandbox-sources";
@@ -14,6 +14,7 @@ export function createRemotionCompositionProps(
   request: VideoRenderRequest,
   sources: SignedSources,
   productName: string,
+  pacingMode?: AbcdPacingMode,
 ): AbcdMarketingVideoProps {
   if (request.width !== 1080 || request.height !== 1920 || request.fps !== 30) {
     throw new Error("ABCD 工业品模板当前只支持 1080×1920、30fps 的竖屏导出。");
@@ -27,6 +28,7 @@ export function createRemotionCompositionProps(
     productName: safeProductName,
     ctaText: request.timeline.cta.text,
     fps: request.fps,
+    ...(pacingMode ? { pacingMode } : {}),
     clips: request.timeline.scenes.map((scene) => {
       const source = sources.get(scene.assetRef);
       if (!source) throw new Error(`ABCD 模板无法读取片段 ${scene.sceneId} 的私有素材。`);

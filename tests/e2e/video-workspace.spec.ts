@@ -121,6 +121,30 @@ test("ABCD roles are editable and missing opening attention is reported", async 
   await expect(page.getByText(/Attention 必须从第一个片段开始/)).toBeVisible();
 });
 
+test("full_funnel objective, shorts_organic pacing, and anti-competing caption checks work in the editor", async ({
+  page,
+}) => {
+  await page.goto("/testing/video-workspace");
+  await page.getByLabel("主要营销目标", { exact: true }).selectOption("full_funnel");
+  await page.getByLabel("叙事节拍模式", { exact: true }).selectOption("shorts_organic");
+  await page
+    .getByRole("group", { name: "片段 1 ABCD 用途" })
+    .getByRole("button", { name: "吸引注意" })
+    .click();
+  await page
+    .getByRole("group", { name: "片段 1 ABCD 用途" })
+    .getByRole("button", { name: "建立联系" })
+    .click();
+  await page
+    .getByRole("group", { name: "片段 2 ABCD 用途" })
+    .getByRole("button", { name: "吸引注意" })
+    .click();
+  await expect(page.getByText(/Attention 必须从第一个片段开始/)).toHaveCount(0);
+  await page.getByLabel("字幕类型").nth(1).selectOption("creative");
+  await page.getByLabel("创意字幕").fill("A".repeat(75));
+  await expect(page.getByText(/同屏创意字幕请控制在 72 字以内/)).toBeVisible();
+});
+
 test("creative brief edits require saving before AI regeneration", async ({ page }) => {
   await page.goto("/testing/video-workspace");
   await page.getByLabel("目标受众", { exact: true }).fill("配件采购商");

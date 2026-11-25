@@ -238,9 +238,29 @@ function ClipEditor({
                         视觉动作 {clip.sourceAnalysis.actionScore}/100 ·{" "}
                         {{ low: "低", medium: "中", high: "高" }[clip.sourceAnalysis.actionLevel]}
                       </Badge>
+                      {"brightnessScore" in clip.sourceAnalysis ? (
+                        <>
+                          <Badge variant="secondary">
+                            画面亮度 {clip.sourceAnalysis.brightnessScore}/100 ·{" "}
+                            {
+                              { low: "偏暗", medium: "适中", high: "明亮" }[
+                                clip.sourceAnalysis.brightnessLevel
+                              ]
+                            }
+                          </Badge>
+                          <Badge variant="secondary">
+                            对比度 {clip.sourceAnalysis.contrastScore}/100 ·{" "}
+                            {
+                              { low: "偏低", medium: "适中", high: "清晰" }[
+                                clip.sourceAnalysis.contrastLevel
+                              ]
+                            }
+                          </Badge>
+                        </>
+                      ) : null}
                     </div>
                     <FieldDescription>
-                      动作分只表示相邻画面的变化强度，不代表内容质量；截取范围被限制在同一检测区间内。
+                      动作、亮度与对比度仅为像素统计（辅助挑选明亮高对比度画面），不代表内容质量；截取范围被限制在同一检测区间内。
                     </FieldDescription>
                   </Field>
                 ) : null}
@@ -580,7 +600,9 @@ function EditVideo({
                         ))}
                       </NativeSelect>
                       <FieldDescription>
-                        选择表示该素材含获授权品牌标识；合成仍需素材权利和成片人工审核。请将其移到开场。
+                        {draft.creativeBrief?.pacingMode === "shorts_organic"
+                          ? "竖屏短片模式下，请确保至少一个标记为「呈现品牌」的片段使用该授权素材；合成仍需人工审核。"
+                          : "选择表示该素材含获授权品牌标识；合成仍需素材权利和成片人工审核。请将其移到开场。"}
                       </FieldDescription>
                     </Field>
                     <Field>
@@ -602,7 +624,8 @@ function EditVideo({
                               objective: event.target.value as
                                 | "awareness"
                                 | "consideration"
-                                | "action",
+                                | "action"
+                                | "full_funnel",
                             },
                           })
                         }
@@ -614,7 +637,51 @@ function EditVideo({
                         <NativeSelectOption value="action">
                           行动：提交需求供人工审核
                         </NativeSelectOption>
+                        <NativeSelectOption value="full_funnel">
+                          全漏斗：串联品牌认知、核实细节与询盘行动
+                        </NativeSelectOption>
                       </NativeSelect>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="creative-pacing">叙事节拍模式</FieldLabel>
+                      <NativeSelect
+                        id="creative-pacing"
+                        disabled={pending || processing}
+                        value={draft.creativeBrief?.pacingMode ?? ""}
+                        onChange={(event) => {
+                          const nextMode = event.target.value as "" | "shorts_organic";
+                          const nextBrief: NonNullable<MarketingVideoDraft["creativeBrief"]> = {
+                            objective: "action",
+                            brandAssetRef: "",
+                            audience: "",
+                            buyerNeed: "",
+                            nextAction: "",
+                            platformAssumptions: "",
+                            ...draft.creativeBrief,
+                          };
+                          if (nextMode === "shorts_organic") {
+                            nextBrief.pacingMode = "shorts_organic";
+                          } else {
+                            delete nextBrief.pacingMode;
+                          }
+                          setDraft({ ...draft, creativeBrief: nextBrief });
+                        }}
+                      >
+                        <NativeSelectOption value="">
+                          标准 ABCD：开场吸引注意并呈现品牌（通用）
+                        </NativeSelectOption>
+                        <NativeSelectOption
+                          value="shorts_organic"
+                          disabled={draft.platform === "x"}
+                        >
+                          竖屏短片（Shorts / Reels）：先建立连接，品牌自然融入叙事
+                        </NativeSelectOption>
+                      </NativeSelect>
+                      <FieldDescription>
+                        竖屏短片参考 Google Ads Shorts ABCD
+                        顺序（Connection→Attention→Branding→Direction）；非 YouTube
+                        渠道仍须保持静音字幕可读。
+                      </FieldDescription>
                     </Field>
                     {(
                       [

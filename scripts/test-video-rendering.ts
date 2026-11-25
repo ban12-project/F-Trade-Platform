@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { buildMarketingAssDocument } from "../lib/video/ass-subtitles";
 import { renderApprovedMarketingTimeline } from "../lib/video/rendering";
 
 void (async () => {
@@ -57,5 +58,47 @@ void (async () => {
       ),
     /Invalid string/,
   );
-  console.log("PASS rendering boundary accepts only coherent private marketing timelines");
+
+  const ass = buildMarketingAssDocument({
+    timeline: {
+      durationSeconds: 6,
+      scenes: [
+        {
+          sceneId: "scene-001",
+          assetRef: "asset-video-901",
+          startSeconds: 0,
+          durationSeconds: 6,
+          prompt: "真实产品素材",
+          claimRefs: [],
+          subtitles: [
+            {
+              text: "Verified product detail",
+              startSeconds: 0,
+              endSeconds: 6,
+              claimRefs: [],
+            },
+          ],
+        },
+      ],
+      cta: { text: "Contact our sales team", startSeconds: 4, endSeconds: 6 },
+    },
+    platform: "tiktok",
+    width: 1080,
+    height: 1920,
+    fps: 30,
+  });
+  assert.ok(ass.includes("Style: CTA,Noto Sans,"), "CTA style must exist");
+  assert.equal(ass.includes(",5,80,80,80,1"), false, "CTA must not use center Alignment=5");
+  assert.ok(ass.includes(",0,0,0,,Verified product detail") && ass.includes("CaptionAboveCta"));
+  assert.ok(
+    ass.includes("Dialogue: 0,0:00:00.00,0:00:04.00,Caption,,0,0,0,,Verified product detail"),
+  );
+  assert.ok(
+    ass.includes(
+      "Dialogue: 0,0:00:04.00,0:00:06.00,CaptionAboveCta,,0,0,0,,Verified product detail",
+    ),
+  );
+  assert.ok(ass.includes("Dialogue: 1,0:00:04.00,0:00:06.00,CTA,,0,0,0,,Contact our sales team"));
+
+  console.log("PASS rendering boundary and non-competing ASS subtitle layout verified");
 })();

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  type MarketingCreativeBrief,
   type MarketingVideoAiDraft,
   type MarketingVideoDraft,
   marketingVideoAiDraftSchema,
@@ -27,6 +28,7 @@ export const marketingShotCandidateSchema = z
     mediaType: z.enum(["image", "video"]),
     trimStartMs: z.number().int().min(0),
     maximumDurationMs: z.number().int().min(1_000).max(10_000),
+    hasAudio: z.boolean().optional(),
     sourceAnalysis: shotSourceAnalysisSchema.optional(),
   })
   .strict()
@@ -36,6 +38,13 @@ export const marketingShotCandidateSchema = z
         code: "custom",
         path: ["trimStartMs"],
         message: "图片候选镜头必须从 0ms 开始。",
+      });
+    }
+    if (candidate.mediaType === "image" && candidate.hasAudio) {
+      context.addIssue({
+        code: "custom",
+        path: ["hasAudio"],
+        message: "图片候选镜头不能包含音轨。",
       });
     }
     if (candidate.mediaType === "image" && candidate.sourceAnalysis) {
@@ -103,6 +112,7 @@ export function createMarketingShotCandidate(input: {
   mediaType: "image" | "video";
   trimStartMs: number;
   sourceDurationMs?: number;
+  hasAudio?: boolean;
   sourceAnalysis?: ShotSourceAnalysis;
 }) {
   let maximumDurationMs = 10_000;
@@ -127,6 +137,7 @@ export function createMarketingShotCandidate(input: {
     mediaType: input.mediaType,
     trimStartMs: input.trimStartMs,
     maximumDurationMs,
+    ...(input.hasAudio === undefined ? {} : { hasAudio: input.hasAudio }),
     sourceAnalysis: input.sourceAnalysis,
   });
 }
@@ -136,6 +147,7 @@ export function createScoredVideoShotCandidates(input: {
   assetRef: string;
   sourceDurationMs: number;
   maximumCandidates: number;
+  hasAudio?: boolean;
   intervals: ShotSourceAnalysis[];
 }) {
   const desiredCount = videoShotCandidateStarts(
@@ -171,6 +183,7 @@ export function createScoredVideoShotCandidates(input: {
       mediaType: "video",
       trimStartMs,
       sourceDurationMs: input.sourceDurationMs,
+      hasAudio: input.hasAudio,
       sourceAnalysis: analysis,
     });
   });
@@ -180,6 +193,7 @@ export function compileMarketingVideoAiDraft(input: {
   suggestion: MarketingVideoAiDraft;
   candidates: MarketingShotCandidate[];
   platform: MarketingVideoDraft["platform"];
+  creativeBrief?: MarketingCreativeBrief;
 }) {
   const suggestion = marketingVideoAiDraftSchema.parse(input.suggestion);
   const candidates = input.candidates.map((candidate) =>
@@ -197,6 +211,8 @@ export function compileMarketingVideoAiDraft(input: {
       throw new Error(`AI 初稿片段超过候选镜头可用时长：${candidate.id}`);
     if (candidate.mediaType === "image" && clip.audioMode !== "muted")
       throw new Error(`图片候选镜头不能保留原声：${candidate.id}`);
+    const audioMode =
+      candidate.mediaType === "video" && candidate.hasAudio === false ? "muted" : clip.audioMode;
     const caption =
       clip.caption.kind === "none"
         ? { kind: "none" as const }
@@ -210,7 +226,7 @@ export function compileMarketingVideoAiDraft(input: {
       trimStartMs: candidate.trimStartMs,
       durationMs: clip.durationMs,
       fitMode: clip.fitMode,
-      audioMode: clip.audioMode,
+      audioMode,
       caption,
       abcdRoles: clip.abcdRoles,
       motionPreset: clip.motionPreset,
@@ -220,6 +236,7 @@ export function compileMarketingVideoAiDraft(input: {
   return marketingVideoDraftSchema.parse({
     version: 3,
     creativeFramework: "google_abcd",
+    ...(input.creativeBrief ? { creativeBrief: input.creativeBrief } : {}),
     platform: input.platform,
     clips,
     ctaText: suggestion.ctaText,
