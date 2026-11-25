@@ -14,7 +14,7 @@ import {
   SelectValue as SelectValuePrimitive,
 } from "@ui-sdk/react/select";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 type SelectItemsInput<T> = ListData<T> | Record<string, string>;
@@ -48,21 +48,69 @@ function hasEmptySelectItem<T>(items?: ListData<T>): boolean {
   });
 }
 
+function hasCustomSelectContent(children: React.ReactNode): boolean {
+  for (const child of React.Children.toArray(children)) {
+    if (!React.isValidElement<{ children?: React.ReactNode }>(child)) continue;
+    if (child.type === SelectContent || child.type === SelectContentPrimitive) {
+      return true;
+    }
+    if (child.props.children && hasCustomSelectContent(child.props.children)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildLabelMap<T>(items?: SelectItemsInput<T>): Map<string, string> | undefined {
+  if (!items) return undefined;
+  const map = new Map<string, string>();
+  if (!Array.isArray(items)) {
+    for (const [key, label] of Object.entries(items)) {
+      map.set(key, label);
+    }
+    return map;
+  }
+  const collect = (entries: ListData<T>) => {
+    for (const entry of entries) {
+      if (typeof entry === "string" || typeof entry === "number") {
+        map.set(String(entry), String(entry));
+      } else if (entry && typeof entry === "object") {
+        if ("items" in entry && Array.isArray(entry.items)) {
+          collect(entry.items);
+        } else if ("value" in entry) {
+          const val = String(entry.value);
+          map.set(val, typeof entry.label === "string" ? entry.label : val);
+        }
+      }
+    }
+  };
+  collect(items);
+  return map;
+}
+
 function Select<T extends string = string>({
   items,
   value,
   defaultValue,
+  itemToLabel,
+  children,
   ...props
 }: SelectProps<T>) {
   const normalizedItems = normalizeItems(items);
   const hasEmptyItem = hasEmptySelectItem(normalizedItems);
+  const hasCustomContent = hasCustomSelectContent(children);
+  const labelMap = buildLabelMap(items);
+  const resolvedItemToLabel =
+    itemToLabel ?? (labelMap ? (val: T) => labelMap.get(String(val)) ?? String(val) : undefined);
   return (
     <SelectPrimitive<T, false>
       {...({
         ...props,
+        children,
         value: !hasEmptyItem && value === "" ? null : value,
         defaultValue: !hasEmptyItem && defaultValue === "" ? undefined : defaultValue,
-        items: normalizedItems,
+        items: hasCustomContent ? undefined : normalizedItems,
+        itemToLabel: resolvedItemToLabel,
       } as React.ComponentProps<typeof SelectPrimitive<T, false>>)}
     />
   );
