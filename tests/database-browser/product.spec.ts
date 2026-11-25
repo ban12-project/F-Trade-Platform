@@ -428,7 +428,7 @@ test("authenticated browser reviews a mock product and its content through real 
     .where(eq(schema.workspaceProjectEvidence.evidenceId, evidenceId));
   expect(evidenceLink.projectId).toBe(projectId);
 
-  await page.getByRole("button", { name: "制作图文内容", exact: true }).click();
+  await page.getByRole("link", { name: "制作图文内容", exact: true }).click();
   await expect(page).toHaveURL(
     new RegExp(`/workspace/${projectId}/new/content[?]product=${created.id}&returnTo=`),
   );

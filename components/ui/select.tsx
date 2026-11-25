@@ -36,19 +36,33 @@ type SelectProps<T extends string = string> = Omit<SingleSelectOptions<T>, "item
   children?: React.ReactNode;
 };
 
+function hasEmptySelectItem<T>(items?: ListData<T>): boolean {
+  if (!Array.isArray(items)) return false;
+  return items.some((entry) => {
+    if (entry === "") return true;
+    if (!entry || typeof entry !== "object") return false;
+    if ("items" in entry && Array.isArray(entry.items)) {
+      return hasEmptySelectItem(entry.items);
+    }
+    return "value" in entry && entry.value === "";
+  });
+}
+
 function Select<T extends string = string>({
   items,
   value,
   defaultValue,
   ...props
 }: SelectProps<T>) {
+  const normalizedItems = normalizeItems(items);
+  const hasEmptyItem = hasEmptySelectItem(normalizedItems);
   return (
     <SelectPrimitive<T, false>
       {...({
         ...props,
-        value: value === "" ? null : value,
-        defaultValue: defaultValue === "" ? undefined : defaultValue,
-        items: normalizeItems(items),
+        value: !hasEmptyItem && value === "" ? null : value,
+        defaultValue: !hasEmptyItem && defaultValue === "" ? undefined : defaultValue,
+        items: normalizedItems,
       } as React.ComponentProps<typeof SelectPrimitive<T, false>>)}
     />
   );
@@ -96,7 +110,7 @@ function SelectContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
-  alignItemWithTrigger = true,
+  alignItemWithTrigger = false,
   ...props
 }: React.ComponentProps<typeof SelectContentPrimitive>) {
   return (
