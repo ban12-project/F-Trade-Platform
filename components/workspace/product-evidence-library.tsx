@@ -5,6 +5,7 @@ import { FileUpIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useId, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,15 +17,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { initialProductEvidenceActionState } from "@/lib/action-states";
 import { uploadProductEvidenceAction } from "@/lib/actions/product-evidence";
 import { documentUploadFormSchema } from "@/lib/product/document-upload-contracts";
 import { uploadProductDocument } from "@/lib/product/upload-document-client";
 import type { EvidenceOption } from "@/lib/workspace/access";
-
 import { useWorkspaceDirty } from "./dirty-state";
+import { FileDropzone } from "./file-dropzone";
 
 export function EvidenceLibrary({
   projectId,
@@ -51,7 +51,10 @@ export function EvidenceLibrary({
         data.set("projectId", projectId);
         data.set("receiptId", receiptId);
         const result = await uploadProductEvidenceAction(previous, data);
-        if (result.status === "success") onUploaded?.(result.evidenceId);
+        if (result.status === "success") {
+          toast.success("资料已入库，可在来源列表中选择。");
+          onUploaded?.(result.evidenceId);
+        }
         return result;
       } catch {
         return { status: "error" as const, message: "文件上传失败，请检查文件与项目权限后重试。" };
@@ -81,6 +84,13 @@ export function EvidenceLibrary({
       router.refresh();
     }
   }, [form, router, state]);
+  const describedBy = [
+    `${fileId}-help`,
+    form.formState.errors.document ? `${fileId}-error` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <Card size="sm">
       <CardHeader>
@@ -108,25 +118,27 @@ export function EvidenceLibrary({
                 control={form.control}
                 name="document"
                 render={({ field }) => (
-                  <Input
+                  <FileDropzone
                     id={fileId}
                     name={field.name}
-                    ref={field.ref}
+                    inputRef={field.ref}
                     onBlur={field.onBlur}
-                    type="file"
                     accept=".pdf,.csv,.xls,.xlsx"
                     required
                     disabled={busy}
-                    aria-invalid={Boolean(form.formState.errors.document)}
-                    aria-describedby={[
-                      `${fileId}-help`,
-                      form.formState.errors.document ? `${fileId}-error` : undefined,
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onChange={(event) => {
+                    invalid={Boolean(form.formState.errors.document)}
+                    describedBy={describedBy}
+                    files={document ? [document] : []}
+                    emptyTitle="拖入或选择来源资料文件"
+                    emptyDescription="支持 PDF、CSV、XLS、XLSX"
+                    onFilesChange={(files) => {
                       setShowResult(false);
-                      field.onChange(event.target.files?.[0]);
+                      const selected = files[0];
+                      field.onChange(selected);
+                      if (form.formState.isSubmitted || form.formState.errors.document) {
+                        if (selected) void form.trigger("document");
+                        else form.clearErrors("document");
+                      }
                     }}
                   />
                 )}

@@ -329,7 +329,8 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
       command.operation === "account" ||
       command.operation === "confirm-login" ||
       command.operation === "open" ||
-      command.operation === "poll-inbox"
+      command.operation === "poll-inbox" ||
+      command.operation === "set-poll-interval"
     ) {
       const account = state.accounts.find((a) => a.id === command.accountId);
       if (!account || row.status !== "active") throw new Error("account_unavailable");
@@ -339,6 +340,15 @@ export async function ownerBrowserCommand(input: unknown, actor: Actor): Promise
         for (const run of state.runs)
           if (run.accountId === account.id && (isLive(run) || run.status === "queued"))
             requestStop(state, run);
+      } else if (command.operation === "set-poll-interval") {
+        const wasDisabled = account.pollSeconds === 0;
+        account.pollSeconds = command.pollSeconds;
+        account.nextPollAt =
+          command.pollSeconds === 0
+            ? 0
+            : wasDisabled || !account.nextPollAt
+              ? now
+              : Math.min(account.nextPollAt, now + command.pollSeconds * 1000);
       } else if (command.operation === "confirm-login") {
         for (const run of state.runs.filter((r) => r.accountId === account.id)) {
           if (

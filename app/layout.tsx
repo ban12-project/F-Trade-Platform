@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "@ui-sdk/core/web.css";
 import "./globals.css";
 import { Geist } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +40,10 @@ export default function RootLayout({
         >
           跳到主要内容
         </a>
-        <TooltipProvider>{children}</TooltipProvider>
+        <TooltipProvider>
+          {children}
+          <Toaster position="bottom-right" richColors closeButton />
+        </TooltipProvider>
       </body>
     </html>
   );

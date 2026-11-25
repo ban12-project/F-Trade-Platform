@@ -22,7 +22,6 @@ import {
   FieldLabel,
   FieldSet,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { initialProductActionState } from "@/lib/action-states";
 import {
@@ -37,6 +36,7 @@ import type { ProductCatalogDetail } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
+import { FileDropzone } from "./file-dropzone";
 import {
   emptyProduct,
   ProductFields,
@@ -139,20 +139,24 @@ export function ProductDraftForm({
                   control={images.control}
                   name="imageFiles"
                   render={({ field }) => (
-                    <Input
-                      ref={(input) => {
+                    <FileDropzone
+                      inputRef={(input) => {
                         imageRef.current = input;
                         field.ref(input);
                       }}
                       id={imageId}
                       name={field.name}
-                      type="file"
                       accept=".png,.jpg,.jpeg"
                       multiple
+                      maxFiles={4}
                       disabled={busy}
+                      invalid={!!images.formState.errors.imageFiles}
+                      files={field.value ?? []}
+                      emptyTitle="拖拽产品实拍图片到这里（最多 4 张）"
+                      emptyDescription="支持 PNG / JPEG，单张不超过 5 MB"
+                      buttonLabel={(field.value?.length ?? 0) ? "继续添加图片" : "选择图片"}
                       onBlur={field.onBlur}
-                      aria-invalid={!!images.formState.errors.imageFiles}
-                      onChange={(event) => field.onChange(Array.from(event.target.files ?? []))}
+                      onFilesChange={(files) => field.onChange(files)}
                     />
                   )}
                 />

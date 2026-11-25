@@ -45,6 +45,7 @@ import type { ProductCatalogDetail } from "@/lib/products";
 import type { EvidenceOption } from "@/lib/workspace/access";
 import { recordStateLabels } from "@/lib/workspace/library-model";
 import { useWorkspaceDirty } from "./dirty-state";
+import { StaticEvidenceCombobox } from "./evidence-select";
 import { ProductDraftForm } from "./product-draft-form";
 import { EvidenceLibrary } from "./product-evidence-library";
 import { ProductFieldReview } from "./product-field-review";
@@ -289,38 +290,22 @@ export function ProductReview({
                       control={form.control}
                       name="evidenceRef"
                       render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={(value) => field.onChange(value ?? "")}
-                          disabled={busy || !evidenceOptions.length}
-                        >
-                          <SelectTrigger
-                            id={fieldId("product-review-evidence")}
-                            ref={field.ref}
-                            onBlur={field.onBlur}
-                            aria-invalid={!!form.formState.errors.evidenceRef}
-                            aria-describedby={
-                              form.formState.errors.evidenceRef
-                                ? fieldId("evidence-error")
-                                : undefined
-                            }
-                            className="min-h-11 w-full"
-                          >
-                            <SelectValue>
-                              {evidenceOptions.find((option) => option.id === field.value)
-                                ?.sourceLabel ?? "选择已上传资料"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {evidenceOptions.map((option) => (
-                                <SelectItem key={option.id} value={option.id}>
-                                  {option.sourceLabel} · {option.id.slice(-8)}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
+                        <StaticEvidenceCombobox
+                          id={fieldId("product-review-evidence")}
+                          options={evidenceOptions}
+                          value={field.value ?? ""}
+                          disabled={busy}
+                          invalid={!!form.formState.errors.evidenceRef}
+                          aria-describedby={
+                            form.formState.errors.evidenceRef
+                              ? fieldId("evidence-error")
+                              : undefined
+                          }
+                          placeholder="搜索或选择审核依据"
+                          onBlur={field.onBlur}
+                          inputRef={field.ref}
+                          onValueChange={(value) => field.onChange(value)}
+                        />
                       )}
                     />
                     <FieldError

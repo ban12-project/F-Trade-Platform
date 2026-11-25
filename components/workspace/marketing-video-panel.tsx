@@ -49,6 +49,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   copyMarketingVideoDraftAction,
   generateMarketingVideoAiDraftAction,
+  getMarketingVideoProcessingStatusAction,
   renderMarketingVideoDraftAction,
   reviewMarketingVideoAction,
   saveMarketingVideoDraftAction,
@@ -67,6 +68,7 @@ import type {
   ReadyVideoProductSource,
 } from "@/lib/video/store";
 import { workspaceRecordHref, workspaceReturnTo } from "@/lib/workspace/navigation";
+import { useBackgroundTasks } from "./background-tasks";
 import { useWorkspaceDirtyState } from "./dirty-state";
 import { EvidenceSelect } from "./evidence-select";
 import { MarketingVideoCreateForm } from "./marketing-video-create-form";
@@ -405,6 +407,7 @@ function EditVideo({
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const router = useRouter();
+  const { startTask } = useBackgroundTasks();
   const [pending, startAction] = useTransition();
   const draftForm = useForm<{ draft: MarketingVideoDraft }>({
     defaultValues: { draft: entry.draft },
@@ -453,6 +456,55 @@ function EditVideo({
       }
     });
   }
+  function trackVideoBackgroundTask(mode: "render" | "ai_draft") {
+    const href = workspaceRecordHref(projectId, "video", entry.id);
+    startTask({
+      id: `video-${mode}-${entry.id}`,
+      kind: mode === "render" ? "video-render" : "video-ai-draft",
+      title:
+        mode === "render"
+          ? `视频正在后台合成：${entry.productName}`
+          : `正在生成视频 AI 初稿：${entry.productName}`,
+      description: "可离开当前页面继续工作，完成后将通过通知提醒。",
+      href,
+      intervalMs: 3000,
+      poller: async () => {
+        const res = await getMarketingVideoProcessingStatusAction(projectId, entry.id);
+        if (!res.ok) return { done: false };
+        if (res.processingStatus === "queued" || res.processingStatus === "running") {
+          return { done: false };
+        }
+        if (res.processingStatus === "failed") {
+          return {
+            done: true,
+            status: "error",
+            title: mode === "render" ? "视频合成失败" : "视频 AI 初稿失败",
+            description: res.failureMessage ?? "请在视频编辑器查看详情或切换模型。",
+            href,
+          };
+        }
+        if (mode === "render" && res.state !== "VIDEO_RENDERING") {
+          return {
+            done: true,
+            status: "success",
+            title: "视频合成预览已完成",
+            description: "可以打开视频播放器预览成片并提交审核。",
+            href,
+          };
+        }
+        if (mode === "ai_draft" && res.processingStatus === "succeeded") {
+          return {
+            done: true,
+            status: "success",
+            title: "视频 AI 初稿已生成",
+            description: "请打开视频编辑器检查片段安排与字幕后保存或合成。",
+            href,
+          };
+        }
+        return { done: false };
+      },
+    });
+  }
   function validatedDraft() {
     const result = marketingVideoDraftSchema.safeParse(draft);
     if (!result.success) {
@@ -492,8 +544,8 @@ function EditVideo({
                 <CardHeader>
                   <CardTitle>ABCD 创意简报</CardTitle>
                   <CardDescription>
-                    完整填写并保存简报后才能生成 AI
-                    初稿。品牌必须来自授权素材；角色完整不代表审核通过。
+                    完整填写并保存简报后才能生成 AI 初稿。请勿在自由文本写入 OE
+                    编号、尺寸或交期；需要展示的参数请在下方片段「字幕类型 → 已核实信息」中选择。
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -522,7 +574,8 @@ function EditVideo({
                         <NativeSelectOption value="">请选择并人工核对品牌权利</NativeSelectOption>
                         {draft.clips.map((clip, index) => (
                           <NativeSelectOption key={clip.clipId} value={clip.assetRef}>
-                            片段 {index + 1} 素材
+                            片段 {index + 1}（
+                            {clip.mediaType === "image" ? "已选图片素材" : "已选视频素材"}）
                           </NativeSelectOption>
                         ))}
                       </NativeSelect>
@@ -641,7 +694,11 @@ function EditVideo({
                   disabled={Boolean(aiUnavailableReason)}
                   aria-describedby={aiUnavailableReason ? `video-ai-reason-${entry.id}` : undefined}
                   onClick={() =>
-                    run(() => generateMarketingVideoAiDraftAction(projectId, entry.id))
+                    run(async () => {
+                      const result = await generateMarketingVideoAiDraftAction(projectId, entry.id);
+                      if (result.status === "success") trackVideoBackgroundTask("ai_draft");
+                      return result;
+                    })
                   }
                 >
                   <BotIcon data-icon="inline-start" />
@@ -669,7 +726,15 @@ function EditVideo({
                         setMessage(error instanceof Error ? error.message : "请完善创意简报");
                         return;
                       }
-                      run(() => renderMarketingVideoDraftAction(projectId, entry.id, value));
+                      run(async () => {
+                        const result = await renderMarketingVideoDraftAction(
+                          projectId,
+                          entry.id,
+                          value,
+                        );
+                        if (result.status === "success") trackVideoBackgroundTask("render");
+                        return result;
+                      });
                     }
                   }}
                 >

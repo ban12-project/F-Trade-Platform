@@ -283,7 +283,14 @@ try {
     assert.equal(choices.error, "");
     assert.equal(choices.options.length, 1);
     assert.equal(choices.options[0].label, "synthetic.csv");
-    assert.deepEqual(Object.keys(choices.options[0]).sort(), ["detail", "id", "label"]);
+    assert.deepEqual(Object.keys(choices.options[0]).sort(), [
+      "contentType",
+      "detail",
+      "id",
+      "inCurrentProject",
+      "label",
+    ]);
+    assert.equal(choices.options[0].inCurrentProject, true);
     assert.equal((await listEvidenceOptionsAction({ projectId: randomUUID() })).options.length, 0);
     assert.equal((await listEvidenceOptionsAction({ projectId: "invalid" })).options.length, 0);
     await revoke(f, "viewer");

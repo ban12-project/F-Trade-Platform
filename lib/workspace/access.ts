@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { type DatabaseExecutor, getDatabase } from "@/lib/db/client";
@@ -36,6 +36,7 @@ export type EvidenceOption = {
   contentType: string;
   classification: "internal" | "confidential" | "restricted";
   createdAt: Date;
+  inCurrentProject?: boolean;
 };
 
 export const workspaceMemberFormSchema = z.object({
@@ -240,6 +241,7 @@ export async function listProjectEvidenceOptions(
 ): Promise<EvidenceOption[]> {
   await assertWorkspaceProjectAccess(projectId, actorId, "view", database);
   const sourceLabel = sql<string>`coalesce(${productDocumentUploadReceipt.originalFilename}, ${evidence.sourceLabel})`;
+  const inCurrentProject = sql<boolean>`(${workspaceProjectEvidence.projectId} IS NOT NULL)`;
   return database
     .selectDistinct({
       id: evidence.id,
@@ -247,6 +249,7 @@ export async function listProjectEvidenceOptions(
       contentType: evidence.contentType,
       classification: evidence.classification,
       createdAt: evidence.createdAt,
+      inCurrentProject,
     })
     .from(evidence)
     .leftJoin(
@@ -282,7 +285,7 @@ export async function listProjectEvidenceOptions(
         ),
       ),
     )
-    .orderBy(asc(sourceLabel), asc(evidence.id));
+    .orderBy(desc(inCurrentProject), desc(evidence.createdAt), asc(sourceLabel), asc(evidence.id));
 }
 
 export async function assertAndLinkProjectEvidence(
