@@ -91,6 +91,6 @@ export function productReviewFailureMessage(error: unknown) {
   if (error instanceof ProductReviewAccessError) return PRODUCT_REVIEW_ACCESS_MESSAGE;
   if (error instanceof Error && reviewMessages.has(error.message)) return error.message;
   if (error instanceof Error && error.message.startsWith("Product cannot be Ready:"))
-    return "产品事实或逐字段证据尚未完整核验，请补齐资料后重新审核。";
+    return "产品事实或逐字段证据尚未完整核验，暂不能批准。请先退回产品信息进入待修订状态，补齐资料后重新送审。";
   return "无法完成 Gate 01 审核，请刷新并确认来源、登录与项目权限后重试。";
 }
