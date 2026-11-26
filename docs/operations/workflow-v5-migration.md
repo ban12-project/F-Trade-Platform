@@ -345,9 +345,16 @@ Audited all `"use step"` functions across `workflows/`:
   `claimCatalogAttempt` (`queued -> running`); duplicate deliveries return `null`
   without LLM, Blob, or DB side effects.
 - `workflows/marketing-video-processing.ts`:
-  - `generateAiDraft`: `markVideoJobRunning` transient retry is covered by
-    `scripts/test-workflow-v5-runtime.mjs` (`video-ai`) and draft application is
-    optimistic-version-fenced (`expectedVersion`); kept retryable.
+  - `generateAiDraft`: opted out with `generateAiDraft.maxRetries = 0` because
+    `markVideoJobRunning` returns `running` without a lease/claim fence and
+    `expectedVersion` only guards the final `applyMarketingVideoAiDraft` write,
+    leaving Sandbox visual sampling, paid model calls, and `failVideoJob`
+    exposed to overlapping speculative attempts. Trade-off: automatic
+    Workflow-level retries are disabled for `generateAiDraft` (explicit user
+    retry via `queueVideoProcessingJob` still works); re-enabling automatic
+    retries later requires adding a recoverable mutual-exclusion claim before
+    the external calls and an overlapping-execution stub test verifying a single
+    model call, a single draft write, and a final `succeeded` job status.
   - `renderPreview`: opted out with `renderPreview.maxRetries = 0` because
     `markVideoJobRunning` does not fence a second `running` delivery and
     `beginGuardedMarketingVideoRender` fails once state has moved to
@@ -367,8 +374,9 @@ Audited all `"use step"` functions across `workflows/`:
 - `pnpm install --frozen-lockfile`: lockfile stable, no changes.
 - `pnpm test:workflow-runtime`: security compatibility, serde compatibility across
   importer boundaries, compiled runtime tests (including `specVersion >= 9` and
-  `renderPreview.maxRetries = 0` single-attempt failure), queue deadlines, and
-  isolated v4 nanoid replay.
+  single-attempt failure under `generateAiDraft.maxRetries = 0` and
+  `renderPreview.maxRetries = 0`), queue deadlines, and isolated v4 nanoid
+  replay.
 - `node --import tsx --test scripts/test-zod-collection-bounds.ts` and
   `node --test scripts/test-undici-tls-compatibility.mjs scripts/test-minimatch-security.mjs scripts/test-tooling-security-compatibility.mjs scripts/test-uri-security-compatibility.mjs`.
 - `pnpm test:ai-sdk-video-adapters && pnpm test:video-private-assets`.

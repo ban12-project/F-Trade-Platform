@@ -125,6 +125,10 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
     );
   }
 }
+// markVideoJobRunning returns "running" without a lease/claim fence, so overlapping
+// speculative attempts could duplicate Sandbox sampling, paid model calls, or race failVideoJob.
+// Opt out of Workflow 5.8 speculative re-runs and automatic retries until a recoverable claim exists.
+generateAiDraft.maxRetries = 0;
 
 async function renderPreview(input: MarketingVideoWorkflowInput) {
   "use step";

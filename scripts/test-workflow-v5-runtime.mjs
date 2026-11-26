@@ -316,7 +316,7 @@ test("fresh v5 compiled runs: Human Gate, sandbox, catalog and video orchestrati
       ],
     );
     for (const [id, workflowName, setup, expectedFailure] of [
-      ["video-ai", "generateMarketingVideoAiDraftWorkflow", { retry: true }, undefined],
+      ["video-ai", "generateMarketingVideoAiDraftWorkflow", {}, undefined],
       [
         "video-ai-stale",
         "generateMarketingVideoAiDraftWorkflow",
@@ -364,8 +364,8 @@ test("fresh v5 compiled runs: Human Gate, sandbox, catalog and video orchestrati
         if (id === "video-ai") {
           assert.equal(
             calls("video.running").length,
-            2,
-            "real step retries the transient adapter failure",
+            1,
+            "generateAiDraft opts out of retries/speculation and runs once on success",
           );
           for (const name of ["video.fact-guard", "video.media-guard", "video.apply"])
             assert.equal(calls(name).length, 1);
@@ -383,22 +383,27 @@ test("fresh v5 compiled runs: Human Gate, sandbox, catalog and video orchestrati
         "terminal jobs must skip all side effects",
       );
     }
-    synthetic.calls = [];
-    synthetic.scenarios["video-render-no-retry"] = { retry: true };
-    const noRetryRun = await runtime.start(workflow("renderMarketingVideoPreviewWorkflow"), [
-      {
-        jobId: "video-render-no-retry",
-        videoId: "video-render-no-retry",
-        actorId: "synthetic-actor",
-      },
-    ]);
-    await terminal(noRetryRun, "failed");
-    await assert.rejects(noRetryRun.returnValue, /synthetic database transient/);
-    assert.equal(
-      calls("video.running").length,
-      1,
-      "renderPreview must opt out of retries and speculative re-runs (maxRetries = 0)",
-    );
+    for (const [id, workflowName, label] of [
+      ["video-ai-no-retry", "generateMarketingVideoAiDraftWorkflow", "generateAiDraft"],
+      ["video-render-no-retry", "renderMarketingVideoPreviewWorkflow", "renderPreview"],
+    ]) {
+      synthetic.calls = [];
+      synthetic.scenarios[id] = { retry: true };
+      const noRetryRun = await runtime.start(workflow(workflowName), [
+        {
+          jobId: id,
+          videoId: id,
+          actorId: "synthetic-actor",
+        },
+      ]);
+      await terminal(noRetryRun, "failed");
+      await assert.rejects(noRetryRun.returnValue, /synthetic database transient/);
+      assert.equal(
+        calls("video.running").length,
+        1,
+        `${label} must opt out of retries and speculative re-runs (maxRetries = 0)`,
+      );
+    }
     assert.equal(requests, 0);
   } finally {
     await world?.close();
