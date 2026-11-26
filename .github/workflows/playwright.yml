@@ -14,11 +14,95 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e:
-    name: playwright-chromium
+  checks:
+    name: playwright-checks
     runs-on: ubuntu-latest
-    # Cold system dependency installation can take 10 minutes before both browser suites.
-    timeout-minutes: 30
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run type checks
+        run: pnpm typecheck
+
+      - name: Check database migrations
+        run: pnpm db:check
+
+      - name: Install Chromium headless shell
+        run: pnpm exec playwright install --only-shell chromium
+
+      - name: Offline browser login control ablations
+        run: node scripts/browser-login-ablation.mjs
+        env:
+          REVIEW_REVISION: ${{ github.sha }}
+
+      - name: Upload ablation report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-login-ablation
+          path: artifacts/browser-login-ablation/
+          retention-days: 7
+
+  ui:
+    name: playwright-ui (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Run production-build Playwright tests (shard ${{ matrix.shard }}/4)
+        run: pnpm exec playwright test --shard=${{ matrix.shard }}/4
+
+      - name: Upload Playwright UI report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-ui-report-shard-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  database:
+    name: playwright-database
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17
@@ -54,21 +138,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Offline browser login control ablations
-        run: node scripts/browser-login-ablation.mjs
-        env:
-          REVIEW_REVISION: ${{ github.sha }}
-
-      - name: Run type checks
-        run: pnpm typecheck
-
-      - name: Check database migrations
-        run: pnpm db:check
-
-      - name: Run production-build Playwright tests
-        run: pnpm test:e2e
+        run: pnpm exec playwright install chromium
 
       - name: Verify authenticated browser writes against isolated PostgreSQL
         run: pnpm exec playwright test --config playwright.database.config.ts
@@ -87,13 +157,28 @@ jobs:
           cd "$rollback_dir"
           node --conditions=react-server --import tsx scripts/test-workspace-rollback-readers.ts
 
-      - name: Upload Playwright report
+      - name: Upload Playwright database report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
-          path: |
-            blob-report/
-            blob-report-database/
-            artifacts/browser-login-ablation/
+          name: playwright-database-report
+          path: blob-report-database/
           retention-days: 7
+          if-no-files-found: ignore
+
+  e2e:
+    name: playwright-chromium
+    needs: [checks, ui, database]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all Playwright jobs succeeded
+        shell: bash
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          UI_RESULT: ${{ needs.ui.result }}
+          DATABASE_RESULT: ${{ needs.database.result }}
+        run: |
+          echo "checks=$CHECKS_RESULT ui=$UI_RESULT database=$DATABASE_RESULT"
+          [[ "$CHECKS_RESULT" == "success" && "$UI_RESULT" == "success" && "$DATABASE_RESULT" == "success" ]]
