@@ -104,6 +104,12 @@ export function publicationFailureLabel(failureCode?: string | null) {
       facebook_audience_applied_timeout: "公开发布设置未能生效",
       publication_preview_text_mismatch: "编辑器中的正文与预览不一致",
       publication_attachment_mismatch: "编辑器中的附件与预览不一致",
+      facebook_matching_post_already_exists:
+        "目标账号主页已存在完全相同的正文帖子，请更换新配文后重新提交",
+      facebook_video_caption_required: "该账号的视频发布要求附带已批准配文，请先选择配文后再提交",
+      facebook_upload_failed: "浏览器未能将发布素材附加到发帖编辑器",
+      publication_media_response_invalid: "平台返回发布素材响应无效，请稍后重试",
+      publication_media_transport_failed: "拉取发布素材时传输失败，请稍后重试",
     };
     const stages: Record<string, string> = {
       open: "打开发布页面",

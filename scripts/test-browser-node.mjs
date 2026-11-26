@@ -38,6 +38,7 @@ import {
   createPublicationAuthorizer,
   createPublicationReporter,
 } from "../ops/browser-node/publication.mjs";
+import { createPublicationExecutor } from "../ops/browser-node/publication-executor.mjs";
 import { publicationUploadFile, stagePublicationUpload } from "../ops/browser-node/upload.mjs";
 
 const nodeId = randomUUID();
@@ -414,6 +415,73 @@ test("iframe has exact frame-ancestor policy and unauthorized admission fails", 
   } finally {
     gateway.close();
     gateway.server.closeAllConnections();
+  }
+});
+
+test("publication executor classifies prepare preclick codes without collapsing to unclassified", async () => {
+  for (const errorCode of [
+    "facebook_matching_post_already_exists",
+    "facebook_video_caption_required",
+    "facebook_upload_failed",
+  ]) {
+    const preclickFailures = [];
+    const execute = createPublicationExecutor({
+      async open() {
+        return { closed: false };
+      },
+      async identity() {
+        return { accountRef: "acc-1", channelRef: "facebook-personal" };
+      },
+      async existingPublicationRefs() {
+        return [];
+      },
+      async prepare() {
+        throw new Error(errorCode);
+      },
+      async inspect() {
+        throw new Error("should_not_inspect");
+      },
+      async publish() {
+        throw new Error("should_not_publish");
+      },
+      async observe() {
+        throw new Error("should_not_observe");
+      },
+      async close() {},
+    });
+    const outcome = await execute({
+      run: {
+        id: randomUUID(),
+        kind: "publish",
+        accountRef: "acc-1",
+        channelRef: "facebook-personal",
+        publication: {
+          accountRef: "acc-1",
+          channelRef: "facebook-personal",
+          format: "video",
+          text: "SYNTHETIC video caption",
+          media: {
+            assetRef: "asset-1",
+            contentType: "video/mp4",
+            sizeBytes: 128,
+            sha256: "a".repeat(64),
+          },
+        },
+      },
+      signal: new AbortController().signal,
+      async preparePublicationMedia() {
+        return { path: "/tmp/ftrade-uploads/a.mp4", media: { sha256: "a".repeat(64) } };
+      },
+      async authorizePublication() {
+        throw new Error("should_not_authorize");
+      },
+      async reportPublication() {},
+      onPreclickFailure(stage, code) {
+        preclickFailures.push({ stage, code });
+      },
+    });
+    assert.equal(outcome, "failed");
+    assert.deepEqual(preclickFailures, [{ stage: "prepare", code: errorCode }]);
   }
 });
 

@@ -43,6 +43,9 @@ export const publicationPreclickCodes = [
   "facebook_audience_picker_timeout",
   "facebook_audience_selection_timeout",
   "facebook_audience_applied_timeout",
+  "facebook_matching_post_already_exists",
+  "facebook_video_caption_required",
+  "facebook_upload_failed",
 ];
 const prefix = "fleet_publication_not_authorized";
 export function publicationPreclickFailure(stage, code) {

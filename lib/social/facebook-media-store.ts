@@ -22,6 +22,7 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import { videoProjectSchema } from "@/lib/video/contracts";
+import { wrapPrivateVideoBodyStream } from "@/lib/video/private-asset-store";
 import { assertCurrentProductFactsForVideo } from "@/lib/video/product-fact-runtime-store";
 import { assertVideoRetentionForId } from "@/lib/video/retention-access";
 import {
@@ -32,6 +33,7 @@ import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { facebookMediaFormSchema, facebookMediaSubmitFormSchema } from "./facebook-account-forms";
 import {
   assertFacebookMediaPreview,
+  type FacebookCaptionSource,
   facebookCaptionSourceSchema,
   facebookMediaPreviewDigest,
 } from "./facebook-media-confirmation";
@@ -314,10 +316,11 @@ export async function requeueUnsentFacebookMediaPublication(
   jobId: string,
   publicationId: string,
   actorId: string,
+  updatedCaption?: { caption: string; captionSource: FacebookCaptionSource | null },
 ) {
   const result = await tx.execute(sql`SELECT p.run_id, p.authorization_id, p.receipt,
     j.status AS job_status, j.failure_code, s.status AS publication_status,
-    s.external_publication_ref, n.document
+    s.format AS publication_format, s.external_publication_ref, n.document
     FROM browser_fleet_publication p
     JOIN social_browser_job j ON j.id = p.job_id
     JOIN social_publication s ON s.id = j.payload_ref AND s.browser_job_id = j.id
@@ -340,6 +343,21 @@ export async function requeueUnsentFacebookMediaPublication(
     run.jobRef !== jobId
   )
     throw new Error("facebook_media_retry_not_proven_unsent");
+  if (updatedCaption !== undefined) {
+    if (row.publication_format !== "video")
+      throw new Error("facebook_media_existing_caption_changed");
+    const parsedCaptionSource = updatedCaption.captionSource
+      ? facebookCaptionSourceSchema.parse(updatedCaption.captionSource)
+      : null;
+    await tx
+      .update(facebookPublicationManifest)
+      .set({
+        caption: updatedCaption.caption,
+        captionSource: parsedCaptionSource,
+        confirmedBy: actorId,
+      })
+      .where(eq(facebookPublicationManifest.publicationId, publicationId));
+  }
   await tx.execute(sql`DELETE FROM browser_fleet_publication WHERE job_id = ${jobId}`);
   await tx
     .update(socialBrowserJob)
@@ -356,7 +374,10 @@ export async function requeueUnsentFacebookMediaPublication(
     action: "facebook_media.preclick_requeued",
     subjectType: "social_publication",
     subjectId: publicationId,
-    metadata: { reason: "no_publish_authorization" },
+    metadata: {
+      reason: "no_publish_authorization",
+      ...(updatedCaption ? { caption_updated: true } : {}),
+    },
     occurredAt: new Date(),
   });
 }
@@ -480,23 +501,27 @@ export async function submitFacebookMediaPublication(
         .select()
         .from(facebookPublicationManifest)
         .where(eq(facebookPublicationManifest.publicationId, existing.id))
-        .for("share");
-      if (
-        !manifest ||
+        .for("update");
+      if (!manifest) throw new Error("facebook_media_existing_caption_changed");
+      const captionChanged =
         manifest.caption !== current.text ||
-        captionIdentity(manifest.captionSource) !== captionIdentity(current.captionSource)
-      )
+        captionIdentity(manifest.captionSource) !== captionIdentity(current.captionSource);
+      const preclickPaused =
+        existing.status === "paused" && isPublicationPreauthorizationFailure(existing.failureCode);
+      if (captionChanged && !(preclickPaused && value.format === "video"))
         throw new Error("facebook_media_existing_caption_changed");
-      if (
-        existing.status === "paused" &&
-        !isPublicationPreauthorizationFailure(existing.failureCode)
-      )
+      if (existing.status === "paused" && !preclickPaused)
         throw new Error("facebook_media_existing_attempt_requires_review");
-      if (
-        existing.status === "paused" &&
-        isPublicationPreauthorizationFailure(existing.failureCode)
-      ) {
-        await requeueUnsentFacebookMediaPublication(tx, existing.jobId, existing.id, actorId);
+      if (preclickPaused) {
+        await requeueUnsentFacebookMediaPublication(
+          tx,
+          existing.jobId,
+          existing.id,
+          actorId,
+          captionChanged
+            ? { caption: current.text, captionSource: current.captionSource ?? null }
+            : undefined,
+        );
       }
       await assertCurrentCommit();
       return { publicationId: existing.id };
@@ -743,7 +768,10 @@ export async function readFacebookPublicationMedia(
       throw error;
     }
   }
-  return { stream: blob.stream, media: mediaPayload.media };
+  return {
+    stream: wrapPrivateVideoBodyStream(blob.stream as ReadableStream<Uint8Array>),
+    media: mediaPayload.media,
+  };
 }
 
 export async function listFacebookMediaOptions(
@@ -996,7 +1024,10 @@ export async function openFacebookMediaSource(
       throw error;
     }
   }
-  return { stream: blob.stream, media: source.media };
+  return {
+    stream: wrapPrivateVideoBodyStream(blob.stream as ReadableStream<Uint8Array>),
+    media: source.media,
+  };
 }
 
 export async function listFacebookMarketingProjects(
@@ -1035,7 +1066,10 @@ export async function openFacebookPublicationPreview(
   const source = await sourceFor(selection, database, new Date());
   if (!["image/jpeg", "image/png", "video/mp4"].includes(source.contentType))
     throw new Error("preview_unavailable");
-  const blob = await get(source.blobKey, { access: "private" });
+  const blob = await get(source.blobKey, {
+    access: "private",
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  });
   if (
     blob?.statusCode !== 200 ||
     !blob.stream ||
@@ -1045,5 +1079,9 @@ export async function openFacebookPublicationPreview(
     await blob?.stream?.cancel();
     throw new Error("preview_unavailable");
   }
-  return { stream: blob.stream, contentType: source.contentType, sizeBytes: source.sizeBytes };
+  return {
+    stream: wrapPrivateVideoBodyStream(blob.stream as ReadableStream<Uint8Array>),
+    contentType: source.contentType,
+    sizeBytes: source.sizeBytes,
+  };
 }

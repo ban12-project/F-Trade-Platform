@@ -1,6 +1,25 @@
 import { handleBrowserNodeRequest } from "@/lib/browser-fleet/store";
 import { parseFacebookMedia } from "@/lib/social/facebook-media-contract";
 
+const knownOperations = new Set([
+  "sync",
+  "recover",
+  "claim",
+  "heartbeat",
+  "finish",
+  "admit",
+  "publication-media",
+  "authorize-publication",
+  "publication-result",
+  "publication-setup",
+  "inbox-messages",
+  "inbox-agent-decide",
+  "inbox-setup",
+  "claim-login",
+  "login-result",
+  "login-challenge",
+]);
+
 export async function POST(request: Request) {
   const response = (body: unknown, status = 200) =>
     Response.json(body, {
@@ -18,6 +37,7 @@ export async function POST(request: Request) {
   const reader = request.body.getReader();
   const parts: Uint8Array[] = [];
   let bytes = 0;
+  let operation = "unknown";
   try {
     for (;;) {
       const { done, value } = await reader.read();
@@ -29,10 +49,12 @@ export async function POST(request: Request) {
       }
       parts.push(value);
     }
-    const result = await handleBrowserNodeRequest(
-      accessKey,
-      JSON.parse(Buffer.concat(parts).toString("utf8")),
-    );
+    const body = JSON.parse(Buffer.concat(parts).toString("utf8")) as {
+      operation?: unknown;
+    } | null;
+    if (typeof body?.operation === "string" && knownOperations.has(body.operation))
+      operation = body.operation;
+    const result = await handleBrowserNodeRequest(accessKey, body);
     if (result.stream instanceof ReadableStream) {
       const media = parseFacebookMedia(result.media);
       return new Response(result.stream, {
@@ -51,7 +73,13 @@ export async function POST(request: Request) {
       error instanceof Error && /^[a-z0-9_]{2,64}$/.test(error.message)
         ? error.message
         : "unclassified";
-    console.warn(JSON.stringify({ event: "browser_node.request_denied", code }));
+    const errorName =
+      error instanceof Error && /^[A-Za-z0-9_]{1,48}$/.test(error.name)
+        ? error.name
+        : "UnknownError";
+    console.warn(
+      JSON.stringify({ event: "browser_node.request_denied", code, operation, errorName }),
+    );
     return response({ error: "node_request_denied" }, 403);
   } finally {
     reader.releaseLock();

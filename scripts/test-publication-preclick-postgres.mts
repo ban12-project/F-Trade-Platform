@@ -5,10 +5,12 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { enqueueRun, initialState } from "../lib/browser-fleet/policy";
 import { reconcilePublications } from "../lib/browser-fleet/publication";
 import { closeDatabase, getDatabase } from "../lib/db/client";
+import { facebookPublicationManifest } from "../lib/db/facebook-runtime-schema";
 import * as s from "../lib/db/schema";
 import { requeueUnsentFacebookMediaPublication } from "../lib/social/facebook-media-store";
 import { publicationFailureLabel } from "../lib/social/publication-presentation";
 import { listProjectPublicationData } from "../lib/social/publication-store";
+import { publicationPreclickFailure } from "../ops/browser-node/publication-diagnostics.mjs";
 import { seedPublicationAccessFixture } from "../tests/fixtures/publication-access";
 
 const connection = process.env.FACEBOOK_PUBLICATION_TEST_DATABASE_URL;
@@ -161,6 +163,195 @@ try {
       assert.equal(retry.status, "queued");
     }
     console.log(`${scenario}: diagnosis, reconciliation and unsent retry guard passed`);
+  }
+  assert.match(
+    publicationFailureLabel(
+      publicationPreclickFailure("prepare", "facebook_matching_post_already_exists"),
+    ) ?? "",
+    /完全相同的正文/,
+  );
+  for (const videoScenario of ["unsent_rebind", "authorized", "quarantined"] as const) {
+    const f = await seedPublicationAccessFixture(db, "video", true);
+    const reservation = (
+      await db.execute(sql`SELECT run_id FROM browser_fleet_publication WHERE job_id=${f.jobId}`)
+    ).rows[0];
+    const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
+    const accountId = randomUUID();
+    state.accounts.push({
+      id: accountId,
+      channelRef: f.channelRef,
+      accountRef: f.accountRef,
+      enabled: true,
+      authState: "ready",
+      credentialVersion: 1,
+      expectedEgressIp: "203.0.113.10",
+      loginCiphertext: null,
+      proxyCiphertext: null,
+      pollSeconds: 0,
+      nextPollAt: 0,
+      lastCheckedAt: null,
+    });
+    const run = enqueueRun(
+      state,
+      {
+        id: String(reservation.run_id),
+        accountId,
+        kind: "publish",
+        jobRef: f.jobId,
+        requestedBy: f.actorId,
+        authSessionId: null,
+      },
+      Date.now(),
+    );
+    run.status = videoScenario === "quarantined" ? "quarantined" : "failed";
+    run.publicationFailure = {
+      stage: "prepare",
+      code: "facebook_matching_post_already_exists",
+    };
+    await db
+      .update(s.socialBrowserJob)
+      .set({ status: "claimed", failureCode: null })
+      .where(eq(s.socialBrowserJob.id, f.jobId));
+    await db
+      .update(s.socialPublication)
+      .set({ status: "submitted" })
+      .where(eq(s.socialPublication.id, f.publicationId));
+    if (videoScenario !== "authorized")
+      await db.execute(
+        sql`UPDATE browser_fleet_publication SET authorization_id=NULL, authorized_lease_id=NULL, authorized_until=NULL, receipt=NULL, received_at=NULL WHERE job_id=${f.jobId}`,
+      );
+    await db.transaction(async (tx) => {
+      await reconcilePublications(tx, f.nodeId, state, Date.now());
+      await tx.execute(
+        sql`UPDATE browser_fleet_node SET document=${JSON.stringify(state)}::jsonb WHERE id=${f.nodeId}`,
+      );
+    });
+    const updatedCaption = {
+      caption: "SYNTHETIC rebound caption; no factory claims.",
+      captionSource: {
+        contentRef: randomUUID(),
+        contentVersion: 1,
+        approvalRef: randomUUID(),
+      },
+    };
+    if (videoScenario === "unsent_rebind") {
+      await db.transaction((tx) =>
+        requeueUnsentFacebookMediaPublication(
+          tx,
+          f.jobId,
+          f.publicationId,
+          f.actorId,
+          updatedCaption,
+        ),
+      );
+      const [manifest] = await db
+        .select()
+        .from(facebookPublicationManifest)
+        .where(eq(facebookPublicationManifest.publicationId, f.publicationId));
+      assert.equal(manifest.caption, updatedCaption.caption);
+      assert.deepEqual(manifest.captionSource, updatedCaption.captionSource);
+      const [retry] = await db
+        .select()
+        .from(s.socialBrowserJob)
+        .where(eq(s.socialBrowserJob.id, f.jobId));
+      assert.equal(retry.status, "queued");
+      const [audit] = await db
+        .select()
+        .from(s.auditEvent)
+        .where(eq(s.auditEvent.subjectId, f.publicationId));
+      assert.equal(audit.action, "facebook_media.preclick_requeued");
+      assert.deepEqual(audit.metadata, {
+        reason: "no_publish_authorization",
+        caption_updated: true,
+      });
+    } else {
+      await assert.rejects(
+        db.transaction((tx) =>
+          requeueUnsentFacebookMediaPublication(
+            tx,
+            f.jobId,
+            f.publicationId,
+            f.actorId,
+            updatedCaption,
+          ),
+        ),
+        /not_proven_unsent/,
+      );
+      const [manifest] = await db
+        .select()
+        .from(facebookPublicationManifest)
+        .where(eq(facebookPublicationManifest.publicationId, f.publicationId));
+      assert.equal(manifest.caption, "");
+    }
+    console.log(`${videoScenario}: video caption rebind guard passed`);
+  }
+  {
+    const f = await seedPublicationAccessFixture(db, "image", true);
+    const reservation = (
+      await db.execute(sql`SELECT run_id FROM browser_fleet_publication WHERE job_id=${f.jobId}`)
+    ).rows[0];
+    const state = initialState({ maxBrowsers: 1, memoryBudgetMb: 2048, browserMemoryMb: 2048 });
+    const accountId = randomUUID();
+    state.accounts.push({
+      id: accountId,
+      channelRef: f.channelRef,
+      accountRef: f.accountRef,
+      enabled: true,
+      authState: "ready",
+      credentialVersion: 1,
+      expectedEgressIp: "203.0.113.10",
+      loginCiphertext: null,
+      proxyCiphertext: null,
+      pollSeconds: 0,
+      nextPollAt: 0,
+      lastCheckedAt: null,
+    });
+    const run = enqueueRun(
+      state,
+      {
+        id: String(reservation.run_id),
+        accountId,
+        kind: "publish",
+        jobRef: f.jobId,
+        requestedBy: f.actorId,
+        authSessionId: null,
+      },
+      Date.now(),
+    );
+    run.status = "failed";
+    run.publicationFailure = { stage: "prepare", code: "facebook_matching_post_already_exists" };
+    await db
+      .update(s.socialBrowserJob)
+      .set({ status: "claimed", failureCode: null })
+      .where(eq(s.socialBrowserJob.id, f.jobId));
+    await db
+      .update(s.socialPublication)
+      .set({ status: "submitted" })
+      .where(eq(s.socialPublication.id, f.publicationId));
+    await db.execute(
+      sql`UPDATE browser_fleet_publication SET authorization_id=NULL, authorized_lease_id=NULL, authorized_until=NULL, receipt=NULL, received_at=NULL WHERE job_id=${f.jobId}`,
+    );
+    await db.transaction(async (tx) => {
+      await reconcilePublications(tx, f.nodeId, state, Date.now());
+      await tx.execute(
+        sql`UPDATE browser_fleet_node SET document=${JSON.stringify(state)}::jsonb WHERE id=${f.nodeId}`,
+      );
+    });
+    await assert.rejects(
+      db.transaction((tx) =>
+        requeueUnsentFacebookMediaPublication(tx, f.jobId, f.publicationId, f.actorId, {
+          caption: "SYNTHETIC image caption change forbidden",
+          captionSource: null,
+        }),
+      ),
+      /existing_caption_changed/,
+    );
+    const [job] = await db
+      .select()
+      .from(s.socialBrowserJob)
+      .where(eq(s.socialBrowserJob.id, f.jobId));
+    assert.equal(job.status, "paused");
+    console.log("non-video caption rebind rejection guard passed");
   }
 } finally {
   await closeDatabase();
