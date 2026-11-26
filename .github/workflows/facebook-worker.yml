@@ -29,6 +29,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   synthetic:
     runs-on: ubuntu-latest
@@ -53,7 +57,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - run: npm install --global pnpm@11.24.0
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Encrypted login factors and local TOTP
         run: |
@@ -103,7 +109,7 @@ jobs:
       - name: Application typecheck
         run: pnpm typecheck
       - name: Install synthetic Chromium runtime
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install chromium
       - name: Migrated PostgreSQL publication claim and authorization
         run: |
           node --conditions=react-server --import tsx scripts/test-publication-preclick-postgres.mts

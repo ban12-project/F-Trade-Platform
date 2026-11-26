@@ -117,9 +117,24 @@ jobs:
       - name: Validate Compose without printing secrets
         if: ${{ !cancelled() }}
         run: docker compose --env-file ops/browser-node/.env.example -f ops/browser-node/compose.yaml config --quiet
+      - name: Set up Docker Buildx
+        if: ${{ !cancelled() }}
+        uses: docker/setup-buildx-action@v4
       - name: Build controller image
         if: ${{ !cancelled() }}
-        run: docker build -f ops/browser-node/Dockerfile -t ftrade-browser-node:ci .
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: "false"
+        with:
+          context: .
+          file: ops/browser-node/Dockerfile
+          load: true
+          provenance: false
+          tags: ftrade-browser-node:ci
+          cache-from: |
+            type=gha,scope=ftrade-browser-agent-amd64
+            type=gha,scope=browser-node-ci
+          cache-to: type=gha,scope=browser-node-ci,mode=max
       - name: Check new code with repository Biome rules
         if: ${{ !cancelled() }}
         run: pnpm exec biome ci lib/browser-fleet lib/actions/browser-nodes.ts app/api/browser-nodes app/workspace/browsers components/workspace/browser-nodes-panel.tsx ops/browser-node scripts/test-browser-fleet.mjs scripts/test-browser-node.mjs scripts/test-browser-request-queue.mjs scripts/test-browser-startup-diagnostics.mjs scripts/test-browser-viewer.mjs scripts/test-browser-egress.mjs scripts/test-browser-fleet-protocol.ts scripts/test-native-profile.mjs scripts/test-browser-fleet-postgres.ts

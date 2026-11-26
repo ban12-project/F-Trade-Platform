@@ -45,11 +45,24 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
-      - name: Build the runtime with only required source files
+      - name: Stage required source files for image context
         run: |
           mkdir -p /tmp/document-image/scripts
           cp scripts/markitdown_preprocess.py scripts/pdf_catalog_layout.py scripts/pdf_kit_ocr.py scripts/pdf_disc_table_ocr.py scripts/pdf_tesseract_ocr.py /tmp/document-image/scripts/
-          docker build -f ops/video-sandbox/Dockerfile -t f-trade-document-smoke /tmp/document-image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build the runtime with only required source files
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: "false"
+        with:
+          context: /tmp/document-image
+          file: ops/video-sandbox/Dockerfile
+          load: true
+          provenance: false
+          tags: f-trade-document-smoke
+          cache-from: type=gha,scope=document-sandbox
+          cache-to: type=gha,scope=document-sandbox,mode=max
       - name: Verify the actual image without network access
         run: |
           mkdir -p /tmp/document-image-tests
