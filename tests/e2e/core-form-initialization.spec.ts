@@ -7,6 +7,7 @@ const scenarios = [
     form: "form#create-rfq",
     label: "客户名称",
     choice: "产品类型",
+    choiceRole: "combobox" as const,
     option: "离合器套件",
   },
   {
@@ -15,6 +16,7 @@ const scenarios = [
     form: 'form[id$="-create-product"]:visible',
     label: "产品名称",
     choice: "产品类型",
+    choiceRole: "combobox" as const,
     option: "离合器套件",
   },
   {
@@ -23,6 +25,7 @@ const scenarios = [
     form: 'form[id$="-product-review"]',
     label: /^审核备注(?:（必填）)?$/,
     choice: "决定",
+    choiceRole: "radio" as const,
     option: "退回产品信息",
   },
 ];
@@ -39,7 +42,12 @@ for (const scenario of scenarios) {
     });
     const form = page.locator(scenario.form);
     const input = form.getByRole("textbox", { name: scenario.label, exact: true });
-    const choice = form.getByRole("combobox", { name: scenario.choice, exact: true });
+    const choice =
+      scenario.choiceRole === "radio"
+        ? form
+            .getByRole("radiogroup", { name: scenario.choice, exact: true })
+            .getByRole("radio", { name: scenario.option, exact: true })
+        : form.getByRole("combobox", { name: scenario.choice, exact: true });
     try {
       await page.goto(scenario.path, { waitUntil: "commit" });
       await expect(input).toBeVisible();
@@ -52,9 +60,14 @@ for (const scenario of scenarios) {
     }
     await expect(input).toBeEnabled();
     await input.fill(`SYNTHETIC first ${scenario.name} edit`);
-    await choice.click();
-    await page.getByRole("option", { name: scenario.option, exact: true }).click();
-    await expect(choice).toContainText(scenario.option);
+    if (scenario.choiceRole === "radio") {
+      await choice.click();
+      await expect(choice).toBeChecked();
+    } else {
+      await choice.click();
+      await page.getByRole("option", { name: scenario.option, exact: true }).click();
+      await expect(choice).toContainText(scenario.option);
+    }
     await expect(input).toHaveValue(`SYNTHETIC first ${scenario.name} edit`);
     await expect(form).toHaveAttribute("aria-busy", "false");
   });
@@ -106,10 +119,19 @@ for (const kind of ["RFQ", "product review"] as const) {
     await page.goto(scenario.path);
     const form = page.locator(scenario.form);
     const input = form.getByRole("textbox", { name: scenario.label, exact: true });
-    const choice = form.getByRole("combobox", { name: scenario.choice, exact: true });
+    const choice =
+      scenario.choiceRole === "radio"
+        ? form
+            .getByRole("radiogroup", { name: scenario.choice, exact: true })
+            .getByRole("radio", { name: scenario.option, exact: true })
+        : form.getByRole("combobox", { name: scenario.choice, exact: true });
     await input.fill(`SYNTHETIC retained ${kind} input`);
-    await choice.click();
-    await page.getByRole("option", { name: scenario.option, exact: true }).click();
+    if (scenario.choiceRole === "radio") {
+      await choice.click();
+    } else {
+      await choice.click();
+      await page.getByRole("option", { name: scenario.option, exact: true }).click();
+    }
     const evidence = form.getByRole("combobox", {
       name: kind === "RFQ" ? "客户需求来源" : "审核依据",
       exact: true,
@@ -148,7 +170,8 @@ for (const kind of ["RFQ", "product review"] as const) {
     await expect(form).toHaveAttribute("aria-busy", "false");
     await expect(save).toBeEnabled();
     await expect(input).toHaveValue(`SYNTHETIC retained ${kind} input`);
-    await expect(choice).toContainText(scenario.option);
+    if (scenario.choiceRole === "radio") await expect(choice).toBeChecked();
+    else await expect(choice).toContainText(scenario.option);
     expect(posts).toHaveLength(1);
   });
 }

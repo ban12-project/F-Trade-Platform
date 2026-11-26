@@ -9,10 +9,12 @@ const markdownPlugins = { cjk };
 export function MarkdownContent({
   children,
   isAnimating = false,
+  controls,
   className,
 }: {
   children: string;
   isAnimating?: boolean;
+  controls?: React.ComponentProps<typeof Streamdown>["controls"];
   className?: string;
 }) {
   return (
@@ -22,7 +24,7 @@ export function MarkdownContent({
         className,
       )}
     >
-      <Streamdown plugins={markdownPlugins} isAnimating={isAnimating}>
+      <Streamdown plugins={markdownPlugins} controls={controls} isAnimating={isAnimating}>
         {children}
       </Streamdown>
     </div>

@@ -126,7 +126,10 @@ test("full_funnel objective, shorts_organic pacing, and anti-competing caption c
 }) => {
   await page.goto("/testing/video-workspace");
   await page.getByLabel("主要营销目标", { exact: true }).selectOption("full_funnel");
-  await page.getByLabel("叙事节拍模式", { exact: true }).selectOption("shorts_organic");
+  await page
+    .getByRole("radiogroup", { name: "叙事节拍模式", exact: true })
+    .getByRole("radio", { name: /竖屏短片/ })
+    .click();
   await page
     .getByRole("group", { name: "片段 1 ABCD 用途" })
     .getByRole("button", { name: "吸引注意" })

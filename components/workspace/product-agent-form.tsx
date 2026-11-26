@@ -1,8 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { BotIcon, EyeIcon } from "lucide-react";
-import dynamic from "next/dynamic";
+import { BotIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   startTransition,
@@ -32,14 +31,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Field,
   FieldDescription,
@@ -73,13 +64,9 @@ import { useBackgroundTasks } from "./background-tasks";
 import { useWorkspaceDirty } from "./dirty-state";
 import { StaticEvidenceCombobox } from "./evidence-select";
 import { FileDropzone } from "./file-dropzone";
+import { MarkdownPreviewDialog } from "./markdown-preview-dialog";
 import { useCreatedRecord } from "./use-created-record";
 import { WorkspaceLink } from "./workspace-link";
-
-const MarkdownContent = dynamic(
-  () => import("./markdown-content").then((module) => module.MarkdownContent),
-  { ssr: false },
-);
 
 type AgentValues = z.infer<typeof productAgentRunFormSchema>;
 
@@ -589,27 +576,15 @@ export function ProductAgentForm({
               <span className="text-xs text-muted-foreground">
                 可在详情面板实时查看 Streamdown 渲染的完整字段与证据表
               </span>
-              <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-                <DialogTrigger render={<Button type="button" variant="outline" size="sm" />}>
-                  <EyeIcon data-icon="inline-start" />
-                  查看 AI 实时输出
-                </DialogTrigger>
-                <DialogContent className="max-w-3xl">
-                  <DialogHeader>
-                    <DialogTitle>AI 资料抽取实时输出</DialogTitle>
-                    <DialogDescription>
-                      按字段实时验证来源证据；仅来源校验通过的字段会写入草稿。
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="max-h-[65dvh] overflow-y-auto rounded-lg border bg-background p-4">
-                    {detailOpen ? (
-                      <MarkdownContent isAnimating={stream.pending}>
-                        {streamMarkdown}
-                      </MarkdownContent>
-                    ) : null}
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <MarkdownPreviewDialog
+                open={detailOpen}
+                onOpenChange={setDetailOpen}
+                triggerLabel="查看 AI 实时输出"
+                title="AI 资料抽取实时输出"
+                description="按字段实时验证来源证据；仅来源校验通过的字段会写入草稿。"
+                markdown={streamMarkdown}
+                isAnimating={stream.pending}
+              />
             </div>
             <section className="grid gap-2" aria-label="生成字段状态">
               {streamFieldsList.map((field) => (

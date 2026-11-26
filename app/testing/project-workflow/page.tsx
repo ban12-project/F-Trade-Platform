@@ -630,10 +630,15 @@ async function ProjectWorkflowFixture({
   const productDetail: ProductCatalogDetail | null =
     state === "product-review" ||
     state === "product-review-complete" ||
+    state === "product-review-images" ||
     state === "product-review-locations" ||
     state === "product-revision"
       ? {
           ...syntheticProductDetail,
+          sourceImages:
+            state === "product-review-images"
+              ? [{ evidenceId: "evidence-image-001" }]
+              : syntheticProductDetail.sourceImages,
           state:
             state === "product-revision"
               ? "PRODUCT_REVISION_REQUIRED"
@@ -652,7 +657,7 @@ async function ProjectWorkflowFixture({
                 : syntheticProductDetail.draft.evidence_refs,
             field_evidence: {
               ...syntheticProductDetail.draft.field_evidence,
-              ...(state === "product-review-complete"
+              ...(state === "product-review-complete" || state === "product-review-images"
                 ? { "commercial.sample_available": "evidence-product-001" }
                 : {}),
               ...(state === "product-review-locations"

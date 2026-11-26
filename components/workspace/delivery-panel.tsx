@@ -31,16 +31,10 @@ import {
   FieldGroup,
   FieldLabel,
   FieldSet,
+  FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
@@ -113,38 +107,34 @@ function DeliveryDecision({
           <FieldSet disabled={busy} className="min-w-0">
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.decision}>
-                <FieldLabel htmlFor={`delivery-decision-${entry.id}-decision`}>决定</FieldLabel>
+                <FieldTitle id={`delivery-decision-${entry.id}-decision-label`}>决定</FieldTitle>
                 <Controller
                   control={form.control}
                   name="decision"
                   render={({ field }) => (
-                    <Select
+                    <RadioGroup
+                      id={`delivery-decision-${entry.id}-decision`}
                       disabled={busy}
-                      items={{ confirmed: "确认交期", rejected: "拒绝确认" }}
+                      aria-labelledby={`delivery-decision-${entry.id}-decision-label`}
+                      aria-invalid={!!form.formState.errors.decision}
+                      aria-describedby={
+                        form.formState.errors.decision
+                          ? `closing-review-${entry.id}-decision-error`
+                          : undefined
+                      }
                       value={field.value ?? null}
-                      onValueChange={field.onChange}
+                      onValueChange={(next) => {
+                        if (next) field.onChange(next);
+                      }}
+                      className="grid gap-2 sm:grid-cols-2"
                     >
-                      <SelectTrigger
-                        ref={field.ref}
-                        onBlur={field.onBlur}
-                        aria-invalid={!!form.formState.errors.decision}
-                        aria-describedby={
-                          form.formState.errors.decision
-                            ? `closing-review-${entry.id}-decision-error`
-                            : undefined
-                        }
-                        id={`delivery-decision-${entry.id}-decision`}
-                        className="w-full"
-                      >
-                        <SelectValue placeholder="请选择交期决定" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="confirmed">确认交期</SelectItem>
-                          <SelectItem value="rejected">拒绝确认</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      <RadioGroupChoice value="confirmed" itemRef={field.ref} onBlur={field.onBlur}>
+                        确认交期
+                      </RadioGroupChoice>
+                      <RadioGroupChoice value="rejected" onBlur={field.onBlur}>
+                        拒绝确认
+                      </RadioGroupChoice>
+                    </RadioGroup>
                   )}
                 />
                 <FieldError

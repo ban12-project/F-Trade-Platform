@@ -297,3 +297,73 @@ for (const outcome of ["transport", "permission"]) {
     expect(uploads).toBe(0);
   });
 }
+
+test("catalog preview dialog opens wide and keeps fullscreen table content unoccluded", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const projectId = "00000000-0000-4000-8000-000000000202";
+  const view: CatalogImportView = {
+    id: "00000000-0000-4000-8000-000000000909",
+    status: "ready",
+    failureCode: null,
+    candidates: [
+      {
+        id: "00000000-0000-4000-8000-000000000910",
+        identifier: "RYC-FULLSCREEN-01",
+        physicalPage: 2,
+        recordLine: 14,
+        duplicateIdentifier: false,
+        status: "completed",
+        attempts: 1,
+        failureCode: null,
+        productId: "00000000-0000-4000-8000-000000000911",
+      },
+    ],
+  };
+  await page.route("**/testing/project-workflow?**", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    expect(JSON.parse(route.request().postData() ?? "[]")).toEqual([projectId]);
+    return route.fulfill({
+      contentType: "text/x-component",
+      body: `0:{"a":"$@1","f":"","b":"synthetic"}\n1:${JSON.stringify({ status: "success", view })}\n`,
+    });
+  });
+  await page.goto("/testing/project-workflow?record=product&method=catalog");
+  await page.getByRole("button", { name: "查看 AI 处理详情", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "目录 AI 处理实时详情", exact: true });
+  await expect(dialog).toBeVisible();
+  const cell = dialog.getByRole("cell", { name: "RYC-FULLSCREEN-01" });
+  await expect(cell).toBeVisible();
+  await expect(dialog.locator('[aria-label="View fullscreen"]')).toHaveCount(0);
+  const initialBox = await dialog.boundingBox();
+  expect(initialBox?.width ?? 0).toBeGreaterThanOrEqual(600);
+
+  const toggle = dialog.getByRole("button", { name: "全屏查看", exact: true });
+  await toggle.click();
+  const exitToggle = dialog.getByRole("button", { name: "退出全屏", exact: true });
+  await expect(exitToggle).toHaveAttribute("aria-pressed", "true");
+  const fullscreenBox = await dialog.boundingBox();
+  expect(fullscreenBox?.width ?? 0).toBeGreaterThanOrEqual(1150);
+  expect(fullscreenBox?.height ?? 0).toBeGreaterThanOrEqual(680);
+
+  const cellBox = await cell.boundingBox();
+  if (!cellBox) throw new Error("Expected fullscreen table cell bounding box");
+  const hitInsideDialog = await page.evaluate(
+    ({ x, y }) => {
+      const target = document.elementFromPoint(x, y);
+      const activeDialog = target?.closest('[role="dialog"]');
+      return Boolean(target && activeDialog?.textContent?.includes("RYC-FULLSCREEN-01"));
+    },
+    { x: cellBox.x + cellBox.width / 2, y: cellBox.y + cellBox.height / 2 },
+  );
+  expect(hitInsideDialog).toBe(true);
+
+  await exitToggle.click();
+  await expect(dialog.getByRole("button", { name: "全屏查看", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});

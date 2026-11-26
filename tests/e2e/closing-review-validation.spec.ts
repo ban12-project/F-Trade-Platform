@@ -15,9 +15,9 @@ for (const kind of ["quotation", "delivery"] as const) {
     page.on("request", (request) => {
       if (request.method() === "POST" && request.headers()["next-action"]) writes++;
     });
-    await form.getByRole("combobox", { name: "决定", exact: true }).click();
-    await page
-      .getByRole("option", {
+    await form
+      .getByRole("radiogroup", { name: "决定", exact: true })
+      .getByRole("radio", {
         name: kind === "quotation" ? "退回人工报价" : "拒绝确认",
         exact: true,
       })
@@ -49,8 +49,10 @@ for (const kind of ["quotation", "delivery"] as const) {
 test("delivery confirmation focuses missing days before evidence", async ({ page }) => {
   await page.goto("/testing/project-workflow?kind=sales&record=delivery&state=delivery-pending");
   const form = page.locator('form[id^="delivery-"]');
-  await form.getByRole("combobox", { name: "决定", exact: true }).click();
-  await page.getByRole("option", { name: "确认交期", exact: true }).click();
+  await form
+    .getByRole("radiogroup", { name: "决定", exact: true })
+    .getByRole("radio", { name: "确认交期", exact: true })
+    .click();
   await page.getByRole("button", { name: "确认人工交期", exact: true }).click();
   const days = form.getByLabel("确认交期（天）", { exact: true });
   await expect(days).toBeFocused();

@@ -20,9 +20,9 @@ for (const kind of ["quotation", "delivery", "receipt"] as const) {
     if (kind === "receipt") {
       await form.getByLabel("平台消息编号或回执链接").fill("SYNTHETIC-receipt-001");
     } else {
-      await form.getByRole("combobox", { name: "决定", exact: true }).click();
-      await page
-        .getByRole("option", {
+      await form
+        .getByRole("radiogroup", { name: "决定", exact: true })
+        .getByRole("radio", {
           name: kind === "delivery" ? "确认交期" : "批准人工报价",
           exact: true,
         })
@@ -49,7 +49,7 @@ for (const kind of ["quotation", "delivery", "receipt"] as const) {
       await expect.poll(() => requested).toBe(true);
       await expect(text).toBeDisabled();
       const controls = form.locator(
-        'input:not([type="hidden"]), textarea, button[role="combobox"]',
+        'input:not([type="hidden"]), textarea, button[role="combobox"], button[role="radio"]',
       );
       for (const control of await controls.all()) await expect(control).toBeDisabled();
       await expect(submit).toBeDisabled();

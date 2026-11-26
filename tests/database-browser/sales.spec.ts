@@ -646,13 +646,17 @@ for (const inbound of [false, true]) {
     const staleDecision = stalePage
       .locator(`form#quote-decision-${draft.id}`)
       .filter({ visible: true });
-    await staleDecision.getByRole("combobox", { name: "决定", exact: true }).click();
-    await stalePage.getByRole("option", { name: "批准人工报价", exact: true }).click();
+    await staleDecision
+      .getByRole("radiogroup", { name: "决定", exact: true })
+      .getByRole("radio", { name: "批准人工报价", exact: true })
+      .click();
     await staleDecision.getByLabel("审核依据", { exact: true }).click();
     await stalePage.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     const decision = page.locator(`form#quote-decision-${draft.id}`).filter({ visible: true });
-    await decision.getByRole("combobox", { name: "决定", exact: true }).click();
-    await page.getByRole("option", { name: "退回人工报价", exact: true }).click();
+    await decision
+      .getByRole("radiogroup", { name: "决定", exact: true })
+      .getByRole("radio", { name: "退回人工报价", exact: true })
+      .click();
     await decision.getByLabel("审核依据", { exact: true }).click();
     await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await decision.locator("textarea").fill("MOCK revision: adjust simulated price");
@@ -708,8 +712,10 @@ for (const inbound of [false, true]) {
     expect(await auditQuery()).toEqual(beforeAudits);
     expect(await eventQuery()).toEqual(beforeEvents);
     await staleContext.close();
-    await decision.getByRole("combobox", { name: "决定", exact: true }).click();
-    await page.getByRole("option", { name: "批准人工报价", exact: true }).click();
+    await decision
+      .getByRole("radiogroup", { name: "决定", exact: true })
+      .getByRole("radio", { name: "批准人工报价", exact: true })
+      .click();
     await decision.getByLabel("审核依据", { exact: true }).click();
     await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
     await page.getByRole("button", { name: "批准人工报价", exact: true }).click();
@@ -831,8 +837,10 @@ for (const inbound of [false, true]) {
     await discard.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/records/delivery/${delivery.id}$`));
     const deliveryForm = page.locator(`form#delivery-${delivery.id}`).filter({ visible: true });
-    await deliveryForm.getByRole("combobox", { name: "决定", exact: true }).click();
-    await page.getByRole("option", { name: "确认交期", exact: true }).click();
+    await deliveryForm
+      .getByRole("radiogroup", { name: "决定", exact: true })
+      .getByRole("radio", { name: "确认交期", exact: true })
+      .click();
     await deliveryForm.getByLabel("确认交期（天）", { exact: true }).fill("21");
     await deliveryForm.getByLabel("审核依据", { exact: true }).click();
     await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();

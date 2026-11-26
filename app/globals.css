@@ -400,6 +400,8 @@ html {
   [data-slot="select-trigger"],
   [data-slot="toggle"],
   [data-slot="toggle-group-item"],
+  [data-slot="radio"],
+  [data-slot="switch"],
   [data-slot="dialog-content"],
   [data-slot="alert-dialog-content"],
   [data-slot="toast"] {

@@ -29,7 +29,7 @@ for (const kind of ["quotation", "delivery", "receipt"] as const) {
       await expect(text).toBeVisible();
       await expect(form).toHaveAttribute("aria-busy", "true");
       const controls = form.locator(
-        'input:not([type="hidden"]), textarea, button[role="combobox"]',
+        'input:not([type="hidden"]), textarea, button[role="combobox"], button[role="radio"]',
       );
       for (const control of await controls.all()) await expect(control).toBeDisabled();
       await expect(submit).toBeDisabled();
@@ -42,14 +42,13 @@ for (const kind of ["quotation", "delivery", "receipt"] as const) {
     if (kind === "receipt") {
       await form.getByLabel("平台消息编号或回执链接").fill("SYNTHETIC-receipt-001");
     } else {
-      const decision = form.getByRole("combobox", { name: "决定", exact: true });
+      const decisionGroup = form.getByRole("radiogroup", { name: "决定", exact: true });
       const option = kind === "delivery" ? "拒绝确认" : "退回人工报价";
-      await expect(decision).toContainText(
-        kind === "delivery" ? "请选择交期决定" : "请选择审核决定",
-      );
-      await decision.click();
-      await page.getByRole("option", { name: option, exact: true }).click();
-      await expect(decision).toContainText(option);
+      for (const radio of await decisionGroup.getByRole("radio").all())
+        await expect(radio).not.toBeChecked();
+      const targetRadio = decisionGroup.getByRole("radio", { name: option, exact: true });
+      await targetRadio.click();
+      await expect(targetRadio).toBeChecked();
     }
     await expect(text).toHaveValue(`SYNTHETIC first ${kind} edit`);
     await expect(form).toHaveAttribute("aria-busy", "false");

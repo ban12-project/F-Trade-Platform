@@ -37,10 +37,12 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
+  FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -659,30 +661,29 @@ function ReviewForm({
       <FieldGroup>
         {!revoking ? (
           <Field data-invalid={Boolean(form.formState.errors.decision)}>
-            <FieldLabel htmlFor={`media-review-decision-${asset.id}`}>审核决定</FieldLabel>
+            <FieldTitle id={`media-review-decision-${asset.id}-label`}>审核决定</FieldTitle>
             <Controller
               control={form.control}
               name="decision"
               render={({ field }) => (
-                <Select
-                  items={{ approved: "批准素材", rejected: "拒绝素材" }}
+                <RadioGroup
+                  id={`media-review-decision-${asset.id}`}
+                  disabled={pending}
+                  aria-labelledby={`media-review-decision-${asset.id}-label`}
+                  aria-invalid={Boolean(form.formState.errors.decision)}
                   value={field.value ?? null}
-                  onValueChange={field.onChange}
+                  onValueChange={(next) => {
+                    if (next) field.onChange(next);
+                  }}
+                  className="grid gap-2 sm:grid-cols-2"
                 >
-                  <SelectTrigger
-                    id={`media-review-decision-${asset.id}`}
-                    className="w-full"
-                    aria-invalid={Boolean(form.formState.errors.decision)}
-                  >
-                    <SelectValue placeholder="请选择审核决定" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="approved">批准素材</SelectItem>
-                      <SelectItem value="rejected">拒绝素材</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                  <RadioGroupChoice value="approved" itemRef={field.ref} onBlur={field.onBlur}>
+                    批准素材
+                  </RadioGroupChoice>
+                  <RadioGroupChoice value="rejected" onBlur={field.onBlur}>
+                    拒绝素材
+                  </RadioGroupChoice>
+                </RadioGroup>
               )}
             />
             <FieldError errors={[form.formState.errors.decision]} />

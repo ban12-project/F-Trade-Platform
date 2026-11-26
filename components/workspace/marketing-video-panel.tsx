@@ -31,10 +31,12 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
+  FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -643,13 +645,18 @@ function EditVideo({
                       </NativeSelect>
                     </Field>
                     <Field>
-                      <FieldLabel htmlFor="creative-pacing">叙事节拍模式</FieldLabel>
-                      <NativeSelect
+                      <FieldTitle id="creative-pacing-label">叙事节拍模式</FieldTitle>
+                      <RadioGroup
                         id="creative-pacing"
                         disabled={pending || processing}
-                        value={draft.creativeBrief?.pacingMode ?? ""}
-                        onChange={(event) => {
-                          const nextMode = event.target.value as "" | "shorts_organic";
+                        aria-labelledby="creative-pacing-label"
+                        value={
+                          draft.creativeBrief?.pacingMode === "shorts_organic"
+                            ? "shorts_organic"
+                            : "standard"
+                        }
+                        onValueChange={(nextMode) => {
+                          if (!nextMode) return;
                           const nextBrief: NonNullable<MarketingVideoDraft["creativeBrief"]> = {
                             objective: "action",
                             brandAssetRef: "",
@@ -666,17 +673,15 @@ function EditVideo({
                           }
                           setDraft({ ...draft, creativeBrief: nextBrief });
                         }}
+                        className="grid gap-2"
                       >
-                        <NativeSelectOption value="">
+                        <RadioGroupChoice value="standard">
                           标准 ABCD：开场吸引注意并呈现品牌（通用）
-                        </NativeSelectOption>
-                        <NativeSelectOption
-                          value="shorts_organic"
-                          disabled={draft.platform === "x"}
-                        >
+                        </RadioGroupChoice>
+                        <RadioGroupChoice value="shorts_organic" disabled={draft.platform === "x"}>
                           竖屏短片（Shorts / Reels）：先建立连接，品牌自然融入叙事
-                        </NativeSelectOption>
-                      </NativeSelect>
+                        </RadioGroupChoice>
+                      </RadioGroup>
                       <FieldDescription>
                         竖屏短片参考 Google Ads Shorts ABCD
                         顺序（Connection→Attention→Branding→Direction）；非 YouTube

@@ -25,8 +25,10 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
+  FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -576,38 +578,34 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
           <FieldSet disabled={busy} className="min-w-0">
             <FieldGroup>
               <Field data-invalid={!!form.formState.errors.decision}>
-                <FieldLabel htmlFor={`quote-decision-${entry.id}-decision`}>决定</FieldLabel>
+                <FieldTitle id={`quote-decision-${entry.id}-decision-label`}>决定</FieldTitle>
                 <Controller
                   control={form.control}
                   name="decision"
                   render={({ field }) => (
-                    <Select
+                    <RadioGroup
+                      id={`quote-decision-${entry.id}-decision`}
                       disabled={busy}
-                      items={{ approved: "批准人工报价", rejected: "退回人工报价" }}
+                      aria-labelledby={`quote-decision-${entry.id}-decision-label`}
+                      aria-invalid={!!form.formState.errors.decision}
+                      aria-describedby={
+                        form.formState.errors.decision
+                          ? `closing-review-${entry.id}-decision-error`
+                          : undefined
+                      }
                       value={field.value ?? null}
-                      onValueChange={field.onChange}
+                      onValueChange={(next) => {
+                        if (next) field.onChange(next);
+                      }}
+                      className="grid gap-2 sm:grid-cols-2"
                     >
-                      <SelectTrigger
-                        ref={field.ref}
-                        onBlur={field.onBlur}
-                        aria-invalid={!!form.formState.errors.decision}
-                        aria-describedby={
-                          form.formState.errors.decision
-                            ? `closing-review-${entry.id}-decision-error`
-                            : undefined
-                        }
-                        id={`quote-decision-${entry.id}-decision`}
-                        className="w-full"
-                      >
-                        <SelectValue placeholder="请选择审核决定" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="approved">批准人工报价</SelectItem>
-                          <SelectItem value="rejected">退回人工报价</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      <RadioGroupChoice value="approved" itemRef={field.ref} onBlur={field.onBlur}>
+                        批准人工报价
+                      </RadioGroupChoice>
+                      <RadioGroupChoice value="rejected" onBlur={field.onBlur}>
+                        退回人工报价
+                      </RadioGroupChoice>
+                    </RadioGroup>
                   )}
                 />
                 <FieldError

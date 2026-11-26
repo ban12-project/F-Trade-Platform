@@ -464,10 +464,9 @@ for (const change of ["unchanged", "revoked", "demoted", "banned"] as const)
       const reviewForm = page
         .locator("form")
         .filter({ has: page.getByLabel("审核依据", { exact: true }) });
-      const select = reviewForm.getByRole("combobox").first();
-      await expect(select).toHaveCount(1);
-      await select.click();
-      await page.getByRole("option", { name: "批准素材", exact: true }).click();
+      const decisionGroup = reviewForm.getByRole("radiogroup", { name: "审核决定", exact: true });
+      await expect(decisionGroup).toHaveCount(1);
+      await decisionGroup.getByRole("radio", { name: "批准素材", exact: true }).click();
       const evidence = page.getByLabel("审核依据", { exact: true }).filter({ visible: true }),
         notes = page.getByLabel("审核备注", { exact: true }).filter({ visible: true });
       await evidence.click();

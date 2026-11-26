@@ -5,9 +5,8 @@ test("delivery approval rejects unsafe days, preserves input, and keeps rejectio
 }) => {
   await page.goto("/testing/project-workflow?kind=sales&record=delivery&state=delivery-pending");
   const form = page.locator('form[id^="delivery-"]');
-  const decision = form.getByRole("combobox", { name: "决定", exact: true });
-  await decision.click();
-  await page.getByRole("option", { name: "确认交期", exact: true }).click();
+  const decisionGroup = form.getByRole("radiogroup", { name: "决定", exact: true });
+  await decisionGroup.getByRole("radio", { name: "确认交期", exact: true }).click();
   await form.getByRole("combobox", { name: "审核依据", exact: true }).click();
   await page.getByRole("option", { name: "合成审核记录.pdf", exact: true }).click();
   const days = form.getByLabel("确认交期（天）", { exact: true });
@@ -27,8 +26,7 @@ test("delivery approval rejects unsafe days, preserves input, and keeps rejectio
   await days.fill("0");
   await expect(days).toHaveAttribute("aria-invalid", "false");
   await days.fill("9007199254740993");
-  await decision.click();
-  await page.getByRole("option", { name: "拒绝确认", exact: true }).click();
+  await decisionGroup.getByRole("radio", { name: "拒绝确认", exact: true }).click();
   await page.getByRole("button", { name: "拒绝交期确认", exact: true }).click();
   await expect(days).toBeDisabled();
   await expect(days).toHaveAttribute("aria-invalid", "false");
