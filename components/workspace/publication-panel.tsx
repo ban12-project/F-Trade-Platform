@@ -18,7 +18,10 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
-import { publicationProgress } from "@/lib/social/publication-presentation";
+import {
+  publicationProgress,
+  publicationStepProgress,
+} from "@/lib/social/publication-presentation";
 import type {
   PublicationCandidate,
   PublicationChannel,
@@ -26,6 +29,7 @@ import type {
 } from "@/lib/social/publication-store";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { PublicationComposer, type PublicationMediaOptions } from "./publication-composer";
+import { PublicationProgressSteps } from "./publication-progress-steps";
 import { PublicationReconciliationForm } from "./publication-reconciliation-form";
 import { VideoPublicationReconciliationForm } from "./video-publication-reconciliation-form";
 import { WorkspaceLink } from "./workspace-link";
@@ -83,6 +87,14 @@ export function PublicationPanel({
       ) : null}
       {publications.map((item) => {
         const progress = publicationProgress(item.status, item.humanConfirmed, item.jobStatus);
+        const stepProgress =
+          item.stepProgress ??
+          publicationStepProgress({
+            format: item.format,
+            status: item.status,
+            jobStatus: item.jobStatus,
+            humanConfirmed: item.humanConfirmed,
+          });
         return (
           <Card key={item.id}>
             <CardHeader>
@@ -93,8 +105,9 @@ export function PublicationPanel({
                 )?.name ?? item.accountRef}
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-2">
+            <CardContent className="flex flex-col gap-3">
               <p className="text-sm">{progress.detail}</p>
+              <PublicationProgressSteps progress={stepProgress} />
               <p className="text-sm text-muted-foreground">
                 提交时间：
                 <time dateTime={new Date(item.createdAt).toISOString()}>

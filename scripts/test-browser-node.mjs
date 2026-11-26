@@ -485,6 +485,109 @@ test("publication executor classifies prepare preclick codes without collapsing 
   }
 });
 
+test("publication executor reports execution stages in order for video and text runs", async () => {
+  for (const format of ["video", "text"]) {
+    const stages = [];
+    const execute = createPublicationExecutor({
+      async open() {
+        return { closed: false };
+      },
+      async identity() {
+        return { accountRef: "acc-1", channelRef: "facebook-personal" };
+      },
+      async existingPublicationRefs() {
+        return [];
+      },
+      async prepare() {},
+      async inspect() {
+        return {
+          accountRef: "acc-1",
+          channelRef: "facebook-personal",
+          text: "SYNTHETIC post",
+          readyToPublish: true,
+          attachmentCount: format === "video" ? 1 : 0,
+          ...(format === "video" ? { attachmentSha256: "a".repeat(64) } : {}),
+        };
+      },
+      async publish() {},
+      async observe() {
+        return {
+          accountRef: "acc-1",
+          channelRef: "facebook-personal",
+          text: "SYNTHETIC post",
+          externalPublicationRef: "https://www.facebook.com/reel/123456",
+        };
+      },
+      async close() {},
+    });
+    const outcome = await execute({
+      run: {
+        id: randomUUID(),
+        kind: "publish",
+        accountRef: "acc-1",
+        channelRef: "facebook-personal",
+        publication: {
+          accountRef: "acc-1",
+          channelRef: "facebook-personal",
+          format,
+          text: "SYNTHETIC post",
+          ...(format === "video"
+            ? {
+                media: {
+                  assetRef: "asset-1",
+                  contentType: "video/mp4",
+                  sizeBytes: 128,
+                  sha256: "a".repeat(64),
+                },
+              }
+            : {}),
+        },
+      },
+      signal: new AbortController().signal,
+      async preparePublicationMedia() {
+        return { path: "/tmp/ftrade-uploads/a.mp4", media: { sha256: "a".repeat(64) } };
+      },
+      async authorizePublication() {
+        return { authorizationId: "auth-1", localExpiresAt: Date.now() + 30_000 };
+      },
+      async reportPublication() {},
+      onStageChange(stage) {
+        stages.push(stage);
+      },
+    });
+    assert.equal(outcome, "completed");
+    assert.deepEqual(
+      stages,
+      format === "video"
+        ? [
+            "open",
+            "identity",
+            "baseline",
+            "media",
+            "prepare",
+            "preview",
+            "authorize",
+            "recheck",
+            "publish",
+            "observe",
+            "validate",
+          ]
+        : [
+            "open",
+            "identity",
+            "baseline",
+            "prepare",
+            "preview",
+            "authorize",
+            "recheck",
+            "publish",
+            "observe",
+            "validate",
+          ],
+    );
+  }
+});
+
 test("publication authorization checks egress before request and reuses one attempt", async () => {
   const events = [];
   const publication = {

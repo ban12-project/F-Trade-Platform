@@ -1,6 +1,211 @@
 import { parseObservationHttpFailure } from "../../ops/browser-node/observation-diagnostics.mjs";
 import { parsePublicationPreclickFailure } from "../../ops/browser-node/publication-diagnostics.mjs";
 
+export type PublicationStepId =
+  | "queued"
+  | "browser"
+  | "account"
+  | "media"
+  | "prepare"
+  | "publish"
+  | "done";
+
+export type PublicationStepStatus = "completed" | "active" | "pending" | "failed" | "warning";
+
+export type PublicationStep = {
+  id: PublicationStepId;
+  label: string;
+  status: PublicationStepStatus;
+  detail?: string;
+};
+
+export type PublicationStepProgress = {
+  steps: PublicationStep[];
+  completedSteps: number;
+  totalSteps: number;
+  percent: number;
+  currentLabel: string;
+  tone: "progressing" | "complete" | "failed" | "warning";
+};
+
+export type PublicationProgressInput = {
+  format: string;
+  status: string;
+  jobStatus?: string | null;
+  failureCode?: string | null;
+  humanConfirmed?: boolean;
+  hasAuthorization?: boolean;
+  runStatus?: string | null;
+  executionStage?: string | null;
+};
+
+function stepDefinitions(isText: boolean): Array<{ id: PublicationStepId; label: string }> {
+  const base: Array<{ id: PublicationStepId; label: string }> = [
+    { id: "queued", label: "提交排队" },
+    { id: "browser", label: "启动浏览器与代理校验" },
+    { id: "account", label: "打开主页与核对身份" },
+  ];
+  if (!isText) base.push({ id: "media", label: "拉取并校验发布素材" });
+  base.push(
+    { id: "prepare", label: "准备编辑器与核对预览" },
+    { id: "publish", label: "提交发布与观察回执" },
+    { id: "done", label: "平台回执已确认" },
+  );
+  return base;
+}
+
+function stageToStepId(
+  stage: string | null | undefined,
+  isText: boolean,
+): PublicationStepId | null {
+  switch (stage) {
+    case "launch":
+      return "browser";
+    case "open":
+    case "identity":
+    case "baseline":
+      return "account";
+    case "media":
+      return isText ? "prepare" : "media";
+    case "prepare":
+    case "preview":
+    case "authorize":
+    case "recheck":
+    case "authorization_deadline":
+      return "prepare";
+    case "publish":
+    case "observe":
+    case "validate":
+      return "publish";
+    default:
+      return null;
+  }
+}
+
+const activeStepDetails: Record<PublicationStepId, string> = {
+  queued: "等待托管节点领取任务",
+  browser: "正在创建隔离浏览器与出口检查",
+  account: "正在核对账号登录态与基线帖子",
+  media: "正在拉取并校验私有媒体文件",
+  prepare: "正在填充配文、附件与受众设置",
+  publish: "正在等待平台返回发布回执",
+  done: "正在保存平台回执",
+};
+
+export function publicationStepProgress(input: PublicationProgressInput): PublicationStepProgress {
+  const isText = input.format === "text";
+  const defs = stepDefinitions(isText);
+  const totalSteps = defs.length;
+  const finish = (
+    steps: PublicationStep[],
+    currentLabel: string,
+    tone: PublicationStepProgress["tone"],
+  ): PublicationStepProgress => {
+    const completedSteps = steps.filter((step) => step.status === "completed").length;
+    return {
+      steps,
+      completedSteps,
+      totalSteps,
+      percent: Math.round((completedSteps / totalSteps) * 100),
+      currentLabel,
+      tone,
+    };
+  };
+
+  if (input.status === "published") {
+    return finish(
+      defs.map((def) => ({
+        ...def,
+        status: "completed" as const,
+        ...(def.id === "done"
+          ? { detail: input.humanConfirmed ? "已由人工核对确认" : "已取得平台回执链接" }
+          : {}),
+      })),
+      "已完成全部步骤",
+      "complete",
+    );
+  }
+
+  if (input.status === "unknown") {
+    const publishIndex = defs.findIndex((def) => def.id === "publish");
+    return finish(
+      defs.map((def, index) => ({
+        ...def,
+        status: index < publishIndex ? "completed" : index === publishIndex ? "warning" : "pending",
+        ...(def.id === "publish" ? { detail: "未能取得可验证回执，需人工核对" } : {}),
+      })),
+      `第 ${publishIndex + 1}/${totalSteps} 步待核对（${defs[publishIndex].label}）`,
+      "warning",
+    );
+  }
+
+  if (["failed", "rejected", "paused", "cancelled"].includes(input.status)) {
+    const preclick = parsePublicationPreclickFailure(input.failureCode);
+    const failedStepId: PublicationStepId =
+      stageToStepId(preclick?.stage, isText) ??
+      (input.failureCode === "fleet_publication_preflight_rejected"
+        ? "queued"
+        : stageToStepId(input.executionStage, isText)) ??
+      (input.failureCode === "fleet_publication_not_authorized" || input.jobStatus === "claimed"
+        ? "browser"
+        : "queued");
+    const failedIndex = Math.max(
+      0,
+      defs.findIndex((def) => def.id === failedStepId),
+    );
+    const unsent =
+      preclick !== null ||
+      input.failureCode === "fleet_publication_not_authorized" ||
+      input.failureCode === "fleet_publication_preflight_rejected";
+    return finish(
+      defs.map((def, index) => ({
+        ...def,
+        status: index < failedIndex ? "completed" : index === failedIndex ? "failed" : "pending",
+        ...(index === failedIndex
+          ? { detail: unsent ? "在此步骤中止，未向平台发送" : "在此步骤中止" }
+          : {}),
+      })),
+      `在「${defs[failedIndex].label}」中止`,
+      "failed",
+    );
+  }
+
+  const executionStep = stageToStepId(input.executionStage, isText);
+  const activeStepId: PublicationStepId =
+    input.hasAuthorization || executionStep === "publish"
+      ? "publish"
+      : executionStep === "prepare" || executionStep === "media" || executionStep === "account"
+        ? executionStep
+        : input.runStatus === "running"
+          ? "account"
+          : input.jobStatus === "claimed" ||
+              input.jobStatus === "running" ||
+              input.runStatus === "starting" ||
+              executionStep === "browser"
+            ? "browser"
+            : "queued";
+  const activeIndex = Math.max(
+    0,
+    defs.findIndex((def) => def.id === activeStepId),
+  );
+  return finish(
+    defs.map((def, index) => ({
+      ...def,
+      status: index < activeIndex ? "completed" : index === activeIndex ? "active" : "pending",
+      ...(index === activeIndex
+        ? {
+            detail:
+              def.id === "publish" && input.hasAuthorization
+                ? "已授权点击发布，正在等待平台回执"
+                : activeStepDetails[def.id],
+          }
+        : {}),
+    })),
+    `正在执行第 ${activeIndex + 1}/${totalSteps} 步：${defs[activeIndex].label}`,
+    "progressing",
+  );
+}
+
 /** Presentation only: publishing and retries remain governed by the domain service. */
 export function publicationProgress(
   status: string,

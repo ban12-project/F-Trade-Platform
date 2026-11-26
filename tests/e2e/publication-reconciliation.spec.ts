@@ -38,6 +38,10 @@ test("unknown publication requires reviewed evidence and rejects an unauthentica
 }) => {
   await page.goto("/testing/project-workflow?kind=marketing&record=publication&state=unknown");
   await expect(page.getByRole("region", { name: "发布记录为空" })).toHaveCount(0);
+  const progressbar = page.getByRole("progressbar");
+  await expect(progressbar).toHaveAttribute("aria-valuenow", "4");
+  await expect(progressbar).toHaveAttribute("aria-valuemax", "6");
+  await expect(page.locator('[data-step-status="warning"]')).toHaveCount(1);
   await page.getByText("查看处理详情", { exact: true }).click();
   await expect(page.getByText("发布步骤未取得可验证回执", { exact: true })).toBeVisible();
   await expect(page.getByText("发布点击完成", { exact: false })).toHaveCount(0);

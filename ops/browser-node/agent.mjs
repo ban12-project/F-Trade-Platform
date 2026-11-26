@@ -337,6 +337,7 @@ async function stop(slot, outcome = "failed") {
 }
 async function launch(slot) {
   const spec = slot.spec;
+  if (slot.run.kind === "publish") slot.publicationStage = "launch";
   slot.launchStage = "volume";
   await ensureAccountVolume(docker, nodeId, slot.run.accountId, spec.volume);
   slot.launchStage = "network";
@@ -428,6 +429,9 @@ async function heartbeat(slot) {
     runId: slot.run.id,
     leaseId: slot.run.leaseId,
     ready: !!slot.ready,
+    ...(slot.run.kind === "publish" && slot.publicationStage
+      ? { publicationStage: slot.publicationStage }
+      : {}),
   });
   if (!renewed.active) {
     await stop(slot, slot.run.kind === "publish" ? "unknown" : "failed");
@@ -746,6 +750,9 @@ async function tick() {
             authorizePublication,
             preparePublicationMedia,
             reportPublication: createPublicationReporter({ run: slot.run, request: nodeCall }),
+            onStageChange(stage) {
+              slot.publicationStage = stage;
+            },
             onPreclickFailure(stage, code) {
               // Both fields come from fixed executor enums; never log raw page text.
               console.error(`browser_publication_preclick_failed:${stage}:${code}`);
