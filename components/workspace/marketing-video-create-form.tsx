@@ -715,10 +715,10 @@ export function MarketingVideoCreateForm({
             : pending
               ? "正在创建剪辑稿…"
               : sourceMode === "product_media"
-                ? "复用媒体并生成 AI 初稿"
+                ? "复用媒体并创建剪辑稿"
                 : sourceMode === "internet_search"
-                  ? "私有导入并生成 AI 初稿"
-                  : "上传并生成 AI 初稿"}
+                  ? "私有导入并创建剪辑稿"
+                  : "上传并创建剪辑稿"}
         </Button>
         {uploadError ? (
           <p className="text-sm text-destructive" aria-live="polite">

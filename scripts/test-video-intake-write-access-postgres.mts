@@ -303,23 +303,27 @@ try {
         assert.equal(result.status, "success", `${op}/${role}`);
         assert(result.videoId);
         const after = await snapshot(f);
-        assert.equal(after.jobs.length, 1);
-        assert.equal(workflowStarts, starts + 1);
-        assert(after.jobs[0].workflowRunId?.startsWith("synthetic-run"));
-        assert.equal(
-          after.jobs[0].requestKey,
-          videoProcessingRequestKey(
-            result.videoId,
-            op === "render" ? "render" : "ai_draft",
-            op === "render" ? 2 : 1,
-          ),
-        );
         if (op === "create") {
+          assert.equal(after.jobs.length, 0);
+          assert.equal(workflowStarts, starts);
           assert.equal(after.records.length, before.records.length + 1);
           assert(
             after.links.some((l) => l.aggregateId === result.videoId && l.relation === "owned"),
           );
-        } else assert.equal(after.records.length, before.records.length);
+        } else {
+          assert.equal(after.jobs.length, 1);
+          assert.equal(workflowStarts, starts + 1);
+          assert(after.jobs[0].workflowRunId?.startsWith("synthetic-run"));
+          assert.equal(
+            after.jobs[0].requestKey,
+            videoProcessingRequestKey(
+              result.videoId,
+              op === "render" ? "render" : "ai_draft",
+              op === "render" ? 2 : 1,
+            ),
+          );
+          assert.equal(after.records.length, before.records.length);
+        }
         scenarios++;
       }
       for (const change of changes) {
@@ -517,13 +521,15 @@ try {
             identity(f),
           );
         }
+        const starts = workflowStarts;
         const result = await actions.createMarketingVideoDraftAction(
           { status: "idle", message: "" },
           form(f, mode, receiptId),
         );
         assert.equal(result.status, "success");
         const after = await snapshot(f);
-        assert.equal(after.jobs.length, 1);
+        assert.equal(after.jobs.length, 0);
+        assert.equal(workflowStarts, starts);
         const created = after.records.find((r) => r.id === result.videoId);
         assert(created);
         if (mode === "internet_search")

@@ -56,6 +56,8 @@ void (async () => {
     saved?.failureMessage,
     "无法确认产品事实或素材授权，AI 初稿未保存。请核对来源后重试。",
   );
+  await failVideoJob("synthetic-brief-job", "AI_DRAFT_BRIEF_REQUIRED", writeDb);
+  assert.equal(saved?.failureMessage, "请先完整填写并保存 ABCD 创意简报，再生成 AI 初稿。");
   const rows = [
     {
       id: "render",
@@ -87,6 +89,14 @@ void (async () => {
       kind: "ai_draft",
       status: "failed",
       failureCode: "AI_DRAFT_SOURCE_INVALID",
+      failureMessage: secret,
+    },
+    {
+      id: "brief",
+      videoProjectId: "video-7",
+      kind: "ai_draft",
+      status: "failed",
+      failureCode: "AI_DRAFT_BRIEF_REQUIRED",
       failureMessage: secret,
     },
     {
@@ -130,6 +140,10 @@ void (async () => {
   assert.equal(
     result.get("video-6")?.failureMessage,
     "无法确认产品事实或素材授权，AI 初稿未保存。请核对来源后重试。",
+  );
+  assert.equal(
+    result.get("video-7")?.failureMessage,
+    "请先完整填写并保存 ABCD 创意简报，再生成 AI 初稿。",
   );
   assert.equal(JSON.stringify([...result]).includes("SYNTHETIC-SECRET"), false);
   assert.equal(JSON.stringify([...result]).includes("private.example"), false);

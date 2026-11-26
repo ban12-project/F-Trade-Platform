@@ -88,7 +88,7 @@ mock.module(moduleUrl("../lib/video/store.ts"), {
       assert.deepEqual(value, identity);
       assert.deepEqual(inputAssets, assets);
       if (failure) throw failure;
-      return { id: videoId, processingJob: job, privateValue };
+      return { id: videoId, privateValue };
     },
   },
 });
@@ -98,7 +98,7 @@ mock.module(moduleUrl("../lib/video/product-media-create.ts"), {
       attempts++;
       assert.deepEqual(value, identity);
       if (failure) throw failure;
-      return { id: videoId, processingJob: job, privateValue };
+      return { id: videoId, privateValue };
     },
   },
 });

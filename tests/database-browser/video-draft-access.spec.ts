@@ -351,11 +351,7 @@ for (const op of ["create", "generate", "render"] as const) {
         const button = page
           .getByRole("button", {
             name:
-              op === "create"
-                ? "复用媒体并生成 AI 初稿"
-                : op === "generate"
-                  ? "AI 初稿"
-                  : "合成预览",
+              op === "create" ? "复用媒体并创建剪辑稿" : op === "generate" ? "AI 初稿" : "合成预览",
             exact: true,
           })
           .filter({ visible: true });
