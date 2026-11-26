@@ -629,10 +629,15 @@ async function ProjectWorkflowFixture({
   }
   const productDetail =
     state === "product-review" ||
+    state === "product-review-images" ||
     state === "product-review-locations" ||
     state === "product-revision"
       ? {
           ...syntheticProductDetail,
+          sourceImages:
+            state === "product-review-images"
+              ? [{ evidenceId: "evidence-image-001" }]
+              : syntheticProductDetail.sourceImages,
           state:
             state === "product-revision"
               ? "PRODUCT_REVISION_REQUIRED"

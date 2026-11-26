@@ -305,8 +305,10 @@ test("authenticated browser reviews a mock product and its content through real 
   await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, actorId));
   await page.reload();
   const review = page.locator('form[id$="-product-review"]').filter({ visible: true });
-  await review.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "退回产品信息", exact: true }).click();
+  await review
+    .getByRole("radiogroup", { name: "决定", exact: true })
+    .getByRole("radio", { name: "退回产品信息", exact: true })
+    .click();
   await review.getByLabel("审核依据", { exact: true }).click();
   await page.getByRole("option", { name: /MOCK evidence/ }).click();
   await review
@@ -332,8 +334,10 @@ test("authenticated browser reviews a mock product and its content through real 
     .from(schema.approval)
     .where(and(eq(schema.approval.aggregateId, created.id), eq(schema.approval.status, "pending")));
   expect(pending.id).not.toBe(rejectedApprovalId);
-  await review.getByRole("combobox").first().click();
-  await page.getByRole("option", { name: "批准产品信息", exact: true }).click();
+  await review
+    .getByRole("radiogroup", { name: "决定", exact: true })
+    .getByRole("radio", { name: "批准产品信息", exact: true })
+    .click();
   await review.getByLabel("审核依据", { exact: true }).click();
   await page.getByRole("option", { name: /MOCK evidence/ }).click();
   await review
@@ -492,15 +496,19 @@ test("authenticated browser reviews a mock product and its content through real 
   const stalePage = await staleContext.newPage();
   await stalePage.goto(`/workspace/${projectId}/records/content/${contentDraft.id}`);
   const staleReview = stalePage.locator("form[data-content-review]").filter({ visible: true });
-  await staleReview.getByRole("combobox", { name: "决定", exact: true }).click();
-  await stalePage.getByRole("option", { name: "批准营销内容", exact: true }).click();
+  await staleReview
+    .getByRole("radiogroup", { name: "决定", exact: true })
+    .getByRole("radio", { name: "批准营销内容", exact: true })
+    .click();
   await staleReview.getByLabel("审核依据", { exact: true }).click();
   await stalePage.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await staleReview
     .locator("[id^=content-review-][id$=-notes]")
     .fill("Synthetic stale review attempt");
-  await contentReview.getByRole("combobox", { name: "决定", exact: true }).click();
-  await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
+  await contentReview
+    .getByRole("radiogroup", { name: "决定", exact: true })
+    .getByRole("radio", { name: "退回营销内容", exact: true })
+    .click();
   await contentReview.getByLabel("审核依据", { exact: true }).click();
   await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await contentReview
@@ -572,8 +580,10 @@ test("authenticated browser reviews a mock product and its content through real 
       .where(eq(schema.workflowEvent.aggregateId, contentDraft.id)),
   ).toEqual(eventsBeforeStale);
   await staleContext.close();
-  await contentReview.getByRole("combobox", { name: "决定", exact: true }).click();
-  await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
+  await contentReview
+    .getByRole("radiogroup", { name: "决定", exact: true })
+    .getByRole("radio", { name: "批准营销内容", exact: true })
+    .click();
   await contentReview.getByLabel("审核依据", { exact: true }).click();
   await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await contentReview
@@ -825,8 +835,10 @@ test("authenticated browser reviews a mock product and its content through real 
     .click();
   await expect(page).toHaveURL(new RegExp(`/records/content/${targetB.id}(?:[?].*)?$`));
   const switchingReview = page.locator("form[data-content-review]").filter({ visible: true });
-  await switchingReview.getByRole("combobox", { name: "决定", exact: true }).click();
-  await page.getByRole("option", { name: "批准营销内容", exact: true }).click();
+  await switchingReview
+    .getByRole("radiogroup", { name: "决定", exact: true })
+    .getByRole("radio", { name: "批准营销内容", exact: true })
+    .click();
   await switchingReview.getByLabel("审核依据", { exact: true }).click();
   await page.locator(`[data-evidence-id="${evidenceId}"]`).filter({ visible: true }).click();
   await page.getByRole("button", { name: "批准营销内容", exact: true }).click();

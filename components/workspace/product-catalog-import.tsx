@@ -1,8 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { EyeIcon, SearchIcon } from "lucide-react";
-import dynamic from "next/dynamic";
+import { SearchIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -20,14 +19,6 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Field,
@@ -70,12 +61,8 @@ import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useBackgroundTasks } from "./background-tasks";
 import { useWorkspaceDirty } from "./dirty-state";
 import { FileDropzone } from "./file-dropzone";
+import { MarkdownPreviewDialog } from "./markdown-preview-dialog";
 import { WorkspaceLink as Link } from "./workspace-link";
-
-const MarkdownContent = dynamic(
-  () => import("./markdown-content").then((module) => module.MarkdownContent),
-  { ssr: false },
-);
 
 const INITIAL_VISIBLE_CANDIDATES = 50;
 
@@ -613,25 +600,15 @@ export function ProductCatalogImport({
               >
                 刷新进度
               </Button>
-              <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-                <DialogTrigger render={<Button type="button" variant="outline" size="sm" />}>
-                  <EyeIcon data-icon="inline-start" />
-                  查看 AI 处理详情
-                </DialogTrigger>
-                <DialogContent className="max-w-3xl">
-                  <DialogHeader>
-                    <DialogTitle>目录 AI 处理实时详情</DialogTitle>
-                    <DialogDescription>
-                      使用 Streamdown 实时渲染目录解析进度与每条候选记录的来源校验结果。
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="max-h-[65dvh] overflow-y-auto rounded-lg border bg-background p-4">
-                    {detailOpen ? (
-                      <MarkdownContent isAnimating={working}>{catalogMarkdown}</MarkdownContent>
-                    ) : null}
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <MarkdownPreviewDialog
+                open={detailOpen}
+                onOpenChange={setDetailOpen}
+                triggerLabel="查看 AI 处理详情"
+                title="目录 AI 处理实时详情"
+                description="使用 Streamdown 实时渲染目录解析进度与每条候选记录的来源校验结果。"
+                markdown={catalogMarkdown}
+                isAnimating={working}
+              />
               {view.status === "failed" && (
                 <Button size="sm" disabled={pending} onClick={() => void update(true)}>
                   重试解析

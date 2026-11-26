@@ -22,8 +22,17 @@ test("product Gate 01 submits the displayed revision and approval request", asyn
   await expect(detail.getByText("产品核实决定", { exact: true })).toBeVisible();
   await expect(detail.getByText(/审核版本 1/)).toBeVisible();
   await expect(detail.getByRole("button", { name: "请先选择决定" })).toBeDisabled();
-  await detail.getByRole("combobox").filter({ hasText: "请选择审核决定" }).press("ArrowDown");
-  await page.getByRole("option", { name: "批准产品信息", exact: true }).click();
+  const decisionGroup = detail.getByRole("radiogroup", { name: "决定", exact: true });
+  await expect(
+    decisionGroup.getByRole("radio", { name: "批准产品信息", exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    decisionGroup.getByRole("radio", { name: "退回产品信息", exact: true }),
+  ).not.toBeChecked();
+  await decisionGroup.getByRole("radio", { name: "批准产品信息", exact: true }).click();
+  await expect(
+    decisionGroup.getByRole("radio", { name: "批准产品信息", exact: true }),
+  ).toBeChecked();
   await detail.getByRole("combobox", { name: "审核依据" }).press("ArrowDown");
   await page.getByRole("option", { name: /Synthetic review evidence/ }).click();
   // Capture the actual Action body without executing a business write or requiring a login.
@@ -383,11 +392,11 @@ test("product review validation focuses missing evidence then rejection notes wi
     if (request.method() === "POST" && request.headers()["next-action"]) writes++;
   });
   const detail = page.getByRole("region", { name: "业务记录", exact: true });
-  const decision = detail.getByRole("combobox", { name: "决定", exact: true });
+  const decisionGroup = detail.getByRole("radiogroup", { name: "决定", exact: true });
+  const rejectRadio = decisionGroup.getByRole("radio", { name: "退回产品信息", exact: true });
   const evidence = detail.getByRole("combobox", { name: "审核依据", exact: true });
   const notes = detail.getByRole("textbox", { name: "审核备注", exact: false });
-  await decision.click();
-  await page.getByRole("option", { name: "退回产品信息", exact: true }).click();
+  await rejectRadio.click();
   const submit = detail.getByRole("button", { name: "退回产品信息", exact: true });
   await submit.click();
   await expect(evidence).toBeFocused();
@@ -404,7 +413,35 @@ test("product review validation focuses missing evidence then rejection notes wi
   await notes.fill("Synthetic: please provide the original factory evidence.");
   await expect(notes).toHaveAttribute("aria-invalid", "false");
   await expect(notes).not.toHaveAttribute("aria-describedby");
-  await expect(decision).toContainText("退回产品信息");
+  await expect(rejectRadio).toBeChecked();
   await expect(evidence).toContainText("Synthetic review evidence");
   expect(writes).toBe(0);
+});
+
+test("product review image consistency switch starts unchecked and submits true when toggled", async ({
+  page,
+}) => {
+  await page.goto("/testing/project-workflow?record=product&state=product-review-images");
+  await page.waitForLoadState("networkidle");
+  const detail = page.getByRole("region", { name: "业务记录", exact: true });
+  const imageSwitch = detail.getByRole("switch", { name: "图片一致性", exact: true });
+  await expect(imageSwitch).not.toBeChecked();
+  await imageSwitch.click();
+  await expect(imageSwitch).toBeChecked();
+  await detail
+    .getByRole("radiogroup", { name: "决定", exact: true })
+    .getByRole("radio", { name: "批准产品信息", exact: true })
+    .click();
+  await detail.getByRole("combobox", { name: "审核依据" }).press("ArrowDown");
+  await page.getByRole("option", { name: /Synthetic review evidence/ }).click();
+  await page.route("**/testing/project-workflow?**", async (route) => {
+    if (route.request().method() === "POST") await route.abort();
+    else await route.continue();
+  });
+  const request = page.waitForRequest(
+    (request) => request.method() === "POST" && Boolean(request.headers()["next-action"]),
+  );
+  await detail.getByRole("button", { name: "批准产品信息", exact: true }).click();
+  const body = (await request).postData() ?? "";
+  expect(body).toMatch(/name="[^"\n]*imageConsistencyConfirmed"\r?\n\r?\ntrue/);
 });

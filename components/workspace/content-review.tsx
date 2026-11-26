@@ -17,15 +17,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Field, FieldError, FieldGroup, FieldLabel, FieldTitle } from "@/components/ui/field";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
@@ -187,30 +180,33 @@ export function ContentReview({
               >
                 <FieldGroup>
                   <Field data-invalid={!!form.formState.errors.decision}>
-                    <FieldLabel htmlFor={`content-review-${detail.id}-decision`}>决定</FieldLabel>
+                    <FieldTitle id={`content-review-${detail.id}-decision-label`}>决定</FieldTitle>
                     <Controller
                       control={form.control}
                       name="decision"
                       render={({ field }) => (
-                        <Select
-                          items={{ approved: "批准营销内容", rejected: "退回营销内容" }}
+                        <RadioGroup
+                          id={`content-review-${detail.id}-decision`}
+                          disabled={pending}
+                          aria-labelledby={`content-review-${detail.id}-decision-label`}
+                          aria-invalid={!!form.formState.errors.decision}
                           value={field.value ?? null}
-                          onValueChange={field.onChange}
+                          onValueChange={(next) => {
+                            if (next) field.onChange(next);
+                          }}
+                          className="grid gap-2 sm:grid-cols-2"
                         >
-                          <SelectTrigger
-                            id={`content-review-${detail.id}-decision`}
-                            className="w-full"
-                            aria-invalid={!!form.formState.errors.decision}
+                          <RadioGroupChoice
+                            value="approved"
+                            itemRef={field.ref}
+                            onBlur={field.onBlur}
                           >
-                            <SelectValue placeholder="请选择审核决定" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectItem value="approved">批准营销内容</SelectItem>
-                              <SelectItem value="rejected">退回营销内容</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
+                            批准营销内容
+                          </RadioGroupChoice>
+                          <RadioGroupChoice value="rejected" onBlur={field.onBlur}>
+                            退回营销内容
+                          </RadioGroupChoice>
+                        </RadioGroup>
                       )}
                     />
                     <FieldError errors={[form.formState.errors.decision]} />

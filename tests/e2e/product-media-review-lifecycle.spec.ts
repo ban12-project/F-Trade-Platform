@@ -47,8 +47,10 @@ test("approval refresh starts a fresh revocation, denial keeps its draft and ret
   const card = page
     .locator('[data-slot="card"]')
     .filter({ hasText: "Authorized front-facing synthetic product image." });
-  await card.getByRole("combobox", { name: "审核决定", exact: true }).click();
-  await page.getByRole("option", { name: "批准素材", exact: true }).click();
+  await card
+    .getByRole("radiogroup", { name: "审核决定", exact: true })
+    .getByRole("radio", { name: "批准素材", exact: true })
+    .click();
   const selectEvidence = async () => {
     await card.getByRole("combobox", { name: "审核依据", exact: true }).click();
     await page.getByRole("option", { name: "合成审核依据.pdf", exact: true }).click();

@@ -208,16 +208,19 @@ for (const change of [
       await page.goto(path);
       const form = page.locator("form[data-content-review]").filter({ visible: true });
       await expect(form).toBeVisible();
+      const decisionGroup = form.getByRole("radiogroup", { name: "决定", exact: true });
       await expect(
-        form.locator('[id^=content-review-][id$=-decision] [data-slot="select-value"]'),
-      ).toHaveText("请选择审核决定");
+        decisionGroup.getByRole("radio", { name: "批准营销内容", exact: true }),
+      ).not.toBeChecked();
+      await expect(
+        decisionGroup.getByRole("radio", { name: "退回营销内容", exact: true }),
+      ).not.toBeChecked();
       await expect(
         page.getByRole("button", { name: "请先选择决定", exact: true }).filter({ visible: true }),
       ).toBeDisabled();
       if (change.endsWith("navigation")) {
         if (change === "decision navigation") {
-          await form.getByRole("combobox", { name: "决定", exact: true }).click();
-          await page.getByRole("option", { name: "退回营销内容", exact: true }).click();
+          await decisionGroup.getByRole("radio", { name: "退回营销内容", exact: true }).click();
         }
         if (change === "evidence navigation") {
           await form.getByLabel("审核依据", { exact: true }).click();
@@ -241,8 +244,8 @@ for (const change of [
           await expect(page).toHaveURL(path);
           if (change === "decision navigation")
             await expect(
-              form.locator('[id^=content-review-][id$=-decision] [data-slot="select-value"]'),
-            ).toHaveText("退回营销内容");
+              decisionGroup.getByRole("radio", { name: "退回营销内容", exact: true }),
+            ).toBeChecked();
           if (change === "evidence navigation")
             await expect(form.getByLabel("审核依据", { exact: true })).toContainText(
               "SYNTHETIC browser review source",
@@ -260,8 +263,7 @@ for (const change of [
         expect(selectErrors).toEqual([]);
         return;
       }
-      await form.getByRole("combobox", { name: "决定", exact: true }).click();
-      await page.getByRole("option", { name: label, exact: true }).click();
+      await decisionGroup.getByRole("radio", { name: label, exact: true }).click();
       await form.getByLabel("审核依据", { exact: true }).click();
       await page
         .locator(`[data-evidence-id="${reviewEvidence}"]`)
@@ -331,11 +333,7 @@ for (const change of [
             .filter({ visible: true }),
         ).toBeVisible();
         await expect(form.locator("[id^=content-review-][id$=-notes]")).toHaveValue(notes);
-        await expect(
-          form
-            .getByRole("combobox", { name: "决定", exact: true })
-            .locator('[data-slot="select-value"]'),
-        ).toHaveText(label);
+        await expect(decisionGroup.getByRole("radio", { name: label, exact: true })).toBeChecked();
         await expect(form.getByLabel("审核依据", { exact: true })).toContainText(
           "SYNTHETIC browser review source",
         );
