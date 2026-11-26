@@ -144,7 +144,8 @@ assert.deepEqual(await run(), { status: "error", message: PRODUCT_REVIEW_ACCESS_
 failure = new Error(`Product cannot be Ready: ${secret}`);
 assert.deepEqual(await run(), {
   status: "error",
-  message: "产品事实或逐字段证据尚未完整核验，请补齐资料后重新审核。",
+  message:
+    "产品事实或逐字段证据尚未完整核验，暂不能批准。请先退回产品信息进入待修订状态，补齐资料后重新送审。",
 });
 for (const message of [
   "产品资料已更新，请刷新并重新审核当前版本。",

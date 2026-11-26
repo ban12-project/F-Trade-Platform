@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { initialProductActionState } from "@/lib/action-states";
 import { decideProductCatalogReviewAction } from "@/lib/actions/products";
 import { productReviewFormSchema } from "@/lib/form-schemas";
+import { productApprovalBlockingFields } from "@/lib/product/blocking-fields";
 import type { ProductEvidencePreview } from "@/lib/product/evidence-preview";
 import { productBlockerLabel } from "@/lib/product/fact-labels";
 import { productReviewValue } from "@/lib/product/field-review";
@@ -113,6 +114,11 @@ export function ProductReview({
     canReview &&
     detail.state === "PRODUCT_REVIEW_REQUIRED" &&
     detail.approvalStatus === "pending";
+  const approvalBlockers = productApprovalBlockingFields(detail.draft);
+  const canApprove = approvalBlockers.length === 0;
+  const revisionState = detail.state === "PRODUCT_REVISION_REQUIRED";
+  const reviewState = detail.state === "PRODUCT_REVIEW_REQUIRED";
+  const decision = form.watch("decision");
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
@@ -120,12 +126,25 @@ export function ProductReview({
         <Badge variant="outline">{detail.internalSku}</Badge>
         <Badge variant="outline">第 {detail.version} 版</Badge>
       </div>
-      {detail.blockingFields.length ? (
+      {approvalBlockers.length ? (
         <Alert>
           <AlertTitle>先补齐核实所需资料</AlertTitle>
           <AlertDescription>
-            {detail.blockingFields.map(productBlockerLabel).join("；")}
-            。请在退回备注中明确需要补充的来源，资料编辑者修订后重新送审。
+            {approvalBlockers.map(productBlockerLabel).join("；")}
+            {revisionState
+              ? "。请在下方修订表单补齐信息与来源资料后重新送审。"
+              : reviewState
+                ? "。当前版本暂不能批准，请先在下方选择「退回产品信息」并填写退回备注；退回进入「待修订」状态后，页面会出现修订表单，补齐资料并重新送审后再批准。"
+                : "。请在退回备注中明确需要补充的来源，资料编辑者修订后重新送审。"}
+          </AlertDescription>
+        </Alert>
+      ) : detail.blockingFields.length ? (
+        <Alert>
+          <AlertTitle>请重点核实完整适配信息</AlertTitle>
+          <AlertDescription>
+            当前记录未填写 OE
+            编号，但已具备完整适配信息（适用范围、车辆品牌、车型）及来源。若核实适配关系准确，可直接批准；若需补充
+            OE 编号或其他资料，请先退回进入「待修订」状态。
           </AlertDescription>
         </Alert>
       ) : null}
@@ -217,23 +236,34 @@ export function ProductReview({
                           }
                           value={field.value ?? null}
                           onValueChange={(value) => {
-                            if (value) field.onChange(value);
+                            if (!value || (value === "approved" && !canApprove)) return;
+                            field.onChange(value);
                           }}
                           className="grid gap-2 sm:grid-cols-2"
                         >
                           <RadioGroupChoice
                             value="approved"
-                            itemRef={field.ref}
+                            disabled={!canApprove}
+                            itemRef={canApprove ? field.ref : undefined}
                             onBlur={field.onBlur}
                           >
                             批准产品信息
                           </RadioGroupChoice>
-                          <RadioGroupChoice value="rejected" onBlur={field.onBlur}>
+                          <RadioGroupChoice
+                            value="rejected"
+                            itemRef={!canApprove ? field.ref : undefined}
+                            onBlur={field.onBlur}
+                          >
                             退回产品信息
                           </RadioGroupChoice>
                         </RadioGroup>
                       )}
                     />
+                    {!canApprove ? (
+                      <FieldDescription>
+                        当前版本存在待补齐项，暂不可选择「批准产品信息」。请先选择「退回产品信息」进入「待修订」状态，再通过修订表单补齐资料。
+                      </FieldDescription>
+                    ) : null}
                     <FieldError
                       id={fieldId("decision-error")}
                       errors={[form.formState.errors.decision]}
@@ -301,7 +331,7 @@ export function ProductReview({
                   </Field>
                   <Field data-invalid={!!form.formState.errors.notes}>
                     <FieldLabel htmlFor={fieldId("product-review-notes")}>
-                      审核备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
+                      审核备注{decision === "rejected" ? "（必填）" : ""}
                     </FieldLabel>
                     <Textarea
                       id={fieldId("product-review-notes")}
@@ -324,19 +354,24 @@ export function ProductReview({
             <Button
               form={fieldId("product-review")}
               type="submit"
-              variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
-              disabled={busy || !form.watch("decision") || !evidenceOptions.length}
+              variant={decision === "rejected" ? "destructive" : "default"}
+              disabled={
+                busy ||
+                !decision ||
+                (decision === "approved" && !canApprove) ||
+                !evidenceOptions.length
+              }
             >
               {pending ? (
                 <Spinner data-icon="inline-start" />
-              ) : form.watch("decision") === "approved" ? (
+              ) : decision === "approved" ? (
                 <CheckCircle2Icon data-icon="inline-start" />
               ) : (
                 <XCircleIcon data-icon="inline-start" />
               )}
-              {form.watch("decision") === "approved"
+              {decision === "approved"
                 ? "批准产品信息"
-                : form.watch("decision") === "rejected"
+                : decision === "rejected"
                   ? "退回产品信息"
                   : "请先选择决定"}
             </Button>

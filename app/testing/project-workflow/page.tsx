@@ -627,8 +627,9 @@ async function ProjectWorkflowFixture({
       </WorkspaceDirtyProvider>
     );
   }
-  const productDetail =
+  const productDetail: ProductCatalogDetail | null =
     state === "product-review" ||
+    state === "product-review-complete" ||
     state === "product-review-images" ||
     state === "product-review-locations" ||
     state === "product-revision"
@@ -656,6 +657,9 @@ async function ProjectWorkflowFixture({
                 : syntheticProductDetail.draft.evidence_refs,
             field_evidence: {
               ...syntheticProductDetail.draft.field_evidence,
+              ...(state === "product-review-complete" || state === "product-review-images"
+                ? { "commercial.sample_available": "evidence-product-001" }
+                : {}),
               ...(state === "product-review-locations"
                 ? {
                     "product.product_name": "evidence-loc-mock-page-3-name",
@@ -666,7 +670,107 @@ async function ProjectWorkflowFixture({
             },
           },
         }
-      : null;
+      : state === "product-review-incomplete"
+        ? {
+            ...syntheticProductDetail,
+            productName: "未填写产品名称",
+            internalSku: "SYN-PARTIAL-001",
+            productType: "unknown",
+            blockingFields: [
+              "oe_numbers_or_verified_application",
+              "product.product_name",
+              "product.product_type",
+            ],
+            draft: {
+              record_id: syntheticProduct.id,
+              source_ref: "source-product-001",
+              evidence_refs: ["evidence-product-001"],
+              field_evidence: {
+                "product.internal_sku": "evidence-product-001",
+                "product.vehicle_model": "evidence-product-001",
+              },
+              verification_status: "review_required",
+              blocking_missing_fields: [
+                "oe_numbers_or_verified_application",
+                "product.product_name",
+                "product.product_type",
+              ],
+              optional_missing_fields: [],
+              product: {
+                internal_sku: "SYN-PARTIAL-001",
+                vehicle_model: "SYN-MODEL-01",
+              },
+            },
+          }
+        : state === "product-review-application"
+          ? {
+              ...syntheticProductDetail,
+              blockingFields: ["oe_numbers_or_verified_application"],
+              draft: {
+                record_id: syntheticProduct.id,
+                source_ref: "source-product-001",
+                evidence_refs: ["evidence-product-001"],
+                field_evidence: {
+                  "product.product_name": "evidence-product-001",
+                  "product.product_type": "evidence-product-001",
+                  "product.internal_sku": "evidence-product-001",
+                  "product.application": "evidence-product-001",
+                  "product.vehicle_brand": "evidence-product-001",
+                  "product.vehicle_model": "evidence-product-001",
+                },
+                verification_status: "review_required",
+                blocking_missing_fields: ["oe_numbers_or_verified_application"],
+                optional_missing_fields: [],
+                product: {
+                  product_name: syntheticProduct.productName,
+                  product_type: "clutch_kit",
+                  internal_sku: syntheticProduct.internalSku,
+                  application: "SYNTHETIC heavy truck application",
+                  vehicle_brand: "SYNTHETIC Brand",
+                  vehicle_model: "SYN-MODEL-01",
+                },
+              },
+            }
+          : state === "product-revision-retained"
+            ? {
+                ...syntheticProductDetail,
+                state: "PRODUCT_REVISION_REQUIRED",
+                approvalStatus: "rejected",
+                productName: "未填写产品名称",
+                internalSku: "SYN-PARTIAL-001",
+                productType: "unknown",
+                blockingFields: [
+                  "oe_numbers_or_verified_application",
+                  "product.product_name",
+                  "product.product_type",
+                ],
+                draft: {
+                  record_id: syntheticProduct.id,
+                  source_ref: "source-synthetic-catalog",
+                  evidence_refs: [
+                    "evidence-loc-row-page-1-000001-000001-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "evidence-loc-row-page-1-000001-000002-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  ],
+                  field_evidence: {
+                    "product.internal_sku":
+                      "evidence-loc-row-page-1-000001-000001-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "product.vehicle_model":
+                      "evidence-loc-row-page-1-000001-000002-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  },
+                  verification_status: "revision_required",
+                  blocking_missing_fields: [
+                    "oe_numbers_or_verified_application",
+                    "product.product_name",
+                    "product.product_type",
+                  ],
+                  optional_missing_fields: [],
+                  product: {
+                    internal_sku: "SYN-PARTIAL-001",
+                    vehicle_model: "SYN-MODEL-01",
+                  },
+                },
+              }
+            : null;
   const contentDetail = state === "content-revision" ? syntheticContentDetail : null;
   const panels = {
     product: productDetail ? (

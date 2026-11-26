@@ -359,7 +359,9 @@ function BatchEvidencePanel({
   }
   function applyDefaultEvidence(mode: "all-filled" | "unlinked-filled") {
     if (!batchEvidence) return;
-    form.setValue("sourceRef", batchEvidence, { shouldDirty: true, shouldValidate: true });
+    if (mode === "all-filled" || !values.sourceRef) {
+      form.setValue("sourceRef", batchEvidence, { shouldDirty: true, shouldValidate: true });
+    }
     for (const [, evidenceName] of eligibleBatchTargets) {
       if (mode === "unlinked-filled" && values[evidenceName]) continue;
       form.setValue(evidenceName, batchEvidence, { shouldDirty: true, shouldValidate: true });
