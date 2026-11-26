@@ -34,6 +34,7 @@ runs:
           echo "BUILD_TAG=run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           echo "REVISION=$GITHUB_SHA"
           echo "SOURCE=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          echo "GEOIP_REFRESH_DATE=$(date -u +%Y-%m-%d)"
         } >> "$GITHUB_ENV"
     - name: Free hosted runner space for Docker image export
       if: runner.environment == 'github-hosted' && runner.os == 'Linux'

@@ -43,6 +43,9 @@ export const publicationPreclickCodes: readonly [
   "facebook_audience_picker_timeout",
   "facebook_audience_selection_timeout",
   "facebook_audience_applied_timeout",
+  "facebook_matching_post_already_exists",
+  "facebook_video_caption_required",
+  "facebook_upload_failed",
 ];
 export function publicationPreclickFailure(stage: unknown, code: unknown): string;
 export function parsePublicationPreclickFailure(value: unknown): {

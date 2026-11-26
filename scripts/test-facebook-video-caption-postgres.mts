@@ -330,6 +330,128 @@ try {
     assert.equal(manifest.captionSource, null);
     count++;
   }
+  {
+    const f = await fixture();
+    const caption2Id = randomUUID(),
+      caption2GateId = randomUUID(),
+      body2 = "SYNTHETIC rebound approved caption; no factory claims.";
+    await db.insert(s.aggregateRecord).values({
+      id: caption2Id,
+      type: "content",
+      state: "CONTENT_APPROVED",
+      payload: { product_id: f.productId, status: "approved", body: body2 },
+      createdByType: "human",
+      createdById: f.actorId,
+    });
+    await db.insert(s.workspaceProjectItem).values({
+      id: randomUUID(),
+      projectId: f.projectId,
+      aggregateId: caption2Id,
+      role: "marketing_content",
+      relation: "owned",
+    });
+    await db.insert(s.approval).values({
+      id: caption2GateId,
+      aggregateId: caption2Id,
+      gate: "gate_01_truth",
+      status: "approved",
+      requestedByType: "human",
+      requestedById: f.actorId,
+      requestedAt: new Date(),
+      decidedByType: "human",
+      decidedById: f.actorId,
+      decidedAt: new Date(),
+      evidenceRef: f.decisionRef,
+    });
+    const firstInput = await input(f);
+    const firstSaved = await submitFacebookMediaPublication(firstInput, f.identity, db);
+    const [firstPub] = await db
+      .select()
+      .from(s.socialPublication)
+      .where(eq(s.socialPublication.id, firstSaved.publicationId));
+    assert.ok(firstPub.browserJobId);
+    const runId = randomUUID();
+    await db.execute(
+      sql`UPDATE browser_fleet_node SET document = jsonb_set(document, '{runs}', ${JSON.stringify([
+        {
+          id: runId,
+          kind: "publish",
+          jobRef: firstPub.browserJobId,
+          status: "failed",
+          failure: "publication_not_authorized",
+        },
+      ])}::jsonb) WHERE id = ${f.nodeId}`,
+    );
+    await db.execute(
+      sql`INSERT INTO browser_fleet_publication (job_id, node_id, run_id) VALUES (${firstPub.browserJobId}, ${f.nodeId}, ${runId})`,
+    );
+    await db
+      .update(s.socialBrowserJob)
+      .set({
+        status: "paused",
+        failureCode:
+          "fleet_publication_not_authorized:prepare:facebook_matching_post_already_exists",
+      })
+      .where(eq(s.socialBrowserJob.id, firstPub.browserJobId));
+    await db
+      .update(s.socialPublication)
+      .set({ status: "failed" })
+      .where(eq(s.socialPublication.id, firstSaved.publicationId));
+    const options = await listFacebookMediaOptions(f.projectId, f.actorId, db, f.contentId);
+    const secondOption = options.find((o) => o.captionContentRef === caption2Id);
+    assert.ok(secondOption);
+    const rebound = await submitFacebookMediaPublication(
+      {
+        ...f.mediaSubmission,
+        captionContentRef: caption2Id,
+        previewDigest: secondOption.previewDigest,
+      },
+      f.identity,
+      db,
+    );
+    assert.deepEqual(rebound, firstSaved);
+    const [reboundManifest] = await db
+      .select()
+      .from(facebookPublicationManifest)
+      .where(eq(facebookPublicationManifest.publicationId, firstSaved.publicationId));
+    assert.equal(reboundManifest.caption, body2);
+    assert.deepEqual(reboundManifest.captionSource, {
+      contentRef: caption2Id,
+      contentVersion: 1,
+      approvalRef: caption2GateId,
+    });
+    const [requeuedJob] = await db
+      .select()
+      .from(s.socialBrowserJob)
+      .where(eq(s.socialBrowserJob.id, firstPub.browserJobId));
+    assert.equal(requeuedJob.status, "queued");
+    assert.equal(requeuedJob.failureCode, null);
+    const [requeuedPub] = await db
+      .select()
+      .from(s.socialPublication)
+      .where(eq(s.socialPublication.id, firstSaved.publicationId));
+    assert.equal(requeuedPub.status, "submitted");
+
+    // Non-preclick unknown pause must still forbid changing the manifest caption.
+    await db
+      .update(s.socialBrowserJob)
+      .set({ status: "paused", failureCode: "fleet_publication_result_unknown" })
+      .where(eq(s.socialBrowserJob.id, firstPub.browserJobId));
+    await db
+      .update(s.socialPublication)
+      .set({ status: "unknown" })
+      .where(eq(s.socialPublication.id, firstSaved.publicationId));
+    await assert.rejects(
+      submitFacebookMediaPublication(firstInput, f.identity, db),
+      /existing_caption_changed/,
+    );
+    const [preservedManifest] = await db
+      .select()
+      .from(facebookPublicationManifest)
+      .where(eq(facebookPublicationManifest.publicationId, firstSaved.publicationId));
+    assert.equal(preservedManifest.caption, body2);
+    count++;
+  }
   console.log(
     `PASS ${count} migrated PostgreSQL video caption cases: approval, ownership, preview drift, read races, durable source, dispatch revocation, idempotency and legacy compatibility; no external delivery`,
   );

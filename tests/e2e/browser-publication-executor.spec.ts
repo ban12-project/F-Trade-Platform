@@ -277,6 +277,29 @@ test("preauthorization diagnostics are bounded and preserve legacy retry behavio
   expect(publicationFailureLabel("fleet_publication_not_authorized")).not.toMatch(
     /尚未取得发帖授权|选择器/,
   );
+  for (const [stage, preclickCode, expectedText] of [
+    ["prepare", "facebook_matching_post_already_exists", "完全相同的正文帖子"],
+    ["prepare", "facebook_video_caption_required", "附带已批准配文"],
+    ["prepare", "facebook_upload_failed", "未能将发布素材附加到发帖编辑器"],
+    ["media", "publication_media_response_invalid", "返回发布素材响应无效"],
+    ["media", "publication_media_transport_failed", "拉取发布素材时传输失败"],
+  ] as const) {
+    const preclick = publicationPreclickFailure(stage, preclickCode);
+    expect(isPublicationPreauthorizationFailure(preclick)).toBe(true);
+    expect(publicationFailureLabel(preclick)).toContain(expectedText);
+    expect(
+      nodeRequestSchema.safeParse({
+        operation: "finish",
+        installationId: "11111111-1111-4111-8111-111111111111",
+        bootId: "11111111-1111-4111-8111-111111111111",
+        runId: "11111111-1111-4111-8111-111111111111",
+        leaseId: "11111111-1111-4111-8111-111111111111",
+        stopped: true,
+        outcome: "failed",
+        publicationFailure: { stage, code: preclickCode },
+      }).success,
+    ).toBe(true);
+  }
   const finish = {
     operation: "finish",
     installationId: "11111111-1111-4111-8111-111111111111",

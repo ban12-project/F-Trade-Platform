@@ -13,6 +13,9 @@ variable "REVISION" {
 variable "SOURCE" {
   default = "https://github.com/ban12-project/F-Trade-Platform"
 }
+variable "GEOIP_REFRESH_DATE" {
+  default = "local"
+}
 
 group "default" {
   targets = ["agent", "browser"]
@@ -41,6 +44,7 @@ target "browser" {
   dockerfile = "browser.Dockerfile"
   args = {
     TARGETARCH = ARCH
+    GEOIP_REFRESH_DATE = GEOIP_REFRESH_DATE
   }
   tags = ["${IMAGE_PREFIX}-browser:${BUILD_TAG}-${ARCH}"]
   cache-from = ["type=gha,scope=ftrade-browser-runtime-${ARCH}"]
