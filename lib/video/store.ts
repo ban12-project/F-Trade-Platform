@@ -250,7 +250,6 @@ export async function createMarketingVideoEditProject(
       .update(workspaceProject)
       .set({ updatedAt: now })
       .where(eq(workspaceProject.id, value.projectId));
-    const processingJob = await queueLockedVideoProcessingJob(tx, id, "ai_draft", identity);
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       action: "marketing_video_edit.created",
@@ -266,7 +265,7 @@ export async function createMarketingVideoEditProject(
       },
       occurredAt: now,
     });
-    return { id, project, processingJob: processingJob.job };
+    return { id, project };
   });
 }
 

@@ -375,7 +375,11 @@ try {
   const callsBeforeMissingBrief = modelCalls;
   const missingBriefJob = await runDraft(missingBrief.id);
   assert.equal(missingBriefJob.status, "failed");
-  assert.equal(missingBriefJob.failureCode, "AI_DRAFT_FAILED");
+  assert.equal(missingBriefJob.failureCode, "AI_DRAFT_BRIEF_REQUIRED");
+  assert.equal(
+    missingBriefJob.failureMessage,
+    "请先完整填写并保存 ABCD 创意简报，再生成 AI 初稿。",
+  );
   assert.equal(
     modelCalls,
     callsBeforeMissingBrief,

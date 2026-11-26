@@ -100,17 +100,11 @@ async function startVideoJob(
   return dispatchVideoJob(queued.job, identity.actorId);
 }
 
-async function finishVideoCreation(
-  result: { id: string; processingJob: ProcessingJob },
+function finishVideoCreation(
+  result: { id: string },
   projectId: string,
-  actorId: string,
   message: string,
-): Promise<MarketingVideoActionState> {
-  try {
-    await dispatchVideoJob(result.processingJob, actorId);
-  } catch {
-    message = "剪辑稿与后台任务已保存，任务暂未启动。请在剪辑器中重试。";
-  }
+): MarketingVideoActionState {
   revalidatePath(`/workspace/${projectId}`);
   refreshWorkspace();
   return { status: "success", message, videoId: result.id };
@@ -196,8 +190,7 @@ export async function createMarketingVideoDraftAction(
       return finishVideoCreation(
         result,
         request.projectId,
-        session.user.id,
-        "已复用审核通过的产品媒体，AI 剪辑初稿已进入后台队列。",
+        "已复用审核通过的产品媒体并创建剪辑稿；请打开剪辑稿填写并保存 ABCD 创意简报后再生成 AI 初稿。",
       );
     }
 
@@ -236,8 +229,7 @@ export async function createMarketingVideoDraftAction(
       return finishVideoCreation(
         result,
         request.projectId,
-        session.user.id,
-        "互联网素材已私有导入；仅限测试预览，AI 剪辑初稿已进入后台队列。",
+        "互联网素材已私有导入并创建剪辑稿；仅限测试预览，请填写并保存 ABCD 创意简报后再生成 AI 初稿。",
       );
     }
 
@@ -266,8 +258,7 @@ export async function createMarketingVideoDraftAction(
     return finishVideoCreation(
       result,
       request.projectId,
-      session.user.id,
-      "素材已保存，AI 剪辑初稿已进入后台队列。",
+      "素材已保存并创建剪辑稿；请打开剪辑稿填写并保存 ABCD 创意简报后再生成 AI 初稿。",
     );
   } catch (error) {
     return { status: "error", message: videoDraftFailureMessage(error, "create") };

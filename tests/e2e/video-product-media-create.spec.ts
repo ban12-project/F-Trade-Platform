@@ -28,12 +28,12 @@ test("marketing video creation reuses approved ProductMedia without repeating ri
   await expect(page.getByText("4.5 秒", { exact: false })).toBeVisible();
   await expect(page.getByLabel("素材（1–3 个）")).toHaveCount(0);
   await expect(page.getByLabel("素材使用授权证明")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "复用媒体并生成 AI 初稿" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "复用媒体并创建剪辑稿" })).toBeEnabled();
 
   await page.getByRole("button", { name: "上传新素材" }).click();
   await expect(page.getByLabel("素材（1–3 个）")).toBeVisible();
   await expect(page.getByLabel("素材使用授权证明")).toBeVisible();
-  await expect(page.getByRole("button", { name: "上传并生成 AI 初稿" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "上传并创建剪辑稿" })).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

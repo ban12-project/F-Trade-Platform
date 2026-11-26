@@ -30,7 +30,6 @@ import {
   createMarketingVideoFromProductMediaSchema,
   marketingVideoDraftSchema,
 } from "./edit-contracts";
-import { queueLockedVideoProcessingJob } from "./processing-jobs";
 
 const parseProductReady = compileContract<ProductReady>(productReadySchema);
 type ProductMediaRow = typeof productMediaAsset.$inferSelect;
@@ -222,7 +221,6 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       .update(workspaceProject)
       .set({ updatedAt: now })
       .where(eq(workspaceProject.id, value.projectId));
-    const processingJob = await queueLockedVideoProcessingJob(tx, id, "ai_draft", identity);
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       action: "marketing_video_edit.created",
@@ -240,6 +238,6 @@ export async function createMarketingVideoEditProjectFromProductMedia(
       },
       occurredAt: now,
     });
-    return { id, project, processingJob: processingJob.job };
+    return { id, project };
   });
 }

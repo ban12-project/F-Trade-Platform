@@ -50,21 +50,26 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
   "use step";
   const job = await markVideoJobRunning(input.jobId);
   if (job.status === "succeeded" || job.status === "failed") return;
+  let stage = "load_project";
   try {
     const { project, state, version } = await getMarketingVideoEditProject(input.videoId);
     if (!["VIDEO_DRAFT", "VIDEO_REVISION_REQUIRED"].includes(state))
       throw new Error("当前视频状态不能生成 AI 初稿。");
     if (job.requestKey !== videoProcessingRequestKey(input.videoId, "ai_draft", version))
       throw new MarketingVideoDraftChangedError();
+    stage = "source_verification";
     await Promise.all([
       assertCurrentProductFactsForVideo(project),
       assertCurrentProductMediaUsageForVideo(project),
     ]);
     const currentDraft = marketingVideoDraftSchema.parse(project.editDraft);
+    stage = "creative_brief";
     const brief = marketingCreativeBriefSchema.parse(currentDraft.creativeBrief);
+    stage = "source_access";
     const sources = await issueSandboxVideoSources(
       project.sourceAssets.map((asset) => asset.assetRef),
     );
+    stage = "visual_sampling";
     const sampling = await extractMarketingVisualSamplesInSandbox(project.sourceAssets, sources);
     const candidatePayload = sampling.candidates.map(
       ({ id, assetRef, mediaType, maximumDurationMs, hasAudio, sourceAnalysis }) => ({
@@ -92,6 +97,7 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
           : {}),
       }),
     );
+    stage = "model_generation";
     const suggestion = await new AiSdkStructuredGenerator().generate({
       model: createProductAgentModel(await resolveProductAgentModelConfig()),
       schema: marketingVideoAiDraftSchema,
@@ -104,25 +110,31 @@ async function generateAiDraft(input: MarketingVideoWorkflowInput) {
       })),
       visualSamples: sampling.visualSamples,
     });
+    stage = "compile_draft";
     const draft = compileMarketingVideoAiDraft({
       suggestion,
       candidates: sampling.candidates,
       platform: currentDraft.platform,
       creativeBrief: brief,
     });
+    stage = "save_draft";
     await applyMarketingVideoAiDraft(input.videoId, draft, input.actorId, version);
+    stage = "completion";
     await completeVideoJob(input.jobId);
   } catch (error) {
-    await failVideoJob(
-      input.jobId,
+    const code =
       error instanceof VideoRetentionError
         ? "RETENTION_EXPIRED"
         : error instanceof MarketingVideoDraftChangedError
           ? "AI_DRAFT_STALE"
           : error instanceof MarketingVideoSourceInvalidError
             ? "AI_DRAFT_SOURCE_INVALID"
-            : "AI_DRAFT_FAILED",
-    );
+            : stage === "creative_brief"
+              ? "AI_DRAFT_BRIEF_REQUIRED"
+              : "AI_DRAFT_FAILED";
+    // Only controlled stage/code values; never log media URLs, payloads or raw errors.
+    console.error("marketing_video_ai_draft.failed", { stage, code });
+    await failVideoJob(input.jobId, code);
   }
 }
 // markVideoJobRunning returns "running" without a lease/claim fence, so overlapping
