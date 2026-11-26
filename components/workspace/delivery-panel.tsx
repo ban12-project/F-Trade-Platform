@@ -28,6 +28,7 @@ import {
   Field,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldSet,
@@ -142,51 +143,55 @@ function DeliveryDecision({
                   errors={[form.formState.errors.decision]}
                 />
               </Field>
-              <Field data-invalid={!!form.formState.errors.leadTimeDays}>
-                <FieldLabel htmlFor={`confirmed-days-${entry.id}`}>确认交期（天）</FieldLabel>
-                <Input
-                  id={`confirmed-days-${entry.id}`}
-                  inputMode="numeric"
-                  disabled={form.watch("decision") !== "confirmed"}
-                  {...form.register("leadTimeDays")}
-                  aria-invalid={!!form.formState.errors.leadTimeDays}
-                  aria-describedby={[
-                    `confirmed-days-${entry.id}-help`,
-                    form.formState.errors.leadTimeDays
-                      ? `closing-review-${entry.id}-leadTimeDays-error`
-                      : undefined,
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                />
-                <FieldDescription id={`confirmed-days-${entry.id}-help`}>
-                  填写工厂核实的交期天数；与确认结果的 {DELIVERY_CONFIRMATION_VALIDITY_DAYS}
-                  天有效期不同。
-                </FieldDescription>
-                <FieldError
-                  id={`closing-review-${entry.id}-leadTimeDays-error`}
-                  errors={[form.formState.errors.leadTimeDays]}
-                />
-              </Field>
-              <Field data-invalid={!!form.formState.errors.evidenceRef}>
-                <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>审核依据</FieldLabel>
-                <EvidenceSelectField
-                  projectId={projectId}
-                  control={form.control}
-                  name="evidenceRef"
-                  disabled={busy}
-                  aria-describedby={
-                    form.formState.errors.evidenceRef
-                      ? `closing-review-${entry.id}-evidenceRef-error`
-                      : undefined
-                  }
-                  id={`delivery-decision-evidence-${entry.id}`}
-                />
-                <FieldError
-                  id={`closing-review-${entry.id}-evidenceRef-error`}
-                  errors={[form.formState.errors.evidenceRef]}
-                />
-              </Field>
+              <FieldGrid columns={2}>
+                <Field data-invalid={!!form.formState.errors.leadTimeDays}>
+                  <FieldLabel htmlFor={`confirmed-days-${entry.id}`}>确认交期（天）</FieldLabel>
+                  <Input
+                    id={`confirmed-days-${entry.id}`}
+                    inputMode="numeric"
+                    disabled={form.watch("decision") !== "confirmed"}
+                    {...form.register("leadTimeDays")}
+                    aria-invalid={!!form.formState.errors.leadTimeDays}
+                    aria-describedby={[
+                      `confirmed-days-${entry.id}-help`,
+                      form.formState.errors.leadTimeDays
+                        ? `closing-review-${entry.id}-leadTimeDays-error`
+                        : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  />
+                  <FieldDescription id={`confirmed-days-${entry.id}-help`}>
+                    填写工厂核实的交期天数；与确认结果的 {DELIVERY_CONFIRMATION_VALIDITY_DAYS}
+                    天有效期不同。
+                  </FieldDescription>
+                  <FieldError
+                    id={`closing-review-${entry.id}-leadTimeDays-error`}
+                    errors={[form.formState.errors.leadTimeDays]}
+                  />
+                </Field>
+                <Field data-invalid={!!form.formState.errors.evidenceRef}>
+                  <FieldLabel htmlFor={`delivery-decision-evidence-${entry.id}`}>
+                    审核依据
+                  </FieldLabel>
+                  <EvidenceSelectField
+                    projectId={projectId}
+                    control={form.control}
+                    name="evidenceRef"
+                    disabled={busy}
+                    aria-describedby={
+                      form.formState.errors.evidenceRef
+                        ? `closing-review-${entry.id}-evidenceRef-error`
+                        : undefined
+                    }
+                    id={`delivery-decision-evidence-${entry.id}`}
+                  />
+                  <FieldError
+                    id={`closing-review-${entry.id}-evidenceRef-error`}
+                    errors={[form.formState.errors.evidenceRef]}
+                  />
+                </Field>
+              </FieldGrid>
               <Field data-invalid={!!form.formState.errors.notes}>
                 <FieldLabel htmlFor={`delivery-notes-${entry.id}`}>
                   备注{form.watch("decision") === "rejected" ? "（必填）" : ""}
@@ -215,6 +220,7 @@ function DeliveryDecision({
           form={`delivery-${entry.id}`}
           type="submit"
           variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
+          className="w-full sm:w-auto sm:self-start"
           disabled={busy || !form.watch("decision")}
         >
           {pending ? (

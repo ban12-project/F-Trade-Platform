@@ -30,6 +30,7 @@ import {
   Field,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -322,33 +323,35 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                   只勾选客户在本轮沟通中明确表达或实际发生的行为。
                 </FieldDescription>
                 <FieldGroup>
-                  {scoringRules.map(([id, label, points]) => (
-                    <Field key={id} orientation="horizontal">
-                      <Controller
-                        control={form.control}
-                        name="triggeredRules"
-                        render={({ field }) => (
-                          <Checkbox
-                            disabled={!form.formState.isReady || pending || planPending}
-                            id={`${entry.id}-${id}`}
-                            checked={field.value.includes(id)}
-                            onCheckedChange={(checked) =>
-                              field.onChange(
-                                checked
-                                  ? [...field.value, id]
-                                  : field.value.filter((item) => item !== id),
-                              )
-                            }
-                          />
-                        )}
-                      />
-                      <FieldLabel htmlFor={`${entry.id}-${id}`}>{label}</FieldLabel>
-                      <span className="text-xs text-muted-foreground" aria-hidden="true">
-                        {points}
-                      </span>
-                      <FieldError errors={[form.formState.errors.triggeredRules]} />
-                    </Field>
-                  ))}
+                  <FieldGrid columns={2}>
+                    {scoringRules.map(([id, label, points]) => (
+                      <Field key={id} orientation="horizontal">
+                        <Controller
+                          control={form.control}
+                          name="triggeredRules"
+                          render={({ field }) => (
+                            <Checkbox
+                              disabled={!form.formState.isReady || pending || planPending}
+                              id={`${entry.id}-${id}`}
+                              checked={field.value.includes(id)}
+                              onCheckedChange={(checked) =>
+                                field.onChange(
+                                  checked
+                                    ? [...field.value, id]
+                                    : field.value.filter((item) => item !== id),
+                                )
+                              }
+                            />
+                          )}
+                        />
+                        <FieldLabel htmlFor={`${entry.id}-${id}`}>{label}</FieldLabel>
+                        <span className="text-xs text-muted-foreground" aria-hidden="true">
+                          {points}
+                        </span>
+                        <FieldError errors={[form.formState.errors.triggeredRules]} />
+                      </Field>
+                    ))}
+                  </FieldGrid>
                 </FieldGroup>
               </FieldSet>
               <Field data-invalid={!!form.formState.errors.draft}>
@@ -365,99 +368,103 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                 </FieldDescription>
                 <FieldError errors={[form.formState.errors.draft]} />
               </Field>
-              <Field data-invalid={!!form.formState.errors.nextFollowUpAt}>
-                <FieldLabel htmlFor={`next-${entry.id}`}>下次跟进时间（可选）</FieldLabel>
-                <Input
-                  id={`next-${entry.id}`}
-                  type="datetime-local"
-                  {...nextFollowUpField}
-                  ref={(input) => {
-                    nextFollowUpField.ref(input);
-                    nextFollowUpInput.current = input;
-                  }}
-                  onChange={(event) => {
-                    void nextFollowUpField.onChange(event);
-                    form.setValue("selectedInstant", "", { shouldDirty: true });
-                    form.clearErrors("selectedInstant");
-                  }}
-                  onInput={clearValidFollowUpError}
-                  // Native date segments can change validity without emitting an input event.
-                  onKeyUp={clearValidFollowUpError}
-                  onBlur={(event) => {
-                    void nextFollowUpField.onBlur(event);
-                    clearValidFollowUpError();
-                  }}
-                  aria-describedby={`next-help-${entry.id}${form.formState.errors.nextFollowUpAt ? ` next-error-${entry.id}` : ""}`}
-                  aria-invalid={!!form.formState.errors.nextFollowUpAt}
-                />
-                <FieldDescription id={`next-help-${entry.id}`}>
-                  按当前设备时区（{timeZone}）填写；留空并保存可取消提醒。
-                </FieldDescription>
-                <FieldError
-                  id={`next-error-${entry.id}`}
-                  errors={[form.formState.errors.nextFollowUpAt]}
-                />
-              </Field>
-              {timeChoices.length > 1 ? (
-                <Field data-invalid={!!form.formState.errors.selectedInstant}>
-                  <FieldLabel htmlFor={`occurrence-${entry.id}`}>重复时间选择</FieldLabel>
-                  <NativeSelect
-                    id={`occurrence-${entry.id}`}
-                    {...occurrenceField}
-                    aria-invalid={!!form.formState.errors.selectedInstant}
-                    aria-describedby={`occurrence-help-${entry.id}${form.formState.errors.selectedInstant ? ` occurrence-error-${entry.id}` : ""}`}
+              <FieldGrid columns={2}>
+                <Field data-invalid={!!form.formState.errors.nextFollowUpAt}>
+                  <FieldLabel htmlFor={`next-${entry.id}`}>下次跟进时间（可选）</FieldLabel>
+                  <Input
+                    id={`next-${entry.id}`}
+                    type="datetime-local"
+                    {...nextFollowUpField}
+                    ref={(input) => {
+                      nextFollowUpField.ref(input);
+                      nextFollowUpInput.current = input;
+                    }}
                     onChange={(event) => {
-                      form.setValue("selectedInstant", event.target.value, { shouldDirty: true });
+                      void nextFollowUpField.onChange(event);
+                      form.setValue("selectedInstant", "", { shouldDirty: true });
                       form.clearErrors("selectedInstant");
                     }}
-                  >
-                    <NativeSelectOption value="">请选择具体时刻</NativeSelectOption>
-                    {timeChoices.map((choice, index) => (
-                      <NativeSelectOption key={choice.instant} value={choice.instant}>
-                        {index === 0 ? "第一次" : "第二次"}（UTC{choice.offset}）
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                  <FieldDescription id={`occurrence-help-${entry.id}`}>
-                    时钟回拨使此时间出现两次。已保存的提醒会保留原时刻；修改日期后需重新选择。
+                    onInput={clearValidFollowUpError}
+                    // Native date segments can change validity without emitting an input event.
+                    onKeyUp={clearValidFollowUpError}
+                    onBlur={(event) => {
+                      void nextFollowUpField.onBlur(event);
+                      clearValidFollowUpError();
+                    }}
+                    aria-describedby={`next-help-${entry.id}${form.formState.errors.nextFollowUpAt ? ` next-error-${entry.id}` : ""}`}
+                    aria-invalid={!!form.formState.errors.nextFollowUpAt}
+                  />
+                  <FieldDescription id={`next-help-${entry.id}`}>
+                    按当前设备时区（{timeZone}）填写；留空并保存可取消提醒。
                   </FieldDescription>
                   <FieldError
-                    id={`occurrence-error-${entry.id}`}
-                    errors={[form.formState.errors.selectedInstant]}
+                    id={`next-error-${entry.id}`}
+                    errors={[form.formState.errors.nextFollowUpAt]}
                   />
                 </Field>
-              ) : null}
+                {timeChoices.length > 1 ? (
+                  <Field data-invalid={!!form.formState.errors.selectedInstant}>
+                    <FieldLabel htmlFor={`occurrence-${entry.id}`}>重复时间选择</FieldLabel>
+                    <NativeSelect
+                      id={`occurrence-${entry.id}`}
+                      {...occurrenceField}
+                      aria-invalid={!!form.formState.errors.selectedInstant}
+                      aria-describedby={`occurrence-help-${entry.id}${form.formState.errors.selectedInstant ? ` occurrence-error-${entry.id}` : ""}`}
+                      onChange={(event) => {
+                        form.setValue("selectedInstant", event.target.value, { shouldDirty: true });
+                        form.clearErrors("selectedInstant");
+                      }}
+                    >
+                      <NativeSelectOption value="">请选择具体时刻</NativeSelectOption>
+                      {timeChoices.map((choice, index) => (
+                        <NativeSelectOption key={choice.instant} value={choice.instant}>
+                          {index === 0 ? "第一次" : "第二次"}（UTC{choice.offset}）
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                    <FieldDescription id={`occurrence-help-${entry.id}`}>
+                      时钟回拨使此时间出现两次。已保存的提醒会保留原时刻；修改日期后需重新选择。
+                    </FieldDescription>
+                    <FieldError
+                      id={`occurrence-error-${entry.id}`}
+                      errors={[form.formState.errors.selectedInstant]}
+                    />
+                  </Field>
+                ) : null}
+              </FieldGrid>
             </FieldGroup>
           </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={savePlan}
-          disabled={!form.formState.isReady || pending || planPending}
-        >
-          {planPending ? (
-            <Spinner data-icon="inline-start" />
-          ) : (
-            <Clock3Icon data-icon="inline-start" />
-          )}
-          保存跟进计划
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={savePlan}
+            disabled={!form.formState.isReady || pending || planPending}
+          >
+            {planPending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <Clock3Icon data-icon="inline-start" />
+            )}
+            保存跟进计划
+          </Button>
+          <Button
+            form={`follow-up-${entry.id}`}
+            type="submit"
+            disabled={!form.formState.isReady || pending || planPending || !canSend}
+          >
+            {pending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <MessageSquareTextIcon data-icon="inline-start" />
+            )}
+            人工确认并发送此回复
+          </Button>
+        </div>
         <Message {...planState} />
-        <Button
-          form={`follow-up-${entry.id}`}
-          type="submit"
-          disabled={!form.formState.isReady || pending || planPending || !canSend}
-        >
-          {pending ? (
-            <Spinner data-icon="inline-start" />
-          ) : (
-            <MessageSquareTextIcon data-icon="inline-start" />
-          )}
-          人工确认并发送此回复
-        </Button>
         {!entry.replyAvailable ? (
           <p className="text-sm text-muted-foreground">
             该线索未关联受控渠道会话，不能从应用内发送。
@@ -639,7 +646,12 @@ function LeadActions({
                   errors={[deliveryErrors.evidenceRef]}
                 />
               </Field>
-              <Button type="submit" variant="outline" disabled={deliveryBusy}>
+              <Button
+                type="submit"
+                variant="outline"
+                className="w-full sm:w-auto"
+                disabled={deliveryBusy}
+              >
                 申请工厂确认交期
               </Button>
             </form>
@@ -698,7 +710,12 @@ function LeadActions({
             </form>
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-3">
-            <Button type="submit" form={`opportunity-${entry.id}`} disabled={opportunityBusy}>
+            <Button
+              type="submit"
+              form={`opportunity-${entry.id}`}
+              className="w-full sm:w-auto sm:self-start"
+              disabled={opportunityBusy}
+            >
               <CheckCircle2Icon />
               确认有效商机
             </Button>

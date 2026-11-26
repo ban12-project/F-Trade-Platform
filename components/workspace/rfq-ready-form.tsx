@@ -83,6 +83,7 @@ export function RfqReadyForm({ projectId, entry }: { projectId: string; entry: R
         <Button
           type="submit"
           form={`rfq-ready-${entry.id}`}
+          className="w-full sm:w-auto sm:self-start"
           disabled={pending || entry.missingFields.length > 0}
         >
           <ShieldCheckIcon data-icon="inline-start" />

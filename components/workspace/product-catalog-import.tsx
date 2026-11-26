@@ -526,18 +526,26 @@ export function ProductCatalogImport({
               </FieldDescription>
               <FieldError errors={[uploadForm.formState.errors.document]} />
             </Field>
-            <Button
-              ref={uploadButtonRef}
-              type="submit"
-              disabled={pending || restoring || restoreFailed || working}
-            >
-              {pending ? "提交中…" : "上传并解析目录"}
-            </Button>
-            {uploading && (
-              <Button type="button" variant="outline" onClick={stopUpload}>
-                停止上传
+            <div className="flex flex-wrap gap-2">
+              <Button
+                ref={uploadButtonRef}
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={pending || restoring || restoreFailed || working}
+              >
+                {pending ? "提交中…" : "上传并解析目录"}
               </Button>
-            )}
+              {uploading && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={stopUpload}
+                >
+                  停止上传
+                </Button>
+              )}
+            </div>
           </FieldGroup>
         </form>
         {error && (
@@ -892,7 +900,11 @@ export function ProductCatalogImport({
                       ) : null}
                       <FieldError errors={[selection.formState.errors.candidateIds]} />
                     </FieldSet>
-                    <Button type="submit" disabled={pending || !selected.length || !choices.length}>
+                    <Button
+                      type="submit"
+                      className="w-full sm:w-auto sm:self-start"
+                      disabled={pending || !selected.length || !choices.length}
+                    >
                       生成 {selected.length} 条待审核草稿
                     </Button>
                   </FieldGroup>

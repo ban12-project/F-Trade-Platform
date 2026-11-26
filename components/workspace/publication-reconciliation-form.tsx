@@ -8,7 +8,14 @@ import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGrid,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { reconcilePublicationAction } from "@/lib/actions/publication-reconciliation";
@@ -51,28 +58,30 @@ export function PublicationReconciliationForm({
           仅账号管理员可确认。先在 Facebook
           核对原账号、完整文案、图片（如有）和公开范围，再填写已存在帖子的正式链接。核对不会恢复发布或重新发帖。若没有找到对应帖子，请保留暂停状态并联系管理员进一步检查，不能直接重发。
         </FieldDescription>
-        <Field data-invalid={!!form.formState.errors.externalPublicationRef}>
-          <FieldLabel htmlFor={`receipt-url-${publicationId}`}>已发布帖子的链接</FieldLabel>
-          <Input
-            id={`receipt-url-${publicationId}`}
-            type="url"
-            autoComplete="off"
-            {...form.register("externalPublicationRef")}
-            aria-invalid={!!form.formState.errors.externalPublicationRef}
-            disabled={pending}
-          />
-          <FieldError errors={[form.formState.errors.externalPublicationRef]} />
-        </Field>
-        <Field data-invalid={!!form.formState.errors.evidenceRef}>
-          <FieldLabel htmlFor={`receipt-evidence-${publicationId}`}>发布结果核对依据</FieldLabel>
-          <EvidenceSelectField
-            projectId={projectId}
-            control={form.control}
-            name="evidenceRef"
-            id={`receipt-evidence-${publicationId}`}
-          />
-          <FieldError errors={[form.formState.errors.evidenceRef]} />
-        </Field>
+        <FieldGrid columns={2}>
+          <Field data-invalid={!!form.formState.errors.externalPublicationRef}>
+            <FieldLabel htmlFor={`receipt-url-${publicationId}`}>已发布帖子的链接</FieldLabel>
+            <Input
+              id={`receipt-url-${publicationId}`}
+              type="url"
+              autoComplete="off"
+              {...form.register("externalPublicationRef")}
+              aria-invalid={!!form.formState.errors.externalPublicationRef}
+              disabled={pending}
+            />
+            <FieldError errors={[form.formState.errors.externalPublicationRef]} />
+          </Field>
+          <Field data-invalid={!!form.formState.errors.evidenceRef}>
+            <FieldLabel htmlFor={`receipt-evidence-${publicationId}`}>发布结果核对依据</FieldLabel>
+            <EvidenceSelectField
+              projectId={projectId}
+              control={form.control}
+              name="evidenceRef"
+              id={`receipt-evidence-${publicationId}`}
+            />
+            <FieldError errors={[form.formState.errors.evidenceRef]} />
+          </Field>
+        </FieldGrid>
         <Controller
           control={form.control}
           name="confirmed"
@@ -96,7 +105,12 @@ export function PublicationReconciliationForm({
             </Field>
           )}
         />
-        <Button type="submit" variant="outline" disabled={pending || result?.ok}>
+        <Button
+          type="submit"
+          variant="outline"
+          className="w-full sm:w-auto sm:self-start"
+          disabled={pending || result?.ok}
+        >
           {pending ? <Spinner data-icon="inline-start" /> : null}确认已发布结果
         </Button>
         {result ? (

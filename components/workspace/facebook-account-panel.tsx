@@ -262,31 +262,33 @@ export function FacebookAccountPanel() {
                 </Field>
               ))}
             </div>
-            {(
-              [
-                ["clearLogin", "清除已保存的登录凭据及验证密钥"],
-                ["clearTotp", "清除已保存的 2FA 密钥"],
-                ["clearPin", "清除已保存的 Messenger PIN"],
-                ["clearProxy", "清除已保存的代理凭据"],
-              ] as const
-            ).map(([name, label]) => (
-              <Field key={name} orientation="horizontal">
-                <Controller
-                  control={form.control}
-                  name={name}
-                  render={({ field }) => (
-                    <Checkbox
-                      id={`fb-${name}`}
-                      checked={field.value ?? false}
-                      onCheckedChange={field.onChange}
-                      disabled={busy || !!connection}
-                    />
-                  )}
-                />
-                <FieldLabel htmlFor={`fb-${name}`}>{label}</FieldLabel>
-              </Field>
-            ))}
-            <Button type="submit" disabled={busy || !!connection}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(
+                [
+                  ["clearLogin", "清除已保存的登录凭据及验证密钥"],
+                  ["clearTotp", "清除已保存的 2FA 密钥"],
+                  ["clearPin", "清除已保存的 Messenger PIN"],
+                  ["clearProxy", "清除已保存的代理凭据"],
+                ] as const
+              ).map(([name, label]) => (
+                <Field key={name} orientation="horizontal">
+                  <Controller
+                    control={form.control}
+                    name={name}
+                    render={({ field }) => (
+                      <Checkbox
+                        id={`fb-${name}`}
+                        checked={field.value ?? false}
+                        onCheckedChange={field.onChange}
+                        disabled={busy || !!connection}
+                      />
+                    )}
+                  />
+                  <FieldLabel htmlFor={`fb-${name}`}>{label}</FieldLabel>
+                </Field>
+              ))}
+            </div>
+            <Button type="submit" className="w-full sm:w-auto" disabled={busy || !!connection}>
               保存加密凭据
             </Button>
           </form>

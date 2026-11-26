@@ -35,6 +35,7 @@ import {
   Field,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldSet,
@@ -334,6 +335,35 @@ export function ProductAgentForm({
     validatedFieldCount,
   ]);
 
+  const imageField = (
+    <Field data-invalid={!!form.formState.errors.imageFiles}>
+      <FieldLabel htmlFor="agent-images">实物图片（可选）</FieldLabel>
+      <FileDropzone
+        id="agent-images"
+        inputRef={imageRef}
+        accept=".png,.jpg,.jpeg"
+        multiple
+        maxFiles={4}
+        disabled={pending}
+        invalid={!!form.formState.errors.imageFiles}
+        files={watchedImages}
+        emptyTitle="拖拽产品实拍图片到这里（最多 4 张）"
+        emptyDescription="支持 PNG / JPG / JPEG，单张不超过 5 MB"
+        buttonLabel={watchedImages.length ? "继续添加图片" : "选择图片"}
+        onFilesChange={(files) =>
+          form.setValue("imageFiles", files, {
+            shouldValidate: true,
+            shouldDirty: true,
+          })
+        }
+      />
+      <FieldError errors={[form.formState.errors.imageFiles]} />
+      <FieldDescription>
+        仅用于当前单个产品的外观核验。图片不补全工程事实，也不代表营销授权；无图可继续。
+      </FieldDescription>
+    </Field>
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -425,60 +455,40 @@ export function ProductAgentForm({
                 </CollapsibleContent>
               </Collapsible>
               {!source ? (
-                <Field>
-                  <FieldLabel htmlFor="agent-document">产品资料</FieldLabel>
-                  <FileDropzone
-                    id="agent-document"
-                    inputRef={fileRef}
-                    accept=".pdf,.csv,.xls,.xlsx"
-                    disabled={pending}
-                    files={standaloneFiles}
-                    emptyTitle="拖拽单品资料到这里，或点击选择"
-                    emptyDescription="支持 PDF、CSV、XLS、XLSX，最大 25 MB"
-                    onFilesChange={(files) => {
-                      setStandaloneFiles(files);
-                      form.setValue("hasUpload", files.length > 0, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      });
-                    }}
-                  />
-                  <FieldDescription>资料会自动保存为私有来源，最大 25MB。</FieldDescription>
-                  <FieldError errors={[form.formState.errors.sourceText]} />
-                </Field>
+                <FieldGrid columns={2}>
+                  <Field>
+                    <FieldLabel htmlFor="agent-document">产品资料</FieldLabel>
+                    <FileDropzone
+                      id="agent-document"
+                      inputRef={fileRef}
+                      accept=".pdf,.csv,.xls,.xlsx"
+                      disabled={pending}
+                      files={standaloneFiles}
+                      emptyTitle="拖拽单品资料到这里，或点击选择"
+                      emptyDescription="支持 PDF、CSV、XLS、XLSX，最大 25 MB"
+                      onFilesChange={(files) => {
+                        setStandaloneFiles(files);
+                        form.setValue("hasUpload", files.length > 0, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }}
+                    />
+                    <FieldDescription>资料会自动保存为私有来源，最大 25MB。</FieldDescription>
+                    <FieldError errors={[form.formState.errors.sourceText]} />
+                  </Field>
+                  {imageField}
+                </FieldGrid>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  {source.file
-                    ? `所选文件：${source.file.name}`
-                    : "请先在上方选择资料文件，或展开下方使用已有资料中的文本。"}
-                </p>
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {source.file
+                      ? `所选文件：${source.file.name}`
+                      : "请先在上方选择资料文件，或展开下方使用已有资料中的文本。"}
+                  </p>
+                  {imageField}
+                </>
               )}
-              <Field data-invalid={!!form.formState.errors.imageFiles}>
-                <FieldLabel htmlFor="agent-images">实物图片（可选）</FieldLabel>
-                <FileDropzone
-                  id="agent-images"
-                  inputRef={imageRef}
-                  accept=".png,.jpg,.jpeg"
-                  multiple
-                  maxFiles={4}
-                  disabled={pending}
-                  invalid={!!form.formState.errors.imageFiles}
-                  files={watchedImages}
-                  emptyTitle="拖拽产品实拍图片到这里（最多 4 张）"
-                  emptyDescription="支持 PNG / JPG / JPEG，单张不超过 5 MB"
-                  buttonLabel={watchedImages.length ? "继续添加图片" : "选择图片"}
-                  onFilesChange={(files) =>
-                    form.setValue("imageFiles", files, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                />
-                <FieldError errors={[form.formState.errors.imageFiles]} />
-                <FieldDescription>
-                  仅用于当前单个产品的外观核验。图片不补全工程事实，也不代表营销授权；无图可继续。
-                </FieldDescription>
-              </Field>
               <Accordion
                 value={textSourceOpen ? ["existing-text"] : []}
                 onValueChange={(next) => setTextSourceOpen(next.includes("existing-text"))}
@@ -527,34 +537,43 @@ export function ProductAgentForm({
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button
-          form="product-agent-import"
-          type="submit"
-          disabled={pending || choices.length === 0}
-        >
-          {pending ? <Spinner data-icon="inline-start" /> : <BotIcon data-icon="inline-start" />}
-          生成待审核草稿
-        </Button>
-        {uploading ? (
-          <Button type="button" variant="outline" onClick={stopUpload}>
-            停止上传
-          </Button>
-        ) : null}
-        {canStream && stream.pending ? (
-          <Button variant="outline" onClick={stream.stop}>
-            停止生成
-          </Button>
-        ) : null}
-        {state.productId ? (
-          <LinkButton
-            variant="outline"
-            href={workspaceRecordHref(projectId, "product", state.productId)}
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="flex flex-wrap gap-2">
+          <Button
+            form="product-agent-import"
+            type="submit"
+            className="w-full sm:w-auto"
+            disabled={pending || choices.length === 0}
           >
-            打开已保存草稿（新窗口）
-          </LinkButton>
-        ) : null}
+            {pending ? <Spinner data-icon="inline-start" /> : <BotIcon data-icon="inline-start" />}
+            生成待审核草稿
+          </Button>
+          {uploading ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={stopUpload}
+            >
+              停止上传
+            </Button>
+          ) : null}
+          {canStream && stream.pending ? (
+            <Button variant="outline" className="w-full sm:w-auto" onClick={stream.stop}>
+              停止生成
+            </Button>
+          ) : null}
+          {state.productId ? (
+            <LinkButton
+              variant="outline"
+              className="w-full sm:w-auto"
+              href={workspaceRecordHref(projectId, "product", state.productId)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              打开已保存草稿（新窗口）
+            </LinkButton>
+          ) : null}
+        </div>
         {canStream && streamFieldsList.length ? (
           <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
             <Progress

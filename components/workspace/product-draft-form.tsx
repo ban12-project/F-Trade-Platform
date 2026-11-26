@@ -171,7 +171,11 @@ export function ProductDraftForm({
             </FieldGroup>
           </CardContent>
           <CardFooter className="flex-col items-stretch gap-3">
-            <Button type="submit" disabled={busy || !evidenceOptions.length}>
+            <Button
+              type="submit"
+              disabled={busy || !evidenceOptions.length}
+              className="w-full sm:w-auto sm:self-start"
+            >
               {pending ? (
                 <Spinner data-icon="inline-start" />
               ) : revising ? (

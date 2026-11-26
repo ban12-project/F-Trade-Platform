@@ -68,31 +68,33 @@ function AccountControls({
         startTransition(() => action(data));
       })}
     >
-      <Field>
-        <FieldLabel htmlFor={`operation-${account.id}`}>要执行的操作</FieldLabel>
-        <NativeSelect id={`operation-${account.id}`} {...form.register("action")} disabled={busy}>
-          <NativeSelectOption value="" disabled>
-            请选择操作（不会自动保存）
-          </NativeSelectOption>
-          <NativeSelectOption value="enable" disabled={account.publicationPaused}>
-            允许发布
-          </NativeSelectOption>
-          <NativeSelectOption value="pause">暂停发布</NativeSelectOption>
-          <NativeSelectOption value="resume">已处理异常，人工恢复发布</NativeSelectOption>
-        </NativeSelect>
-        <FieldError errors={[form.formState.errors.action]} />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor={`reason-${account.id}`}>处理情况或操作原因</FieldLabel>
-        <Input
-          id={`reason-${account.id}`}
-          {...form.register("evidenceRef")}
-          disabled={busy}
-          placeholder="说明已核实的情况，操作将留存记录"
-        />
-        <FieldError errors={[form.formState.errors.evidenceRef]} />
-      </Field>
-      <Button type="submit" disabled={busy}>
+      <div className="grid grid-cols-1 items-start gap-4 *:min-w-0 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor={`operation-${account.id}`}>要执行的操作</FieldLabel>
+          <NativeSelect id={`operation-${account.id}`} {...form.register("action")} disabled={busy}>
+            <NativeSelectOption value="" disabled>
+              请选择操作（不会自动保存）
+            </NativeSelectOption>
+            <NativeSelectOption value="enable" disabled={account.publicationPaused}>
+              允许发布
+            </NativeSelectOption>
+            <NativeSelectOption value="pause">暂停发布</NativeSelectOption>
+            <NativeSelectOption value="resume">已处理异常，人工恢复发布</NativeSelectOption>
+          </NativeSelect>
+          <FieldError errors={[form.formState.errors.action]} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`reason-${account.id}`}>处理情况或操作原因</FieldLabel>
+          <Input
+            id={`reason-${account.id}`}
+            {...form.register("evidenceRef")}
+            disabled={busy}
+            placeholder="说明已核实的情况，操作将留存记录"
+          />
+          <FieldError errors={[form.formState.errors.evidenceRef]} />
+        </Field>
+      </div>
+      <Button type="submit" className="w-full sm:w-auto" disabled={busy}>
         {pending ? "正在保存…" : "确认操作"}
       </Button>
       {state.message && (

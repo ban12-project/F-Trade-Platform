@@ -355,6 +355,7 @@ export function ProductReview({
               form={fieldId("product-review")}
               type="submit"
               variant={decision === "rejected" ? "destructive" : "default"}
+              className="w-full sm:w-auto sm:self-start"
               disabled={
                 busy ||
                 !decision ||

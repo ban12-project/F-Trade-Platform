@@ -358,7 +358,7 @@ export function BrowserNodesPanel() {
                     <FieldError errors={[nodeForm.formState.errors[name]]} />
                   </Field>
                 ))}
-                <Button type="submit" disabled={busy}>
+                <Button type="submit" disabled={busy} className="sm:col-span-2 sm:w-fit">
                   创建节点并生成 Key
                 </Button>
               </form>
@@ -453,7 +453,7 @@ export function BrowserNodesPanel() {
               }
             })}
           >
-            <Field>
+            <Field className="sm:col-span-2">
               <FieldLabel htmlFor="account-displayName">账号名称（方便团队识别）</FieldLabel>
               <Input
                 id="account-displayName"
@@ -582,42 +582,48 @@ export function BrowserNodesPanel() {
                 ))}
               </CollapsibleContent>
             </Collapsible>
-            <FieldSet>
+            <FieldSet className="sm:col-span-2">
               <FieldLegend>清除已保存的凭据</FieldLegend>
               <FieldDescription>
                 输入留空会保留原值。勾选后，在保存账号授权时清除。
               </FieldDescription>
-              {(
-                [
-                  ["clearTotp", "清除已保存的 2FA 密钥"],
-                  ["clearPin", "清除已保存的 Messenger PIN"],
-                  ["clearLogin", "清除全部登录凭据及验证密钥"],
-                ] as const
-              ).map(([name, label]) => (
-                <Field
-                  key={name}
-                  orientation="horizontal"
-                  data-invalid={!!accountForm.formState.errors.credentials?.[name]}
-                >
-                  <Controller
-                    control={accountForm.control}
-                    name={`credentials.${name}`}
-                    render={({ field }) => (
-                      <Checkbox
-                        id={`credential-${name}`}
-                        checked={field.value ?? false}
-                        onCheckedChange={field.onChange}
-                        disabled={busy}
-                        aria-invalid={!!accountForm.formState.errors.credentials?.[name]}
-                      />
-                    )}
-                  />
-                  <FieldLabel htmlFor={`credential-${name}`}>{label}</FieldLabel>
-                  <FieldError errors={[accountForm.formState.errors.credentials?.[name]]} />
-                </Field>
-              ))}
+              <div className="grid gap-3 sm:grid-cols-3">
+                {(
+                  [
+                    ["clearTotp", "清除已保存的 2FA 密钥"],
+                    ["clearPin", "清除已保存的 Messenger PIN"],
+                    ["clearLogin", "清除全部登录凭据及验证密钥"],
+                  ] as const
+                ).map(([name, label]) => (
+                  <Field
+                    key={name}
+                    orientation="horizontal"
+                    data-invalid={!!accountForm.formState.errors.credentials?.[name]}
+                  >
+                    <Controller
+                      control={accountForm.control}
+                      name={`credentials.${name}`}
+                      render={({ field }) => (
+                        <Checkbox
+                          id={`credential-${name}`}
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                          disabled={busy}
+                          aria-invalid={!!accountForm.formState.errors.credentials?.[name]}
+                        />
+                      )}
+                    />
+                    <FieldLabel htmlFor={`credential-${name}`}>{label}</FieldLabel>
+                    <FieldError errors={[accountForm.formState.errors.credentials?.[name]]} />
+                  </Field>
+                ))}
+              </div>
             </FieldSet>
-            <Button type="submit" disabled={busy || !nodes.length}>
+            <Button
+              type="submit"
+              disabled={busy || !nodes.length}
+              className="sm:col-span-2 sm:w-fit"
+            >
               保存账号凭据
             </Button>
           </form>

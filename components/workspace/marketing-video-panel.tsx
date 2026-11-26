@@ -27,6 +27,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -206,25 +207,6 @@ function ClipEditor({
                     整条视频应包含吸引注意、呈现品牌、建立联系和引导行动；同一片段可承担多个用途。
                   </FieldDescription>
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor={`${clip.clipId}-motion`}>运动方式</FieldLabel>
-                  <NativeSelect
-                    className="w-full"
-                    id={`${clip.clipId}-motion`}
-                    value={clip.motionPreset}
-                    onChange={(event) =>
-                      patchClip(index, {
-                        motionPreset: event.target.value as keyof typeof motionPresetLabels,
-                      })
-                    }
-                  >
-                    {Object.entries(motionPresetLabels).map(([value, label]) => (
-                      <NativeSelectOption key={value} value={value}>
-                        {label}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
                 {clip.sourceAnalysis ? (
                   <Field>
                     <FieldLabel>自动镜头分析</FieldLabel>
@@ -266,106 +248,154 @@ function ClipEditor({
                     </FieldDescription>
                   </Field>
                 ) : null}
-                {clip.mediaType === "video" ? (
+                <FieldGrid columns={3}>
                   <Field>
-                    <FieldLabel htmlFor={`${clip.clipId}-start`}>源素材起点（秒）</FieldLabel>
-                    <Input
-                      id={`${clip.clipId}-start`}
-                      type="number"
-                      min={(clip.sourceAnalysis?.intervalStartMs ?? 0) / 1_000}
-                      max={
-                        clip.sourceAnalysis
-                          ? Math.max(
-                              clip.sourceAnalysis.intervalStartMs,
-                              clip.sourceAnalysis.intervalEndMs - clip.durationMs,
-                            ) / 1_000
-                          : undefined
-                      }
-                      step="0.1"
-                      value={clip.trimStartMs / 1_000}
+                    <FieldLabel htmlFor={`${clip.clipId}-motion`}>运动方式</FieldLabel>
+                    <NativeSelect
+                      className="w-full"
+                      id={`${clip.clipId}-motion`}
+                      value={clip.motionPreset}
                       onChange={(event) =>
                         patchClip(index, {
-                          trimStartMs: Math.max(
-                            clip.sourceAnalysis?.intervalStartMs ?? 0,
-                            Math.round(Number(event.target.value) * 1_000),
-                          ),
+                          motionPreset: event.target.value as keyof typeof motionPresetLabels,
+                        })
+                      }
+                    >
+                      {Object.entries(motionPresetLabels).map(([value, label]) => (
+                        <NativeSelectOption key={value} value={value}>
+                          {label}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                  {clip.mediaType === "video" ? (
+                    <Field>
+                      <FieldLabel htmlFor={`${clip.clipId}-start`}>源素材起点（秒）</FieldLabel>
+                      <Input
+                        id={`${clip.clipId}-start`}
+                        type="number"
+                        min={(clip.sourceAnalysis?.intervalStartMs ?? 0) / 1_000}
+                        max={
+                          clip.sourceAnalysis
+                            ? Math.max(
+                                clip.sourceAnalysis.intervalStartMs,
+                                clip.sourceAnalysis.intervalEndMs - clip.durationMs,
+                              ) / 1_000
+                            : undefined
+                        }
+                        step="0.1"
+                        value={clip.trimStartMs / 1_000}
+                        onChange={(event) =>
+                          patchClip(index, {
+                            trimStartMs: Math.max(
+                              clip.sourceAnalysis?.intervalStartMs ?? 0,
+                              Math.round(Number(event.target.value) * 1_000),
+                            ),
+                          })
+                        }
+                      />
+                    </Field>
+                  ) : null}
+                  <Field>
+                    <FieldLabel htmlFor={`${clip.clipId}-duration`}>成片时长（秒）</FieldLabel>
+                    <Input
+                      id={`${clip.clipId}-duration`}
+                      type="number"
+                      min="1"
+                      max={
+                        clip.sourceAnalysis
+                          ? Math.min(
+                              10,
+                              (clip.sourceAnalysis.intervalEndMs - clip.trimStartMs) / 1_000,
+                            )
+                          : 10
+                      }
+                      step="0.1"
+                      value={clip.durationMs / 1_000}
+                      onChange={(event) =>
+                        patchClip(index, {
+                          durationMs: Math.round(Number(event.target.value) * 1_000),
                         })
                       }
                     />
                   </Field>
-                ) : null}
-                <Field>
-                  <FieldLabel htmlFor={`${clip.clipId}-duration`}>成片时长（秒）</FieldLabel>
-                  <Input
-                    id={`${clip.clipId}-duration`}
-                    type="number"
-                    min="1"
-                    max={
-                      clip.sourceAnalysis
-                        ? Math.min(
-                            10,
-                            (clip.sourceAnalysis.intervalEndMs - clip.trimStartMs) / 1_000,
-                          )
-                        : 10
-                    }
-                    step="0.1"
-                    value={clip.durationMs / 1_000}
-                    onChange={(event) =>
-                      patchClip(index, {
-                        durationMs: Math.round(Number(event.target.value) * 1_000),
-                      })
-                    }
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>画面适配</FieldLabel>
-                  <ToggleGroup
-                    value={[clip.fitMode]}
-                    onValueChange={(value) =>
-                      value[0] && patchClip(index, { fitMode: value[0] as "contain" | "cover" })
-                    }
-                    variant="outline"
-                  >
-                    <ToggleGroupItem value="contain">完整显示</ToggleGroupItem>
-                    <ToggleGroupItem value="cover">铺满裁切</ToggleGroupItem>
-                  </ToggleGroup>
-                </Field>
-                {clip.mediaType === "video" ? (
                   <Field>
-                    <FieldLabel>声音</FieldLabel>
+                    <FieldLabel>画面适配</FieldLabel>
                     <ToggleGroup
-                      value={[clip.audioMode]}
+                      value={[clip.fitMode]}
                       onValueChange={(value) =>
-                        value[0] && patchClip(index, { audioMode: value[0] as "muted" | "source" })
+                        value[0] && patchClip(index, { fitMode: value[0] as "contain" | "cover" })
                       }
                       variant="outline"
                     >
-                      <ToggleGroupItem value="muted">静音</ToggleGroupItem>
-                      <ToggleGroupItem value="source">保留原声</ToggleGroupItem>
+                      <ToggleGroupItem value="contain">完整显示</ToggleGroupItem>
+                      <ToggleGroupItem value="cover">铺满裁切</ToggleGroupItem>
                     </ToggleGroup>
                   </Field>
-                ) : null}
-                <Field>
-                  <FieldLabel htmlFor={`${clip.clipId}-caption-kind`}>字幕类型</FieldLabel>
-                  <NativeSelect
-                    className="w-full"
-                    id={`${clip.clipId}-caption-kind`}
-                    value={clip.caption.kind}
-                    onChange={(event) =>
-                      changeCaptionKind(
-                        index,
-                        event.target.value as "none" | "creative" | "verified_fact",
-                      )
-                    }
-                  >
-                    <NativeSelectOption value="none">无字幕</NativeSelectOption>
-                    <NativeSelectOption value="creative">创意文案</NativeSelectOption>
-                    <NativeSelectOption value="verified_fact">已核实信息</NativeSelectOption>
-                  </NativeSelect>
-                  <FieldDescription>
-                    事实字幕引用当前已核实的产品资料；修改事实请回到产品资料核实。
-                  </FieldDescription>
-                </Field>
+                  {clip.mediaType === "video" ? (
+                    <Field>
+                      <FieldLabel>声音</FieldLabel>
+                      <ToggleGroup
+                        value={[clip.audioMode]}
+                        onValueChange={(value) =>
+                          value[0] &&
+                          patchClip(index, { audioMode: value[0] as "muted" | "source" })
+                        }
+                        variant="outline"
+                      >
+                        <ToggleGroupItem value="muted">静音</ToggleGroupItem>
+                        <ToggleGroupItem value="source">保留原声</ToggleGroupItem>
+                      </ToggleGroup>
+                    </Field>
+                  ) : null}
+                </FieldGrid>
+                <FieldGrid columns={2}>
+                  <Field>
+                    <FieldLabel htmlFor={`${clip.clipId}-caption-kind`}>字幕类型</FieldLabel>
+                    <NativeSelect
+                      className="w-full"
+                      id={`${clip.clipId}-caption-kind`}
+                      value={clip.caption.kind}
+                      onChange={(event) =>
+                        changeCaptionKind(
+                          index,
+                          event.target.value as "none" | "creative" | "verified_fact",
+                        )
+                      }
+                    >
+                      <NativeSelectOption value="none">无字幕</NativeSelectOption>
+                      <NativeSelectOption value="creative">创意文案</NativeSelectOption>
+                      <NativeSelectOption value="verified_fact">已核实信息</NativeSelectOption>
+                    </NativeSelect>
+                    <FieldDescription>
+                      事实字幕引用当前已核实的产品资料；修改事实请回到产品资料核实。
+                    </FieldDescription>
+                  </Field>
+                  {clip.caption.kind === "verified_fact" ? (
+                    <Field>
+                      <FieldLabel htmlFor={`${clip.clipId}-caption-fact`}>产品信息项</FieldLabel>
+                      <NativeSelect
+                        className="w-full"
+                        id={`${clip.clipId}-caption-fact`}
+                        value={clip.caption.claimRef}
+                        onChange={(event) =>
+                          patchClip(index, {
+                            caption: { kind: "verified_fact", claimRef: event.target.value },
+                          })
+                        }
+                      >
+                        {factOptions.map((fact) => (
+                          <NativeSelectOption key={fact.field} value={fact.field}>
+                            {productFactLabels[fact.field] ?? fact.field} · {fact.value}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                      <FieldDescription>
+                        成片使用已核实的产品信息，字幕中的事实文字不能直接改写。
+                      </FieldDescription>
+                    </Field>
+                  ) : null}
+                </FieldGrid>
                 {clip.caption.kind === "creative" ? (
                   <Field>
                     <FieldLabel htmlFor={`${clip.clipId}-caption-text`}>创意字幕</FieldLabel>
@@ -381,30 +411,6 @@ function ClipEditor({
                     />
                     <FieldDescription>
                       仅写营销表达；工程和商业事实请使用“已核实信息”。
-                    </FieldDescription>
-                  </Field>
-                ) : null}
-                {clip.caption.kind === "verified_fact" ? (
-                  <Field>
-                    <FieldLabel htmlFor={`${clip.clipId}-caption-fact`}>产品信息项</FieldLabel>
-                    <NativeSelect
-                      className="w-full"
-                      id={`${clip.clipId}-caption-fact`}
-                      value={clip.caption.claimRef}
-                      onChange={(event) =>
-                        patchClip(index, {
-                          caption: { kind: "verified_fact", claimRef: event.target.value },
-                        })
-                      }
-                    >
-                      {factOptions.map((fact) => (
-                        <NativeSelectOption key={fact.field} value={fact.field}>
-                          {productFactLabels[fact.field] ?? fact.field} · {fact.value}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                    <FieldDescription>
-                      成片使用已核实的产品信息，字幕中的事实文字不能直接改写。
                     </FieldDescription>
                   </Field>
                 ) : null}
@@ -572,78 +578,82 @@ function EditVideo({
                 </CardHeader>
                 <CardContent>
                   <FieldGroup>
-                    <Field>
-                      <FieldLabel htmlFor="brand-source">含授权品牌标识的开场素材</FieldLabel>
-                      <NativeSelect
-                        id="brand-source"
-                        value={draft.creativeBrief?.brandAssetRef ?? ""}
-                        disabled={pending || processing}
-                        onChange={(event) =>
-                          setDraft({
-                            ...draft,
-                            creativeBrief: {
-                              objective: "action",
-                              audience: "",
-                              buyerNeed: "",
-                              nextAction: "",
-                              platformAssumptions: "",
-                              ...draft.creativeBrief,
-                              brandAssetRef: event.target.value,
-                            },
-                          })
-                        }
-                      >
-                        <NativeSelectOption value="">请选择并人工核对品牌权利</NativeSelectOption>
-                        {draft.clips.map((clip, index) => (
-                          <NativeSelectOption key={clip.clipId} value={clip.assetRef}>
-                            片段 {index + 1}（
-                            {clip.mediaType === "image" ? "已选图片素材" : "已选视频素材"}）
+                    <FieldGrid columns={2}>
+                      <Field>
+                        <FieldLabel htmlFor="brand-source">含授权品牌标识的开场素材</FieldLabel>
+                        <NativeSelect
+                          id="brand-source"
+                          value={draft.creativeBrief?.brandAssetRef ?? ""}
+                          disabled={pending || processing}
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              creativeBrief: {
+                                objective: "action",
+                                audience: "",
+                                buyerNeed: "",
+                                nextAction: "",
+                                platformAssumptions: "",
+                                ...draft.creativeBrief,
+                                brandAssetRef: event.target.value,
+                              },
+                            })
+                          }
+                        >
+                          <NativeSelectOption value="">请选择并人工核对品牌权利</NativeSelectOption>
+                          {draft.clips.map((clip, index) => (
+                            <NativeSelectOption key={clip.clipId} value={clip.assetRef}>
+                              片段 {index + 1}（
+                              {clip.mediaType === "image" ? "已选图片素材" : "已选视频素材"}）
+                            </NativeSelectOption>
+                          ))}
+                        </NativeSelect>
+                        <FieldDescription>
+                          {draft.creativeBrief?.pacingMode === "shorts_organic"
+                            ? "竖屏短片模式下，请确保至少一个标记为「呈现品牌」的片段使用该授权素材；合成仍需人工审核。"
+                            : "选择表示该素材含获授权品牌标识；合成仍需素材权利和成片人工审核。请将其移到开场。"}
+                        </FieldDescription>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="creative-objective">主要营销目标</FieldLabel>
+                        <NativeSelect
+                          id="creative-objective"
+                          disabled={pending || processing}
+                          value={draft.creativeBrief?.objective ?? "action"}
+                          onChange={(event) =>
+                            setDraft({
+                              ...draft,
+                              creativeBrief: {
+                                brandAssetRef: "",
+                                audience: "",
+                                buyerNeed: "",
+                                nextAction: "",
+                                platformAssumptions: "",
+                                ...draft.creativeBrief,
+                                objective: event.target.value as
+                                  | "awareness"
+                                  | "consideration"
+                                  | "action"
+                                  | "full_funnel",
+                              },
+                            })
+                          }
+                        >
+                          <NativeSelectOption value="awareness">
+                            认知：介绍供应商
                           </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                      <FieldDescription>
-                        {draft.creativeBrief?.pacingMode === "shorts_organic"
-                          ? "竖屏短片模式下，请确保至少一个标记为「呈现品牌」的片段使用该授权素材；合成仍需人工审核。"
-                          : "选择表示该素材含获授权品牌标识；合成仍需素材权利和成片人工审核。请将其移到开场。"}
-                      </FieldDescription>
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="creative-objective">主要营销目标</FieldLabel>
-                      <NativeSelect
-                        id="creative-objective"
-                        disabled={pending || processing}
-                        value={draft.creativeBrief?.objective ?? "action"}
-                        onChange={(event) =>
-                          setDraft({
-                            ...draft,
-                            creativeBrief: {
-                              brandAssetRef: "",
-                              audience: "",
-                              buyerNeed: "",
-                              nextAction: "",
-                              platformAssumptions: "",
-                              ...draft.creativeBrief,
-                              objective: event.target.value as
-                                | "awareness"
-                                | "consideration"
-                                | "action"
-                                | "full_funnel",
-                            },
-                          })
-                        }
-                      >
-                        <NativeSelectOption value="awareness">认知：介绍供应商</NativeSelectOption>
-                        <NativeSelectOption value="consideration">
-                          考虑：展示相关产品细节
-                        </NativeSelectOption>
-                        <NativeSelectOption value="action">
-                          行动：提交需求供人工审核
-                        </NativeSelectOption>
-                        <NativeSelectOption value="full_funnel">
-                          全漏斗：串联品牌认知、核实细节与询盘行动
-                        </NativeSelectOption>
-                      </NativeSelect>
-                    </Field>
+                          <NativeSelectOption value="consideration">
+                            考虑：展示相关产品细节
+                          </NativeSelectOption>
+                          <NativeSelectOption value="action">
+                            行动：提交需求供人工审核
+                          </NativeSelectOption>
+                          <NativeSelectOption value="full_funnel">
+                            全漏斗：串联品牌认知、核实细节与询盘行动
+                          </NativeSelectOption>
+                        </NativeSelect>
+                      </Field>
+                    </FieldGrid>
                     <Field>
                       <FieldTitle id="creative-pacing-label">叙事节拍模式</FieldTitle>
                       <RadioGroup
@@ -673,7 +683,7 @@ function EditVideo({
                           }
                           setDraft({ ...draft, creativeBrief: nextBrief });
                         }}
-                        className="grid gap-2"
+                        className="grid gap-2 @xl/field-group:grid-cols-2"
                       >
                         <RadioGroupChoice value="standard">
                           标准 ABCD：开场吸引注意并呈现品牌（通用）
@@ -688,39 +698,42 @@ function EditVideo({
                         渠道仍须保持静音字幕可读。
                       </FieldDescription>
                     </Field>
-                    {(
-                      [
-                        ["audience", "目标受众"],
-                        ["buyerNeed", "一个主要买家需求"],
-                        ["nextAction", "可用的下一步与承接入口"],
-                        ["platformAssumptions", "平台与声音、字幕假设"],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <Field key={key}>
-                        <FieldLabel htmlFor={`creative-${key}`}>{label}</FieldLabel>
-                        <Textarea
-                          id={`creative-${key}`}
-                          disabled={pending || processing}
-                          maxLength={key === "platformAssumptions" ? 300 : 200}
-                          value={draft.creativeBrief?.[key] ?? ""}
-                          onChange={(event) =>
-                            setDraft({
-                              ...draft,
-                              creativeBrief: {
-                                objective: "action",
-                                brandAssetRef: "",
-                                audience: "",
-                                buyerNeed: "",
-                                nextAction: "",
-                                platformAssumptions: "",
-                                ...draft.creativeBrief,
-                                [key]: event.target.value,
-                              },
-                            })
-                          }
-                        />
-                      </Field>
-                    ))}
+                    <FieldGrid columns={2}>
+                      {(
+                        [
+                          ["audience", "目标受众"],
+                          ["buyerNeed", "一个主要买家需求"],
+                          ["nextAction", "可用的下一步与承接入口"],
+                          ["platformAssumptions", "平台与声音、字幕假设"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <Field key={key}>
+                          <FieldLabel htmlFor={`creative-${key}`}>{label}</FieldLabel>
+                          <Textarea
+                            id={`creative-${key}`}
+                            rows={2}
+                            disabled={pending || processing}
+                            maxLength={key === "platformAssumptions" ? 300 : 200}
+                            value={draft.creativeBrief?.[key] ?? ""}
+                            onChange={(event) =>
+                              setDraft({
+                                ...draft,
+                                creativeBrief: {
+                                  objective: "action",
+                                  brandAssetRef: "",
+                                  audience: "",
+                                  buyerNeed: "",
+                                  nextAction: "",
+                                  platformAssumptions: "",
+                                  ...draft.creativeBrief,
+                                  [key]: event.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </Field>
+                      ))}
+                    </FieldGrid>
                   </FieldGroup>
                 </CardContent>
               </Card>
@@ -742,7 +755,7 @@ function EditVideo({
                 disabled={pending || processing}
               />
               <Separator />
-              <Field>
+              <Field className="max-w-2xl">
                 <FieldLabel htmlFor="video-cta">行动引导文案</FieldLabel>
                 <Input
                   id="video-cta"
@@ -1049,6 +1062,7 @@ export function MarketingVideoPanel({
           <CardFooter className="flex-col items-stretch gap-3">
             <Button
               variant="outline"
+              className="w-full sm:w-auto sm:self-start"
               disabled={copyPending || !copyId}
               onClick={() =>
                 startCopy(async () => {
@@ -1071,7 +1085,10 @@ export function MarketingVideoPanel({
             {copiedId ? (
               <WorkspaceLink
                 href={workspaceRecordHref(projectId, "video", copiedId, returnTo)}
-                className={buttonVariants({ variant: "outline" })}
+                className={buttonVariants({
+                  variant: "outline",
+                  className: "w-full sm:w-auto sm:self-start",
+                })}
               >
                 打开复制的剪辑稿
               </WorkspaceLink>

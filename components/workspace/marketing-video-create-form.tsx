@@ -33,6 +33,7 @@ import {
   FieldContent,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -334,44 +335,79 @@ export function MarketingVideoCreateForm({
       <CardContent>
         <form id="create-marketing-video" onSubmit={form.handleSubmit(submit)}>
           <FieldGroup>
-            <Field data-invalid={Boolean(form.formState.errors.productId)}>
-              <FieldLabel htmlFor="video-create-product">已核验产品</FieldLabel>
-              <Controller
-                control={form.control}
-                name="productId"
-                render={({ field }) => (
-                  <Select
-                    disabled={products.length === 1}
-                    items={Object.fromEntries(
-                      products.map((product) => [
-                        product.id,
-                        `${product.productName} · ${product.internalSku}`,
-                      ]),
-                    )}
-                    value={field.value}
-                    onValueChange={(value) => selectProduct(value, field.onChange)}
-                  >
-                    <SelectTrigger
-                      id="video-create-product"
-                      aria-invalid={Boolean(form.formState.errors.productId)}
-                      className="w-full"
+            <FieldGrid columns={2}>
+              <Field data-invalid={Boolean(form.formState.errors.productId)}>
+                <FieldLabel htmlFor="video-create-product">已核验产品</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="productId"
+                  render={({ field }) => (
+                    <Select
+                      disabled={products.length === 1}
+                      items={Object.fromEntries(
+                        products.map((product) => [
+                          product.id,
+                          `${product.productName} · ${product.internalSku}`,
+                        ]),
+                      )}
+                      value={field.value}
+                      onValueChange={(value) => selectProduct(value, field.onChange)}
                     >
-                      <SelectValue placeholder="选择已核实产品" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.productName} · {product.internalSku}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError>{form.formState.errors.productId?.message}</FieldError>
-            </Field>
+                      <SelectTrigger
+                        id="video-create-product"
+                        aria-invalid={Boolean(form.formState.errors.productId)}
+                        className="w-full"
+                      >
+                        <SelectValue placeholder="选择已核实产品" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {products.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.productName} · {product.internalSku}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError>{form.formState.errors.productId?.message}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(form.formState.errors.factPath)}>
+                <FieldLabel>可用于字幕的产品信息</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="factPath"
+                  render={({ field }) => (
+                    <Select
+                      items={Object.fromEntries(
+                        (selectedProduct?.factOptions ?? []).map((fact) => [
+                          fact.value,
+                          productFactLabels[fact.value] ?? fact.label,
+                        ]),
+                      )}
+                      value={field.value}
+                      onValueChange={(value) => value && field.onChange(value)}
+                    >
+                      <SelectTrigger aria-label="可用于字幕的产品信息" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {selectedProduct?.factOptions.map((fact) => (
+                            <SelectItem key={fact.value} value={fact.value}>
+                              {productFactLabels[fact.value] ?? fact.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError>{form.formState.errors.factPath?.message}</FieldError>
+              </Field>
+            </FieldGrid>
             <Field>
               <FieldLabel>素材来源</FieldLabel>
               <Controller
@@ -407,57 +443,26 @@ export function MarketingVideoCreateForm({
                     : "当前产品没有审核通过且仍在授权期内的可复用媒体。"}
               </FieldDescription>
             </Field>
-            <Field data-invalid={Boolean(form.formState.errors.factPath)}>
-              <FieldLabel>可用于字幕的产品信息</FieldLabel>
-              <Controller
-                control={form.control}
-                name="factPath"
-                render={({ field }) => (
-                  <Select
-                    items={Object.fromEntries(
-                      (selectedProduct?.factOptions ?? []).map((fact) => [
-                        fact.value,
-                        productFactLabels[fact.value] ?? fact.label,
-                      ]),
-                    )}
-                    value={field.value}
-                    onValueChange={(value) => value && field.onChange(value)}
-                  >
-                    <SelectTrigger aria-label="可用于字幕的产品信息" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {selectedProduct?.factOptions.map((fact) => (
-                          <SelectItem key={fact.value} value={fact.value}>
-                            {productFactLabels[fact.value] ?? fact.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError>{form.formState.errors.factPath?.message}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(form.formState.errors.objective)}>
-              <FieldLabel htmlFor="video-objective">视频目标</FieldLabel>
-              <Input
-                id="video-objective"
-                aria-invalid={Boolean(form.formState.errors.objective)}
-                {...form.register("objective")}
-              />
-              <FieldError>{form.formState.errors.objective?.message}</FieldError>
-            </Field>
-            <Field data-invalid={Boolean(form.formState.errors.targetAudience)}>
-              <FieldLabel htmlFor="video-audience">目标受众</FieldLabel>
-              <Input
-                id="video-audience"
-                aria-invalid={Boolean(form.formState.errors.targetAudience)}
-                {...form.register("targetAudience")}
-              />
-              <FieldError>{form.formState.errors.targetAudience?.message}</FieldError>
-            </Field>
+            <FieldGrid columns={2}>
+              <Field data-invalid={Boolean(form.formState.errors.objective)}>
+                <FieldLabel htmlFor="video-objective">视频目标</FieldLabel>
+                <Input
+                  id="video-objective"
+                  aria-invalid={Boolean(form.formState.errors.objective)}
+                  {...form.register("objective")}
+                />
+                <FieldError>{form.formState.errors.objective?.message}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(form.formState.errors.targetAudience)}>
+                <FieldLabel htmlFor="video-audience">目标受众</FieldLabel>
+                <Input
+                  id="video-audience"
+                  aria-invalid={Boolean(form.formState.errors.targetAudience)}
+                  {...form.register("targetAudience")}
+                />
+                <FieldError>{form.formState.errors.targetAudience?.message}</FieldError>
+              </Field>
+            </FieldGrid>
             <Field>
               <FieldLabel>输出平台</FieldLabel>
               <Controller
@@ -490,7 +495,7 @@ export function MarketingVideoCreateForm({
                   control={form.control}
                   name="productMediaIds"
                   render={({ field }) => (
-                    <FieldGroup>
+                    <FieldGrid columns={2}>
                       {mediaOptions.map((option) => {
                         const checked = field.value.includes(option.id);
                         const disabled = !checked && field.value.length >= 3;
@@ -531,8 +536,10 @@ export function MarketingVideoCreateForm({
                           </Field>
                         );
                       })}
-                      <FieldError>{form.formState.errors.productMediaIds?.message}</FieldError>
-                    </FieldGroup>
+                      <FieldError className="@xl/field-group:col-span-2">
+                        {form.formState.errors.productMediaIds?.message}
+                      </FieldError>
+                    </FieldGrid>
                   )}
                 />
               </FieldSet>
@@ -625,7 +632,7 @@ export function MarketingVideoCreateForm({
                       control={form.control}
                       name="internetMediaIds"
                       render={({ field }) => (
-                        <FieldGroup>
+                        <FieldGrid columns={2}>
                           {searchState.results.map((result) => {
                             const checked = field.value.includes(result.id);
                             const disabled = !checked && field.value.length >= 3;
@@ -690,8 +697,10 @@ export function MarketingVideoCreateForm({
                               </Field>
                             );
                           })}
-                          <FieldError>{form.formState.errors.internetMediaIds?.message}</FieldError>
-                        </FieldGroup>
+                          <FieldError className="@xl/field-group:col-span-2">
+                            {form.formState.errors.internetMediaIds?.message}
+                          </FieldError>
+                        </FieldGrid>
                       )}
                     />
                   ) : null}
@@ -708,7 +717,12 @@ export function MarketingVideoCreateForm({
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button form="create-marketing-video" type="submit" disabled={busy}>
+        <Button
+          form="create-marketing-video"
+          type="submit"
+          disabled={busy}
+          className="w-full sm:w-auto sm:self-start"
+        >
           {busy ? <Spinner data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
           {uploading
             ? "正在直传素材…"
@@ -728,7 +742,10 @@ export function MarketingVideoCreateForm({
         {state.status === "success" && state.videoId ? (
           <WorkspaceLink
             href={workspaceRecordHref(projectId, "video", state.videoId)}
-            className={buttonVariants({ variant: "outline" })}
+            className={buttonVariants({
+              variant: "outline",
+              className: "w-full sm:w-auto sm:self-start",
+            })}
           >
             打开新建的剪辑稿
           </WorkspaceLink>

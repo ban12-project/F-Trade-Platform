@@ -89,7 +89,12 @@ function EvidenceCopyForm({
           </FieldLabel>
         </Field>
         <FieldError errors={[form.formState.errors.workingCopyOnly]} />
-        <Button type="submit" variant="outline" disabled={pending}>
+        <Button
+          type="submit"
+          variant="outline"
+          className="w-full sm:w-auto sm:self-start"
+          disabled={pending}
+        >
           {pending ? "正在登记…" : "登记审核工作副本"}
         </Button>
         {state.message ? <p role="status">{state.message}</p> : null}

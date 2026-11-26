@@ -148,7 +148,12 @@ export function EvidenceLibrary({
               </FieldDescription>
               <FieldError id={`${fileId}-error`} errors={[form.formState.errors.document]} />
             </Field>
-            <Button type="submit" variant="outline" className="min-h-11 w-full" disabled={busy}>
+            <Button
+              type="submit"
+              variant="outline"
+              className="min-h-11 w-full sm:w-auto sm:self-start"
+              disabled={busy}
+            >
               {pending ? (
                 <Spinner data-icon="inline-start" />
               ) : (
