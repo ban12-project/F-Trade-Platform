@@ -12,6 +12,9 @@ import {
 } from "./geoip-store.mjs";
 
 const day = 86400000;
+// Match camoufox FROZEN_DAYS=30 so weekly upstream release jitter (>8d) does
+// not trip validation while daily rechecks still trigger refreshGeoip.
+const maxAgeDays = 30;
 async function validate(directory) {
   const databases = (await readdir(`${directory}/mmdb`)).filter((name) => name.endsWith(".mmdb"));
   assert.ok(databases.length > 0, "geoip_database_missing");
@@ -20,7 +23,7 @@ async function validate(directory) {
     const bytes = await readFile(`${directory}/mmdb/${name}`);
     const reader = new Reader(bytes);
     const age = Date.now() - reader.metadata.buildEpoch.getTime();
-    assert.ok(age >= -300000 && age <= 8 * day, "geoip_database_expired");
+    assert.ok(age >= -300000 && age <= maxAgeDays * day, "geoip_database_expired");
     hashes[name] = createHash("sha256").update(bytes).digest("hex");
   }
   return { hashes, checkedAt: Date.now() };

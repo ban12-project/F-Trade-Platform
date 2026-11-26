@@ -23,7 +23,8 @@ RUN set -eu; \
     echo '{"version":"158.0.1","release":"beta.41"}' > /root/.cache/camoufox/browsers/official/158.0.1-beta.41/version.json; \
     rm /tmp/camoufox.zip
 COPY official-runtime/prepare-assets.mjs official-runtime/geoip-store.mjs ./
-RUN node prepare-assets.mjs
+ARG GEOIP_REFRESH_DATE=local
+RUN test -n "$GEOIP_REFRESH_DATE" && node prepare-assets.mjs
 WORKDIR /app
 COPY official-runtime/package.json ./package.json
 COPY startup-diagnostics.mjs ./startup-diagnostics.mjs
