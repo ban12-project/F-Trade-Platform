@@ -22,11 +22,11 @@ const parentPins = [
   "@remotion/studio@4.0.520",
   "@vercel/cli-auth@0.0.1",
   "@vercel/cli-config@0.2.4",
-  "@workflow/cli@5.0.7",
-  "@workflow/core@5.3.0",
-  "@workflow/world-local@5.2.0",
-  "@workflow/world-vercel@5.3.0",
-  "@workflow/world@5.1.0",
+  "@workflow/cli@5.3.3",
+  "@workflow/core@5.8.0",
+  "@workflow/world-local@5.6.0",
+  "@workflow/world-vercel@5.8.0",
+  "@workflow/world@5.4.0",
 ];
 const store = resolve("node_modules/.pnpm");
 const entries = readdirSync(store);
@@ -107,7 +107,7 @@ test("actual product model OE bound rejects one oversized collection without per
 
 test("actual Workflow queue schemas retain date coercion, namespace parsing and rejection", () => {
   const parent = createRequire(
-    resolve(store, "@workflow+world@5.1.0/node_modules/@workflow/world/package.json"),
+    resolve(store, "@workflow+world@5.4.0/node_modules/@workflow/world/package.json"),
   );
   const { WorkflowInvokePayloadSchema, parseQueueName, getQueueTopicPrefix } =
     parent("./dist/queue.js");

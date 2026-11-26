@@ -9,8 +9,6 @@ allowBuilds:
 overrides:
   # Same-major URI fixes, verified at active parent boundaries (#498).
   'ajv@8.20.0>fast-uri': 3.1.9
-  '@workflow/world-local@5.2.0>undici': 7.30.1
-  '@workflow/world-vercel@5.3.0>undici': 7.30.1
 
   # Tooling-only parent pins, with loader compatibility checks; see #498.
   # esbuild's 0.x minor API change is checked at the actual legacy loader boundary.
@@ -23,11 +21,6 @@ overrides:
   '@remotion/studio@4.0.520>zod': 4.6.7
   '@vercel/cli-auth@0.0.1>zod': 4.6.7
   '@vercel/cli-config@0.2.4>zod': 4.6.7
-  '@workflow/cli@5.0.7>zod': 4.6.7
-  '@workflow/core@5.3.0>zod': 4.6.7
-  '@workflow/world-local@5.2.0>zod': 4.6.7
-  '@workflow/world-vercel@5.3.0>zod': 4.6.7
-  '@workflow/world@5.1.0>zod': 4.6.7
 
 patchedDependencies:
   # Enforce the existing dependency-list limit before the embedded parser (#702).

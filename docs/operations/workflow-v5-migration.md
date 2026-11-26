@@ -304,3 +304,83 @@ PR #822 remains draft. No merge, manual deployment, real message, production
 database write, retention adjustment, permission change or CI-setting change
 was performed. Marketing creative review is not applicable: this continuation
 only updates integration evidence and does not change content or prompts.
+
+## Workflow 5.8.0 upgrade (speculative execution)
+
+Upgraded `workflow` from `5.3.0` to `5.8.0` on 2026-11-26 to adopt the new
+execution engine and speculative step execution (Vercel Workflow changelog
+`workflows-speculative-execution`). Existing runs created on older spec versions
+continue on their original version; new runs default to the new engine and can
+opt out per environment with `WORKFLOW_SPEC_VERSION=8`.
+
+Marketing-video ABCD creative review is not applicable: this upgrade only
+changes Workflow SDK dependencies, step retry policy (`renderPreview.maxRetries = 0`),
+and type ownership (`PrivateVideoAssetStore`), with no changes to prompts,
+captions, scripts, storyboards, branding, CTA, or product facts.
+
+### Dependency and override cleanup
+
+- `package.json`: `"workflow": "5.8.0"`.
+- Resolved SDK packages: `@workflow/core@5.8.0`, `@workflow/cli@5.3.3`,
+  `@workflow/next@5.1.6`, `@workflow/nest@5.1.13`, `@workflow/world-local@5.6.0`,
+  `@workflow/world-vercel@5.8.0`, `@workflow/world@5.4.0`.
+- Removed the 7 superseded `@workflow/*` overrides in `pnpm-workspace.yaml`:
+  upstream `@workflow/world-local@5.6.0` and `@workflow/world-vercel@5.8.0` now
+  pin `undici@7.30.2`, and all `@workflow/*` packages pin `zod@~4.6.7` (resolved
+  to `4.6.7`). Non-Workflow overrides (including `@vercel/cli-auth` and
+  `@vercel/cli-config` Zod pins) and all `patchedDependencies` remain intact.
+- Updated pinned parent expectations in `scripts/test-zod-collection-bounds.ts`
+  and `scripts/validate_repository.py`.
+
+### Step idempotency audit and bundle isolation
+
+Audited all `"use step"` functions across `workflows/`:
+
+- `workflows/human-gate.ts`: hook-only workflow (`waitForHumanGate`), no steps.
+- `workflows/browser-sandbox.ts` (`dispatch`, `observe`, `recover`, `wake`):
+  `dispatch` is DB-fenced via `recordedBrowserSandboxDispatch` and atomic
+  `claimManualSandboxDispatch`; `observe`, `recover`, and `wake` are
+  idempotent / DB-fenced.
+- `workflows/product-catalog-import.ts` (`processAttempt`): DB-fenced via atomic
+  `claimCatalogAttempt` (`queued -> running`); duplicate deliveries return `null`
+  without LLM, Blob, or DB side effects.
+- `workflows/marketing-video-processing.ts`:
+  - `generateAiDraft`: opted out with `generateAiDraft.maxRetries = 0` because
+    `markVideoJobRunning` returns `running` without a lease/claim fence and
+    `expectedVersion` only guards the final `applyMarketingVideoAiDraft` write,
+    leaving Sandbox visual sampling, paid model calls, and `failVideoJob`
+    exposed to overlapping speculative attempts. Trade-off: automatic
+    Workflow-level retries are disabled for `generateAiDraft` (explicit user
+    retry via `queueVideoProcessingJob` still works); re-enabling automatic
+    retries later requires adding a recoverable mutual-exclusion claim before
+    the external calls and an overlapping-execution stub test verifying a single
+    model call, a single draft write, and a final `succeeded` job status.
+  - `renderPreview`: opted out with `renderPreview.maxRetries = 0` because
+    `markVideoJobRunning` does not fence a second `running` delivery and
+    `beginGuardedMarketingVideoRender` fails once state has moved to
+    `VIDEO_RENDERING`, which would mark an active render job failed and risk
+    duplicate external sandbox rendering.
+- `lib/video/private-asset-store.ts` & `lib/video/ai-sdk-adapters.ts`: moved
+  `PrivateVideoAssetStore` type definition into `lib/video/private-asset-store.ts`
+  and re-exported it from `lib/video/ai-sdk-adapters.ts`. `@workflow/builders@5.1.6`
+  scans unfollowed packages reachable from Next.js entrypoints for
+  `static [WORKFLOW_SERIALIZE]` (`discoverSerdeInUnfollowedPackage`); breaking the
+  type-only import prevents `@ai-sdk/google-vertex` (`google-auth-library` Node
+  built-ins) from entering the sandboxed workflow VM bundle while keeping all
+  video adapter runtime behavior unchanged.
+
+### Verification
+
+- `pnpm install --frozen-lockfile`: lockfile stable, no changes.
+- `pnpm test:workflow-runtime`: security compatibility, serde compatibility across
+  importer boundaries, compiled runtime tests (including `specVersion >= 9` and
+  single-attempt failure under `generateAiDraft.maxRetries = 0` and
+  `renderPreview.maxRetries = 0`), queue deadlines, and isolated v4 nanoid
+  replay.
+- `node --import tsx --test scripts/test-zod-collection-bounds.ts` and
+  `node --test scripts/test-undici-tls-compatibility.mjs scripts/test-minimatch-security.mjs scripts/test-tooling-security-compatibility.mjs scripts/test-uri-security-compatibility.mjs`.
+- `pnpm test:ai-sdk-video-adapters && pnpm test:video-private-assets`.
+- `pnpm typecheck && pnpm build < /dev/null` (Biome check, Remotion bundle, and
+  Next.js 16.4.6 Turbopack + Cache Components + Rust React Compiler + TS CLI build;
+  `< /dev/null` avoids an interactive `.gitignore` prompt from `remotion bundle`).
+- `python3 scripts/validate_repository.py && git diff --check`.
