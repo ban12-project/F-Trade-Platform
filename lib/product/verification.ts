@@ -1,6 +1,7 @@
 import productDraftSchema from "../../contracts/data/product-draft.schema.json";
 import productReadySchema from "../../contracts/data/product-ready.schema.json";
 import { compileContract } from "../contracts/validator";
+import { productBlockingFields } from "./blocking-fields";
 
 type ProductSection = Record<string, unknown>;
 
@@ -40,53 +41,6 @@ export interface ProductApproval {
 const parseProductDraft = compileContract<ProductDraft>(productDraftSchema);
 const parseProductReady = compileContract<ProductReady>(productReadySchema);
 
-const corePaths = ["product.product_name", "product.product_type", "product.internal_sku"] as const;
-
-function hasValue(value: unknown) {
-  return value !== undefined && value !== null && value !== "";
-}
-
-function valueAt(draft: ProductDraft, path: string) {
-  const [section, field] = path.split(".");
-  return (
-    draft[section as "product" | "specifications" | "commercial"] as ProductSection | undefined
-  )?.[field];
-}
-
-function presentFactPaths(draft: ProductDraft) {
-  return (["product", "specifications", "commercial"] as const).flatMap((section) =>
-    Object.entries(draft[section] ?? {})
-      .filter(([, value]) => hasValue(value))
-      .map(([field]) => `${section}.${field}`),
-  );
-}
-
-function hasApplicationIdentity(draft: ProductDraft) {
-  return ["product.application", "product.vehicle_brand", "product.vehicle_model"].every((path) =>
-    hasValue(valueAt(draft, path)),
-  );
-}
-
-function hasOeIdentity(draft: ProductDraft) {
-  const oeNumbers = valueAt(draft, "product.oe_numbers");
-  return Array.isArray(oeNumbers) && oeNumbers.length > 0;
-}
-
-function blockingFields(draft: ProductDraft, allowVerifiedApplication: boolean) {
-  const blocking: string[] = corePaths.filter((path) => !hasValue(valueAt(draft, path)));
-  if (!hasOeIdentity(draft) && !(allowVerifiedApplication && hasApplicationIdentity(draft))) {
-    blocking.push("oe_numbers_or_verified_application");
-  }
-
-  for (const path of presentFactPaths(draft)) {
-    const evidenceRef = draft.field_evidence[path];
-    if (!evidenceRef || !draft.evidence_refs.includes(evidenceRef)) {
-      blocking.push(`field_evidence.${path}`);
-    }
-  }
-  return [...new Set<string>(blocking)].sort();
-}
-
 function assertApproval(draft: ProductDraft, approval: ProductApproval) {
   if (
     approval.gate !== "gate_01_truth" ||
@@ -109,7 +63,7 @@ function assertApproval(draft: ProductDraft, approval: ProductApproval) {
 export function reviewProductDraft(value: unknown): ProductDraft {
   const draft = structuredClone(parseProductDraft(value));
   draft.verification_status = "review_required";
-  draft.blocking_missing_fields = blockingFields(draft, false);
+  draft.blocking_missing_fields = productBlockingFields(draft, false);
   return parseProductDraft(draft);
 }
 
@@ -119,7 +73,7 @@ export function approveProductDraft(draftValue: unknown, approval: ProductApprov
   if (approval.status !== "approved") {
     throw new Error("Rejected approval cannot make a product Ready");
   }
-  const blocking = blockingFields(draft, true);
+  const blocking = productBlockingFields(draft, true);
   if (blocking.length > 0) {
     throw new Error(`Product cannot be Ready: ${blocking.join(", ")}`);
   }
@@ -141,6 +95,6 @@ export function rejectProductDraft(draftValue: unknown, approval: ProductApprova
     throw new Error("Only a rejected approval can request product revision");
   }
   draft.verification_status = "revision_required";
-  draft.blocking_missing_fields = blockingFields(draft, false);
+  draft.blocking_missing_fields = productBlockingFields(draft, false);
   return parseProductDraft(draft);
 }

@@ -15,7 +15,7 @@ test("Product Agent keeps saved models selectable in the product step", async ({
 });
 
 test("product Gate 01 submits the displayed revision and approval request", async ({ page }) => {
-  await page.goto("/testing/project-workflow?record=product&state=product-review");
+  await page.goto("/testing/project-workflow?record=product&state=product-review-complete");
   await page.waitForLoadState("networkidle");
   const detail = page.getByRole("region", { name: "业务记录", exact: true });
   await expect(detail.getByText(/逐项核对产品信息与来源资料/)).toBeVisible();
@@ -407,4 +407,62 @@ test("product review validation focuses missing evidence then rejection notes wi
   await expect(decision).toContainText("退回产品信息");
   await expect(evidence).toContainText("Synthetic review evidence");
   expect(writes).toBe(0);
+});
+
+test("incomplete product review disables approval and guides reviewer to reject for revision", async ({
+  page,
+}) => {
+  await page.goto("/testing/project-workflow?record=product&state=product-review-incomplete");
+  const detail = page.getByRole("region", { name: "业务记录", exact: true });
+  await expect(detail.getByText("先补齐核实所需资料", { exact: true })).toBeVisible();
+  await expect(
+    detail.getByText(/当前版本暂不能批准，请先在下方选择「退回产品信息」/),
+  ).toBeVisible();
+  const decision = detail.getByRole("combobox", { name: "决定", exact: true });
+  await decision.click();
+  const approveOption = page.getByRole("option", { name: "批准产品信息", exact: true });
+  await expect(approveOption).toHaveAttribute("aria-disabled", "true");
+  await page.getByRole("option", { name: "退回产品信息", exact: true }).click();
+  await expect(decision).toContainText("退回产品信息");
+  const submit = detail.getByRole("button", { name: "退回产品信息", exact: true });
+  await expect(submit).toBeEnabled();
+});
+
+test("application-only product review highlights fitment verification and permits approval", async ({
+  page,
+}) => {
+  await page.goto("/testing/project-workflow?record=product&state=product-review-application");
+  const detail = page.getByRole("region", { name: "业务记录", exact: true });
+  await expect(detail.getByText("请重点核实完整适配信息", { exact: true })).toBeVisible();
+  const decision = detail.getByRole("combobox", { name: "决定", exact: true });
+  await decision.click();
+  const approveOption = page.getByRole("option", { name: "批准产品信息", exact: true });
+  await expect(approveOption).not.toHaveAttribute("aria-disabled", "true");
+  await approveOption.click();
+  await detail.getByRole("combobox", { name: "审核依据", exact: true }).click();
+  await page.getByRole("option", { name: /Synthetic review evidence/ }).click();
+  await expect(detail.getByRole("button", { name: "批准产品信息", exact: true })).toBeEnabled();
+});
+
+test("batch filling unlinked field evidence preserves retained sourceRef during product revision", async ({
+  page,
+}) => {
+  await page.goto("/testing/project-workflow?record=product&state=product-revision-retained");
+  const form = page.locator('form[id$="-revise-product"]').filter({ visible: true });
+  const coverage = form.getByRole("status");
+  await expect(form.getByText("保留原主要来源，待确认访问", { exact: true })).toBeVisible();
+  await expect(coverage).toHaveText(
+    "来源覆盖：0 / 3 项已填写信息已关联当前可选资料；2 项保留原来源，待确认访问",
+  );
+  await form.getByRole("textbox", { name: "产品名称", exact: true }).fill("SYNTHETIC revised disc");
+  await form.getByLabel("默认来源资料", { exact: true }).click();
+  await page.getByRole("option", { name: /Synthetic review evidence/ }).click();
+  await form.getByRole("button", { name: "填充未关联来源的已填字段", exact: true }).click();
+  await expect(form.getByLabel("产品名称来源", { exact: true })).toContainText(
+    "Synthetic review evidence",
+  );
+  await expect(form.getByText("保留原主要来源，待确认访问", { exact: true })).toBeVisible();
+  await expect(coverage).toHaveText(
+    "来源覆盖：2 / 4 项已填写信息已关联当前可选资料；2 项保留原来源，待确认访问",
+  );
 });

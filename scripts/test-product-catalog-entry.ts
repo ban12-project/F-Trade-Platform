@@ -5,6 +5,7 @@ import productAcceptanceResultSchema from "../contracts/testing/product-acceptan
 import { compileContract } from "../lib/contracts/validator";
 
 import { productReviewFormSchema } from "../lib/form-schemas";
+import { productApprovalBlockingFields } from "../lib/product/blocking-fields";
 import { productCatalogFormSchema } from "../lib/product/catalog-form-schema";
 import { buildEvidenceBoundProductCatalogDraft } from "../lib/product/evidence-bound-catalog";
 import {
@@ -353,6 +354,58 @@ assert.equal(
 );
 
 assert.throws(() => approveProductDraft(draft, reviewerApproval), /Product cannot be Ready/);
+assert.deepEqual(
+  productApprovalBlockingFields({
+    evidence_refs: ["evidence-catalog-sku-001"],
+    field_evidence: {
+      "product.internal_sku": "evidence-catalog-sku-001",
+      "product.vehicle_model": "evidence-catalog-sku-001",
+    },
+    product: {
+      internal_sku: "SYN-PARTIAL-001",
+      vehicle_model: "SYN-MODEL-01",
+    },
+  }),
+  ["oe_numbers_or_verified_application", "product.product_name", "product.product_type"],
+);
+assert.deepEqual(
+  productApprovalBlockingFields({
+    evidence_refs: ["evidence-catalog-source-001"],
+    field_evidence: {
+      "product.product_name": "evidence-catalog-source-001",
+      "product.product_type": "evidence-catalog-source-001",
+      "product.internal_sku": "evidence-catalog-source-001",
+      "product.application": "evidence-catalog-source-001",
+      "product.vehicle_brand": "evidence-catalog-source-001",
+      "product.vehicle_model": "evidence-catalog-source-001",
+    },
+    product: {
+      product_name: "Synthetic clutch disc",
+      product_type: "clutch_disc",
+      internal_sku: "SYN-APP-001",
+      application: "Synthetic heavy truck",
+      vehicle_brand: "Synthetic Brand",
+      vehicle_model: "SYN-MODEL-01",
+    },
+  }),
+  [],
+);
+assert.deepEqual(
+  productApprovalBlockingFields({
+    ...draft,
+    product: {
+      ...draft.product,
+      oe_numbers: ["SYN-OE-001"],
+    },
+    field_evidence: {
+      ...draft.field_evidence,
+      "product.oe_numbers": "evidence-catalog-oe-001",
+    },
+    evidence_refs: [...draft.evidence_refs, "evidence-catalog-oe-001"],
+    commercial: { sample_available: false },
+  }),
+  ["field_evidence.commercial.sample_available"],
+);
 const revision = rejectProductDraft(draft, { ...reviewerApproval, status: "rejected" as const });
 assert.equal(revision.verification_status, "revision_required");
 assertTransition({

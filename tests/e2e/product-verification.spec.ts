@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import productDraftFixture from "../../data/fixtures/product-draft.synthetic.json";
+import { productApprovalBlockingFields } from "../../lib/product/blocking-fields";
 import {
   approveProductDraft,
   type ProductApproval,
@@ -81,4 +82,27 @@ test("rejects an agent-authored truth approval at runtime", () => {
   expect(() => approveProductDraft(productDraftFixture, agentApproval)).toThrow(
     "Product approval requires a human actor",
   );
+});
+
+test("distinguishes hard approval blockers from human-verifiable application identity", () => {
+  expect(productApprovalBlockingFields(productDraftFixture)).toEqual([]);
+  expect(
+    productApprovalBlockingFields({
+      evidence_refs: ["evidence-product-001"],
+      field_evidence: {
+        "product.internal_sku": "evidence-product-001",
+        "product.vehicle_model": "evidence-product-001",
+      },
+      product: {
+        internal_sku: "SYN-PARTIAL-001",
+        vehicle_model: "SYN-MODEL-01",
+      },
+    }),
+  ).toEqual(["oe_numbers_or_verified_application", "product.product_name", "product.product_type"]);
+  expect(
+    productApprovalBlockingFields({
+      ...productDraftFixture,
+      commercial: { ...productDraftFixture.commercial, moq: 50 },
+    }),
+  ).toEqual(["field_evidence.commercial.moq"]);
 });
