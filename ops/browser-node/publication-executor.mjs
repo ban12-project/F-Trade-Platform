@@ -86,10 +86,18 @@ export function createPublicationExecutor(driver) {
     preparePublicationMedia,
     authorizePublication,
     reportPublication,
+    onStageChange,
     onPreclickFailure,
   }) {
     const active = () => {
       if (signal.aborted) throw new Error("publication_cancelled");
+    };
+    const reportStage = (stage) => {
+      try {
+        onStageChange?.(stage);
+      } catch {
+        /* Diagnostics must never alter execution. */
+      }
     };
     const payload = run.publication;
     if (
@@ -109,28 +117,39 @@ export function createPublicationExecutor(driver) {
     let preClickStage = "open";
     try {
       active();
+      reportStage("open");
       session = await driver.open(run, signal);
       active();
       preClickStage = "identity";
+      reportStage("identity");
       const identity = await driver.identity(session);
       if (identity.accountRef !== run.accountRef || identity.channelRef !== run.channelRef)
         throw new Error("publication_identity_mismatch");
       preClickStage = "baseline";
+      reportStage("baseline");
       const existingRefs = new Set(await driver.existingPublicationRefs(session));
       preClickStage = "media";
-      const upload = payload.format === "text" ? null : await preparePublicationMedia();
+      let upload = null;
+      if (payload.format !== "text") {
+        reportStage("media");
+        upload = await preparePublicationMedia();
+      }
       active();
       preClickStage = "prepare";
+      reportStage("prepare");
       await driver.prepare(session, payload, upload);
       active();
       preClickStage = "preview";
+      reportStage("preview");
       checkedPreview(await driver.inspect(session), run, upload);
       preClickStage = "authorize";
+      reportStage("authorize");
       authorization = await authorizePublication();
       active();
       // Authorization can involve network/egress checks; inspect again in case
       // the composer, attachment or acting account changed while it was pending.
       preClickStage = "recheck";
+      reportStage("recheck");
       checkedPreview(await driver.inspect(session), run, upload);
       active();
       preClickStage = "authorization_deadline";
@@ -140,11 +159,14 @@ export function createPublicationExecutor(driver) {
       )
         throw new Error("publication_authorization_expired");
       clickStarted = true;
+      reportStage("publish");
       await driver.publish(session, authorization);
       active();
       phase = "observe";
+      reportStage("observe");
       const observation = await driver.observe(session, payload, signal);
       phase = "validate";
+      reportStage("validate");
       if (
         observation.accountRef !== run.accountRef ||
         observation.channelRef !== run.channelRef ||

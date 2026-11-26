@@ -20,6 +20,8 @@ export type PublicationReceipt = {
   externalPublicationRef?: string;
   failureCode?: string;
 };
+export type PublicationExecutionStage =
+  typeof import("./publication-diagnostics.mjs").publicationExecutionStages[number];
 export type PublicationPreclickStage =
   typeof import("./publication-diagnostics.mjs").publicationPreclickStages[number];
 export type PublicationPreclickCode =
@@ -66,5 +68,6 @@ export function createPublicationExecutor<Session>(
   preparePublicationMedia(): Promise<PreparedUpload>;
   authorizePublication(): Promise<{ authorizationId: string; localExpiresAt: number }>;
   reportPublication(receipt: PublicationReceipt): Promise<unknown>;
+  onStageChange?(stage: PublicationExecutionStage): void;
   onPreclickFailure?(stage: PublicationPreclickStage, code: PublicationPreclickCode): void;
 }) => Promise<"completed" | "failed" | "unknown">;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { facebookCredentialFormSchema } from "@/lib/social/facebook-account-forms";
 import {
+  publicationExecutionStages,
   publicationPreclickCodes,
   publicationPreclickStages,
 } from "../../ops/browser-node/publication-diagnostics.mjs";
@@ -297,6 +298,7 @@ export const nodeRequestSchema = z.discriminatedUnion("operation", [
       runId: id,
       leaseId: id,
       ready: z.boolean(),
+      publicationStage: z.enum(publicationExecutionStages).optional(),
     })
     .strict(),
   z

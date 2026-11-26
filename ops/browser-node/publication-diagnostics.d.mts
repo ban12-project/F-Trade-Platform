@@ -1,3 +1,17 @@
+export const publicationExecutionStages: readonly [
+  "launch",
+  "open",
+  "identity",
+  "baseline",
+  "media",
+  "prepare",
+  "preview",
+  "authorize",
+  "recheck",
+  "publish",
+  "observe",
+  "validate",
+];
 export const publicationPreclickStages: readonly [
   "open",
   "identity",

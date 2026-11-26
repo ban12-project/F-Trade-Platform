@@ -24,12 +24,20 @@ test("results associate each status with its account", async ({ page }) => {
   });
   await expect(alpha).toHaveCount(1);
   await expect(alpha.getByText("已发布", { exact: true })).toBeVisible();
+  const alphaProgress = alpha.getByRole("progressbar");
+  await expect(alphaProgress).toHaveAttribute("aria-valuenow", "6");
+  await expect(alphaProgress).toHaveAttribute("aria-valuemax", "6");
+  await expect(alpha.getByRole("list", { name: "发布步骤详情" }).locator("li")).toHaveCount(6);
   await expect(alpha.getByRole("link", { name: "查看平台帖子" })).toHaveAttribute(
     "href",
     "https://www.facebook.com/synthetic/posts/1",
   );
   await expect(beta).toHaveCount(1);
   await expect(beta.getByText("发布失败", { exact: true })).toBeVisible();
+  const betaProgress = beta.getByRole("progressbar");
+  await expect(betaProgress).toHaveAttribute("aria-valuenow", "0");
+  await expect(betaProgress).toHaveAttribute("aria-valuemax", "6");
+  await expect(beta.locator('[data-step-status="failed"]')).toHaveCount(1);
   await expect(beta.getByRole("link", { name: "查看平台帖子" })).toHaveCount(0);
 });
 

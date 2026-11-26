@@ -815,6 +815,10 @@ async function nodeOperation(
       finishRun(state, run.id, "failed", true, now);
       return { run: null };
     }
+    if (run.kind === "publish") {
+      run.publicationStage = "launch";
+      run.publicationStageUpdatedAt = now;
+    }
     await audit(tx, row.id, "browser_lease.claimed", run.id);
     // Neither login passwords nor platform master keys are part of sync/claim.
     return {
@@ -1042,16 +1046,17 @@ async function nodeOperation(
     return { inboxAgentRequest: { snapshot: request.snapshot, context: request.context } };
   }
   if (request.operation === "publication-media") {
-    return {
-      mediaSource: await resolvePublicationMedia(
-        tx,
-        row.id,
-        state,
-        run,
-        request.payloadDigest,
-        now,
-      ),
-    };
+    const mediaSource = await resolvePublicationMedia(
+      tx,
+      row.id,
+      state,
+      run,
+      request.payloadDigest,
+      now,
+    );
+    run.publicationStage = "media";
+    run.publicationStageUpdatedAt = now;
+    return { mediaSource };
   }
   if (request.operation === "publication-result") {
     const { authorizationId, payloadDigest, outcome, externalPublicationRef, failureCode } =
@@ -1063,7 +1068,10 @@ async function nodeOperation(
       ...(externalPublicationRef ? { externalPublicationRef } : {}),
       ...(failureCode ? { failureCode } : {}),
     };
-    return { receipt: await recordPublicationReceipt(tx, row.id, state, run, receipt, now) };
+    const recorded = await recordPublicationReceipt(tx, row.id, state, run, receipt, now);
+    run.publicationStage = receipt.outcome === "published" ? "validate" : "observe";
+    run.publicationStageUpdatedAt = now;
+    return { receipt: recorded };
   }
   if (request.operation === "authorize-publication") {
     const authorization = await authorizePublication(
@@ -1074,6 +1082,8 @@ async function nodeOperation(
       request.payloadDigest,
       now,
     );
+    run.publicationStage = "authorize";
+    run.publicationStageUpdatedAt = now;
     await audit(tx, row.id, "browser_publication.authorized", run.id);
     return { authorization };
   }
@@ -1103,6 +1113,15 @@ async function nodeOperation(
   )
     requestStop(state, run);
   const renewed = renewRun(state, run.id, request.leaseId, request.ready, now);
+  if (renewed && run.kind === "publish") {
+    if (request.publicationStage) {
+      run.publicationStage = request.publicationStage;
+      run.publicationStageUpdatedAt = now;
+    } else if (request.ready && (!run.publicationStage || run.publicationStage === "launch")) {
+      run.publicationStage = "open";
+      run.publicationStageUpdatedAt = now;
+    }
+  }
   const loginAccount = state.accounts.find((account) => account.id === run.accountId);
   if (
     renewed &&

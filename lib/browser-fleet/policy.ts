@@ -1,3 +1,5 @@
+import type { publicationExecutionStages } from "../../ops/browser-node/publication-diagnostics.mjs";
+
 export type RunKind = "interactive" | "inbox" | "publish";
 export type RunStatus =
   | "queued"
@@ -73,6 +75,8 @@ export type Run = {
     historyEvidence?: "threads" | "empty_inbox" | "unverified";
   };
   publicationFailure?: { stage: string; code: string };
+  publicationStage?: (typeof publicationExecutionStages)[number];
+  publicationStageUpdatedAt?: number;
   publicationOutcome?: "published" | "unknown";
   requestedBy: string;
   authSessionId: string | null;

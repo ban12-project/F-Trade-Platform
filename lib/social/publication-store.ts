@@ -34,7 +34,11 @@ import {
 } from "./human-write-access";
 import { isBatchPublication } from "./publication-batch-receipt";
 import { createControlledPublicationCommand } from "./publication-command";
-import { publicationFailureLabel } from "./publication-presentation";
+import {
+  type PublicationStepProgress,
+  publicationFailureLabel,
+  publicationStepProgress,
+} from "./publication-presentation";
 import type { PublishingAccount } from "./publishing-account-policy";
 import { assertPublishingAccountReady, listPublishingAccounts } from "./publishing-account-store";
 import { digestSocialWorkerPayload } from "./worker-protocol";
@@ -56,6 +60,7 @@ export type PublicationEntry = {
   publishedAt?: Date | null;
   jobStatus?: string | null;
   humanConfirmed?: boolean;
+  stepProgress?: PublicationStepProgress;
   id: string;
   projectId: string;
   contentRef: string;
@@ -205,6 +210,13 @@ export async function listProjectPublicationData(
           externalPublicationRef: socialPublication.externalPublicationRef,
           failureCode: socialBrowserJob.failureCode,
           humanConfirmed: sql<boolean>`EXISTS (SELECT 1 FROM audit_event e WHERE e.subject_id = social_publication.id AND e.action = 'social_publication.reconciled')`,
+          hasAuthorization: sql<boolean>`EXISTS (SELECT 1 FROM browser_fleet_publication bfp WHERE bfp.job_id = ${socialBrowserJob.id} AND bfp.authorization_id IS NOT NULL)`,
+          runStatus: sql<
+            string | null
+          >`(SELECT r->>'status' FROM browser_fleet_publication bfp JOIN browser_fleet_node n ON n.id = bfp.node_id CROSS JOIN LATERAL jsonb_array_elements(COALESCE(n.document->'runs', '[]'::jsonb)) r WHERE bfp.job_id = ${socialBrowserJob.id} AND r->>'id' = bfp.run_id LIMIT 1)`,
+          executionStage: sql<
+            string | null
+          >`(SELECT r->>'publicationStage' FROM browser_fleet_publication bfp JOIN browser_fleet_node n ON n.id = bfp.node_id CROSS JOIN LATERAL jsonb_array_elements(COALESCE(n.document->'runs', '[]'::jsonb)) r WHERE bfp.job_id = ${socialBrowserJob.id} AND r->>'id' = bfp.run_id LIMIT 1)`,
           jobStatus: socialBrowserJob.status,
           status: socialPublication.status,
           createdAt: socialPublication.createdAt,
@@ -282,11 +294,27 @@ export async function listProjectPublicationData(
     candidates,
     channels,
     publications: publications.map(
-      ({ failureCode, ...publication }): PublicationEntry => ({
+      ({
+        failureCode,
+        hasAuthorization,
+        runStatus,
+        executionStage,
+        ...publication
+      }): PublicationEntry => ({
         ...publication,
         failureLabel: publicationFailureLabel(failureCode),
         canRetry:
           publication.status === "failed" && isPublicationPreauthorizationFailure(failureCode),
+        stepProgress: publicationStepProgress({
+          format: publication.format,
+          status: publication.status,
+          jobStatus: publication.jobStatus,
+          failureCode,
+          humanConfirmed: publication.humanConfirmed,
+          hasAuthorization,
+          runStatus,
+          executionStage,
+        }),
       }),
     ),
   };
