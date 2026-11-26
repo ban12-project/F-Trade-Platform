@@ -218,6 +218,9 @@ async function renderPreview(input: MarketingVideoWorkflowInput) {
     await failVideoJob(input.jobId, code);
   }
 }
+// renderPreview transitions the video aggregate into VIDEO_RENDERING and starts external sandbox
+// compute without a running-state claim fence; opt out of Workflow 5.8 speculative re-runs/retries.
+renderPreview.maxRetries = 0;
 
 export async function generateMarketingVideoAiDraftWorkflow(input: MarketingVideoWorkflowInput) {
   "use workflow";

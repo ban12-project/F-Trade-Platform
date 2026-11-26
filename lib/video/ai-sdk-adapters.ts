@@ -10,6 +10,7 @@ import { experimental_generateVideo } from "ai";
 import { z } from "zod";
 
 import type { VideoGenerationAdapter, VideoGenerationAdapterRequest } from "./execution";
+import type { PrivateVideoAssetStore } from "./private-asset-store";
 import type { VideoProviderId } from "./provider-capabilities";
 
 const privateAssetRef = z
@@ -17,14 +18,7 @@ const privateAssetRef = z
   .trim()
   .regex(/^asset-[a-z0-9][a-z0-9_-]{2,120}$/i);
 
-export type PrivateVideoAssetStore = {
-  putGeneratedVideo(input: {
-    data: Uint8Array;
-    contentType: string;
-    provider: VideoProviderId;
-    modelId: string;
-  }): Promise<string>;
-};
+export type { PrivateVideoAssetStore };
 
 export type AiSdkVideoAdapterSettings = {
   /** Non-secret deployment settings. Credentials are resolved per request. */

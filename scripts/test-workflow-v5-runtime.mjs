@@ -203,6 +203,11 @@ test("fresh v5 compiled runs: Human Gate, sandbox, catalog and video orchestrati
     assert.equal(result.last.value, 42);
     assert.notEqual(result.first.stepId, result.last.stepId);
     assert.equal(result.attempt, 2);
+    const lifecycleRun = await world.runs.get(lifecycle.runId);
+    assert.ok(
+      lifecycleRun.specVersion >= 9,
+      `expected Workflow 5.8 speculative engine specVersion >= 9, got ${lifecycleRun.specVersion}`,
+    );
     const { data: events } = await world.events.list({ runId: lifecycle.runId });
     const types = events.map((event) => event.eventType);
     assert.equal(types.filter((type) => type === "step_completed").length, 3);
@@ -378,6 +383,22 @@ test("fresh v5 compiled runs: Human Gate, sandbox, catalog and video orchestrati
         "terminal jobs must skip all side effects",
       );
     }
+    synthetic.calls = [];
+    synthetic.scenarios["video-render-no-retry"] = { retry: true };
+    const noRetryRun = await runtime.start(workflow("renderMarketingVideoPreviewWorkflow"), [
+      {
+        jobId: "video-render-no-retry",
+        videoId: "video-render-no-retry",
+        actorId: "synthetic-actor",
+      },
+    ]);
+    await terminal(noRetryRun, "failed");
+    await assert.rejects(noRetryRun.returnValue, /synthetic database transient/);
+    assert.equal(
+      calls("video.running").length,
+      1,
+      "renderPreview must opt out of retries and speculative re-runs (maxRetries = 0)",
+    );
     assert.equal(requests, 0);
   } finally {
     await world?.close();
