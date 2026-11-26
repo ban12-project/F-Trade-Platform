@@ -130,7 +130,11 @@ export function ProductReferencePanel({
         </CardContent>
         <CardFooter className="flex-col items-stretch gap-3">
           {candidates.length ? (
-            <Button disabled={pending || !effectiveSelectedId} onClick={link}>
+            <Button
+              className="w-full sm:w-auto sm:self-start"
+              disabled={pending || !effectiveSelectedId}
+              onClick={link}
+            >
               <LinkIcon data-icon="inline-start" />
               添加到当前项目
             </Button>

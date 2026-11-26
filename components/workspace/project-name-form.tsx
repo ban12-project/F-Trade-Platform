@@ -47,6 +47,7 @@ export function ProjectNameForm({ projectId, title }: { projectId: string; title
       <Button
         disabled={pending || !form.formState.isReady || !form.formState.isDirty}
         type="submit"
+        className="w-full sm:w-auto sm:self-start"
       >
         {pending ? "保存中…" : "保存名称"}
       </Button>

@@ -8,7 +8,14 @@ import type { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGrid,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { reconcileVideoPublicationAction } from "@/lib/actions/publication-reconciliation";
@@ -51,30 +58,34 @@ export function VideoPublicationReconciliationForm({
           仅账号管理员可确认。先在 Facebook 核对原账号、视频画面、受众和 Reel
           链接。此确认属于人工核对，不会改变原 unknown 回执、恢复渠道或重新发布。
         </FieldDescription>
-        <Field data-invalid={!!form.formState.errors.externalPublicationRef}>
-          <FieldLabel htmlFor={`video-receipt-url-${publicationId}`}>已发布 Reel 的链接</FieldLabel>
-          <Input
-            id={`video-receipt-url-${publicationId}`}
-            type="url"
-            autoComplete="off"
-            {...form.register("externalPublicationRef")}
-            aria-invalid={!!form.formState.errors.externalPublicationRef}
-            disabled={pending}
-          />
-          <FieldError errors={[form.formState.errors.externalPublicationRef]} />
-        </Field>
-        <Field data-invalid={!!form.formState.errors.evidenceRef}>
-          <FieldLabel htmlFor={`video-receipt-evidence-${publicationId}`}>
-            发布结果核对依据
-          </FieldLabel>
-          <EvidenceSelectField
-            projectId={projectId}
-            control={form.control}
-            name="evidenceRef"
-            id={`video-receipt-evidence-${publicationId}`}
-          />
-          <FieldError errors={[form.formState.errors.evidenceRef]} />
-        </Field>
+        <FieldGrid columns={2}>
+          <Field data-invalid={!!form.formState.errors.externalPublicationRef}>
+            <FieldLabel htmlFor={`video-receipt-url-${publicationId}`}>
+              已发布 Reel 的链接
+            </FieldLabel>
+            <Input
+              id={`video-receipt-url-${publicationId}`}
+              type="url"
+              autoComplete="off"
+              {...form.register("externalPublicationRef")}
+              aria-invalid={!!form.formState.errors.externalPublicationRef}
+              disabled={pending}
+            />
+            <FieldError errors={[form.formState.errors.externalPublicationRef]} />
+          </Field>
+          <Field data-invalid={!!form.formState.errors.evidenceRef}>
+            <FieldLabel htmlFor={`video-receipt-evidence-${publicationId}`}>
+              发布结果核对依据
+            </FieldLabel>
+            <EvidenceSelectField
+              projectId={projectId}
+              control={form.control}
+              name="evidenceRef"
+              id={`video-receipt-evidence-${publicationId}`}
+            />
+            <FieldError errors={[form.formState.errors.evidenceRef]} />
+          </Field>
+        </FieldGrid>
         <Controller
           control={form.control}
           name="confirmed"
@@ -98,7 +109,12 @@ export function VideoPublicationReconciliationForm({
             </Field>
           )}
         />
-        <Button type="submit" variant="outline" disabled={pending || result?.ok}>
+        <Button
+          type="submit"
+          variant="outline"
+          className="w-full sm:w-auto sm:self-start"
+          disabled={pending || result?.ok}
+        >
           {pending ? <Spinner data-icon="inline-start" /> : null}确认已发布结果
         </Button>
         {result ? (

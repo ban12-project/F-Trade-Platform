@@ -31,6 +31,7 @@ import {
   Field,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -173,45 +174,47 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
           <FieldSet disabled={busy}>
             <FieldLegend className="sr-only">模型配置编辑</FieldLegend>
             <FieldGroup>
-              <Field>
-                <FieldLabel>模型配置</FieldLabel>
-                <Select
-                  items={configurationItems}
-                  value={selectedId}
-                  onValueChange={selectConfiguration}
-                >
-                  <SelectTrigger className="w-full" aria-label="模型配置">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="new">新建模型配置</SelectItem>
-                      {settings.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name}
-                          {item.isDefault ? "（默认）" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field data-invalid={!!form.formState.errors.name}>
-                <FieldLabel htmlFor="agent-config-name">配置名称</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <Input
-                      id="agent-config-name"
-                      aria-invalid={!!form.formState.errors.name}
-                      placeholder="例如：日常产品导入"
-                      {...field}
-                    />
-                  )}
-                />
-                <FieldError errors={[form.formState.errors.name]} />
-              </Field>
+              <FieldGrid columns={2}>
+                <Field>
+                  <FieldLabel>模型配置</FieldLabel>
+                  <Select
+                    items={configurationItems}
+                    value={selectedId}
+                    onValueChange={selectConfiguration}
+                  >
+                    <SelectTrigger className="w-full" aria-label="模型配置">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="new">新建模型配置</SelectItem>
+                        {settings.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name}
+                            {item.isDefault ? "（默认）" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field data-invalid={!!form.formState.errors.name}>
+                  <FieldLabel htmlFor="agent-config-name">配置名称</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <Input
+                        id="agent-config-name"
+                        aria-invalid={!!form.formState.errors.name}
+                        placeholder="例如：日常产品导入"
+                        {...field}
+                      />
+                    )}
+                  />
+                  <FieldError errors={[form.formState.errors.name]} />
+                </Field>
+              </FieldGrid>
               <Field orientation="horizontal">
                 <Controller
                   control={form.control}
@@ -226,57 +229,59 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                 />
                 <FieldLabel htmlFor="default-agent-model">作为默认模型</FieldLabel>
               </Field>
-              <Field>
-                <FieldLabel htmlFor="agent-provider">Provider</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="provider"
-                  render={({ field }) => (
-                    <Select
-                      items={{
-                        openai: "OpenAI",
-                        anthropic: "Anthropic",
-                        google: "Google Gemini",
-                        "openai-compatible": "OpenAI-compatible",
-                      }}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <SelectTrigger id="agent-provider" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="openai">OpenAI</SelectItem>
-                          <SelectItem value="anthropic">Anthropic</SelectItem>
-                          <SelectItem value="google">Google Gemini</SelectItem>
-                          <SelectItem value="openai-compatible">OpenAI-compatible</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-              <Field data-invalid={!!form.formState.errors.model}>
-                <FieldLabel htmlFor="agent-model">默认模型</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="model"
-                  render={({ field }) => (
-                    <Input
-                      id="agent-model"
-                      aria-invalid={!!form.formState.errors.model}
-                      {...field}
-                    />
-                  )}
-                />
-                {selected?.discoveredModels.length ? (
-                  <FieldDescription>
-                    已发现 {selected.discoveredModels.length} 个模型，智能导入时可逐次选择。
-                  </FieldDescription>
-                ) : null}
-                <FieldError errors={[form.formState.errors.model]} />
-              </Field>
+              <FieldGrid columns={2}>
+                <Field>
+                  <FieldLabel htmlFor="agent-provider">Provider</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name="provider"
+                    render={({ field }) => (
+                      <Select
+                        items={{
+                          openai: "OpenAI",
+                          anthropic: "Anthropic",
+                          google: "Google Gemini",
+                          "openai-compatible": "OpenAI-compatible",
+                        }}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger id="agent-provider" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="openai">OpenAI</SelectItem>
+                            <SelectItem value="anthropic">Anthropic</SelectItem>
+                            <SelectItem value="google">Google Gemini</SelectItem>
+                            <SelectItem value="openai-compatible">OpenAI-compatible</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                <Field data-invalid={!!form.formState.errors.model}>
+                  <FieldLabel htmlFor="agent-model">默认模型</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name="model"
+                    render={({ field }) => (
+                      <Input
+                        id="agent-model"
+                        aria-invalid={!!form.formState.errors.model}
+                        {...field}
+                      />
+                    )}
+                  />
+                  {selected?.discoveredModels.length ? (
+                    <FieldDescription>
+                      已发现 {selected.discoveredModels.length} 个模型，智能导入时可逐次选择。
+                    </FieldDescription>
+                  ) : null}
+                  <FieldError errors={[form.formState.errors.model]} />
+                </Field>
+              </FieldGrid>
               <Field>
                 <FieldLabel htmlFor="agent-api-key">
                   API key {selected?.apiKeyConfigured ? "（已配置）" : ""}
@@ -324,40 +329,42 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-4">
                   <FieldGroup>
-                    <Field data-invalid={!!form.formState.errors.baseUrl}>
-                      <FieldLabel htmlFor="agent-base-url">服务地址（Base URL）</FieldLabel>
-                      <Controller
-                        control={form.control}
-                        name="baseUrl"
-                        render={({ field }) => (
-                          <Input
-                            id="agent-base-url"
-                            inputMode="url"
-                            placeholder="官方端点可留空"
-                            aria-invalid={!!form.formState.errors.baseUrl}
-                            {...field}
-                          />
-                        )}
-                      />
-                      <FieldError errors={[form.formState.errors.baseUrl]} />
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="agent-auth-token">
-                        Auth token {selected?.authTokenConfigured ? "（已配置）" : ""}
-                      </FieldLabel>
-                      <Controller
-                        control={form.control}
-                        name="authToken"
-                        render={({ field }) => (
-                          <Input
-                            id="agent-auth-token"
-                            type="password"
-                            autoComplete="new-password"
-                            {...field}
-                          />
-                        )}
-                      />
-                    </Field>
+                    <FieldGrid columns={2}>
+                      <Field data-invalid={!!form.formState.errors.baseUrl}>
+                        <FieldLabel htmlFor="agent-base-url">服务地址（Base URL）</FieldLabel>
+                        <Controller
+                          control={form.control}
+                          name="baseUrl"
+                          render={({ field }) => (
+                            <Input
+                              id="agent-base-url"
+                              inputMode="url"
+                              placeholder="官方端点可留空"
+                              aria-invalid={!!form.formState.errors.baseUrl}
+                              {...field}
+                            />
+                          )}
+                        />
+                        <FieldError errors={[form.formState.errors.baseUrl]} />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="agent-auth-token">
+                          Auth token {selected?.authTokenConfigured ? "（已配置）" : ""}
+                        </FieldLabel>
+                        <Controller
+                          control={form.control}
+                          name="authToken"
+                          render={({ field }) => (
+                            <Input
+                              id="agent-auth-token"
+                              type="password"
+                              autoComplete="new-password"
+                              {...field}
+                            />
+                          )}
+                        />
+                      </Field>
+                    </FieldGrid>
                     <Field orientation="horizontal">
                       <Controller
                         control={form.control}
@@ -398,7 +405,12 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button form="agent-settings" type="submit" disabled={busy}>
+        <Button
+          form="agent-settings"
+          type="submit"
+          disabled={busy}
+          className="w-full sm:w-auto sm:self-start"
+        >
           {pending ? <Spinner data-icon="inline-start" /> : <SaveIcon data-icon="inline-start" />}
           保存模型配置
         </Button>
@@ -434,7 +446,7 @@ function TeamSettings() {
     startTransition(() => action(data));
   }
   return (
-    <Card>
+    <Card className="max-w-xl">
       <CardHeader>
         <CardTitle>邀请用户</CardTitle>
         <CardDescription>单次、限时邀请；不开放公开注册。</CardDescription>
@@ -457,7 +469,12 @@ function TeamSettings() {
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button form="invite-user" type="submit" disabled={busy}>
+        <Button
+          form="invite-user"
+          type="submit"
+          disabled={busy}
+          className="w-full sm:w-auto sm:self-start"
+        >
           <MailPlusIcon data-icon="inline-start" />
           发送邀请
         </Button>

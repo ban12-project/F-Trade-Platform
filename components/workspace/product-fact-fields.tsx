@@ -19,6 +19,7 @@ import {
   Field,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -264,7 +265,11 @@ function EvidenceInput({
 }
 
 function FactPair({ children }: { children: ReactNode }) {
-  return <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">{children}</div>;
+  return (
+    <div className="grid items-start gap-3 rounded-lg border p-3 *:min-w-0 sm:grid-cols-2">
+      {children}
+    </div>
+  );
 }
 
 function ProductReadinessCard({
@@ -414,23 +419,28 @@ function BatchEvidencePanel({
               或仅勾选部分目标字段
             </FieldLegend>
             <FieldGroup>
-              {eligibleBatchTargets.map(([, evidenceName, label]) => (
-                <Field key={evidenceName} orientation="horizontal">
-                  <Checkbox
-                    disabled={disabled}
-                    id={fieldId(`batch-${evidenceName}`)}
-                    checked={batchTargets.has(evidenceName)}
-                    onCheckedChange={(checked) => toggleBatchTarget(evidenceName, checked === true)}
-                  />
-                  <FieldLabel htmlFor={fieldId(`batch-${evidenceName}`)}>{label}</FieldLabel>
-                </Field>
-              ))}
+              <FieldGrid columns={3}>
+                {eligibleBatchTargets.map(([, evidenceName, label]) => (
+                  <Field key={evidenceName} orientation="horizontal">
+                    <Checkbox
+                      disabled={disabled}
+                      id={fieldId(`batch-${evidenceName}`)}
+                      checked={batchTargets.has(evidenceName)}
+                      onCheckedChange={(checked) =>
+                        toggleBatchTarget(evidenceName, checked === true)
+                      }
+                    />
+                    <FieldLabel htmlFor={fieldId(`batch-${evidenceName}`)}>{label}</FieldLabel>
+                  </Field>
+                ))}
+              </FieldGrid>
             </FieldGroup>
           </FieldSet>
         ) : null}
         <Button
           type="button"
           variant="outline"
+          className="w-full sm:w-auto sm:self-start"
           disabled={!batchEvidence || !batchTargets.size}
           onClick={applyBatchEvidence}
         >

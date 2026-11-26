@@ -50,6 +50,33 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+const fieldGridVariants = cva("grid w-full grid-cols-1 items-start gap-4 *:min-w-0", {
+  variants: {
+    columns: {
+      2: "@xl/field-group:grid-cols-2",
+      3: "@xl/field-group:grid-cols-2 @3xl/field-group:grid-cols-3",
+      4: "@xl/field-group:grid-cols-2 @4xl/field-group:grid-cols-4",
+    },
+  },
+  defaultVariants: {
+    columns: 2,
+  },
+});
+
+function FieldGrid({
+  className,
+  columns = 2,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof fieldGridVariants>) {
+  return (
+    <div
+      data-slot="field-grid"
+      className={cn(fieldGridVariants({ columns }), className)}
+      {...props}
+    />
+  );
+}
+
 const fieldVariants = cva("group/field flex w-full gap-2 data-[invalid=true]:text-destructive", {
   variants: {
     orientation: {
@@ -217,6 +244,7 @@ export {
   FieldContent,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldLegend,

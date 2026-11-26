@@ -97,7 +97,11 @@ export function ContentCopy({
         )}
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button disabled={pending || created || !selected} onClick={copy}>
+        <Button
+          className="w-full sm:w-auto sm:self-start"
+          disabled={pending || created || !selected}
+          onClick={copy}
+        >
           <CopyIcon data-icon="inline-start" />
           复制为新草稿
         </Button>
@@ -105,6 +109,7 @@ export function ContentCopy({
           <Button
             render={<Link href={workspaceRecordHref(projectId, "content", state.contentId)} />}
             variant="outline"
+            className="w-full sm:w-auto sm:self-start"
           >
             打开复制的内容草稿
           </Button>

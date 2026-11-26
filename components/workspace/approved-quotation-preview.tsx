@@ -95,6 +95,7 @@ export function ApprovedQuotationPreview({
         <Button
           type="button"
           variant="outline"
+          className="w-full sm:w-auto sm:self-start"
           onClick={copyText}
           disabled={copyStatus === "copying"}
         >

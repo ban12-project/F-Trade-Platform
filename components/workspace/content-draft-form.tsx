@@ -338,88 +338,92 @@ export function ContentDraftForm({
                     errors={[form.formState.errors.productId]}
                   />
                 </Field>
-                <Field data-invalid={!!form.formState.errors.contentType}>
-                  <FieldLabel htmlFor="content-kind">内容类型</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="contentType"
-                    render={({ field }) => (
-                      <Select
-                        items={Object.fromEntries(contentTypes)}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger
-                          ref={field.ref}
-                          onBlur={field.onBlur}
-                          aria-invalid={!!form.formState.errors.contentType}
-                          aria-describedby={
-                            form.formState.errors.contentType ? "content-kind-error" : undefined
-                          }
-                          id="content-kind"
-                          className="w-full"
+                <div className="grid grid-cols-1 items-start gap-4 *:min-w-0 sm:grid-cols-2">
+                  <Field data-invalid={!!form.formState.errors.contentType}>
+                    <FieldLabel htmlFor="content-kind">内容类型</FieldLabel>
+                    <Controller
+                      control={form.control}
+                      name="contentType"
+                      render={({ field }) => (
+                        <Select
+                          items={Object.fromEntries(contentTypes)}
+                          value={field.value}
+                          onValueChange={field.onChange}
                         >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {contentTypes.map(([value, label]) => (
-                              <SelectItem key={value} value={value}>
-                                {label}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError
-                    id="content-kind-error"
-                    errors={[form.formState.errors.contentType]}
-                  />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.factPath}>
-                  <FieldLabel htmlFor="content-source-fact">可用于文案的产品信息</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="factPath"
-                    render={({ field }) => (
-                      <Select
-                        items={Object.fromEntries(
-                          (product?.factOptions ?? []).map((fact) => [fact.path, fact.label]),
-                        )}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger
-                          ref={field.ref}
-                          onBlur={field.onBlur}
-                          aria-invalid={!!form.formState.errors.factPath}
-                          aria-describedby={
-                            form.formState.errors.factPath ? "content-source-fact-error" : undefined
-                          }
-                          id="content-source-fact"
-                          className="w-full"
+                          <SelectTrigger
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                            aria-invalid={!!form.formState.errors.contentType}
+                            aria-describedby={
+                              form.formState.errors.contentType ? "content-kind-error" : undefined
+                            }
+                            id="content-kind"
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {contentTypes.map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                  {label}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <FieldError
+                      id="content-kind-error"
+                      errors={[form.formState.errors.contentType]}
+                    />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.factPath}>
+                    <FieldLabel htmlFor="content-source-fact">可用于文案的产品信息</FieldLabel>
+                    <Controller
+                      control={form.control}
+                      name="factPath"
+                      render={({ field }) => (
+                        <Select
+                          items={Object.fromEntries(
+                            (product?.factOptions ?? []).map((fact) => [fact.path, fact.label]),
+                          )}
+                          value={field.value}
+                          onValueChange={field.onChange}
                         >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {product?.factOptions.map((fact) => (
-                              <SelectItem key={fact.path} value={fact.path}>
-                                {fact.label}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError
-                    id="content-source-fact-error"
-                    errors={[form.formState.errors.factPath]}
-                  />
-                </Field>
+                          <SelectTrigger
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                            aria-invalid={!!form.formState.errors.factPath}
+                            aria-describedby={
+                              form.formState.errors.factPath
+                                ? "content-source-fact-error"
+                                : undefined
+                            }
+                            id="content-source-fact"
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {product?.factOptions.map((fact) => (
+                                <SelectItem key={fact.path} value={fact.path}>
+                                  {fact.label}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <FieldError
+                      id="content-source-fact-error"
+                      errors={[form.formState.errors.factPath]}
+                    />
+                  </Field>
+                </div>
                 <Field>
                   <FieldLabel>快捷场景预设</FieldLabel>
                   <div className="flex flex-wrap gap-2">
@@ -453,39 +457,42 @@ export function ContentDraftForm({
                     选择外贸常见获客场景，自动填入内容类型、营销目标与目标客户。
                   </FieldDescription>
                 </Field>
-                <Field data-invalid={!!form.formState.errors.objective}>
-                  <FieldLabel htmlFor="content-objective">营销目标</FieldLabel>
-                  <Input
-                    id="content-objective"
-                    aria-invalid={!!form.formState.errors.objective}
-                    aria-describedby={
-                      form.formState.errors.objective ? "content-objective-error" : undefined
-                    }
-                    {...form.register("objective")}
-                  />
-                  <FieldError
-                    id="content-objective-error"
-                    errors={[form.formState.errors.objective]}
-                  />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.targetCustomer}>
-                  <FieldLabel htmlFor="target-customer">目标客户</FieldLabel>
-                  <Input
-                    id="target-customer"
-                    aria-invalid={!!form.formState.errors.targetCustomer}
-                    aria-describedby={
-                      form.formState.errors.targetCustomer ? "target-customer-error" : undefined
-                    }
-                    {...form.register("targetCustomer")}
-                  />
-                  <FieldError
-                    id="target-customer-error"
-                    errors={[form.formState.errors.targetCustomer]}
-                  />
-                </Field>
+                <div className="grid grid-cols-1 items-start gap-4 *:min-w-0 sm:grid-cols-2">
+                  <Field data-invalid={!!form.formState.errors.objective}>
+                    <FieldLabel htmlFor="content-objective">营销目标</FieldLabel>
+                    <Input
+                      id="content-objective"
+                      aria-invalid={!!form.formState.errors.objective}
+                      aria-describedby={
+                        form.formState.errors.objective ? "content-objective-error" : undefined
+                      }
+                      {...form.register("objective")}
+                    />
+                    <FieldError
+                      id="content-objective-error"
+                      errors={[form.formState.errors.objective]}
+                    />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.targetCustomer}>
+                    <FieldLabel htmlFor="target-customer">目标客户</FieldLabel>
+                    <Input
+                      id="target-customer"
+                      aria-invalid={!!form.formState.errors.targetCustomer}
+                      aria-describedby={
+                        form.formState.errors.targetCustomer ? "target-customer-error" : undefined
+                      }
+                      {...form.register("targetCustomer")}
+                    />
+                    <FieldError
+                      id="target-customer-error"
+                      errors={[form.formState.errors.targetCustomer]}
+                    />
+                  </Field>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
+                  className="w-full sm:w-auto sm:self-start"
                   disabled={!form.formState.isReady || generating || saving || created}
                   onClick={generate}
                 >
@@ -520,36 +527,38 @@ export function ContentDraftForm({
                   />
                   <FieldError id="content-body-error" errors={[form.formState.errors.body]} />
                 </Field>
-                <Field data-invalid={!!form.formState.errors.callToAction}>
-                  <FieldLabel htmlFor="content-cta">行动号召</FieldLabel>
-                  <Input
-                    id="content-cta"
-                    aria-invalid={!!form.formState.errors.callToAction}
-                    aria-describedby={
-                      form.formState.errors.callToAction ? "content-cta-error" : undefined
-                    }
-                    {...form.register("callToAction")}
-                  />
-                  <FieldError
-                    id="content-cta-error"
-                    errors={[form.formState.errors.callToAction]}
-                  />
-                </Field>
-                <Field data-invalid={!!form.formState.errors.hashtags}>
-                  <FieldLabel htmlFor="content-hashtags">标签</FieldLabel>
-                  <Input
-                    id="content-hashtags"
-                    aria-invalid={!!form.formState.errors.hashtags}
-                    aria-describedby={
-                      form.formState.errors.hashtags ? "content-hashtags-error" : undefined
-                    }
-                    {...form.register("hashtags")}
-                  />
-                  <FieldError
-                    id="content-hashtags-error"
-                    errors={[form.formState.errors.hashtags]}
-                  />
-                </Field>
+                <div className="grid grid-cols-1 items-start gap-4 *:min-w-0 sm:grid-cols-2">
+                  <Field data-invalid={!!form.formState.errors.callToAction}>
+                    <FieldLabel htmlFor="content-cta">行动号召</FieldLabel>
+                    <Input
+                      id="content-cta"
+                      aria-invalid={!!form.formState.errors.callToAction}
+                      aria-describedby={
+                        form.formState.errors.callToAction ? "content-cta-error" : undefined
+                      }
+                      {...form.register("callToAction")}
+                    />
+                    <FieldError
+                      id="content-cta-error"
+                      errors={[form.formState.errors.callToAction]}
+                    />
+                  </Field>
+                  <Field data-invalid={!!form.formState.errors.hashtags}>
+                    <FieldLabel htmlFor="content-hashtags">标签</FieldLabel>
+                    <Input
+                      id="content-hashtags"
+                      aria-invalid={!!form.formState.errors.hashtags}
+                      aria-describedby={
+                        form.formState.errors.hashtags ? "content-hashtags-error" : undefined
+                      }
+                      {...form.register("hashtags")}
+                    />
+                    <FieldError
+                      id="content-hashtags-error"
+                      errors={[form.formState.errors.hashtags]}
+                    />
+                  </Field>
+                </div>
                 <Field data-invalid={!!form.formState.errors.visualInstruction}>
                   <FieldLabel htmlFor="visual-instruction">视觉说明</FieldLabel>
                   <Textarea
@@ -597,6 +606,7 @@ export function ContentDraftForm({
           form={revising ? "revise-content" : "create-content"}
           type="submit"
           disabled={!form.formState.isReady || saving || created || generating}
+          className="w-full sm:w-auto sm:self-start"
         >
           {saving ? (
             <Spinner data-icon="inline-start" />
@@ -611,6 +621,7 @@ export function ContentDraftForm({
           <Button
             render={<Link href={workspaceRecordHref(projectId, "content", saveState.contentId)} />}
             variant="outline"
+            className="w-full sm:w-auto sm:self-start"
           >
             打开内容草稿
           </Button>

@@ -27,6 +27,7 @@ import {
   Field,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -361,159 +362,165 @@ export function RfqForm({
               <FieldSet>
                 <FieldLegend>客户与需求</FieldLegend>
                 <FieldGroup>
-                  <Field data-invalid={!!form.formState.errors.customerName}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-customer-name`}>
-                      客户名称
-                    </FieldLabel>
-                    <Input
-                      id={`${entry?.id ?? "new"}-customer-name`}
-                      {...form.register("customerName")}
-                      aria-invalid={!!form.formState.errors.customerName}
-                      aria-describedby={errorDescription("customerName")}
-                    />
-                    <FieldError
-                      id={errorDescription("customerName")}
-                      errors={[form.formState.errors.customerName]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.customerCompany}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-company`}>公司</FieldLabel>
-                    <Input
-                      id={`${entry?.id ?? "new"}-company`}
-                      {...form.register("customerCompany")}
-                      aria-invalid={!!form.formState.errors.customerCompany}
-                      aria-describedby={errorDescription("customerCompany")}
-                    />
-                    <FieldError
-                      id={errorDescription("customerCompany")}
-                      errors={[form.formState.errors.customerCompany]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.customerCountry}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-country`}>国家</FieldLabel>
-                    <Input
-                      id={`${entry?.id ?? "new"}-country`}
-                      {...form.register("customerCountry")}
-                      aria-invalid={!!form.formState.errors.customerCountry}
-                      aria-describedby={errorDescription("customerCountry")}
-                    />
-                    <FieldError
-                      id={errorDescription("customerCountry")}
-                      errors={[form.formState.errors.customerCountry]}
-                    />
-                  </Field>
+                  <FieldGrid columns={3}>
+                    <Field data-invalid={!!form.formState.errors.customerName}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-customer-name`}>
+                        客户名称
+                      </FieldLabel>
+                      <Input
+                        id={`${entry?.id ?? "new"}-customer-name`}
+                        {...form.register("customerName")}
+                        aria-invalid={!!form.formState.errors.customerName}
+                        aria-describedby={errorDescription("customerName")}
+                      />
+                      <FieldError
+                        id={errorDescription("customerName")}
+                        errors={[form.formState.errors.customerName]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.customerCompany}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-company`}>公司</FieldLabel>
+                      <Input
+                        id={`${entry?.id ?? "new"}-company`}
+                        {...form.register("customerCompany")}
+                        aria-invalid={!!form.formState.errors.customerCompany}
+                        aria-describedby={errorDescription("customerCompany")}
+                      />
+                      <FieldError
+                        id={errorDescription("customerCompany")}
+                        errors={[form.formState.errors.customerCompany]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.customerCountry}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-country`}>国家</FieldLabel>
+                      <Input
+                        id={`${entry?.id ?? "new"}-country`}
+                        {...form.register("customerCountry")}
+                        aria-invalid={!!form.formState.errors.customerCountry}
+                        aria-describedby={errorDescription("customerCountry")}
+                      />
+                      <FieldError
+                        id={errorDescription("customerCountry")}
+                        errors={[form.formState.errors.customerCountry]}
+                      />
+                    </Field>
+                  </FieldGrid>
                 </FieldGroup>
               </FieldSet>
               <FieldSet>
                 <FieldLegend>产品与交付信息</FieldLegend>
                 <FieldGroup>
-                  <Field data-invalid={!!form.formState.errors.productType}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-product-type`}>产品类型</FieldLabel>
-                    <Controller
-                      control={form.control}
-                      name="productType"
-                      render={({ field }) => (
-                        <Select
-                          disabled={busy}
-                          items={Object.fromEntries(types)}
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
-                          <SelectTrigger
-                            ref={field.ref}
-                            onBlur={field.onBlur}
-                            aria-invalid={!!form.formState.errors.productType}
-                            aria-describedby={errorDescription("productType")}
-                            id={`${entry?.id ?? "new"}-product-type`}
-                            className="w-full"
+                  <FieldGrid columns={3}>
+                    <Field data-invalid={!!form.formState.errors.productType}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-product-type`}>
+                        产品类型
+                      </FieldLabel>
+                      <Controller
+                        control={form.control}
+                        name="productType"
+                        render={({ field }) => (
+                          <Select
+                            disabled={busy}
+                            items={Object.fromEntries(types)}
+                            value={field.value}
+                            onValueChange={field.onChange}
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {types.map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                  {label}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    <FieldError
-                      id={errorDescription("productType")}
-                      errors={[form.formState.errors.productType]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.oeNumber}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-oe`}>OE / OEM 编号</FieldLabel>
-                    <Input
-                      id={`${entry?.id ?? "new"}-oe`}
-                      {...form.register("oeNumber")}
-                      aria-invalid={!!form.formState.errors.oeNumber}
-                      aria-describedby={errorDescription("oeNumber")}
-                    />
-                    <FieldError
-                      id={errorDescription("oeNumber")}
-                      errors={[form.formState.errors.oeNumber]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.vehicleBrand}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-brand`}>车辆品牌</FieldLabel>
-                    <Input
-                      id={`${entry?.id ?? "new"}-brand`}
-                      {...form.register("vehicleBrand")}
-                      aria-invalid={!!form.formState.errors.vehicleBrand}
-                      aria-describedby={errorDescription("vehicleBrand")}
-                    />
-                    <FieldError
-                      id={errorDescription("vehicleBrand")}
-                      errors={[form.formState.errors.vehicleBrand]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.vehicleModel}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-model`}>车型</FieldLabel>
-                    <Input
-                      id={`${entry?.id ?? "new"}-model`}
-                      {...form.register("vehicleModel")}
-                      aria-invalid={!!form.formState.errors.vehicleModel}
-                      aria-describedby={errorDescription("vehicleModel")}
-                    />
-                    <FieldError
-                      id={errorDescription("vehicleModel")}
-                      errors={[form.formState.errors.vehicleModel]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.quantity}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-quantity`}>数量</FieldLabel>
-                    <Input
-                      id={`${entry?.id ?? "new"}-quantity`}
-                      inputMode="numeric"
-                      {...form.register("quantity")}
-                      aria-invalid={!!form.formState.errors.quantity}
-                      aria-describedby={errorDescription("quantity")}
-                    />
-                    <FieldError
-                      id={errorDescription("quantity")}
-                      errors={[form.formState.errors.quantity]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.destination}>
-                    <FieldLabel htmlFor={`${entry?.id ?? "new"}-destination`}>
-                      目的地国家或港口
-                    </FieldLabel>
-                    <Input
-                      id={`${entry?.id ?? "new"}-destination`}
-                      {...form.register("destination")}
-                      aria-invalid={!!form.formState.errors.destination}
-                      aria-describedby={errorDescription("destination")}
-                    />
-                    <FieldError
-                      id={errorDescription("destination")}
-                      errors={[form.formState.errors.destination]}
-                    />
-                  </Field>
+                            <SelectTrigger
+                              ref={field.ref}
+                              onBlur={field.onBlur}
+                              aria-invalid={!!form.formState.errors.productType}
+                              aria-describedby={errorDescription("productType")}
+                              id={`${entry?.id ?? "new"}-product-type`}
+                              className="w-full"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {types.map(([value, label]) => (
+                                  <SelectItem key={value} value={value}>
+                                    {label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      <FieldError
+                        id={errorDescription("productType")}
+                        errors={[form.formState.errors.productType]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.oeNumber}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-oe`}>OE / OEM 编号</FieldLabel>
+                      <Input
+                        id={`${entry?.id ?? "new"}-oe`}
+                        {...form.register("oeNumber")}
+                        aria-invalid={!!form.formState.errors.oeNumber}
+                        aria-describedby={errorDescription("oeNumber")}
+                      />
+                      <FieldError
+                        id={errorDescription("oeNumber")}
+                        errors={[form.formState.errors.oeNumber]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.vehicleBrand}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-brand`}>车辆品牌</FieldLabel>
+                      <Input
+                        id={`${entry?.id ?? "new"}-brand`}
+                        {...form.register("vehicleBrand")}
+                        aria-invalid={!!form.formState.errors.vehicleBrand}
+                        aria-describedby={errorDescription("vehicleBrand")}
+                      />
+                      <FieldError
+                        id={errorDescription("vehicleBrand")}
+                        errors={[form.formState.errors.vehicleBrand]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.vehicleModel}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-model`}>车型</FieldLabel>
+                      <Input
+                        id={`${entry?.id ?? "new"}-model`}
+                        {...form.register("vehicleModel")}
+                        aria-invalid={!!form.formState.errors.vehicleModel}
+                        aria-describedby={errorDescription("vehicleModel")}
+                      />
+                      <FieldError
+                        id={errorDescription("vehicleModel")}
+                        errors={[form.formState.errors.vehicleModel]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.quantity}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-quantity`}>数量</FieldLabel>
+                      <Input
+                        id={`${entry?.id ?? "new"}-quantity`}
+                        inputMode="numeric"
+                        {...form.register("quantity")}
+                        aria-invalid={!!form.formState.errors.quantity}
+                        aria-describedby={errorDescription("quantity")}
+                      />
+                      <FieldError
+                        id={errorDescription("quantity")}
+                        errors={[form.formState.errors.quantity]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.destination}>
+                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-destination`}>
+                        目的地国家或港口
+                      </FieldLabel>
+                      <Input
+                        id={`${entry?.id ?? "new"}-destination`}
+                        {...form.register("destination")}
+                        aria-invalid={!!form.formState.errors.destination}
+                        aria-describedby={errorDescription("destination")}
+                      />
+                      <FieldError
+                        id={errorDescription("destination")}
+                        errors={[form.formState.errors.destination]}
+                      />
+                    </Field>
+                  </FieldGrid>
                 </FieldGroup>
               </FieldSet>
               <FieldSet>
@@ -522,21 +529,23 @@ export function RfqForm({
                   按客户原意记录，留待报价人员核对。车型、发动机和规格尚未核验；期望交付不是工厂交期承诺。
                 </FieldDescription>
                 <FieldGroup>
-                  {rfqCustomerRequirements.map(({ field, label }) => (
-                    <Field key={field} data-invalid={!!form.formState.errors[field]}>
-                      <FieldLabel htmlFor={`${entry?.id ?? "new"}-${field}`}>{label}</FieldLabel>
-                      <Input
-                        id={`${entry?.id ?? "new"}-${field}`}
-                        {...form.register(field)}
-                        aria-invalid={!!form.formState.errors[field]}
-                        aria-describedby={errorDescription(field)}
-                      />
-                      <FieldError
-                        id={errorDescription(field)}
-                        errors={[form.formState.errors[field]]}
-                      />
-                    </Field>
-                  ))}
+                  <FieldGrid columns={2}>
+                    {rfqCustomerRequirements.map(({ field, label }) => (
+                      <Field key={field} data-invalid={!!form.formState.errors[field]}>
+                        <FieldLabel htmlFor={`${entry?.id ?? "new"}-${field}`}>{label}</FieldLabel>
+                        <Input
+                          id={`${entry?.id ?? "new"}-${field}`}
+                          {...form.register(field)}
+                          aria-invalid={!!form.formState.errors[field]}
+                          aria-describedby={errorDescription(field)}
+                        />
+                        <FieldError
+                          id={errorDescription(field)}
+                          errors={[form.formState.errors[field]]}
+                        />
+                      </Field>
+                    ))}
+                  </FieldGrid>
                 </FieldGroup>
               </FieldSet>
               <Field data-invalid={!!form.formState.errors.evidenceRef}>
@@ -563,6 +572,7 @@ export function RfqForm({
           form={revising ? `revise-rfq-${entry?.id}` : "create-rfq"}
           type="submit"
           disabled={busy || suggesting}
+          className="w-full sm:w-auto sm:self-start"
         >
           {pending ? (
             <Spinner data-icon="inline-start" />

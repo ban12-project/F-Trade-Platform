@@ -21,6 +21,7 @@ import {
   Field,
   FieldDescription,
   FieldError,
+  FieldGrid,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -201,7 +202,7 @@ function QuotationForm({
                   <FieldDescription>
                     以下是客户要求，不代表已核实产品信息或工厂承诺。请核对后填写报价。
                   </FieldDescription>
-                  <dl className="grid gap-3 text-sm">
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                     {[
                       ["产品类型", productTypeLabel(selectedRfq.productType)],
                       ["OE / OEM 编号", selectedRfq.formValues.oeNumber],
@@ -279,78 +280,84 @@ function QuotationForm({
               <FieldSet>
                 <FieldLegend>人工商业条款</FieldLegend>
                 <FieldGroup>
-                  <Field data-invalid={!!form.formState.errors.unitPrice}>
-                    <FieldLabel htmlFor={`price-${entry?.id ?? "new"}`}>单价</FieldLabel>
-                    <Input
-                      id={`price-${entry?.id ?? "new"}`}
-                      inputMode="decimal"
-                      aria-invalid={!!form.formState.errors.unitPrice}
-                      aria-describedby={
-                        form.formState.errors.unitPrice
-                          ? `quotation-${entry?.id ?? "new"}-unitPrice-error`
-                          : undefined
-                      }
-                      {...form.register("unitPrice")}
-                    />
-                    <FieldError
-                      id={`quotation-${entry?.id ?? "new"}-unitPrice-error`}
-                      errors={[form.formState.errors.unitPrice]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.currency}>
-                    <FieldLabel htmlFor={`currency-${entry?.id ?? "new"}`}>币种</FieldLabel>
-                    <Input
-                      id={`currency-${entry?.id ?? "new"}`}
-                      maxLength={3}
-                      {...form.register("currency")}
-                      aria-invalid={!!form.formState.errors.currency}
-                      aria-describedby={
-                        form.formState.errors.currency
-                          ? `quotation-${entry?.id ?? "new"}-currency-error`
-                          : undefined
-                      }
-                    />
-                    <FieldError
-                      id={`quotation-${entry?.id ?? "new"}-currency-error`}
-                      errors={[form.formState.errors.currency]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.moq}>
-                    <FieldLabel htmlFor={`moq-${entry?.id ?? "new"}`}>最小起订量（MOQ）</FieldLabel>
-                    <Input
-                      id={`moq-${entry?.id ?? "new"}`}
-                      inputMode="numeric"
-                      {...form.register("moq")}
-                      aria-invalid={!!form.formState.errors.moq}
-                      aria-describedby={
-                        form.formState.errors.moq
-                          ? `quotation-${entry?.id ?? "new"}-moq-error`
-                          : undefined
-                      }
-                    />
-                    <FieldError
-                      id={`quotation-${entry?.id ?? "new"}-moq-error`}
-                      errors={[form.formState.errors.moq]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.leadTimeDays}>
-                    <FieldLabel htmlFor={`lead-time-${entry?.id ?? "new"}`}>交期（天）</FieldLabel>
-                    <Input
-                      id={`lead-time-${entry?.id ?? "new"}`}
-                      inputMode="numeric"
-                      {...form.register("leadTimeDays")}
-                      aria-invalid={!!form.formState.errors.leadTimeDays}
-                      aria-describedby={
-                        form.formState.errors.leadTimeDays
-                          ? `quotation-${entry?.id ?? "new"}-leadTimeDays-error`
-                          : undefined
-                      }
-                    />
-                    <FieldError
-                      id={`quotation-${entry?.id ?? "new"}-leadTimeDays-error`}
-                      errors={[form.formState.errors.leadTimeDays]}
-                    />
-                  </Field>
+                  <FieldGrid columns={4}>
+                    <Field data-invalid={!!form.formState.errors.unitPrice}>
+                      <FieldLabel htmlFor={`price-${entry?.id ?? "new"}`}>单价</FieldLabel>
+                      <Input
+                        id={`price-${entry?.id ?? "new"}`}
+                        inputMode="decimal"
+                        aria-invalid={!!form.formState.errors.unitPrice}
+                        aria-describedby={
+                          form.formState.errors.unitPrice
+                            ? `quotation-${entry?.id ?? "new"}-unitPrice-error`
+                            : undefined
+                        }
+                        {...form.register("unitPrice")}
+                      />
+                      <FieldError
+                        id={`quotation-${entry?.id ?? "new"}-unitPrice-error`}
+                        errors={[form.formState.errors.unitPrice]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.currency}>
+                      <FieldLabel htmlFor={`currency-${entry?.id ?? "new"}`}>币种</FieldLabel>
+                      <Input
+                        id={`currency-${entry?.id ?? "new"}`}
+                        maxLength={3}
+                        {...form.register("currency")}
+                        aria-invalid={!!form.formState.errors.currency}
+                        aria-describedby={
+                          form.formState.errors.currency
+                            ? `quotation-${entry?.id ?? "new"}-currency-error`
+                            : undefined
+                        }
+                      />
+                      <FieldError
+                        id={`quotation-${entry?.id ?? "new"}-currency-error`}
+                        errors={[form.formState.errors.currency]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.moq}>
+                      <FieldLabel htmlFor={`moq-${entry?.id ?? "new"}`}>
+                        最小起订量（MOQ）
+                      </FieldLabel>
+                      <Input
+                        id={`moq-${entry?.id ?? "new"}`}
+                        inputMode="numeric"
+                        {...form.register("moq")}
+                        aria-invalid={!!form.formState.errors.moq}
+                        aria-describedby={
+                          form.formState.errors.moq
+                            ? `quotation-${entry?.id ?? "new"}-moq-error`
+                            : undefined
+                        }
+                      />
+                      <FieldError
+                        id={`quotation-${entry?.id ?? "new"}-moq-error`}
+                        errors={[form.formState.errors.moq]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.leadTimeDays}>
+                      <FieldLabel htmlFor={`lead-time-${entry?.id ?? "new"}`}>
+                        交期（天）
+                      </FieldLabel>
+                      <Input
+                        id={`lead-time-${entry?.id ?? "new"}`}
+                        inputMode="numeric"
+                        {...form.register("leadTimeDays")}
+                        aria-invalid={!!form.formState.errors.leadTimeDays}
+                        aria-describedby={
+                          form.formState.errors.leadTimeDays
+                            ? `quotation-${entry?.id ?? "new"}-leadTimeDays-error`
+                            : undefined
+                        }
+                      />
+                      <FieldError
+                        id={`quotation-${entry?.id ?? "new"}-leadTimeDays-error`}
+                        errors={[form.formState.errors.leadTimeDays]}
+                      />
+                    </Field>
+                  </FieldGrid>
                   <Field data-invalid={!!form.formState.errors.paymentTerms}>
                     <FieldLabel htmlFor={`terms-${entry?.id ?? "new"}`}>付款条件</FieldLabel>
                     <Textarea
@@ -395,103 +402,107 @@ function QuotationForm({
                   <FieldDescription id={`validity-help-${entry?.id ?? "new"}`}>
                     可补充人工确认的起止日期和时区；三项须一起填写，首尾日期均计入有效天数。留空表示日期尚未记录，不会自动推算。
                   </FieldDescription>
-                  <Field data-invalid={!!form.formState.errors.validityStart}>
-                    <FieldLabel htmlFor={`validityStart-${entry?.id ?? "new"}`}>
-                      有效期起算日
-                    </FieldLabel>
-                    <Input
-                      id={`validityStart-${entry?.id ?? "new"}`}
-                      type="date"
-                      {...form.register("validityStart")}
-                      aria-invalid={!!form.formState.errors.validityStart}
-                      aria-describedby={[
-                        `validity-help-${entry?.id ?? "new"}`,
-                        form.formState.errors.validityStart
-                          ? `validityStart-error-${entry?.id ?? "new"}`
-                          : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    />
-                    <FieldError
-                      id={`validityStart-error-${entry?.id ?? "new"}`}
-                      errors={[form.formState.errors.validityStart]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.validityEnd}>
-                    <FieldLabel htmlFor={`validityEnd-${entry?.id ?? "new"}`}>
-                      有效期截止日
-                    </FieldLabel>
-                    <Input
-                      id={`validityEnd-${entry?.id ?? "new"}`}
-                      type="date"
-                      {...form.register("validityEnd")}
-                      aria-invalid={!!form.formState.errors.validityEnd}
-                      aria-describedby={[
-                        `validity-help-${entry?.id ?? "new"}`,
-                        form.formState.errors.validityEnd
-                          ? `validityEnd-error-${entry?.id ?? "new"}`
-                          : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    />
-                    <FieldError
-                      id={`validityEnd-error-${entry?.id ?? "new"}`}
-                      errors={[form.formState.errors.validityEnd]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.validityTimeZone}>
-                    <FieldLabel htmlFor={`validityTimeZone-${entry?.id ?? "new"}`}>
-                      有效期适用时区
-                    </FieldLabel>
-                    <Input
-                      id={`validityTimeZone-${entry?.id ?? "new"}`}
-                      type="text"
-                      autoComplete="off"
-                      spellCheck={false}
-                      {...form.register("validityTimeZone")}
-                      aria-invalid={!!form.formState.errors.validityTimeZone}
-                      aria-describedby={[
-                        `validity-help-${entry?.id ?? "new"}`,
-                        `validity-zone-help-${entry?.id ?? "new"}`,
-                        form.formState.errors.validityTimeZone
-                          ? `validityTimeZone-error-${entry?.id ?? "new"}`
-                          : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    />
-                    <FieldDescription id={`validity-zone-help-${entry?.id ?? "new"}`}>
-                      填写双方确认的时区标识，例如 Asia/Shanghai 或
-                      America/New_York；不会使用浏览器时区自动填写。
-                    </FieldDescription>
-                    <FieldError
-                      id={`validityTimeZone-error-${entry?.id ?? "new"}`}
-                      errors={[form.formState.errors.validityTimeZone]}
-                    />
-                  </Field>
-                  <Field data-invalid={!!form.formState.errors.validityDays}>
-                    <FieldLabel htmlFor={`validity-${entry?.id ?? "new"}`}>有效期（天）</FieldLabel>
-                    <Input
-                      id={`validity-${entry?.id ?? "new"}`}
-                      inputMode="numeric"
-                      {...form.register("validityDays")}
-                      aria-invalid={!!form.formState.errors.validityDays}
-                      aria-describedby={[
-                        `validity-help-${entry?.id ?? "new"}`,
-                        form.formState.errors.validityDays
-                          ? `validityDays-error-${entry?.id ?? "new"}`
-                          : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    />
-                    <FieldError
-                      id={`validityDays-error-${entry?.id ?? "new"}`}
-                      errors={[form.formState.errors.validityDays]}
-                    />
-                  </Field>
+                  <FieldGrid columns={4}>
+                    <Field data-invalid={!!form.formState.errors.validityStart}>
+                      <FieldLabel htmlFor={`validityStart-${entry?.id ?? "new"}`}>
+                        有效期起算日
+                      </FieldLabel>
+                      <Input
+                        id={`validityStart-${entry?.id ?? "new"}`}
+                        type="date"
+                        {...form.register("validityStart")}
+                        aria-invalid={!!form.formState.errors.validityStart}
+                        aria-describedby={[
+                          `validity-help-${entry?.id ?? "new"}`,
+                          form.formState.errors.validityStart
+                            ? `validityStart-error-${entry?.id ?? "new"}`
+                            : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      />
+                      <FieldError
+                        id={`validityStart-error-${entry?.id ?? "new"}`}
+                        errors={[form.formState.errors.validityStart]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.validityEnd}>
+                      <FieldLabel htmlFor={`validityEnd-${entry?.id ?? "new"}`}>
+                        有效期截止日
+                      </FieldLabel>
+                      <Input
+                        id={`validityEnd-${entry?.id ?? "new"}`}
+                        type="date"
+                        {...form.register("validityEnd")}
+                        aria-invalid={!!form.formState.errors.validityEnd}
+                        aria-describedby={[
+                          `validity-help-${entry?.id ?? "new"}`,
+                          form.formState.errors.validityEnd
+                            ? `validityEnd-error-${entry?.id ?? "new"}`
+                            : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      />
+                      <FieldError
+                        id={`validityEnd-error-${entry?.id ?? "new"}`}
+                        errors={[form.formState.errors.validityEnd]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.validityTimeZone}>
+                      <FieldLabel htmlFor={`validityTimeZone-${entry?.id ?? "new"}`}>
+                        有效期适用时区
+                      </FieldLabel>
+                      <Input
+                        id={`validityTimeZone-${entry?.id ?? "new"}`}
+                        type="text"
+                        autoComplete="off"
+                        spellCheck={false}
+                        {...form.register("validityTimeZone")}
+                        aria-invalid={!!form.formState.errors.validityTimeZone}
+                        aria-describedby={[
+                          `validity-help-${entry?.id ?? "new"}`,
+                          `validity-zone-help-${entry?.id ?? "new"}`,
+                          form.formState.errors.validityTimeZone
+                            ? `validityTimeZone-error-${entry?.id ?? "new"}`
+                            : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      />
+                      <FieldDescription id={`validity-zone-help-${entry?.id ?? "new"}`}>
+                        填写双方确认的时区标识，例如 Asia/Shanghai 或
+                        America/New_York；不会使用浏览器时区自动填写。
+                      </FieldDescription>
+                      <FieldError
+                        id={`validityTimeZone-error-${entry?.id ?? "new"}`}
+                        errors={[form.formState.errors.validityTimeZone]}
+                      />
+                    </Field>
+                    <Field data-invalid={!!form.formState.errors.validityDays}>
+                      <FieldLabel htmlFor={`validity-${entry?.id ?? "new"}`}>
+                        有效期（天）
+                      </FieldLabel>
+                      <Input
+                        id={`validity-${entry?.id ?? "new"}`}
+                        inputMode="numeric"
+                        {...form.register("validityDays")}
+                        aria-invalid={!!form.formState.errors.validityDays}
+                        aria-describedby={[
+                          `validity-help-${entry?.id ?? "new"}`,
+                          form.formState.errors.validityDays
+                            ? `validityDays-error-${entry?.id ?? "new"}`
+                            : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      />
+                      <FieldError
+                        id={`validityDays-error-${entry?.id ?? "new"}`}
+                        errors={[form.formState.errors.validityDays]}
+                      />
+                    </Field>
+                  </FieldGrid>
                 </FieldGroup>
               </FieldSet>
             </FieldGroup>
@@ -502,6 +513,7 @@ function QuotationForm({
         <Button
           form={`quotation-${entry?.id ?? "new"}`}
           type="submit"
+          className="w-full sm:w-auto sm:self-start"
           disabled={
             !form.formState.isReady || pending || created || !rfqs.length || !products.length
           }
@@ -660,6 +672,7 @@ function QuoteDecision({ projectId, entry }: { projectId: string; entry: Quotati
           form={`quote-decision-${entry.id}`}
           type="submit"
           variant={form.watch("decision") === "rejected" ? "destructive" : "default"}
+          className="w-full sm:w-auto sm:self-start"
           disabled={busy || !form.watch("decision")}
         >
           {pending ? (
@@ -712,48 +725,55 @@ function QuoteSend({ projectId, entry }: { projectId: string; entry: QuotationEn
         <form aria-busy={busy} id={`quote-send-${entry.id}`} onSubmit={form.handleSubmit(submit)}>
           <FieldSet disabled={busy} className="min-w-0">
             <FieldGroup>
-              <Field data-invalid={!!form.formState.errors.channelRef}>
-                <FieldLabel htmlFor={`send-channel-${entry.id}`}>发送渠道</FieldLabel>
-                <Input
-                  id={`send-channel-${entry.id}`}
-                  placeholder="例如 WhatsApp 或电子邮件"
-                  {...form.register("channelRef")}
-                  aria-invalid={!!form.formState.errors.channelRef}
-                  aria-describedby={
-                    form.formState.errors.channelRef
-                      ? `quote-send-${entry.id}-channelRef-error`
-                      : undefined
-                  }
-                />
-                <FieldError
-                  id={`quote-send-${entry.id}-channelRef-error`}
-                  errors={[form.formState.errors.channelRef]}
-                />
-              </Field>
-              <Field data-invalid={!!form.formState.errors.externalRef}>
-                <FieldLabel htmlFor={`send-ref-${entry.id}`}>平台消息编号或回执链接</FieldLabel>
-                <Input
-                  id={`send-ref-${entry.id}`}
-                  placeholder="填写发送记录中的消息编号或回执链接"
-                  {...form.register("externalRef")}
-                  aria-invalid={!!form.formState.errors.externalRef}
-                  aria-describedby={
-                    form.formState.errors.externalRef
-                      ? `quote-send-${entry.id}-externalRef-error`
-                      : undefined
-                  }
-                />
-                <FieldError
-                  id={`quote-send-${entry.id}-externalRef-error`}
-                  errors={[form.formState.errors.externalRef]}
-                />
-              </Field>
+              <FieldGrid columns={2}>
+                <Field data-invalid={!!form.formState.errors.channelRef}>
+                  <FieldLabel htmlFor={`send-channel-${entry.id}`}>发送渠道</FieldLabel>
+                  <Input
+                    id={`send-channel-${entry.id}`}
+                    placeholder="例如 WhatsApp 或电子邮件"
+                    {...form.register("channelRef")}
+                    aria-invalid={!!form.formState.errors.channelRef}
+                    aria-describedby={
+                      form.formState.errors.channelRef
+                        ? `quote-send-${entry.id}-channelRef-error`
+                        : undefined
+                    }
+                  />
+                  <FieldError
+                    id={`quote-send-${entry.id}-channelRef-error`}
+                    errors={[form.formState.errors.channelRef]}
+                  />
+                </Field>
+                <Field data-invalid={!!form.formState.errors.externalRef}>
+                  <FieldLabel htmlFor={`send-ref-${entry.id}`}>平台消息编号或回执链接</FieldLabel>
+                  <Input
+                    id={`send-ref-${entry.id}`}
+                    placeholder="填写发送记录中的消息编号或回执链接"
+                    {...form.register("externalRef")}
+                    aria-invalid={!!form.formState.errors.externalRef}
+                    aria-describedby={
+                      form.formState.errors.externalRef
+                        ? `quote-send-${entry.id}-externalRef-error`
+                        : undefined
+                    }
+                  />
+                  <FieldError
+                    id={`quote-send-${entry.id}-externalRef-error`}
+                    errors={[form.formState.errors.externalRef]}
+                  />
+                </Field>
+              </FieldGrid>
             </FieldGroup>
           </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
-        <Button form={`quote-send-${entry.id}`} type="submit" disabled={busy}>
+        <Button
+          form={`quote-send-${entry.id}`}
+          type="submit"
+          disabled={busy}
+          className="w-full sm:w-auto sm:self-start"
+        >
           {pending ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
           核验凭证并登记已发送
         </Button>
