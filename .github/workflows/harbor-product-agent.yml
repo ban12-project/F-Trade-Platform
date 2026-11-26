@@ -58,6 +58,8 @@ jobs:
           tags: f-trade-product-agent-eval:latest
           cache-from: type=gha,scope=harbor-product-agent
           cache-to: type=gha,scope=harbor-product-agent,mode=max
+      - name: Restore default Docker builder for Harbor compose builds
+        run: docker buildx use default
       - name: Prepare synthetic Harbor tasks
         run: pnpm eval:harbor:prepare
       - name: Validate Harbor task and adapter compatibility

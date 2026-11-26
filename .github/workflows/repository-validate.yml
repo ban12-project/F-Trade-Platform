@@ -401,5 +401,7 @@ jobs:
           tags: f-trade-product-agent-eval:latest
           cache-from: type=gha,scope=harbor-product-agent
           cache-to: type=gha,scope=harbor-product-agent,mode=max
+      - name: Restore default Docker builder for Harbor compose builds
+        run: docker buildx use default
       - name: Verify container execution and artifact collection with oracle fixtures
         run: python3 scripts/test-harbor-container-smoke.py
