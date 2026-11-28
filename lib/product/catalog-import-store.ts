@@ -51,7 +51,7 @@ async function authorize(
   access: "view" | "write" = "write",
 ) {
   const [actor] = await tx
-    .select({ role: user.role })
+    .select({ role: user.role, expiresAt: session.expiresAt })
     .from(user)
     .innerJoin(session, eq(session.userId, user.id))
     .where(
@@ -78,15 +78,30 @@ async function authorize(
   } catch {
     throw new CatalogAccessError("目录项目编辑权限已失效。");
   }
+  return actor.expiresAt;
 }
 
-async function ownImport(
+async function humanCatalogTransaction<T>(
+  database: Database,
+  identity: CatalogIdentity,
+  access: "view" | "write",
+  operation: (tx: DatabaseTransaction) => Promise<T>,
+) {
+  return database.transaction(async (tx) => {
+    const expiresAt = await authorize(tx, identity, access);
+    const result = await operation(tx);
+    if (expiresAt.getTime() <= Date.now())
+      throw new CatalogAccessError("产品导入会话或权限已失效。");
+    return result;
+  });
+}
+
+async function readOwnedImport(
   tx: DatabaseTransaction,
   importId: string,
   identity: CatalogIdentity,
   access: "view" | "write" = "write",
 ) {
-  await authorize(tx, identity, access);
   const importQuery = tx
     .select()
     .from(imports)
@@ -168,8 +183,7 @@ export async function intakeCatalog(
 ): Promise<CatalogDispatch> {
   const parsed = catalogIntakeSchema.parse(input);
   if (parsed.projectId !== identity.projectId) throw new Error("目录项目不匹配。");
-  const existing = await database.transaction(async (tx) => {
-    await authorize(tx, identity);
+  const existing = await humanCatalogTransaction(database, identity, "write", async (tx) => {
     const [row] = await tx.select().from(imports).where(eq(imports.receiptId, parsed.receiptId));
     if (!row) return null;
     if (row.actorId !== identity.actorId || row.projectId !== identity.projectId)
@@ -178,8 +192,7 @@ export async function intakeCatalog(
   });
   if (existing) return existing;
   const claimed = await claim({ ...parsed, purpose: "agent" }, identity, database);
-  return database.transaction(async (tx) => {
-    await authorize(tx, identity);
+  return humanCatalogTransaction(database, identity, "write", async (tx) => {
     const [existingRow] = await tx
       .select()
       .from(imports)
@@ -212,8 +225,8 @@ export async function retryCatalogParsing(
 ) {
   const parsed = catalogLookupSchema.parse(input);
   if (parsed.projectId !== identity.projectId) throw new Error("目录项目不匹配。");
-  return database.transaction(async (tx) =>
-    queueParsing(tx, await ownImport(tx, parsed.importId, identity), identity),
+  return humanCatalogTransaction(database, identity, "write", async (tx) =>
+    queueParsing(tx, await readOwnedImport(tx, parsed.importId, identity), identity),
   );
 }
 
@@ -224,8 +237,8 @@ export async function selectCatalogRecords(
 ): Promise<CatalogDispatch> {
   const parsed = catalogSelectionSchema.parse(input);
   if (parsed.projectId !== identity.projectId) throw new Error("目录项目不匹配。");
-  return database.transaction(async (tx) => {
-    const row = await ownImport(tx, parsed.importId, identity);
+  return humanCatalogTransaction(database, identity, "write", async (tx) => {
+    const row = await readOwnedImport(tx, parsed.importId, identity);
     if (row.status !== "ready") throw new Error("目录尚未解析完成。");
     const selected = await tx
       .select()
@@ -327,8 +340,8 @@ export async function catalogImportView(
 ): Promise<CatalogImportView> {
   const parsed = catalogLookupSchema.parse(input);
   if (parsed.projectId !== identity.projectId) throw new Error("目录项目不匹配。");
-  return database.transaction(async (tx) =>
-    readCatalogImportView(tx, await ownImport(tx, parsed.importId, identity, "view")),
+  return humanCatalogTransaction(database, identity, "view", async (tx) =>
+    readCatalogImportView(tx, await readOwnedImport(tx, parsed.importId, identity, "view")),
   );
 }
 
@@ -338,8 +351,7 @@ export async function latestCatalogImport(
   database: Database = getDatabase(),
 ): Promise<CatalogImportView | null> {
   if (projectId !== identity.projectId) throw new Error("目录项目不匹配。");
-  return database.transaction(async (tx) => {
-    await authorize(tx, identity, "view");
+  return humanCatalogTransaction(database, identity, "view", async (tx) => {
     const [row] = await tx
       .select()
       .from(imports)
@@ -360,7 +372,8 @@ async function attemptContext(tx: DatabaseTransaction, attemptId: string) {
     projectId: owner.projectId,
     sessionId: initial.sessionId,
   };
-  const row = await ownImport(tx, owner.id, identity);
+  await authorize(tx, identity);
+  const row = await readOwnedImport(tx, owner.id, identity);
   // Refresh after locking: an earlier read may precede another worker's claim.
   const [attempt] = await tx.select().from(attempts).where(eq(attempts.id, attemptId));
   if (!attempt) return null;

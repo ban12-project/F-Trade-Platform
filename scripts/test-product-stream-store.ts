@@ -25,6 +25,7 @@ async function verify() {
   for (const mode of [
     "allowed",
     "revoked",
+    "expires-during-write",
     "membership",
     "expired",
     "completed",
@@ -34,6 +35,7 @@ async function verify() {
   ] as const) {
     const writes: Record<string, unknown>[] = [];
     const locks: string[] = [];
+    const sessionExpiry = new Date(Date.now() + 60000);
     const tx = {
       select() {
         let table = "";
@@ -61,7 +63,7 @@ async function verify() {
                   (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value),
                 ),
               );
-              return mode === "revoked" ? [] : [{ id: identity.actorId }];
+              return mode === "revoked" ? [] : [{ expiresAt: sessionExpiry }];
             }
             if (table === "workspace_project_member") {
               assert.ok(params.includes("marketing"));
@@ -112,12 +114,21 @@ async function verify() {
         return {
           async values(value: Record<string, unknown>) {
             writes.push(value);
+            if (mode === "expires-during-write") sessionExpiry.setTime(0);
           },
         };
       },
     };
     const database = {
-      transaction: async (run: (transaction: typeof tx) => Promise<unknown>) => run(tx),
+      async transaction(run: (transaction: typeof tx) => Promise<unknown>) {
+        try {
+          return await run(tx);
+        } catch (error) {
+          if (mode === "expires-during-write") assert.equal(writes.length, 2);
+          writes.length = 0;
+          throw error;
+        }
+      },
     } as unknown as Database;
     const write = () => persistProductStreamDraft(identity, "run", draft, database);
     if (mode === "allowed") {
@@ -130,7 +141,8 @@ async function verify() {
         "aggregate_record:update",
       ]);
     } else {
-      await assert.rejects(write);
+      if (mode === "expires-during-write") await assert.rejects(write, /会话已失效/);
+      else await assert.rejects(write);
       assert.deepEqual(writes, [], mode);
     }
   }

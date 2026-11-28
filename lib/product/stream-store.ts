@@ -28,7 +28,7 @@ export async function authorizeProductStreamWrite(
   identity: ProductStreamIdentity,
 ) {
   const [authorized] = await tx
-    .select({ id: user.id })
+    .select({ expiresAt: session.expiresAt })
     .from(user)
     .innerJoin(session, eq(session.userId, user.id))
     .where(
@@ -57,6 +57,25 @@ export async function authorizeProductStreamWrite(
     )
     .for("share");
   if (!member) throw new Error("当前项目编辑权限已失效。");
+  assertStreamSessionAlive(authorized.expiresAt);
+  return authorized.expiresAt;
+}
+
+function assertStreamSessionAlive(expiresAt: Date) {
+  if (expiresAt.getTime() <= Date.now()) throw new Error("管理员会话已失效或权限已变更。");
+}
+
+async function humanStreamTransaction<T>(
+  database: Database,
+  identity: ProductStreamIdentity,
+  operation: (tx: DatabaseTransaction) => Promise<T>,
+) {
+  return database.transaction(async (tx) => {
+    const expiresAt = await authorizeProductStreamWrite(tx, identity);
+    const result = await operation(tx);
+    assertStreamSessionAlive(expiresAt);
+    return result;
+  });
 }
 
 export async function startProductStreamRun(
@@ -67,8 +86,7 @@ export async function startProductStreamRun(
 ) {
   const runId = randomUUID();
   const draft = emptyProductStreamDraft(prepareProductAgentEvidenceSource(source));
-  return database.transaction(async (tx) => {
-    await authorizeProductStreamWrite(tx, identity);
+  return humanStreamTransaction(database, identity, async (tx) => {
     await assertAndLinkProjectEvidence(
       identity.projectId,
       source.evidence_refs,
@@ -105,8 +123,7 @@ export async function persistProductStreamDraft(
   draft: ProductDraft,
   database: Database = getDatabase(),
 ) {
-  return database.transaction(async (tx) => {
-    await authorizeProductStreamWrite(tx, identity);
+  return humanStreamTransaction(database, identity, async (tx) => {
     const [run] = await tx
       .select()
       .from(productAgentStreamRun)
