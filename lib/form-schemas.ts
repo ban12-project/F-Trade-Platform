@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { followUpContexts } from "./follow-up/cadence";
 import { scoringRules } from "./follow-up/lead-scoring";
 import { productImageFilesSchema } from "./product/source-image-contracts";
 import { quotationValidityDays, quotationValiditySchema } from "./quotation/validity";
@@ -360,14 +361,7 @@ export const followUpFormSchema = z
   .object({
     projectId: z.uuid("项目标识无效。"),
     leadId: z.uuid("线索标识无效。"),
-    context: z.enum([
-      "quote_sent_unread",
-      "quote_sent_read_no_reply",
-      "price_high",
-      "purchase_later",
-      "asks_sample",
-      "asks_lead_time",
-    ]),
+    context: z.enum(followUpContexts),
     triggeredRules: z.array(z.enum(scoringRules.map((rule) => rule.id))).max(scoringRules.length),
     draft: z.string().trim().min(1, "请填写人工确认后的跟进内容。").max(4_000),
     confirmationRef: privateReference,
