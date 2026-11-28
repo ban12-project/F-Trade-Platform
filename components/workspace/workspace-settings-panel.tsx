@@ -52,6 +52,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { initialAgentSettingsActionState, initialInvitationActionState } from "@/lib/action-states";
 import { saveProductAgentModelSettingsAction } from "@/lib/actions/agent-settings";
 import { createInvitationAction } from "@/lib/actions/invitations";
+import { modelProviderSchema, providerLabels } from "@/lib/ai/model-provider-schema";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { authClient } from "@/lib/auth-client";
 import { invitationFormSchema, productAgentModelSettingsSchema } from "@/lib/form-schemas";
@@ -237,12 +238,7 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                     name="provider"
                     render={({ field }) => (
                       <Select
-                        items={{
-                          openai: "OpenAI",
-                          anthropic: "Anthropic",
-                          google: "Google Gemini",
-                          "openai-compatible": "OpenAI-compatible",
-                        }}
+                        items={providerLabels}
                         value={field.value}
                         onValueChange={field.onChange}
                       >
@@ -251,10 +247,11 @@ function AgentSettings({ settings }: { settings: ProductAgentModelSettings[] }) 
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
-                            <SelectItem value="openai">OpenAI</SelectItem>
-                            <SelectItem value="anthropic">Anthropic</SelectItem>
-                            <SelectItem value="google">Google Gemini</SelectItem>
-                            <SelectItem value="openai-compatible">OpenAI-compatible</SelectItem>
+                            {modelProviderSchema.options.map((provider) => (
+                              <SelectItem key={provider} value={provider}>
+                                {providerLabels[provider]}
+                              </SelectItem>
+                            ))}
                           </SelectGroup>
                         </SelectContent>
                       </Select>

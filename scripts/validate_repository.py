@@ -356,6 +356,15 @@ def check_channel_onboarding() -> None:
 
 
 
+def check_harbor_provider_choices() -> None:
+    providers = load_json(ROOT / "lib/ai/model-providers.json")
+    workflow_path = ROOT / ".github/workflows/harbor-product-agent.yml"
+    workflow = yaml.load(workflow_path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    choices = workflow["on"]["workflow_dispatch"]["inputs"]["provider"]["options"]
+    if choices != list(providers):
+        raise AssertionError("Harbor workflow choices must match the model provider catalog")
+
+
 def check_database_baseline() -> None:
     database_client = (ROOT / "lib/db/client.ts").read_text(encoding="utf-8")
     for required in ("drizzle-orm/neon-serverless", "new Pool", "closeDatabase"):
@@ -686,6 +695,7 @@ def check_local_markdown_links() -> None:
 
 def main() -> int:
     checks = [
+        ("Harbor provider choices", check_harbor_provider_choices),
         ("schemas and fixtures", check_schemas),
         ("CSV template", check_csv_template),
         ("product acceptance", check_product_acceptance_config),

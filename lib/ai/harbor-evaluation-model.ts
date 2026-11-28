@@ -1,13 +1,7 @@
-import type { ProductAgentModelConfig, SupportedModelProvider } from "./model-provider";
+import type { ProductAgentModelConfig } from "./model-provider";
+import { modelProviderSchema } from "./model-provider-schema";
 
 type HarborEnvironment = Record<string, string | undefined>;
-
-const supportedProviders = new Set<SupportedModelProvider>([
-  "openai",
-  "anthropic",
-  "google",
-  "openai-compatible",
-]);
 
 function required(environment: HarborEnvironment, name: string) {
   const value = environment[name];
@@ -24,12 +18,13 @@ export function getHarborEvaluationModelConfig(
 ): ProductAgentModelConfig {
   const modelId = required(environment, "HARBOR_MODEL");
   const match = /^([^/\s]+)\/([^/\s]+)$/.exec(modelId);
-  if (!match || !supportedProviders.has(match[1] as SupportedModelProvider)) {
+  const parsed = modelProviderSchema.safeParse(match?.[1]);
+  if (!match || !parsed.success) {
     throw new Error(
-      "HARBOR_MODEL must use provider/model format with openai, anthropic, google, or openai-compatible",
+      `HARBOR_MODEL must use provider/model format with ${new Intl.ListFormat("en", { type: "disjunction" }).format(modelProviderSchema.options)}`,
     );
   }
-  const provider = match[1] as SupportedModelProvider;
+  const provider = parsed.data;
   const model = match[2];
   switch (provider) {
     case "openai":

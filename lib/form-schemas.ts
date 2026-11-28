@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { modelProviderSchema } from "./ai/model-provider-schema";
 import { followUpContexts } from "./follow-up/cadence";
 import { scoringRules } from "./follow-up/lead-scoring";
 import { productImageFilesSchema } from "./product/source-image-contracts";
@@ -541,7 +542,6 @@ export const videoReviewFormSchema = z
       context.addIssue({ code: "custom", path: ["notes"], message: "退回视频时必须填写原因。" });
   });
 
-const modelProvider = z.enum(["openai", "anthropic", "google", "openai-compatible"]);
 const optionalProviderText = z.string().trim().max(2_000, "字段不能超过 2000 个字符。");
 
 export const productAgentModelSettingsSchema = z
@@ -549,7 +549,7 @@ export const productAgentModelSettingsSchema = z
     configId: z.string().trim().max(120, "模型配置标识无效。"),
     name: z.string().trim().min(1, "请填写配置名称。").max(120, "配置名称不能超过 120 个字符。"),
     isDefault: z.boolean(),
-    provider: modelProvider,
+    provider: modelProviderSchema,
     model: z.string().trim().min(1, "请填写模型名称。").max(240, "模型名称不能超过 240 个字符。"),
     baseUrl: z
       .string()

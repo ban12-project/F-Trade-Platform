@@ -3,9 +3,10 @@ import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderSettings } fro
 import { createOpenAI, type OpenAIProviderSettings } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 import { UserFacingError } from "../user-facing-error";
+import type { SupportedModelProvider } from "./model-provider-schema";
 import { type ProductOutputMode, registerProductOutputPolicy } from "./product-output-policy";
 
-export type SupportedModelProvider = "openai" | "anthropic" | "google" | "openai-compatible";
+export type { SupportedModelProvider } from "./model-provider-schema";
 
 type ConfigurableProviderSettings =
   | OpenAIProviderSettings
