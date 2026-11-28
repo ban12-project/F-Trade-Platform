@@ -149,3 +149,10 @@ Chromium 验证四个可见标签、顺序、选择切换与既有配置回填�
 静态文件图未计入所有延迟导入。用 Biome 项目解析器复查应用及工作流等六个目录，在 527 个文件中发现 9 条参与循环的导入边。发布资格检查现归属 `lib/social/publication-eligibility.ts`，发布预约归属 `lib/browser-fleet/publication-scheduling.ts`；写入、执行和回执沿用原事务与锁。持久工作流在 wake step 内向投递服务传入自身的已编译引用，工作流参数仍只序列化节点与操作标识。编译运行测试核对该引用可用于启动同一个工作流。
 
 `pnpm test:import-cycles` 对 Biome 配置纳入的整个仓库执行检查，CI 对 PR 执行同一命令。相对路径、项目别名、延迟字面量导入组成的合成循环均触发失败，移除夹具后通过。类型专用导入、运行时计算路径、HTTP 和跨进程调用不在该规则的完整证明范围内。此变更仅调整代码依赖方向，营销视频创意审查不适用。
+
+
+### #1141 通用交换契约与实库枚举
+
+通用 workflow-event 与 human-approval 交换契约暂时维持各自现有的范围。内部 video 聚合继续使用已有视频领域契约。2026-11-28 通过项目配置的 Neon 连接，在只读事务中查询 public.aggregate_type 的 pg_enum，按 enumsortorder 从 1 到 7 得到 product、content、rfq、quotation、lead、delivery_confirmation、video，与历史迁移 0004 追加 video 一致。此次取证没有读取业务表，连接的部署环境标签未单独核验。
+
+领域元组和 Drizzle 声明按该顺序排列。0046 只核验目录顺序并推进生成器快照，遇到不同顺序时停止供人工取证。没有重建枚举或转换业务列。

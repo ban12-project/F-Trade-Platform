@@ -4,11 +4,11 @@ export type ActorType = (typeof actorTypes)[number];
 export const aggregateTypes = [
   "product",
   "content",
-  "video",
   "rfq",
   "quotation",
   "lead",
   "delivery_confirmation",
+  "video",
 ] as const;
 export type AggregateType = (typeof aggregateTypes)[number];
 
