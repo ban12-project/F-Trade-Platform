@@ -1,8 +1,10 @@
 allowBuilds:
   # Platform-specific packages are already resolved; dependency scripts stay blocked.
   '@swc/core': false
+  '@vgpu/adapter-node': true
   cbor-extract: false
   esbuild: false
+  webgpu: true
 
 # Reviewed same-major patches at exact parent boundaries; see #498 and #821.
 # Remove these when the selected upstream runtime pins equivalent patched versions.

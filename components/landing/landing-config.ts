@@ -24,7 +24,8 @@ export const LANDING_BRAND_CONFIG = {
   heroLeadHighlight: "以可核验的工程事实开展海外获客。",
   heroLeadSuffix:
     "在同一工作台打通产品资料结构化、多渠道内容与 15 秒实拍短视频、受控社媒发布、客户询盘补全与人工报价，每一步都清晰可控。",
-  accessNote: "仅受邀用户可访问 · 邮箱 OTP 与 Passkey 登录 · 不自动生成正式报价、交期或未经确认的工程事实",
+  accessNote:
+    "仅受邀用户可访问 · 邮箱 OTP 与 Passkey 登录 · 不自动生成正式报价、交期或未经确认的工程事实",
 } as const;
 
 export const SOCIAL_CHANNEL_STAGES: readonly SocialChannelStage[] = [
@@ -46,7 +47,8 @@ export const SOCIAL_CHANNEL_STAGES: readonly SocialChannelStage[] = [
     shortLabel: "YouTube",
     status: "planned",
     badge: "16:9 预设就绪",
-    description: "已内置 1920×1080 横屏 ABCD 创意框架与字幕规范，支持后续海外长视频与 Shorts 扩展。",
+    description:
+      "已内置 1920×1080 横屏 ABCD 创意框架与字幕规范，支持后续海外长视频与 Shorts 扩展。",
     colorHex: "#FF5C5C",
     secondaryHex: "#FFD1D1",
     rgb: [1.0, 0.36, 0.36],
@@ -106,7 +108,8 @@ export const SOCIAL_CHANNEL_STAGES: readonly SocialChannelStage[] = [
     shortLabel: LANDING_BRAND_CONFIG.shortBrand,
     status: "brand",
     badge: "统一工作台汇聚",
-    description: "所有社媒触点最终汇聚于同一受控工作台：统一证据库、统一人工门禁、统一询盘与商机流转。",
+    description:
+      "所有社媒触点最终汇聚于同一受控工作台：统一证据库、统一人工门禁、统一询盘与商机流转。",
     colorHex: "#4AB0FF",
     secondaryHex: "#FFFFFF",
     rgb: [0.29, 0.69, 1.0],

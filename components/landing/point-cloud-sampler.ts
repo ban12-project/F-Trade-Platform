@@ -89,7 +89,7 @@ export function sampleStagePointCloud(
   stageId: string,
   particleCount: number,
   brandName: string,
-): Float32Array {
+): Float32Array<ArrayBuffer> {
   const canvas = document.createElement("canvas");
   canvas.width = SAMPLE_SIZE;
   canvas.height = SAMPLE_SIZE;
@@ -131,10 +131,7 @@ export function sampleStagePointCloud(
     for (let x = 0; x < SAMPLE_SIZE; x += 4) {
       if (!isOpaque(x, y)) continue;
       const edge =
-        !isOpaque(x - 4, y) ||
-        !isOpaque(x + 4, y) ||
-        !isOpaque(x, y - 4) ||
-        !isOpaque(x, y + 4);
+        !isOpaque(x - 4, y) || !isOpaque(x + 4, y) || !isOpaque(x, y - 4) || !isOpaque(x, y + 4);
       const nx = ((x + (deterministicHash(x * 13 + y * 7) - 0.5) * 2.5) / SAMPLE_SIZE) * 2 - 1;
       const ny = ((y + (deterministicHash(x * 19 + y * 11) - 0.5) * 2.5) / SAMPLE_SIZE) * 2 - 1;
       if (edge) edgePts.push([nx, ny]);

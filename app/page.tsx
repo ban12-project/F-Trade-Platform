@@ -29,15 +29,17 @@ export default function HomePage() {
         className="overflow-hidden border-y border-white/10 bg-[#0b0b0a] py-5 text-white/55"
       >
         <div className="landing-marquee-track gap-10">
-          {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, idx) => (
-            <span
-              key={`${item}-${idx}`}
-              className="inline-flex shrink-0 items-center gap-3 font-mono text-xs tracking-wide"
-            >
-              <span className="size-1.5 rounded-full bg-[#4AB0FF]/80" aria-hidden="true" />
-              {item}
-            </span>
-          ))}
+          {(["a", "b"] as const).flatMap((group) =>
+            MARQUEE_ITEMS.map((item) => (
+              <span
+                key={`${group}-${item}`}
+                className="inline-flex shrink-0 items-center gap-3 font-mono text-xs tracking-wide"
+              >
+                <span className="size-1.5 rounded-full bg-[#4AB0FF]/80" aria-hidden="true" />
+                {item}
+              </span>
+            )),
+          )}
         </div>
       </section>
 
@@ -55,7 +57,8 @@ export default function HomePage() {
             围绕工厂真实资料，构建可控的外贸业务工作流。
           </h2>
           <p className="mt-4 text-base leading-7 text-[#6b6e70]">
-            从产品目录结构化、人工事实核验、多平台图文与 15 秒实拍短视频，到受控社媒发布、被动询盘补全与人工报价，每一步都由领域状态机与独立审批记录约束。
+            从产品目录结构化、人工事实核验、多平台图文与 15
+            秒实拍短视频，到受控社媒发布、被动询盘补全与人工报价，每一步都由领域状态机与独立审批记录约束。
           </p>
         </div>
 
@@ -79,8 +82,9 @@ export default function HomePage() {
               </h2>
             </div>
             <p className="max-w-2xl text-base leading-7 text-[#3a3c3e] lg:text-lg">
-              把分散在 PDF、CSV、Excel 与图册中的离合器产品资料上传至受限私有存储，由 Product
-              Agent 提取 OE 号、车型适配、直径与花键参数，并强制逐字段绑定来源证据——缺失或无依据的参数自动阻断进入就绪状态。
+              把分散在 PDF、CSV、Excel 与图册中的离合器产品资料上传至受限私有存储，由 Product Agent
+              提取 OE
+              号、车型适配、直径与花键参数，并强制逐字段绑定来源证据——缺失或无依据的参数自动阻断进入就绪状态。
             </p>
           </div>
 
@@ -146,7 +150,8 @@ export default function HomePage() {
                 <span className="text-white">
                   营销语言可以由 AI 辅助生成，但工程事实、正式报价与生产交期必须由人确认。
                 </span>{" "}
-                审批记录与业务对象在数据库中严格分表存储，运行时状态机在事务内校验审批人身份、时间与版本引用，彻底杜绝 Agent 越权提交。
+                审批记录与业务对象在数据库中严格分表存储，运行时状态机在事务内校验审批人身份、时间与版本引用，彻底杜绝
+                Agent 越权提交。
               </p>
               <div className="grid gap-3 pt-2 sm:grid-cols-3">
                 {[
@@ -154,10 +159,7 @@ export default function HomePage() {
                   ["正式报价审批", "人工建单、确认 MOQ 与日历有效期"],
                   ["交期与产能确认", "工厂管理员确认，7 天有效期约束"],
                 ].map(([t, d]) => (
-                  <div
-                    key={t}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
-                  >
+                  <div key={t} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                     <p className="text-sm font-medium text-white">{t}</p>
                     <p className="mt-1.5 text-xs leading-5 text-white/45">{d}</p>
                   </div>
@@ -167,9 +169,7 @@ export default function HomePage() {
 
             <div className="overflow-hidden rounded-[22px] border border-white/10 bg-[#141413]">
               <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 text-xs">
-                <span className="font-mono text-white/60">
-                  工作台 › 状态机门禁规则 › 事务校验
-                </span>
+                <span className="font-mono text-white/60">工作台 › 状态机门禁规则 › 事务校验</span>
                 <span className="rounded-full border border-[#4AB0FF]/40 bg-[#4AB0FF]/15 px-3 py-0.5 font-mono text-[11px] text-[#4AB0FF]">
                   强制执行中
                 </span>
@@ -235,7 +235,9 @@ export default function HomePage() {
             <p className="max-w-2xl text-base leading-7 text-white/60">
               第一阶段专注跑通{" "}
               <span className="text-white">Facebook 受控图文、15 秒实拍视频发布与被动 DM 入站</span>
-              ，确保每条线索可归因；系统已预置多平台视频比例与静音可读规范，支持向 YouTube、Instagram、TikTok、LinkedIn 与 X 平滑演进。遇风控或页面异动即时熔断，绝不盲目重试。
+              ，确保每条线索可归因；系统已预置多平台视频比例与静音可读规范，支持向
+              YouTube、Instagram、TikTok、LinkedIn 与 X
+              平滑演进。遇风控或页面异动即时熔断，绝不盲目重试。
             </p>
           </div>
 

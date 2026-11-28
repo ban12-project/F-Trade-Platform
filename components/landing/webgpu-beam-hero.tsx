@@ -70,8 +70,7 @@ export function WebGpuBeamHero({
     const reducedMotion =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const isTouchOnly =
-      typeof window !== "undefined" && window.matchMedia("(hover: none)").matches;
+    const isTouchOnly = typeof window !== "undefined" && window.matchMedia("(hover: none)").matches;
 
     let cancelled = false;
     let loopHandle: { stop(): void } | null = null;
@@ -252,7 +251,11 @@ export function WebGpuBeamHero({
         });
         renderPipeline = renderer;
 
-        await Promise.all([bg.compile(targetSurface), sim.compile(), renderer.compile(targetSurface)]);
+        await Promise.all([
+          bg.compile(targetSurface),
+          sim.compile(),
+          renderer.compile(targetSurface),
+        ]);
         if (cancelled) return;
 
         setStatus("running");
@@ -311,14 +314,12 @@ export function WebGpuBeamHero({
           const curY = curFocus.fy;
 
           const autoSweep = isTouchOnly && !reducedMotion && now - state.lastPointerMs > 2200;
-          const ptrX = autoSweep
-            ? curX + Math.sin(0.55 * totalTime) * curR * 0.62
-            : state.pointerX;
-          const ptrY = autoSweep
-            ? curY + Math.sin(1.1 * totalTime) * curR * 0.42
-            : state.pointerY;
+          const ptrX = autoSweep ? curX + Math.sin(0.55 * totalTime) * curR * 0.62 : state.pointerX;
+          const ptrY = autoSweep ? curY + Math.sin(1.1 * totalTime) * curR * 0.42 : state.pointerY;
           const inMark =
-            state.phase === 0 && !reducedMotion && Math.hypot(ptrX - curX, ptrY - curY) < 1.15 * curR;
+            state.phase === 0 &&
+            !reducedMotion &&
+            Math.hypot(ptrX - curX, ptrY - curY) < 1.15 * curR;
 
           if (inMark && state.pulseAge > 0.65) {
             state.pulseAge = 0.0;
@@ -432,7 +433,7 @@ export function WebGpuBeamHero({
       className="relative -mt-16 overflow-hidden bg-[#0b0b0a] text-white"
     >
       <div className="relative min-h-screen" data-phone-stage="true">
-        <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 size-full" />
+        <canvas ref={canvasRef} className="absolute inset-0 size-full" />
 
         <div
           aria-hidden="true"
