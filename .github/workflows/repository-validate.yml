@@ -65,6 +65,9 @@ jobs:
           pnpm test:vps-compute
           python3 scripts/test-compute-image-context.py
 
+      - name: Verify shared Action error privacy
+        run: node --conditions=react-server --experimental-test-module-mocks --import tsx scripts/test-shared-action-errors.mts
+
       - name: Test Better Auth core and Passkey schema mappings
         run: pnpm exec tsx scripts/test-auth-schema.ts
 

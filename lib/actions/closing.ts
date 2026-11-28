@@ -37,7 +37,6 @@ import { submitControlledPublication } from "@/lib/social/publication-store";
 import { assertPublicPublishingAccountReady } from "@/lib/social/publishing-account-store";
 
 const actor = requireActionActor;
-const resultError = actionError;
 const refresh = refreshWorkspace;
 function values(formData: FormData) {
   return Object.fromEntries(formData);
@@ -50,12 +49,13 @@ export async function saveQuotationAction(
   try {
     const actorId = await actor("sales:write");
     const parsed = quotationDraftFormSchema.safeParse(values(formData));
-    if (!parsed.success) return resultError(parsed.error);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查表单内容。" };
     const saved = await createOrReviseQuotation(parsed.data, actorId);
     refresh(parsed.data.projectId);
     return { status: "success", message: "报价已保存并提交人工审核。", id: saved.id };
   } catch (error) {
-    return resultError(error);
+    return actionError(error);
   }
 }
 export async function decideQuotationAction(
@@ -65,7 +65,8 @@ export async function decideQuotationAction(
   try {
     const actorId = await actor("quotation:review");
     const parsed = quotationDecisionFormSchema.safeParse(values(formData));
-    if (!parsed.success) return resultError(parsed.error);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查表单内容。" };
     const saved = await decideQuotation(parsed.data, actorId);
     refresh(parsed.data.projectId);
     return {
@@ -74,7 +75,7 @@ export async function decideQuotationAction(
       id: saved.id,
     };
   } catch (error) {
-    return resultError(error);
+    return actionError(error);
   }
 }
 export async function sendQuotationAction(
@@ -84,7 +85,8 @@ export async function sendQuotationAction(
   try {
     const actorId = await actor("sales:write");
     const parsed = quotationSendFormSchema.safeParse(values(formData));
-    if (!parsed.success) return resultError(parsed.error);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查表单内容。" };
     const saved = await sendQuotation(parsed.data, actorId);
     refresh(parsed.data.projectId);
     return {
@@ -93,7 +95,7 @@ export async function sendQuotationAction(
       id: saved.leadId,
     };
   } catch (error) {
-    return resultError(error);
+    return actionError(error);
   }
 }
 export async function saveFollowUpPlanAction(
@@ -106,12 +108,13 @@ export async function saveFollowUpPlanAction(
       ...values(formData),
       triggeredRules: formData.getAll("triggeredRules"),
     });
-    if (!parsed.success) return resultError(parsed.error);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查表单内容。" };
     const saved = await saveFollowUpPlan(parsed.data, actorId);
     refresh(parsed.data.projectId);
     return { status: "success", message: "跟进计划已保存，未发送客户消息。", id: saved.id };
   } catch (error) {
-    return resultError(error, "无法保存跟进计划。");
+    return actionError(error, "无法保存跟进计划。");
   }
 }
 
@@ -160,12 +163,13 @@ export async function requestDeliveryAction(
   try {
     const actorId = await actor("sales:write");
     const parsed = deliveryRequestFormSchema.safeParse(values(formData));
-    if (!parsed.success) return resultError(parsed.error);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查表单内容。" };
     const saved = await createDeliveryRequest(parsed.data, actorId);
     refresh(parsed.data.projectId);
     return { status: "success", message: "已提交工厂交期确认请求。", id: saved.id };
   } catch (error) {
-    return resultError(error);
+    return actionError(error);
   }
 }
 export async function decideDeliveryAction(
@@ -175,7 +179,8 @@ export async function decideDeliveryAction(
   try {
     const actorId = await actor("delivery:review");
     const parsed = deliveryDecisionFormSchema.safeParse(values(formData));
-    if (!parsed.success) return resultError(parsed.error);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查表单内容。" };
     const saved = await decideDelivery(parsed.data, actorId);
     refresh(parsed.data.projectId);
     return {
@@ -184,7 +189,7 @@ export async function decideDeliveryAction(
       id: saved.id,
     };
   } catch (error) {
-    return resultError(error);
+    return actionError(error);
   }
 }
 export async function confirmOpportunityAction(
@@ -194,12 +199,13 @@ export async function confirmOpportunityAction(
   try {
     const actorId = await actor("sales:write");
     const parsed = opportunityDecisionFormSchema.safeParse(values(formData));
-    if (!parsed.success) return resultError(parsed.error);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查表单内容。" };
     await confirmOpportunity(parsed.data, actorId);
     refresh(parsed.data.projectId);
     return { status: "success", message: "已由人工确认有效商机。", id: parsed.data.leadId };
   } catch (error) {
-    return resultError(error);
+    return actionError(error);
   }
 }
 export async function confirmPublicationAction(
@@ -210,7 +216,8 @@ export async function confirmPublicationAction(
     const current = await authorizedActionSession("content:write");
     if (!current) throw new SocialHumanAccessError();
     const parsed = publicationConfirmationFormSchema.safeParse(values(formData));
-    if (!parsed.success) return resultError(parsed.error);
+    if (!parsed.success)
+      return { status: "error", message: parsed.error.issues[0]?.message ?? "请检查表单内容。" };
     await assertPublicPublishingAccountReady(getDatabase(), parsed.data, current.user.id);
     const saved = await submitControlledPublication(parsed.data, {
       actorId: current.user.id,

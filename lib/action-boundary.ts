@@ -1,9 +1,9 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { ZodError } from "zod";
 import { auth } from "@/lib/auth";
 import { hasPermission, type Permission } from "@/lib/authz";
+import { UserFacingError } from "./user-facing-error";
 
 // Every Action calls this independently; rendering and Proxy checks are not authorization boundaries.
 export async function authorizedActionSession(permission: Permission) {
@@ -12,7 +12,7 @@ export async function authorizedActionSession(permission: Permission) {
 }
 export async function requireActionActor(permission: Permission, message = "无权执行该操作。") {
   const session = await authorizedActionSession(permission);
-  if (!session) throw new Error(message);
+  if (!session) throw new UserFacingError(message);
   return session.user.id;
 }
 export function actionError(
@@ -21,12 +21,7 @@ export function actionError(
 ): { status: "error"; message: string } {
   return {
     status: "error",
-    message:
-      error instanceof ZodError
-        ? (error.issues[0]?.message ?? "请检查表单内容。")
-        : error instanceof Error
-          ? error.message
-          : fallback,
+    message: error instanceof UserFacingError ? error.publicMessage : fallback,
   };
 }
 export function refreshWorkspace(projectId?: string) {

@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { actionError } from "@/lib/action-boundary";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
@@ -28,10 +29,7 @@ export async function submitApprovedVideoJobAction(
   try {
     assertVideoGenerationEnabled();
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "视频生成能力当前未启用。",
-    };
+    return actionError(error, "视频生成能力当前未启用。");
   }
   const parsed = videoJobSubmissionSchema.safeParse({
     videoId: value(formData, "videoId"),
@@ -55,9 +53,6 @@ export async function submitApprovedVideoJobAction(
       jobId: job.id,
     };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法提交视频生成任务。",
-    };
+    return actionError(error, "无法提交视频生成任务。");
   }
 }

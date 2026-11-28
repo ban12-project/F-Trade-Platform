@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
-
 import {
   inquirySuggestionRequestSchema,
   rfqFormSchema,
@@ -16,6 +15,7 @@ import {
 } from "@/lib/sales/inquiry-suggestions";
 import { rfqMissingLabel } from "@/lib/sales/journey";
 import { createRfq, reviseRfq, submitRfqReady } from "@/lib/sales/store";
+import { parseActionInput } from "@/lib/user-facing-error";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type SalesActionState = {
@@ -26,7 +26,7 @@ export type SalesActionState = {
 function projectIdFrom(formData: FormData) {
   const value = formData.get("projectId");
   if (value === null || value === "") return undefined;
-  return z.uuid("项目标识无效。").parse(value);
+  return parseActionInput(z.uuid("项目标识无效。"), value);
 }
 
 export async function suggestInquiryAction(

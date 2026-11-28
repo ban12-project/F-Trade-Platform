@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/lib/user-facing-error";
 import { memberRolesForAccess, type WorkspaceMemberRole } from "@/lib/workspace/member-roles";
 import "server-only";
 
@@ -304,7 +305,7 @@ export async function assertWorkspaceProjectKind(
     .from(workspaceProject)
     .where(eq(workspaceProject.id, projectId));
   if (!project || project.kind !== expectedKind)
-    throw new Error(
+    throw new UserFacingError(
       expectedKind === "marketing"
         ? "该操作只能在产品营销项目中执行。"
         : "该操作只能在销售机会项目中执行。",
@@ -337,7 +338,7 @@ export async function assertWorkspaceAggregateLink(
                 : aggregateType === "delivery_confirmation"
                   ? ["delivery_confirmation"]
                   : [];
-  if (!roles.length) throw new Error("该业务类型尚未定义项目归属规则。");
+  if (!roles.length) throw new UserFacingError("该业务类型尚未定义项目归属规则。");
   const [link] = await database
     .select({ id: workspaceProjectItem.id })
     .from(workspaceProjectItem)
@@ -351,7 +352,7 @@ export async function assertWorkspaceAggregateLink(
         inArray(workspaceProjectItem.role, roles),
       ),
     );
-  if (!link) throw new Error("该记录不属于当前项目。");
+  if (!link) throw new UserFacingError("该记录不属于当前项目。");
 }
 
 export async function linkReadyProductToSalesProject(
@@ -367,7 +368,7 @@ export async function linkReadyProductToSalesProject(
       .from(workspaceProject)
       .where(eq(workspaceProject.id, projectId))
       .for("update");
-    if (project?.kind !== "sales") throw new Error("产品引用只能添加到销售机会项目。");
+    if (project?.kind !== "sales") throw new UserFacingError("产品引用只能添加到销售机会项目。");
     const [readable] = await tx
       .select({ id: workspaceProjectItem.id })
       .from(workspaceProjectItem)
@@ -382,13 +383,14 @@ export async function linkReadyProductToSalesProject(
         ),
       )
       .limit(1);
-    if (!readable) throw new Error("该产品不在可访问项目范围内。");
+    if (!readable) throw new UserFacingError("该产品不在可访问项目范围内。");
     const [product] = await tx
       .select({ state: aggregateRecord.state })
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
       .for("update");
-    if (product?.state !== "PRODUCT_READY") throw new Error("只能引用已通过 Gate 01 的产品。");
+    if (product?.state !== "PRODUCT_READY")
+      throw new UserFacingError("只能引用已通过 Gate 01 的产品。");
     await tx
       .insert(workspaceProjectItem)
       .values({

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { actionError } from "@/lib/action-boundary";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
@@ -38,10 +39,7 @@ export async function saveVideoProviderModelSettingsAction(
   try {
     assertVideoGenerationEnabled();
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "视频生成能力当前未启用。",
-    };
+    return actionError(error, "视频生成能力当前未启用。");
   }
   const parsed = videoProviderModelSettingsFormSchema.safeParse({
     provider: text(formData, "provider"),
@@ -93,9 +91,6 @@ export async function saveVideoProviderModelSettingsAction(
     revalidatePath("/workspace", "layout");
     return { status: "success", message: "视频提供商配置已保存；凭据不会显示或返回到浏览器。" };
   } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "无法保存视频提供商配置。",
-    };
+    return actionError(error, "无法保存视频提供商配置。");
   }
 }

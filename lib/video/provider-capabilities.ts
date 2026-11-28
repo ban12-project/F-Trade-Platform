@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UserFacingError } from "@/lib/user-facing-error";
 
 /**
  * This catalogue is an allow-list, not a claim that every listed provider is
@@ -88,22 +89,23 @@ export function selectVerifiedVideoModel(
   const candidate = catalog.find(
     (model) => model.provider === parsed.provider && model.modelId === parsed.modelId,
   );
-  if (!candidate) throw new Error("视频模型未在能力注册表中登记。");
+  if (!candidate) throw new UserFacingError("视频模型未在能力注册表中登记。");
   const model = videoModelCapabilitySchema.parse(candidate);
   if (!model.enabled || !model.verifiedAt || !model.verificationRef) {
-    throw new Error("视频模型尚未通过验证或未启用。");
+    throw new UserFacingError("视频模型尚未通过验证或未启用。");
   }
   if (!parsed.requiredCapabilities.every((capability) => model.capabilities.includes(capability))) {
-    throw new Error("视频模型不满足所需生成能力。");
+    throw new UserFacingError("视频模型不满足所需生成能力。");
   }
   if (!model.aspectRatios.includes(parsed.aspectRatio))
-    throw new Error("视频模型不支持所需画幅比例。");
+    throw new UserFacingError("视频模型不支持所需画幅比例。");
   if (
     parsed.durationSeconds < model.durationSeconds.min ||
     parsed.durationSeconds > model.durationSeconds.max
   ) {
-    throw new Error("视频时长超出已验证模型能力范围。");
+    throw new UserFacingError("视频时长超出已验证模型能力范围。");
   }
-  if (!model.resolutions.includes(parsed.resolution)) throw new Error("视频模型不支持所需分辨率。");
+  if (!model.resolutions.includes(parsed.resolution))
+    throw new UserFacingError("视频模型不支持所需分辨率。");
   return model;
 }

@@ -142,14 +142,20 @@ for (const field of ["unit_price", "moq", "lead_time_days", "validity_days"] as 
     );
   }
 }
-const approved = applyHumanQuoteDecision(draft, {
+const approvalDecision = {
   actorType: "human",
   actorId: "synthetic-quote-reviewer",
   status: "approved",
   approvalRef: "synthetic-quote-approval-gate-02",
   evidenceRef: "synthetic-quote-evidence-gate-02",
   decidedAt: "2026-08-24T12:00:00Z",
-});
+} as const;
+for (const field of ["actorId", "approvalRef", "evidenceRef"] as const) {
+  assert.throws(() => applyHumanQuoteDecision(draft, { ...approvalDecision, [field]: " " }), {
+    message: `Quotation handoff requires ${field}`,
+  });
+}
+const approved = applyHumanQuoteDecision(draft, approvalDecision);
 assert.equal(
   sendManualQuotation(
     approved,

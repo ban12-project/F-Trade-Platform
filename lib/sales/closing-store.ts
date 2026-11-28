@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
-
 import { and, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { z } from "zod";
-
 import leadSchema from "@/contracts/sales/lead.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
 import { type Database, getDatabase } from "@/lib/db/client";
@@ -55,6 +53,7 @@ import { decryptSocialMessageBody } from "@/lib/social/message-crypto";
 import { createStoredSocialMessageRecord } from "@/lib/social/message-record";
 import { replyResultSchema } from "@/lib/social/reply-result-protocol";
 import { authorizeSalesReply } from "@/lib/social/reply-write-access";
+import { UserFacingError } from "@/lib/user-facing-error";
 import { assertTransition } from "@/lib/workflow/transitions";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 
@@ -150,7 +149,7 @@ async function assertSalesProject(
     .from(workspaceProject)
     .where(eq(workspaceProject.id, projectId))
     .for("update");
-  if (project?.kind !== "sales") throw new Error("该操作只能在销售机会项目中执行。");
+  if (project?.kind !== "sales") throw new UserFacingError("该操作只能在销售机会项目中执行。");
 }
 
 async function prepareControlledFollowUp(
@@ -222,7 +221,8 @@ export async function createOrReviseQuotation(
         ),
       )
       .for("update");
-    if (rfq?.state !== "RFQ_READY") throw new Error("正式报价必须引用当前项目的 RFQ Ready。");
+    if (rfq?.state !== "RFQ_READY")
+      throw new UserFacingError("正式报价必须引用当前项目的 RFQ Ready。");
     const [product] = await tx
       .select({ state: aggregateRecord.state })
       .from(workspaceProjectItem)
@@ -237,7 +237,7 @@ export async function createOrReviseQuotation(
       )
       .for("update");
     if (product?.state !== "PRODUCT_READY")
-      throw new Error("正式报价必须引用当前项目的 Product Ready。");
+      throw new UserFacingError("正式报价必须引用当前项目的 Product Ready。");
     const id = value.quotationId || randomUUID();
     const approvalId = randomUUID();
     if (value.quotationId) {
@@ -259,9 +259,9 @@ export async function createOrReviseQuotation(
           ),
         )
         .for("update");
-      if (!current) throw new Error("报价不属于当前项目，不能修订。");
+      if (!current) throw new UserFacingError("报价不属于当前项目，不能修订。");
       if (current?.state !== "QUOTE_REVISION_REQUIRED")
-        throw new Error("只有被退回的报价可以修订。");
+        throw new UserFacingError("只有被退回的报价可以修订。");
       const existing = current.payload as unknown as QuotationHandoff;
       const next: QuotationHandoff = {
         ...existing,
@@ -409,9 +409,9 @@ export async function decideQuotation(
       )
       .for("update");
     if (record && String(record.version) !== value.reviewedVersion)
-      throw new Error("报价已更新，请刷新后重新审核当前条款。");
+      throw new UserFacingError("报价已更新，请刷新后重新审核当前条款。");
     if (record?.state !== "QUOTE_REVIEW_REQUIRED")
-      throw new Error("该报价当前不处于 Gate 02 待审核状态。");
+      throw new UserFacingError("该报价当前不处于 Gate 02 待审核状态。");
     const [pending] = await tx
       .select()
       .from(approval)
@@ -423,8 +423,9 @@ export async function decideQuotation(
         ),
       )
       .for("update");
-    if (!pending) throw new Error("未找到 Gate 02 待审核请求。");
-    if (pending.id !== value.approvalId) throw new Error("审核请求已更新，请刷新后重新审核。");
+    if (!pending) throw new UserFacingError("未找到 Gate 02 待审核请求。");
+    if (pending.id !== value.approvalId)
+      throw new UserFacingError("审核请求已更新，请刷新后重新审核。");
     const next = applyHumanQuoteDecision(record.payload as unknown as QuotationHandoff, {
       actorType: "human",
       actorId,
@@ -523,7 +524,7 @@ export async function sendQuotation(
         ),
       )
       .for("update");
-    if (!record) throw new Error("报价不存在或不属于当前项目。");
+    if (!record) throw new UserFacingError("报价不存在或不属于当前项目。");
     const sent = sendManualQuotation(
       record.payload as unknown as QuotationHandoff,
       "human",
@@ -671,7 +672,8 @@ export async function saveFollowUpPlan(
         ),
       )
       .for("update");
-    if (record?.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以保存跟进计划。");
+    if (record?.state !== "FOLLOW_UP")
+      throw new UserFacingError("只有跟进中的线索可以保存跟进计划。");
     const lead = validateLead(record.payload);
     const scoring = scoreLead(value.triggeredRules);
     const { next_follow_up_at: _previousTime, ...retained } = lead;
@@ -739,9 +741,10 @@ export async function recordFollowUp(
         ),
       )
       .for("update");
-    if (record?.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以发送回复。");
+    if (record?.state !== "FOLLOW_UP") throw new UserFacingError("只有跟进中的线索可以发送回复。");
     const lead = validateLead(record.payload);
-    if (!lead.conversation_ref) throw new Error("该线索没有可发送的渠道会话，请先关联入站消息。");
+    if (!lead.conversation_ref)
+      throw new UserFacingError("该线索没有可发送的渠道会话，请先关联入站消息。");
     const [conversation] = await tx
       .select()
       .from(socialConversation)
@@ -752,7 +755,7 @@ export async function recordFollowUp(
         ),
       )
       .for("update");
-    if (!conversation) throw new Error("该线索未关联授权可见的渠道会话。");
+    if (!conversation) throw new UserFacingError("该线索未关联授权可见的渠道会话。");
     const [control] = await tx
       .select()
       .from(socialChannelControl)
@@ -764,7 +767,7 @@ export async function recordFollowUp(
       )
       .for("update");
     if (!control?.enabled || control.circuitStatus !== "active")
-      throw new Error("渠道未启用或已暂停，不能发送回复。");
+      throw new UserFacingError("渠道未启用或已暂停，不能发送回复。");
     const [latestInbound] = await tx
       .select({
         id: socialMessage.id,
@@ -784,10 +787,10 @@ export async function recordFollowUp(
       .orderBy(desc(socialMessage.receivedAt))
       .limit(1)
       .for("update");
-    if (!latestInbound) throw new Error("没有仍在保留期内的入站消息，不能发送回复。");
+    if (!latestInbound) throw new UserFacingError("没有仍在保留期内的入站消息，不能发送回复。");
     function assertReplyEligible(now: Date) {
       if (latestInbound.expiresAt <= now)
-        throw new Error("没有仍在保留期内的入站消息，不能发送回复。");
+        throw new UserFacingError("没有仍在保留期内的入站消息，不能发送回复。");
       const window = assessReplyWindow(
         {
           channelRef: conversation.channelRef,
@@ -805,7 +808,7 @@ export async function recordFollowUp(
         now.toISOString(),
       );
       if (window.status !== "within_window")
-        throw new Error("已超过渠道回复窗口；当前 MVP 禁止发送，需人工升级处理。");
+        throw new UserFacingError("已超过渠道回复窗口；当前 MVP 禁止发送，需人工升级处理。");
       return window;
     }
     assertReplyEligible(new Date());
@@ -821,7 +824,7 @@ export async function recordFollowUp(
       assertSocialAuthorizationAlive(expiresAt);
       const now = new Date();
       if (prepared.validUntil && Date.parse(prepared.validUntil) <= now.getTime())
-        throw new Error("Gate 03 交期确认已过期，请重新申请确认。");
+        throw new UserFacingError("Gate 03 交期确认已过期，请重新申请确认。");
       return assertReplyEligible(now);
     }
     const window = assertCurrentEligibility();
@@ -912,19 +915,19 @@ export async function recordControlledReplyResult(
       .from(socialBrowserJob)
       .where(eq(socialBrowserJob.id, value.jobId))
       .for("update");
-    if (job?.kind !== "reply") throw new Error("回复任务不存在。");
+    if (job?.kind !== "reply") throw new UserFacingError("回复任务不存在。");
     const [message] = await tx
       .select()
       .from(socialMessage)
       .where(eq(socialMessage.id, job.payloadRef))
       .for("update");
-    if (message?.direction !== "outbound") throw new Error("回复任务缺少待发送消息。");
+    if (message?.direction !== "outbound") throw new UserFacingError("回复任务缺少待发送消息。");
     const [conversation] = await tx
       .select()
       .from(socialConversation)
       .where(eq(socialConversation.id, message.conversationId))
       .for("update");
-    if (!conversation?.leadId) throw new Error("回复任务未关联有效线索。");
+    if (!conversation?.leadId) throw new UserFacingError("回复任务未关联有效线索。");
     if (["succeeded", "failed", "paused"].includes(job.status)) {
       if (
         value.outcome === "sent" &&
@@ -938,7 +941,7 @@ export async function recordControlledReplyResult(
         job.failureCode === value.failureCode
       )
         return job;
-      throw new Error("回复任务已经终结，不能用不同结果覆盖。");
+      throw new UserFacingError("回复任务已经终结，不能用不同结果覆盖。");
     }
     const [control] = await tx
       .select()
@@ -951,9 +954,9 @@ export async function recordControlledReplyResult(
       )
       .for("update");
     if (value.outcome === "sent") {
-      if (!value.externalMessageRef) throw new Error("成功发送结果缺少平台消息凭证。");
+      if (!value.externalMessageRef) throw new UserFacingError("成功发送结果缺少平台消息凭证。");
       if (!control?.enabled || control.circuitStatus !== "active")
-        throw new Error("渠道已暂停，不能接受成功发送结果。");
+        throw new UserFacingError("渠道已暂停，不能接受成功发送结果。");
       const [duplicate] = await tx
         .select({ id: socialMessage.id })
         .from(socialMessage)
@@ -965,7 +968,7 @@ export async function recordControlledReplyResult(
           ),
         )
         .limit(1);
-      if (duplicate) throw new Error("平台消息凭证已被其他消息使用。");
+      if (duplicate) throw new UserFacingError("平台消息凭证已被其他消息使用。");
       const [saved] = await tx
         .update(socialBrowserJob)
         .set({
@@ -1052,7 +1055,7 @@ export async function confirmOpportunity(
       .for("update");
     const lead = record?.payload as LeadRecord | undefined;
     if (record?.state !== "FOLLOW_UP" || lead?.score_band !== "HOT")
-      throw new Error("只有达到 HOT 的跟进线索才能由人工确认有效商机。");
+      throw new UserFacingError("只有达到 HOT 的跟进线索才能由人工确认有效商机。");
     const next = validateLead({
       ...lead,
       status: "opportunity",
@@ -1109,9 +1112,10 @@ export async function createDeliveryRequest(
         ),
       )
       .for("update");
-    if (lead?.state !== "FOLLOW_UP") throw new Error("只有跟进中的线索可以申请交期确认。");
+    if (lead?.state !== "FOLLOW_UP")
+      throw new UserFacingError("只有跟进中的线索可以申请交期确认。");
     const leadPayload = validateLead(lead.payload);
-    if (!leadPayload.rfq_ref) throw new Error("交期确认必须引用当前线索的 RFQ。");
+    if (!leadPayload.rfq_ref) throw new UserFacingError("交期确认必须引用当前线索的 RFQ。");
     if (leadPayload.delivery_confirmation_ref) {
       const [existing] = await tx
         .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
@@ -1127,7 +1131,7 @@ export async function createDeliveryRequest(
           ),
         )
         .for("update");
-      if (!existing) throw new Error("交期确认不属于当前项目，请核对线索关联。");
+      if (!existing) throw new UserFacingError("交期确认不属于当前项目，请核对线索关联。");
       const confirmation = validateDeliveryConfirmation(existing.payload);
       const matchesRfq =
         confirmation.related_entity_type === "rfq" &&
@@ -1266,7 +1270,7 @@ export async function decideDelivery(
       )
       .for("update");
     if (record?.state !== "DELIVERY_CONFIRMATION_PENDING")
-      throw new Error("该交期确认当前不可审核。");
+      throw new UserFacingError("该交期确认当前不可审核。");
     const [pending] = await tx
       .select()
       .from(approval)
@@ -1278,7 +1282,7 @@ export async function decideDelivery(
         ),
       )
       .for("update");
-    if (!pending) throw new Error("未找到 Gate 03 待审核请求。");
+    if (!pending) throw new UserFacingError("未找到 Gate 03 待审核请求。");
     const next = decideDeliveryConfirmation(validateDeliveryConfirmation(record.payload), {
       actorType: "human",
       actorId,
