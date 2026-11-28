@@ -165,7 +165,7 @@ export const WORKFLOW_TABS: readonly WorkflowTabItem[] = [
       "支持上传授权 PDF、CSV、XLS 与 XLSX 目录（最大 25MB），通过私有存储与 MarkItDown 预处理提取 SKU、OE 号、车型适配与离合器规格，自动标记缺失项并阻断无依据字段。",
     breadcrumb: "工作台 › 产品资料 › 目录录入",
     actionLabel: "提交核验",
-    statusBadge: "待核对",
+    statusBadge: "字段核验",
     rows: [
       {
         id: "1",
@@ -185,7 +185,7 @@ export const WORKFLOW_TABS: readonly WorkflowTabItem[] = [
         id: "3",
         primary: "摩擦材料与包装规格",
         secondary: "缺少工厂实测寿命与 MOQ 依据",
-        meta: "待核对",
+        meta: "待人工核对",
         state: "pending",
       },
       {
@@ -198,7 +198,7 @@ export const WORKFLOW_TABS: readonly WorkflowTabItem[] = [
     ],
     footerTitle: "进入人工事实核验",
     footerMeta: "营销语言可生成，工程事实必须有工厂来源",
-    footerStatus: "待核对",
+    footerStatus: "待人工核对",
   },
   {
     id: "review",
@@ -208,13 +208,13 @@ export const WORKFLOW_TABS: readonly WorkflowTabItem[] = [
       "审批记录与业务对象独立存储，运行时状态机强制校验审批人、时间与版本引用。Agent 无法绕过门禁直接将产品置为就绪、对外发布或发送报价。",
     breadcrumb: "工作台 › 审核中心 › 门禁规则",
     actionLabel: "批准进入就绪",
-    statusBadge: "人工把关",
+    statusBadge: "门禁审批",
     rows: [
       {
         id: "1",
         primary: "产品与内容真实性审核",
         secondary: "核对 OE 号、适配车型、尺寸与图文一致性",
-        meta: "人工把关",
+        meta: "强制人审",
         state: "active",
       },
       {
@@ -241,7 +241,7 @@ export const WORKFLOW_TABS: readonly WorkflowTabItem[] = [
     ],
     footerTitle: "三道强制人工防线",
     footerMeta: "独立审批表 + 不可变事件流重放",
-    footerStatus: "人工把关",
+    footerStatus: "强制人审",
   },
   {
     id: "content",
@@ -251,13 +251,13 @@ export const WORKFLOW_TABS: readonly WorkflowTabItem[] = [
       "围绕已通过核验的产品事实生成产品介绍、应用场景与专业采购指南，并可在独立视频工作台剪辑授权工厂素材，输出多平台静音可读成片。",
     breadcrumb: "工作台 › 内容与发布 › 草稿队列",
     actionLabel: "逐帖确认发布",
-    statusBadge: "待审发布",
+    statusBadge: "排期审核",
     rows: [
       {
         id: "1",
         primary: "产品型图文 · Clutch Kit 适配解析",
         secondary: "全部 OE 与规格字段自动关联已核验产品",
-        meta: "待审发布",
+        meta: "待确认排期",
         state: "pending",
       },
       {
@@ -284,7 +284,7 @@ export const WORKFLOW_TABS: readonly WorkflowTabItem[] = [
     ],
     footerTitle: "受控渠道发布边界",
     footerMeta: "遇风控或页面异动立即暂停，禁止自动重试",
-    footerStatus: "待审发布",
+    footerStatus: "受控发布",
   },
   {
     id: "sales",

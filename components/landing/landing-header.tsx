@@ -127,7 +127,7 @@ export function LandingHeader() {
             {[
               ["#workflow", "工作流"],
               ["#open", "入库溯源"],
-              ["#decide", "人工把关"],
+              ["#decide", "审批门禁"],
               ["#watch", "社媒矩阵"],
               ["#prove", "审计对比"],
               ["#faq", "常见问题"],
