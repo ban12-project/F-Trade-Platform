@@ -139,8 +139,9 @@ for (const op of ["save", "copy", "render"] as const) {
     cause: new Error(privateValue),
   });
   assert.deepEqual(await run(), { status: "error", message: VIDEO_DRAFT_ACCESS_MESSAGE });
-  failure = new Error("剪辑稿引用了不属于当前视频的素材。");
-  assert.deepEqual(await run(), { status: "error", message: failure.message });
+  const expectedMessage = "剪辑稿引用了不属于当前视频的素材。";
+  failure = new Error(expectedMessage);
+  assert.deepEqual(await run(), { status: "error", message: expectedMessage });
   const before = attempts;
   boundaryFailure = new Error(privateValue);
   if (op !== "copy") {

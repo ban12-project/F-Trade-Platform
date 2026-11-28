@@ -369,7 +369,7 @@ try {
       rows: [{ revokerPid }],
     } = await revoker.query('SELECT pg_backend_pid() AS "revokerPid"');
     await held.query("SELECT pg_advisory_xact_lock($1)", [key]);
-    let pendingRevocation: ReturnType<typeof revoker.query> | undefined;
+    let pendingRevocation: Promise<unknown> | undefined;
     try {
       const before = await snapshot(f),
         pending = run(f, mode);
