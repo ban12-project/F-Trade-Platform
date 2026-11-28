@@ -6,7 +6,6 @@ import { start } from "workflow/api";
 import { z } from "zod";
 import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 import { getDatabase } from "@/lib/db/client";
-import { videoReviewFormSchema } from "@/lib/form-schemas";
 import {
   assertCurrentVideoDraftWriter,
   VideoDraftAccessError,
@@ -39,6 +38,7 @@ import {
   registerVideoReviewWorkingEvidence,
   VideoReviewCopyError,
 } from "@/lib/video/review-evidence-store";
+import { videoReviewFormSchema } from "@/lib/video/review-form-schema";
 import { VideoReviewAccessError, videoReviewFailureMessage } from "@/lib/video/review-write-access";
 import {
   assertMarketingVideoProjectLink,

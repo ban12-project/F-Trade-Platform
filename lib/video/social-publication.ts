@@ -1,17 +1,16 @@
 import { z } from "zod";
-
 import type { ReviewVideoExport } from "./export-artifact";
+import { videoPlatformSchema } from "./platform";
 
 const opaqueRef = (prefix: string) =>
   z
     .string()
     .trim()
     .regex(new RegExp(`^${prefix}-[a-z0-9][a-z0-9_-]{2,120}$`, "i"));
-const channelSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
 
 export const socialVideoPublicationPolicySchema = z
   .object({
-    channel: channelSchema,
+    channel: videoPlatformSchema,
     transport: z.enum(["official_api", "camofox_controlled_mvp1"]),
     draftEnabled: z.boolean(),
     publishingEnabled: z.boolean(),
@@ -31,7 +30,7 @@ export const socialVideoPublicationPolicySchema = z
 export type SocialVideoPublicationPolicy = z.infer<typeof socialVideoPublicationPolicySchema>;
 
 export type SocialVideoPublicationAdapter = {
-  channel: z.infer<typeof channelSchema>;
+  channel: z.infer<typeof videoPlatformSchema>;
   transport: SocialVideoPublicationPolicy["transport"];
   createDraft(input: {
     accountRef: string;
@@ -48,7 +47,7 @@ export type SocialVideoPublicationAdapter = {
 };
 
 export type SocialVideoDraft = {
-  channel: z.infer<typeof channelSchema>;
+  channel: z.infer<typeof videoPlatformSchema>;
   accountRef: string;
   assetRef: string;
   publicationRef: string;

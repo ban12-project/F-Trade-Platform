@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { getTableName, type SQL, type Table } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { Database } from "../lib/db/client";
-import { inboundRoutingFormSchema } from "../lib/form-schemas";
+import { inboundRoutingFormSchema } from "../lib/social/form-schemas";
 import { readInboundContext } from "../lib/social/inbound-context-store";
 import { routeInboundConversation } from "../lib/social/inbound-routing-store";
 import { encryptSocialMessageBody } from "../lib/social/message-crypto";

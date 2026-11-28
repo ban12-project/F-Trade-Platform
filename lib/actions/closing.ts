@@ -9,18 +9,13 @@ import {
 } from "@/lib/action-boundary";
 import type { ClosingActionState } from "@/lib/action-states";
 import { getDatabase } from "@/lib/db/client";
+import { deliveryDecisionFormSchema, deliveryRequestFormSchema } from "@/lib/delivery/form-schemas";
+import { followUpFormSchema, followUpPlanFormSchema } from "@/lib/follow-up/form-schemas";
 import {
-  deliveryDecisionFormSchema,
-  deliveryRequestFormSchema,
-  followUpFormSchema,
-  followUpPlanFormSchema,
-  inboundRoutingFormSchema,
-  opportunityDecisionFormSchema,
-  publicationConfirmationFormSchema,
   quotationDecisionFormSchema,
   quotationDraftFormSchema,
   quotationSendFormSchema,
-} from "@/lib/form-schemas";
+} from "@/lib/quotation/form-schemas";
 import {
   confirmOpportunity,
   createDeliveryRequest,
@@ -31,6 +26,11 @@ import {
   saveFollowUpPlan,
   sendQuotation,
 } from "@/lib/sales/closing-store";
+import { opportunityDecisionFormSchema } from "@/lib/sales/opportunity-form-schema";
+import {
+  inboundRoutingFormSchema,
+  publicationConfirmationFormSchema,
+} from "@/lib/social/form-schemas";
 import { SocialHumanAccessError, socialHumanFailureMessage } from "@/lib/social/human-write-access";
 import { routeInboundConversation } from "@/lib/social/inbound-routing-store";
 import { submitControlledPublication } from "@/lib/social/publication-store";

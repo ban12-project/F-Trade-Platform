@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord, approval, auditEvent, workflowEvent } from "@/lib/db/schema";
-import { videoReviewFormSchema } from "@/lib/form-schemas";
+import { videoReviewFormSchema } from "@/lib/video/review-form-schema";
 import { assertTransition } from "@/lib/workflow/transitions";
 import {
   assertAggregateWorkspaceWrite,

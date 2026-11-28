@@ -6,6 +6,7 @@ import { actionError, authorizedActionSession } from "@/lib/action-boundary";
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { hasPermission } from "@/lib/authz";
+import { contentAgentRequestSchema } from "@/lib/content/form-schemas";
 import {
   type contentGenerationOutputSchema,
   generateMarketingContent,
@@ -13,7 +14,6 @@ import {
 import { listReadyProductContentSources } from "@/lib/content/store";
 import { getDatabase } from "@/lib/db/client";
 import { user } from "@/lib/db/schema";
-import { contentAgentRequestSchema } from "@/lib/form-schemas";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
 

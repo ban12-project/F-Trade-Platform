@@ -7,7 +7,7 @@ import {
   inquirySuggestionRequestSchema,
   rfqFormSchema,
   rfqReadyFormSchema,
-} from "@/lib/form-schemas";
+} from "@/lib/rfq/form-schemas";
 import {
   type InquirySuggestion,
   InquiryUnavailableError,

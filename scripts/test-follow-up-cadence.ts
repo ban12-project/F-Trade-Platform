@@ -5,7 +5,7 @@ import {
   needsDeliveryConfirmation,
   nextFollowUp,
 } from "../lib/follow-up/cadence";
-import { followUpPlanFormSchema } from "../lib/form-schemas";
+import { followUpPlanFormSchema } from "../lib/follow-up/form-schemas";
 
 const scenarios = [
   ["quote_sent_unread", "wait_then_reference_quote_validity", false, false],

@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
 
+import {
+  videoAspectRatioSchema,
+  videoCapabilitySchema,
+  videoProviderIdSchema,
+} from "../lib/video/provider-capabilities";
+import { videoProviderModelSettingsFormSchema } from "../lib/video/provider-form-schemas";
 import { videoJobIdempotencyKey, videoJobSubmissionSchema } from "../lib/video/submission";
 
 const input = videoJobSubmissionSchema.parse({
@@ -12,6 +18,17 @@ const input = videoJobSubmissionSchema.parse({
   resolution: "1080x1920",
   expectedCostCents: 300,
 });
+for (const provider of videoProviderIdSchema.options) {
+  assert.equal(videoProviderModelSettingsFormSchema.shape.provider.parse(provider), provider);
+  assert.equal(videoJobSubmissionSchema.parse({ ...input, provider }).provider, provider);
+}
+for (const aspectRatio of videoAspectRatioSchema.options)
+  assert.equal(videoJobSubmissionSchema.parse({ ...input, aspectRatio }).aspectRatio, aspectRatio);
+assert.deepEqual(
+  videoJobSubmissionSchema.parse({ ...input, requiredCapabilities: videoCapabilitySchema.options })
+    .requiredCapabilities,
+  videoCapabilitySchema.options,
+);
 assert.equal(
   videoJobIdempotencyKey(input),
   videoJobIdempotencyKey({ ...input, requiredCapabilities: ["text-to-video"] }),

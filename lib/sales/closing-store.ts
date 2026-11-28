@@ -23,26 +23,24 @@ import {
   requestDeliveryConfirmation,
   validateDeliveryConfirmation,
 } from "@/lib/delivery/confirmation";
+import { deliveryDecisionFormSchema, deliveryRequestFormSchema } from "@/lib/delivery/form-schemas";
 import { DELIVERY_CONFIRMATION_VALIDITY_MS } from "@/lib/delivery/validity";
 import { needsDeliveryConfirmation, nextFollowUp } from "@/lib/follow-up/cadence";
 import { buildControlledReply } from "@/lib/follow-up/controlled-reply";
+import { followUpFormSchema, followUpPlanFormSchema } from "@/lib/follow-up/form-schemas";
 import { scoreLead } from "@/lib/follow-up/lead-scoring";
 import {
-  deliveryDecisionFormSchema,
-  deliveryRequestFormSchema,
-  followUpFormSchema,
-  followUpPlanFormSchema,
-  opportunityDecisionFormSchema,
   quotationDecisionFormSchema,
   quotationDraftFormSchema,
   quotationSendFormSchema,
-} from "@/lib/form-schemas";
+} from "@/lib/quotation/form-schemas";
 import {
   applyHumanQuoteDecision,
   createManualQuotation,
   type QuotationHandoff,
   sendManualQuotation,
 } from "@/lib/quotation/handoff";
+import { opportunityDecisionFormSchema } from "@/lib/sales/opportunity-form-schema";
 import {
   assertSocialAuthorizationAlive,
   parseSocialProjectIdentity,

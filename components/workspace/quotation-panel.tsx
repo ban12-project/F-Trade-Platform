@@ -50,7 +50,7 @@ import {
   quotationDecisionFormSchema,
   quotationDraftFormSchema,
   quotationSendFormSchema,
-} from "@/lib/form-schemas";
+} from "@/lib/quotation/form-schemas";
 import { rfqCustomerRequirements } from "@/lib/rfq/customer-requirements";
 import type { QuotationEntry } from "@/lib/sales/closing-store";
 import { productTypeLabel } from "@/lib/sales/journey";

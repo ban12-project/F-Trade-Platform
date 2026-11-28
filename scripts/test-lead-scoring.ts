@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import leadContract from "../contracts/sales/lead.schema.json";
+import { followUpFormSchema } from "../lib/follow-up/form-schemas";
 import { firstHotScore, scoreLead } from "../lib/follow-up/lead-scoring";
-import { followUpFormSchema } from "../lib/form-schemas";
 
 const weights = {
   active_inquiry: 20,

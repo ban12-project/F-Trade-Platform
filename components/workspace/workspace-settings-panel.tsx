@@ -53,9 +53,10 @@ import { initialAgentSettingsActionState, initialInvitationActionState } from "@
 import { saveProductAgentModelSettingsAction } from "@/lib/actions/agent-settings";
 import { createInvitationAction } from "@/lib/actions/invitations";
 import { modelProviderSchema, providerLabels } from "@/lib/ai/model-provider-schema";
+import { productAgentModelSettingsSchema } from "@/lib/ai/model-settings-form-schema";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
 import { authClient } from "@/lib/auth-client";
-import { invitationFormSchema, productAgentModelSettingsSchema } from "@/lib/form-schemas";
+import { invitationFormSchema } from "@/lib/auth-form-schemas";
 import { BrowserNodesPanel } from "./browser-nodes-panel";
 import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
 import { FacebookAccountPanel } from "./facebook-account-panel";

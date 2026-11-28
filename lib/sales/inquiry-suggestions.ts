@@ -10,7 +10,10 @@ import {
   workspaceProject,
   workspaceProjectItem,
 } from "@/lib/db/schema";
-import { inquirySuggestionFieldsSchema, inquirySuggestionRequestSchema } from "@/lib/form-schemas";
+import {
+  inquirySuggestionFieldsSchema,
+  inquirySuggestionRequestSchema,
+} from "@/lib/rfq/form-schemas";
 import { decryptSocialMessageBody } from "@/lib/social/message-crypto";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { INQUIRY_HISTORY_LIMIT, summarizeInquiryMessages } from "./inquiry-history";

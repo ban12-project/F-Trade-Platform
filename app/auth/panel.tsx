@@ -13,8 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { provisionInvitedUserAction } from "@/lib/actions/invitations";
 import { authClient } from "@/lib/auth-client";
+import { authFormSchema } from "@/lib/auth-form-schemas";
 import { workspaceSignInTarget } from "@/lib/auth-navigation";
-import { authFormSchema } from "@/lib/form-schemas";
 
 type AuthAction = "sendOtp" | "verifyOtp" | "passkey";
 

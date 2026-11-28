@@ -11,7 +11,7 @@ import {
   workspaceProject,
   workspaceProjectItem,
 } from "@/lib/db/schema";
-import type { productReviewFormSchema } from "@/lib/form-schemas";
+import type { productReviewFormSchema } from "@/lib/product/agent-review-forms";
 import {
   authorizeLockedProductAgentWrite,
   type ProductAgentWriteIdentity,

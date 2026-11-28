@@ -5,7 +5,7 @@ import {
   requestDeliveryConfirmation,
   validateDeliveryConfirmation,
 } from "../lib/delivery/confirmation";
-import { deliveryDecisionFormSchema } from "../lib/form-schemas";
+import { deliveryDecisionFormSchema } from "../lib/delivery/form-schemas";
 
 const decisionInput = {
   projectId: "00000000-0000-4000-8000-000000000001",

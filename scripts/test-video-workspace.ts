@@ -1,48 +1,15 @@
 import assert from "node:assert/strict";
-
-import { videoProjectDraftFormSchema } from "../lib/form-schemas";
 import {
   createMarketingVideoDraftFormSchema,
   createMarketingVideoFromProductMediaSchema,
 } from "../lib/video/edit-contracts";
 
-const valid = {
+const marketingBase = {
+  projectId: "00000000-0000-4000-8000-000000000510",
   productId: "00000000-0000-4000-8000-000000000501",
   factPath: "product.product_name",
   objective: "Introduce a verified synthetic product",
   targetAudience: "Synthetic distributor",
-  scenePrompt: "Show the rights-cleared product image without extra claims.",
-  durationSeconds: "5",
-  platforms: ["youtube", "tiktok"],
-  assetRef: "asset-product-501",
-  rightsEvidenceRef: "evidence-rights-501",
-};
-
-assert.equal(videoProjectDraftFormSchema.parse(valid).durationSeconds, 5);
-assert.equal(
-  videoProjectDraftFormSchema.parse({ ...valid, assetRef: "", rightsEvidenceRef: "" }).assetRef,
-  "",
-);
-assert.throws(
-  () => videoProjectDraftFormSchema.parse({ ...valid, factPath: "engineering.oe_number" }),
-  /已核验/,
-);
-assert.throws(() => videoProjectDraftFormSchema.parse({ ...valid, platforms: [] }), /至少选择/);
-assert.throws(
-  () => videoProjectDraftFormSchema.parse({ ...valid, assetRef: "https://example.com/image.png" }),
-  /私有素材/,
-);
-assert.throws(
-  () => videoProjectDraftFormSchema.parse({ ...valid, rightsEvidenceRef: "" }),
-  /权利证据/,
-);
-
-const marketingBase = {
-  projectId: "00000000-0000-4000-8000-000000000510",
-  productId: valid.productId,
-  factPath: valid.factPath,
-  objective: valid.objective,
-  targetAudience: valid.targetAudience,
   platform: "facebook" as const,
 };
 const upload = createMarketingVideoDraftFormSchema.parse({
@@ -50,6 +17,15 @@ const upload = createMarketingVideoDraftFormSchema.parse({
   rightsEvidenceRef: "evidence-rights-501",
 });
 assert.equal(upload.rightsEvidenceRef, "evidence-rights-501");
+assert.equal(
+  createMarketingVideoDraftFormSchema.safeParse({ ...upload, factPath: "engineering.oe_number" })
+    .success,
+  false,
+);
+assert.equal(
+  createMarketingVideoDraftFormSchema.safeParse({ ...upload, platform: "unsupported" }).success,
+  false,
+);
 assert.throws(
   () =>
     createMarketingVideoDraftFormSchema.parse({

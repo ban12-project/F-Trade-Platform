@@ -8,7 +8,7 @@ import { Pool } from "pg";
 import type { z } from "zod";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as s from "../lib/db/schema";
-import type { followUpFormSchema } from "../lib/form-schemas";
+import type { followUpFormSchema } from "../lib/follow-up/form-schemas";
 import {
   SocialHumanAccessError,
   type SocialProjectIdentity,

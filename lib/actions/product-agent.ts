@@ -7,7 +7,7 @@ import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary
 
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
-import { productAgentRunFormSchema } from "@/lib/form-schemas";
+import { productAgentRunFormSchema } from "@/lib/product/agent-review-forms";
 import { assertProductAgentWriteAccess } from "@/lib/product/agent-write-access";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";

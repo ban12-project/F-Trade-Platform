@@ -3,8 +3,8 @@ import { ZodError } from "zod";
 import draftSchema from "../contracts/sales/rfq-draft.schema.json";
 import readySchema from "../contracts/sales/rfq-ready.schema.json";
 import { compileContract } from "../lib/contracts/validator";
-import { inquirySuggestionFieldsSchema, rfqFormSchema } from "../lib/form-schemas";
 import { assessRfq, promoteRfqReady, updateRfqDraft } from "../lib/rfq/completeness";
+import { inquirySuggestionFieldsSchema, rfqFormSchema } from "../lib/rfq/form-schemas";
 import { createRfq, reviseRfq } from "../lib/sales/store";
 
 const draft = {

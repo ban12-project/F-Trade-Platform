@@ -1,7 +1,7 @@
 "use server";
 import { actionError, authorizedActionSession } from "@/lib/action-boundary";
 
-import { invitationFormSchema } from "@/lib/form-schemas";
+import { invitationFormSchema } from "@/lib/auth-form-schemas";
 import { issueInvitation, provisionInvitedUser } from "@/lib/invitations";
 
 export type InvitationActionState = {

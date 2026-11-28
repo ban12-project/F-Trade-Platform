@@ -56,6 +56,12 @@ flowchart LR
 | 浏览器任务与会话 | `lib/browser-fleet/` 管理租约、工作流调度、回执和恢复；`ops/browser-node/` 承接浏览器执行 | HTTP 与持久工作流是跨进程边界。计算任务与常驻浏览器分别使用独立运行时，见 `vercel-compute-return.md` |
 | 身份、缓存与审计 | Better Auth 提供会话，`lib/authz.ts` 提供权限，`lib/action-boundary.ts` 处理 Action 身份和刷新；产品和内容写入在领域事务中追加审计事件 | 数据库是持久状态来源。页面、客户端表单和 Next 缓存是读写界面。PostgreSQL 的事务和锁需要数据库集成测试 |
 
+## #1164 表单规则归属
+
+旧的 `lib/form-schemas.ts` 汇集登录、产品、内容、销售与视频校验；登录入口经它依赖报价、计分和产品图片契约。业务表单现按所属领域直接导入，登录与邀请只依赖身份表单及 Zod。源资料或证据引用的共同规则归属 `lib/evidence/form-reference.ts`。视频设置与任务提交共用能力目录，剪辑、导出和发布配置共用平台值域；各平台能否实际发布仍由对应策略决定。
+
+仓内无调用方的视频项目表单已删除。单场景视频草稿表单的生产 Action 已在 `8eda77c` 移除，其孤立测试已迁至现用创建入口，保留权利、已核实字段与平台的拒绝场景。27 个在用 schema 的 432 组迁移前后比较覆盖解析结果、输出和错误路径与消息。视频供应商、能力、画幅的一致性另有 CI 回归。本批没有更改视频脚本、素材选择、品牌、CTA 或平台规则，营销视频创意审查不适用。
+
 ## #1154 脚本类型检查
 
 基线配置逐项列出 15 个脚本。扩展检查到全部已跟踪的 64 个 `.mts` 文件后，14 个文件暴露 28 条诊断。项目改用 `**/*.mts` 并在现有 noEmit 配置下允许显式 TypeScript 扩展名，使 Node 与模块模拟器继续使用同一模块标识。现有 PR 类型检查会自动纳入以后新增的脚本。
@@ -66,7 +72,7 @@ flowchart LR
 
 | 修改范围 | 运行时所有权与验证入口 |
 | --- | --- |
-| 工作区列表与页面刷新 | `lib/workspace/read-model.ts` 使用 React cache 合并同次服务端渲染的读取。项目列表与任务查询使用参与者标识，设置管理页由 canManage 控制读取；产品创建页也在项目写入权限检查后读取模型配置。写入方通过 `revalidatePath` 刷新对应界面。核对调用方的刷新范围及项目页回填行为。 |
+| 工作区列表与页面刷新 | `lib/workspace/read-model.ts` 使用 React cache 合并同次服务端渲染的读取。项目列表与任务查询使用参与者标识，设置管理页由 canManage 控制读取；产品创建页在项目写入权限检查后只读取 #1161 的五个模型选择字段。写入方通过 `revalidatePath` 刷新对应界面。核对调用方的刷新范围及项目页回填行为。 |
 | 上传与私有证据 | `lib/evidence/store.ts` 定义对象读写接口，`vercel-private-blob.ts` 管理真实对象，`memory-store.ts` 提供内存实现。上传、数据库关联和清理涉及两个持久系统，核对 `persist-upload.ts`、`upload-reconciliation.ts` 和实际上传事务测试。 |
 | 任务与计算 | `workflows/` 有目录导入、视频、浏览器和人工门禁入口。计算运行时按配置选择 Vercel 或 VPS；服务端协议由 `ops/vps-runtime/` 实现。镜像、传输和容量测试分别验证不同边界。运行时选择及重试限制见[计算运行时决策](vercel-compute-return.md)。 |
 | 业务审计与运行诊断 | 产品和内容存储在同一 PostgreSQL 事务内写业务记录与 auditEvent。产品流的请求诊断由 `lib/product/intake-diagnostics.ts` 管理，真实 Action 回归覆盖私有错误脱敏。基线中的 `lib/audit/append.ts` 只有两个导出，库内未找到调用方；不可用该模块推断事务审计覆盖率。 |

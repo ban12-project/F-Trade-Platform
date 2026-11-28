@@ -1,7 +1,7 @@
 "use server";
 
 import { authorizedActionSession } from "@/lib/action-boundary";
-import { inboundContextRequestSchema } from "@/lib/form-schemas";
+import { inboundContextRequestSchema } from "@/lib/social/form-schemas";
 import { SocialHumanAccessError } from "@/lib/social/human-write-access";
 import { type InboundContextPreview, readInboundContext } from "@/lib/social/inbound-context-store";
 

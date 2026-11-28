@@ -6,9 +6,9 @@ import deliveryFixture from "../data/fixtures/delivery-confirmation.synthetic.js
 import rfqFixture from "../data/fixtures/rfq-ready.synthetic.json";
 import { closeDatabase, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
-import { rfqFormSchema } from "../lib/form-schemas";
 import { promoteRfqReady } from "../lib/rfq/completeness";
 import { rfqCustomerRequirements } from "../lib/rfq/customer-requirements";
+import { rfqFormSchema } from "../lib/rfq/form-schemas";
 import { listProjectLeads, saveFollowUpPlan } from "../lib/sales/closing-store";
 import { suggestFromInquiryHistory } from "../lib/sales/inquiry-suggestions";
 import { salesRelations } from "../lib/sales/journey";

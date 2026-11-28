@@ -55,8 +55,8 @@ import {
   type ContentAgentActionState,
   generateContentDraftAction,
 } from "@/lib/actions/content-agent";
+import { contentAgentRequestSchema, contentDraftFormSchema } from "@/lib/content/form-schemas";
 import type { ContentCatalogDetail, ReadyProductContentSource } from "@/lib/content/store";
-import { contentAgentRequestSchema, contentDraftFormSchema } from "@/lib/form-schemas";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
 import { MarkdownContent } from "./markdown-content";

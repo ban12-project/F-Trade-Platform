@@ -13,8 +13,8 @@ import {
   workspaceProjectItem,
   workspaceProjectMember,
 } from "../lib/db/schema";
-import { rfqFormSchema } from "../lib/form-schemas";
 import { decideProductCatalogReview } from "../lib/products";
+import { rfqFormSchema } from "../lib/rfq/form-schemas";
 import { createRfq, listProjectRfqEntries, reviseRfq } from "../lib/sales/store";
 import {
   completeVideoJob,

@@ -19,7 +19,7 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { initialSalesActionState } from "@/lib/action-states";
 import { submitRfqReadyAction } from "@/lib/actions/sales";
-import { rfqReadyFormSchema } from "@/lib/form-schemas";
+import { rfqReadyFormSchema } from "@/lib/rfq/form-schemas";
 import { rfqMissingLabel } from "@/lib/sales/journey";
 import type { RfqEntry } from "@/lib/sales/store";
 import { useWorkspaceDirty } from "./dirty-state";

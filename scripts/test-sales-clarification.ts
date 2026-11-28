@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
+import { promoteRfqReady } from "../lib/rfq/completeness";
 import {
   inquirySuggestionFieldsSchema,
   inquirySuggestionRequestSchema,
   rfqFormSchema,
-} from "../lib/form-schemas";
-import { promoteRfqReady } from "../lib/rfq/completeness";
+} from "../lib/rfq/form-schemas";
 import {
   applyInquiryMessage,
   assertNoAgentQuotation,

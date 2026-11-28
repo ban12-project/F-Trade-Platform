@@ -4,12 +4,13 @@ import {
   createProductAgentModel,
   validateProductAgentModelConfig,
 } from "../../lib/ai/model-provider";
-import { productAgentModelSettingsSchema, productAgentRunFormSchema } from "../../lib/form-schemas";
+import { productAgentModelSettingsSchema } from "../../lib/ai/model-settings-form-schema";
 import {
   finalizeProductAgentDraft,
   type ProductAgentSource,
   validateProductAgentSource,
 } from "../../lib/product/agent";
+import { productAgentRunFormSchema } from "../../lib/product/agent-review-forms";
 import { discoverCatalogCandidates } from "../../lib/product/catalog-candidates";
 
 const source: ProductAgentSource = {

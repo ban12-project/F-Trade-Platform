@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 
-import { productReviewFormSchema } from "@/lib/form-schemas";
+import { productReviewFormSchema } from "@/lib/product/agent-review-forms";
 import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
 import { claimProductImageEvidenceRefs } from "@/lib/product/claimed-source-images";
 import {

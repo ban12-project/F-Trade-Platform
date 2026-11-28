@@ -45,12 +45,12 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { initialSalesActionState } from "@/lib/action-states";
 import { createRfqAction, reviseRfqAction, suggestInquiryAction } from "@/lib/actions/sales";
-import { inquirySuggestionRequestSchema, rfqFormSchema } from "@/lib/form-schemas";
 import { updateRfqDraft } from "@/lib/rfq/assessment";
 import {
   readRfqCustomerRequirements,
   rfqCustomerRequirements,
 } from "@/lib/rfq/customer-requirements";
+import { inquirySuggestionRequestSchema, rfqFormSchema } from "@/lib/rfq/form-schemas";
 import { nextClarification } from "@/lib/sales/clarification";
 import type { LeadEntry } from "@/lib/sales/closing-store";
 import { type InquiryField, inquiryFieldLabels } from "@/lib/sales/inquiry-history";
