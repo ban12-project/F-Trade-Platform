@@ -88,7 +88,7 @@ export async function authorizeSocialProject(
       and(
         eq(workspaceProjectMember.projectId, identity.projectId),
         eq(workspaceProjectMember.userId, identity.actorId),
-        inArray(workspaceProjectMember.role, memberRolesForAccess.write),
+        inArray(workspaceProjectMember.role, memberRolesForAccess[access]),
       ),
     )
     .for("share");
