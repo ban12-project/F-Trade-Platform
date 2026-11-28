@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-
 import { and, eq, gt } from "drizzle-orm";
+import { UserFacingError } from "@/lib/user-facing-error";
 
 import { sendInvitationEmail } from "./auth-email";
 import { getDatabase } from "./db/client";
@@ -11,7 +11,8 @@ const INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 
 function normalizeEmail(value: string) {
   const email = value.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("A valid email is required");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    throw new UserFacingError("A valid email is required");
   return email;
 }
 
@@ -33,7 +34,7 @@ export async function issueInvitation(input: { email: string; invitedBy: string 
     .from(user)
     .where(eq(user.email, email))
     .limit(1);
-  if (existing) throw new Error("This email already has an account");
+  if (existing) throw new UserFacingError("This email already has an account");
 
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + INVITATION_LIFETIME_MS);
@@ -63,7 +64,7 @@ export async function issueInvitation(input: { email: string; invitedBy: string 
 
 export async function provisionInvitedUser(input: { email: string; token: string }) {
   const email = normalizeEmail(input.email);
-  if (!input.token || input.token.length < 32) throw new Error("Invalid invitation");
+  if (!input.token || input.token.length < 32) throw new UserFacingError("Invalid invitation");
   const database = getDatabase();
   const now = new Date();
 
@@ -80,14 +81,14 @@ export async function provisionInvitedUser(input: { email: string; token: string
         ),
       )
       .limit(1);
-    if (!matched) throw new Error("Invitation is invalid, expired, or already used");
+    if (!matched) throw new UserFacingError("Invitation is invalid, expired, or already used");
 
     const [existing] = await tx
       .select({ id: user.id })
       .from(user)
       .where(eq(user.email, email))
       .limit(1);
-    if (existing) throw new Error("Invitation has already been activated");
+    if (existing) throw new UserFacingError("Invitation has already been activated");
 
     await tx.insert(user).values({
       id: randomUUID(),

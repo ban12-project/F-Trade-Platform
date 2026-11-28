@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/lib/user-facing-error";
 import quotationHandoffSchema from "../../contracts/sales/quotation-handoff.schema.json";
 import { compileContract } from "../contracts/validator";
 import type { ActorType } from "../workflow/vocabulary";
@@ -51,18 +52,18 @@ function validateQuotation(value: QuotationHandoff) {
     result.quote.validity &&
     quotationValidityDays(result.quote.validity) !== result.quote.validity_days
   )
-    throw new Error("报价有效天数必须与人工确认的起止日期一致（包含首尾日期）。");
+    throw new UserFacingError("报价有效天数必须与人工确认的起止日期一致（包含首尾日期）。");
   return result;
 }
 
 function assertNonEmpty(value: string, name: string) {
-  if (!value.trim()) throw new Error(`Quotation handoff requires ${name}`);
+  if (!value.trim()) throw new UserFacingError(`Quotation handoff requires ${name}`);
 }
 
 /** Creates a private quotation handoff. Agents and systems cannot author price terms. */
 export function createManualQuotation(input: ManualQuotationInput): QuotationHandoff {
   if (input.actorType !== "human") {
-    throw new Error("Only a human actor can create a formal quotation");
+    throw new UserFacingError("Only a human actor can create a formal quotation");
   }
   assertNonEmpty(input.handoffId, "handoffId");
   assertNonEmpty(input.rfqId, "rfqId");
@@ -83,12 +84,12 @@ export function applyHumanQuoteDecision(
   decision: HumanQuoteDecision,
 ): QuotationHandoff {
   if (quotation.status !== "review_required") {
-    throw new Error("Only a quotation awaiting review can receive a Gate 02 decision");
+    throw new UserFacingError("Only a quotation awaiting review can receive a Gate 02 decision");
   }
   if (decision.actorType !== "human") {
-    throw new Error("Gate 02 decisions require a human actor");
+    throw new UserFacingError("Gate 02 decisions require a human actor");
   }
-  for (const [value, name] of Object.entries({
+  for (const [name, value] of Object.entries({
     actorId: decision.actorId,
     approvalRef: decision.approvalRef,
     evidenceRef: decision.evidenceRef,
@@ -96,7 +97,7 @@ export function applyHumanQuoteDecision(
     assertNonEmpty(value, name);
   }
   if (Number.isNaN(Date.parse(decision.decidedAt))) {
-    throw new Error("Gate 02 decisions require an ISO date-time");
+    throw new UserFacingError("Gate 02 decisions require an ISO date-time");
   }
   return validateQuotation({
     ...quotation,
@@ -114,15 +115,15 @@ export function sendManualQuotation(
   sentChannel: string,
   sentRef: string,
 ): QuotationHandoff {
-  if (actorType !== "human") throw new Error("An agent cannot send a formal quotation");
+  if (actorType !== "human") throw new UserFacingError("An agent cannot send a formal quotation");
   if (quotation.status !== "approved" || !quotation.approval_ref) {
-    throw new Error("Only a Gate 02-approved quotation can be sent");
+    throw new UserFacingError("Only a Gate 02-approved quotation can be sent");
   }
   assertNonEmpty(actorId, "actorId");
   assertNonEmpty(sentChannel, "sentChannel");
   assertNonEmpty(sentRef, "sentRef");
   if (Number.isNaN(Date.parse(sentAt)))
-    throw new Error("Quotation send time must be an ISO date-time");
+    throw new UserFacingError("Quotation send time must be an ISO date-time");
   return validateQuotation({
     ...quotation,
     status: "sent",

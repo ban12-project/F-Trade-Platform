@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
-
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
-
 import { type DatabaseExecutor, getDatabase } from "@/lib/db/client";
 import {
   auditEvent,
@@ -15,6 +13,7 @@ import {
   workspaceProjectItem,
   workspaceProjectMember,
 } from "@/lib/db/schema";
+import { UserFacingError } from "@/lib/user-facing-error";
 import { assertVideoWorkingEvidenceRetained } from "@/lib/video/retention-access";
 import {
   assertVideoObjectRetained,
@@ -63,9 +62,9 @@ export async function assertWorkspaceProjectAccess(
       .from(workspaceProject)
       .where(eq(workspaceProject.id, projectId))
       .for("update");
-    if (!project) throw new Error("项目不存在。");
+    if (!project) throw new UserFacingError("项目不存在。");
     if (access === "write" && project.status !== "active")
-      throw new Error("项目已归档，请重开后再写入业务资料。");
+      throw new UserFacingError("项目已归档，请重开后再写入业务资料。");
   }
   const allowedRoles: WorkspaceMemberRole[] =
     access === "manage"
@@ -84,7 +83,7 @@ export async function assertWorkspaceProjectAccess(
       ),
     );
   if (!membership)
-    throw new Error(
+    throw new UserFacingError(
       access === "view"
         ? "你不是该项目成员。"
         : access === "write" || access === "receipt"
@@ -127,7 +126,7 @@ export async function upsertWorkspaceProjectMember(
       .where(eq(workspaceProject.id, value.projectId))
       .for("update");
     const [target] = await tx.select({ id: user.id }).from(user).where(eq(user.email, value.email));
-    if (!target) throw new Error("该邮箱尚未注册，不能加入项目。");
+    if (!target) throw new UserFacingError("该邮箱尚未注册，不能加入项目。");
     const [currentTarget] = await tx
       .select({ role: workspaceProjectMember.role })
       .from(workspaceProjectMember)
@@ -148,7 +147,7 @@ export async function upsertWorkspaceProjectMember(
           ),
         );
       if (owners.length === 1)
-        throw new Error("项目必须至少保留一名所有者。请先添加另一名所有者。");
+        throw new UserFacingError("项目必须至少保留一名所有者。请先添加另一名所有者。");
     }
     const [saved] = await tx
       .insert(workspaceProjectMember)
@@ -200,7 +199,7 @@ export async function removeWorkspaceProjectMember(
         ),
       )
       .for("update");
-    if (!target) throw new Error("该成员已不在项目中。");
+    if (!target) throw new UserFacingError("该成员已不在项目中。");
     if (target.role === "owner") {
       const owners = await tx
         .select({ id: workspaceProjectMember.id })
@@ -213,7 +212,7 @@ export async function removeWorkspaceProjectMember(
         )
         .for("update");
       if (owners.length === 1)
-        throw new Error("不能移除项目最后一名所有者。请先指定另一名所有者。");
+        throw new UserFacingError("不能移除项目最后一名所有者。请先指定另一名所有者。");
     }
     await tx.delete(workspaceProjectMember).where(eq(workspaceProjectMember.id, target.id));
     await tx.insert(auditEvent).values({
@@ -297,7 +296,7 @@ export async function assertAndLinkProjectEvidence(
 ) {
   return database.transaction(async (tx) => {
     const uniqueIds = [...new Set(evidenceIds.filter(Boolean))];
-    if (!uniqueIds.length) throw new Error("至少需要一项已持久化证据。");
+    if (!uniqueIds.length) throw new UserFacingError("至少需要一项已持久化证据。");
     await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
     const rows = await tx
       .select({
@@ -326,10 +325,13 @@ export async function assertAndLinkProjectEvidence(
       .from(videoReviewWorkingEvidence)
       .where(inArray(videoReviewWorkingEvidence.evidenceId, uniqueIds));
     if (reviewCopies.some((copy) => copy.videoId !== reviewVideoId))
-      throw new Error("视频审核工作副本只能用于所属视频审核，不能作为工厂资料或其他业务证据。");
+      throw new UserFacingError(
+        "视频审核工作副本只能用于所属视频审核，不能作为工厂资料或其他业务证据。",
+      );
     await assertVideoWorkingEvidenceRetained(tx, uniqueIds);
     for (const row of rows) {
-      if (row.blobKey.startsWith("retired/")) throw new Error("部分证据不存在或无权用于当前项目。");
+      if (row.blobKey.startsWith("retired/"))
+        throw new UserFacingError("部分证据不存在或无权用于当前项目。");
       if (isVideoWorkingEvidence(row.sourceLabel)) assertVideoObjectRetained(row.createdAt);
     }
     const allowed = new Set(
@@ -342,7 +344,7 @@ export async function assertAndLinkProjectEvidence(
         .map((row) => row.id),
     );
     const missing = uniqueIds.filter((id) => !allowed.has(id));
-    if (missing.length) throw new Error("部分证据不存在或无权用于当前项目。");
+    if (missing.length) throw new UserFacingError("部分证据不存在或无权用于当前项目。");
     await tx
       .insert(workspaceProjectEvidence)
       .values(
@@ -377,7 +379,8 @@ export async function assertActiveWorkspaceProject(projectId: string, database: 
     .from(workspaceProject)
     .where(eq(workspaceProject.id, projectId))
     .for("update");
-  if (project?.status !== "active") throw new Error("项目已归档，请重开后再写入业务资料。");
+  if (project?.status !== "active")
+    throw new UserFacingError("项目已归档，请重开后再写入业务资料。");
 }
 
 /** Freeze mutations of owned aggregates; reference projects do not own their source facts.

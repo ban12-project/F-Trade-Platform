@@ -2,6 +2,7 @@ import { type AnthropicProviderSettings, createAnthropic } from "@ai-sdk/anthrop
 import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderSettings } from "@ai-sdk/google";
 import { createOpenAI, type OpenAIProviderSettings } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
+import { UserFacingError } from "../user-facing-error";
 import { type ProductOutputMode, registerProductOutputPolicy } from "./product-output-policy";
 
 export type SupportedModelProvider = "openai" | "anthropic" | "google" | "openai-compatible";
@@ -33,15 +34,21 @@ export function validateProductAgentModelConfig(config: ProductAgentModelConfig)
     headers?: Record<string, string | undefined>;
   };
   if (config.provider === "openai-compatible" && !options.baseURL) {
-    throw new Error("Saved OpenAI-compatible provider requires a Base URL");
+    throw new UserFacingError("Saved OpenAI-compatible provider requires a Base URL");
   }
   if (config.provider === "anthropic") {
     if (!options.apiKey && !options.authToken && !hasAuthenticationHeader(options.headers)) {
-      throw new Error("Saved Anthropic provider requires an API key or Auth token");
+      throw new UserFacingError("Saved Anthropic provider requires an API key or Auth token");
     }
     return;
   }
   if (!options.apiKey && !hasAuthenticationHeader(options.headers)) {
+    if (
+      config.provider === "google" ||
+      config.provider === "openai" ||
+      config.provider === "openai-compatible"
+    )
+      throw new UserFacingError(`Saved ${config.provider} provider requires an API key`);
     throw new Error(`Saved ${config.provider} provider requires an API key`);
   }
 }

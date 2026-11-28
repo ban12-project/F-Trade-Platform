@@ -52,7 +52,7 @@ flowchart LR
 | 待验证：跟进上下文 | `cadence.ts`、`controlled-reply.ts`、`form-schemas.ts`、工作台选项与 lead 交换契约都列出六个上下文 | 核对外部协议，保留已存上下文和 Gate 03 检查，评估能否从既有交换契约派生值域。下一步动作与上下文应独立建模 |
 | 待验证：工作流词汇 | `lib/db/schema.ts`、`lib/workflow/transitions.ts` 和 `contracts/workflow/` 分别声明 actor、聚合和门禁 | 比较枚举成员、数据库排序、历史迁移与外部契约。先取证再决定由类型派生或用一致性测试约束 |
 | 已排查：静态环 | 多文件强连通分量共四组：record-page 与两个记录视图，AI model-provider 与 product-output-policy，workspace types 与 navigation，task-context 与 task-model | 各组至少一条必要回边为显式类型导入。当前扫描没有发现可由这些边形成的运行时循环。后续门禁需要识别值导入、类型导入及重导出 |
-| 待核查：错误与重试 | 公共 `actionError` 将 Error.message 返回调用方；内容、视频等 Action 另有针对用户消息及隐私的测试。计算失败有明确的提供商选择约束 | 沿调用源区分领域错误、远端失败和私有诊断，再评估共享处理的范围。测试用户可见字段、诊断和副作用的重试语义 |
+| #1152 已治理共享错误边界；重试继续按服务核查 | 基线中的公共 `actionError` 将 Error.message 返回调用方；内容、视频等 Action 另有针对用户消息及隐私的测试。计算失败有明确的提供商选择约束 | 共享入口只展示标记为可公开的业务消息，输入校验在请求边界给出提示。真实 Action 回归覆盖含参数的数据库异常、内部校验与诊断改写。后续按不同服务核查副作用的重试语义 |
 | 持续审查：工具与基础设施 | 当前门禁分布在 package scripts、仓库校验脚本及多个 CI workflow | 改动测试清单时核对实际执行命令、条件和数据库前提；独立验收未执行的项目保持待验证 |
 
 本批涉及架构文档与线索评分数据来源，未触及视频素材、脚本、品牌或导出内容，营销视频 ABCD 创意审查不适用。

@@ -15,6 +15,7 @@ import {
   readRfqCustomerRequirements,
   writeRfqCustomerRequirements,
 } from "@/lib/rfq/customer-requirements";
+import { UserFacingError } from "@/lib/user-facing-error";
 import { assertTransition } from "@/lib/workflow/transitions";
 import {
   assertAggregateWorkspaceWrite,
@@ -126,7 +127,7 @@ export async function createRfq(rawInput: RfqFormInput, actorId: string, project
         .from(workspaceProject)
         .where(eq(workspaceProject.id, projectId))
         .for("update");
-      if (project?.kind !== "sales") throw new Error("询盘只能关联到销售机会项目。");
+      if (project?.kind !== "sales") throw new UserFacingError("询盘只能关联到销售机会项目。");
       if (input.leadId) {
         const [lead] = await tx
           .select({ id: aggregateRecord.id })
@@ -141,7 +142,8 @@ export async function createRfq(rawInput: RfqFormInput, actorId: string, project
             ),
           )
           .for("update");
-        if (!lead) throw new Error("只能为当前项目中尚未进入报价流程的入站线索录入 RFQ。");
+        if (!lead)
+          throw new UserFacingError("只能为当前项目中尚未进入报价流程的入站线索录入 RFQ。");
       }
     }
     await tx.insert(aggregateRecord).values({
@@ -231,7 +233,7 @@ export async function reviseRfq(
             eq(workspaceProjectItem.aggregateId, rfqId),
           ),
         );
-      if (!link) throw new Error("该 RFQ 不属于当前销售项目。");
+      if (!link) throw new UserFacingError("该 RFQ 不属于当前销售项目。");
     }
     const [record] = await tx
       .select({
@@ -243,14 +245,15 @@ export async function reviseRfq(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.type, "rfq")))
       .for("update");
-    if (record?.state !== "RFQ_COLLECTING") throw new Error("只有收集中的 RFQ 可以补充资料。");
+    if (record?.state !== "RFQ_COLLECTING")
+      throw new UserFacingError("只有收集中的 RFQ 可以补充资料。");
     const draft = rfqFromInput(input, rfqId, record.payload);
     const [updated] = await tx
       .update(aggregateRecord)
       .set({ payload: draft, version: sql`${aggregateRecord.version} + 1` })
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.version, record.version)))
       .returning({ id: aggregateRecord.id });
-    if (!updated) throw new Error("RFQ 已被其他操作更新，请刷新后重试。");
+    if (!updated) throw new UserFacingError("RFQ 已被其他操作更新，请刷新后重试。");
     await tx.insert(auditEvent).values({
       id: randomUUID(),
       action: "rfq_collecting_revised",
@@ -292,7 +295,7 @@ export async function submitRfqReady(
             eq(workspaceProjectItem.aggregateId, rfqId),
           ),
         );
-      if (!link) throw new Error("该 RFQ 不属于当前销售项目。");
+      if (!link) throw new UserFacingError("该 RFQ 不属于当前销售项目。");
     }
     const [record] = await tx
       .select({
@@ -304,7 +307,8 @@ export async function submitRfqReady(
       .from(aggregateRecord)
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.type, "rfq")))
       .for("update");
-    if (record?.state !== "RFQ_COLLECTING") throw new Error("该 RFQ 当前不处于信息收集状态。");
+    if (record?.state !== "RFQ_COLLECTING")
+      throw new UserFacingError("该 RFQ 当前不处于信息收集状态。");
     const assessment = assessRfq(record.payload);
     if (!assessment.ready)
       return { state: "RFQ_COLLECTING" as const, missingFields: assessment.missing_fields };
@@ -325,7 +329,7 @@ export async function submitRfqReady(
       .set({ state: "RFQ_READY", payload: ready, version: sql`${aggregateRecord.version} + 1` })
       .where(and(eq(aggregateRecord.id, rfqId), eq(aggregateRecord.version, record.version)))
       .returning({ id: aggregateRecord.id });
-    if (!updated) throw new Error("RFQ 已被其他操作更新，请刷新后重试。");
+    if (!updated) throw new UserFacingError("RFQ 已被其他操作更新，请刷新后重试。");
     await tx.insert(workflowEvent).values({
       id: eventId,
       aggregateId: rfqId,

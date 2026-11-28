@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/lib/user-facing-error";
 import deliverySchema from "../../contracts/sales/delivery-confirmation.schema.json";
 import { compileContract } from "../contracts/validator";
 import type { ActorType } from "../workflow/vocabulary";
@@ -25,7 +26,7 @@ export type DeliveryConfirmation = {
 export const validateDeliveryConfirmation = compileContract<DeliveryConfirmation>(deliverySchema);
 
 function nonEmpty(value: string, label: string) {
-  if (!value.trim()) throw new Error(`Delivery confirmation requires ${label}`);
+  if (!value.trim()) throw new UserFacingError(`Delivery confirmation requires ${label}`);
 }
 
 export function requestDeliveryConfirmation(input: {
@@ -40,7 +41,7 @@ export function requestDeliveryConfirmation(input: {
   nonEmpty(input.relatedEntityId, "relatedEntityId");
   nonEmpty(input.requestedById, "requestedById");
   if (Number.isNaN(Date.parse(input.requestedAt)))
-    throw new Error("Delivery request requires an ISO date-time");
+    throw new UserFacingError("Delivery request requires an ISO date-time");
   return validateDeliveryConfirmation({
     confirmation_id: input.confirmationId,
     related_entity_type: input.relatedEntityType,
@@ -66,8 +67,9 @@ export function decideDeliveryConfirmation(
   },
 ) {
   if (pending.status !== "pending")
-    throw new Error("Only a pending delivery confirmation can be decided");
-  if (decision.actorType !== "human") throw new Error("Gate 03 decisions require a human actor");
+    throw new UserFacingError("Only a pending delivery confirmation can be decided");
+  if (decision.actorType !== "human")
+    throw new UserFacingError("Gate 03 decisions require a human actor");
   for (const [label, value] of Object.entries({
     actorId: decision.actorId,
     approvalRef: decision.approvalRef,
@@ -75,12 +77,12 @@ export function decideDeliveryConfirmation(
   }))
     nonEmpty(value, label);
   if (Number.isNaN(Date.parse(decision.decidedAt)))
-    throw new Error("Gate 03 decisions require an ISO date-time");
+    throw new UserFacingError("Gate 03 decisions require an ISO date-time");
   if (
     decision.status === "confirmed" &&
     (!Number.isSafeInteger(decision.leadTimeDays) || (decision.leadTimeDays ?? -1) < 0)
   )
-    throw new Error(
+    throw new UserFacingError(
       "A confirmed delivery requires a nonnegative safe integer human-confirmed lead time",
     );
   if (
@@ -89,7 +91,7 @@ export function decideDeliveryConfirmation(
       Number.isNaN(Date.parse(decision.validUntil)) ||
       Date.parse(decision.validUntil) <= Date.parse(decision.decidedAt))
   )
-    throw new Error("A confirmed delivery requires a future validity deadline");
+    throw new UserFacingError("A confirmed delivery requires a future validity deadline");
   return validateDeliveryConfirmation({
     ...pending,
     status: decision.status,
@@ -108,8 +110,9 @@ export function decideDeliveryConfirmation(
 
 export function expireDeliveryConfirmation(pending: DeliveryConfirmation, actorType: ActorType) {
   if (pending.status !== "pending" && pending.status !== "confirmed")
-    throw new Error("Only a pending or confirmed delivery confirmation can expire");
-  if (actorType !== "system") throw new Error("Only the system can expire a delivery confirmation");
+    throw new UserFacingError("Only a pending or confirmed delivery confirmation can expire");
+  if (actorType !== "system")
+    throw new UserFacingError("Only the system can expire a delivery confirmation");
   const expired = { ...pending, status: "expired" as const };
   delete expired.result;
   delete expired.approval_ref;

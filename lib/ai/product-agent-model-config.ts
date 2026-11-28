@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-
 import { asc, eq } from "drizzle-orm";
+import { UserFacingError } from "@/lib/user-facing-error";
 import { getDatabase } from "../db/client";
 import { auditEvent, productAgentModelConfig } from "../db/schema";
 import { decryptStoredSecret, encryptStoredSecret } from "../security/encrypted-secret";
@@ -160,9 +160,10 @@ export async function saveProductAgentModelSettings(input: SaveProductAgentModel
       where: eq(productAgentModelConfig.name, input.name.trim()),
     }),
   ]);
-  if (input.configId && !existing) throw new Error("要编辑的模型配置不存在，请刷新后重试。");
+  if (input.configId && !existing)
+    throw new UserFacingError("要编辑的模型配置不存在，请刷新后重试。");
   if (duplicateName && duplicateName.id !== existing?.id)
-    throw new Error("配置名称已存在，请换一个名称。");
+    throw new UserFacingError("配置名称已存在，请换一个名称。");
   const configId = existing?.id ?? randomUUID();
   const isDefault = input.isDefault || existing?.isDefault || !defaultConfig;
   const apiKeyCiphertext = input.clearApiKey

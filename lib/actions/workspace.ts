@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
+import { parseActionInput, UserFacingError } from "@/lib/user-facing-error";
 
 import {
   removeWorkspaceProjectMember,
@@ -30,7 +31,7 @@ export type WorkspaceActionState = {
 
 async function requireWorkspaceUser() {
   const session = await authorizedActionSession("workspace:view");
-  if (!session) throw new Error("无权访问项目工作区。");
+  if (!session) throw new UserFacingError("无权访问项目工作区。");
   return session;
 }
 
@@ -57,9 +58,9 @@ export async function linkReadyProductToSalesProjectAction(
 ): Promise<WorkspaceActionState> {
   try {
     const session = await authorizedActionSession("sales:write");
-    if (!session) throw new Error("无权为销售项目引用产品。");
-    const projectId = z.uuid("项目标识无效。").parse(projectIdInput);
-    const productId = z.uuid("产品记录标识无效。").parse(productIdInput);
+    if (!session) throw new UserFacingError("无权为销售项目引用产品。");
+    const projectId = parseActionInput(z.uuid("项目标识无效。"), projectIdInput);
+    const productId = parseActionInput(z.uuid("产品记录标识无效。"), productIdInput);
     await linkReadyProductToSalesProject(projectId, productId, session.user.id);
     revalidatePath(`/workspace/${projectId}`);
     refreshWorkspace();
@@ -114,7 +115,7 @@ export async function changeWorkspaceProjectStatusAction(
 ): Promise<WorkspaceActionState> {
   try {
     const session = await requireWorkspaceUser();
-    const value = workspaceProjectStatusChangeSchema.parse(input);
+    const value = parseActionInput(workspaceProjectStatusChangeSchema, input);
     const project = await changeWorkspaceProjectStatus(value, session.user.id);
     refreshWorkspace();
     return {
@@ -132,7 +133,7 @@ export async function changeWorkspaceProjectNameAction(
 ): Promise<WorkspaceActionState> {
   try {
     const session = await requireWorkspaceUser();
-    const value = workspaceProjectNameChangeSchema.parse(input);
+    const value = parseActionInput(workspaceProjectNameChangeSchema, input);
     const project = await changeWorkspaceProjectName(value, session.user.id);
     refreshWorkspace();
     return { status: "success", projectId: project.id, message: "项目名称已更新。" };

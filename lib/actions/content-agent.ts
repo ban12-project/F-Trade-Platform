@@ -3,7 +3,6 @@
 import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import { actionError, authorizedActionSession } from "@/lib/action-boundary";
-
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { hasPermission } from "@/lib/authz";
@@ -15,6 +14,7 @@ import { listReadyProductContentSources } from "@/lib/content/store";
 import { getDatabase } from "@/lib/db/client";
 import { user } from "@/lib/db/schema";
 import { contentAgentRequestSchema } from "@/lib/form-schemas";
+import { UserFacingError } from "@/lib/user-facing-error";
 import { assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type ContentAgentActionState = {
@@ -28,14 +28,15 @@ async function assertGenerationAccess(projectId: string, actorId: string) {
     .from(user)
     .where(eq(user.id, actorId));
   if (!actor || actor.banned || !hasPermission(actor.role, "content:write"))
-    throw new Error("当前账号不可用或无权生成内容初稿。");
+    throw new UserFacingError("当前账号不可用或无权生成内容初稿。");
   await assertWorkspaceProjectKind(projectId, "marketing", actorId);
 }
 async function selectedProductFacts(projectId: string, productId: string, factPath: string) {
   const product = (await listReadyProductContentSources(projectId, productId))[0];
   const selected = product?.factOptions.find((fact) => fact.path === factPath);
   const productName = product?.factOptions.find((fact) => fact.path === "product.product_name");
-  if (!product || !selected || !productName) throw new Error("只能使用当前已审核通过的产品信息。");
+  if (!product || !selected || !productName)
+    throw new UserFacingError("只能使用当前已审核通过的产品信息。");
   return [productName, selected]
     .filter((fact, index, facts) => facts.findIndex((other) => other.path === fact.path) === index)
     .map((fact) => ({ field: fact.path, value: fact.value, evidenceRef: fact.evidenceRef }));
@@ -74,11 +75,11 @@ export async function generateContentDraftAction(
     // protected result after its requesting actor or product source loses eligibility.
     const currentSession = await authorizedActionSession("content:write");
     if (!currentSession || currentSession.user.id !== session.user.id)
-      throw new Error("生成期间权限已变化，未返回内容初稿。请重新登录并确认项目权限。");
+      throw new UserFacingError("生成期间权限已变化，未返回内容初稿。请重新登录并确认项目权限。");
     await assertGenerationAccess(projectId, session.user.id);
     const currentFacts = await selectedProductFacts(projectId, productId, factPath);
     if (JSON.stringify(currentFacts) !== JSON.stringify(verifiedFacts))
-      throw new Error("生成期间产品事实已更新，未返回旧初稿。请按当前资料重新生成。");
+      throw new UserFacingError("生成期间产品事实已更新，未返回旧初稿。请按当前资料重新生成。");
     return { status: "success", message: "AI 初稿已生成；请人工核对后再创建待审内容。", draft };
   } catch (error) {
     return actionError(error, "无法生成内容初稿。");

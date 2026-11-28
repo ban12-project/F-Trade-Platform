@@ -1,11 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-
 import { and, eq } from "drizzle-orm";
 import type { z } from "zod";
-
 import { type Database, getDatabase } from "@/lib/db/client";
 import { aggregateRecord } from "@/lib/db/schema";
 import { videoJobSubmissionFormSchema } from "@/lib/form-schemas";
+import { UserFacingError } from "@/lib/user-facing-error";
 import { videoProjectSchema } from "./contracts";
 import { enqueueVideoJob } from "./job-store";
 import { selectVerifiedVideoModel } from "./provider-capabilities";
@@ -46,16 +45,16 @@ export async function submitApprovedVideoJob(
   database: Database = getDatabase(),
 ): Promise<SubmittedVideoJob> {
   const submission = videoJobSubmissionSchema.parse(input);
-  if (!actorId.trim()) throw new Error("提交人标识不能为空。");
+  if (!actorId.trim()) throw new UserFacingError("提交人标识不能为空。");
   const [record] = await database
     .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
     .from(aggregateRecord)
     .where(and(eq(aggregateRecord.id, submission.videoId), eq(aggregateRecord.type, "video")));
-  if (!record) throw new Error("未找到视频计划。");
+  if (!record) throw new UserFacingError("未找到视频计划。");
   await assertVideoRetentionForId(database, submission.videoId);
   const project = videoProjectSchema.parse(record.payload);
   if (record.state !== "VIDEO_READY_FOR_GENERATION" || project.status !== "ready_for_generation") {
-    throw new Error("视频创意尚未准备好生成。 ");
+    throw new UserFacingError("视频创意尚未准备好生成。 ");
   }
   const configuration = await loadVideoExecutionConfiguration(database);
   selectVerifiedVideoModel(configuration.catalog, submission);

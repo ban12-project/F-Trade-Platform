@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
-
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-
 import { type Database, getDatabase } from "@/lib/db/client";
 import { auditEvent, videoModelConfig, videoProviderConfig } from "@/lib/db/schema";
 import { decryptStoredSecret, encryptStoredSecret } from "@/lib/security/encrypted-secret";
+import { UserFacingError } from "@/lib/user-facing-error";
 
 import type { VideoProviderExecutionPolicy } from "./execution";
 import {
@@ -152,12 +151,12 @@ export async function resolveVideoProviderCredential(
   database: Database = getDatabase(),
 ): Promise<string> {
   const provider = providerFromCredentialRef(credentialRef);
-  if (!provider) throw new Error("视频提供商凭据引用无效。");
+  if (!provider) throw new UserFacingError("视频提供商凭据引用无效。");
   const [row] = await database
     .select()
     .from(videoProviderConfig)
     .where(and(eq(videoProviderConfig.provider, provider), eq(videoProviderConfig.enabled, true)));
-  if (!row?.credentialCiphertext) throw new Error("视频提供商未启用或未配置凭据。");
+  if (!row?.credentialCiphertext) throw new UserFacingError("视频提供商未启用或未配置凭据。");
   return decryptStoredSecret(
     row.credentialCiphertext,
     "Stored video provider credential is invalid",
@@ -179,7 +178,7 @@ export async function saveVideoProviderModelSettings(
       ? encryptStoredSecret(parsed.credential)
       : (existing?.credentialCiphertext ?? null);
   if (parsed.providerEnabled && !credentialCiphertext) {
-    throw new Error("启用视频提供商前必须配置加密凭据。");
+    throw new UserFacingError("启用视频提供商前必须配置加密凭据。");
   }
   const model = videoModelCapabilitySchema.parse(parsed.model);
   const providerValues = {
