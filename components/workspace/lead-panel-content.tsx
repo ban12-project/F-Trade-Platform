@@ -58,6 +58,7 @@ import {
   saveFollowUpPlanAction,
 } from "@/lib/actions/closing";
 import { nextFollowUp } from "@/lib/follow-up/cadence";
+import { firstHotScore, scoringRules } from "@/lib/follow-up/lead-scoring";
 import {
   deliveryRequestFormSchema,
   followUpFormSchema,
@@ -102,7 +103,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
       triggeredRules: entry.lead.score_reasons
         .map((item) => item.rule_id)
         .filter((item): item is z.infer<typeof followUpFormSchema>["triggeredRules"][number] =>
-          scoringRules.some(([id]) => id === item),
+          scoringRules.some(({ id }) => id === item),
         ),
       draft: "",
       confirmationRef: "",
@@ -324,7 +325,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                 </FieldDescription>
                 <FieldGroup>
                   <FieldGrid columns={2}>
-                    {scoringRules.map(([id, label, points]) => (
+                    {scoringRules.map(({ id, label, points }) => (
                       <Field key={id} orientation="horizontal">
                         <Controller
                           control={form.control}
@@ -346,7 +347,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                         />
                         <FieldLabel htmlFor={`${entry.id}-${id}`}>{label}</FieldLabel>
                         <span className="text-xs text-muted-foreground" aria-hidden="true">
-                          {points}
+                          +{points}
                         </span>
                         <FieldError errors={[form.formState.errors.triggeredRules]} />
                       </Field>
@@ -726,13 +727,13 @@ function LeadActions({
         <div className="flex flex-col gap-2 rounded-xl border bg-muted/20 p-4">
           <Progress
             aria-label="高意向商机评分进度"
-            value={Math.min(100, Math.round((entry.lead.score / 61) * 100))}
+            value={Math.min(100, Math.round((entry.lead.score / firstHotScore) * 100))}
           >
             <ProgressLabel>高意向（HOT）门槛进度</ProgressLabel>
-            <ProgressValue>{() => `${entry.lead.score} / 61 分`}</ProgressValue>
+            <ProgressValue>{() => `${entry.lead.score} / ${firstHotScore} 分`}</ProgressValue>
           </Progress>
           <p className="text-sm text-muted-foreground">
-            采购意向尚待确认，还差 {Math.max(1, 61 - entry.lead.score)}{" "}
+            采购意向尚待确认，还差 {Math.max(1, firstHotScore - entry.lead.score)}{" "}
             分达到高意向（HOT）。请按实际沟通继续勾选上方客户意向行为并点击「保存跟进计划」，满足条件后即可确认有效商机。
           </p>
         </div>
@@ -823,14 +824,4 @@ const contexts = [
   ["purchase_later", "稍后采购"],
   ["asks_sample", "询问样品"],
   ["asks_lead_time", "询问交期"],
-] as const;
-const scoringRules = [
-  ["active_inquiry", "主动询盘", "+20"],
-  ["provides_oe_number", "提供 OE", "+15"],
-  ["explicit_quantity", "明确数量", "+15"],
-  ["target_quantity_range", "目标数量区间", "+10"],
-  ["asks_sample", "询问样品", "+10"],
-  ["asks_lead_time", "询问交期", "+10"],
-  ["asks_payment_terms", "询问付款条件", "+15"],
-  ["replies_again", "再次回复", "+15"],
 ] as const;

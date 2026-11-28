@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { scoringRules } from "./follow-up/lead-scoring";
 import { productImageFilesSchema } from "./product/source-image-contracts";
 import { quotationValidityDays, quotationValiditySchema } from "./quotation/validity";
 
@@ -367,20 +368,7 @@ export const followUpFormSchema = z
       "asks_sample",
       "asks_lead_time",
     ]),
-    triggeredRules: z
-      .array(
-        z.enum([
-          "active_inquiry",
-          "provides_oe_number",
-          "explicit_quantity",
-          "target_quantity_range",
-          "asks_sample",
-          "asks_lead_time",
-          "asks_payment_terms",
-          "replies_again",
-        ]),
-      )
-      .max(8),
+    triggeredRules: z.array(z.enum(scoringRules.map((rule) => rule.id))).max(scoringRules.length),
     draft: z.string().trim().min(1, "请填写人工确认后的跟进内容。").max(4_000),
     confirmationRef: privateReference,
     nextFollowUpAt: z.string().trim().optional().or(z.literal("")),

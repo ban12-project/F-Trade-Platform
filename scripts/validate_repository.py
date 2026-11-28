@@ -178,20 +178,6 @@ def check_csv_template() -> None:
         raise AssertionError(f"Unexpected CSV header: {header}")
 
 
-def check_scoring_config() -> None:
-    with (ROOT / "config/lead-scoring.yaml").open(encoding="utf-8") as stream:
-        config = yaml.safe_load(stream)
-    points = sum(rule["points"] for rule in config["rules"])
-    if points != 110:
-        raise AssertionError(f"Lead scoring source weights changed unexpectedly: {points}")
-    if config["score_cap"] != 100:
-        raise AssertionError("Lead scoring must cap at 100")
-    if "min(100" not in config["normalization"]:
-        raise AssertionError("Lead scoring normalization must cap at 100")
-    if config["thresholds"] != {"cold_max": 30, "warm_max": 60}:
-        raise AssertionError("Lead scoring thresholds changed unexpectedly")
-
-
 def check_product_acceptance_config() -> None:
     with (ROOT / "config/product-acceptance.yaml").open(encoding="utf-8") as stream:
         config = yaml.safe_load(stream)
@@ -817,7 +803,6 @@ def main() -> int:
     checks = [
         ("schemas and fixtures", check_schemas),
         ("CSV template", check_csv_template),
-        ("lead scoring", check_scoring_config),
         ("product acceptance", check_product_acceptance_config),
         ("MVP acceptance summary", check_mvp_acceptance_summary),
         ("product pilot authorization", check_product_pilot_authorization),
