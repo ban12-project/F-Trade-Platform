@@ -5,9 +5,28 @@ import type { BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getTableColumns, getTableName } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pg-proxy";
+import { actorSessionSchema, projectActorSessionSchema } from "../lib/actor-session";
 import { account, authSchema, passkey, session, user, verification } from "../lib/db/schema";
 
 async function main() {
+  const identity = { actorId: " worker ", sessionId: " session " };
+  const projectId = "11111111-1111-4111-8111-111111111111";
+  assert.deepEqual(actorSessionSchema.parse(identity), { actorId: "worker", sessionId: "session" });
+  assert.deepEqual(projectActorSessionSchema.parse({ ...identity, projectId }), {
+    actorId: "worker",
+    sessionId: "session",
+    projectId,
+  });
+  assert.equal(actorSessionSchema.safeParse({ ...identity, projectId }).success, false);
+  assert.equal(
+    projectActorSessionSchema.safeParse({ ...identity, projectId, role: "admin" }).success,
+    false,
+  );
+  assert.equal(
+    projectActorSessionSchema.safeParse({ ...identity, projectId: "invalid" }).success,
+    false,
+  );
+
   const expected = { user, session, account, verification, passkey };
   for (const [model, table] of Object.entries(expected)) {
     assert.equal(

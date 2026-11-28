@@ -1,5 +1,6 @@
 import { issueSignedToken } from "@vercel/blob";
 import { type HandleUploadPresignedBody, handleUploadPresigned } from "@vercel/blob/client";
+import type { ProjectActorSessionIdentity } from "@/lib/actor-session";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
 import {
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     let reservation:
       | {
           receipt: Awaited<ReturnType<typeof issueDocumentUploadReceipt>>;
-          identity: { actorId: string; sessionId: string; projectId: string };
+          identity: ProjectActorSessionIdentity;
         }
       | undefined;
     const body = (await request.json()) as HandleUploadPresignedBody;

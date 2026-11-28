@@ -1,34 +1,23 @@
-import { and, eq } from "drizzle-orm";
-import { z } from "zod";
+import { eq } from "drizzle-orm";
+import type { ProjectActorSessionIdentity } from "@/lib/actor-session";
+import { lockActorSession, projectActorSessionSchema } from "@/lib/actor-session";
 import { hasPermission } from "@/lib/authz";
 import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
-import { session, user, workspaceProject } from "@/lib/db/schema";
+import { workspaceProject } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { ProductAgentAccessError } from "./intake-errors";
 
-const identitySchema = z
-  .object({
-    actorId: z.string().trim().min(1),
-    sessionId: z.string().trim().min(1),
-    projectId: z.uuid(),
-  })
-  .strict();
-export type ProductAgentWriteIdentity = z.infer<typeof identitySchema>;
+export type ProductAgentWriteIdentity = ProjectActorSessionIdentity;
 
 /** Holds the current user, session and project authorization until the write commits. */
 export async function authorizeLockedProductAgentWrite(
   tx: DatabaseTransaction,
   identityInput: ProductAgentWriteIdentity,
 ) {
-  const parsed = identitySchema.safeParse(identityInput);
+  const parsed = projectActorSessionSchema.safeParse(identityInput);
   if (!parsed.success) throw new ProductAgentAccessError();
   const identity = parsed.data;
-  const [actor] = await tx
-    .select({ role: user.role, banned: user.banned, expiresAt: session.expiresAt })
-    .from(user)
-    .innerJoin(session, eq(session.userId, user.id))
-    .where(and(eq(user.id, identity.actorId), eq(session.id, identity.sessionId)))
-    .for("share");
+  const actor = await lockActorSession(tx, identity);
   if (!actor || actor.banned || !hasPermission(actor.role, "product:write"))
     throw new ProductAgentAccessError();
   try {

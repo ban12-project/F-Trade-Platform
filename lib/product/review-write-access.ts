@@ -1,18 +1,12 @@
 import { and, eq } from "drizzle-orm";
-import { z } from "zod";
+import type { ProjectActorSessionIdentity } from "@/lib/actor-session";
+import { lockActorSession, projectActorSessionSchema } from "@/lib/actor-session";
 import { hasPermission } from "@/lib/authz";
 import type { DatabaseTransaction } from "@/lib/db/client";
-import { session, user, workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
+import { workspaceProject, workspaceProjectItem } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 
-const identitySchema = z
-  .object({
-    actorId: z.string().trim().min(1),
-    sessionId: z.string().trim().min(1),
-    projectId: z.uuid(),
-  })
-  .strict();
-export type ProductReviewIdentity = z.infer<typeof identitySchema>;
+export type ProductReviewIdentity = ProjectActorSessionIdentity;
 export const PRODUCT_REVIEW_ACCESS_MESSAGE =
   "无法确认当前登录或 Gate 01 审核权限，审核决定未保存。请重新登录并确认项目权限后重试。";
 
@@ -24,7 +18,7 @@ export class ProductReviewAccessError extends Error {
 }
 
 export function parseProductReviewIdentity(input: unknown): ProductReviewIdentity {
-  const parsed = identitySchema.safeParse(input);
+  const parsed = projectActorSessionSchema.safeParse(input);
   if (!parsed.success) throw new ProductReviewAccessError();
   return parsed.data;
 }
@@ -53,12 +47,7 @@ export async function authorizeLockedProductReview(
         ),
       )
       .for("share");
-    const [actor] = await tx
-      .select({ role: user.role, banned: user.banned, expiresAt: session.expiresAt })
-      .from(user)
-      .innerJoin(session, eq(session.userId, user.id))
-      .where(and(eq(user.id, identity.actorId), eq(session.id, identity.sessionId)))
-      .for("share");
+    const actor = await lockActorSession(tx, identity);
     // Time is evaluated after project/product/Gate and authorization lock waits.
     if (
       project?.kind !== "marketing" ||

@@ -1,10 +1,11 @@
+import { lockActorSession } from "@/lib/actor-session";
 import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
 import { hasPermission } from "@/lib/authz";
 import type { DatabaseTransaction } from "@/lib/db/client";
-import { session, user, workspaceProject, workspaceProjectMember } from "@/lib/db/schema";
+import { session, workspaceProject, workspaceProjectMember } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import {
   authorizeLockedProductAgentWrite,
@@ -25,12 +26,7 @@ export async function authorizeDocumentUpload(
     const identity =
       purpose === "evidence" ? input : await authorizeLockedProductAgentWrite(tx, input);
     if (purpose === "evidence") {
-      const [actor] = await tx
-        .select({ role: user.role, banned: user.banned, expiresAt: session.expiresAt })
-        .from(user)
-        .innerJoin(session, eq(session.userId, user.id))
-        .where(and(eq(user.id, input.actorId), eq(session.id, input.sessionId)))
-        .for("share");
+      const actor = await lockActorSession(tx, input);
       if (
         !actor ||
         actor.banned ||
