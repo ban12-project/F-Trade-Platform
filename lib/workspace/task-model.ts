@@ -1,5 +1,6 @@
 import { hasPermission, type Permission } from "@/lib/authz";
 import { rfqMissingLabel, salesNextActionLabels } from "@/lib/sales/journey";
+import { isReadOnlyMember, type WorkspaceMemberRole } from "@/lib/workspace/member-roles";
 import { workspaceCollection, workspaceTaskHref } from "./navigation";
 import { workspaceTaskContext } from "./task-context";
 import type {
@@ -9,7 +10,7 @@ import type {
 } from "./types";
 
 export type TaskProject = WorkspaceProjectSummary & {
-  memberRole: "owner" | "editor" | "viewer";
+  memberRole: WorkspaceMemberRole;
   appRole: string | null;
 };
 export type TaskRecord = {
@@ -174,7 +175,7 @@ export function deriveWorkspaceTasks(
       permission: Permission,
     ) {
       const permitted =
-        project.memberRole !== "viewer" && hasPermission(project.appRole, permission);
+        !isReadOnlyMember(project.memberRole) && hasPermission(project.appRole, permission);
       const requestedState = values.state ?? "actionable";
       const needsPerson = requestedState === "actionable" || requestedState === "attention";
       const state = needsPerson && !permitted ? "waiting" : requestedState;

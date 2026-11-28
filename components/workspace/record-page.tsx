@@ -1,3 +1,4 @@
+import { isReadOnlyMember } from "@/lib/workspace/member-roles";
 import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -111,7 +112,7 @@ const readRecordContext = cache(
     const canWrite =
       !unavailable &&
       project.status === "active" &&
-      project.memberRole !== "viewer" &&
+      !isReadOnlyMember(project.memberRole) &&
       (!record || record.relation === "owned") &&
       hasPermission(session.user.role, permissionFor[kind]);
     return {

@@ -10,6 +10,7 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 
 const identitySchema = z
   .object({
@@ -100,7 +101,7 @@ export async function authorizeReadableContentDraftSource(
       and(
         eq(workspaceProjectMember.projectId, sourceProjectId),
         eq(workspaceProjectMember.userId, identity.actorId),
-        inArray(workspaceProjectMember.role, ["owner", "editor", "viewer"]),
+        inArray(workspaceProjectMember.role, memberRolesForAccess.view),
       ),
     )
     .for("share");

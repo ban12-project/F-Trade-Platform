@@ -16,6 +16,7 @@ import {
   listProjectMarketingVideoEntries,
 } from "@/lib/video/store";
 import { resolveVideoSelection, type VideoSelectionQuery } from "@/lib/video/workspace-selection";
+import { isReadOnlyMember } from "@/lib/workspace/member-roles";
 import { workspaceReturnTo } from "@/lib/workspace/navigation";
 import { readWorkspaceRecord } from "@/lib/workspace/record-read-model";
 import { getWorkspaceProject } from "@/lib/workspace/store";
@@ -62,7 +63,7 @@ async function VideoContent({
     products.map((product) => product.id),
   );
   const canWrite =
-    project.memberRole !== "viewer" &&
+    !isReadOnlyMember(project.memberRole) &&
     project.status === "active" &&
     hasPermission(session.user.role, "video:write");
   const copyCandidates =

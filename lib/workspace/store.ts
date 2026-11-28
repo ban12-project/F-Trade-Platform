@@ -1,4 +1,5 @@
 import { UserFacingError } from "@/lib/user-facing-error";
+import { memberRolesForAccess, type WorkspaceMemberRole } from "@/lib/workspace/member-roles";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -249,7 +250,7 @@ export async function getWorkspaceProject(
   projectId: string,
   actorId: string,
   database: Database = getDatabase(),
-): Promise<(WorkspaceProjectSummary & { memberRole: "owner" | "editor" | "viewer" }) | null> {
+): Promise<(WorkspaceProjectSummary & { memberRole: WorkspaceMemberRole }) | null> {
   // Missing and inaccessible projects have the same read result. Keep membership
   // in the query itself; do not catch database failures as if they were 404s.
   const [row] = await database
@@ -267,7 +268,7 @@ export async function getWorkspaceProject(
       and(
         eq(workspaceProject.id, projectId),
         eq(workspaceProjectMember.userId, actorId),
-        inArray(workspaceProjectMember.role, ["owner", "editor", "viewer"]),
+        inArray(workspaceProjectMember.role, memberRolesForAccess.view),
       ),
     );
   return row ?? null;

@@ -38,6 +38,11 @@ import {
   type WorkspaceActionState,
 } from "@/lib/actions/workspace";
 import type { WorkspaceMemberSummary } from "@/lib/workspace/access";
+import {
+  memberRolesForAccess,
+  type WorkspaceMemberRole,
+  workspaceMemberRoles,
+} from "@/lib/workspace/member-roles";
 
 const initialState: WorkspaceActionState = { status: "idle", message: "" };
 const roleLabel = { owner: "所有者", editor: "可编辑", viewer: "仅查看" } as const;
@@ -53,10 +58,11 @@ export function ProjectMembersPanel({
 }) {
   const router = useRouter();
   const canManage = members.some(
-    (member) => member.userId === currentUserId && member.role === "owner",
+    (member) =>
+      member.userId === currentUserId && memberRolesForAccess.manage.includes(member.role),
   );
   const [open, setOpen] = useState(false);
-  const [role, setRole] = useState<"owner" | "editor" | "viewer">("editor");
+  const [role, setRole] = useState<WorkspaceMemberRole>("editor");
   const [state, action, pending] = useActionState(upsertWorkspaceProjectMemberAction, initialState);
   const [removalState, removalAction, removalPending] = useActionState(
     removeWorkspaceProjectMemberAction,
@@ -144,9 +150,11 @@ export function ProjectMembersPanel({
                         <SelectValue>{roleLabel[role]}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="owner">所有者</SelectItem>
-                        <SelectItem value="editor">可编辑</SelectItem>
-                        <SelectItem value="viewer">仅查看</SelectItem>
+                        {workspaceMemberRoles.map((id) => (
+                          <SelectItem key={id} value={id}>
+                            {roleLabel[id]}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </Field>

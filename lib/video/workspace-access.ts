@@ -1,3 +1,4 @@
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { type Database, getDatabase } from "@/lib/db/client";
@@ -27,7 +28,7 @@ function ownedVideos(actorId: string, database: Database) {
       and(
         eq(workspaceProjectMember.projectId, workspaceProjectItem.projectId),
         eq(workspaceProjectMember.userId, actorId),
-        inArray(workspaceProjectMember.role, ["owner", "editor", "viewer"]),
+        inArray(workspaceProjectMember.role, memberRolesForAccess.view),
       ),
     );
 }
