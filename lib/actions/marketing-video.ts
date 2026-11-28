@@ -38,6 +38,7 @@ import {
   registerVideoReviewWorkingEvidence,
   VideoReviewCopyError,
 } from "@/lib/video/review-evidence-store";
+import { videoReviewFormSchema } from "@/lib/video/review-form-schema";
 import { VideoReviewAccessError, videoReviewFailureMessage } from "@/lib/video/review-write-access";
 import {
   assertMarketingVideoProjectLink,
@@ -48,7 +49,6 @@ import {
   updateMarketingVideoEditDraft,
 } from "@/lib/video/store";
 import { claimCompletedVideoUploads } from "@/lib/video/upload-receipts";
-import { videoReviewFormSchema } from "@/lib/video/review-form-schema";
 import { assertWorkspaceAggregateLink } from "@/lib/workspace/store";
 import {
   generateMarketingVideoAiDraftWorkflow,
