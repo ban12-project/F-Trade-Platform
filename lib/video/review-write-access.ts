@@ -10,6 +10,7 @@ import {
   workspaceProjectMember,
 } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import { VIDEO_RETENTION_MESSAGE } from "./retention-policy";
 
 const identitySchema = z
@@ -55,7 +56,7 @@ export async function authorizeLockedVideoReview(
         and(
           eq(workspaceProjectMember.projectId, identity.projectId),
           eq(workspaceProjectMember.userId, identity.actorId),
-          inArray(workspaceProjectMember.role, ["owner", "editor"]),
+          inArray(workspaceProjectMember.role, memberRolesForAccess.write),
         ),
       )
       .for("share");

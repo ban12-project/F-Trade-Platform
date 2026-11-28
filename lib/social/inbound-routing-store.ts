@@ -1,3 +1,4 @@
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
@@ -121,7 +122,7 @@ export async function routeInboundConversation(
           and(
             eq(workspaceProjectMember.projectId, projectId),
             eq(workspaceProjectMember.userId, actorId),
-            inArray(workspaceProjectMember.role, ["owner", "editor"]),
+            inArray(workspaceProjectMember.role, memberRolesForAccess.write),
           ),
         )
         .for("share");

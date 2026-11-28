@@ -1,3 +1,4 @@
+import type { WorkspaceMemberRole } from "@/lib/workspace/member-roles";
 import type { WorkspaceRecordKind } from "./navigation";
 
 export type WorkspaceTaskDestination =
@@ -9,7 +10,7 @@ export type WorkspaceTaskDestination =
     };
 
 export type WorkspaceProjectSummary = {
-  memberRole?: "owner" | "editor" | "viewer";
+  memberRole?: WorkspaceMemberRole;
   id: string;
   title: string;
   kind: "marketing" | "sales";

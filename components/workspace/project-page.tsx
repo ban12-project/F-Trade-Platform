@@ -1,3 +1,4 @@
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import { StickyPanel } from "./sticky-panel";
 import "server-only";
 import { notFound } from "next/navigation";
@@ -82,7 +83,7 @@ async function ProjectDetails({ params, searchParams }: ProjectPageProps) {
         </div>
         <StickyPanel>
           <aside aria-label="项目设置" className="workspace-support">
-            {project.memberRole === "owner" ? (
+            {project.memberRole && memberRolesForAccess.manage.includes(project.memberRole) ? (
               <>
                 <ProjectNameForm projectId={projectId} title={project.title} />
                 <ProjectStatusControl projectId={projectId} status={project.status} />

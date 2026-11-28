@@ -30,6 +30,7 @@ import {
   type WorkspaceLibraryRecord,
 } from "@/lib/workspace/library-model";
 import { librarySearchSchema } from "@/lib/workspace/library-search";
+import { isReadOnlyMember } from "@/lib/workspace/member-roles";
 import { type WorkspaceCollection, withWorkspaceReturnTo } from "@/lib/workspace/navigation";
 import { workspaceCreationRestriction } from "@/lib/workspace/new-work";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
@@ -221,7 +222,7 @@ export function WorkspaceLibrary({
             {projects.map((project) => (
               <NativeSelectOption key={project.id} value={project.id}>
                 {project.title}
-                {project.memberRole === "viewer"
+                {isReadOnlyMember(project.memberRole)
                   ? "（只读）"
                   : project.status === "archived"
                     ? "（已归档）"
