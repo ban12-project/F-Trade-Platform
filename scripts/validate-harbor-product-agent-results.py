@@ -9,7 +9,8 @@ from collections import Counter
 from pathlib import Path
 
 AGENT = "f-trade-product-agent"
-PROVIDERS = {"openai", "anthropic", "google", "openai-compatible"}
+PROVIDER_CATALOG = Path(__file__).resolve().parents[1] / "lib/ai/model-providers.json"
+PROVIDERS = json.loads(PROVIDER_CATALOG.read_text(encoding="utf-8"))
 
 
 def load_json(path: Path) -> dict:

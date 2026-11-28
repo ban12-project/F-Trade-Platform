@@ -4,11 +4,8 @@ import { UserFacingError } from "@/lib/user-facing-error";
 import { getDatabase } from "../db/client";
 import { auditEvent, productAgentModelConfig } from "../db/schema";
 import { decryptStoredSecret, encryptStoredSecret } from "../security/encrypted-secret";
-import {
-  type ProductAgentModelConfig,
-  type SupportedModelProvider,
-  validateProductAgentModelConfig,
-} from "./model-provider";
+import { type ProductAgentModelConfig, validateProductAgentModelConfig } from "./model-provider";
+import type { SupportedModelProvider } from "./model-provider-schema";
 
 export interface ProductAgentModelSettings {
   id: string;

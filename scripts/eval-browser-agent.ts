@@ -15,6 +15,7 @@ import {
   variants,
 } from "../evals/browser-agent/fixture";
 import type { ProductAgentModelConfig } from "../lib/ai/model-provider";
+import { modelProviderSchema } from "../lib/ai/model-provider-schema";
 import { browserAgentDecision } from "../lib/browser-agent/model";
 import { selectPublicationDriver } from "../lib/browser-agent/publication";
 import { type AgentResult, type Decide, runBrowserAgent } from "../lib/browser-agent/runtime";
@@ -26,7 +27,7 @@ const arg = (name: string) => {
 };
 const configSchema = z
   .object({
-    provider: z.enum(["openai", "anthropic", "google", "openai-compatible"]),
+    provider: modelProviderSchema,
     model: z.string().min(1),
     revision: z.string().min(1),
     apiKeyEnv: z.string().regex(/^[A-Z][A-Z0-9_]+$/),

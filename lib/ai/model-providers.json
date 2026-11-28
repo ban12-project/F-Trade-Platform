@@ -1,0 +1,6 @@
+{
+  "openai": "OpenAI",
+  "anthropic": "Anthropic",
+  "google": "Google Gemini",
+  "openai-compatible": "OpenAI-compatible"
+}

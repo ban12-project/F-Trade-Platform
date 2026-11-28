@@ -14,13 +14,14 @@ import {
 import { evaluationExpectation } from "../evals/harbor/product-agent/expectations";
 import { summarizeSelection } from "../evals/harbor/product-agent/selection-summary";
 import { createProductAgentModel, type ProductAgentModelConfig } from "../lib/ai/model-provider";
+import { modelProviderSchema } from "../lib/ai/model-provider-schema";
 import { resolveProductOutputPolicy } from "../lib/ai/product-output-policy";
 import { runProductAgentEvaluation } from "../lib/product/evaluation-run";
 
 const modelSchema = z
   .object({
     name: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,70}$/),
-    provider: z.enum(["openai", "anthropic", "google", "openai-compatible"]),
+    provider: modelProviderSchema,
     model: z.string().regex(/^[a-zA-Z0-9_.-]+$/),
     apiKeyEnv: z.string().regex(/^[A-Z][A-Z0-9_]+$/),
     baseUrl: z.url().optional(),
