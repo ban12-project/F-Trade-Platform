@@ -57,7 +57,12 @@ import {
   requestDeliveryAction,
   saveFollowUpPlanAction,
 } from "@/lib/actions/closing";
-import { nextFollowUp } from "@/lib/follow-up/cadence";
+import {
+  followUpContextLabel,
+  followUpContexts,
+  needsDeliveryConfirmation,
+  nextFollowUp,
+} from "@/lib/follow-up/cadence";
 import { firstHotScore, scoringRules } from "@/lib/follow-up/lead-scoring";
 import {
   deliveryRequestFormSchema,
@@ -76,6 +81,10 @@ import {
   salesRecordStateLabel as stateLabel,
 } from "./submission-feedback";
 import { WorkspaceLink } from "./workspace-link";
+
+const contextLabels = Object.fromEntries(
+  followUpContexts.map((id) => [id, followUpContextLabel(id)]),
+);
 
 function localDateTime(value?: string) {
   if (!value) return "";
@@ -136,7 +145,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
   );
   const context = form.watch("context");
   const recommendation = nextFollowUp(context);
-  const requiresDeliveryConfirmation = context === "asks_lead_time" || context === "asks_sample";
+  const requiresDeliveryConfirmation = needsDeliveryConfirmation(context);
   const canSend =
     entry.replyAvailable && (!requiresDeliveryConfirmation || Boolean(entry.confirmedDelivery));
   useWorkspaceDirty(`follow-up-${entry.id}`, form.formState.isDirty);
@@ -256,7 +265,7 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                   name="context"
                   render={({ field }) => (
                     <Select
-                      items={Object.fromEntries(contexts)}
+                      items={contextLabels}
                       value={field.value}
                       onValueChange={field.onChange}
                     >
@@ -269,9 +278,9 @@ function FollowUpForm({ projectId, entry }: { projectId: string; entry: LeadEntr
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          {contexts.map(([id, label]) => (
+                          {followUpContexts.map((id) => (
                             <SelectItem key={id} value={id}>
-                              {label}
+                              {contextLabels[id]}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -581,10 +590,7 @@ function LeadActions({
   return (
     <div className="space-y-4">
       <Collapsible
-        defaultOpen={
-          entry.lead.follow_up_context === "asks_lead_time" ||
-          entry.lead.follow_up_context === "asks_sample"
-        }
+        defaultOpen={needsDeliveryConfirmation(entry.lead.follow_up_context)}
         className="rounded-xl border bg-card p-4"
       >
         <CollapsibleTrigger render={<Button variant="outline" className="w-full justify-start" />}>
@@ -816,12 +822,3 @@ export function LeadPanel({
     </div>
   );
 }
-
-const contexts = [
-  ["quote_sent_unread", "报价未读"],
-  ["quote_sent_read_no_reply", "已读未回复"],
-  ["price_high", "反馈价格高"],
-  ["purchase_later", "稍后采购"],
-  ["asks_sample", "询问样品"],
-  ["asks_lead_time", "询问交期"],
-] as const;

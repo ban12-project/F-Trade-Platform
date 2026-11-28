@@ -1,5 +1,6 @@
 import quotationHandoffSchema from "../../contracts/sales/quotation-handoff.schema.json";
 import { compileContract } from "../contracts/validator";
+import type { ActorType } from "../workflow/vocabulary";
 import { type QuotationValidity, quotationValidityDays } from "./validity";
 
 export type Quote = {
@@ -15,13 +16,13 @@ export type Quote = {
 export interface ManualQuotationInput {
   handoffId: string;
   rfqId: string;
-  actorType: "human" | "agent" | "system";
+  actorType: ActorType;
   actorId: string;
   quote: Quote;
 }
 
 export interface HumanQuoteDecision {
-  actorType: "human" | "agent" | "system";
+  actorType: ActorType;
   actorId: string;
   status: "approved" | "rejected";
   approvalRef: string;

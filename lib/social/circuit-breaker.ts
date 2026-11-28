@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ActorType } from "../workflow/vocabulary";
 
 export const socialStopReasonSchema = z.enum([
   "security_checkpoint",
@@ -50,7 +51,7 @@ export function applyWorkerObservation(
 /** A resumed channel requires an explicit human acknowledgement of the resolved stop reason. */
 export function resumeSocialChannel(
   state: SocialChannelCircuitState,
-  actorType: "human" | "agent" | "system",
+  actorType: ActorType,
   acknowledgementRef: string,
 ): SocialChannelCircuitState {
   if (actorType !== "human") throw new Error("Only a human can resume a paused social channel");

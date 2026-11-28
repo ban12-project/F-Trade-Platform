@@ -3,6 +3,7 @@ import { type Database, getDatabase } from "../db/client";
 import { aggregateRecord, approval, auditEvent, workflowEvent } from "../db/schema";
 import { assertAggregateWorkspaceWrite } from "../workspace/access";
 import { type ApprovalDecision, assertTransition, type WorkflowEventInput } from "./transitions";
+import type { ActorType } from "./vocabulary";
 
 export interface PersistedTransition {
   state: string;
@@ -16,7 +17,7 @@ function toApprovalDecision(
         aggregateId: string;
         gate: ApprovalDecision["gate"];
         status: "pending" | "approved" | "rejected";
-        decidedByType: "agent" | "human" | "system" | null;
+        decidedByType: ActorType | null;
         decidedById: string | null;
         evidenceRef: string | null;
       }

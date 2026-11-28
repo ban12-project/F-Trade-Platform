@@ -1,12 +1,8 @@
 import type { DeliveryConfirmation } from "@/lib/delivery/confirmation";
 
-export type FollowUpContext =
-  | "quote_sent_unread"
-  | "quote_sent_read_no_reply"
-  | "price_high"
-  | "purchase_later"
-  | "asks_sample"
-  | "asks_lead_time";
+import { type FollowUpContext, needsDeliveryConfirmation } from "./cadence";
+
+export type { FollowUpContext } from "./cadence";
 
 const DELIVERY_CLAIM_PATTERN =
   /(?:交期|货期|发货时间|lead\s*time|delivery\s+(?:in|within|after|before)|ship(?:s|ping)?\s+(?:in|within|after|before))/iu;
@@ -38,7 +34,7 @@ export function buildControlledReply(input: {
       "delivery_claim_in_draft",
       "自由文本不能包含交期承诺；请选择交期场景，由系统插入有效的 Gate 03 结果。",
     );
-  if (input.context !== "asks_lead_time" && input.context !== "asks_sample") return input.draft;
+  if (!needsDeliveryConfirmation(input.context)) return input.draft;
   if (!input.delivery)
     throw new ControlledReplyError("gate_03_missing", "该场景必须先完成 Gate 03 交期确认。");
   if (input.delivery.status !== "confirmed")

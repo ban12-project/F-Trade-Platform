@@ -1,14 +1,6 @@
-export type AggregateType =
-  | "product"
-  | "content"
-  | "video"
-  | "rfq"
-  | "quotation"
-  | "lead"
-  | "delivery_confirmation";
+import type { ActorType, AggregateType, HumanGate } from "./vocabulary";
 
-export type ActorType = "agent" | "human" | "system";
-export type HumanGate = "gate_01_truth" | "gate_02_quote" | "gate_03_delivery";
+export type { ActorType, AggregateType, HumanGate } from "./vocabulary";
 
 export interface WorkflowEventInput {
   eventId: string;
