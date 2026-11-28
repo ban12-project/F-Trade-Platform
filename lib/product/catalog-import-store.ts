@@ -1,3 +1,4 @@
+import type { ProjectActorSessionIdentity } from "@/lib/actor-session";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -37,7 +38,7 @@ import {
   prepareProductAgentEvidenceSource,
 } from "./evidence-locations";
 
-export type CatalogIdentity = { actorId: string; sessionId: string; projectId: string };
+export type CatalogIdentity = ProjectActorSessionIdentity;
 export type CatalogDispatch = { importId: string; attemptIds: string[] };
 type ImportRow = typeof imports.$inferSelect;
 type AttemptRow = typeof attempts.$inferSelect;

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import type { ProjectActorSessionIdentity } from "@/lib/actor-session";
 import { type Database, type DatabaseTransaction, getDatabase } from "../db/client";
 import {
   aggregateRecord,
@@ -18,11 +19,7 @@ import { buildProductEvidenceSourceBinding } from "./evidence-source-binding";
 import { emptyProductStreamDraft } from "./stream-validation";
 import { type ProductDraft, reviewProductDraft } from "./verification";
 
-export interface ProductStreamIdentity {
-  actorId: string;
-  sessionId: string;
-  projectId: string;
-}
+export type ProductStreamIdentity = ProjectActorSessionIdentity;
 
 /** Lock current authorization rows until the write commits, including session revocation. */
 export async function authorizeProductStreamWrite(

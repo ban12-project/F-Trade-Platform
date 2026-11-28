@@ -1,22 +1,17 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
+import type { ActorSessionIdentity, ProjectActorSessionIdentity } from "@/lib/actor-session";
+import {
+  actorSessionSchema,
+  lockActorSession,
+  projectActorSessionSchema,
+} from "@/lib/actor-session";
 import { hasPermission, type Permission } from "@/lib/authz";
 import type { DatabaseTransaction } from "@/lib/db/client";
-import {
-  session,
-  user,
-  workspaceProject,
-  workspaceProjectItem,
-  workspaceProjectMember,
-} from "@/lib/db/schema";
+import { workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
 import { PublishingAccountUnavailableError } from "./publishing-account-policy";
 
-const actorSchema = z
-  .object({ actorId: z.string().trim().min(1), sessionId: z.string().trim().min(1) })
-  .strict();
-const projectSchema = actorSchema.extend({ projectId: z.uuid() }).strict();
-export type SocialActorIdentity = z.infer<typeof actorSchema>;
-export type SocialProjectIdentity = z.infer<typeof projectSchema>;
+export type SocialActorIdentity = ActorSessionIdentity;
+export type SocialProjectIdentity = ProjectActorSessionIdentity;
 export const SOCIAL_HUMAN_ACCESS_MESSAGE =
   "无法确认当前登录或操作权限，本次请求未提交。请重新登录并确认项目权限后重试。";
 export class SocialHumanAccessError extends Error {
@@ -26,7 +21,7 @@ export class SocialHumanAccessError extends Error {
   }
 }
 export function parseSocialActorIdentity(input: unknown): SocialActorIdentity {
-  const value = actorSchema.safeParse(input);
+  const value = actorSessionSchema.safeParse(input);
   if (!value.success) throw new SocialHumanAccessError();
   return value.data;
 }
@@ -34,7 +29,7 @@ export function parseSocialProjectIdentity(
   input: unknown,
   projectId: string,
 ): SocialProjectIdentity {
-  const value = projectSchema.safeParse(input);
+  const value = projectActorSessionSchema.safeParse(input);
   if (!value.success || value.data.projectId !== projectId) throw new SocialHumanAccessError();
   return value.data;
 }
@@ -50,12 +45,7 @@ export async function authorizeSocialActor(
   permissions: readonly Permission[],
   configuredOwner = false,
 ) {
-  const [actor] = await tx
-    .select({ role: user.role, banned: user.banned, expiresAt: session.expiresAt })
-    .from(user)
-    .innerJoin(session, eq(session.userId, user.id))
-    .where(and(eq(user.id, identity.actorId), eq(session.id, identity.sessionId)))
-    .for("share");
+  const actor = await lockActorSession(tx, identity);
   if (
     !actor ||
     actor.banned ||

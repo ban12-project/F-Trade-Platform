@@ -1,25 +1,13 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
+import type { ProjectActorSessionIdentity } from "@/lib/actor-session";
+import { lockActorSession, projectActorSessionSchema } from "@/lib/actor-session";
 import { hasPermission } from "@/lib/authz";
 import type { Database, DatabaseTransaction } from "@/lib/db/client";
-import {
-  session,
-  user,
-  workspaceProject,
-  workspaceProjectItem,
-  workspaceProjectMember,
-} from "@/lib/db/schema";
+import { workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { VIDEO_RETENTION_MESSAGE } from "./retention-policy";
 
-const identitySchema = z
-  .object({
-    actorId: z.string().trim().min(1),
-    sessionId: z.string().trim().min(1),
-    projectId: z.uuid(),
-  })
-  .strict();
-export type VideoDraftIdentity = z.infer<typeof identitySchema>;
+export type VideoDraftIdentity = ProjectActorSessionIdentity;
 export const VIDEO_DRAFT_ACCESS_MESSAGE =
   "无法确认当前登录或视频编辑权限，本次请求未提交。请重新登录并确认项目权限后重试。";
 export class VideoDraftAccessError extends Error {
@@ -29,7 +17,7 @@ export class VideoDraftAccessError extends Error {
   }
 }
 export function parseVideoDraftIdentity(input: unknown): VideoDraftIdentity {
-  const parsed = identitySchema.safeParse(input);
+  const parsed = projectActorSessionSchema.safeParse(input);
   if (!parsed.success) throw new VideoDraftAccessError();
   return parsed.data;
 }
@@ -56,12 +44,7 @@ export async function authorizeLockedVideoDraft(
         ),
       )
       .for("share");
-    const [actor] = await tx
-      .select({ role: user.role, banned: user.banned, expiresAt: session.expiresAt })
-      .from(user)
-      .innerJoin(session, eq(session.userId, user.id))
-      .where(and(eq(user.id, identity.actorId), eq(session.id, identity.sessionId)))
-      .for("share");
+    const actor = await lockActorSession(tx, identity);
     if (
       project?.kind !== "marketing" ||
       !member ||
