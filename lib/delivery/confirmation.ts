@@ -1,12 +1,13 @@
 import deliverySchema from "../../contracts/sales/delivery-confirmation.schema.json";
 import { compileContract } from "../contracts/validator";
+import type { ActorType } from "../workflow/vocabulary";
 
 export type DeliveryConfirmation = {
   confirmation_id: string;
   related_entity_type: "rfq" | "opportunity";
   related_entity_id: string;
   status: "pending" | "confirmed" | "rejected" | "expired";
-  requested_by_type: "agent" | "human" | "system";
+  requested_by_type: ActorType;
   requested_by_id: string;
   requested_at: string;
   approval_ref?: string;
@@ -31,7 +32,7 @@ export function requestDeliveryConfirmation(input: {
   confirmationId: string;
   relatedEntityType: "rfq" | "opportunity";
   relatedEntityId: string;
-  requestedByType: "agent" | "human" | "system";
+  requestedByType: ActorType;
   requestedById: string;
   requestedAt: string;
 }) {
@@ -54,7 +55,7 @@ export function requestDeliveryConfirmation(input: {
 export function decideDeliveryConfirmation(
   pending: DeliveryConfirmation,
   decision: {
-    actorType: "human" | "agent" | "system";
+    actorType: ActorType;
     actorId: string;
     status: "confirmed" | "rejected";
     approvalRef: string;
@@ -105,10 +106,7 @@ export function decideDeliveryConfirmation(
   });
 }
 
-export function expireDeliveryConfirmation(
-  pending: DeliveryConfirmation,
-  actorType: "system" | "agent" | "human",
-) {
+export function expireDeliveryConfirmation(pending: DeliveryConfirmation, actorType: ActorType) {
   if (pending.status !== "pending" && pending.status !== "confirmed")
     throw new Error("Only a pending or confirmed delivery confirmation can expire");
   if (actorType !== "system") throw new Error("Only the system can expire a delivery confirmation");

@@ -12,6 +12,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { actorTypes, aggregateTypes, humanGates } from "../workflow/vocabulary";
+
 const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 const updatedAt = () =>
   timestamp("updated_at", { withTimezone: true })
@@ -19,21 +21,9 @@ const updatedAt = () =>
     .$onUpdate(() => new Date())
     .notNull();
 
-export const actorType = pgEnum("actor_type", ["agent", "human", "system"]);
-export const aggregateType = pgEnum("aggregate_type", [
-  "product",
-  "content",
-  "video",
-  "rfq",
-  "quotation",
-  "lead",
-  "delivery_confirmation",
-]);
-export const approvalGate = pgEnum("approval_gate", [
-  "gate_01_truth",
-  "gate_02_quote",
-  "gate_03_delivery",
-]);
+export const actorType = pgEnum("actor_type", actorTypes);
+export const aggregateType = pgEnum("aggregate_type", aggregateTypes);
+export const approvalGate = pgEnum("approval_gate", humanGates);
 export const approvalStatus = pgEnum("approval_status", ["pending", "approved", "rejected"]);
 export const invitationStatus = pgEnum("invitation_status", [
   "pending",

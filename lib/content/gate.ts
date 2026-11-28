@@ -1,3 +1,4 @@
+import type { ActorType } from "../workflow/vocabulary";
 export function decideContent(
   content: Record<string, unknown>,
   decision: {
@@ -21,7 +22,7 @@ export function decideContent(
 }
 export function publishContent(
   content: Record<string, unknown>,
-  actorType: "human" | "agent" | "system",
+  actorType: ActorType,
   publishedRef: string,
 ) {
   if (content.status !== "approved") throw new Error("Only approved content can be published");

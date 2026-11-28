@@ -1,11 +1,30 @@
 import assert from "node:assert/strict";
 
+import delivery from "../contracts/sales/delivery-confirmation.schema.json";
+import approval from "../contracts/workflow/human-approval.schema.json";
+import event from "../contracts/workflow/workflow-event.schema.json";
 import {
   type ApprovalDecision,
   assertTransition,
   replayTransitions,
   type WorkflowEventInput,
 } from "../lib/workflow/transitions";
+import { actorTypes, aggregateTypes, humanGates } from "../lib/workflow/vocabulary";
+
+// Exchange schemas can expose a subset of aggregates. Actor and gate vocabularies agree.
+assert.deepEqual(new Set(event.properties.actor_type.enum), new Set(actorTypes));
+assert.deepEqual(new Set(approval.properties.requested_by_type.enum), new Set(actorTypes));
+assert.deepEqual(new Set(delivery.properties.requested_by_type.enum), new Set(actorTypes));
+assert.deepEqual(new Set(event.properties.gate.enum), new Set(humanGates));
+assert.deepEqual(new Set(approval.properties.gate.enum), new Set(humanGates));
+for (const schema of [event, approval]) {
+  for (const entity of schema.properties.entity_type.enum) {
+    assert.ok(
+      aggregateTypes.some((type) => type === entity),
+      entity,
+    );
+  }
+}
 
 const approvedTruth: ApprovalDecision = {
   id: "approval-01",
