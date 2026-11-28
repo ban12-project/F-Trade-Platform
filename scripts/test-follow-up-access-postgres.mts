@@ -14,6 +14,7 @@ import {
   type SocialProjectIdentity,
 } from "../lib/social/human-write-access";
 import { decryptSocialMessageBody } from "../lib/social/message-crypto";
+import { createStoredSocialMessageRecord } from "../lib/social/message-record";
 import { seedFollowUpFixture } from "../tests/fixtures/follow-up-access";
 
 const connection = process.env.FOLLOW_UP_TEST_DATABASE_URL;
@@ -124,6 +125,116 @@ async function deliveryExpiry(f: Fixture, expiresAt: Date) {
 let count = 0;
 try {
   await migrate(db, { migrationsFolder: "drizzle" });
+  const { claimNextSocialWorkerJob } = await import("../lib/social/job-store");
+  const worker = "synthetic-reply-worker";
+  process.env.SOCIAL_WORKER_ID = worker;
+  process.env.SOCIAL_WORKER_SIGNING_KEY = randomBytes(32).toString("base64");
+  for (const scenario of [
+    "ordinary",
+    "gate",
+    "legacy-ordinary",
+    "legacy-gate",
+    "legacy-missing",
+    "changed",
+    "revoked",
+    "expired",
+  ] as const) {
+    const f = await fixture();
+    process.env.SOCIAL_WORKER_CHANNEL_REF = f.channelRef;
+    process.env.SOCIAL_WORKER_ACCOUNT_REF = f.accountRef;
+    const ordinary = scenario.endsWith("ordinary");
+    const context = ordinary ? "purchase_later" : "asks_sample";
+    if (scenario.startsWith("legacy")) {
+      const jobId = randomUUID(),
+        messageId = randomUUID();
+      const [row] = await db
+        .select()
+        .from(s.aggregateRecord)
+        .where(eq(s.aggregateRecord.id, f.deliveryId));
+      const delivery = (await import("../lib/delivery/confirmation")).validateDeliveryConfirmation(
+        row.payload,
+      );
+      const body = ordinary
+        ? "SYNTHETIC reply only"
+        : `SYNTHETIC reply only\n\nConfirmed lead time: 21 days. Valid through ${delivery.result?.valid_until?.slice(0, 10)} (Gate 03).`;
+      await db
+        .insert(s.socialMessage)
+        .values(
+          createStoredSocialMessageRecord({
+            id: messageId,
+            conversationId: f.conversationId,
+            externalMessageRef: `pending-${jobId}`,
+            direction: "outbound",
+            identityQuality: "manual",
+            body,
+            receivedAt: new Date(),
+          }),
+        );
+      await db
+        .insert(s.socialBrowserJob)
+        .values({
+          id: jobId,
+          channelRef: f.channelRef,
+          accountRef: f.accountRef,
+          kind: "reply",
+          payloadRef: messageId,
+          idempotencyKey: `reply:${f.projectId}:${f.leadId}:${f.confirmationRef}`,
+          status: "queued",
+        });
+      await db
+        .insert(s.auditEvent)
+        .values({
+          id: randomUUID(),
+          action: "lead.follow_up_submitted",
+          actorType: "human",
+          actorId: f.actorId,
+          subjectType: "lead",
+          subjectId: f.leadId,
+          aggregateId: f.leadId,
+          occurredAt: new Date(),
+          metadata: {
+            context,
+            browser_job_id: jobId,
+            confirmation_ref: f.confirmationRef,
+            delivery_confirmation_ref: scenario === "legacy-missing" ? null : f.deliveryId,
+          },
+        });
+    } else assert.equal((await run(f, context)).status, "success");
+    await db.execute(
+      sql`UPDATE aggregate_record SET payload=jsonb_set(payload,'{follow_up_context}',to_jsonb(${ordinary ? "asks_sample" : "purchase_later"}::text)) WHERE id=${f.leadId}`,
+    );
+    if (scenario === "changed")
+      await db.execute(
+        sql`UPDATE aggregate_record SET payload=jsonb_set(payload,'{result,valid_until}',to_jsonb(to_char((payload#>>'{result,valid_until}')::timestamptz - interval '1 millisecond','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))) WHERE id=${f.deliveryId}`,
+      );
+    if (scenario === "revoked")
+      await db
+        .update(s.approval)
+        .set({ status: "rejected" })
+        .where(eq(s.approval.aggregateId, f.deliveryId));
+    const claim = await claimNextSocialWorkerJob(
+      worker,
+      new Date(Date.now() + (scenario === "expired" ? 4_000_000 : 0)),
+      db,
+    );
+    const [job] = await db
+      .select()
+      .from(s.socialBrowserJob)
+      .where(eq(s.socialBrowserJob.channelRef, f.channelRef));
+    if (["legacy-missing", "changed", "revoked", "expired"].includes(scenario)) {
+      assert.equal(claim, null);
+      assert.equal(job.status, "paused");
+      assert.equal(
+        job.failureCode,
+        scenario === "expired" ? "gate_03_expired" : "reply_approval_unverified",
+      );
+    } else {
+      assert.equal(job.status, "claimed", `${scenario}: ${job.failureCode}`);
+      assert.equal(typeof claim?.payload.text, "string");
+      assert.equal(String(claim?.payload.text).includes("(Gate 03)"), !ordinary);
+    }
+    count++;
+  }
   for (const role of ["user", "admin"])
     for (const context of ["quote_sent_unread", "asks_lead_time"] as const) {
       const f = await fixture(role);

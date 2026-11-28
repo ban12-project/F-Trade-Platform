@@ -15,6 +15,8 @@ export async function seedFollowUpFixture(db: Database, role = "user") {
     ownedId = randomUUID(),
     deliveryId = randomUUID(),
     rfqId = randomUUID(),
+    approvalId = randomUUID(),
+    decidedAt = new Date(),
     confirmationRef = `evidence-mock-${randomUUID()}`;
   const [conversation] = await db
     .select()
@@ -59,16 +61,29 @@ export async function seedFollowUpFixture(db: Database, role = "user") {
       requested_by_type: "human",
       requested_by_id: f.actorId,
       requested_at: new Date().toISOString(),
-      approval_ref: randomUUID(),
+      approval_ref: approvalId,
       result: {
         actor_type: "human",
         decided_by: f.actorId,
-        decided_at: new Date().toISOString(),
+        decided_at: decidedAt.toISOString(),
         evidence_ref: confirmationRef,
         confirmed_lead_time_days: 21,
         valid_until: new Date(Date.now() + 3_600_000).toISOString(),
       },
     },
+  });
+  await db.insert(s.approval).values({
+    id: approvalId,
+    gate: "gate_03_delivery",
+    status: "approved",
+    aggregateId: deliveryId,
+    requestedByType: "human",
+    requestedById: f.actorId,
+    requestedAt: decidedAt,
+    decidedByType: "human",
+    decidedById: f.actorId,
+    decidedAt,
+    evidenceRef: confirmationRef,
   });
   await db.insert(s.workspaceProjectItem).values([
     {

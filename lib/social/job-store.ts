@@ -2,12 +2,14 @@ import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
 import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import leadSchema from "@/contracts/sales/lead.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
 import { type Database, getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
+  approval,
   auditEvent,
   socialBrowserJob,
   socialChannelControl,
@@ -15,11 +17,13 @@ import {
   socialMessage,
   socialPublication,
   workflowEvent,
+  workspaceProjectItem,
 } from "@/lib/db/schema";
 import {
   expireDeliveryConfirmation,
   validateDeliveryConfirmation,
 } from "@/lib/delivery/confirmation";
+import { deliverySuffix, hasDeliveryClaim, replyBasis } from "@/lib/follow-up/controlled-reply";
 import { assessReplyWindow } from "@/lib/social/inbound-policy";
 import { decryptSocialMessageBody } from "@/lib/social/message-crypto";
 import { digestSocialWorkerPayload, signSocialWorkerCommand } from "@/lib/social/worker-protocol";
@@ -108,6 +112,183 @@ async function pauseExpiredClaims(
       metadata: { job_kind: stale.kind, retry_allowed: false },
       occurredAt: now,
     });
+  }
+}
+
+async function verifyQueuedReplyApproval(
+  tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
+  job: typeof socialBrowserJob.$inferSelect,
+  message: typeof socialMessage.$inferSelect,
+  leadId: string,
+  text: string,
+  workerId: string,
+  now: Date,
+) {
+  const submissions = await tx
+    .select({ metadata: auditEvent.metadata, at: auditEvent.occurredAt })
+    .from(auditEvent)
+    .where(
+      and(
+        eq(auditEvent.action, "lead.follow_up_submitted"),
+        eq(auditEvent.actorType, "human"),
+        eq(auditEvent.subjectType, "lead"),
+        eq(auditEvent.subjectId, leadId),
+        eq(auditEvent.aggregateId, leadId),
+        sql`${auditEvent.metadata}->>'browser_job_id' = ${job.id}`,
+      ),
+    )
+    .limit(2);
+  const submission = submissions[0];
+  const meta = submission?.metadata;
+  const unverified = () =>
+    new PreflightRejection("reply_approval_unverified", "无法核实原回复的审批依据，请人工复核。");
+  const owners = await tx
+    .select({ projectId: workspaceProjectItem.projectId })
+    .from(workspaceProjectItem)
+    .where(
+      and(
+        eq(workspaceProjectItem.aggregateId, leadId),
+        eq(workspaceProjectItem.role, "sales_lead"),
+        eq(workspaceProjectItem.relation, "owned"),
+      ),
+    )
+    .for("share");
+  const projectId = owners.find((owner) =>
+    job.idempotencyKey.startsWith(`reply:${owner.projectId}:${leadId}:`),
+  )?.projectId;
+  const pinned = meta && Object.hasOwn(meta, "reply_basis");
+  const ordinary =
+    !hasDeliveryClaim(text) &&
+    !submissions.some((event) =>
+      needsDeliveryConfirmation(event.metadata.context as FollowUpContext),
+    );
+  if (pinned && submissions.length !== 1) throw unverified();
+  if (ordinary) {
+    if (
+      pinned &&
+      (!projectId ||
+        !isDeepStrictEqual(
+          meta.reply_basis,
+          replyBasis(projectId, message.id, message.bodyCiphertext, null),
+        ))
+    )
+      throw unverified();
+  } else {
+    if (
+      !projectId ||
+      submissions.length !== 1 ||
+      !needsDeliveryConfirmation(meta?.context as FollowUpContext) ||
+      typeof meta?.delivery_confirmation_ref !== "string" ||
+      message.externalMessageRef !== `pending-${job.id}` ||
+      job.idempotencyKey !== `reply:${projectId}:${leadId}:${meta.confirmation_ref}`
+    )
+      throw unverified();
+    const [deliveryRow] = await tx
+      .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
+      .from(aggregateRecord)
+      .where(
+        and(
+          eq(aggregateRecord.id, meta.delivery_confirmation_ref),
+          eq(aggregateRecord.type, "delivery_confirmation"),
+        ),
+      )
+      .for("update");
+    if (deliveryRow?.state !== "DELIVERY_CONFIRMATION_CONFIRMED")
+      throw new PreflightRejection("gate_03_not_confirmed", "Gate 03 未确认，不能发送回复。");
+    const delivery = validateDeliveryConfirmation(deliveryRow.payload);
+    const validUntil = delivery.result?.valid_until;
+    const result = delivery.result;
+    if (
+      delivery.status !== "confirmed" ||
+      delivery.confirmation_id !== meta.delivery_confirmation_ref ||
+      delivery.related_entity_type !== "rfq" ||
+      !validUntil ||
+      !delivery.approval_ref ||
+      !result ||
+      typeof result.confirmed_lead_time_days !== "number"
+    )
+      throw unverified();
+    const suffix = deliverySuffix(result.confirmed_lead_time_days, validUntil);
+    if (
+      !text.endsWith(suffix) ||
+      hasDeliveryClaim(text.slice(0, -suffix.length)) ||
+      (pinned &&
+        !isDeepStrictEqual(
+          meta.reply_basis,
+          replyBasis(projectId, message.id, message.bodyCiphertext, delivery),
+        ))
+    )
+      throw unverified();
+    const [decision] = await tx
+      .select()
+      .from(approval)
+      .where(
+        and(
+          eq(approval.id, delivery.approval_ref),
+          eq(approval.aggregateId, delivery.confirmation_id),
+          eq(approval.gate, "gate_03_delivery"),
+          eq(approval.status, "approved"),
+          eq(approval.decidedByType, "human"),
+          eq(approval.decidedById, result.decided_by),
+          eq(approval.evidenceRef, result.evidence_ref),
+        ),
+      )
+      .for("share");
+    if (
+      !decision?.decidedAt ||
+      decision.decidedAt > submission.at ||
+      Date.parse(result.decided_at) !== decision.decidedAt.getTime()
+    )
+      throw unverified();
+    for (const [id, role] of [
+      [delivery.confirmation_id, "delivery_confirmation"],
+      [delivery.related_entity_id, "sales_rfq"],
+    ] as const) {
+      const [link] = await tx
+        .select({ id: workspaceProjectItem.id })
+        .from(workspaceProjectItem)
+        .where(
+          and(
+            eq(workspaceProjectItem.projectId, projectId),
+            eq(workspaceProjectItem.aggregateId, id),
+            eq(workspaceProjectItem.role, role),
+          ),
+        )
+        .for("share");
+      if (!link) throw unverified();
+    }
+    if (Date.parse(validUntil) <= Math.max(now.getTime(), Date.now())) {
+      await tx
+        .update(aggregateRecord)
+        .set({
+          state: "DELIVERY_CONFIRMATION_EXPIRED",
+          payload: expireDeliveryConfirmation(delivery, "system"),
+          version: sql`${aggregateRecord.version} + 1`,
+        })
+        .where(eq(aggregateRecord.id, delivery.confirmation_id));
+      await tx.insert(workflowEvent).values({
+        id: randomUUID(),
+        aggregateId: delivery.confirmation_id,
+        fromState: "DELIVERY_CONFIRMATION_CONFIRMED",
+        toState: "DELIVERY_CONFIRMATION_EXPIRED",
+        actorType: "system",
+        actorId: workerId,
+        evidenceRefs: [],
+        occurredAt: now,
+      });
+      await tx.insert(auditEvent).values({
+        id: randomUUID(),
+        action: "delivery_confirmation.expired_before_reply",
+        actorType: "system",
+        actorId: workerId,
+        aggregateId: delivery.confirmation_id,
+        subjectType: "delivery_confirmation",
+        subjectId: delivery.confirmation_id,
+        metadata: { browser_job_id: job.id },
+        occurredAt: now,
+      });
+      throw new PreflightRejection("gate_03_expired", "Gate 03 已过期，不能发送回复。");
+    }
   }
 }
 
@@ -225,59 +406,8 @@ export async function claimNextSocialWorkerJob(
             "lead_not_in_follow_up",
             "线索已不处于跟进状态，不能发送回复。",
           );
-        const lead = validateWorkerLead(leadRow.payload);
-        if (needsDeliveryConfirmation(lead.follow_up_context)) {
-          if (!lead.delivery_confirmation_ref)
-            throw new PreflightRejection("gate_03_missing", "回复缺少 Gate 03 交期确认。");
-          const [deliveryRow] = await tx
-            .select({ state: aggregateRecord.state, payload: aggregateRecord.payload })
-            .from(aggregateRecord)
-            .where(
-              and(
-                eq(aggregateRecord.id, lead.delivery_confirmation_ref),
-                eq(aggregateRecord.type, "delivery_confirmation"),
-              ),
-            )
-            .for("update");
-          if (deliveryRow?.state !== "DELIVERY_CONFIRMATION_CONFIRMED")
-            throw new PreflightRejection("gate_03_not_confirmed", "Gate 03 未确认，不能发送回复。");
-          const delivery = validateDeliveryConfirmation(deliveryRow.payload);
-          const validUntil = delivery.result?.valid_until;
-          if (delivery.related_entity_id !== lead.rfq_ref || !validUntil)
-            throw new PreflightRejection("gate_03_mismatch", "Gate 03 与当前 RFQ 不匹配。");
-          if (Date.parse(validUntil) <= now.getTime()) {
-            await tx
-              .update(aggregateRecord)
-              .set({
-                state: "DELIVERY_CONFIRMATION_EXPIRED",
-                payload: expireDeliveryConfirmation(delivery, "system"),
-                version: sql`${aggregateRecord.version} + 1`,
-              })
-              .where(eq(aggregateRecord.id, delivery.confirmation_id));
-            await tx.insert(workflowEvent).values({
-              id: randomUUID(),
-              aggregateId: delivery.confirmation_id,
-              fromState: "DELIVERY_CONFIRMATION_CONFIRMED",
-              toState: "DELIVERY_CONFIRMATION_EXPIRED",
-              actorType: "system",
-              actorId: workerId,
-              evidenceRefs: [],
-              occurredAt: now,
-            });
-            await tx.insert(auditEvent).values({
-              id: randomUUID(),
-              action: "delivery_confirmation.expired_before_reply",
-              actorType: "system",
-              actorId: workerId,
-              aggregateId: delivery.confirmation_id,
-              subjectType: "delivery_confirmation",
-              subjectId: delivery.confirmation_id,
-              metadata: { browser_job_id: job.id },
-              occurredAt: now,
-            });
-            throw new PreflightRejection("gate_03_expired", "Gate 03 已过期，不能发送回复。");
-          }
-        }
+        validateWorkerLead(leadRow.payload);
+        const text = decryptSocialMessageBody(message.bodyCiphertext);
         const [latestInbound] = await tx
           .select({
             externalMessageRef: socialMessage.externalMessageRef,
@@ -296,6 +426,7 @@ export async function claimNextSocialWorkerJob(
           .limit(1)
           .for("update");
         if (!latestInbound) throw new Error("没有仍在保留期内的入站消息，不能发送回复。");
+        await verifyQueuedReplyApproval(tx, job, message, conversation.leadId, text, workerId, now);
         const window = assessReplyWindow(
           {
             channelRef: job.channelRef,
@@ -310,14 +441,14 @@ export async function claimNextSocialWorkerJob(
             direction: "inbound",
             receivedAt: latestInbound.receivedAt.toISOString(),
           },
-          now.toISOString(),
+          new Date(Math.max(now.getTime(), Date.now())).toISOString(),
         );
         if (window.status !== "within_window") {
           throw new PreflightRejection("reply_window_expired", "渠道回复窗口已过期。");
         }
         payload = {
           conversationRef: conversation.externalConversationRef,
-          text: decryptSocialMessageBody(message.bodyCiphertext),
+          text,
         };
       } else {
         throw new Error("队列包含不支持的社交任务类型。");

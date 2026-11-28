@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { DeliveryConfirmation } from "@/lib/delivery/confirmation";
 
 import { type FollowUpContext, needsDeliveryConfirmation } from "./cadence";
@@ -6,6 +7,38 @@ export type { FollowUpContext } from "./cadence";
 
 const DELIVERY_CLAIM_PATTERN =
   /(?:交期|货期|发货时间|lead\s*time|delivery\s+(?:in|within|after|before)|ship(?:s|ping)?\s+(?:in|within|after|before))/iu;
+
+export function hasDeliveryClaim(text: string) {
+  return DELIVERY_CLAIM_PATTERN.test(text);
+}
+
+export function deliverySuffix(days: number, validUntil: string) {
+  return `\n\nConfirmed lead time: ${days} days. Valid through ${validUntil.slice(0, 10)} (Gate 03).`;
+}
+
+export function replyBasis(
+  projectId: string,
+  messageId: string,
+  ciphertext: string,
+  delivery: DeliveryConfirmation | null,
+) {
+  return {
+    projectId,
+    messageId,
+    ciphertextDigest: createHash("sha256").update(ciphertext).digest("hex"),
+    kind: delivery ? "gate_03" : "ordinary",
+    ...(delivery && {
+      confirmationId: delivery.confirmation_id,
+      rfqId: delivery.related_entity_id,
+      approvalRef: delivery.approval_ref,
+      decidedBy: delivery.result?.decided_by,
+      decidedAt: delivery.result?.decided_at,
+      evidenceRef: delivery.result?.evidence_ref,
+      leadTimeDays: delivery.result?.confirmed_lead_time_days,
+      validUntil: delivery.result?.valid_until,
+    }),
+  };
+}
 
 export class ControlledReplyError extends Error {
   constructor(
@@ -29,7 +62,7 @@ export function buildControlledReply(input: {
   delivery: DeliveryConfirmation | null;
   now: Date;
 }) {
-  if (DELIVERY_CLAIM_PATTERN.test(input.draft))
+  if (hasDeliveryClaim(input.draft))
     throw new ControlledReplyError(
       "delivery_claim_in_draft",
       "自由文本不能包含交期承诺；请选择交期场景，由系统插入有效的 Gate 03 结果。",
@@ -47,10 +80,11 @@ export function buildControlledReply(input: {
   if (
     input.delivery.related_entity_id !== input.rfqRef ||
     !validUntil ||
+    typeof leadTimeDays !== "number" ||
     !Number.isInteger(leadTimeDays)
   )
     throw new ControlledReplyError("gate_03_mismatch", "Gate 03 与当前 RFQ 不匹配，不能用于回复。");
   if (Date.parse(validUntil) <= input.now.getTime())
     throw new ControlledReplyError("gate_03_expired", "Gate 03 交期确认已过期，请重新申请确认。");
-  return `${input.draft}\n\nConfirmed lead time: ${leadTimeDays} days. Valid through ${validUntil.slice(0, 10)} (Gate 03).`;
+  return input.draft + deliverySuffix(leadTimeDays, validUntil);
 }
