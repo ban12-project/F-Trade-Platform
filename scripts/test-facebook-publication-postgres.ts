@@ -7,7 +7,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import { initialState } from "../lib/browser-fleet/policy";
-import { schedulePublications } from "../lib/browser-fleet/publication";
+import { schedulePublications } from "../lib/browser-fleet/publication-scheduling";
 import { handleBrowserNodeRequest, ownerBrowserCommand } from "../lib/browser-fleet/store";
 import { closeDatabase, type Database } from "../lib/db/client";
 import { facebookPublicationManifest } from "../lib/db/facebook-runtime-schema";

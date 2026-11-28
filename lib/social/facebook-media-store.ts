@@ -55,7 +55,7 @@ import {
   SocialHumanAccessError,
   type SocialProjectIdentity,
 } from "./human-write-access";
-import { assertPublicationEligible } from "./publication-store";
+import { assertPublicationEligible } from "./publication-eligibility";
 import {
   digestSocialWorkerPayload,
   type SignedSocialWorkerCommand,
