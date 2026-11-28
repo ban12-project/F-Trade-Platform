@@ -2,9 +2,7 @@ import { assertAggregateWorkspaceWrite } from "@/lib/workspace/access";
 import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
-
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
-
 import leadSchema from "@/contracts/sales/lead.schema.json";
 import { compileContract } from "@/lib/contracts/validator";
 import { type Database, getDatabase } from "@/lib/db/client";
@@ -25,6 +23,7 @@ import {
 import { assessReplyWindow } from "@/lib/social/inbound-policy";
 import { decryptSocialMessageBody } from "@/lib/social/message-crypto";
 import { digestSocialWorkerPayload, signSocialWorkerCommand } from "@/lib/social/worker-protocol";
+import { type FollowUpContext, needsDeliveryConfirmation } from "../follow-up/cadence";
 import { buildFacebookPublicationPayload } from "./facebook-media-store";
 import {
   configuredFacebookWorkerScope,
@@ -37,7 +36,7 @@ export type ClaimedSocialJob = {
 };
 
 type WorkerLead = {
-  follow_up_context?: string;
+  follow_up_context?: FollowUpContext;
   delivery_confirmation_ref?: string;
   rfq_ref?: string;
 };
@@ -227,10 +226,7 @@ export async function claimNextSocialWorkerJob(
             "线索已不处于跟进状态，不能发送回复。",
           );
         const lead = validateWorkerLead(leadRow.payload);
-        if (
-          lead.follow_up_context === "asks_lead_time" ||
-          lead.follow_up_context === "asks_sample"
-        ) {
+        if (needsDeliveryConfirmation(lead.follow_up_context)) {
           if (!lead.delivery_confirmation_ref)
             throw new PreflightRejection("gate_03_missing", "回复缺少 Gate 03 交期确认。");
           const [deliveryRow] = await tx
