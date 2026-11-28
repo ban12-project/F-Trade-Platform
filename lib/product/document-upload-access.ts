@@ -1,3 +1,4 @@
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
@@ -53,7 +54,7 @@ export async function authorizeDocumentUpload(
         and(
           eq(workspaceProjectMember.projectId, projectId),
           eq(workspaceProjectMember.userId, identity.actorId),
-          inArray(workspaceProjectMember.role, ["owner", "editor"]),
+          inArray(workspaceProjectMember.role, memberRolesForAccess.write),
         ),
       )
       .for("share");

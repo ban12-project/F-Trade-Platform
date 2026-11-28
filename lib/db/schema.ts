@@ -11,8 +11,8 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-
 import { actorTypes, aggregateTypes, humanGates } from "../workflow/vocabulary";
+import { workspaceMemberRoles } from "../workspace/member-roles";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 const updatedAt = () =>
@@ -64,11 +64,10 @@ export const videoReviewOutcome = pgEnum("video_review_outcome", [
 ]);
 export const workspaceProjectKind = pgEnum("workspace_project_kind", ["marketing", "sales"]);
 export const workspaceProjectStatus = pgEnum("workspace_project_status", ["active", "archived"]);
-export const workspaceProjectMemberRole = pgEnum("workspace_project_member_role", [
-  "owner",
-  "editor",
-  "viewer",
-]);
+export const workspaceProjectMemberRole = pgEnum(
+  "workspace_project_member_role",
+  workspaceMemberRoles,
+);
 export const workspaceItemRelation = pgEnum("workspace_item_relation", ["owned", "reference"]);
 
 export const user = pgTable(
