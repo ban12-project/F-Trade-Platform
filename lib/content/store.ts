@@ -9,6 +9,7 @@ import {
   type ContentDraftIdentity,
   parseContentDraftIdentity,
 } from "@/lib/content/draft-write-access";
+import type { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/content/form-schemas";
 import {
   authorizeLockedContentReview,
   ContentReviewAccessError,
@@ -26,7 +27,6 @@ import {
   workspaceProjectItem,
   workspaceProjectMember,
 } from "@/lib/db/schema";
-import type { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
 import { productFactLabels } from "@/lib/product/fact-labels";
 import type { ProductReady } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";

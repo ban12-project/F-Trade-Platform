@@ -57,22 +57,19 @@ import {
   requestDeliveryAction,
   saveFollowUpPlanAction,
 } from "@/lib/actions/closing";
+import { deliveryRequestFormSchema } from "@/lib/delivery/form-schemas";
 import {
   followUpContextLabel,
   followUpContexts,
   needsDeliveryConfirmation,
   nextFollowUp,
 } from "@/lib/follow-up/cadence";
+import { followUpFormSchema, followUpPlanFormSchema } from "@/lib/follow-up/form-schemas";
 import { firstHotScore, scoringRules } from "@/lib/follow-up/lead-scoring";
-import {
-  deliveryRequestFormSchema,
-  followUpFormSchema,
-  followUpPlanFormSchema,
-  opportunityDecisionFormSchema,
-} from "@/lib/form-schemas";
 import { localTimeChoices } from "@/lib/local-time";
 import type { DeliveryConfirmationEntry, LeadEntry } from "@/lib/sales/closing-store";
 import { salesNextActionLabels } from "@/lib/sales/journey";
+import { opportunityDecisionFormSchema } from "@/lib/sales/opportunity-form-schema";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import { useWorkspaceDirty } from "./dirty-state";
 import { EvidenceSelectField } from "./evidence-select";

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicationConfirmationFormSchema } from "@/lib/form-schemas";
+import { publicationConfirmationFormSchema } from "@/lib/social/form-schemas";
 import { facebookMediaSubmitFormSchema } from "./facebook-account-forms";
 
 const target = z

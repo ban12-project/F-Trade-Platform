@@ -16,7 +16,7 @@ import {
   workspaceProjectItem,
   workspaceProjectMember,
 } from "@/lib/db/schema";
-import { inboundRoutingFormSchema } from "@/lib/form-schemas";
+import { inboundRoutingFormSchema } from "@/lib/social/form-schemas";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import {
   assertSocialAuthorizationAlive,

@@ -31,8 +31,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { initialContentActionState } from "@/lib/action-states";
 import { decideContentReviewAction } from "@/lib/actions/content";
+import { contentReviewFormSchema } from "@/lib/content/form-schemas";
 import type { ContentCatalogDetail, ReadyProductContentSource } from "@/lib/content/store";
-import { contentReviewFormSchema } from "@/lib/form-schemas";
 import { productFactLabels } from "@/lib/product/fact-labels";
 import { recordStateLabels } from "@/lib/workspace/library-model";
 import { useWorkspaceDirty } from "./dirty-state";

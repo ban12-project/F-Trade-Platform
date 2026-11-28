@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createProductAgentModel } from "@/lib/ai/model-provider";
 import { resolveProductAgentModelConfig } from "@/lib/ai/product-agent-model-config";
 import { auth } from "@/lib/auth";
-import { productAgentRunFormSchema } from "@/lib/form-schemas";
+import { productAgentRunFormSchema } from "@/lib/product/agent-review-forms";
 import { prepareClaimedProductDocument } from "@/lib/product/claimed-document";
 import { attachClaimedProductImages } from "@/lib/product/claimed-source-images";
 import { logProductIntakeFailure, type ProductIntakeStage } from "@/lib/product/intake-diagnostics";

@@ -1,5 +1,5 @@
+import { contentDraftFormSchema, contentReviewFormSchema } from "../lib/content/form-schemas";
 import { assertContentVisualInstruction, buildContentDraft } from "../lib/content/store";
-import { contentDraftFormSchema, contentReviewFormSchema } from "../lib/form-schemas";
 import type { ProductReady } from "../lib/product/verification";
 import { assertTransition } from "../lib/workflow/transitions";
 

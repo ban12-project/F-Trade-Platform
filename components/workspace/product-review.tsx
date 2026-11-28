@@ -33,7 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { initialProductActionState } from "@/lib/action-states";
 import { decideProductCatalogReviewAction } from "@/lib/actions/products";
-import { productReviewFormSchema } from "@/lib/form-schemas";
+import { productReviewFormSchema } from "@/lib/product/agent-review-forms";
 import { productApprovalBlockingFields } from "@/lib/product/blocking-fields";
 import type { ProductEvidencePreview } from "@/lib/product/evidence-preview";
 import { productBlockerLabel } from "@/lib/product/fact-labels";

@@ -31,7 +31,7 @@ import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { type ClosingActionState, initialClosingActionState } from "@/lib/action-states";
 import { routeInboundConversationAction } from "@/lib/actions/closing";
 import { readInboundContextAction } from "@/lib/actions/inbound-context";
-import { inboundRoutingFormSchema } from "@/lib/form-schemas";
+import { inboundRoutingFormSchema } from "@/lib/social/form-schemas";
 import type { InboundContextPreview } from "@/lib/social/inbound-context-store";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
 import { isReadOnlyMember } from "@/lib/workspace/member-roles";

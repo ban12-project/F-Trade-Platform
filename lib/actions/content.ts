@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
 import { contentDraftFailureMessage } from "@/lib/content/draft-write-access";
+import { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/content/form-schemas";
 import { contentReviewFailureMessage } from "@/lib/content/review-write-access";
 import {
   copyContentDraftToProject,
@@ -10,7 +11,6 @@ import {
   decideContentReview,
   reviseContentDraft,
 } from "@/lib/content/store";
-import { contentDraftFormSchema, contentReviewFormSchema } from "@/lib/form-schemas";
 import { assertWorkspaceAggregateLink, assertWorkspaceProjectKind } from "@/lib/workspace/store";
 
 export type ContentActionState = {

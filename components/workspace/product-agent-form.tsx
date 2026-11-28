@@ -55,7 +55,7 @@ import { useProductStream } from "@/components/workspace/use-product-stream";
 import { initialProductAgentActionState } from "@/lib/action-states";
 import { runProductAgentAction } from "@/lib/actions/product-agent";
 import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
-import { productAgentRunFormSchema } from "@/lib/form-schemas";
+import { productAgentRunFormSchema } from "@/lib/product/agent-review-forms";
 import { productFactLabels } from "@/lib/product/fact-labels";
 import { productImageFilesSchema } from "@/lib/product/source-image-contracts";
 import { uploadProductDocument } from "@/lib/product/upload-document-client";

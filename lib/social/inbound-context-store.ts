@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
 import { socialConversation, socialMessage } from "@/lib/db/schema";
-import { inboundContextRequestSchema } from "@/lib/form-schemas";
+import { inboundContextRequestSchema } from "@/lib/social/form-schemas";
 import {
   assertSocialAuthorizationAlive,
   authorizeSocialActor,

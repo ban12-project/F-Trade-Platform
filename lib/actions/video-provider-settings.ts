@@ -6,10 +6,10 @@ import { actionError } from "@/lib/action-boundary";
 
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/authz";
-import { videoProviderModelSettingsFormSchema } from "@/lib/form-schemas";
 import { assertVideoGenerationEnabled } from "@/lib/video/mvp-policy";
 import { videoAspectRatioSchema, videoCapabilitySchema } from "@/lib/video/provider-capabilities";
 import { saveVideoProviderModelSettings } from "@/lib/video/provider-config-store";
+import { videoProviderModelSettingsFormSchema } from "@/lib/video/provider-form-schemas";
 
 export type VideoProviderSettingsActionState = {
   status: "idle" | "success" | "error";

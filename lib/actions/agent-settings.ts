@@ -1,8 +1,7 @@
 "use server";
 import { actionError, authorizedActionSession, refreshWorkspace } from "@/lib/action-boundary";
-
+import { productAgentModelSettingsSchema } from "@/lib/ai/model-settings-form-schema";
 import { saveProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
-import { productAgentModelSettingsSchema } from "@/lib/form-schemas";
 
 export type AgentSettingsActionState = {
   status: "idle" | "success" | "error";

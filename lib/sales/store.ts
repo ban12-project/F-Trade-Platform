@@ -9,12 +9,12 @@ import {
   workspaceProject,
   workspaceProjectItem,
 } from "@/lib/db/schema";
-import { rfqFormSchema } from "@/lib/form-schemas";
 import { assessRfq, promoteRfqReady, updateRfqDraft } from "@/lib/rfq/completeness";
 import {
   readRfqCustomerRequirements,
   writeRfqCustomerRequirements,
 } from "@/lib/rfq/customer-requirements";
+import { rfqFormSchema } from "@/lib/rfq/form-schemas";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { assertTransition } from "@/lib/workflow/transitions";
 import {

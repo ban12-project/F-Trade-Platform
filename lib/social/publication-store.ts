@@ -11,7 +11,10 @@ import {
   socialPublication,
   workspaceProjectItem,
 } from "@/lib/db/schema";
-import { publicationConfirmationFormSchema, publicationResultSchema } from "@/lib/form-schemas";
+import {
+  publicationConfirmationFormSchema,
+  publicationResultSchema,
+} from "@/lib/social/form-schemas";
 import { aggregateRetentionCondition } from "@/lib/video/retention-policy";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
 import { isPublicationPreauthorizationFailure } from "../../ops/browser-node/publication-diagnostics.mjs";

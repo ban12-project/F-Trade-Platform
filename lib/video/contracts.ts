@@ -7,6 +7,7 @@ import {
   marketingVideoDraftSchema,
 } from "./edit-contracts";
 import { videoEncodingSchema } from "./encoding-contract";
+import { videoPlatformSchema } from "./platform";
 import { videoResourceMeasurementsSchema } from "./resource-measurements";
 
 const unverifiedGenerationFactPattern =
@@ -21,8 +22,7 @@ const evidenceRef = z
   .trim()
   .regex(/^evidence-[a-z0-9][a-z0-9_-]{2,120}$/i, "ProductMedia 必须引用私有证据记录。");
 
-export const videoPlatformSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
-export type VideoPlatform = z.infer<typeof videoPlatformSchema>;
+export { type VideoPlatform, videoPlatformSchema } from "./platform";
 
 export const videoExportArtifactSchema = z
   .object({

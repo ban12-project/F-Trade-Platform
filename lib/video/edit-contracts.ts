@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { videoPlatformSchema } from "./platform";
 
 import { shotSourceAnalysisSchema } from "./shot-analysis";
 
@@ -10,7 +11,6 @@ const claimRef = z
   .string()
   .trim()
   .regex(/^(?:product|specifications|commercial)\.[a-z_]+$/, "产品事实引用无效。");
-const editingPlatformSchema = z.enum(["facebook", "instagram", "x", "youtube", "tiktok"]);
 const evidenceRef = z
   .string()
   .trim()
@@ -40,7 +40,7 @@ const marketingVideoCreationShape = {
   factPath: claimRef,
   objective: z.string().trim().min(1, "请填写视频目标。").max(2_000),
   targetAudience: z.string().trim().min(1, "请填写目标受众。").max(240),
-  platform: editingPlatformSchema,
+  platform: videoPlatformSchema,
 } as const;
 
 /** Existing browser-upload form contract. */
@@ -441,7 +441,7 @@ const marketingVideoDraftV3Schema = z
     version: z.literal(3),
     creativeFramework: z.literal("google_abcd"),
     creativeBrief: marketingCreativeBriefSchema.optional(),
-    platform: editingPlatformSchema,
+    platform: videoPlatformSchema,
     clips: z
       .array(marketingVideoClipSchema)
       .min(1, "至少需要一个片段。")
@@ -520,7 +520,7 @@ const marketingVideoDraftV3Schema = z
 const marketingVideoDraftV2Schema = z
   .object({
     version: z.literal(2),
-    platform: editingPlatformSchema,
+    platform: videoPlatformSchema,
     clips: z
       .array(marketingVideoClipV2Schema)
       .min(1, "至少需要一个片段。")
@@ -604,7 +604,7 @@ const legacyMarketingVideoClipSchema = z
 const legacyMarketingVideoDraftSchema = z
   .object({
     version: z.literal(1),
-    platform: editingPlatformSchema,
+    platform: videoPlatformSchema,
     clips: z.array(legacyMarketingVideoClipSchema).min(1).max(3),
     ctaText: z.string().trim().max(40),
   })
