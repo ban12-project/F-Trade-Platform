@@ -7,8 +7,8 @@ import { productReviewFormSchema } from "@/lib/form-schemas";
 import { productCatalogFormSchema } from "@/lib/product/catalog-form-schema";
 import { claimProductImageEvidenceRefs } from "@/lib/product/claimed-source-images";
 import {
-  createEvidenceBoundProductCatalogDraft as createProductCatalogDraft,
-  reviseEvidenceBoundProductCatalogDraft as reviseProductCatalogDraft,
+  createEvidenceBoundProductCatalogDraft,
+  reviseEvidenceBoundProductCatalogDraft,
 } from "@/lib/product/evidence-bound-catalog";
 import { productRevisionFailureMessage } from "@/lib/product/retained-evidence";
 import { productReviewFailureMessage } from "@/lib/product/review-write-access";
@@ -55,7 +55,7 @@ export async function createProductCatalogDraftAction(
       formData.getAll("imageReceiptId"),
       identity,
     );
-    const result = await createProductCatalogDraft(
+    const result = await createEvidenceBoundProductCatalogDraft(
       parsed.data,
       session.user.id,
       projectId,
@@ -150,7 +150,7 @@ export async function reviseProductCatalogDraftAction(
       formData.getAll("imageReceiptId"),
       identity,
     );
-    await reviseProductCatalogDraft(
+    await reviseEvidenceBoundProductCatalogDraft(
       parsedProductId.data,
       parsed.data,
       session.user.id,
