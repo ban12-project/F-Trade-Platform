@@ -123,7 +123,7 @@
     "title": "Calibrate rule-based lead scoring with cap",
     "milestone": "M4 跟单商机闭环",
     "labels": ["type:task", "area:follow-up", "area:data", "priority:P1"],
-    "body": "使用 config/lead-scoring.yaml 的规则作为初始基线；权重合计 110，输出必须 min(100, sum)。用真实运行数据（不得提交到 GitHub）校准阈值。\n\n## 验收\n- [ ] 每条得分都有触发证据\n- [ ] COLD/WARM/HOT 边界无歧义\n- [ ] 规则版本可追溯"
+    "body": "使用 lib/follow-up/lead-scoring.ts 的规则作为初始基线；权重合计 110，输出必须 min(100, sum)。用真实运行数据（不得提交到 GitHub）校准阈值。\n\n## 验收\n- [ ] 每条得分都有触发证据\n- [ ] COLD/WARM/HOT 边界无歧义\n- [ ] 规则版本可追溯"
   },
   {
     "title": "Implement Gate 03 delivery confirmation",
