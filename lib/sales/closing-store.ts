@@ -26,7 +26,7 @@ import {
 import { deliveryDecisionFormSchema, deliveryRequestFormSchema } from "@/lib/delivery/form-schemas";
 import { DELIVERY_CONFIRMATION_VALIDITY_MS } from "@/lib/delivery/validity";
 import { needsDeliveryConfirmation, nextFollowUp } from "@/lib/follow-up/cadence";
-import { buildControlledReply } from "@/lib/follow-up/controlled-reply";
+import { buildControlledReply, replyBasis } from "@/lib/follow-up/controlled-reply";
 import { followUpFormSchema, followUpPlanFormSchema } from "@/lib/follow-up/form-schemas";
 import { scoreLead } from "@/lib/follow-up/lead-scoring";
 import {
@@ -166,6 +166,7 @@ async function prepareControlledFollowUp(
         delivery: null,
         now: new Date(),
       }),
+      confirmation: null,
       validUntil: undefined,
     };
   const [row] = await tx
@@ -193,6 +194,7 @@ async function prepareControlledFollowUp(
       delivery: confirmation,
       now: new Date(),
     }),
+    confirmation,
     validUntil: confirmation?.result?.valid_until,
   };
 }
@@ -891,6 +893,12 @@ export async function recordFollowUp(
         confirmation_ref: value.confirmationRef,
         reply_window: window.status,
         draft_length: controlledDraft.length,
+        reply_basis: replyBasis(
+          value.projectId,
+          messageId,
+          storedMessage.bodyCiphertext,
+          prepared.confirmation,
+        ),
         delivery_confirmation_ref: lead.delivery_confirmation_ref ?? null,
       },
       occurredAt: now,
