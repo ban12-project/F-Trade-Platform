@@ -673,6 +673,16 @@ def check_server_action_exports() -> None:
         )
 
 
+def check_decision_index() -> None:
+    directory = ROOT / "docs/decisions"
+    decisions = {path.name for path in directory.glob("[0-9][0-9][0-9][0-9]-*.md")}
+    index = (directory / "README.md").read_text(encoding="utf-8")
+    linked = set(re.findall(r"\[[^\]]+\]\((?:\./)?(\d{4}-[^/)#]+\.md)(?:#[^)]*)?\)", index))
+    missing = sorted(decisions - linked)
+    if missing:
+        raise AssertionError("Unindexed architecture decisions: " + ", ".join(missing))
+
+
 def check_local_markdown_links() -> None:
     pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
     ignored_directories = {".git", ".next", ".venv", "node_modules", "playwright-report"}
@@ -731,6 +741,7 @@ def main() -> int:
         ("content safety policy", check_content_policy),
         ("Server Action runtime exports", check_server_action_exports),
         ("repository hygiene", check_repository_hygiene),
+        ("architecture decision index", check_decision_index),
         ("local Markdown links", check_local_markdown_links),
     ]
     for name, check in checks:

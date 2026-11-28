@@ -54,7 +54,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useProductStream } from "@/components/workspace/use-product-stream";
 import { initialProductAgentActionState } from "@/lib/action-states";
 import { runProductAgentAction } from "@/lib/actions/product-agent";
-import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
+import type { ProductIntakeModelOption } from "@/lib/ai/product-agent-model-config";
 import { productAgentRunFormSchema } from "@/lib/product/agent-review-forms";
 import { productFactLabels } from "@/lib/product/fact-labels";
 import { productImageFilesSchema } from "@/lib/product/source-image-contracts";
@@ -89,7 +89,7 @@ export function ProductAgentForm({
 }: {
   canStream: boolean;
   projectId: string;
-  modelConfigs: ProductAgentModelSettings[];
+  modelConfigs: ProductIntakeModelOption[];
   evidenceOptions: EvidenceOption[];
   source?: { file?: File; clear: () => void };
   onDraftDirty?: (dirty: boolean) => void;
@@ -128,11 +128,7 @@ export function ProductAgentForm({
     onBusyChange?.(pending);
     return () => onBusyChange?.(false);
   }, [pending, onBusyChange]);
-  const usableConfigs = useMemo(
-    () => modelConfigs.filter((item) => item.apiKeyConfigured || item.authTokenConfigured),
-    [modelConfigs],
-  );
-  const defaultConfig = usableConfigs.find((item) => item.isDefault) ?? usableConfigs[0];
+  const defaultConfig = modelConfigs.find((item) => item.isDefault) ?? modelConfigs[0];
   const emptyAgent = useMemo(
     () => ({
       modelConfigId: defaultConfig?.id ?? "",
@@ -163,7 +159,7 @@ export function ProductAgentForm({
   const clearSource = useEffectEvent(() => source?.clear());
   const choices = useMemo(
     () =>
-      usableConfigs.flatMap((config) =>
+      modelConfigs.flatMap((config) =>
         Array.from(
           new Set(
             [config.model, ...config.discoveredModels].map((model) => model.trim()).filter(Boolean),
@@ -175,7 +171,7 @@ export function ProductAgentForm({
           label: `${config.name} · ${model}`,
         })),
       ),
-    [usableConfigs],
+    [modelConfigs],
   );
   const initialChoice =
     choices.find(

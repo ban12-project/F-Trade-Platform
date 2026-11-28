@@ -3,6 +3,7 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { buttonVariants } from "@/components/ui/button";
+import { listProductIntakeModelOptions } from "@/lib/ai/product-agent-model-config";
 import { hasPermission } from "@/lib/authz";
 import {
   getProjectContentCatalogDetail,
@@ -15,7 +16,6 @@ import { getProjectProductCatalogDetail } from "@/lib/products";
 import { listProjectPublicationData } from "@/lib/social/publication-store";
 import { listProjectEvidenceOptions } from "@/lib/workspace/access";
 import { workspaceCreateHref, workspaceRecordHref } from "@/lib/workspace/navigation";
-import { readWorkspaceModelSettings } from "@/lib/workspace/read-model";
 import { PublicationPanel } from "../closing-panels";
 import { ContentCreatePanel } from "../content-create-panel";
 import { ContentReview } from "../content-review";
@@ -46,7 +46,7 @@ async function ProductMedia({ context }: { context: RecordContext }) {
 }
 export async function ProductCreate({ context }: { context: RecordContext }) {
   const [settings, evidenceOptions] = await Promise.all([
-    readWorkspaceModelSettings(),
+    listProductIntakeModelOptions(),
     listProjectEvidenceOptions(context.projectId, context.session.user.id),
   ]);
   return (

@@ -23,6 +23,9 @@ const evidenceId = `evidence-synthetic-${randomUUID()}`;
 const receiptId = randomUUID();
 const importId = randomUUID();
 const configId = randomUUID();
+const tokenOnlyId = randomUUID();
+const noCredentialId = randomUUID();
+const emptyCredentialId = randomUUID();
 const candidateIds = [randomUUID(), randomUUID()] as const;
 
 test.beforeAll(async () => {
@@ -99,9 +102,23 @@ test.beforeAll(async () => {
     provider: "openai-compatible",
     model: "synthetic-unused",
     baseUrl: "http://127.0.0.1:9/v1",
+    headers: { "x-test-setting": "synthetic-admin-only-header" },
     apiKeyCiphertext: encryptStoredSecret("synthetic-only"),
     updatedBy: actorId,
   });
+  await db.insert(schema.productAgentModelConfig).values(
+    [
+      { id: tokenOnlyId, authTokenCiphertext: encryptStoredSecret("synthetic-token") },
+      { id: noCredentialId },
+      { id: emptyCredentialId, apiKeyCiphertext: "", authTokenCiphertext: "" },
+    ].map((entry) => ({
+      ...entry,
+      name: `zz-synthetic-${entry.id}`,
+      provider: "anthropic",
+      model: "synthetic-test",
+      updatedBy: actorId,
+    })),
+  );
 });
 
 test.afterAll(async () => {
@@ -113,7 +130,7 @@ test.afterAll(async () => {
     await db.delete(schema.evidence).where(eq(schema.evidence.id, evidenceId));
     await db
       .delete(schema.productAgentModelConfig)
-      .where(eq(schema.productAgentModelConfig.id, configId));
+      .where(eq(schema.productAgentModelConfig.updatedBy, actorId));
     await db
       .delete(schema.workspaceProjectMember)
       .where(eq(schema.workspaceProjectMember.projectId, projectId));
@@ -141,7 +158,13 @@ test("real catalog Actions restore persisted progress, reconcile selection and r
       sameSite: "Lax",
     },
   ]);
-  await page.goto(`/workspace/${projectId}/new/product`);
+  const response = await page.goto(`/workspace/${projectId}/new/product`);
+  const document = await response?.text();
+  expect(document).toContain(configId);
+  expect(document).toContain(tokenOnlyId);
+  expect(document).not.toContain(noCredentialId);
+  expect(document).not.toContain(emptyCredentialId);
+  expect(document).not.toContain("synthetic-admin-only-header");
   await page.getByRole("tab", { name: "产品目录", exact: true }).click();
   await expect(page.getByRole("checkbox")).toHaveCount(2);
   await page.getByRole("button", { name: "选择前 20 条可用记录", exact: true }).click();
