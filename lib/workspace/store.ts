@@ -18,6 +18,7 @@ import {
 } from "@/lib/db/schema";
 import type { ProductReady } from "@/lib/product/verification";
 import { aggregateRetentionCondition } from "@/lib/video/retention-policy";
+import type { AggregateType } from "@/lib/workflow/vocabulary";
 import { assertWorkspaceProjectAccess } from "./access";
 
 import {
@@ -273,14 +274,7 @@ export async function getWorkspaceProject(
 
 export async function listWorkspaceProjectAggregateIds(
   projectId: string,
-  aggregateType:
-    | "product"
-    | "content"
-    | "video"
-    | "rfq"
-    | "quotation"
-    | "lead"
-    | "delivery_confirmation",
+  aggregateType: AggregateType,
   database: Database = getDatabase(),
 ) {
   const rows = await database
@@ -321,14 +315,7 @@ export async function assertWorkspaceAggregateLink(
   projectId: string,
   aggregateId: string,
   expectedKind: "marketing" | "sales",
-  aggregateType:
-    | "product"
-    | "content"
-    | "video"
-    | "rfq"
-    | "quotation"
-    | "lead"
-    | "delivery_confirmation",
+  aggregateType: AggregateType,
   actorId: string,
   database: Database = getDatabase(),
 ) {

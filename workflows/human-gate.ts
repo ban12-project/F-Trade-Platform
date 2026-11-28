@@ -1,6 +1,8 @@
 import { defineHook } from "workflow";
 
-export type HumanGate = "gate_01_truth" | "gate_02_quote" | "gate_03_delivery";
+import type { HumanGate } from "../lib/workflow/vocabulary";
+
+export type { HumanGate } from "../lib/workflow/vocabulary";
 
 export interface HumanGateWorkflowInput {
   approvalId: string;

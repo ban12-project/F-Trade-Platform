@@ -1,3 +1,4 @@
+import type { ActorType } from "../workflow/vocabulary";
 import { publishContent } from "./gate";
 
 export interface ContentPublicationPolicy {
@@ -22,7 +23,7 @@ export function validatePublicationPolicy(policy: ContentPublicationPolicy) {
 export function publishThroughChannel(
   content: Record<string, unknown>,
   policy: ContentPublicationPolicy,
-  actorType: "human" | "agent" | "system",
+  actorType: ActorType,
   publicationRef: string,
 ) {
   validatePublicationPolicy(policy);
