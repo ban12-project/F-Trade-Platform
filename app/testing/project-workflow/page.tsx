@@ -21,7 +21,7 @@ import { RfqForm } from "@/components/workspace/rfq-form";
 import { SalesContext } from "@/components/workspace/sales-context";
 import { WorkspaceGuide } from "@/components/workspace/workspace-guide";
 import { WorkspaceLink } from "@/components/workspace/workspace-link";
-import type { ProductIntakeModelOption } from "@/lib/ai/product-agent-model-config";
+import type { ProductIntakeModelOption } from "@/lib/ai/model-choices";
 import type { ContentCatalogDetail } from "@/lib/content/store";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type {
@@ -237,15 +237,15 @@ const syntheticAgentModels: ProductIntakeModelOption[] = [
     id: "00000000-0000-4000-8000-000000000501",
     name: "日常产品导入",
     isDefault: true,
-    model: "gpt-5-mini",
-    discoveredModels: ["gpt-5-mini", "gpt-5.6-terra"],
+    model: " gpt-5-mini ",
+    discoveredModels: ["gpt-5-mini", " ", "gpt-5.6-terra", " gpt-5.6-terra "],
   },
   {
     id: "00000000-0000-4000-8000-000000000502",
     name: "复杂目录识别",
     isDefault: false,
     model: "claude-sonnet-test",
-    discoveredModels: ["claude-sonnet-test"],
+    discoveredModels: ["claude-sonnet-test", "gpt-5-mini"],
   },
 ];
 const syntheticProductDetail: ProductCatalogDetail = {
