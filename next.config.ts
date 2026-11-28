@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   reactCompiler: true,
+  turbopack: {
+    rules: {
+      "*.wgsl": {
+        loaders: ["@vgpu/wgsl/loader-webpack"],
+        as: "*.js",
+      },
+    },
+  },
   outputFileTracingIncludes: {
     "/.well-known/workflow/v1/*": [".remotion/**/*"],
   },

@@ -490,3 +490,86 @@ html {
 .workspace-toolbar[data-sticky="true"] {
   position: sticky;
 }
+
+/* 1Centre-inspired Landing Page typography & light-beam motion */
+.landing-display {
+  letter-spacing: -0.035em;
+  font-weight: 500;
+}
+
+.landing-glint {
+  color: transparent;
+  background-image: linear-gradient(100deg, #d2d2ce 0% 34%, #ffffff 46% 54%, #d2d2ce 66% 100%);
+  background-size: 260% 100%;
+  background-position: 120% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  padding-bottom: 0.1em;
+  margin-bottom: -0.1em;
+  animation: landing-glint-sweep 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes landing-glint-sweep {
+  0%,
+  30% {
+    background-position: 120% 0;
+  }
+  70%,
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+@keyframes landing-stat-run {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(420%);
+  }
+}
+
+.landing-stat-beam {
+  animation: landing-stat-run 3.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.landing-stat-beam-delay {
+  animation: landing-stat-run 3.2s cubic-bezier(0.65, 0, 0.35, 1) 1.6s infinite;
+}
+
+@keyframes landing-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: landing-marquee 34s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-glint,
+  .landing-stat-beam,
+  .landing-stat-beam-delay,
+  .landing-marquee-track {
+    animation: none;
+  }
+
+  .landing-glint {
+    color: #ffffff;
+    background-image: none;
+  }
+}

@@ -60,7 +60,7 @@ MVP1 视频从内容列表或已核验产品按需进入独立编辑器，把用
 ## 研发流
 
 ```text
-Issue → codex/issue-short-name 分支 → Pull Request → repository-validate
+Issue → issue-short-name 分支 → Pull Request → repository-validate
 → squash merge → 自动关闭 Issue
 ```
 
