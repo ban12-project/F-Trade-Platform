@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import sys
+from functools import partial
 from pathlib import Path
 
 import yaml
@@ -18,6 +19,12 @@ from jsonschema import Draft202012Validator, FormatChecker
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = ROOT / "contracts"
 FIXTURE_DIR = ROOT / "data" / "fixtures"
+
+
+def run_pnpm_test(script: str) -> None:
+    result = subprocess.run(["pnpm", script], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        raise AssertionError(f"pnpm {script} failed: {result.stderr or result.stdout}")
 
 
 def load_json(path: Path) -> dict:
@@ -290,11 +297,7 @@ def check_mvp_acceptance_summary() -> None:
             raise AssertionError("Go decision requires every RFQ to be ready")
         if metrics["blocked_external_dependency_count"]:
             raise AssertionError("Go decision requires no blocked external dependencies")
-    result = subprocess.run(
-        ["pnpm", "test:mvp-acceptance"], cwd=ROOT, capture_output=True, text=True
-    )
-    if result.returncode:
-        raise AssertionError(f"MVP acceptance decision tests failed: {result.stderr or result.stdout}")
+    run_pnpm_test("test:mvp-acceptance")
 
 
 def check_product_pilot_authorization() -> None:
@@ -579,111 +582,13 @@ def check_workflow_orchestrator() -> None:
     for required in ("database.transaction", "workflowEvent", "auditEvent", "for(\"update\")"):
         if required not in orchestrator:
             raise AssertionError(f"Workflow orchestrator is missing: {required}")
-    result = subprocess.run(
-        ["pnpm", "test:workflow"], cwd=ROOT, capture_output=True, text=True
-    )
-    if result.returncode:
-        raise AssertionError(f"Workflow transition tests failed: {result.stderr or result.stdout}")
-
-
-def check_synthetic_demo() -> None:
-    result = subprocess.run(
-        ["pnpm", "test:demo"], cwd=ROOT, capture_output=True, text=True
-    )
-    if result.returncode:
-        raise AssertionError(f"Synthetic demo tests failed: {result.stderr or result.stdout}")
-
-
-def check_product_catalog_preflight() -> None:
-    result = subprocess.run(
-        ["pnpm", "test:catalog-preflight"], cwd=ROOT, capture_output=True, text=True
-    )
-    if result.returncode:
-        raise AssertionError(f"Product catalog preflight tests failed: {result.stderr or result.stdout}")
-
-
-def check_product_catalog_entry() -> None:
-    result = subprocess.run(["pnpm", "test:product-catalog-entry"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Product catalog entry tests failed: {result.stderr or result.stdout}")
-
-
-def check_content_catalog_entry() -> None:
-    result = subprocess.run(["pnpm", "test:content-catalog-entry"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Content catalog entry tests failed: {result.stderr or result.stdout}")
-
-
-def check_local_ocr() -> None:
-    result = subprocess.run(["pnpm", "test:local-ocr"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Local OCR guard tests failed: {result.stderr or result.stdout}")
-
-
-def check_social_inbound_policy() -> None:
-    result = subprocess.run(["pnpm", "test:social-inbound"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Social inbound policy tests failed: {result.stderr or result.stdout}")
-
-
-def check_inbound_delivery_receipts() -> None:
-    result = subprocess.run(["pnpm", "test:inbound-delivery"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Inbound delivery receipt tests failed: {result.stderr or result.stdout}")
-
-
-def check_database_driver() -> None:
-    result = subprocess.run(["pnpm", "test:database-driver"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Database transaction driver tests failed: {result.stderr or result.stdout}")
-
-
-def check_github_governance() -> None:
-    result = subprocess.run(["pnpm", "test:github-governance"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"GitHub governance artifact tests failed: {result.stderr or result.stdout}")
-
-
-def check_main_push_guard() -> None:
-    result = subprocess.run(["pnpm", "test:main-push-guard"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Local main push guard tests failed: {result.stderr or result.stdout}")
-
-
-def check_content_publication_policy() -> None:
-    result = subprocess.run(["pnpm", "test:content-publication"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Content publication policy tests failed: {result.stderr or result.stdout}")
+    run_pnpm_test("test:workflow")
 
 
 def check_controlled_effect_results() -> None:
-    for script, label in (
-        ("test:controlled-publication", "controlled publication command"),
-        ("test:publication-result", "publication result protocol"),
-        ("test:reply-result", "reply result protocol"),
-        ("test:controlled-reply", "Gate 03 controlled reply"),
-    ):
-        result = subprocess.run(["pnpm", script], cwd=ROOT, capture_output=True, text=True)
-        if result.returncode:
-            raise AssertionError(f"{label} tests failed: {result.stderr or result.stdout}")
+    for script in ("test:controlled-publication", "test:publication-result", "test:reply-result", "test:controlled-reply"):
+        run_pnpm_test(script)
 
-
-def check_quotation_gate() -> None:
-    result = subprocess.run(["pnpm", "test:quotation"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Quotation Gate 02 tests failed: {result.stderr or result.stdout}")
-
-
-def check_delivery_gate() -> None:
-    result = subprocess.run(["pnpm", "test:delivery"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Delivery Gate 03 tests failed: {result.stderr or result.stdout}")
-
-
-def check_rfq_completeness() -> None:
-    result = subprocess.run(["pnpm", "test:rfq"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"RFQ completeness tests failed: {result.stderr or result.stdout}")
 
 def check_rfq_acceptance_matrix() -> None:
     cases = load_json(FIXTURE_DIR / "rfq-acceptance-matrix.synthetic.json")
@@ -698,32 +603,12 @@ def check_rfq_acceptance_matrix() -> None:
         if case["expected_state"] != "RFQ_READY" and not case["next_question"]:
             raise AssertionError("Collecting RFQ scenarios require a next question")
 
-def check_sales_clarification() -> None:
-    result = subprocess.run(["pnpm", "test:sales"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Sales clarification tests failed: {result.stderr or result.stdout}")
-
-def check_lead_scoring() -> None:
-    result = subprocess.run(["pnpm", "test:scoring"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Lead scoring tests failed: {result.stderr or result.stdout}")
-
 def check_follow_up_scenarios() -> None:
     cases = load_json(FIXTURE_DIR / "follow-up-scenarios.synthetic.json")
     if {case["id"] for case in cases} != {"unread", "read_no_reply", "price_high", "purchase_later", "sample_or_lead_time"}:
         raise AssertionError("Follow-up scenarios must cover the five required cases")
     if any(not case["next_action"] or not case["prohibited_action"] for case in cases):
         raise AssertionError("Every follow-up scenario requires an action and prohibited action")
-
-def check_follow_up_cadence() -> None:
-    result = subprocess.run(["pnpm", "test:cadence"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Follow-up cadence tests failed: {result.stderr or result.stdout}")
-
-def check_content_gate() -> None:
-    result = subprocess.run(["pnpm", "test:content-gate"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode:
-        raise AssertionError(f"Content Gate 01 tests failed: {result.stderr or result.stdout}")
 
 def check_content_policy() -> None:
     policy = load_json(ROOT / "config/content-policy.json")
@@ -827,27 +712,27 @@ def main() -> int:
         ("service adapters", check_service_adapters),
         ("Next.js security release readiness", check_next_security_release_readiness),
         ("workflow orchestrator", check_workflow_orchestrator),
-        ("synthetic end-to-end demo", check_synthetic_demo),
-        ("product catalog preflight", check_product_catalog_preflight),
-        ("product catalog entry", check_product_catalog_entry),
-        ("content catalog entry", check_content_catalog_entry),
-        ("local OCR guards", check_local_ocr),
-        ("social inbound policy", check_social_inbound_policy),
-        ("inbound delivery receipts", check_inbound_delivery_receipts),
-        ("database transaction driver", check_database_driver),
-        ("GitHub governance artifacts", check_github_governance),
-        ("local main push guard", check_main_push_guard),
-        ("content publication policy", check_content_publication_policy),
+        ("synthetic end-to-end demo", partial(run_pnpm_test, "test:demo")),
+        ("product catalog preflight", partial(run_pnpm_test, "test:catalog-preflight")),
+        ("product catalog entry", partial(run_pnpm_test, "test:product-catalog-entry")),
+        ("content catalog entry", partial(run_pnpm_test, "test:content-catalog-entry")),
+        ("local OCR guards", partial(run_pnpm_test, "test:local-ocr")),
+        ("social inbound policy", partial(run_pnpm_test, "test:social-inbound")),
+        ("inbound delivery receipts", partial(run_pnpm_test, "test:inbound-delivery")),
+        ("database transaction driver", partial(run_pnpm_test, "test:database-driver")),
+        ("GitHub governance artifacts", partial(run_pnpm_test, "test:github-governance")),
+        ("local main push guard", partial(run_pnpm_test, "test:main-push-guard")),
+        ("content publication policy", partial(run_pnpm_test, "test:content-publication")),
         ("controlled publication and reply results", check_controlled_effect_results),
-        ("quotation Gate 02", check_quotation_gate),
-        ("delivery Gate 03", check_delivery_gate),
-        ("RFQ completeness", check_rfq_completeness),
+        ("quotation Gate 02", partial(run_pnpm_test, "test:quotation")),
+        ("delivery Gate 03", partial(run_pnpm_test, "test:delivery")),
+        ("RFQ completeness", partial(run_pnpm_test, "test:rfq")),
         ("RFQ acceptance matrix", check_rfq_acceptance_matrix),
-        ("sales clarification", check_sales_clarification),
-        ("lead scoring", check_lead_scoring),
+        ("sales clarification", partial(run_pnpm_test, "test:sales")),
+        ("lead scoring", partial(run_pnpm_test, "test:scoring")),
         ("follow-up scenarios", check_follow_up_scenarios),
-        ("follow-up cadence", check_follow_up_cadence),
-        ("content Gate 01", check_content_gate),
+        ("follow-up cadence", partial(run_pnpm_test, "test:cadence")),
+        ("content Gate 01", partial(run_pnpm_test, "test:content-gate")),
         ("content safety policy", check_content_policy),
         ("Server Action runtime exports", check_server_action_exports),
         ("repository hygiene", check_repository_hygiene),
