@@ -19,7 +19,10 @@ export async function recoverBrowserSandboxDispatch(nodeId, operationId) {
   record("recover", nodeId, operationId);
   return scenario(operationId).status ?? "stopped";
 }
-export async function wakeQueuedManualBrowserSandbox(nodeId) {
+export async function wakeQueuedManualBrowserSandbox(nodeId, workflow) {
+  if (!workflow?.workflowId?.endsWith("runManualBrowserSandbox")) {
+    throw new Error("Expected compiled browser sandbox workflow reference");
+  }
   record("wake", nodeId);
 }
 export class CatalogAccessError extends Error {}

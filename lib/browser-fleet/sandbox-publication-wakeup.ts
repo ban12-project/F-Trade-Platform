@@ -3,6 +3,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import type { Database, DatabaseTransaction } from "../db/client";
 import type { FleetState } from "./policy";
+import { schedulePublications } from "./publication-scheduling";
 import { enqueueManualBrowserSandboxStart } from "./sandbox-outbox";
 
 async function reservePublicationStart(tx: DatabaseTransaction, nodeId: string) {
@@ -10,7 +11,6 @@ async function reservePublicationStart(tx: DatabaseTransaction, nodeId: string) 
     WHERE id = ${nodeId} AND status = 'active' FOR UPDATE SKIP LOCKED`);
   const state = result.rows[0]?.document as FleetState | undefined;
   if (state?.version !== 1) return null;
-  const { schedulePublications } = await import("./publication");
   // Lock waits can outlive a page scope; schedule against the current time.
   await schedulePublications(tx, nodeId, state, Date.now());
   await tx.execute(sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(state)}::jsonb

@@ -47,6 +47,9 @@ jobs:
       - name: Verify video failure summaries omit private provider details
         run: node --conditions=react-server --import tsx scripts/test-video-failure-privacy.ts
 
+      - name: Reject runtime module import cycles across application sources
+        run: pnpm test:import-cycles
+
       - name: Check formatting, imports, Next.js and React rules
         shell: bash
         run: |
