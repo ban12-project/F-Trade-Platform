@@ -4,6 +4,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 import { getDatabase } from "../db/client";
 import { auditEvent, productAgentModelConfig } from "../db/schema";
 import { decryptStoredSecret, encryptStoredSecret } from "../security/encrypted-secret";
+import { type ProductIntakeModelOption, selectableModelNames } from "./model-choices";
 import { type ProductAgentModelConfig, validateProductAgentModelConfig } from "./model-provider";
 import type { SupportedModelProvider } from "./model-provider-schema";
 
@@ -74,7 +75,7 @@ export function productAgentModelOptionLabel(
   return `${settings.name} · ${settings.provider}`;
 }
 
-export async function listProductIntakeModelOptions() {
+export async function listProductIntakeModelOptions(): Promise<ProductIntakeModelOption[]> {
   const config = productAgentModelConfig;
   return getDatabase()
     .select({
@@ -88,10 +89,6 @@ export async function listProductIntakeModelOptions() {
     .where(or(ne(config.apiKeyCiphertext, ""), ne(config.authTokenCiphertext, "")))
     .orderBy(asc(config.name));
 }
-
-export type ProductIntakeModelOption = Awaited<
-  ReturnType<typeof listProductIntakeModelOptions>
->[number];
 
 export async function listStoredProductAgentModelSettings(): Promise<ProductAgentModelSettings[]> {
   const rows = await getDatabase().query.productAgentModelConfig.findMany({
@@ -120,11 +117,9 @@ export async function getSavedProductAgentModelConfig(
       : eq(productAgentModelConfig.isDefault, true),
   });
   if (!row) return undefined;
-  const allowedModels = new Set(
-    [row.model, ...row.discoveredModels].map((model) => model.trim()).filter(Boolean),
-  );
-  const model = selectedModel?.trim() || row.model;
-  if (!allowedModels.has(model)) throw new Error("所选模型不属于该配置，请重新选择。");
+  const model = selectedModel?.trim() || row.model.trim();
+  if (!selectableModelNames(row).includes(model))
+    throw new Error("所选模型不属于该配置，请重新选择。");
   const apiKey = row.apiKeyCiphertext
     ? decryptStoredSecret(row.apiKeyCiphertext, "Stored Product Agent credential is invalid")
     : undefined;

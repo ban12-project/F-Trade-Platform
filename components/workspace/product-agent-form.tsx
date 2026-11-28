@@ -54,7 +54,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useProductStream } from "@/components/workspace/use-product-stream";
 import { initialProductAgentActionState } from "@/lib/action-states";
 import { runProductAgentAction } from "@/lib/actions/product-agent";
-import type { ProductIntakeModelOption } from "@/lib/ai/product-agent-model-config";
+import type { ProductIntakeModelChoices } from "@/lib/ai/model-choices";
 import { productAgentRunFormSchema } from "@/lib/product/agent-review-forms";
 import { productFactLabels } from "@/lib/product/fact-labels";
 import { productImageFilesSchema } from "@/lib/product/source-image-contracts";
@@ -80,7 +80,7 @@ const fieldStatusText = {
 
 export function ProductAgentForm({
   projectId,
-  modelConfigs,
+  modelChoices: { choices, defaultChoice },
   evidenceOptions,
   canStream,
   source,
@@ -89,7 +89,7 @@ export function ProductAgentForm({
 }: {
   canStream: boolean;
   projectId: string;
-  modelConfigs: ProductIntakeModelOption[];
+  modelChoices: ProductIntakeModelChoices;
   evidenceOptions: EvidenceOption[];
   source?: { file?: File; clear: () => void };
   onDraftDirty?: (dirty: boolean) => void;
@@ -128,18 +128,17 @@ export function ProductAgentForm({
     onBusyChange?.(pending);
     return () => onBusyChange?.(false);
   }, [pending, onBusyChange]);
-  const defaultConfig = modelConfigs.find((item) => item.isDefault) ?? modelConfigs[0];
   const emptyAgent = useMemo(
     () => ({
-      modelConfigId: defaultConfig?.id ?? "",
-      model: defaultConfig?.model ?? "",
+      modelConfigId: defaultChoice?.configId ?? "",
+      model: defaultChoice?.model ?? "",
       sourceRef: "",
       evidenceRef: "",
       sourceText: "",
       hasUpload: false,
       imageFiles: [] as File[],
     }),
-    [defaultConfig?.id, defaultConfig?.model],
+    [defaultChoice?.configId, defaultChoice?.model],
   );
   const form = useForm<AgentValues>({
     resolver: zodResolver(productAgentRunFormSchema),
@@ -157,26 +156,7 @@ export function ProductAgentForm({
     return () => onDraftDirty?.(false);
   }, [form.formState.isDirty, onDraftDirty]);
   const clearSource = useEffectEvent(() => source?.clear());
-  const choices = useMemo(
-    () =>
-      modelConfigs.flatMap((config) =>
-        Array.from(
-          new Set(
-            [config.model, ...config.discoveredModels].map((model) => model.trim()).filter(Boolean),
-          ),
-        ).map((model) => ({
-          value: JSON.stringify([config.id, model]),
-          configId: config.id,
-          model,
-          label: `${config.name} · ${model}`,
-        })),
-      ),
-    [modelConfigs],
-  );
-  const initialChoice =
-    choices.find(
-      (choice) => choice.configId === emptyAgent.modelConfigId && choice.model === emptyAgent.model,
-    )?.value ?? "";
+  const initialChoice = defaultChoice?.value ?? "";
   const [selectedChoice, setSelectedChoice] = useState(initialChoice);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   useWorkspaceDirty("product-agent-import", form.formState.isDirty);

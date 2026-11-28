@@ -50,6 +50,15 @@ for (const remaining of [0, 1]) {
     await page.getByRole("tab", { name: "产品目录", exact: true }).click();
     await page.getByRole("button", { name: "高级设置：抽取模型", exact: true }).click();
     const model = page.getByLabel("抽取模型", { exact: true });
+    await expect(model.locator("option")).toHaveCount(4);
+    const sameModel = await model
+      .locator("option")
+      .evaluateAll((options) =>
+        options
+          .map((option) => JSON.parse((option as HTMLOptionElement).value) as [string, string])
+          .filter(([, name]) => name === "gpt-5-mini"),
+      );
+    expect(new Set(sameModel.map(([id]) => id)).size).toBe(2);
     await model.selectOption({ index: 1 });
     const chosenModel = await model.inputValue();
     await page.getByRole("button", { name: "选择前 20 条可用记录", exact: true }).click();
