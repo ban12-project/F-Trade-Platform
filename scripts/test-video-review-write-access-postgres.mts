@@ -37,7 +37,7 @@ async function readSession() {
     .where(eq(schema.session.id, sid));
   return r && !r.user.banned && r.session.expiresAt > new Date() ? r : null;
 }
-let cachedSession: Awaited<ReturnType<typeof readSession>>;
+let cachedSession: Awaited<ReturnType<typeof readSession>> | undefined;
 mock.module("next/headers", { exports: { headers: async () => new Headers() } });
 mock.module("next/cache", { exports: { revalidatePath: () => {}, refresh: () => {} } });
 mock.module(new URL("../lib/auth.ts", import.meta.url).href, {

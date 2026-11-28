@@ -107,8 +107,10 @@ assert.deepEqual(await run(), {
   status: "error",
   message: productIntakeErrorMessage("source_labels_missing"),
 });
-failure = new ProductAgentAccessError();
-Object.assign(failure, { message: secret, cause: new Error(secret) });
+failure = Object.assign(new ProductAgentAccessError(), {
+  message: secret,
+  cause: new Error(secret),
+});
 assert.deepEqual(await run(), {
   status: "error",
   message: "无法确认登录或项目编辑权限，产品草稿未创建。请重新登录并确认权限后重试。",

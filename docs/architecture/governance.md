@@ -36,6 +36,12 @@ flowchart LR
 | 浏览器任务与会话 | `lib/browser-fleet/` 管理租约、工作流调度、回执和恢复；`ops/browser-node/` 承接浏览器执行 | HTTP 与持久工作流是跨进程边界。计算任务与常驻浏览器分别使用独立运行时，见 `vercel-compute-return.md` |
 | 身份、缓存与审计 | Better Auth 提供会话，`lib/authz.ts` 提供权限，`lib/action-boundary.ts` 处理 Action 身份和刷新；`lib/audit/append.ts` 写审计 | 数据库是持久状态来源。页面、客户端表单和 Next 缓存是读写界面。PostgreSQL 的事务和锁需要数据库集成测试 |
 
+## #1154 脚本类型检查
+
+基线配置逐项列出 15 个脚本。扩展检查到全部已跟踪的 64 个 `.mts` 文件后，14 个文件暴露 28 条诊断。项目改用 `**/*.mts` 并在现有 noEmit 配置下允许显式 TypeScript 扩展名，使 Node 与模块模拟器继续使用同一模块标识。现有 PR 类型检查会自动纳入以后新增的脚本。
+
+以编译器文件清单对照 Git 跟踪清单确认覆盖；无增量缓存的类型检查通过。10 个修改过的测试脚本在本地通过，其中 7 个连接合成 PostgreSQL。保留期恢复脚本仅增加类型注解，容器恢复演练由 repository-validate 执行。本批未改变视频内容，创意审查不适用。
+
 ## 技术方案与依赖例外
 
 - Next App Router、React、ui-sdk 及 Tailwind 承担界面。表单经 React Hook Form 和共享 Zod schema 进入 Server Action。HTTP Route Handler 另承接鉴权、流式响应、媒体交付和外部集成等 HTTP 契约。
