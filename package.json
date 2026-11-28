@@ -51,6 +51,7 @@
     "test:harbor": "tsx scripts/test-harbor-product-agent.ts",
     "eval:harbor:prepare": "tsx scripts/prepare-harbor-product-agent-dataset.ts",
     "eval:harbor:podman": "sh scripts/run-harbor-product-agent-podman.sh",
+    "architecture:dependencies": "python3 scripts/architecture_dependencies.py",
     "typecheck": "tsc --noEmit",
     "test:workflow-runtime": "node scripts/test-workflow-security-compatibility.mjs && node scripts/test-workflow-serde-compatibility.mjs && node --test scripts/test-workflow-v5-runtime.mjs scripts/test-workflow-queue-deadlines.mjs scripts/test-workflow-nanoid-replay.mjs",
     "test:workflow": "tsx scripts/test-workflow-transitions.ts",

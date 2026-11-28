@@ -50,6 +50,9 @@ jobs:
       - name: Reject runtime module import cycles across application sources
         run: pnpm test:import-cycles
 
+      - name: Verify TypeScript dependency graph resolution
+        run: python3 scripts/test_architecture_dependencies.py
+
       - name: Check formatting, imports, Next.js and React rules
         shell: bash
         run: |
