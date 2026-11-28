@@ -11,7 +11,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { ZodError } from "zod";
 import { closeDatabase, type Database, getDatabase } from "../lib/db/client";
 import * as schema from "../lib/db/schema";
-import { assertPublicationEligible } from "../lib/social/publication-store";
+import { assertPublicationEligible } from "../lib/social/publication-eligibility";
 import { queueVideoProcessingJob } from "../lib/video/processing-jobs";
 import { decideGuardedVideoReview } from "../lib/video/product-media-guarded-operations";
 import { cleanupExpiredVideoObjects } from "../lib/video/retention-cleanup";

@@ -1,24 +1,12 @@
 import "server-only";
 
 import { sql } from "drizzle-orm";
-import { start } from "workflow/api";
 import { runManualBrowserSandbox } from "@/workflows/browser-sandbox";
 import { getDatabase } from "../db/client";
-import { deliverBrowserSandboxOutbox } from "./sandbox-outbox";
-import { reconcileStoppedBrowserSandboxes } from "./sandbox-reconcile";
+import { dispatchQueuedBrowserSandboxes } from "./sandbox-wakeup";
 
 export async function deliverQueuedBrowserSandboxes(nodeId?: string) {
-  await reconcileStoppedBrowserSandboxes(nodeId);
-  const { enqueueDueInboxSandboxes } = await import("./sandbox-inbox-wakeup");
-  const { enqueueQueuedPublicationSandboxes } = await import("./sandbox-publication-wakeup");
-  await enqueueDueInboxSandboxes(getDatabase(), nodeId);
-  await enqueueQueuedPublicationSandboxes(getDatabase(), nodeId);
-  return deliverBrowserSandboxOutbox(
-    getDatabase(),
-    async (node, operation) => (await start(runManualBrowserSandbox, [node, operation])).runId,
-    nodeId,
-    nodeId ? 1 : 10,
-  );
+  return dispatchQueuedBrowserSandboxes(runManualBrowserSandbox, nodeId);
 }
 
 /** Best-effort immediate delivery for one committed submission. The existing

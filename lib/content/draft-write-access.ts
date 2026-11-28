@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/authz";
 import type { DatabaseTransaction } from "@/lib/db/client";
 import { workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 
 export type ContentDraftIdentity = ProjectActorSessionIdentity;
 export const CONTENT_DRAFT_ACCESS_MESSAGE =
@@ -83,7 +84,7 @@ export async function authorizeReadableContentDraftSource(
       and(
         eq(workspaceProjectMember.projectId, sourceProjectId),
         eq(workspaceProjectMember.userId, identity.actorId),
-        inArray(workspaceProjectMember.role, ["owner", "editor", "viewer"]),
+        inArray(workspaceProjectMember.role, memberRolesForAccess.view),
       ),
     )
     .for("share");

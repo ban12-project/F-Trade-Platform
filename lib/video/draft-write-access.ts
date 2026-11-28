@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/authz";
 import type { Database, DatabaseTransaction } from "@/lib/db/client";
 import { workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
 import { assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import { VIDEO_RETENTION_MESSAGE } from "./retention-policy";
 
 export type VideoDraftIdentity = ProjectActorSessionIdentity;
@@ -40,7 +41,7 @@ export async function authorizeLockedVideoDraft(
         and(
           eq(workspaceProjectMember.projectId, identity.projectId),
           eq(workspaceProjectMember.userId, identity.actorId),
-          inArray(workspaceProjectMember.role, ["owner", "editor"]),
+          inArray(workspaceProjectMember.role, memberRolesForAccess.write),
         ),
       )
       .for("share");
@@ -94,7 +95,7 @@ export async function authorizeReadableVideoDraftSource(
       and(
         eq(workspaceProjectMember.projectId, sourceProjectId),
         eq(workspaceProjectMember.userId, identity.actorId),
-        inArray(workspaceProjectMember.role, ["owner", "editor", "viewer"]),
+        inArray(workspaceProjectMember.role, memberRolesForAccess.view),
       ),
     )
     .for("share");

@@ -18,7 +18,7 @@ async function recover(nodeId: string, operationId: string) {
 }
 async function wake(nodeId: string) {
   "use step";
-  return wakeQueuedManualBrowserSandbox(nodeId);
+  return wakeQueuedManualBrowserSandbox(nodeId, runManualBrowserSandbox);
 }
 
 /** One committed manual start operation. Only non-secret identifiers and status

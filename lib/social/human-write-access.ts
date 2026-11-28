@@ -8,6 +8,7 @@ import {
 import { hasPermission, type Permission } from "@/lib/authz";
 import type { DatabaseTransaction } from "@/lib/db/client";
 import { workspaceProject, workspaceProjectItem, workspaceProjectMember } from "@/lib/db/schema";
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import { PublishingAccountUnavailableError } from "./publishing-account-policy";
 
 export type SocialActorIdentity = ActorSessionIdentity;
@@ -77,7 +78,7 @@ export async function authorizeSocialProject(
       and(
         eq(workspaceProjectMember.projectId, identity.projectId),
         eq(workspaceProjectMember.userId, identity.actorId),
-        inArray(workspaceProjectMember.role, ["owner", "editor"]),
+        inArray(workspaceProjectMember.role, memberRolesForAccess[access]),
       ),
     )
     .for("share");

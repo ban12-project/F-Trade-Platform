@@ -22,8 +22,14 @@ import {
   videoWorkingEvidenceRetainedCondition,
 } from "@/lib/video/retention-policy";
 
-export type WorkspaceMemberRole = "owner" | "editor" | "viewer";
-export type WorkspaceAccess = "view" | "write" | "manage" | "receipt";
+import {
+  memberRolesForAccess,
+  type WorkspaceAccess,
+  type WorkspaceMemberRole,
+  workspaceMemberRoles,
+} from "./member-roles";
+
+export type { WorkspaceAccess, WorkspaceMemberRole } from "./member-roles";
 export type WorkspaceMemberSummary = {
   userId: string;
   name: string;
@@ -42,7 +48,7 @@ export type EvidenceOption = {
 export const workspaceMemberFormSchema = z.object({
   projectId: z.uuid("项目标识无效。"),
   email: z.string().trim().email("请输入有效邮箱地址。"),
-  role: z.enum(["owner", "editor", "viewer"]),
+  role: z.enum(workspaceMemberRoles),
 });
 export const workspaceMemberRemovalSchema = z.object({
   projectId: z.uuid("项目标识无效。"),
@@ -67,12 +73,6 @@ export async function assertWorkspaceProjectAccess(
     if (access === "write" && project.status !== "active")
       throw new Error("项目已归档，请重开后再写入业务资料。");
   }
-  const allowedRoles: WorkspaceMemberRole[] =
-    access === "manage"
-      ? ["owner"]
-      : access === "write" || access === "receipt"
-        ? ["owner", "editor"]
-        : ["owner", "editor", "viewer"];
   const [membership] = await database
     .select({ role: workspaceProjectMember.role })
     .from(workspaceProjectMember)
@@ -80,7 +80,7 @@ export async function assertWorkspaceProjectAccess(
       and(
         eq(workspaceProjectMember.projectId, projectId),
         eq(workspaceProjectMember.userId, actorId),
-        inArray(workspaceProjectMember.role, allowedRoles),
+        inArray(workspaceProjectMember.role, memberRolesForAccess[access]),
       ),
     );
   if (!membership)

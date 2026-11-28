@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-
 import { createWorkspaceProjectSchema } from "../lib/workspace/contracts";
+import {
+  isReadOnlyMember,
+  memberRolesForAccess,
+  workspaceMemberRoles,
+} from "../lib/workspace/member-roles";
 import { workspaceTaskHref } from "../lib/workspace/navigation";
 import type { WorkspaceTaskSummary } from "../lib/workspace/types";
 
@@ -36,3 +40,18 @@ assert.equal(
 );
 
 console.log("PASS workspace project navigation contracts");
+
+// These role sets govern project membership only. Archival and app permissions are checked separately.
+assert.deepEqual(workspaceMemberRoles, ["owner", "editor", "viewer"]);
+assert.deepEqual(memberRolesForAccess, {
+  view: ["owner", "editor", "viewer"],
+  write: ["owner", "editor"],
+  manage: ["owner"],
+  receipt: ["owner", "editor"],
+});
+assert.deepEqual([...workspaceMemberRoles, undefined].map(isReadOnlyMember), [
+  false,
+  false,
+  true,
+  false,
+]);

@@ -34,6 +34,7 @@ import { readInboundContextAction } from "@/lib/actions/inbound-context";
 import { inboundRoutingFormSchema } from "@/lib/form-schemas";
 import type { InboundContextPreview } from "@/lib/social/inbound-context-store";
 import type { InboundRoutingSummary } from "@/lib/social/inbound-routing-store";
+import { isReadOnlyMember } from "@/lib/workspace/member-roles";
 import { workspaceRecordHref } from "@/lib/workspace/navigation";
 import type { WorkspaceProjectSummary } from "@/lib/workspace/types";
 
@@ -283,7 +284,9 @@ export function InboundRoutingList({
   const timeZone = useBrowserTimeZone();
   const salesProjects = projects.filter(
     (project) =>
-      project.kind === "sales" && project.status === "active" && project.memberRole !== "viewer",
+      project.kind === "sales" &&
+      project.status === "active" &&
+      !isReadOnlyMember(project.memberRole),
   );
   if (!items.length) return null;
   return (

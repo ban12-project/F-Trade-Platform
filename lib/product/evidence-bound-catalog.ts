@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
-
 import { and, eq, type InferInsertModel, inArray, sql } from "drizzle-orm";
-
 import { getDatabase } from "@/lib/db/client";
 import {
   aggregateRecord,
@@ -16,6 +14,7 @@ import {
 } from "@/lib/db/schema";
 import { assertTransition } from "@/lib/workflow/transitions";
 import { assertAndLinkProjectEvidence, assertWorkspaceProjectAccess } from "@/lib/workspace/access";
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 
 import {
   kitContentValues,
@@ -409,7 +408,7 @@ export async function reviseEvidenceBoundProductCatalogDraft(
         and(
           eq(workspaceProjectMember.projectId, workspaceProject.id),
           eq(workspaceProjectMember.userId, actorId),
-          inArray(workspaceProjectMember.role, ["owner", "editor"]),
+          inArray(workspaceProjectMember.role, memberRolesForAccess.write),
         ),
       )
       .innerJoin(user, and(eq(user.id, workspaceProjectMember.userId), eq(user.banned, false)))

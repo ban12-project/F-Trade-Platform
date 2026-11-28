@@ -55,8 +55,8 @@ import {
   reconcilePublications,
   recordPublicationReceipt,
   resolvePublicationMedia,
-  schedulePublications,
 } from "./publication";
+import { schedulePublications } from "./publication-scheduling";
 import { sealBrowserSandboxKey } from "./sandbox-credentials";
 import { cancelInvalidManualSandboxStart } from "./sandbox-dispatch";
 import type { SandboxLifecycle } from "./sandbox-lifecycle";

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import type { ProjectActorSessionIdentity } from "@/lib/actor-session";
+import { memberRolesForAccess } from "@/lib/workspace/member-roles";
 import { type Database, type DatabaseTransaction, getDatabase } from "../db/client";
 import {
   aggregateRecord,
@@ -51,7 +52,7 @@ export async function authorizeProductStreamWrite(
         eq(workspaceProject.kind, "marketing"),
         eq(workspaceProject.status, "active"),
         eq(workspaceProjectMember.userId, identity.actorId),
-        inArray(workspaceProjectMember.role, ["owner", "editor"]),
+        inArray(workspaceProjectMember.role, memberRolesForAccess.write),
       ),
     )
     .for("share");
