@@ -65,6 +65,15 @@ async function authorize(
     .for("share");
   if (!actor || !hasPermission(actor.role, "product:write"))
     throw new CatalogAccessError("产品导入会话或权限已失效。");
+  await authorizeCatalogProject(tx, identity, access);
+  return actor.expiresAt;
+}
+
+async function authorizeCatalogProject(
+  tx: DatabaseTransaction,
+  identity: Pick<CatalogIdentity, "actorId" | "projectId">,
+  access: "view" | "write",
+) {
   // Project membership mutations take this same lock; check access after acquiring it.
   const projectQuery = tx
     .select()
@@ -78,7 +87,6 @@ async function authorize(
   } catch {
     throw new CatalogAccessError("目录项目编辑权限已失效。");
   }
-  return actor.expiresAt;
 }
 
 async function humanCatalogTransaction<T>(
@@ -372,11 +380,24 @@ async function attemptContext(tx: DatabaseTransaction, attemptId: string) {
     projectId: owner.projectId,
     sessionId: initial.sessionId,
   };
-  await authorize(tx, identity);
+  if (initial.candidateId === null) {
+    // The committed parse attempt authorizes processing its original document across sessions.
+    const [actor] = await tx
+      .select({ role: user.role })
+      .from(user)
+      .where(and(eq(user.id, owner.actorId), eq(user.banned, false)))
+      .for("share");
+    if (!actor || !hasPermission(actor.role, "product:write"))
+      throw new CatalogAccessError("目录解析发起人的产品写入权限已失效。");
+    await authorizeCatalogProject(tx, identity, "write");
+  } else {
+    await authorize(tx, identity);
+  }
   const row = await readOwnedImport(tx, owner.id, identity);
   // Refresh after locking: an earlier read may precede another worker's claim.
   const [attempt] = await tx.select().from(attempts).where(eq(attempts.id, attemptId));
-  if (!attempt) return null;
+  if (!attempt || attempt.importId !== row.id || attempt.candidateId !== initial.candidateId)
+    return null;
   const [candidate] = attempt.candidateId
     ? await tx
         .select()
@@ -413,6 +434,9 @@ export async function claimCatalogAttempt(attemptId: string, database: Database 
     if (
       !original ||
       !receipt ||
+      receipt.projectId !== row.projectId ||
+      receipt.ownerId !== row.actorId ||
+      receipt.purpose !== "agent" ||
       receipt.evidenceId !== original.id ||
       receipt.blobPath !== original.blobKey
     )

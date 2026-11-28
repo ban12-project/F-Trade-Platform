@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import type { get } from "@vercel/blob";
 import { eq, inArray, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { closeDatabase, getDatabase } from "../lib/db/client";
-import { productCatalogAttempt, productCatalogImport } from "../lib/db/product-catalog-schema";
+import {
+  productCatalogAttempt,
+  productCatalogCandidate,
+  productCatalogImport,
+} from "../lib/db/product-catalog-schema";
 import {
   aggregateRecord,
   approval,
@@ -30,6 +35,7 @@ import {
   retryCatalogParsing,
   selectCatalogRecords,
 } from "../lib/product/catalog-import-store";
+import type { ProductAgentDocumentSource } from "../lib/product/document-source";
 import {
   claimDocumentUpload,
   issueDocumentUploadReceipt,
@@ -146,6 +152,19 @@ void (async () => {
     assert.equal(parseIds.length, 1, "concurrent receipt intake creates one parse attempt");
     const parseId = parseIds[0];
     assert.ok(parseId);
+    await db
+      .update(session)
+      .set({ expiresAt: new Date(0) })
+      .where(eq(session.id, identity.sessionId));
+    await db
+      .update(workspaceProjectMember)
+      .set({ role: "viewer" })
+      .where(eq(workspaceProjectMember.projectId, identity.projectId));
+    await assert.rejects(claimCatalogAttempt(parseId, db), /编辑权限/);
+    await db
+      .update(workspaceProjectMember)
+      .set({ role: "owner" })
+      .where(eq(workspaceProjectMember.projectId, identity.projectId));
     const claims = await Promise.all([
       claimCatalogAttempt(parseId, db),
       claimCatalogAttempt(parseId, db),
@@ -158,53 +177,83 @@ void (async () => {
       (_, index) =>
         `<!-- f-trade:pdf-page=${index + 1} -->\nInternal SKU: RYC-MOCK${index === 1 ? 0 : index}\nProduct name: MOCK clutch kit\nProduct type: clutch_kit`,
     ).join("\n\n");
+    const document: ProductAgentDocumentSource = {
+      source: {
+        record_id: first.importId,
+        source_ref: "synthetic",
+        evidence_refs: ["synthetic"],
+        source_text: sourceText,
+        image_availability: "none",
+        image_refs: [],
+      },
+      document_sha256: work.original.sha256,
+      filename: "synthetic.csv",
+      media_type: "text/csv",
+      ocr_enabled: false,
+      layout_recovered_pages: [],
+      conversion_status: "converted",
+    };
+    const lookup = { projectId: identity.projectId, importId: first.importId };
+    await db.delete(session).where(eq(session.id, identity.sessionId));
+    await assert.rejects(retryCatalogParsing(lookup, identity, db), /会话/);
     await assert.rejects(
-      completeCatalogParsing(
-        parseId,
-        {
-          source: {
-            record_id: first.importId,
-            source_ref: "synthetic",
-            evidence_refs: ["synthetic"],
-            source_text: sourceText,
-            image_availability: "none",
-            image_refs: [],
-          },
-          document_sha256: "bad",
-          filename: "synthetic.csv",
-          media_type: "text/csv",
-          ocr_enabled: false,
-          layout_recovered_pages: [],
-          conversion_status: "converted",
-        },
-        db,
-      ),
+      completeCatalogParsing(parseId, { ...document, document_sha256: "bad" }, db),
       /摘要/,
     );
-    assert.equal(
-      await completeCatalogParsing(
-        parseId,
-        {
-          source: {
-            record_id: first.importId,
-            source_ref: "synthetic",
-            evidence_refs: ["synthetic"],
-            source_text: sourceText,
-            image_availability: "none",
-            image_refs: [],
-          },
-          document_sha256: work.original.sha256,
-          filename: "synthetic.csv",
-          media_type: "text/csv",
-          ocr_enabled: false,
-          layout_recovered_pages: [],
-          conversion_status: "converted",
-        },
-        db,
-      ),
-      true,
+    await db.update(user).set({ banned: true }).where(eq(user.id, identity.actorId));
+    await assert.rejects(completeCatalogParsing(parseId, document, db), /权限/);
+    await db.update(user).set({ banned: false }).where(eq(user.id, identity.actorId));
+    let resultAfterRevocation: Promise<boolean | Error> | undefined;
+    await db.transaction(async (tx) => {
+      // Membership management reserves the project row before changing its members.
+      await tx
+        .select({ id: workspaceProject.id })
+        .from(workspaceProject)
+        .where(eq(workspaceProject.id, identity.projectId))
+        .for("update");
+      await tx
+        .update(workspaceProjectMember)
+        .set({ role: "viewer" })
+        .where(eq(workspaceProjectMember.projectId, identity.projectId));
+      resultAfterRevocation = completeCatalogParsing(parseId, document, db).catch(
+        (error: Error) => error,
+      );
+      const deadline = Date.now() + 5000;
+      for (;;) {
+        const wait = await tx.execute(
+          sql`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pg_backend_pid()=ANY(pg_blocking_pids(pid))) AS blocked`,
+        );
+        if (wait.rows[0]?.blocked) break;
+        assert(
+          Date.now() < deadline,
+          "Result submission must wait for the project permission transaction",
+        );
+        await delay(10);
+      }
+    });
+    const denied = await resultAfterRevocation;
+    assert(denied instanceof Error);
+    assert.match(denied.message, /编辑权限/);
+    assert.deepEqual(
+      await db
+        .select({ id: productCatalogCandidate.id })
+        .from(productCatalogCandidate)
+        .where(eq(productCatalogCandidate.importId, first.importId)),
+      [],
     );
-    const lookup = { projectId: identity.projectId, importId: first.importId };
+    await db
+      .update(workspaceProjectMember)
+      .set({ role: "owner" })
+      .where(eq(workspaceProjectMember.projectId, identity.projectId));
+    assert.equal(await completeCatalogParsing(parseId, document, db), true);
+    assert.equal(await completeCatalogParsing(parseId, document, db), false);
+    identity.sessionId = randomUUID();
+    await db.insert(session).values({
+      id: identity.sessionId,
+      userId: identity.actorId,
+      token: randomUUID(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
     const view = await catalogImportView(lookup, identity, db);
     assert.equal(view.candidates.length, 20);
     assert.equal(view.candidates.filter((candidate) => candidate.duplicateIdentifier).length, 2);
