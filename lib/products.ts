@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, type InferInsertModel, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { type Database, type DatabaseTransaction, getDatabase } from "@/lib/db/client";
 import {
@@ -11,12 +11,11 @@ import {
   workspaceProject,
   workspaceProjectItem,
 } from "@/lib/db/schema";
-import type { productCatalogFormSchema, productReviewFormSchema } from "@/lib/form-schemas";
+import type { productReviewFormSchema } from "@/lib/form-schemas";
 import {
   authorizeLockedProductAgentWrite,
   type ProductAgentWriteIdentity,
 } from "@/lib/product/agent-write-access";
-import { productFactRevision } from "@/lib/product/retained-evidence";
 import {
   authorizeLockedProductReview,
   ProductReviewAccessError,
@@ -28,11 +27,7 @@ import {
   listProductSourceImages,
 } from "@/lib/product/source-image-store";
 import type { ProductApproval, ProductDraft } from "@/lib/product/verification";
-import {
-  approveProductDraft,
-  rejectProductDraft,
-  reviewProductDraft,
-} from "@/lib/product/verification";
+import { approveProductDraft, rejectProductDraft } from "@/lib/product/verification";
 import { assertTransition } from "@/lib/workflow/transitions";
 import {
   assertAggregateWorkspaceWrite,
@@ -40,7 +35,6 @@ import {
   assertWorkspaceProjectAccess,
 } from "@/lib/workspace/access";
 
-export type ProductCatalogInput = z.infer<typeof productCatalogFormSchema>;
 export type ProductReviewInput = z.infer<typeof productReviewFormSchema>;
 
 export type ProductCatalogEntry = {
@@ -69,174 +63,6 @@ export type ProductCatalogDashboard = {
   ready: number;
   queue: ProductCatalogEntry[];
 };
-
-function optionalText(value: string) {
-  const normalized = value.trim();
-  return normalized || undefined;
-}
-
-function optionalNumber(value: string) {
-  const normalized = optionalText(value);
-  return normalized === undefined ? undefined : Number(normalized);
-}
-
-function splitOeNumbers(value: string) {
-  const numbers = value
-    .split(/[\n,;，；]/)
-    .map((number) => number.trim())
-    .filter(Boolean);
-  return numbers.length > 0 ? [...new Set(numbers)] : undefined;
-}
-
-function evidenceForPresentFields(
-  draft: Omit<ProductDraft, "field_evidence">,
-  evidenceRef: string,
-) {
-  return Object.fromEntries(
-    (["product", "specifications", "commercial"] as const).flatMap((section) =>
-      Object.entries(draft[section] ?? {})
-        .filter(([, value]) => value !== undefined && value !== null && value !== "")
-        .map(([field]) => [`${section}.${field}`, evidenceRef]),
-    ),
-  );
-}
-
-/** Builds a review-only draft. It intentionally cannot produce ProductReady. */
-export function buildProductCatalogDraft(
-  input: ProductCatalogInput,
-  recordId: string = randomUUID(),
-): ProductDraft {
-  const product = {
-    product_name: input.productName.trim(),
-    product_type: input.productType,
-    internal_sku: input.internalSku.trim(),
-    ...(splitOeNumbers(input.oeNumbers) ? { oe_numbers: splitOeNumbers(input.oeNumbers) } : {}),
-    ...(optionalText(input.application) ? { application: optionalText(input.application) } : {}),
-    ...(optionalText(input.vehicleBrand)
-      ? { vehicle_brand: optionalText(input.vehicleBrand) }
-      : {}),
-    ...(optionalText(input.vehicleModel)
-      ? { vehicle_model: optionalText(input.vehicleModel) }
-      : {}),
-  };
-  const specifications = {
-    ...(optionalNumber(input.clutchDiameterMm)
-      ? { clutch_diameter_mm: optionalNumber(input.clutchDiameterMm) }
-      : {}),
-    ...(optionalNumber(input.splineCount)
-      ? { spline_count: optionalNumber(input.splineCount) }
-      : {}),
-    ...(optionalText(input.splineSize) ? { spline_size: optionalText(input.splineSize) } : {}),
-    ...(optionalText(input.frictionMaterial)
-      ? { friction_material: optionalText(input.frictionMaterial) }
-      : {}),
-  };
-  const partialDraft = {
-    record_id: recordId,
-    source_ref: input.sourceRef,
-    evidence_refs: [input.evidenceRef],
-    verification_status: "review_required" as const,
-    blocking_missing_fields: [],
-    optional_missing_fields: [],
-    product,
-    ...(Object.keys(specifications).length > 0 ? { specifications } : {}),
-  };
-  return reviewProductDraft({
-    ...partialDraft,
-    field_evidence: evidenceForPresentFields(partialDraft, input.evidenceRef),
-  });
-}
-
-export async function createProductCatalogDraft(
-  input: ProductCatalogInput,
-  actorId: string,
-  projectId?: string,
-) {
-  const id = randomUUID();
-  const draft = buildProductCatalogDraft(input, id);
-  const now = new Date();
-  const workflowEventId = randomUUID();
-  const approvalId = randomUUID();
-  assertTransition({
-    eventId: workflowEventId,
-    entityType: "product",
-    entityId: id,
-    fromState: "PRODUCT_IMPORTED",
-    toState: "PRODUCT_REVIEW_REQUIRED",
-    actorType: "human",
-    actorId,
-    occurredAt: now.toISOString(),
-    evidenceRefs: draft.evidence_refs,
-  });
-
-  const database = getDatabase();
-  const aggregateValues: InferInsertModel<typeof aggregateRecord> = {
-    id,
-    type: "product",
-    state: "PRODUCT_REVIEW_REQUIRED",
-    payload: draft as unknown as Record<string, unknown>,
-    createdByType: "human",
-    createdById: actorId,
-  };
-  const workflowValues: InferInsertModel<typeof workflowEvent> = {
-    id: workflowEventId,
-    aggregateId: id,
-    fromState: "PRODUCT_IMPORTED",
-    toState: "PRODUCT_REVIEW_REQUIRED",
-    actorType: "human",
-    actorId,
-    evidenceRefs: draft.evidence_refs,
-    occurredAt: now,
-  };
-  const approvalValues: InferInsertModel<typeof approval> = {
-    id: approvalId,
-    aggregateId: id,
-    gate: "gate_01_truth",
-    status: "pending",
-    requestedByType: "human",
-    requestedById: actorId,
-    requestedAt: now,
-  };
-  const auditValues: InferInsertModel<typeof auditEvent> = {
-    id: randomUUID(),
-    action: "product_draft_created",
-    actorType: "human",
-    actorId,
-    aggregateId: id,
-    subjectType: "product",
-    subjectId: id,
-    metadata: {
-      verification_status: draft.verification_status,
-      blocking_field_count: draft.blocking_missing_fields.length,
-    },
-    occurredAt: now,
-  };
-  await database.transaction(async (tx) => {
-    if (projectId) {
-      await assertWorkspaceProjectAccess(projectId, actorId, "write", tx);
-      const [project] = await tx
-        .select({ kind: workspaceProject.kind })
-        .from(workspaceProject)
-        .where(eq(workspaceProject.id, projectId))
-        .for("update");
-      if (project?.kind !== "marketing") throw new Error("产品草稿只能关联到产品营销项目。");
-    }
-    await tx.insert(aggregateRecord).values(aggregateValues);
-    if (projectId)
-      await tx.insert(workspaceProjectItem).values({
-        id: randomUUID(),
-        projectId,
-        aggregateId: id,
-        role: "product_source",
-        relation: "owned",
-      });
-    await tx.insert(approval).values(approvalValues);
-    await tx.insert(workflowEvent).values(workflowValues);
-    await tx.insert(auditEvent).values(auditValues);
-  });
-
-  return { id, draft, approvalId };
-}
 
 /** Persists a Product Agent result as review-only work; callers must never promote it to Ready. */
 export async function createProductAgentDraft(
@@ -678,92 +504,5 @@ export async function decideProductCatalogReview(
       occurredAt: now,
     });
     return { state: nextState, approvalId: pendingApproval.id };
-  });
-}
-
-export async function reviseProductCatalogDraft(
-  productId: string,
-  input: ProductCatalogInput,
-  actorId: string,
-) {
-  const now = new Date();
-  const eventId = randomUUID();
-  const approvalId = randomUUID();
-  return getDatabase().transaction(async (tx) => {
-    await assertAggregateWorkspaceWrite(productId, tx, actorId);
-    const [aggregate] = await tx
-      .select({
-        id: aggregateRecord.id,
-        state: aggregateRecord.state,
-        version: aggregateRecord.version,
-        payload: aggregateRecord.payload,
-      })
-      .from(aggregateRecord)
-      .where(and(eq(aggregateRecord.id, productId), eq(aggregateRecord.type, "product")))
-      .for("update");
-    if (!aggregate) throw new Error("产品草稿不存在。");
-    if (aggregate.state !== "PRODUCT_REVISION_REQUIRED")
-      throw new Error("该产品当前不处于待修订状态。");
-
-    const draft = buildProductCatalogDraft(input, productId);
-    const previousDraft = reviewProductDraft(aggregate.payload);
-    assertTransition({
-      eventId,
-      entityType: "product",
-      entityId: productId,
-      fromState: "PRODUCT_REVISION_REQUIRED",
-      toState: "PRODUCT_REVIEW_REQUIRED",
-      actorType: "human",
-      actorId,
-      occurredAt: now.toISOString(),
-      evidenceRefs: draft.evidence_refs,
-    });
-    const [updated] = await tx
-      .update(aggregateRecord)
-      .set({
-        state: "PRODUCT_REVIEW_REQUIRED",
-        payload: draft as unknown as Record<string, unknown>,
-        version: sql`${aggregateRecord.version} + 1`,
-      })
-      .where(
-        and(eq(aggregateRecord.id, aggregate.id), eq(aggregateRecord.version, aggregate.version)),
-      )
-      .returning({ id: aggregateRecord.id });
-    if (!updated) throw new Error("产品修订与另一项操作冲突，请刷新后重试。");
-    await tx.insert(approval).values({
-      id: approvalId,
-      aggregateId: productId,
-      gate: "gate_01_truth",
-      status: "pending",
-      requestedByType: "human",
-      requestedById: actorId,
-      requestedAt: now,
-    });
-    await tx.insert(workflowEvent).values({
-      id: eventId,
-      aggregateId: productId,
-      fromState: "PRODUCT_REVISION_REQUIRED",
-      toState: "PRODUCT_REVIEW_REQUIRED",
-      actorType: "human",
-      actorId,
-      evidenceRefs: draft.evidence_refs,
-      occurredAt: now,
-    });
-    await tx.insert(auditEvent).values({
-      id: randomUUID(),
-      action: "product_draft_revised",
-      actorType: "human",
-      actorId,
-      aggregateId: productId,
-      subjectType: "product",
-      subjectId: productId,
-      metadata: {
-        approval_id: approvalId,
-        fact_revision: productFactRevision(previousDraft, draft, aggregate.version),
-        blocking_field_count: draft.blocking_missing_fields.length,
-      },
-      occurredAt: now,
-    });
-    return { approvalId, draft };
   });
 }
