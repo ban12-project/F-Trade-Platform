@@ -9,7 +9,7 @@ import type { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
+import type { ProductIntakeModelOption } from "@/lib/ai/product-agent-model-config";
 import { documentUploadFormSchema } from "@/lib/product/document-upload-contracts";
 import type { EvidenceOption } from "@/lib/workspace/access";
 import { useWorkspaceDirty, useWorkspaceDirtyState } from "./dirty-state";
@@ -34,7 +34,7 @@ export function ProductIntakePanel({
 }: {
   projectId: string;
   canReview: boolean;
-  agentModelConfigs: ProductAgentModelSettings[];
+  agentModelConfigs: ProductIntakeModelOption[];
   evidenceOptions?: EvidenceOption[];
 }) {
   const pathname = usePathname();

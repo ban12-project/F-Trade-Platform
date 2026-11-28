@@ -46,7 +46,7 @@ import {
   retryProductCatalogAction,
   selectProductCatalogAction,
 } from "@/lib/actions/product-catalog";
-import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
+import type { ProductIntakeModelOption } from "@/lib/ai/product-agent-model-config";
 import {
   type CatalogActionResult,
   type CatalogFailureCode,
@@ -102,7 +102,7 @@ export function ProductCatalogImport({
   onBusyChange,
 }: {
   projectId: string;
-  modelConfigs: ProductAgentModelSettings[];
+  modelConfigs: ProductIntakeModelOption[];
   source?: { file?: File; clear: () => void };
   onDraftDirty?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -139,11 +139,8 @@ export function ProductCatalogImport({
     return () => onBusyChange?.(false);
   }, [pending, onBusyChange]);
   const fileRef = useRef<HTMLInputElement>(null);
-  const usable = modelConfigs.filter(
-    (config) => config.apiKeyConfigured || config.authTokenConfigured,
-  );
-  const defaultConfig = usable.find((config) => config.isDefault) ?? usable[0];
-  const choices = usable.flatMap((config) =>
+  const defaultConfig = modelConfigs.find((config) => config.isDefault) ?? modelConfigs[0];
+  const choices = modelConfigs.flatMap((config) =>
     Array.from(new Set([config.model, ...config.discoveredModels])).map((model) => ({
       value: JSON.stringify([config.id, model]),
       configId: config.id,

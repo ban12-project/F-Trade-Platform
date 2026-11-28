@@ -21,7 +21,7 @@ import { RfqForm } from "@/components/workspace/rfq-form";
 import { SalesContext } from "@/components/workspace/sales-context";
 import { WorkspaceGuide } from "@/components/workspace/workspace-guide";
 import { WorkspaceLink } from "@/components/workspace/workspace-link";
-import type { ProductAgentModelSettings } from "@/lib/ai/product-agent-model-config";
+import type { ProductIntakeModelOption } from "@/lib/ai/product-agent-model-config";
 import type { ContentCatalogDetail } from "@/lib/content/store";
 import type { ProductCatalogDetail } from "@/lib/products";
 import type {
@@ -232,38 +232,20 @@ const syntheticRelations: SalesRelationRecord[] = [
     rfqId: syntheticRfq.id,
   },
 ];
-const syntheticAgentModels: ProductAgentModelSettings[] = [
+const syntheticAgentModels: ProductIntakeModelOption[] = [
   {
     id: "00000000-0000-4000-8000-000000000501",
     name: "日常产品导入",
     isDefault: true,
-    provider: "openai",
     model: "gpt-5-mini",
     discoveredModels: ["gpt-5-mini", "gpt-5.6-terra"],
-    baseUrl: "",
-    headersJson: "{}",
-    providerName: "",
-    organization: "",
-    project: "",
-    apiKeyConfigured: true,
-    authTokenConfigured: false,
-    source: "database",
   },
   {
     id: "00000000-0000-4000-8000-000000000502",
     name: "复杂目录识别",
     isDefault: false,
-    provider: "anthropic",
     model: "claude-sonnet-test",
     discoveredModels: ["claude-sonnet-test"],
-    baseUrl: "",
-    headersJson: "{}",
-    providerName: "",
-    organization: "",
-    project: "",
-    apiKeyConfigured: true,
-    authTokenConfigured: false,
-    source: "database",
   },
 ];
 const syntheticProductDetail: ProductCatalogDetail = {

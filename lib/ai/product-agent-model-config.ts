@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, ne, or } from "drizzle-orm";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { getDatabase } from "../db/client";
 import { auditEvent, productAgentModelConfig } from "../db/schema";
@@ -76,6 +76,25 @@ export function productAgentModelOptionLabel(
 ) {
   return `${settings.name} · ${settings.provider}`;
 }
+
+export async function listProductIntakeModelOptions() {
+  const config = productAgentModelConfig;
+  return getDatabase()
+    .select({
+      id: config.id,
+      name: config.name,
+      isDefault: config.isDefault,
+      model: config.model,
+      discoveredModels: config.discoveredModels,
+    })
+    .from(config)
+    .where(or(ne(config.apiKeyCiphertext, ""), ne(config.authTokenCiphertext, "")))
+    .orderBy(asc(config.name));
+}
+
+export type ProductIntakeModelOption = Awaited<
+  ReturnType<typeof listProductIntakeModelOptions>
+>[number];
 
 export async function listStoredProductAgentModelSettings(): Promise<ProductAgentModelSettings[]> {
   const rows = await getDatabase().query.productAgentModelConfig.findMany({
