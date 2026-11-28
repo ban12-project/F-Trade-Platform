@@ -1,38 +1,46 @@
 import assert from "node:assert/strict";
-import { scoreLead } from "../lib/follow-up/lead-scoring";
+import leadContract from "../contracts/sales/lead.schema.json";
+import { firstHotScore, scoreLead } from "../lib/follow-up/lead-scoring";
+import { followUpFormSchema } from "../lib/form-schemas";
 
-assert.deepEqual(scoreLead(["active_inquiry"]), {
-  raw_score: 20,
-  score: 20,
-  status: "COLD",
-  evidence: [{ rule_id: "active_inquiry", points: 20 }],
-});
-assert.equal(
+const weights = {
+  active_inquiry: 20,
+  provides_oe_number: 15,
+  explicit_quantity: 15,
+  target_quantity_range: 10,
+  asks_sample: 10,
+  asks_lead_time: 10,
+  asks_payment_terms: 15,
+  replies_again: 15,
+};
+const ids = Object.keys(weights);
+for (let mask = 0; mask < 2 ** ids.length; mask++) {
+  const selected = Object.entries(weights).filter((_, index) => mask & (1 << index));
+  const raw = selected.reduce((sum, [, points]) => sum + points, 0);
+  assert.deepEqual(scoreLead(selected.map(([id]) => id)), {
+    raw_score: raw,
+    score: Math.min(100, raw),
+    status: raw <= 30 ? "COLD" : raw <= 60 ? "WARM" : "HOT",
+    evidence: selected.map(([rule_id, points]) => ({ rule_id, points })),
+  });
+}
+assert.deepEqual(
   scoreLead([
-    "active_inquiry",
-    "provides_oe_number",
-    "explicit_quantity",
-    "target_quantity_range",
     "asks_sample",
-    "asks_lead_time",
-    "asks_payment_terms",
-    "replies_again",
-  ]).score,
-  100,
-);
-assert.equal(
-  scoreLead(["active_inquiry", "provides_oe_number", "explicit_quantity"]).status,
-  "WARM",
-);
-assert.equal(
-  scoreLead([
     "active_inquiry",
-    "provides_oe_number",
-    "explicit_quantity",
-    "target_quantity_range",
     "asks_sample",
-    "asks_lead_time",
-  ]).status,
-  "HOT",
+    "unknown",
+    "constructor",
+    "__proto__",
+  ]),
+  scoreLead(["asks_sample", "active_inquiry"]),
 );
-console.log("PASS lead scoring");
+
+assert.equal(firstHotScore, 61);
+assert.equal(scoreLead(ids).score, leadContract.properties.score.maximum);
+
+const input = followUpFormSchema.shape.triggeredRules;
+assert.deepEqual(input.parse(ids), ids);
+assert.equal(input.safeParse(["unknown"]).success, false);
+assert.equal(input.safeParse([...ids, ids[0]]).success, false);
+console.log("PASS lead scoring and follow-up inputs");
