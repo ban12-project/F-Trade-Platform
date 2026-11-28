@@ -26,7 +26,7 @@ import {
   validateDeliveryConfirmation,
 } from "@/lib/delivery/confirmation";
 import { DELIVERY_CONFIRMATION_VALIDITY_MS } from "@/lib/delivery/validity";
-import { nextFollowUp } from "@/lib/follow-up/cadence";
+import { needsDeliveryConfirmation, nextFollowUp } from "@/lib/follow-up/cadence";
 import { buildControlledReply } from "@/lib/follow-up/controlled-reply";
 import { scoreLead } from "@/lib/follow-up/lead-scoring";
 import {
@@ -160,10 +160,7 @@ async function prepareControlledFollowUp(
   context: z.infer<typeof followUpFormSchema>["context"],
   draft: string,
 ) {
-  if (
-    (context !== "asks_lead_time" && context !== "asks_sample") ||
-    !lead.delivery_confirmation_ref
-  )
+  if (!needsDeliveryConfirmation(context) || !lead.delivery_confirmation_ref)
     return {
       draft: buildControlledReply({
         draft,
@@ -596,7 +593,7 @@ export async function sendQuotation(
       score: scoring.score,
       score_band: scoring.status,
       score_reasons: scoring.evidence,
-      next_action: "wait_then_reference_quote_validity",
+      next_action: nextFollowUp("quote_sent_unread").action,
     });
     if (receivedLead)
       await tx
