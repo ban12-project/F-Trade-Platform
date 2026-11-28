@@ -157,48 +157,42 @@ try {
       const body = ordinary
         ? "SYNTHETIC reply only"
         : `SYNTHETIC reply only\n\nConfirmed lead time: 21 days. Valid through ${delivery.result?.valid_until?.slice(0, 10)} (Gate 03).`;
-      await db
-        .insert(s.socialMessage)
-        .values(
-          createStoredSocialMessageRecord({
-            id: messageId,
-            conversationId: f.conversationId,
-            externalMessageRef: `pending-${jobId}`,
-            direction: "outbound",
-            identityQuality: "manual",
-            body,
-            receivedAt: new Date(),
-          }),
-        );
-      await db
-        .insert(s.socialBrowserJob)
-        .values({
-          id: jobId,
-          channelRef: f.channelRef,
-          accountRef: f.accountRef,
-          kind: "reply",
-          payloadRef: messageId,
-          idempotencyKey: `reply:${f.projectId}:${f.leadId}:${f.confirmationRef}`,
-          status: "queued",
-        });
-      await db
-        .insert(s.auditEvent)
-        .values({
-          id: randomUUID(),
-          action: "lead.follow_up_submitted",
-          actorType: "human",
-          actorId: f.actorId,
-          subjectType: "lead",
-          subjectId: f.leadId,
-          aggregateId: f.leadId,
-          occurredAt: new Date(),
-          metadata: {
-            context,
-            browser_job_id: jobId,
-            confirmation_ref: f.confirmationRef,
-            delivery_confirmation_ref: scenario === "legacy-missing" ? null : f.deliveryId,
-          },
-        });
+      await db.insert(s.socialMessage).values(
+        createStoredSocialMessageRecord({
+          id: messageId,
+          conversationId: f.conversationId,
+          externalMessageRef: `pending-${jobId}`,
+          direction: "outbound",
+          identityQuality: "manual",
+          body,
+          receivedAt: new Date(),
+        }),
+      );
+      await db.insert(s.socialBrowserJob).values({
+        id: jobId,
+        channelRef: f.channelRef,
+        accountRef: f.accountRef,
+        kind: "reply",
+        payloadRef: messageId,
+        idempotencyKey: `reply:${f.projectId}:${f.leadId}:${f.confirmationRef}`,
+        status: "queued",
+      });
+      await db.insert(s.auditEvent).values({
+        id: randomUUID(),
+        action: "lead.follow_up_submitted",
+        actorType: "human",
+        actorId: f.actorId,
+        subjectType: "lead",
+        subjectId: f.leadId,
+        aggregateId: f.leadId,
+        occurredAt: new Date(),
+        metadata: {
+          context,
+          browser_job_id: jobId,
+          confirmation_ref: f.confirmationRef,
+          delivery_confirmation_ref: scenario === "legacy-missing" ? null : f.deliveryId,
+        },
+      });
     } else assert.equal((await run(f, context)).status, "success");
     await db.execute(
       sql`UPDATE aggregate_record SET payload=jsonb_set(payload,'{follow_up_context}',to_jsonb(${ordinary ? "asks_sample" : "purchase_later"}::text)) WHERE id=${f.leadId}`,
