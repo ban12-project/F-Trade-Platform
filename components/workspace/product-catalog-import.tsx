@@ -46,7 +46,7 @@ import {
   retryProductCatalogAction,
   selectProductCatalogAction,
 } from "@/lib/actions/product-catalog";
-import type { ProductIntakeModelOption } from "@/lib/ai/product-agent-model-config";
+import type { ProductIntakeModelChoices } from "@/lib/ai/model-choices";
 import {
   type CatalogActionResult,
   type CatalogFailureCode,
@@ -96,13 +96,13 @@ function isWorking(view: CatalogImportView | null) {
 
 export function ProductCatalogImport({
   projectId,
-  modelConfigs,
+  modelChoices: { choices, defaultChoice },
   source,
   onDraftDirty,
   onBusyChange,
 }: {
   projectId: string;
-  modelConfigs: ProductIntakeModelOption[];
+  modelChoices: ProductIntakeModelChoices;
   source?: { file?: File; clear: () => void };
   onDraftDirty?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -139,15 +139,6 @@ export function ProductCatalogImport({
     return () => onBusyChange?.(false);
   }, [pending, onBusyChange]);
   const fileRef = useRef<HTMLInputElement>(null);
-  const defaultConfig = modelConfigs.find((config) => config.isDefault) ?? modelConfigs[0];
-  const choices = modelConfigs.flatMap((config) =>
-    Array.from(new Set([config.model, ...config.discoveredModels])).map((model) => ({
-      value: JSON.stringify([config.id, model]),
-      configId: config.id,
-      model,
-      label: `${config.name} · ${model}`,
-    })),
-  );
   const uploadForm = useForm<z.infer<typeof documentUploadFormSchema>>({
     resolver: zodResolver(documentUploadFormSchema),
   });
@@ -157,8 +148,8 @@ export function ProductCatalogImport({
       projectId,
       importId: "",
       candidateIds: [],
-      modelConfigId: defaultConfig?.id ?? "",
-      model: defaultConfig?.model ?? "",
+      modelConfigId: defaultChoice?.configId ?? "",
+      model: defaultChoice?.model ?? "",
     },
   });
   const sourceFile = source?.file;

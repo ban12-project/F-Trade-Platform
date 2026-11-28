@@ -9,6 +9,13 @@ test("Product Agent keeps saved models selectable in the product step", async ({
     .getByRole("combobox", { name: "模型", exact: true });
   await expect(model).toContainText("日常产品导入 · gpt-5-mini");
   await model.click();
+  await expect(page.getByRole("option")).toHaveCount(4);
+  await expect(
+    page.getByRole("option", { name: "日常产品导入 · gpt-5-mini", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: "复杂目录识别 · gpt-5-mini", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("option", { name: "复杂目录识别 · claude-sonnet-test" }),
   ).toBeVisible();
