@@ -110,7 +110,10 @@ try {
         const changed = structuredClone(original);
         if (state === "needs_login") changed.accounts[1].authState = "needs_login";
         if (state === "disabled") changed.accounts[1].enabled = false;
-        if (state === "private_worker") changed.publicationScopes[1].audience = "Friends";
+        if (state === "private_worker") {
+          assert(changed.publicationScopes);
+          changed.publicationScopes[1].audience = "Friends";
+        }
         await db.execute(
           sql`UPDATE browser_fleet_node SET document = ${JSON.stringify(changed)}::jsonb WHERE id = ${f.nodeId}`,
         );
@@ -169,6 +172,8 @@ try {
           .select()
           .from(s.socialPublication)
           .where(eq(s.socialPublication.id, target.publicationId));
+        const jobId = publication.browserJobId;
+        assert(jobId);
         await db.transaction(async (tx) => {
           if (format === "text") await buildFacebookPublicationPayload(tx, publication, new Date());
           else await buildFacebookMediaPayload(tx, publication, new Date());
@@ -176,9 +181,10 @@ try {
         await db
           .update(s.socialBrowserJob)
           .set({ status: "claimed" })
-          .where(eq(s.socialBrowserJob.id, publication.browserJobId));
+          .where(eq(s.socialBrowserJob.id, jobId));
         if (index === 0) {
           const account = original.accounts.find((a) => a.accountRef === target.accountRef);
+          assert(account);
           const run = {
             id: randomUUID(),
             kind: "publish",

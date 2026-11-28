@@ -90,7 +90,10 @@ function request(overrides: Record<string, string | undefined> = {}) {
   return data;
 }
 async function deny(input: FormData, message: RegExp) {
-  const before = { configurations, requests: modelRequests.length };
+  const before: { configurations: number; requests: number } = {
+    configurations,
+    requests: modelRequests.length,
+  };
   const result = await generateContentDraftAction({ status: "idle", message: "" }, input);
   assert.equal(result.status, "error");
   assert.match(result.message, message);
@@ -234,7 +237,10 @@ try {
     { stage: "generation", value: null },
   ];
   for (const scenario of failures) {
-    const before = { configurations, requests: modelRequests.length };
+    const before: { configurations: number; requests: number } = {
+      configurations,
+      requests: modelRequests.length,
+    };
     failure = scenario;
     const result = await generateContentDraftAction({ status: "idle", message: "" }, request());
     failure = undefined;

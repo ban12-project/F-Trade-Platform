@@ -94,8 +94,9 @@ failure = Object.assign(new VideoReviewAccessError(), {
   cause: new Error(privateValue),
 });
 assert.deepEqual(await run(), { status: "error", message: VIDEO_REVIEW_ACCESS_MESSAGE });
-failure = new Error("部分证据不存在或无权用于当前项目。");
-assert.deepEqual(await run(), { status: "error", message: failure.message });
+const expectedMessage = "部分证据不存在或无权用于当前项目。";
+failure = new Error(expectedMessage);
+assert.deepEqual(await run(), { status: "error", message: expectedMessage });
 const before = attempts;
 boundaryFailure = new Error(privateValue);
 assert.deepEqual(await run(), { status: "error", message: generic });

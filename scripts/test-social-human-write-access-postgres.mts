@@ -419,6 +419,7 @@ try {
   {
     const f = await fixture("text");
     await db.update(s.user).set({ role: "user" }).where(eq(s.user.id, f.actorId));
+    assert(current);
     current.user.role = "user";
     assert(success(await run("text", f)));
     count++;
@@ -621,7 +622,7 @@ try {
     const {
       rows: [{ pid }],
     } = await writer.query("SELECT pg_backend_pid() AS pid");
-    let pending: ReturnType<typeof writer.query> | undefined;
+    let pending: Promise<unknown> | undefined;
     await db.transaction(async (tx) => {
       await authorizeSocialProject(tx, f.identity, "write", f.contentId, "text");
       await authorizeSocialActor(tx, f.identity, ["content:write"]);

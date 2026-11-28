@@ -298,7 +298,7 @@ try {
       {
         const f = await fixture(role),
           before = await snapshot(f),
-          starts = workflowStarts,
+          starts: number = workflowStarts,
           result = await run(f, op);
         assert.equal(result.status, "success", `${op}/${role}`);
         assert(result.videoId);
@@ -338,7 +338,7 @@ try {
           const {
             rows: [r],
           } = await c.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-          const starts = workflowStarts;
+          const starts: number = workflowStarts;
           pending = run(f, op);
           await observe(r.pid);
           await mutate(f, change);
@@ -392,7 +392,7 @@ try {
             rows: [r],
           } = await c.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
           const before = await snapshot(f),
-            starts = workflowStarts;
+            starts: number = workflowStarts;
           pending = run(f, op);
           await observe(r.pid);
           await delay(Math.max(1, expires.getTime() - Date.now() + 30));
@@ -428,7 +428,7 @@ try {
         rows: [r],
       } = await c.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
       const before = await snapshot(f),
-        starts = workflowStarts;
+        starts: number = workflowStarts;
       pending = run(f, "create");
       await observe(r.pid);
       await delay(Math.max(1, expires.getTime() - Date.now() + 30));
@@ -521,7 +521,7 @@ try {
             identity(f),
           );
         }
-        const starts = workflowStarts;
+        const starts: number = workflowStarts;
         const result = await actions.createMarketingVideoDraftAction(
           { status: "idle", message: "" },
           form(f, mode, receiptId),
@@ -558,7 +558,7 @@ try {
           );
         }
         const before = await snapshot(f),
-          starts = workflowStarts;
+          starts: number = workflowStarts;
         const callback = () => mutate(f, change);
         if (mode === "upload") duringRead = callback;
         else duringDownload = callback;

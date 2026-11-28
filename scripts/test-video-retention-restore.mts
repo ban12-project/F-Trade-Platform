@@ -476,7 +476,9 @@ try {
     for (const path of [source.blobKey, historical.blobKey])
       assert.equal(await readFile(localFile(path), "utf8"), "SYNTHETIC retention bytes");
     if (label === "pending_cleanup") {
-      const retried = after.cleanup.find((r) => r.id === pendingJob.id);
+      const retried: (typeof after.cleanup)[number] | undefined = after.cleanup.find(
+        (r) => r.id === pendingJob.id,
+      );
       assert(retried);
       assert.equal(retried.policyVersion, "1.0.0");
       assert.equal(retried.attempts, 2);
