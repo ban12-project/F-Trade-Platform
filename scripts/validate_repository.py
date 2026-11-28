@@ -455,8 +455,8 @@ def check_database_baseline() -> None:
     product_actions = (ROOT / "lib/actions/products.ts").read_text(encoding="utf-8")
     for required in (
         '"use server"', 'await authorizedActionSession("product:write")', 'await authorizedActionSession("product:review")', "productCatalogFormSchema.safeParse",
-        "productReviewFormSchema.safeParse", "createProductCatalogDraft",
-        "decideProductCatalogReview", "reviseProductCatalogDraft", "refreshWorkspace(projectId)",
+        "productReviewFormSchema.safeParse", "createEvidenceBoundProductCatalogDraft(",
+        "decideProductCatalogReview", "reviseEvidenceBoundProductCatalogDraft(", "refreshWorkspace(projectId)",
     ):
         if required not in product_actions:
             raise AssertionError(f"Product catalog Server Action contract is missing: {required}")
